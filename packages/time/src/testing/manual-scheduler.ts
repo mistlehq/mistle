@@ -1,14 +1,11 @@
 import type { Clock } from "../clock.js";
 import type { Scheduler, TimerHandle } from "../scheduler.js";
 
-type ManualSchedulerHandle = {
-  __manualSchedulerId: number;
-};
-
 type ScheduledTask = {
   id: number;
   dueMs: number;
   callback: () => void;
+  handle: TimerHandle;
   canceled: boolean;
 };
 
@@ -24,28 +21,12 @@ export type ManualScheduler = Scheduler & {
   pendingCount: () => number;
 };
 
-function isManualSchedulerHandle(value: unknown): value is ManualSchedulerHandle {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-
-  if (!("__manualSchedulerId" in value)) {
-    return false;
-  }
-
-  return typeof value.__manualSchedulerId === "number";
-}
-
-function toTimerHandle(id: number): TimerHandle {
-  return { __manualSchedulerId: id } as unknown as TimerHandle;
-}
-
-function fromTimerHandle(handle: TimerHandle): number | undefined {
-  if (!isManualSchedulerHandle(handle)) {
-    return undefined;
-  }
-
-  return handle.__manualSchedulerId;
+function createTimerHandle(): TimerHandle {
+  const handle = setTimeout(() => {
+    // The manual scheduler controls callback execution via runDue().
+  }, 2_147_483_647);
+  clearTimeout(handle);
+  return handle;
 }
 
 /**
@@ -55,11 +36,13 @@ function fromTimerHandle(handle: TimerHandle): number | undefined {
 export function createManualScheduler(clock: Clock): ManualScheduler {
   let nextId = 1;
   let tasks: ScheduledTask[] = [];
+  const taskIdsByHandle = new Map<TimerHandle, number>();
 
   return {
     schedule: (callback, delayMs) => {
       const id = nextId;
       nextId += 1;
+      const handle = createTimerHandle();
 
       const dueMs = clock.nowMs() + Math.max(0, delayMs);
 
@@ -67,16 +50,19 @@ export function createManualScheduler(clock: Clock): ManualScheduler {
         id,
         dueMs,
         callback,
+        handle,
         canceled: false,
       });
+      taskIdsByHandle.set(handle, id);
 
-      return toTimerHandle(id);
+      return handle;
     },
     cancel: (handle) => {
-      const id = fromTimerHandle(handle);
+      const id = taskIdsByHandle.get(handle);
       if (id === undefined) {
         return;
       }
+      taskIdsByHandle.delete(handle);
 
       tasks = tasks.map((task) => {
         if (task.id !== id) {
@@ -96,6 +82,7 @@ export function createManualScheduler(clock: Clock): ManualScheduler {
         .sort((left, right) => left.dueMs - right.dueMs || left.id - right.id);
 
       for (const task of dueTasks) {
+        taskIdsByHandle.delete(task.handle);
         task.canceled = true;
         task.callback();
       }
