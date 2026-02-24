@@ -164,6 +164,7 @@ List of checks and tests performed to validate the changes. When listing tests, 
 ### TypeScript
 
 - `any` and `as` are forbidden.
+- For identifier registries and constants maps, use PascalCase object names with UPPER_SNAKE_CASE keys (for example `AppIds.CONTROL_PLANE_API`), not camelCase key access patterns.
 - Check `node_modules` for external API type definitions instead of guessing.
 - **NEVER use inline imports** - no `await import("./foo.js")`, no `import("pkg").Type` in type positions, no dynamic imports for types. Always use standard top-level imports.
 - NEVER remove or downgrade code to fix type errors from outdated dependencies; upgrade the dependency instead.
