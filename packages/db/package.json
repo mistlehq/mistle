@@ -1,0 +1,64 @@
+{
+  "name": "@mistle/db",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "node": "./dist/index.js",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./control-plane": {
+      "types": "./src/control-plane/index.ts",
+      "node": "./dist/control-plane/index.js",
+      "import": "./src/control-plane/index.ts",
+      "default": "./src/control-plane/index.ts"
+    },
+    "./data-plane": {
+      "types": "./src/data-plane/index.ts",
+      "node": "./dist/data-plane/index.js",
+      "import": "./src/data-plane/index.ts",
+      "default": "./src/data-plane/index.ts"
+    },
+    "./migrator": {
+      "types": "./src/migrator/index.ts",
+      "node": "./dist/migrator/index.js",
+      "import": "./src/migrator/index.ts",
+      "default": "./src/migrator/index.ts"
+    },
+    "./testing": {
+      "types": "./src/testing/index.ts",
+      "node": "./dist/testing/index.js",
+      "import": "./src/testing/index.ts",
+      "default": "./src/testing/index.ts"
+    },
+    "./*.js": {
+      "types": "./src/*.ts",
+      "node": "./dist/*.js",
+      "import": "./src/*.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
+    "lint:sql": "squawk --config ./.squawk.toml --no-error-on-unmatched-pattern \"migrations/control-plane/**/*.sql\" \"migrations/data-plane/**/*.sql\"",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.18.0",
+    "typeid-js": "^1.2.0"
+  },
+  "devDependencies": {
+    "@mistle/test-harness": "workspace:*",
+    "@types/pg": "^8.15.6",
+    "drizzle-kit": "^0.31.9",
+    "squawk-cli": "^2.41.0"
+  }
+}

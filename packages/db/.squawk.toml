@@ -1,0 +1,11 @@
+pg_version = "18.0"
+assume_in_transaction = true
+
+excluded_rules = [
+  "prefer-robust-stmts",
+  "require-concurrent-index-creation",
+  "require-concurrent-index-deletion",
+  "require-timeout-settings",
+  "adding-foreign-key-constraint",
+  "constraint-missing-not-valid",
+]
