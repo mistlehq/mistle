@@ -8,6 +8,8 @@ This package keeps template internals private and exposes a simple public API:
 - runtime sender(s), currently `SMTPEmailSender`
 - template IDs via `EmailTemplateIds`
 
+Template rendering is powered by `jsx-email`.
+
 For tests, use the dedicated testing subpath:
 
 - `@mistle/emails/testing` (currently `InMemoryEmailSender`)

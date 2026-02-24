@@ -33,11 +33,12 @@ export async function buildEmailOtpTemplate(
   options: BuildEmailOtpTemplateOptions,
 ): Promise<EmailTemplate> {
   const subject = getSubjectForOtpType(options.type);
-  const html = await renderEmail(createElement(EmailOtpTemplate, buildTemplateProps(options)));
+  const template = createElement(EmailOtpTemplate, buildTemplateProps(options));
+  const html = await renderEmail(template);
 
   return {
     subject,
     html,
-    text: renderEmailText(html),
+    text: await renderEmailText(template),
   };
 }

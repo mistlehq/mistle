@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 
-import { render, toPlainText } from "@react-email/render";
+import { render, renderPlainText } from "jsx-email";
 
 export type EmailTemplate = {
   subject: string;
@@ -13,4 +13,5 @@ export const renderEmail = async (template: ReactElement): Promise<string> =>
     pretty: true,
   });
 
-export const renderEmailText = (html: string): string => toPlainText(html);
+export const renderEmailText = async (template: ReactElement): Promise<string> =>
+  renderPlainText(template);
