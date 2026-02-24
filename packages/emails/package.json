@@ -9,6 +9,12 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./testing": {
+      "types": "./src/testing/index.ts",
+      "node": "./dist/testing/index.js",
+      "import": "./src/testing/index.ts",
+      "default": "./src/testing/index.ts"
+    },
     "./*.js": {
       "types": "./src/*",
       "node": "./dist/*.js",
@@ -27,7 +33,11 @@
   "dependencies": {
     "@react-email/components": "^1.0.1",
     "@react-email/render": "^2.0.4",
+    "nodemailer": "^8.0.1",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^7.0.11"
   }
 }

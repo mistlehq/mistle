@@ -1,11 +1,90 @@
 # @mistle/emails
 
-Email template rendering utilities and templates used by control-plane.
+Type-safe email rendering + sending package.
 
-## Scope
+This package keeps template internals private and exposes a simple public API:
 
-- Package path: `packages/emails`
-- Workspace name: `@mistle/emails`
+- `sendEmail(...)`
+- runtime sender(s), currently `SMTPEmailSender`
+- template IDs via `EmailTemplateIds`
+
+For tests, use the dedicated testing subpath:
+
+- `@mistle/emails/testing` (currently `InMemoryEmailSender`)
+
+## Public API
+
+From `@mistle/emails`:
+
+- `sendEmail`
+- `EmailSendError`
+- `SMTPEmailSender`
+- `EmailTemplateIds`
+- sender/message/result types (`EmailSender`, `EmailMessage`, `SendEmailResult`, etc.)
+
+From `@mistle/emails/testing`:
+
+- `InMemoryEmailSender`
+
+## Runtime Usage
+
+```ts
+import { EmailTemplateIds, SMTPEmailSender, sendEmail } from "@mistle/emails";
+
+const sender = SMTPEmailSender.fromTransportOptions({
+  host: "localhost",
+  port: 1025,
+  secure: false,
+});
+
+await sendEmail({
+  sender,
+  from: { email: "no-reply@mistle.dev", name: "Mistle" },
+  to: [{ email: "user@mistle.dev" }],
+  templateId: EmailTemplateIds.OTP,
+  templateInput: {
+    otp: "123456",
+    type: "sign-in",
+    expiresInSeconds: 300,
+  },
+});
+```
+
+`sendEmail` renders the template using `templateId` + `templateInput`, then sends it through the provided sender.
+On sender failure, it throws `EmailSendError`.
+
+## Testing Usage
+
+```ts
+import { EmailTemplateIds, sendEmail } from "@mistle/emails";
+import { InMemoryEmailSender } from "@mistle/emails/testing";
+
+const sender = new InMemoryEmailSender();
+
+await sendEmail({
+  sender,
+  from: { email: "no-reply@mistle.dev" },
+  to: [{ email: "user@mistle.dev" }],
+  templateId: EmailTemplateIds.OTP,
+  templateInput: {
+    otp: "123456",
+    type: "sign-in",
+    expiresInSeconds: 300,
+  },
+});
+
+expect(sender.sent).toHaveLength(1);
+```
+
+## Template Registry
+
+Templates are selected by ID, not by importing template modules directly from apps.
+To add a new template:
+
+1. Implement template files under `src/templates/<template>/`.
+2. Add a new ID in `src/templates/template-ids.ts`.
+3. Add typed input mapping + builder wiring in `src/templates/registry.ts`.
+4. `sendEmail` will then accept the new `templateId` with its corresponding typed `templateInput`.
 
 ## Scripts
 
