@@ -24,6 +24,8 @@
     "@fast-check/vitest": "^0.2.4",
     "@playwright/test": "^1.58.1",
     "@types/node": "^24.10.9",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
     "@typescript/native-preview": "latest",
     "@vitest/coverage-v8": "^4.0.18",
     "fast-check": "^4.5.3",

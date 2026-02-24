@@ -1,0 +1,33 @@
+{
+  "name": "@mistle/emails",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "node": "./dist/index.js",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./*.js": {
+      "types": "./src/*",
+      "node": "./dist/*.js",
+      "import": "./src/*",
+      "default": "./src/*"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "lint": "oxlint --deny-warnings -c ../../.oxlintrc.jsonc .",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@react-email/components": "^1.0.1",
+    "@react-email/render": "^2.0.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  }
+}
