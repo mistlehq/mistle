@@ -4,5 +4,5 @@ Ground-up rewrite scaffold for Mistle.
 
 ## Workspaces
 - `apps/*`: service apps
-- `packages/*`: shared packages (currently empty)
+- `packages/*`: shared packages
 - `tests`: system/e2e test harness scaffold
