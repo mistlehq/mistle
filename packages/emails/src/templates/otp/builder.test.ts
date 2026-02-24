@@ -15,4 +15,14 @@ describe("emails otp", () => {
     expect(template.text).toContain("123456");
     expect(template.text).toContain("5 minutes");
   });
+
+  it("matches snapshot for a stable OTP template output", async () => {
+    const template = await buildEmailOtpTemplate({
+      otp: "123456",
+      type: "sign-in",
+      expiresInSeconds: 300,
+    });
+
+    expect(template).toMatchSnapshot();
+  });
 });
