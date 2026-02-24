@@ -53,6 +53,9 @@ importers:
       oxlint-tsgolint:
         specifier: ^0.11.5
         version: 0.11.5
+      smol-toml:
+        specifier: ^1.6.0
+        version: 1.6.0
       tsc-alias:
         specifier: ^1.8.16
         version: 1.8.16
