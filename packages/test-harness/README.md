@@ -14,6 +14,7 @@ Exported from [`src/index.ts`](./src/index.ts):
 ## Service Modules
 
 - [Mailpit service](./src/services/mailpit/README.md)
+- [Postgres + PgBouncer service](./src/services/postgres/README.md)
 
 As more services are added, each service should include its own `README.md` with focused setup and usage examples.
 

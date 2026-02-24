@@ -11,7 +11,7 @@
       },
     },
     {
-      "files": ["integration/mailpit.integration.test.ts"],
+      "files": ["integration/*.integration.test.ts"],
       "rules": {
         "jest/no-standalone-expect": "off",
       },
