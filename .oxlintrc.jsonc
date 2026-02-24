@@ -5,6 +5,7 @@
   },
   "plugins": ["eslint", "typescript", "node", "vitest"],
   "rules": {
+    "typescript/no-deprecated": "error",
     "eslint/no-restricted-imports": [
       "error",
       {
