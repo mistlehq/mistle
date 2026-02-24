@@ -7,6 +7,7 @@ dist
 *.tsbuildinfo
 .DS_Store
 .pnpm-debug.log*
+.pkgrep
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
