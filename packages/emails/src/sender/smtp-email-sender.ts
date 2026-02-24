@@ -1,3 +1,5 @@
+import type NodemailerSMTPTransport from "nodemailer/lib/smtp-transport/index.js";
+
 import nodemailer from "nodemailer";
 
 import type {
@@ -29,7 +31,7 @@ export type SMTPTransport = {
   sendMail: (input: SMTPTransportSendInput) => Promise<SMTPTransportSendResult>;
 };
 
-export type SMTPTransportOptions = Parameters<typeof nodemailer.createTransport>[0];
+export type SMTPTransportOptions = NodemailerSMTPTransport.Options;
 
 const RETRYABLE_SMTP_ERROR_CODES = new Set<string>([
   "EAI_AGAIN",

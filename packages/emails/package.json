@@ -24,9 +24,11 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
-    "lint": "oxlint --type-aware --deny-warnings -c ../../.oxlintrc.jsonc .",
+    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run",
+    "test:integration": "vitest run -c vitest.integration.config.ts",
+    "test:all": "pnpm test && pnpm test:integration",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },
@@ -38,6 +40,7 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@mistle/test-harness": "workspace:*",
     "@types/nodemailer": "^7.0.11"
   }
 }

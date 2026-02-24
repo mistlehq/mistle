@@ -92,5 +92,7 @@ To add a new template:
 - `pnpm --filter @mistle/emails lint`
 - `pnpm --filter @mistle/emails typecheck`
 - `pnpm --filter @mistle/emails test`
+- `pnpm --filter @mistle/emails test:integration`
+- `pnpm --filter @mistle/emails test:all`
 - `pnpm --filter @mistle/emails format`
 - `pnpm --filter @mistle/emails format:check`
