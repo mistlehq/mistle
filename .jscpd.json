@@ -1,0 +1,23 @@
+{
+  "format": ["typescript"],
+  "gitignore": true,
+  "minLines": 5,
+  "minTokens": 50,
+  "reporters": ["console"],
+  "silent": true,
+  "ignore": [
+    "**/*.test.ts",
+    "**/*.integration.test.ts",
+    "**/*.system.test.ts",
+    "**/*.e2e.test.ts",
+    "**/*.property.test.ts",
+    "**/integration/**",
+    "**/tests/**",
+    "**/generated/**",
+    "**/*.generated.ts",
+    "**/dist/**",
+    "**/coverage/**",
+    "**/test-results/**",
+    "node_modules/**"
+  ]
+}

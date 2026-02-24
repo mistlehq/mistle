@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 100,
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "all",
+  "ignorePatterns": ["**/dist/**", "**/node_modules/**", "**/coverage/**", "**/.turbo/**"],
+  "experimentalSortImports": {
+    "sortSideEffects": false
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema-jsonc.json",
+  "include": ["dependencies", "devDependencies", "unlisted", "binaries", "unresolved"],
+  "workspaces": {
+    ".": {},
+    "apps/*": {},
+    "tests": {}
+  },
+  "ignoreFiles": [
+    ".git/**",
+    ".github/**",
+    "**/dist/**",
+    "**/coverage/**",
+    "**/test-results/**",
+    "node_modules/**"
+  ]
+}
