@@ -1,0 +1,27 @@
+{
+  "name": "@mistle/config",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "node": "./dist/index.js",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "lint": "oxlint --deny-warnings -c ../../.oxlintrc.jsonc .",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run -c vitest.integration.config.ts",
+    "test:all": "pnpm test && pnpm test:integration",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "smol-toml": "^1.6.0",
+    "zod": "^4.1.12"
+  }
+}

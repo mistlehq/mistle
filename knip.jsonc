@@ -4,7 +4,7 @@
   "workspaces": {
     ".": {},
     "apps/*": {},
-    "tests": {}
+    "tests": {},
   },
   "ignoreFiles": [
     ".git/**",
@@ -12,6 +12,6 @@
     "**/dist/**",
     "**/coverage/**",
     "**/test-results/**",
-    "node_modules/**"
-  ]
+    "node_modules/**",
+  ],
 }

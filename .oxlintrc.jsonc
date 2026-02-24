@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "env": {
-    "builtin": true
+    "builtin": true,
   },
   "plugins": ["eslint", "typescript", "node", "vitest"],
   "rules": {
@@ -11,138 +11,138 @@
         "paths": [
           {
             "name": "node:timers/promises",
-            "message": "Use @mistle/time abstractions instead of node:timers/promises in runtime code."
+            "message": "Use @mistle/time abstractions instead of node:timers/promises in runtime code.",
           },
           {
             "name": "timers/promises",
-            "message": "Use @mistle/time abstractions instead of timers/promises in runtime code."
+            "message": "Use @mistle/time abstractions instead of timers/promises in runtime code.",
           },
           {
             "name": "node:timers",
-            "message": "Use @mistle/time abstractions instead of node:timers in runtime code."
+            "message": "Use @mistle/time abstractions instead of node:timers in runtime code.",
           },
           {
             "name": "timers",
-            "message": "Use @mistle/time abstractions instead of timers in runtime code."
+            "message": "Use @mistle/time abstractions instead of timers in runtime code.",
           },
           {
             "name": "vitest",
             "importNames": ["vi"],
-            "message": "Do not use vi-based mocks/spies. Assert observable behavior instead."
+            "message": "Do not use vi-based mocks/spies. Assert observable behavior instead.",
           },
           {
             "name": "jest",
-            "message": "Do not use jest mocking APIs. Assert observable behavior instead."
+            "message": "Do not use jest mocking APIs. Assert observable behavior instead.",
           },
           {
             "name": "@jest/globals",
-            "message": "Do not use jest globals for mocking/spying."
+            "message": "Do not use jest globals for mocking/spying.",
           },
           {
             "name": "sinon",
-            "message": "Do not use sinon fakes/stubs/spies."
+            "message": "Do not use sinon fakes/stubs/spies.",
           },
           {
             "name": "nock",
-            "message": "Do not use nock-based request mocking."
+            "message": "Do not use nock-based request mocking.",
           },
           {
             "name": "msw",
-            "message": "Do not use MSW-based request mocking."
+            "message": "Do not use MSW-based request mocking.",
           },
           {
             "name": "testdouble",
-            "message": "Do not use testdouble-based mocking."
+            "message": "Do not use testdouble-based mocking.",
           },
           {
             "name": "ts-mockito",
-            "message": "Do not use ts-mockito-based mocking."
+            "message": "Do not use ts-mockito-based mocking.",
           },
           {
             "name": "typemoq",
-            "message": "Do not use typemoq-based mocking."
+            "message": "Do not use typemoq-based mocking.",
           },
           {
             "name": "fetch-mock",
-            "message": "Do not use fetch-mock-based request mocking."
-          }
-        ]
-      }
+            "message": "Do not use fetch-mock-based request mocking.",
+          },
+        ],
+      },
     ],
     "eslint/no-restricted-globals": [
       "error",
       {
         "name": "vi",
-        "message": "Do not use vi-based mocks/spies. Assert observable behavior instead."
+        "message": "Do not use vi-based mocks/spies. Assert observable behavior instead.",
       },
       {
         "name": "jest",
-        "message": "Do not use jest-based mocks/spies. Assert observable behavior instead."
-      }
+        "message": "Do not use jest-based mocks/spies. Assert observable behavior instead.",
+      },
     ],
     "eslint/no-restricted-properties": [
       "error",
       {
         "object": "vi",
         "property": "fn",
-        "message": "Do not use vi.fn mocks/stubs. Assert observable behavior instead."
+        "message": "Do not use vi.fn mocks/stubs. Assert observable behavior instead.",
       },
       {
         "object": "vi",
         "property": "spyOn",
-        "message": "Do not use vi.spyOn. Assert observable behavior instead."
+        "message": "Do not use vi.spyOn. Assert observable behavior instead.",
       },
       {
         "object": "vi",
         "property": "mock",
-        "message": "Do not use vi.mock. Assert observable behavior instead."
+        "message": "Do not use vi.mock. Assert observable behavior instead.",
       },
       {
         "object": "vi",
         "property": "mocked",
-        "message": "Do not use vi.mocked. Assert observable behavior instead."
+        "message": "Do not use vi.mocked. Assert observable behavior instead.",
       },
       {
         "object": "vi",
         "property": "stubGlobal",
-        "message": "Do not stub globals in tests. Assert observable behavior instead."
+        "message": "Do not stub globals in tests. Assert observable behavior instead.",
       },
       {
         "object": "jest",
         "property": "fn",
-        "message": "Do not use jest.fn mocks/stubs. Assert observable behavior instead."
+        "message": "Do not use jest.fn mocks/stubs. Assert observable behavior instead.",
       },
       {
         "object": "jest",
         "property": "spyOn",
-        "message": "Do not use jest.spyOn. Assert observable behavior instead."
+        "message": "Do not use jest.spyOn. Assert observable behavior instead.",
       },
       {
         "object": "jest",
         "property": "mock",
-        "message": "Do not use jest.mock. Assert observable behavior instead."
+        "message": "Do not use jest.mock. Assert observable behavior instead.",
       },
       {
         "object": "jest",
         "property": "mocked",
-        "message": "Do not use jest.mocked. Assert observable behavior instead."
+        "message": "Do not use jest.mocked. Assert observable behavior instead.",
       },
       {
         "object": "sinon",
         "property": "stub",
-        "message": "Do not use sinon stubs. Assert observable behavior instead."
+        "message": "Do not use sinon stubs. Assert observable behavior instead.",
       },
       {
         "object": "sinon",
         "property": "spy",
-        "message": "Do not use sinon spies. Assert observable behavior instead."
+        "message": "Do not use sinon spies. Assert observable behavior instead.",
       },
       {
         "object": "sinon",
         "property": "mock",
-        "message": "Do not use sinon mocks. Assert observable behavior instead."
-      }
-    ]
+        "message": "Do not use sinon mocks. Assert observable behavior instead.",
+      },
+    ],
   },
-  "ignorePatterns": ["**/dist/**", "**/node_modules/**", "**/coverage/**", "**/.turbo/**"]
+  "ignorePatterns": ["**/dist/**", "**/node_modules/**", "**/coverage/**", "**/.turbo/**"],
 }

@@ -1,0 +1,9 @@
+# Full reference of config keys (current set).
+# This sample is production-centric.
+
+[global]
+env = "production"
+
+[apps.control_plane_api]
+host = "0.0.0.0"
+port = 8080

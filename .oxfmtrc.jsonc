@@ -6,6 +6,6 @@
   "trailingComma": "all",
   "ignorePatterns": ["**/dist/**", "**/node_modules/**", "**/coverage/**", "**/.turbo/**"],
   "experimentalSortImports": {
-    "sortSideEffects": false
-  }
+    "sortSideEffects": false,
+  },
 }
