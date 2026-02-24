@@ -25,29 +25,70 @@ Exported from [`src/index.ts`](./src/index.ts):
   - `toIsoFromEpochSeconds(epochSeconds: number): string`
   - `addMilliseconds(date: Date, durationMs: number): Date`
 
-## Runtime Usage
+Exported from `@mistle/time/testing` ([`src/testing/index.ts`](./src/testing/index.ts)):
+
+- `createFixedClock(fixedNowMs)`
+- `createMutableClock(initialNowMs?)`
+- `createManualScheduler(clock)`
+- `immediateSleeper`
+
+## Dependency Injection Pattern
+
+Define app logic against time interfaces, then inject concrete implementations at composition time.
 
 ```ts
-import { type Clock, systemClock } from "@mistle/time";
+import type { Clock, Scheduler } from "@mistle/time";
 
-export function createTokenExpiry(clock: Clock = systemClock): number {
-  const oneHourMs = 60 * 60 * 1000;
-  return clock.nowMs() + oneHourMs;
+type ReminderServiceDeps = {
+  clock: Clock;
+  scheduler: Scheduler;
+};
+
+export function createReminderService(deps: ReminderServiceDeps) {
+  return {
+    scheduleReminder(delayMs: number, onDue: () => void) {
+      const dueAtMs = deps.clock.nowMs() + delayMs;
+      deps.scheduler.schedule(() => {
+        if (deps.clock.nowMs() >= dueAtMs) {
+          onDue();
+        }
+      }, delayMs);
+    },
+  };
 }
 ```
 
-## Testing Usage
+## Runtime Composition
 
 ```ts
-import { type Clock } from "@mistle/time";
+import { systemClock, systemScheduler } from "@mistle/time";
 
-const fixedClock: Clock = {
-  nowMs: () => 1_700_000_000_000,
-  nowDate: () => new Date(1_700_000_000_000),
-};
+const reminderService = createReminderService({
+  clock: systemClock,
+  scheduler: systemScheduler,
+});
 ```
 
-The second example shows the preferred test pattern: pass a deterministic implementation directly rather than mocking global timers or dates.
+## Testing Composition
+
+```ts
+import { createManualScheduler, createMutableClock } from "@mistle/time/testing";
+
+const clock = createMutableClock(1_700_000_000_000);
+const scheduler = createManualScheduler(clock);
+const reminderService = createReminderService({ clock, scheduler });
+
+let called = false;
+reminderService.scheduleReminder(5_000, () => {
+  called = true;
+});
+
+clock.advanceMs(5_000);
+scheduler.runDue();
+// called === true
+```
+
+Use `@mistle/time/testing` helpers to keep time deterministic in tests without mocking global date/timer APIs.
 
 ## Enforcement
 

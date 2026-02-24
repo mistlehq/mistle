@@ -9,6 +9,12 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./testing": {
+      "types": "./src/testing/index.ts",
+      "node": "./dist/testing/index.js",
+      "import": "./src/testing/index.ts",
+      "default": "./src/testing/index.ts"
+    },
     "./*.js": {
       "types": "./src/*.ts",
       "node": "./dist/*.js",
