@@ -17,6 +17,7 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:property": "turbo run test:property",
+    "test:integration": "turbo run test:integration",
     "test:e2e": "pnpm --filter @mistle/tests test:e2e",
     "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "prepare": "node -e \"const cp = require('child_process'); if (!(process.env.CI || process.env.LEFTHOOK === '0')) { try { cp.execSync('git rev-parse --is-inside-work-tree', { stdio: 'ignore' }); cp.execSync('lefthook install', { stdio: 'inherit' }); } catch {} }\""

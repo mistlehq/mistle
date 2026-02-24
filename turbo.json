@@ -24,6 +24,10 @@
     "test:property": {
       "dependsOn": ["^build"],
       "outputs": []
+    },
+    "test:integration": {
+      "dependsOn": ["^build"],
+      "outputs": []
     }
   }
 }
