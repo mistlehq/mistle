@@ -1,4 +1,5 @@
-import { MemberRoles } from "@mistle/db/control-plane";
+import { MemberRoles, verifications } from "@mistle/db/control-plane";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
@@ -207,4 +208,134 @@ describe("auth otp integration", () => {
     });
     expect(user).toBeUndefined();
   });
+
+  it("locks OTP verification after allowed failed attempts", async ({ fixture }) => {
+    const recipient = "integration-auth-otp-attempt-limit@example.com";
+
+    const sendResponse = await sendOTPRequest({
+      fixture,
+      recipient,
+    });
+    expect(sendResponse.status).toBe(200);
+
+    const listItem = await fixture.mailpitService.waitForMessage({
+      timeoutMs: 15_000,
+      description: `OTP email for ${recipient}`,
+      matcher: ({ message }) =>
+        message.Subject === "Your sign-in code" &&
+        message.To.some((address) => address.Address === recipient),
+    });
+    const message = await fixture.mailpitService.getMessageSummary(listItem.ID);
+
+    const otp = extractOTPCode(message.Text, fixture.config.auth.otpLength);
+    expect(otp).toBeDefined();
+    if (otp === undefined) {
+      throw new Error("OTP was not found in Mailpit message text.");
+    }
+
+    for (
+      let attemptIndex = 0;
+      attemptIndex < fixture.config.auth.otpAllowedAttempts;
+      attemptIndex += 1
+    ) {
+      const invalidAttemptResponse = await signInWithOTP({
+        fixture,
+        recipient,
+        otp: "000000",
+      });
+      expect(invalidAttemptResponse.status).toBe(400);
+
+      const invalidAttemptBody = await invalidAttemptResponse.text();
+      expect(invalidAttemptBody).toContain('"code":"INVALID_OTP"');
+      expect(invalidAttemptBody).toContain('"message":"Invalid OTP"');
+    }
+
+    const blockedResponse = await signInWithOTP({
+      fixture,
+      recipient,
+      otp,
+    });
+    expect(blockedResponse.status).toBe(403);
+
+    const blockedBody = await blockedResponse.text();
+    expect(blockedBody).toContain('"code":"TOO_MANY_ATTEMPTS"');
+    expect(blockedBody).toContain('"message":"Too many attempts"');
+
+    const user = await fixture.db.query.users.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (users, { eq }) => eq(users.email, recipient),
+    });
+    expect(user).toBeUndefined();
+  });
+
+  it("rejects sign-in with an expired OTP", async ({ fixture }) => {
+    const recipient = "integration-auth-otp-expired@example.com";
+
+    const sendResponse = await sendOTPRequest({
+      fixture,
+      recipient,
+    });
+    expect(sendResponse.status).toBe(200);
+
+    const listItem = await fixture.mailpitService.waitForMessage({
+      timeoutMs: 15_000,
+      description: `OTP email for ${recipient}`,
+      matcher: ({ message }) =>
+        message.Subject === "Your sign-in code" &&
+        message.To.some((address) => address.Address === recipient),
+    });
+    const message = await fixture.mailpitService.getMessageSummary(listItem.ID);
+
+    const otp = extractOTPCode(message.Text, fixture.config.auth.otpLength);
+    expect(otp).toBeDefined();
+    if (otp === undefined) {
+      throw new Error("OTP was not found in Mailpit message text.");
+    }
+
+    const verificationIdentifier = `sign-in-otp-${recipient}`;
+    const verification = await fixture.db.query.verifications.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (table, { eq }) => eq(table.identifier, verificationIdentifier),
+      orderBy: (table, { desc }) => [desc(table.createdAt)],
+    });
+    expect(verification).toBeDefined();
+    if (verification === undefined) {
+      throw new Error("Expected sign-in OTP verification row to exist.");
+    }
+
+    const expiredAt = new Date(0);
+    const updatedVerifications = await fixture.db
+      .update(verifications)
+      .set({
+        expiresAt: expiredAt,
+      })
+      .where(eq(verifications.id, verification.id))
+      .returning({
+        id: verifications.id,
+      });
+    expect(updatedVerifications).toHaveLength(1);
+
+    const expiredResponse = await signInWithOTP({
+      fixture,
+      recipient,
+      otp,
+    });
+    expect(expiredResponse.status).toBe(400);
+
+    const expiredBody = await expiredResponse.text();
+    expect(expiredBody).toContain('"code":"OTP_EXPIRED"');
+    expect(expiredBody).toContain('"message":"OTP expired"');
+
+    const user = await fixture.db.query.users.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (users, { eq }) => eq(users.email, recipient),
+    });
+    expect(user).toBeUndefined();
+  }, 60_000);
 });
