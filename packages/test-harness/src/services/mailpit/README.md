@@ -12,6 +12,7 @@ From [`index.ts`](./index.ts):
   - `smtpPort: number`
   - `httpBaseUrl: string`
   - `listMessages(): Promise<readonly MailpitMessageListItem[]>`
+  - `getMessageSummary(id: string): Promise<MailpitMessageSummaryResponse>`
   - `waitForMessage({ matcher, timeoutMs, description? }): Promise<MailpitMessageListItem>`
   - `stop(): Promise<void>`
 
@@ -49,6 +50,13 @@ const message = await mailpitService.waitForMessage({
   description: "subject: welcome",
   matcher: ({ message }) => message.Subject === "Welcome",
 });
+```
+
+Use `getMessageSummary` when you need full message content (body, recipients, attachments, headers).
+
+```ts
+const summary = await mailpitService.getMessageSummary(message.ID);
+expect(summary.Text).toContain("Welcome");
 ```
 
 ## Lifecycle

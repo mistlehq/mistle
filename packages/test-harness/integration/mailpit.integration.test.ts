@@ -53,6 +53,14 @@ describe("mailpit service integration", () => {
     expect(matched.Subject).toBe("second subject");
     const matchedSummary = await mailpitService.getMessageSummary(matched.ID);
     expect(matchedSummary.Subject).toBe("second subject");
+    expect(matchedSummary.Text).toContain("second subject body");
+    expect(matchedSummary.To).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          Address: "second@mistle.dev",
+        }),
+      ]),
+    );
 
     const messages = await mailpitService.listMessages();
     expect(messages).toHaveLength(2);
@@ -73,6 +81,17 @@ describe("mailpit service integration", () => {
     ).rejects.toThrowError(
       "Timed out waiting for Mailpit message (subject: never-arrives) within 150ms.",
     );
+  });
+
+  it("throws a timeout error without description when no message matches", async ({
+    mailpitService,
+  }) => {
+    await expect(
+      mailpitService.waitForMessage({
+        timeoutMs: 150,
+        matcher: ({ message }) => message.Subject === "never-arrives",
+      }),
+    ).rejects.toThrowError("Timed out waiting for a matching Mailpit message within 150ms.");
   });
 
   test("throws when stopping the same service twice", async () => {
