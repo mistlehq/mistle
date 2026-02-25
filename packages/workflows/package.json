@@ -32,7 +32,8 @@
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
     "typecheck": "tsgo --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run -c vitest.config.ts --passWithNoTests",
+    "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",
     "test:property": "vitest run --passWithNoTests",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
@@ -40,5 +41,8 @@
   "dependencies": {
     "openworkflow": "^0.7.3",
     "postgres": "^3.4.8"
+  },
+  "devDependencies": {
+    "@mistle/test-harness": "workspace:*"
   }
 }
