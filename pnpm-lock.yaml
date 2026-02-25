@@ -179,25 +179,7 @@ importers:
         specifier: ^4.10.6
         version: 4.12.2
 
-  apps/sandbox-manager:
-    dependencies:
-      '@hono/node-server':
-        specifier: ^1.19.4
-        version: 1.19.9(hono@4.12.2)
-      hono:
-        specifier: ^4.10.6
-        version: 4.12.2
-
   apps/sandbox-runtime: {}
-
-  apps/tokenizer-proxy:
-    dependencies:
-      '@hono/node-server':
-        specifier: ^1.19.4
-        version: 1.19.9(hono@4.12.2)
-      hono:
-        specifier: ^4.10.6
-        version: 4.12.2
 
   packages/config:
     dependencies:
