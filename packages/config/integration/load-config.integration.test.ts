@@ -7,7 +7,7 @@ import { createIntegrationEnv } from "./fixtures/env.js";
 
 const configFixturePath = fileURLToPath(new URL("./fixtures/config.toml", import.meta.url));
 
-const baseAppConfig = {
+const controlPlaneApiEnvConfig = {
   server: {
     host: "127.0.0.1",
     port: 5000,
@@ -34,8 +34,51 @@ const baseAppConfig = {
   },
 } as const;
 
+const controlPlaneApiFixtureConfig = {
+  ...controlPlaneApiEnvConfig,
+  server: {
+    host: "0.0.0.0",
+    port: 5100,
+  },
+} as const;
+
+const controlPlaneWorkerEnvConfig = {
+  server: {
+    host: "127.0.0.1",
+    port: 5001,
+  },
+  workflow: {
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane",
+    namespaceId: "development",
+    runMigrations: true,
+    concurrency: 1,
+  },
+  email: {
+    fromAddress: "no-reply@mistle.local",
+    fromName: "Mistle Local",
+    smtpHost: "127.0.0.1",
+    smtpPort: 1025,
+    smtpSecure: false,
+    smtpUsername: "mailpit",
+    smtpPassword: "mailpit",
+  },
+} as const;
+
+const controlPlaneWorkerFixtureConfig = {
+  ...controlPlaneWorkerEnvConfig,
+  server: {
+    host: "0.0.0.0",
+    port: 5200,
+  },
+  workflow: {
+    ...controlPlaneWorkerEnvConfig.workflow,
+    namespaceId: "fixture",
+    concurrency: 2,
+  },
+} as const;
+
 describe("loadConfig integrations", () => {
-  it("loads purely from a config file fixture", () => {
+  it("loads control-plane-api purely from a config file fixture", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_API,
       configPath: configFixturePath,
@@ -45,17 +88,11 @@ describe("loadConfig integrations", () => {
       global: {
         env: "development",
       },
-      app: {
-        ...baseAppConfig,
-        server: {
-          host: "0.0.0.0",
-          port: 5100,
-        },
-      },
+      app: controlPlaneApiFixtureConfig,
     });
   });
 
-  it("loads purely from env", () => {
+  it("loads control-plane-api purely from env", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_API,
       env: createIntegrationEnv({
@@ -70,7 +107,7 @@ describe("loadConfig integrations", () => {
         env: "production",
       },
       app: {
-        ...baseAppConfig,
+        ...controlPlaneApiEnvConfig,
         server: {
           host: "localhost",
           port: 5300,
@@ -79,7 +116,7 @@ describe("loadConfig integrations", () => {
     });
   });
 
-  it("loads from both config file and env, with env precedence", () => {
+  it("loads control-plane-api from both config file and env, with env precedence", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_API,
       configPath: configFixturePath,
@@ -93,7 +130,7 @@ describe("loadConfig integrations", () => {
         env: "development",
       },
       app: {
-        ...baseAppConfig,
+        ...controlPlaneApiFixtureConfig,
         server: {
           host: "localhost",
           port: 5100,
@@ -102,7 +139,7 @@ describe("loadConfig integrations", () => {
     });
   });
 
-  it("returns only app config when includeGlobal is false", () => {
+  it("returns only control-plane-api app config when includeGlobal is false", () => {
     const config = loadConfig({
       app: AppIds.CONTROL_PLANE_API,
       includeGlobal: false,
@@ -110,13 +147,80 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
+      app: controlPlaneApiFixtureConfig,
+    });
+  });
+
+  it("loads control-plane-worker purely from a config file fixture", () => {
+    const config = loadConfig({
+      app: AppIds.CONTROL_PLANE_WORKER,
+      configPath: configFixturePath,
+    });
+
+    expect(config).toEqual({
+      global: {
+        env: "development",
+      },
+      app: controlPlaneWorkerFixtureConfig,
+    });
+  });
+
+  it("loads control-plane-worker purely from env", () => {
+    const config = loadConfig({
+      app: AppIds.CONTROL_PLANE_WORKER,
+      env: createIntegrationEnv({
+        NODE_ENV: "production",
+        MISTLE_APPS_CONTROL_PLANE_WORKER_HOST: "localhost",
+        MISTLE_APPS_CONTROL_PLANE_WORKER_PORT: "5301",
+      }),
+    });
+
+    expect(config).toEqual({
+      global: {
+        env: "production",
+      },
       app: {
-        ...baseAppConfig,
+        ...controlPlaneWorkerEnvConfig,
         server: {
-          host: "0.0.0.0",
-          port: 5100,
+          host: "localhost",
+          port: 5301,
         },
       },
+    });
+  });
+
+  it("loads control-plane-worker from both config file and env, with env precedence", () => {
+    const config = loadConfig({
+      app: AppIds.CONTROL_PLANE_WORKER,
+      configPath: configFixturePath,
+      env: {
+        MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: "override",
+      },
+    });
+
+    expect(config).toEqual({
+      global: {
+        env: "development",
+      },
+      app: {
+        ...controlPlaneWorkerFixtureConfig,
+        workflow: {
+          ...controlPlaneWorkerFixtureConfig.workflow,
+          namespaceId: "override",
+        },
+      },
+    });
+  });
+
+  it("returns only control-plane-worker app config when includeGlobal is false", () => {
+    const config = loadConfig({
+      app: AppIds.CONTROL_PLANE_WORKER,
+      includeGlobal: false,
+      configPath: configFixturePath,
+    });
+
+    expect(config).toEqual({
+      app: controlPlaneWorkerFixtureConfig,
     });
   });
 });
