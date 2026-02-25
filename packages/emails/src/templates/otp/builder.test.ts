@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildEmailOtpTemplate } from "./builder.js";
+import { buildEmailOTPTemplate } from "./builder.js";
 
 describe("emails otp", () => {
   it("builds an OTP email template", async () => {
-    const template = await buildEmailOtpTemplate({
+    const template = await buildEmailOTPTemplate({
       otp: "123456",
       type: "sign-in",
       expiresInSeconds: 300,
@@ -17,7 +17,7 @@ describe("emails otp", () => {
   });
 
   it("matches snapshot for a stable OTP template output", async () => {
-    const template = await buildEmailOtpTemplate({
+    const template = await buildEmailOTPTemplate({
       otp: "123456",
       type: "sign-in",
       expiresInSeconds: 300,

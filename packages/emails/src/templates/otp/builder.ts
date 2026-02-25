@@ -1,17 +1,17 @@
 import { createElement } from "react";
 
 import { type EmailTemplate, renderEmail, renderEmailText } from "../../render.js";
-import { EmailOtpTemplate, type EmailOtpTemplateProps } from "./template.jsx";
+import { EmailOTPTemplate, type EmailOTPTemplateProps } from "./template.jsx";
 
-export type OtpVerificationType = "sign-in" | "email-verification" | "forget-password";
+export type OTPVerificationType = "sign-in" | "email-verification" | "forget-password";
 
-export type BuildEmailOtpTemplateOptions = {
+export type BuildEmailOTPTemplateOptions = {
   otp: string;
-  type: OtpVerificationType;
+  type: OTPVerificationType;
   expiresInSeconds: number;
 };
 
-function getSubjectForOtpType(type: OtpVerificationType): string {
+function getSubjectForOTPType(type: OTPVerificationType): string {
   if (type === "email-verification") {
     return "Verify your email";
   }
@@ -21,19 +21,19 @@ function getSubjectForOtpType(type: OtpVerificationType): string {
   return "Your sign-in code";
 }
 
-function buildTemplateProps(options: BuildEmailOtpTemplateOptions): EmailOtpTemplateProps {
+function buildTemplateProps(options: BuildEmailOTPTemplateOptions): EmailOTPTemplateProps {
   return {
     otp: options.otp,
     expiresInSeconds: options.expiresInSeconds,
-    title: getSubjectForOtpType(options.type),
+    title: getSubjectForOTPType(options.type),
   };
 }
 
-export async function buildEmailOtpTemplate(
-  options: BuildEmailOtpTemplateOptions,
+export async function buildEmailOTPTemplate(
+  options: BuildEmailOTPTemplateOptions,
 ): Promise<EmailTemplate> {
-  const subject = getSubjectForOtpType(options.type);
-  const template = createElement(EmailOtpTemplate, buildTemplateProps(options));
+  const subject = getSubjectForOTPType(options.type);
+  const template = createElement(EmailOTPTemplate, buildTemplateProps(options));
   const html = await renderEmail(template);
 
   return {

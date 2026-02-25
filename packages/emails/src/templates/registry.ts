@@ -1,10 +1,10 @@
 import type { EmailTemplate } from "../render.js";
 
-import { buildEmailOtpTemplate, type BuildEmailOtpTemplateOptions } from "./otp/builder.js";
+import { buildEmailOTPTemplate, type BuildEmailOTPTemplateOptions } from "./otp/builder.js";
 import { EmailTemplateIds, type EmailTemplateId } from "./template-ids.js";
 
 export type EmailTemplateInputById = {
-  [EmailTemplateIds.OTP]: BuildEmailOtpTemplateOptions;
+  [EmailTemplateIds.OTP]: BuildEmailOTPTemplateOptions;
 };
 
 type EmailTemplateBuilderById = {
@@ -14,7 +14,7 @@ type EmailTemplateBuilderById = {
 };
 
 const EmailTemplateBuilders: EmailTemplateBuilderById = {
-  [EmailTemplateIds.OTP]: buildEmailOtpTemplate,
+  [EmailTemplateIds.OTP]: buildEmailOTPTemplate,
 };
 
 export function buildRegisteredEmailTemplate<TTemplateId extends EmailTemplateId>(

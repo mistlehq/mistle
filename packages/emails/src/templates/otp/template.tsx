@@ -2,7 +2,7 @@ import type { CSSProperties, ReactElement } from "react";
 
 import { Body, Container, Head, Html, Preview, Section, Text } from "jsx-email";
 
-export type EmailOtpTemplateProps = {
+export type EmailOTPTemplateProps = {
   otp: string;
   expiresInSeconds: number;
   title: string;
@@ -66,11 +66,11 @@ function toDisplayMinutes(expiresInSeconds: number): number {
   return Math.max(1, Math.ceil(expiresInSeconds / 60));
 }
 
-export function EmailOtpTemplate({
+export function EmailOTPTemplate({
   otp,
   expiresInSeconds,
   title,
-}: EmailOtpTemplateProps): ReactElement {
+}: EmailOTPTemplateProps): ReactElement {
   const expiryMinutes = toDisplayMinutes(expiresInSeconds);
 
   return (
