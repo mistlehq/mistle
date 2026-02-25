@@ -14,7 +14,7 @@ ARG SANDBOX_GID=10001
 ARG MISE_VERSION=2026.2.20
 
 ENV DEBIAN_FRONTEND=noninteractive \
-  SANDBOX_RUNTIME_LISTEN_ADDR=:8080
+  SANDBOX_RUNTIME_LISTEN_ADDR=:8090
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \

@@ -11,5 +11,5 @@ The base image includes a single sandbox runtime entrypoint that every sandbox w
 ## Runtime Contract
 
 - Entry point: `/usr/local/bin/sandboxd`
-- Default listen address: `SANDBOX_RUNTIME_LISTEN_ADDR=:8080`
+- Default listen address: `SANDBOX_RUNTIME_LISTEN_ADDR=:8090`
 - `PATH` includes `mise` shims at `/home/sandbox/.local/share/mise/shims`

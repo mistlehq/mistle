@@ -2,7 +2,7 @@
   "name": "@mistle/sandbox-runtime",
   "private": true,
   "scripts": {
-    "dev": "SANDBOX_RUNTIME_LISTEN_ADDR=:8080 go run ./cmd/sandboxd",
+    "dev": "SANDBOX_RUNTIME_LISTEN_ADDR=:8090 go run ./cmd/sandboxd",
     "build": "mkdir -p dist/bin && go build -trimpath -o dist/bin/sandboxd ./cmd/sandboxd",
     "start": "./dist/bin/sandboxd",
     "lint": "go vet ./...",
