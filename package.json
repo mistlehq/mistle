@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "node ./scripts/dev/start.mjs",
+    "dev:nix": "nix develop --command pnpm dev",
     "dev:workspace": "turbo run dev --ui=tui",
     "dev:down": "node ./scripts/dev/down.mjs",
     "build": "turbo run build",
@@ -23,6 +24,7 @@
     "test:integration": "turbo run test:integration",
     "test:e2e": "pnpm --filter @mistle/tests test:e2e",
     "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "ci:nix": "nix develop --command pnpm run ci",
     "prepare": "node -e \"const cp = require('child_process'); if (!(process.env.CI || process.env.LEFTHOOK === '0')) { try { cp.execSync('git rev-parse --is-inside-work-tree', { stdio: 'ignore' }); cp.execSync('lefthook install', { stdio: 'inherit' }); } catch {} }\""
   },
   "devDependencies": {

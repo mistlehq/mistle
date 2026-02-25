@@ -2,6 +2,7 @@ node_modules
 coverage
 dist
 .turbo
+.direnv
 .env
 .env.*
 .env.local
