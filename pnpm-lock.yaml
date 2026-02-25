@@ -129,6 +129,10 @@ importers:
       hono:
         specifier: ^4.10.6
         version: 4.12.2
+    devDependencies:
+      '@mistle/test-harness':
+        specifier: workspace:*
+        version: link:../../packages/test-harness
 
   apps/data-plane-api:
     dependencies:
