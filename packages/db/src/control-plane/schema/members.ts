@@ -5,6 +5,14 @@ import { controlPlaneSchema } from "./namespace.js";
 import { organizations } from "./organizations.js";
 import { users } from "./users.js";
 
+export const MemberRoles = {
+  MEMBER: "member",
+  ADMIN: "admin",
+  OWNER: "owner",
+} as const;
+
+export type MemberRole = (typeof MemberRoles)[keyof typeof MemberRoles];
+
 export const members = controlPlaneSchema.table(
   "members",
   {
@@ -17,7 +25,7 @@ export const members = controlPlaneSchema.table(
     userId: text("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    role: text("role").notNull().default("member"),
+    role: text("role").notNull().$type<MemberRole>().default(MemberRoles.MEMBER),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [

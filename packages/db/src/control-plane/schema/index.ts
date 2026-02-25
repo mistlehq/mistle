@@ -1,6 +1,7 @@
 export { accounts } from "./accounts.js";
 export { invitations } from "./invitations.js";
-export { members } from "./members.js";
+export { members, MemberRoles } from "./members.js";
+export type { MemberRole } from "./members.js";
 export { CONTROL_PLANE_SCHEMA_NAME } from "./namespace.js";
 export { organizations } from "./organizations.js";
 export { sessions } from "./sessions.js";
