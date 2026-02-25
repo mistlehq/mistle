@@ -4,7 +4,7 @@ export const controlPlaneWorkerDevelopmentPreset = {
       control_plane_worker: {
         server: {
           host: "127.0.0.1",
-          port: 5001,
+          port: 5101,
         },
         workflow: {
           database_url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane",

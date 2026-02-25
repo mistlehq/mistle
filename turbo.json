@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": ["MISTLE_CONFIG_PATH"],
   "tasks": {
     "dev": {
       "dependsOn": ["^build"],

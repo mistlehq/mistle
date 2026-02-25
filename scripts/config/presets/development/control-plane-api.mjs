@@ -6,13 +6,13 @@ export const controlPlaneApiDevelopmentPreset = {
       control_plane_api: {
         server: {
           host: "127.0.0.1",
-          port: 5000,
+          port: 5100,
         },
         database: {
           url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane",
         },
         auth: {
-          base_url: "http://127.0.0.1:5000",
+          base_url: "http://127.0.0.1:5100",
           trusted_origins: ["http://127.0.0.1:3000", "http://localhost:3000"],
           otp_length: 6,
           otp_expires_in_seconds: 300,
@@ -28,8 +28,8 @@ export const controlPlaneApiDevelopmentPreset = {
   generators: [
     {
       path: ["apps", "control_plane_api", "auth", "secret"],
-      when: "missing",
-      generate: () => randomBytes(32).toString("hex"),
+      when: "always",
+      generate: () => randomBytes(32).toString("base64url"),
     },
   ],
 };

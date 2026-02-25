@@ -10,7 +10,7 @@ import { developmentPresetModules } from "./presets/development/index.mjs";
  */
 
 /**
- * @typedef {"missing"} DevelopmentGeneratorWhen
+ * @typedef {"missing" | "always"} DevelopmentGeneratorWhen
  */
 
 /**
