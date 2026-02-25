@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseToml } from "smol-toml";
@@ -9,6 +9,8 @@ const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
 const DEV_CONFIG_PATH = resolve(REPO_ROOT, "config", "config.development.toml");
 const DEV_COMPOSE_PATH = resolve(REPO_ROOT, "infra", "local", "docker-compose.yml");
 const DEV_ENV_LOCAL_PATH = resolve(REPO_ROOT, ".env.local");
+const DEV_CLOUDFLARED_CONFIG_DIR = resolve(REPO_ROOT, "infra", "local", ".generated");
+const DEV_CLOUDFLARED_CONFIG_PATH = resolve(DEV_CLOUDFLARED_CONFIG_DIR, "cloudflared-config.yml");
 
 const TUNNEL_SERVICE_NAME = "tunnel";
 let localInfraStarted = false;
@@ -46,6 +48,21 @@ function loadDevelopmentEnvFile() {
   }
 
   process.loadEnvFile(DEV_ENV_LOCAL_PATH);
+}
+
+function writeCloudflaredConfig(input) {
+  const configContent = [
+    "ingress:",
+    `  - hostname: ${input.controlPlaneApiTunnelHostname}`,
+    `    service: http://host.docker.internal:${input.controlPlaneApiLocalPort}`,
+    `  - hostname: ${input.dataPlaneEdgeTunnelHostname}`,
+    "    service: http://edge:8088",
+    "  - service: http_status:404",
+    "",
+  ].join("\n");
+
+  mkdirSync(DEV_CLOUDFLARED_CONFIG_DIR, { recursive: true });
+  writeFileSync(DEV_CLOUDFLARED_CONFIG_PATH, configContent, "utf8");
 }
 
 function runOrThrow(input) {
@@ -204,12 +221,20 @@ async function start() {
   const cloudflareTunnelToken = readRequiredEnv("CLOUDFLARE_TUNNEL_TOKEN");
   const controlPlaneApiTunnelHostname = readRequiredEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME");
   const dataPlaneEdgeTunnelHostname = readRequiredEnv("DATA_PLANE_EDGE_TUNNEL_HOSTNAME");
+
+  writeCloudflaredConfig({
+    controlPlaneApiTunnelHostname,
+    controlPlaneApiLocalPort,
+    dataPlaneEdgeTunnelHostname,
+  });
+
   const sharedDevEnv = {
     MISTLE_CONFIG_PATH: DEV_CONFIG_PATH,
     CONTROL_PLANE_API_LOCAL_PORT: String(controlPlaneApiLocalPort),
     CLOUDFLARE_TUNNEL_TOKEN: cloudflareTunnelToken,
     CONTROL_PLANE_API_TUNNEL_HOSTNAME: controlPlaneApiTunnelHostname,
     DATA_PLANE_EDGE_TUNNEL_HOSTNAME: dataPlaneEdgeTunnelHostname,
+    CLOUDFLARED_CONFIG_PATH: DEV_CLOUDFLARED_CONFIG_PATH,
   };
   localInfraEnv = sharedDevEnv;
   localInfraStartAttempted = true;

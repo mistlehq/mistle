@@ -57,19 +57,15 @@ services:
 
   tunnel:
     image: "${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}"
+    volumes:
+      - "${CLOUDFLARED_CONFIG_PATH:?CLOUDFLARED_CONFIG_PATH is required}:/etc/cloudflared/config.yml:ro"
     command:
-      - sh
-      - -ceu
-      - |
-        cat >/tmp/config.yml <<EOF
-        ingress:
-          - hostname: ${CONTROL_PLANE_API_TUNNEL_HOSTNAME:-}
-            service: http://host.docker.internal:${CONTROL_PLANE_API_LOCAL_PORT:-5000}
-          - hostname: ${DATA_PLANE_EDGE_TUNNEL_HOSTNAME:-}
-            service: http://host.docker.internal:${EDGE_PORT:-8088}
-          - service: http_status:404
-        EOF
-        cloudflared tunnel --no-autoupdate --config /tmp/config.yml run --token "${CLOUDFLARE_TUNNEL_TOKEN:-}"
+      - tunnel
+      - --config
+      - /etc/cloudflared/config.yml
+      - run
+      - --token
+      - "${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is required}"
     depends_on:
       edge:
         condition: service_started
