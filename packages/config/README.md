@@ -48,6 +48,8 @@ Return shape:
 - with `includeGlobal: true` (default): `{ global, app }`
 - with `includeGlobal: false`: `{ app }`
 
+`app` is type-safe and inferred from `options.app` (for example, `AppIds.CONTROL_PLANE_API` returns the control-plane-api app config shape).
+
 ## Merge Rules
 
 - TOML is loaded first.
@@ -58,6 +60,7 @@ Return shape:
 
 - [Global module](./src/global/README.md)
 - [Control Plane API module](./src/apps/control-plane-api/README.md)
+- [Control Plane Worker module](./src/apps/control-plane-worker/README.md)
 
 ## Adding And Managing Config
 
@@ -76,7 +79,7 @@ Use module ownership to keep config changes localized:
 6. If development init should populate the key, update `scripts/config/presets/development/*.mjs` defaults and/or generators.
 7. Add or update tests:
    - unit tests in `src/**/*test.ts` for parsing/merge/validation behavior
-   - integration coverage in `integrations/load-config.test.ts` (and fixture updates if needed)
+   - integration coverage in `integration/load-config.integration.test.ts` (and fixture updates if needed)
 
 ### Add A New App Module
 
@@ -89,7 +92,7 @@ Use module ownership to keep config changes localized:
 2. Register the app in `src/modules.ts`:
    - add `AppIds.<NEW_APP>`
    - add to `appConfigModules`
-3. Extend typed load results in `src/loader.ts` so `loadConfig` returns the correct app config type for the new app id.
+3. Update `src/loader.ts` app parsing branch/map so `loadConfig` can parse and return the app config for the new app id.
 4. Add the app section in [`../../config/config.sample.toml`](../../config/config.sample.toml).
 5. Add module docs link in this README.
 6. Add integration test coverage for TOML-only, env-only, and merged precedence cases.

@@ -36,6 +36,27 @@ describe("parseConfigRecord", () => {
             smtpPassword: "mailpit",
           },
         },
+        control_plane_worker: {
+          server: {
+            host: "127.0.0.1",
+            port: 5100,
+          },
+          workflow: {
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane",
+            namespaceId: "development",
+            runMigrations: true,
+            concurrency: 1,
+          },
+          email: {
+            fromAddress: "no-reply@mistle.local",
+            fromName: "Mistle Local",
+            smtpHost: "127.0.0.1",
+            smtpPort: 1025,
+            smtpSecure: false,
+            smtpUsername: "mailpit",
+            smtpPassword: "mailpit",
+          },
+        },
       },
     };
     const config = parseConfigRecord(configRecord);

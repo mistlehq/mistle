@@ -31,6 +31,20 @@ function hasEnvValue(value: string | undefined): value is string {
   return value !== undefined;
 }
 
+export function parseBooleanEnv(value: string, envVar: string): boolean {
+  if (value === "true") {
+    return true;
+  }
+  if (value === "false") {
+    return false;
+  }
+  throw new Error(`Invalid ${envVar}. Expected 'true' or 'false'.`);
+}
+
+export function hasEntries(record: Record<string, unknown>): boolean {
+  return Object.keys(record).length > 0;
+}
+
 export function createEnvLoader<TSchema extends z.ZodType>(
   descriptors: readonly EnvFieldDescriptor<TSchema>[],
 ): (env: NodeJS.ProcessEnv) => Record<string, unknown> {

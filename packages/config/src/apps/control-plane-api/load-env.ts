@@ -1,4 +1,4 @@
-import { createEnvLoader } from "../../core/load-env.js";
+import { createEnvLoader, hasEntries, parseBooleanEnv } from "../../core/load-env.js";
 import {
   type PartialControlPlaneApiConfigInput,
   ControlPlaneApiAuthConfigSchema,
@@ -62,16 +62,6 @@ const loadAuthEnv = createEnvLoader<typeof ControlPlaneApiAuthConfigSchema>([
   },
 ]);
 
-function parseSmtpSecureEnv(value: string): boolean {
-  if (value === "true") {
-    return true;
-  }
-  if (value === "false") {
-    return false;
-  }
-  throw new Error("Invalid MISTLE_APPS_CONTROL_PLANE_API_SMTP_SECURE. Expected 'true' or 'false'.");
-}
-
 const loadEmailEnv = createEnvLoader<typeof ControlPlaneApiEmailConfigSchema>([
   {
     key: "fromAddress",
@@ -93,7 +83,7 @@ const loadEmailEnv = createEnvLoader<typeof ControlPlaneApiEmailConfigSchema>([
   {
     key: "smtpSecure",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_SMTP_SECURE",
-    parse: parseSmtpSecureEnv,
+    parse: (value) => parseBooleanEnv(value, "MISTLE_APPS_CONTROL_PLANE_API_SMTP_SECURE"),
   },
   {
     key: "smtpUsername",
@@ -104,10 +94,6 @@ const loadEmailEnv = createEnvLoader<typeof ControlPlaneApiEmailConfigSchema>([
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_SMTP_PASSWORD",
   },
 ]);
-
-function hasEntries(record: Record<string, unknown>): boolean {
-  return Object.keys(record).length > 0;
-}
 
 export function loadControlPlaneApiFromEnv(
   env: NodeJS.ProcessEnv,

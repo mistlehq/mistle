@@ -27,3 +27,22 @@ smtp_port = 587
 smtp_secure = false
 smtp_username = "replace-with-smtp-username"
 smtp_password = "replace-with-smtp-password"
+
+[apps.control_plane_worker.server]
+host = "0.0.0.0"
+port = 8081
+
+[apps.control_plane_worker.workflow]
+database_url = "postgresql://mistle:replace-with-password@db:5432/mistle_control_plane"
+namespace_id = "production"
+run_migrations = true
+concurrency = 4
+
+[apps.control_plane_worker.email]
+from_address = "no-reply@mistle.example"
+from_name = "Mistle"
+smtp_host = "smtp.mistle.example"
+smtp_port = 587
+smtp_secure = false
+smtp_username = "replace-with-smtp-username"
+smtp_password = "replace-with-smtp-password"
