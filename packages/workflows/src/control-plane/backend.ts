@@ -1,6 +1,7 @@
-import { BackendPostgres } from "openworkflow/postgres";
+import type { BackendPostgres } from "openworkflow/postgres";
 
-import { ControlPlaneOpenWorkflow } from "../constants.js";
+import { createOpenWorkflowBackend } from "../core/create-backend.js";
+import { ControlPlaneOpenWorkflow } from "./constants.js";
 
 export type CreateControlPlaneBackendInput = {
   url: string;
@@ -15,7 +16,8 @@ export type CreateControlPlaneBackendInput = {
 export async function createControlPlaneBackend(
   input: CreateControlPlaneBackendInput,
 ): Promise<BackendPostgres> {
-  return BackendPostgres.connect(input.url, {
+  return createOpenWorkflowBackend({
+    url: input.url,
     namespaceId: input.namespaceId,
     runMigrations: input.runMigrations,
     schema: ControlPlaneOpenWorkflow.SCHEMA,

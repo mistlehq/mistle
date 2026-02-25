@@ -1,6 +1,6 @@
 import type { BackendPostgres } from "openworkflow/postgres";
 
-import { OpenWorkflow } from "openworkflow";
+import { createOpenWorkflow } from "../core/create-openworkflow.js";
 
 export type CreateControlPlaneOpenWorkflowInput = {
   backend: BackendPostgres;
@@ -11,6 +11,6 @@ export type CreateControlPlaneOpenWorkflowInput = {
  */
 export function createControlPlaneOpenWorkflow(
   input: CreateControlPlaneOpenWorkflowInput,
-): OpenWorkflow {
-  return new OpenWorkflow({ backend: input.backend });
+): ReturnType<typeof createOpenWorkflow> {
+  return createOpenWorkflow({ backend: input.backend });
 }

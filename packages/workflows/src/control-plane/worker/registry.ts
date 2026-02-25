@@ -1,5 +1,6 @@
 import type { OpenWorkflow } from "openworkflow";
 
+import { registerWorkflows } from "../../core/register-workflows.js";
 import { controlPlaneWorkflowDefinitions } from "../workflows/index.js";
 
 export type RegisterControlPlaneWorkflowsInput = {
@@ -10,7 +11,8 @@ export type RegisterControlPlaneWorkflowsInput = {
  * Registers all control-plane workflow implementations against the client.
  */
 export function registerControlPlaneWorkflows(input: RegisterControlPlaneWorkflowsInput): void {
-  for (const workflow of controlPlaneWorkflowDefinitions) {
-    input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
-  }
+  registerWorkflows({
+    openWorkflow: input.openWorkflow,
+    workflows: controlPlaneWorkflowDefinitions,
+  });
 }

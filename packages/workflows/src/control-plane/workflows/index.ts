@@ -1,10 +1,10 @@
-import type { Workflow } from "openworkflow";
+import type { OpenWorkflowDefinition } from "../../core/register-workflows.js";
 
 /**
  * Control-plane workflow implementations.
  *
  * Start empty and add workflows under `workflows/<workflow-id>/`.
  */
-export type ControlPlaneWorkflowDefinition = Workflow<unknown, unknown, unknown>;
+export type ControlPlaneWorkflowDefinition = OpenWorkflowDefinition;
 
 export const controlPlaneWorkflowDefinitions: ReadonlyArray<ControlPlaneWorkflowDefinition> = [];

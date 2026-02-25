@@ -1,6 +1,7 @@
 import type { OpenWorkflow, Worker } from "openworkflow";
 
-import { registerControlPlaneWorkflows } from "./registry.js";
+import { createOpenWorkflowWorker } from "../../core/create-worker.js";
+import { controlPlaneWorkflowDefinitions } from "../workflows/index.js";
 
 export type CreateControlPlaneWorkerInput = {
   openWorkflow: OpenWorkflow;
@@ -11,7 +12,9 @@ export type CreateControlPlaneWorkerInput = {
  * Creates a control-plane OpenWorkflow worker and registers all workflows.
  */
 export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): Worker {
-  registerControlPlaneWorkflows({ openWorkflow: input.openWorkflow });
-
-  return input.openWorkflow.newWorker({ concurrency: input.concurrency });
+  return createOpenWorkflowWorker({
+    openWorkflow: input.openWorkflow,
+    workflows: controlPlaneWorkflowDefinitions,
+    concurrency: input.concurrency,
+  });
 }
