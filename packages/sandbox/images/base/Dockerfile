@@ -11,6 +11,7 @@ FROM debian:bookworm-slim AS sandbox-base-prod
 ARG SANDBOX_USER=sandbox
 ARG SANDBOX_UID=10001
 ARG SANDBOX_GID=10001
+ARG MISE_VERSION=2026.2.20
 
 ENV DEBIAN_FRONTEND=noninteractive \
   SANDBOX_RUNTIME_LISTEN_ADDR=:8080
@@ -29,10 +30,15 @@ RUN groupadd --gid "${SANDBOX_GID}" "${SANDBOX_USER}" \
   && mkdir -p /workspace \
   && chown -R "${SANDBOX_UID}:${SANDBOX_GID}" /workspace
 
+RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PATH="/usr/local/bin/mise" sh
+
 COPY --from=sandbox-runtime-builder /out/sandboxd /usr/local/bin/sandboxd
 
 RUN chmod +x \
+  /usr/local/bin/mise \
   /usr/local/bin/sandboxd
+
+ENV PATH="/home/${SANDBOX_USER}/.local/share/mise/shims:/usr/local/bin:${PATH}"
 
 WORKDIR /workspace
 USER ${SANDBOX_USER}
