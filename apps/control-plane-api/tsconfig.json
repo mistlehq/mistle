@@ -1,4 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
-  "include": ["src/**/*.ts"]
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "integration/**/*.ts",
+    "integration/**/*.tsx",
+    "vitest.config.ts",
+    "vitest.integration.config.ts"
+  ]
 }
