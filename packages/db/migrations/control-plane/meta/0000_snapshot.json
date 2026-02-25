@@ -133,12 +133,8 @@
           "tableFrom": "accounts",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -263,12 +259,8 @@
           "tableFrom": "invitations",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -277,12 +269,8 @@
           "tableFrom": "invitations",
           "tableTo": "teams",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "team_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["team_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         },
@@ -291,12 +279,8 @@
           "tableFrom": "invitations",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "inviter_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["inviter_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -403,12 +387,8 @@
           "tableFrom": "members",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -417,12 +397,8 @@
           "tableFrom": "members",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -604,12 +580,8 @@
           "tableFrom": "sessions",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -709,12 +681,8 @@
           "tableFrom": "team_members",
           "tableTo": "teams",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "team_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["team_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -723,12 +691,8 @@
           "tableFrom": "team_members",
           "tableTo": "users",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -799,12 +763,8 @@
           "tableFrom": "teams",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["organization_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }

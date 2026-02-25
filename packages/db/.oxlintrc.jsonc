@@ -7,14 +7,14 @@
       "rules": {
         "jest/expect-expect": "off",
         "jest/no-disabled-tests": "off",
-        "no-empty-pattern": "off"
-      }
+        "no-empty-pattern": "off",
+      },
     },
     {
       "files": ["integration/control-plane-migrations.integration.test.ts"],
       "rules": {
-        "jest/no-standalone-expect": "off"
-      }
-    }
-  ]
+        "jest/no-standalone-expect": "off",
+      },
+    },
+  ],
 }
