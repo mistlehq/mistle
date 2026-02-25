@@ -307,11 +307,10 @@ describe("auth otp integration", () => {
       throw new Error("Expected sign-in OTP verification row to exist.");
     }
 
-    const expiredAt = new Date(0);
     const updatedVerifications = await fixture.db
       .update(verifications)
       .set({
-        expiresAt: expiredAt,
+        expiresAt: new Date(0),
       })
       .where(eq(verifications.id, verification.id))
       .returning({
