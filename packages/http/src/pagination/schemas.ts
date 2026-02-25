@@ -1,41 +1,29 @@
 import { z } from "zod";
 
-type KeysetPaginationSchemaOptions = {
-  defaultLimit?: number;
-  maxLimit?: number;
-};
+import {
+  createKeysetPageSizeSchema,
+  getKeysetPaginationLimits,
+  type KeysetPaginationLimitOptions,
+} from "./page-size.js";
 
-function getPaginationLimits(options: KeysetPaginationSchemaOptions | undefined): {
-  defaultLimit: number;
-  maxLimit: number;
-} {
-  const defaultLimit = options?.defaultLimit ?? 20;
-  const maxLimit = options?.maxLimit ?? 100;
-
-  if (!Number.isInteger(defaultLimit) || defaultLimit < 1) {
-    throw new Error("Keyset pagination `defaultLimit` must be an integer greater than 0.");
-  }
-
-  if (!Number.isInteger(maxLimit) || maxLimit < 1) {
-    throw new Error("Keyset pagination `maxLimit` must be an integer greater than 0.");
-  }
-
-  if (defaultLimit > maxLimit) {
-    throw new Error("Keyset pagination `defaultLimit` must be less than or equal to `maxLimit`.");
-  }
-
-  return {
-    defaultLimit,
-    maxLimit,
-  };
-}
-
-export function createKeysetPaginationQuerySchema(options?: KeysetPaginationSchemaOptions) {
-  const { defaultLimit, maxLimit } = getPaginationLimits(options);
-
+export function createKeysetPaginationQuerySchema(options?: KeysetPaginationLimitOptions) {
   return z
     .object({
-      limit: z.coerce.number().int().min(1).max(maxLimit).default(defaultLimit),
+      limit: z.preprocess((rawValue) => {
+        if (rawValue === undefined) {
+          return undefined;
+        }
+
+        if (typeof rawValue === "number") {
+          return rawValue;
+        }
+
+        if (typeof rawValue === "string") {
+          return Number(rawValue);
+        }
+
+        return rawValue;
+      }, createKeysetPageSizeSchema(options)),
       after: z.string().min(1).optional(),
       before: z.string().min(1).optional(),
     })
@@ -47,9 +35,9 @@ export function createKeysetPaginationQuerySchema(options?: KeysetPaginationSche
 
 export function createKeysetPaginationEnvelopeSchema<TItemSchema extends z.ZodType>(
   itemSchema: TItemSchema,
-  options?: KeysetPaginationSchemaOptions,
+  options?: KeysetPaginationLimitOptions,
 ) {
-  const { maxLimit } = getPaginationLimits(options);
+  const { maxLimit } = getKeysetPaginationLimits(options);
 
   const nextPageSchema = z
     .object({

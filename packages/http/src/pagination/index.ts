@@ -3,6 +3,11 @@ export {
   createKeysetPaginationQuerySchema,
 } from "./schemas.js";
 export {
+  createKeysetPageSizeSchema,
+  getKeysetPaginationLimits,
+  parseKeysetPageSize,
+} from "./page-size.js";
+export {
   decodeKeysetCursor,
   decodeKeysetCursorOrThrow,
   decodeOptionalKeysetCursor,
@@ -22,6 +27,7 @@ export type {
   KeysetPaginationQuery,
   KeysetPreviousPage,
 } from "./types.js";
+export type { KeysetPaginationLimitOptions } from "./page-size.js";
 export type { KeysetCursorDecodeErrorReason } from "./cursor.js";
 export type {
   KeysetPaginationDirection,

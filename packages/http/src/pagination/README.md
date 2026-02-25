@@ -13,6 +13,15 @@ Shared keyset pagination primitives for HTTP-facing list endpoints.
   - Builds a response envelope schema:
   - `totalResults`, `items`, `nextPage`, `previousPage`.
 
+### Page size utilities
+
+- `createKeysetPageSizeSchema(options?)`
+  - Zod schema for page size with default + max bound enforcement.
+- `parseKeysetPageSize(limit, options?)`
+  - Parses page size (or applies default) using Zod.
+- `getKeysetPaginationLimits(options?)`
+  - Resolves and validates `defaultLimit`/`maxLimit` configuration.
+
 ### Cursor utilities
 
 - `encodeKeysetCursor(cursor)`
@@ -68,10 +77,7 @@ const responseSchema = createKeysetPaginationEnvelopeSchema(itemSchema, {
 
 ```ts
 import { z } from "zod";
-import {
-  decodeKeysetCursorOrThrow,
-  KeysetCursorDecodeErrorReasons,
-} from "@mistle/http/pagination";
+import { decodeKeysetCursorOrThrow, KeysetCursorDecodeErrorReasons } from "@mistle/http/pagination";
 
 const cursorSchema = z.object({
   createdAt: z.string().min(1),
