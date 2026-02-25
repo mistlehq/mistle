@@ -1,0 +1,5 @@
+@import "@mistle/ui/styles.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/quicksand";
+
+@source "./**/*.{ts,tsx}";

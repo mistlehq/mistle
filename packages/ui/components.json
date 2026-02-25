@@ -1,0 +1,21 @@
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "base-vega",
+  "rsc": false,
+  "tsx": true,
+  "iconLibrary": "phosphor",
+  "tailwind": {
+    "config": "../../apps/dashboard/tailwind.config.ts",
+    "css": "../../apps/dashboard/src/index.css",
+    "baseColor": "zinc",
+    "cssVariables": true
+  },
+  "menuColor": "default",
+  "menuAccent": "subtle",
+  "aliases": {
+    "components": "src/components",
+    "ui": "src/components/ui",
+    "lib": "src/lib",
+    "utils": "src/lib/utils"
+  }
+}
