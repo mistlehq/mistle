@@ -3,7 +3,7 @@
   "extends": ["../../.oxlintrc.jsonc"],
   "overrides": [
     {
-      "files": ["integration/test-context.ts"],
+      "files": ["integration/**/test-context.ts"],
       "rules": {
         "jest/expect-expect": "off",
         "jest/no-disabled-tests": "off",
@@ -11,7 +11,7 @@
       },
     },
     {
-      "files": ["integration/*.integration.test.ts"],
+      "files": ["integration/**/*.integration.test.ts"],
       "rules": {
         "jest/no-standalone-expect": "off",
       },

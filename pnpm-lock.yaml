@@ -306,6 +306,9 @@ importers:
         specifier: ^3.4.8
         version: 3.4.8
     devDependencies:
+      '@mistle/db':
+        specifier: workspace:*
+        version: link:../db
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../test-harness
