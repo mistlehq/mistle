@@ -1,0 +1,51 @@
+FROM golang:1.26.0-bookworm AS sandbox-runtime-builder
+
+WORKDIR /src/apps/sandbox-runtime
+COPY apps/sandbox-runtime/go.mod ./go.mod
+RUN go mod download
+COPY apps/sandbox-runtime ./
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/sandboxd ./cmd/sandboxd
+
+FROM debian:bookworm-slim AS sandbox-base-prod
+
+ARG SANDBOX_USER=sandbox
+ARG SANDBOX_UID=10001
+ARG SANDBOX_GID=10001
+
+ENV DEBIAN_FRONTEND=noninteractive \
+  SANDBOX_RUNTIME_LISTEN_ADDR=:8080
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    git \
+    jq \
+    tini \
+  && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --gid "${SANDBOX_GID}" "${SANDBOX_USER}" \
+  && useradd --uid "${SANDBOX_UID}" --gid "${SANDBOX_GID}" --create-home --shell /bin/sh "${SANDBOX_USER}" \
+  && mkdir -p /workspace \
+  && chown -R "${SANDBOX_UID}:${SANDBOX_GID}" /workspace
+
+COPY --from=sandbox-runtime-builder /out/sandboxd /usr/local/bin/sandboxd
+
+RUN chmod +x \
+  /usr/local/bin/sandboxd
+
+WORKDIR /workspace
+USER ${SANDBOX_USER}
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandboxd"]
+
+FROM sandbox-base-prod AS sandbox-base-dev
+
+USER root
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    procps \
+    strace \
+    vim \
+  && rm -rf /var/lib/apt/lists/*
+USER ${SANDBOX_USER}

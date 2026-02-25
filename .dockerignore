@@ -1,0 +1,12 @@
+.git
+.turbo
+.DS_Store
+.pkgrep
+node_modules
+**/node_modules
+**/.turbo
+**/dist
+**/coverage
+**/test-results
+**/.DS_Store
+*.log
