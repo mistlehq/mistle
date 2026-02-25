@@ -73,6 +73,22 @@
     "eslint/no-restricted-globals": [
       "error",
       {
+        "name": "setTimeout",
+        "message": "Use @mistle/time abstractions instead of global setTimeout.",
+      },
+      {
+        "name": "clearTimeout",
+        "message": "Use @mistle/time abstractions instead of global clearTimeout.",
+      },
+      {
+        "name": "setInterval",
+        "message": "Use @mistle/time abstractions instead of global setInterval.",
+      },
+      {
+        "name": "clearInterval",
+        "message": "Use @mistle/time abstractions instead of global clearInterval.",
+      },
+      {
         "name": "vi",
         "message": "Do not use vi-based mocks/spies. Assert observable behavior instead.",
       },
