@@ -3,6 +3,8 @@ import type { z } from "zod";
 import { readFileSync } from "node:fs";
 import { parse as parseToml } from "smol-toml";
 
+import { controlPlaneApiConfigModule } from "./apps/control-plane-api/index.js";
+import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/index.js";
 import { mergeConfigRoots } from "./core/merge.js";
 import { type ConfigModule } from "./core/module.js";
 import { asObjectRecord, getValueAtPath } from "./core/record.js";
@@ -16,27 +18,27 @@ import {
 import { loadFromEnv, loadFromToml, validateModules } from "./pipeline.js";
 import { type AppConfig, ConfigSchema } from "./schema.js";
 
-export type LoadConfigOptions = {
+type LoadConfigSourceOptions = {
   configPath?: string;
   env?: NodeJS.ProcessEnv;
-  app: AppConfigModuleKey;
-  includeGlobal?: boolean;
 };
 
-export type LoadConfigResult =
-  | {
-      app: AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API>;
-    }
-  | {
-      global: AppConfig["global"];
-      app: AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API>;
-    };
+export type LoadConfigOptions<TApp extends AppConfigModuleKey = AppConfigModuleKey> =
+  LoadConfigSourceOptions & {
+    app: TApp;
+    includeGlobal?: boolean;
+  };
 
-function resolveConfigPath(options: LoadConfigOptions): string | undefined {
+export type LoadConfigResult<TApp extends AppConfigModuleKey = AppConfigModuleKey> = {
+  app: AppConfigModuleValue<TApp>;
+  global?: AppConfig["global"];
+};
+
+function resolveConfigPath(options: LoadConfigSourceOptions): string | undefined {
   return options.configPath ?? options.env?.MISTLE_CONFIG_PATH;
 }
 
-function resolveLoadInputs(options: LoadConfigOptions): {
+function resolveLoadInputs(options: LoadConfigSourceOptions): {
   configPath?: string;
   env: NodeJS.ProcessEnv;
 } {
@@ -65,7 +67,7 @@ function parseModuleValue<TSchema extends z.ZodType>(
 
 function loadValidatedRoot(
   modules: readonly ConfigModule[],
-  options: LoadConfigOptions,
+  options: LoadConfigSourceOptions,
 ): Record<string, unknown> {
   const { configPath, env } = resolveLoadInputs(options);
 
@@ -82,26 +84,44 @@ export function parseConfigRecord(record: unknown): AppConfig {
   return ConfigSchema.parse(record);
 }
 
-export function loadConfig(options: LoadConfigOptions & { includeGlobal: false }): {
-  app: AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API>;
-};
-export function loadConfig(options: LoadConfigOptions & { includeGlobal?: true }): {
-  global: AppConfig["global"];
-  app: AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API>;
-};
-export function loadConfig(options: LoadConfigOptions): LoadConfigResult {
+function parseAppConfig(
+  appId: typeof AppIds.CONTROL_PLANE_API,
+  root: Record<string, unknown>,
+): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_API>;
+function parseAppConfig(
+  appId: typeof AppIds.CONTROL_PLANE_WORKER,
+  root: Record<string, unknown>,
+): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_WORKER>;
+function parseAppConfig<TApp extends AppConfigModuleKey>(
+  appId: TApp,
+  root: Record<string, unknown>,
+): AppConfigModuleValue<TApp>;
+function parseAppConfig(
+  appId: AppConfigModuleKey,
+  root: Record<string, unknown>,
+): AppConfigModuleValue<AppConfigModuleKey> {
+  if (appId === AppIds.CONTROL_PLANE_API) {
+    return parseModuleValue(controlPlaneApiConfigModule, root);
+  }
+
+  return parseModuleValue(controlPlaneWorkerConfigModule, root);
+}
+
+export function loadConfig<TApp extends AppConfigModuleKey>(
+  options: LoadConfigOptions<TApp>,
+): LoadConfigResult<TApp> {
   const appModule = appConfigModules[options.app];
 
   if (options.includeGlobal === false) {
     const validatedRoot = loadValidatedRoot([appModule], options);
-    const appConfig = parseModuleValue(appModule, validatedRoot);
+    const appConfig = parseAppConfig(options.app, validatedRoot);
     return {
       app: appConfig,
     };
   }
 
   const validatedRoot = loadValidatedRoot([globalConfigModule, appModule], options);
-  const appConfig = parseModuleValue(appModule, validatedRoot);
+  const appConfig = parseAppConfig(options.app, validatedRoot);
   return {
     global: parseModuleValue(globalConfigModule, validatedRoot),
     app: appConfig,

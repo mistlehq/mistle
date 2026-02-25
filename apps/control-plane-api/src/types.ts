@@ -1,11 +1,16 @@
 import type { ServerType } from "@hono/node-server";
-import type { loadConfig } from "@mistle/config";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { Context, Hono } from "hono";
 
+import { AppIds, type loadConfig } from "@mistle/config";
+
 import type { ControlPlaneAuth } from "./auth/index.js";
 
-export type ControlPlaneApiConfig = ReturnType<typeof loadConfig>["app"];
+type LoadControlPlaneApiConfigResult = ReturnType<
+  typeof loadConfig<typeof AppIds.CONTROL_PLANE_API>
+>;
+
+export type ControlPlaneApiConfig = LoadControlPlaneApiConfigResult["app"];
 
 export type AppContextBindings = {
   Variables: AppContextVariables;
