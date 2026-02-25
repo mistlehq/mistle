@@ -216,7 +216,7 @@ async function start() {
     args: ["config:init:dev"],
   });
 
-  console.log("Starting local infra dependencies (Postgres 18, PgBouncer, Caddy)...");
+  console.log("Starting local infra dependencies (Postgres 18, PgBouncer, Caddy, Mailpit)...");
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const cloudflareTunnelToken = readRequiredEnv("CLOUDFLARE_TUNNEL_TOKEN");
   const controlPlaneApiTunnelHostname = readRequiredEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME");
@@ -251,6 +251,7 @@ async function start() {
       "postgres",
       "pgbouncer",
       "edge",
+      "mailpit",
     ],
     env: sharedDevEnv,
   });
@@ -278,6 +279,7 @@ async function start() {
   console.log(`- control-plane-api: ${controlPlaneApiPublicUrl}`);
   console.log(`- data-plane tunnel base: ${dataPlaneEdgePublicUrl}`);
   console.log(`- data-plane tunnel route: ${dataPlaneEdgePublicUrl}/tunnel`);
+  console.log("- mailpit ui: http://127.0.0.1:8025");
   console.log("");
 
   appDevProcess = spawn("pnpm", ["dev:workspace"], {

@@ -13,7 +13,12 @@ export const controlPlaneApiDevelopmentPreset = {
         },
         auth: {
           base_url: "http://127.0.0.1:5100",
-          trusted_origins: ["http://127.0.0.1:3000", "http://localhost:3000"],
+          trusted_origins: [
+            "http://127.0.0.1:3000",
+            "http://localhost:3000",
+            "http://127.0.0.1:5173",
+            "http://localhost:5173",
+          ],
           otp_length: 6,
           otp_expires_in_seconds: 300,
           otp_allowed_attempts: 3,

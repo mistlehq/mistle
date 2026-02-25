@@ -41,3 +41,6 @@ smtp_port = 587
 smtp_secure = false
 smtp_username = "replace-with-smtp-username"
 smtp_password = "replace-with-smtp-password"
+
+[apps.dashboard]
+control_plane_api_origin = "https://api.mistle.example"

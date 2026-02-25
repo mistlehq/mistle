@@ -70,7 +70,7 @@ cloudflared tunnel token <tunnel-name-or-id>
 pnpm dev
 ```
 
-`pnpm dev` brings up local infra (Postgres, PgBouncer, Caddy), runs control-plane migrations, and starts a named Cloudflare tunnel with stable hostnames.
+`pnpm dev` brings up local infra (Postgres, PgBouncer, Caddy, Mailpit), runs control-plane migrations, and starts a named Cloudflare tunnel with stable hostnames.
 
 ### Daily Workflow
 
