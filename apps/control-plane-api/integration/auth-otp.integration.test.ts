@@ -155,4 +155,56 @@ describe("auth otp integration", () => {
     }
     expect(session.activeOrganizationId).toBe(organization.id);
   }, 60_000);
+
+  it("rejects sign-in with an incorrect OTP and does not create a user", async ({ fixture }) => {
+    const recipient = "integration-auth-otp-wrong-code@example.com";
+
+    const sendResponse = await sendOTPRequest({
+      fixture,
+      recipient,
+    });
+    expect(sendResponse.status).toBe(200);
+
+    const wrongOTPResponse = await signInWithOTP({
+      fixture,
+      recipient,
+      otp: "000000",
+    });
+    expect(wrongOTPResponse.status).toBe(400);
+
+    const wrongOTPBody = await wrongOTPResponse.text();
+    expect(wrongOTPBody).toContain('"code":"INVALID_OTP"');
+    expect(wrongOTPBody).toContain('"message":"Invalid OTP"');
+
+    const user = await fixture.db.query.users.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (users, { eq }) => eq(users.email, recipient),
+    });
+    expect(user).toBeUndefined();
+  });
+
+  it("rejects sign-in when no OTP was issued and does not create a user", async ({ fixture }) => {
+    const recipient = "integration-auth-otp-no-send@example.com";
+
+    const signInResponse = await signInWithOTP({
+      fixture,
+      recipient,
+      otp: "123456",
+    });
+    expect(signInResponse.status).toBe(400);
+
+    const signInBody = await signInResponse.text();
+    expect(signInBody).toContain('"code":"INVALID_OTP"');
+    expect(signInBody).toContain('"message":"Invalid OTP"');
+
+    const user = await fixture.db.query.users.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (users, { eq }) => eq(users.email, recipient),
+    });
+    expect(user).toBeUndefined();
+  });
 });
