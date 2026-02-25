@@ -39,6 +39,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@mistle/emails": "workspace:*",
     "openworkflow": "^0.7.3",
     "postgres": "^3.4.8"
   },

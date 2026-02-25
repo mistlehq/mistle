@@ -1,10 +1,22 @@
-import type { OpenWorkflowDefinition } from "../../core/register-workflows.js";
+import {
+  createSendVerificationOTPWorkflow,
+  SendVerificationOTPWorkflowSpec,
+  type CreateSendVerificationOTPWorkflowInput,
+} from "./send-verification-otp/index.js";
 
 /**
  * Control-plane workflow implementations.
- *
- * Start empty and add workflows under `workflows/<workflow-id>/`.
  */
-export type ControlPlaneWorkflowDefinition = OpenWorkflowDefinition;
+export type ControlPlaneWorkflowDefinition = ReturnType<typeof createSendVerificationOTPWorkflow>;
 
-export const controlPlaneWorkflowDefinitions: ReadonlyArray<ControlPlaneWorkflowDefinition> = [];
+export type CreateControlPlaneWorkflowDefinitionsInput = {
+  sendVerificationOTP: CreateSendVerificationOTPWorkflowInput;
+};
+
+export function createControlPlaneWorkflowDefinitions(
+  input: CreateControlPlaneWorkflowDefinitionsInput,
+): ReadonlyArray<ControlPlaneWorkflowDefinition> {
+  return [createSendVerificationOTPWorkflow(input.sendVerificationOTP)];
+}
+
+export { SendVerificationOTPWorkflowSpec };

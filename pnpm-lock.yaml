@@ -250,6 +250,9 @@ importers:
 
   packages/workflows:
     dependencies:
+      '@mistle/emails':
+        specifier: workspace:*
+        version: link:../emails
       openworkflow:
         specifier: ^0.7.3
         version: 0.7.3(postgres@3.4.8)
