@@ -6,3 +6,4 @@ packages:
 onlyBuiltDependencies:
   - esbuild
   - lefthook
+  - squawk-cli
