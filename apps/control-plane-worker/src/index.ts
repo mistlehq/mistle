@@ -1,6 +1,6 @@
 import { AppIds, loadConfig } from "@mistle/config";
 
-import { createControlPlaneWorkerRuntime } from "./runtime.js";
+import { createControlPlaneWorkerRuntime } from "./runtime/index.js";
 
 const loadedConfig = loadConfig({
   app: AppIds.CONTROL_PLANE_WORKER,
