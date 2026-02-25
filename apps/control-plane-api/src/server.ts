@@ -1,12 +1,17 @@
 import { serve } from "@hono/node-server";
 
-import { createApp } from "./app.js";
+import type { ControlPlaneApp } from "./types.js";
 
-export function startServer(port = 3000): void {
-  const app = createApp();
+export type StartServerInput = {
+  app: ControlPlaneApp;
+  host: string;
+  port: number;
+};
 
+export function startServer(input: StartServerInput): void {
   serve({
-    fetch: app.fetch,
-    port,
+    fetch: input.app.fetch,
+    hostname: input.host,
+    port: input.port,
   });
 }

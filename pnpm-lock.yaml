@@ -98,6 +98,9 @@ importers:
       pg:
         specifier: ^8.18.0
         version: 8.18.0
+      typeid-js:
+        specifier: ^1.2.0
+        version: 1.2.0
     devDependencies:
       '@types/pg':
         specifier: ^8.15.6
