@@ -1,0 +1,30 @@
+{
+  "name": "@mistle/sandbox",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "node": "./dist/index.js",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./*.js": {
+      "types": "./src/*.ts",
+      "node": "./dist/*.js",
+      "import": "./src/*.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "image:build:prod": "test -n \"$IMAGE_TAG\" && docker build --target sandbox-base-prod -f images/base/Dockerfile -t mistle/sandbox-base:$IMAGE_TAG ../..",
+    "image:build:prod:sha": "IMAGE_TAG=$(git rev-parse --short=12 HEAD) pnpm image:build:prod",
+    "image:build:dev": "docker build --target sandbox-base-dev -f images/base/Dockerfile -t mistle/sandbox-base:dev ../..",
+    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  }
+}
