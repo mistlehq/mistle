@@ -1,5 +1,5 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
-import type { EmailSender } from "@mistle/emails";
+import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 
 import { ControlPlaneDbSchema } from "@mistle/db/control-plane";
 import { betterAuth } from "better-auth";
@@ -19,26 +19,22 @@ export type ControlPlaneAuthConfig = {
   authOTPLength: number;
   authOTPExpiresInSeconds: number;
   authOTPAllowedAttempts: number;
-  emailFromAddress: string;
-  emailFromName: string;
 };
+
+type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
 
 type CreateControlPlaneAuthOptions = {
   config: ControlPlaneAuthConfig;
   db: ControlPlaneDatabase;
-  emailSender: EmailSender;
+  openWorkflow: ControlPlaneOpenWorkflow;
 };
 
 export type ControlPlaneAuth = ReturnType<typeof betterAuth>;
 
 export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions): ControlPlaneAuth {
-  const { config, db, emailSender } = options;
+  const { config, db, openWorkflow } = options;
   const sendVerificationOTP = createSendVerificationOTPService({
-    emailSender,
-    from: {
-      email: config.emailFromAddress,
-      name: config.emailFromName,
-    },
+    openWorkflow,
     expiresInSeconds: config.authOTPExpiresInSeconds,
   });
 

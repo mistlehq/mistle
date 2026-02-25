@@ -3,10 +3,10 @@ import type { ControlPlaneApiConfig, ControlPlaneApiRuntime, StartedServer } fro
 import { createApp, getAppDatabase, stopApp } from "./app.js";
 import { startServer } from "./server.js";
 
-export function createControlPlaneApiRuntime(
+export async function createControlPlaneApiRuntime(
   config: ControlPlaneApiConfig,
-): ControlPlaneApiRuntime {
-  const app = createApp(config);
+): Promise<ControlPlaneApiRuntime> {
+  const app = await createApp(config);
   const db = getAppDatabase(app);
   let startedServer: StartedServer | undefined;
   let stopPromise: Promise<void> | undefined;

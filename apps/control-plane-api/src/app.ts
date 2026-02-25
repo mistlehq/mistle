@@ -1,5 +1,8 @@
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { SMTPEmailSender } from "@mistle/emails";
+import {
+  createControlPlaneBackend,
+  createControlPlaneOpenWorkflow,
+} from "@mistle/workflows/control-plane";
 import { Hono } from "hono";
 import { Pool } from "pg";
 
@@ -13,6 +16,7 @@ import { createCorsMiddleware } from "./middleware/cors.js";
 type AppRuntimeResources = {
   db: ControlPlaneDatabase;
   dbPool: Pool;
+  workflowBackend: Awaited<ReturnType<typeof createControlPlaneBackend>>;
 };
 
 const AppResourcesByInstance = new WeakMap<ControlPlaneApp, AppRuntimeResources>();
@@ -27,22 +31,19 @@ function getAppResources(app: ControlPlaneApp): AppRuntimeResources {
   return appResources;
 }
 
-export function createApp(config: ControlPlaneApiConfig): ControlPlaneApp {
+export async function createApp(config: ControlPlaneApiConfig): Promise<ControlPlaneApp> {
   const app = new Hono<AppContextBindings>();
   const authApp = createAuthApp();
   const dbPool = new Pool({
     connectionString: config.database.url,
   });
   const db = createControlPlaneDatabase(dbPool);
-  const emailSender = SMTPEmailSender.fromTransportOptions({
-    host: config.email.smtpHost,
-    port: config.email.smtpPort,
-    secure: config.email.smtpSecure,
-    auth: {
-      user: config.email.smtpUsername,
-      pass: config.email.smtpPassword,
-    },
+  const workflowBackend = await createControlPlaneBackend({
+    url: config.workflow.databaseUrl,
+    namespaceId: config.workflow.namespaceId,
+    runMigrations: false,
   });
+  const openWorkflow = createControlPlaneOpenWorkflow({ backend: workflowBackend });
   const auth = createControlPlaneAuth({
     config: {
       authBaseUrl: config.auth.baseUrl,
@@ -51,11 +52,9 @@ export function createApp(config: ControlPlaneApiConfig): ControlPlaneApp {
       authOTPLength: config.auth.otpLength,
       authOTPExpiresInSeconds: config.auth.otpExpiresInSeconds,
       authOTPAllowedAttempts: config.auth.otpAllowedAttempts,
-      emailFromAddress: config.email.fromAddress,
-      emailFromName: config.email.fromName,
     },
     db,
-    emailSender,
+    openWorkflow,
   });
 
   app.use("*", createCorsMiddleware({ trustedOrigins: config.auth.trustedOrigins }));
@@ -76,6 +75,7 @@ export function createApp(config: ControlPlaneApiConfig): ControlPlaneApp {
   AppResourcesByInstance.set(app, {
     db,
     dbPool,
+    workflowBackend,
   });
 
   return app;
@@ -85,7 +85,7 @@ export async function stopApp(app: ControlPlaneApp): Promise<void> {
   const appResources = getAppResources(app);
 
   AppResourcesByInstance.delete(app);
-  await appResources.dbPool.end();
+  await Promise.all([appResources.dbPool.end(), appResources.workflowBackend.stop()]);
 }
 
 export function getAppDatabase(app: ControlPlaneApp): ControlPlaneDatabase {

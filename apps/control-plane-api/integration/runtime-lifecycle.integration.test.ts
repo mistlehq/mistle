@@ -10,7 +10,7 @@ describe("runtime lifecycle integration", () => {
   it("enforces start/stop runtime lifecycle semantics", async ({ fixture }) => {
     const host = "127.0.0.1";
     const port = await reserveAvailablePort({ host });
-    const runtime = createControlPlaneApiRuntime(
+    const runtime = await createControlPlaneApiRuntime(
       createRuntimeConfigWithPort({
         config: fixture.config,
         host,
@@ -38,7 +38,7 @@ describe("runtime lifecycle integration", () => {
   }) => {
     const host = "127.0.0.1";
     const port = await reserveAvailablePort({ host });
-    const runtime = createControlPlaneApiRuntime(
+    const runtime = await createControlPlaneApiRuntime(
       createRuntimeConfigWithPort({
         config: fixture.config,
         host,
@@ -63,7 +63,7 @@ describe("runtime lifecycle integration", () => {
   }, 60_000);
 
   it("releases app resources after stopApp", async ({ fixture }) => {
-    const app = createApp(fixture.config);
+    const app = await createApp(fixture.config);
     expect(getAppDatabase(app)).toBeDefined();
 
     await stopApp(app);

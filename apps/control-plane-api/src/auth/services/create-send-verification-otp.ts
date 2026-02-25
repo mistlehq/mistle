@@ -1,11 +1,11 @@
 import {
-  EmailTemplateIds,
-  sendEmail,
-  type EmailSender,
-  type EmailTemplateInputById,
-} from "@mistle/emails";
+  SendVerificationOTPWorkflowSpec,
+  type SendVerificationOTPWorkflowInput,
+  type createControlPlaneOpenWorkflow,
+} from "@mistle/workflows/control-plane";
 
-type OTPVerificationType = EmailTemplateInputById[typeof EmailTemplateIds.OTP]["type"];
+type OTPVerificationType = SendVerificationOTPWorkflowInput["type"];
+type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
 
 type SendVerificationOTPRequest = {
   email: string;
@@ -14,32 +14,19 @@ type SendVerificationOTPRequest = {
 };
 
 type CreateSendVerificationOTPServiceInput = {
-  emailSender: EmailSender;
-  from: {
-    email: string;
-    name: string;
-  };
+  openWorkflow: ControlPlaneOpenWorkflow;
   expiresInSeconds: number;
 };
 
 export function createSendVerificationOTPService(input: CreateSendVerificationOTPServiceInput) {
-  const { emailSender, from, expiresInSeconds } = input;
+  const { openWorkflow, expiresInSeconds } = input;
 
   return async (data: SendVerificationOTPRequest): Promise<void> => {
-    await sendEmail({
-      sender: emailSender,
-      from,
-      to: [
-        {
-          email: data.email,
-        },
-      ],
-      templateId: EmailTemplateIds.OTP,
-      templateInput: {
-        otp: data.otp,
-        type: data.type,
-        expiresInSeconds,
-      },
+    await openWorkflow.runWorkflow(SendVerificationOTPWorkflowSpec, {
+      email: data.email,
+      otp: data.otp,
+      type: data.type,
+      expiresInSeconds,
     });
   };
 }

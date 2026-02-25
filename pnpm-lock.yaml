@@ -83,12 +83,12 @@ importers:
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@mistle/emails':
-        specifier: workspace:*
-        version: link:../../packages/emails
       '@mistle/time':
         specifier: workspace:*
         version: link:../../packages/time
+      '@mistle/workflows':
+        specifier: workspace:*
+        version: link:../../packages/workflows
       better-auth:
         specifier: 1.4.18
         version: 1.4.18(drizzle-kit@0.31.9)(drizzle-orm@0.45.1(@types/pg@8.16.0)(kysely@0.28.11)(pg@8.18.0)(postgres@3.4.8))(pg@8.18.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(vitest@4.0.18(@types/node@24.10.13)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
@@ -105,6 +105,9 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0
     devDependencies:
+      '@mistle/emails':
+        specifier: workspace:*
+        version: link:../../packages/emails
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
