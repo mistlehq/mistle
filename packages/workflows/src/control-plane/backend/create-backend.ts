@@ -1,0 +1,23 @@
+import { BackendPostgres } from "openworkflow/postgres";
+
+import { ControlPlaneOpenWorkflow } from "../constants.js";
+
+export type CreateControlPlaneBackendInput = {
+  url: string;
+  namespaceId: string;
+  runMigrations: boolean;
+};
+
+/**
+ * Creates the control-plane OpenWorkflow backend using a dedicated schema.
+ * This prevents control-plane and data-plane migrations from colliding.
+ */
+export async function createControlPlaneBackend(
+  input: CreateControlPlaneBackendInput,
+): Promise<BackendPostgres> {
+  return BackendPostgres.connect(input.url, {
+    namespaceId: input.namespaceId,
+    runMigrations: input.runMigrations,
+    schema: ControlPlaneOpenWorkflow.SCHEMA,
+  });
+}
