@@ -55,15 +55,21 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
-  tunnel-control-plane-api:
+  tunnel:
     image: "${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}"
-    command: tunnel --no-autoupdate --url "http://host.docker.internal:${CONTROL_PLANE_API_LOCAL_PORT:-5000}"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
-  tunnel-data-plane-edge:
-    image: "${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}"
-    command: tunnel --no-autoupdate --url "http://host.docker.internal:${EDGE_PORT:-8088}"
+    command:
+      - sh
+      - -ceu
+      - |
+        cat >/tmp/config.yml <<EOF
+        ingress:
+          - hostname: ${CONTROL_PLANE_API_TUNNEL_HOSTNAME:-}
+            service: http://host.docker.internal:${CONTROL_PLANE_API_LOCAL_PORT:-5000}
+          - hostname: ${DATA_PLANE_EDGE_TUNNEL_HOSTNAME:-}
+            service: http://host.docker.internal:${EDGE_PORT:-8088}
+          - service: http_status:404
+        EOF
+        cloudflared tunnel --no-autoupdate --config /tmp/config.yml run --token "${CLOUDFLARE_TUNNEL_TOKEN:-}"
     depends_on:
       edge:
         condition: service_started

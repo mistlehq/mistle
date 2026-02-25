@@ -4,6 +4,7 @@ dist
 .turbo
 .env
 .env.*
+.env.local
 *.tsbuildinfo
 .DS_Store
 .pnpm-debug.log*

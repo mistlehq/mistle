@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseToml } from "smol-toml";
@@ -8,11 +8,9 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
 const DEV_CONFIG_PATH = resolve(REPO_ROOT, "config", "config.development.toml");
 const DEV_COMPOSE_PATH = resolve(REPO_ROOT, "infra", "local", "docker-compose.yml");
+const DEV_ENV_LOCAL_PATH = resolve(REPO_ROOT, ".env.local");
 
-const TUNNEL_SERVICES = ["tunnel-control-plane-api", "tunnel-data-plane-edge"];
-const TUNNEL_URL_PATTERN = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/g;
-const TUNNEL_DISCOVERY_TIMEOUT_MS = 45_000;
-const TUNNEL_DISCOVERY_POLL_INTERVAL_MS = 1_000;
+const TUNNEL_SERVICE_NAME = "tunnel";
 let localInfraStarted = false;
 let localInfraStartAttempted = false;
 let localInfraEnv;
@@ -30,6 +28,24 @@ function readControlPlaneApiLocalPort(configPath) {
   }
 
   return controlPlaneApiPort;
+}
+
+function readRequiredEnv(envVarName) {
+  const value = process.env[envVarName];
+
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(`Missing required environment variable: ${envVarName}`);
+  }
+
+  return value.trim();
+}
+
+function loadDevelopmentEnvFile() {
+  if (!existsSync(DEV_ENV_LOCAL_PATH)) {
+    return;
+  }
+
+  process.loadEnvFile(DEV_ENV_LOCAL_PATH);
 }
 
 function runOrThrow(input) {
@@ -174,46 +190,9 @@ process.once("SIGTERM", () => {
   forwardSignal("SIGTERM");
 });
 
-function sleep(durationMs) {
-  return new Promise((resolveSleep) => {
-    setTimeout(resolveSleep, durationMs);
-  });
-}
-
-function readTunnelUrl(serviceName) {
-  const result = runOrThrow({
-    command: "docker",
-    args: ["compose", "-f", DEV_COMPOSE_PATH, "logs", "--no-color", "--no-log-prefix", serviceName],
-    stdio: "pipe",
-  });
-
-  const stdout = result.stdout ?? "";
-  const matches = stdout.match(TUNNEL_URL_PATTERN);
-  if (matches === null || matches.length === 0) {
-    return undefined;
-  }
-
-  return matches[matches.length - 1];
-}
-
-async function waitForTunnelUrl(serviceName) {
-  const deadline = Date.now() + TUNNEL_DISCOVERY_TIMEOUT_MS;
-
-  while (Date.now() < deadline) {
-    const tunnelUrl = readTunnelUrl(serviceName);
-    if (tunnelUrl !== undefined) {
-      return tunnelUrl;
-    }
-
-    await sleep(TUNNEL_DISCOVERY_POLL_INTERVAL_MS);
-  }
-
-  throw new Error(
-    `Timed out waiting for tunnel URL for service '${serviceName}' after ${String(TUNNEL_DISCOVERY_TIMEOUT_MS)}ms.`,
-  );
-}
-
 async function start() {
+  loadDevelopmentEnvFile();
+
   console.log("Initializing development config...");
   runOrThrow({
     command: "pnpm",
@@ -222,9 +201,15 @@ async function start() {
 
   console.log("Starting local infra dependencies (Postgres 18, PgBouncer, Caddy)...");
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
+  const cloudflareTunnelToken = readRequiredEnv("CLOUDFLARE_TUNNEL_TOKEN");
+  const controlPlaneApiTunnelHostname = readRequiredEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME");
+  const dataPlaneEdgeTunnelHostname = readRequiredEnv("DATA_PLANE_EDGE_TUNNEL_HOSTNAME");
   const sharedDevEnv = {
     MISTLE_CONFIG_PATH: DEV_CONFIG_PATH,
     CONTROL_PLANE_API_LOCAL_PORT: String(controlPlaneApiLocalPort),
+    CLOUDFLARE_TUNNEL_TOKEN: cloudflareTunnelToken,
+    CONTROL_PLANE_API_TUNNEL_HOSTNAME: controlPlaneApiTunnelHostname,
+    DATA_PLANE_EDGE_TUNNEL_HOSTNAME: dataPlaneEdgeTunnelHostname,
   };
   localInfraEnv = sharedDevEnv;
   localInfraStartAttempted = true;
@@ -256,12 +241,12 @@ async function start() {
   console.log("Starting public tunnels...");
   runOrThrow({
     command: "docker",
-    args: ["compose", "-f", DEV_COMPOSE_PATH, "up", "-d", ...TUNNEL_SERVICES],
+    args: ["compose", "-f", DEV_COMPOSE_PATH, "up", "-d", TUNNEL_SERVICE_NAME],
     env: sharedDevEnv,
   });
 
-  const controlPlaneApiPublicUrl = await waitForTunnelUrl("tunnel-control-plane-api");
-  const dataPlaneEdgePublicUrl = await waitForTunnelUrl("tunnel-data-plane-edge");
+  const controlPlaneApiPublicUrl = `https://${controlPlaneApiTunnelHostname}`;
+  const dataPlaneEdgePublicUrl = `https://${dataPlaneEdgeTunnelHostname}`;
 
   console.log("");
   console.log("Public tunnel URLs:");
