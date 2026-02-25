@@ -338,4 +338,139 @@ describe("auth otp integration", () => {
     });
     expect(user).toBeUndefined();
   }, 60_000);
+
+  it("does not duplicate bootstrap records on repeated sign-ins", async ({ fixture }) => {
+    const recipient = "integration-auth-otp-idempotent-bootstrap@example.com";
+
+    const firstSendResponse = await sendOTPRequest({
+      fixture,
+      recipient,
+    });
+    expect(firstSendResponse.status).toBe(200);
+
+    const firstMessageListItem = await fixture.mailpitService.waitForMessage({
+      timeoutMs: 15_000,
+      description: `first OTP email for ${recipient}`,
+      matcher: ({ message }) =>
+        message.Subject === "Your sign-in code" &&
+        message.To.some((address) => address.Address === recipient),
+    });
+    const firstMessage = await fixture.mailpitService.getMessageSummary(firstMessageListItem.ID);
+
+    const firstOTP = extractOTPCode(firstMessage.Text, fixture.config.auth.otpLength);
+    expect(firstOTP).toBeDefined();
+    if (firstOTP === undefined) {
+      throw new Error("First OTP was not found in Mailpit message text.");
+    }
+
+    const firstSignInResponse = await signInWithOTP({
+      fixture,
+      recipient,
+      otp: firstOTP,
+    });
+    expect(firstSignInResponse.status).toBe(200);
+
+    const user = await fixture.db.query.users.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (users, { eq }) => eq(users.email, recipient),
+    });
+    expect(user).toBeDefined();
+    if (user === undefined) {
+      throw new Error("Expected user to exist after the first sign-in.");
+    }
+
+    const firstOwnerMemberships = await fixture.db.query.members.findMany({
+      columns: {
+        organizationId: true,
+      },
+      where: (members, { and, eq }) =>
+        and(eq(members.userId, user.id), eq(members.role, MemberRoles.OWNER)),
+    });
+    expect(firstOwnerMemberships).toHaveLength(1);
+
+    const firstOwnerMembership = firstOwnerMemberships[0];
+    if (firstOwnerMembership === undefined) {
+      throw new Error("Expected owner membership after first sign-in.");
+    }
+
+    const firstTeams = await fixture.db.query.teams.findMany({
+      columns: {
+        id: true,
+      },
+      where: (teams, { eq }) => eq(teams.organizationId, firstOwnerMembership.organizationId),
+    });
+    expect(firstTeams).toHaveLength(1);
+
+    const firstTeam = firstTeams[0];
+    if (firstTeam === undefined) {
+      throw new Error("Expected one default team after first sign-in.");
+    }
+
+    const firstTeamMemberships = await fixture.db.query.teamMembers.findMany({
+      columns: {
+        teamId: true,
+      },
+      where: (teamMembers, { eq }) => eq(teamMembers.userId, user.id),
+    });
+    expect(firstTeamMemberships).toHaveLength(1);
+
+    const secondSendResponse = await sendOTPRequest({
+      fixture,
+      recipient,
+    });
+    expect(secondSendResponse.status).toBe(200);
+
+    const secondMessageListItem = await fixture.mailpitService.waitForMessage({
+      timeoutMs: 15_000,
+      description: `second OTP email for ${recipient}`,
+      matcher: ({ message }) =>
+        message.Subject === "Your sign-in code" &&
+        message.ID !== firstMessageListItem.ID &&
+        message.To.some((address) => address.Address === recipient),
+    });
+    const secondMessage = await fixture.mailpitService.getMessageSummary(secondMessageListItem.ID);
+
+    const secondOTP = extractOTPCode(secondMessage.Text, fixture.config.auth.otpLength);
+    expect(secondOTP).toBeDefined();
+    if (secondOTP === undefined) {
+      throw new Error("Second OTP was not found in Mailpit message text.");
+    }
+
+    const secondSignInResponse = await signInWithOTP({
+      fixture,
+      recipient,
+      otp: secondOTP,
+    });
+    expect(secondSignInResponse.status).toBe(200);
+
+    const secondOwnerMemberships = await fixture.db.query.members.findMany({
+      columns: {
+        organizationId: true,
+      },
+      where: (members, { and, eq }) =>
+        and(eq(members.userId, user.id), eq(members.role, MemberRoles.OWNER)),
+    });
+    expect(secondOwnerMemberships).toHaveLength(1);
+    expect(secondOwnerMemberships[0]?.organizationId).toBe(firstOwnerMembership.organizationId);
+
+    const secondTeams = await fixture.db.query.teams.findMany({
+      columns: {
+        id: true,
+      },
+      where: (teams, { eq }) => eq(teams.organizationId, firstOwnerMembership.organizationId),
+    });
+    expect(secondTeams).toHaveLength(1);
+    expect(secondTeams[0]?.id).toBe(firstTeam.id);
+
+    const secondTeamMemberships = await fixture.db.query.teamMembers.findMany({
+      columns: {
+        teamId: true,
+      },
+      where: (teamMembers, { eq }) => eq(teamMembers.userId, user.id),
+    });
+    expect(secondTeamMemberships).toHaveLength(1);
+    expect(secondTeamMemberships[0]?.teamId).toBe(firstTeam.id);
+  }, 60_000);
 });
