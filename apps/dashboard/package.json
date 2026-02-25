@@ -7,9 +7,11 @@
     "dev:e2e": "vite --host localhost --port 4173 --strictPort",
     "build": "vite build",
     "preview": "vite preview",
-    "lint": "oxlint --deny-warnings -c ../../.oxlintrc.jsonc .",
+    "lint": "oxlint --deny-warnings -c ../../.oxlintrc.jsonc . && pnpm run openapi:check",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run --passWithNoTests",
+    "openapi:generate": "tsx scripts/generate-control-plane-client.ts",
+    "openapi:check": "tsx scripts/check-control-plane-client-drift.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },

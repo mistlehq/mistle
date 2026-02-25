@@ -6,6 +6,7 @@ import { createAuthApp } from "../auth/app.js";
 import { createAppContextMiddleware } from "../middleware/app-context.js";
 import { createCorsMiddleware } from "../middleware/cors.js";
 import { withAuthSession } from "../middleware/with-auth-session.js";
+import { CONTROL_PLANE_OPENAPI_INFO, CONTROL_PLANE_OPENAPI_PATH } from "../openapi/constants.js";
 import { createSandboxProfilesApp } from "../sandbox-profiles/index.js";
 
 type RegisterAppRoutesInput = {
@@ -17,8 +18,6 @@ type RegisterAppRoutesInput = {
 
 export function registerAppRoutes(input: RegisterAppRoutesInput): void {
   const { app, config, db, services } = input;
-  const authApp = createAuthApp();
-  const sandboxProfilesApp = withAuthSession(createSandboxProfilesApp());
 
   app.use("*", createCorsMiddleware({ trustedOrigins: config.auth.trustedOrigins }));
   app.use(
@@ -29,16 +28,19 @@ export function registerAppRoutes(input: RegisterAppRoutesInput): void {
       services,
     }),
   );
-  app.doc("/openapi.json", {
-    openapi: "3.0.0",
-    info: {
-      title: "Mistle Control Plane API",
-      version: "0.0.0",
-    },
+  app.doc(CONTROL_PLANE_OPENAPI_PATH, {
+    openapi: "3.1.0",
+    info: CONTROL_PLANE_OPENAPI_INFO,
   });
-  app.route(authApp.basePath, authApp.routes);
-  app.route(sandboxProfilesApp.basePath, sandboxProfilesApp.routes);
+  registerApiRouteModules(app);
   app.get("/__healthz", (c) => {
     return c.json({ ok: true });
   });
+}
+
+export function registerApiRouteModules(app: ControlPlaneApp): void {
+  const authApp = createAuthApp();
+  const sandboxProfilesApp = withAuthSession(createSandboxProfilesApp());
+  app.route(authApp.basePath, authApp.routes);
+  app.route(sandboxProfilesApp.basePath, sandboxProfilesApp.routes);
 }
