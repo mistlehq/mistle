@@ -4,6 +4,8 @@ export { members, MemberRoles } from "./members.js";
 export type { MemberRole } from "./members.js";
 export { CONTROL_PLANE_SCHEMA_NAME } from "./namespace.js";
 export { organizations } from "./organizations.js";
+export { sandboxProfiles, SandboxProfileStatuses } from "./sandbox-profiles.js";
+export type { SandboxProfileStatus } from "./sandbox-profiles.js";
 export { sessions } from "./sessions.js";
 export { teamMembers } from "./team-members.js";
 export { teams } from "./teams.js";
