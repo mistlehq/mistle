@@ -2,7 +2,7 @@ import { reserveAvailablePort } from "@mistle/test-harness";
 import { describe, expect } from "vitest";
 
 import { createApp, getAppDatabase, stopApp } from "../src/app.js";
-import { createControlPlaneApiRuntime } from "../src/runtime.js";
+import { createControlPlaneApiRuntime } from "../src/runtime/index.js";
 import { createRuntimeConfigWithPort } from "./config.js";
 import { it } from "./test-context.js";
 

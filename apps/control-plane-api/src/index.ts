@@ -1,6 +1,6 @@
 import { AppIds, loadConfig } from "@mistle/config";
 
-import { createControlPlaneApiRuntime } from "./runtime.js";
+import { createControlPlaneApiRuntime } from "./runtime/index.js";
 
 async function startControlPlaneApi(): Promise<void> {
   const loadedConfig = loadConfig({
