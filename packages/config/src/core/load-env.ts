@@ -1,35 +1,41 @@
 import type { z } from "zod";
 
-import type { OptionalInput } from "./module.js";
-
 type InputOf<TSchema extends z.ZodType> = z.input<TSchema>;
+type InputKey<TSchema extends z.ZodType> = Extract<keyof InputOf<TSchema>, string>;
+type StringInputKey<TSchema extends z.ZodType> = {
+  [Key in InputKey<TSchema>]-?: Exclude<InputOf<TSchema>[Key], undefined> extends string
+    ? Key
+    : never;
+}[InputKey<TSchema>];
 
-type EnvFieldDescriptor<
-  TSchema extends z.ZodType,
-  Key extends keyof InputOf<TSchema> = keyof InputOf<TSchema>,
-> = {
+type EnvFieldDescriptorWithParse<TSchema extends z.ZodType, Key extends InputKey<TSchema>> = {
   key: Key;
   envVar: string;
   parse: (value: string) => InputOf<TSchema>[Key];
 };
 
+type EnvFieldDescriptorWithoutParse<
+  TSchema extends z.ZodType,
+  Key extends StringInputKey<TSchema>,
+> = {
+  key: Key;
+  envVar: string;
+  parse?: undefined;
+};
+
+type EnvFieldDescriptor<TSchema extends z.ZodType> =
+  | EnvFieldDescriptorWithParse<TSchema, InputKey<TSchema>>
+  | EnvFieldDescriptorWithoutParse<TSchema, StringInputKey<TSchema>>;
+
 function hasEnvValue(value: string | undefined): value is string {
   return value !== undefined;
 }
 
-function setLoadedValue<TSchema extends z.ZodType, Key extends keyof InputOf<TSchema>>(
-  loaded: OptionalInput<TSchema>,
-  key: Key,
-  value: InputOf<TSchema>[Key] | undefined,
-): void {
-  loaded[key] = value;
-}
-
 export function createEnvLoader<TSchema extends z.ZodType>(
   descriptors: readonly EnvFieldDescriptor<TSchema>[],
-): (env: NodeJS.ProcessEnv) => OptionalInput<TSchema> {
+): (env: NodeJS.ProcessEnv) => Record<string, unknown> {
   return (env) => {
-    const loaded: OptionalInput<TSchema> = {};
+    const loaded: Record<string, unknown> = {};
 
     for (const descriptor of descriptors) {
       const rawValue = env[descriptor.envVar];
@@ -37,7 +43,12 @@ export function createEnvLoader<TSchema extends z.ZodType>(
         continue;
       }
 
-      setLoadedValue(loaded, descriptor.key, descriptor.parse(rawValue));
+      if (descriptor.parse === undefined) {
+        loaded[descriptor.key] = rawValue;
+        continue;
+      }
+
+      loaded[descriptor.key] = descriptor.parse(rawValue);
     }
 
     return loaded;

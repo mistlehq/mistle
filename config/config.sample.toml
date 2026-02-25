@@ -4,6 +4,26 @@
 [global]
 env = "production"
 
-[apps.control_plane_api]
+[apps.control_plane_api.server]
 host = "0.0.0.0"
 port = 8080
+
+[apps.control_plane_api.database]
+url = "postgresql://mistle:replace-with-password@db:5432/mistle_control_plane"
+
+[apps.control_plane_api.auth]
+base_url = "https://api.mistle.example"
+secret = "replace-with-strong-secret"
+trusted_origins = ["https://app.mistle.example"]
+otp_length = 6
+otp_expires_in_seconds = 300
+otp_allowed_attempts = 3
+
+[apps.control_plane_api.email]
+from_address = "no-reply@mistle.example"
+from_name = "Mistle"
+smtp_host = "smtp.mistle.example"
+smtp_port = 587
+smtp_secure = false
+smtp_username = "replace-with-smtp-username"
+smtp_password = "replace-with-smtp-password"
