@@ -1,7 +1,6 @@
 import { AppIds, loadConfig } from "@mistle/config";
 
-import { createApp } from "./app.js";
-import { startServer } from "./server.js";
+import { createControlPlaneApiRuntime } from "./runtime.js";
 
 const loadedConfig = loadConfig({
   app: AppIds.CONTROL_PLANE_API,
@@ -9,12 +8,39 @@ const loadedConfig = loadConfig({
   includeGlobal: false,
 });
 const appConfig = loadedConfig.app;
-const app = createApp(appConfig);
+const runtime = createControlPlaneApiRuntime(appConfig);
 
-startServer({
-  app,
-  host: appConfig.server.host,
-  port: appConfig.server.port,
+runtime.start();
+
+let shutdownPromise: Promise<void> | undefined;
+
+async function stopRuntimeAndExit(signal: NodeJS.Signals): Promise<void> {
+  try {
+    await runtime.stop();
+    process.exit(0);
+  } catch (error) {
+    console.error("Failed to gracefully shutdown control-plane-api after", signal, error);
+    process.exit(1);
+  }
+}
+
+async function shutdownAndExit(signal: NodeJS.Signals): Promise<void> {
+  if (shutdownPromise !== undefined) {
+    await shutdownPromise;
+    return;
+  }
+
+  shutdownPromise = stopRuntimeAndExit(signal);
+
+  await shutdownPromise;
+}
+
+process.once("SIGINT", () => {
+  void shutdownAndExit("SIGINT");
+});
+
+process.once("SIGTERM", () => {
+  void shutdownAndExit("SIGTERM");
 });
 
 console.log(

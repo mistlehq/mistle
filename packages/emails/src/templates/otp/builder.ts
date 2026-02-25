@@ -1,7 +1,7 @@
 import { createElement } from "react";
 
 import { type EmailTemplate, renderEmail, renderEmailText } from "../../render.js";
-import { EmailOTPTemplate, type EmailOTPTemplateProps } from "./template.jsx";
+import { EmailOTPTemplate, type EmailOTPTemplateProps } from "./template.js";
 
 export type OTPVerificationType = "sign-in" | "email-verification" | "forget-password";
 

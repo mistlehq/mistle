@@ -1,5 +1,9 @@
 import { systemClock, systemSleeper } from "@mistle/time";
-import { MailpitClient, type MailpitMessageListItem } from "mailpit-api";
+import {
+  MailpitClient,
+  type MailpitMessageListItem,
+  type MailpitMessageSummaryResponse,
+} from "mailpit-api";
 import { GenericContainer, type StartedTestContainer } from "testcontainers";
 
 const MAILPIT_SMTP_PORT = 1025;
@@ -12,6 +16,7 @@ export type MailpitService = {
   smtpPort: number;
   httpBaseUrl: string;
   listMessages: () => Promise<readonly MailpitMessageListItem[]>;
+  getMessageSummary: (id: string) => Promise<MailpitMessageSummaryResponse>;
   waitForMessage: (input: {
     matcher: (input: {
       messages: readonly MailpitMessageListItem[];
@@ -83,6 +88,7 @@ export async function startMailpit(): Promise<MailpitService> {
     smtpPort,
     httpBaseUrl,
     listMessages: async () => listMessages(client),
+    getMessageSummary: async (id: string) => client.getMessageSummary(id),
     waitForMessage: (input) =>
       waitForMessage({
         listMessages: async () => listMessages(client),

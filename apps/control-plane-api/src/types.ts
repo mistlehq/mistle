@@ -1,3 +1,4 @@
+import type { ServerType } from "@hono/node-server";
 import type { loadConfig } from "@mistle/config";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { Context, Hono } from "hono";
@@ -27,3 +28,22 @@ export type AppContextVariables = {
 
 export type AppContext = Context<AppContextBindings>;
 export type ControlPlaneApp = Hono<AppContextBindings>;
+
+export type StartServerInput = {
+  app: ControlPlaneApp;
+  host: string;
+  port: number;
+};
+
+export type StartedServer = {
+  server: ServerType;
+  close: () => Promise<void>;
+};
+
+export type ControlPlaneApiRuntime = {
+  app: ControlPlaneApp;
+  db: ControlPlaneDatabase;
+  request: (path: string, init?: RequestInit) => Promise<Response>;
+  start: () => void;
+  stop: () => Promise<void>;
+};

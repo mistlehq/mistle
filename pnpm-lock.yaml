@@ -102,6 +102,9 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0
     devDependencies:
+      '@mistle/test-harness':
+        specifier: workspace:*
+        version: link:../../packages/test-harness
       '@types/pg':
         specifier: ^8.15.6
         version: 8.16.0

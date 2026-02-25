@@ -51,6 +51,8 @@ describe("mailpit service integration", () => {
     });
 
     expect(matched.Subject).toBe("second subject");
+    const matchedSummary = await mailpitService.getMessageSummary(matched.ID);
+    expect(matchedSummary.Subject).toBe("second subject");
 
     const messages = await mailpitService.listMessages();
     expect(messages).toHaveLength(2);

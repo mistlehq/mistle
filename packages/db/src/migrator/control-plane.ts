@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { fileURLToPath } from "node:url";
-import { Pool } from "pg";
+import { Client } from "pg";
 
 export type RunControlPlaneMigrationsInput = {
   connectionString: string;
@@ -18,14 +18,15 @@ export const CONTROL_PLANE_MIGRATIONS_FOLDER_PATH = fileURLToPath(
 export async function runControlPlaneMigrations(
   input: RunControlPlaneMigrationsInput,
 ): Promise<void> {
-  const pool = new Pool({
+  const databaseClient = new Client({
     connectionString: input.connectionString,
   });
+  await databaseClient.connect();
 
   try {
-    await pool.query(`create schema if not exists "${input.schemaName}"`);
+    await databaseClient.query(`create schema if not exists "${input.schemaName}"`);
 
-    const database = drizzle(pool);
+    const database = drizzle(databaseClient);
 
     await migrate(database, {
       migrationsFolder: input.migrationsFolder,
@@ -33,6 +34,6 @@ export async function runControlPlaneMigrations(
       migrationsTable: input.migrationsTable,
     });
   } finally {
-    await pool.end();
+    await databaseClient.end();
   }
 }
