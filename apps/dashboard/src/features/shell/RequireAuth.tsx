@@ -29,7 +29,19 @@ export function RequireAuth(): React.JSX.Element {
 
     async function loadSession(): Promise<void> {
       setIsLoading(true);
-      const response = await authClient.getSession();
+      let response;
+      try {
+        response = await authClient.getSession();
+      } catch {
+        if (!active) {
+          return;
+        }
+
+        setSession(null);
+        setErrorMessage("Unable to load session.");
+        setIsLoading(false);
+        return;
+      }
 
       if (!active) {
         return;

@@ -31,21 +31,28 @@ export function AuthScreen(): React.JSX.Element {
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
-  async function refreshSession(): Promise<void> {
-    const response = await authClient.getSession();
+  async function refreshSession(): Promise<SessionData> {
+    try {
+      const response = await authClient.getSession();
 
-    if (response.error) {
-      if (response.error.status !== 401) {
-        setSessionError(resolveErrorMessage(response.error, "Unable to load session."));
-      } else {
-        setSessionError(null);
+      if (response.error) {
+        if (response.error.status !== 401) {
+          setSessionError(resolveErrorMessage(response.error, "Unable to load session."));
+        } else {
+          setSessionError(null);
+        }
+        setSession(null);
+        return null;
       }
-      setSession(null);
-      return;
-    }
 
-    setSessionError(null);
-    setSession(response.data);
+      setSessionError(null);
+      setSession(response.data);
+      return response.data;
+    } catch {
+      setSession(null);
+      setSessionError("Unable to load session.");
+      return null;
+    }
   }
 
   useEffect(() => {
@@ -83,15 +90,21 @@ export function AuthScreen(): React.JSX.Element {
 
     const emailValue = email.trim();
     setIsSendingOtp(true);
-    const response = await authClient.emailOtp.sendVerificationOtp({
-      email: emailValue,
-      type: "sign-in",
-    });
-    setIsSendingOtp(false);
+    try {
+      const response = await authClient.emailOtp.sendVerificationOtp({
+        email: emailValue,
+        type: "sign-in",
+      });
 
-    if (response.error) {
-      setAuthError(resolveErrorMessage(response.error, "Unable to send OTP."));
+      if (response.error) {
+        setAuthError(resolveErrorMessage(response.error, "Unable to send OTP."));
+        return;
+      }
+    } catch {
+      setAuthError("Unable to send OTP.");
       return;
+    } finally {
+      setIsSendingOtp(false);
     }
 
     setEmail(emailValue);
@@ -111,18 +124,28 @@ export function AuthScreen(): React.JSX.Element {
 
     const otpValue = otp.trim();
     setIsVerifyingOtp(true);
-    const signInResponse = await authClient.signIn.emailOtp({
-      email,
-      otp: otpValue,
-    });
-    setIsVerifyingOtp(false);
+    try {
+      const signInResponse = await authClient.signIn.emailOtp({
+        email,
+        otp: otpValue,
+      });
 
-    if (signInResponse.error) {
-      setAuthError(resolveErrorMessage(signInResponse.error, "Unable to verify OTP."));
-      return;
+      if (signInResponse.error) {
+        setAuthError(resolveErrorMessage(signInResponse.error, "Unable to verify OTP."));
+        return;
+      }
+
+      const signedInSession = await refreshSession();
+      if (!signedInSession) {
+        setAuthError(
+          "Sign-in succeeded but no session cookie was established. Use the same hostname for dashboard and API (localhost with localhost, or 127.0.0.1 with 127.0.0.1).",
+        );
+      }
+    } catch {
+      setAuthError("Unable to verify OTP.");
+    } finally {
+      setIsVerifyingOtp(false);
     }
-
-    await refreshSession();
   }
 
   function handleUseDifferentEmail(): void {
