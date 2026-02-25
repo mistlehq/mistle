@@ -8,9 +8,8 @@
   }
 
   handle /__healthz {
-    respond "{\"ok\":true}" 200 {
-      content_type application/json
-    }
+    header Content-Type application/json
+    respond "{\"ok\":true}" 200
   }
 
   handle {

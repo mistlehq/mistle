@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "turbo run dev --ui=tui",
+    "dev": "node ./scripts/dev/start.mjs",
+    "dev:workspace": "turbo run dev --ui=tui",
+    "dev:down": "node ./scripts/dev/down.mjs",
     "build": "turbo run build",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
