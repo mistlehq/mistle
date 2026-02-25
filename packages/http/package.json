@@ -1,0 +1,36 @@
+{
+  "name": "@mistle/http",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "node": "./dist/index.js",
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./pagination": {
+      "types": "./src/pagination/index.ts",
+      "node": "./dist/pagination/index.js",
+      "import": "./src/pagination/index.ts",
+      "default": "./src/pagination/index.ts"
+    },
+    "./*.js": {
+      "types": "./src/*.ts",
+      "node": "./dist/*.js",
+      "import": "./src/*.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "zod": "^4.3.6"
+  }
+}
