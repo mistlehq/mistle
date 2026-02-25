@@ -16,7 +16,6 @@ describe("createEnvLoader", () => {
       {
         key: "name",
         envVar: "APP_NAME",
-        parse: (value) => value,
       },
       {
         key: "port",
@@ -41,7 +40,6 @@ describe("createEnvLoader", () => {
       {
         key: "name",
         envVar: "APP_NAME",
-        parse: (value) => value,
       },
       {
         key: "port",
