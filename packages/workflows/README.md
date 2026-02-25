@@ -14,6 +14,11 @@ Root export is also available:
 
 - `@mistle/workflows` (namespaced re-exports as `ControlPlaneWorkflows` and `DataPlaneWorkflows`)
 
+## Workflow Libraries
+
+- [Control-plane workflow library](./src/control-plane/workflows/README.md)
+- [Data-plane workflow library](./src/data-plane/workflows/README.md)
+
 ### `@mistle/workflows/control-plane`
 
 | Export                                  | Type            | Purpose                                                                            |
