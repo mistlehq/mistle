@@ -12,7 +12,7 @@ export function loadControlPlaneApiFromToml(
   const server = asObjectRecord(controlPlaneApi.server);
   const database = asObjectRecord(controlPlaneApi.database);
   const auth = asObjectRecord(controlPlaneApi.auth);
-  const email = asObjectRecord(controlPlaneApi.email);
+  const workflow = asObjectRecord(controlPlaneApi.workflow);
 
   return PartialControlPlaneApiConfigSchema.parse({
     server: {
@@ -30,14 +30,9 @@ export function loadControlPlaneApiFromToml(
       otpExpiresInSeconds: auth.otp_expires_in_seconds,
       otpAllowedAttempts: auth.otp_allowed_attempts,
     },
-    email: {
-      fromAddress: email.from_address,
-      fromName: email.from_name,
-      smtpHost: email.smtp_host,
-      smtpPort: email.smtp_port,
-      smtpSecure: email.smtp_secure,
-      smtpUsername: email.smtp_username,
-      smtpPassword: email.smtp_password,
+    workflow: {
+      databaseUrl: workflow.database_url,
+      namespaceId: workflow.namespace_id,
     },
   });
 }

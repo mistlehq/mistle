@@ -19,14 +19,9 @@ otp_length = 6
 otp_expires_in_seconds = 300
 otp_allowed_attempts = 3
 
-[apps.control_plane_api.email]
-from_address = "no-reply@mistle.example"
-from_name = "Mistle"
-smtp_host = "smtp.mistle.example"
-smtp_port = 587
-smtp_secure = false
-smtp_username = "replace-with-smtp-username"
-smtp_password = "replace-with-smtp-password"
+[apps.control_plane_api.workflow]
+database_url = "postgresql://mistle:replace-with-password@db:6432/mistle_control_plane"
+namespace_id = "production"
 
 [apps.control_plane_worker.server]
 host = "0.0.0.0"

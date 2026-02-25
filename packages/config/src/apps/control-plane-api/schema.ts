@@ -24,15 +24,10 @@ export const ControlPlaneApiAuthConfigSchema = z
   })
   .strict();
 
-export const ControlPlaneApiEmailConfigSchema = z
+export const ControlPlaneApiWorkflowConfigSchema = z
   .object({
-    fromAddress: z.string().min(1),
-    fromName: z.string().min(1),
-    smtpHost: z.string().min(1),
-    smtpPort: z.number().int().min(1).max(65535),
-    smtpSecure: z.boolean(),
-    smtpUsername: z.string().min(1),
-    smtpPassword: z.string().min(1),
+    databaseUrl: z.string().min(1),
+    namespaceId: z.string().min(1),
   })
   .strict();
 
@@ -41,7 +36,7 @@ export const ControlPlaneApiConfigSchema = z
     server: ControlPlaneApiServerConfigSchema,
     database: ControlPlaneApiDatabaseConfigSchema,
     auth: ControlPlaneApiAuthConfigSchema,
-    email: ControlPlaneApiEmailConfigSchema,
+    workflow: ControlPlaneApiWorkflowConfigSchema,
   })
   .strict();
 
@@ -50,7 +45,7 @@ export const PartialControlPlaneApiConfigSchema = z
     server: ControlPlaneApiServerConfigSchema.partial().optional(),
     database: ControlPlaneApiDatabaseConfigSchema.partial().optional(),
     auth: ControlPlaneApiAuthConfigSchema.partial().optional(),
-    email: ControlPlaneApiEmailConfigSchema.partial().optional(),
+    workflow: ControlPlaneApiWorkflowConfigSchema.partial().optional(),
   })
   .strict();
 

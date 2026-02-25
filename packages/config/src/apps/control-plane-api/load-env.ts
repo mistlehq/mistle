@@ -1,10 +1,10 @@
-import { createEnvLoader, hasEntries, parseBooleanEnv } from "../../core/load-env.js";
+import { createEnvLoader, hasEntries } from "../../core/load-env.js";
 import {
   type PartialControlPlaneApiConfigInput,
   ControlPlaneApiAuthConfigSchema,
   ControlPlaneApiDatabaseConfigSchema,
-  ControlPlaneApiEmailConfigSchema,
   ControlPlaneApiServerConfigSchema,
+  ControlPlaneApiWorkflowConfigSchema,
   PartialControlPlaneApiConfigSchema,
 } from "./schema.js";
 
@@ -62,36 +62,14 @@ const loadAuthEnv = createEnvLoader<typeof ControlPlaneApiAuthConfigSchema>([
   },
 ]);
 
-const loadEmailEnv = createEnvLoader<typeof ControlPlaneApiEmailConfigSchema>([
+const loadWorkflowEnv = createEnvLoader<typeof ControlPlaneApiWorkflowConfigSchema>([
   {
-    key: "fromAddress",
-    envVar: "MISTLE_APPS_CONTROL_PLANE_API_EMAIL_FROM_ADDRESS",
+    key: "databaseUrl",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL",
   },
   {
-    key: "fromName",
-    envVar: "MISTLE_APPS_CONTROL_PLANE_API_EMAIL_FROM_NAME",
-  },
-  {
-    key: "smtpHost",
-    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SMTP_HOST",
-  },
-  {
-    key: "smtpPort",
-    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SMTP_PORT",
-    parse: Number,
-  },
-  {
-    key: "smtpSecure",
-    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SMTP_SECURE",
-    parse: (value) => parseBooleanEnv(value, "MISTLE_APPS_CONTROL_PLANE_API_SMTP_SECURE"),
-  },
-  {
-    key: "smtpUsername",
-    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SMTP_USERNAME",
-  },
-  {
-    key: "smtpPassword",
-    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SMTP_PASSWORD",
+    key: "namespaceId",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID",
   },
 ]);
 
@@ -115,9 +93,9 @@ export function loadControlPlaneApiFromEnv(
     partialConfig.auth = auth;
   }
 
-  const email = loadEmailEnv(env);
-  if (hasEntries(email)) {
-    partialConfig.email = email;
+  const workflow = loadWorkflowEnv(env);
+  if (hasEntries(workflow)) {
+    partialConfig.workflow = workflow;
   }
 
   return PartialControlPlaneApiConfigSchema.parse(partialConfig);
