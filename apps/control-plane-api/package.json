@@ -16,15 +16,19 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.4",
+    "@hono/zod-openapi": "^1.2.2",
     "@mistle/config": "workspace:*",
     "@mistle/db": "workspace:*",
+    "@mistle/http": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "better-auth": "1.4.18",
     "drizzle-orm": "^0.45.1",
+    "drizzle-zod": "^0.8.3",
     "hono": "^4.10.6",
     "pg": "^8.18.0",
-    "typeid-js": "^1.2.0"
+    "typeid-js": "^1.2.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@mistle/emails": "workspace:*",

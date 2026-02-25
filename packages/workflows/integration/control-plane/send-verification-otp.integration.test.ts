@@ -8,6 +8,7 @@ import {
   type MailpitService,
   type PostgresWithPgBouncerService,
 } from "@mistle/test-harness";
+import postgres from "postgres";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -23,6 +24,7 @@ describe("send verification otp workflow integration", () => {
     let mailpitService: MailpitService | undefined;
     let backend: BackendPostgres | undefined;
     let worker: Worker | undefined;
+    let sql: ReturnType<typeof postgres> | undefined;
 
     try {
       databaseStack = await startPostgresWithPgBouncer({
@@ -35,6 +37,10 @@ describe("send verification otp workflow integration", () => {
         namespaceId: "control-plane-tests",
         runMigrations: true,
       });
+      const sqlClient = postgres(databaseStack.directUrl, {
+        max: 1,
+      });
+      sql = sqlClient;
 
       const openWorkflow = createControlPlaneOpenWorkflow({ backend });
       const emailSender = SMTPEmailSender.fromTransportOptions({
@@ -52,6 +58,14 @@ describe("send verification otp workflow integration", () => {
             from: {
               email: "no-reply@mistle.dev",
               name: "Mistle",
+            },
+          },
+          requestDeleteSandboxProfile: {
+            deleteSandboxProfile: async (input) => {
+              await sqlClient`
+                delete from control_plane.sandbox_profiles
+                where id = ${input.profileId} and organization_id = ${input.organizationId}
+              `;
             },
           },
         },
@@ -86,6 +100,9 @@ describe("send verification otp workflow integration", () => {
       }
       if (backend !== undefined) {
         stopPromises.push(backend.stop());
+      }
+      if (sql !== undefined) {
+        stopPromises.push(sql.end({ timeout: 5 }));
       }
       if (mailpitService !== undefined) {
         stopPromises.push(mailpitService.stop());

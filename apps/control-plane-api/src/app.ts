@@ -1,9 +1,9 @@
+import { OpenAPIHono } from "@hono/zod-openapi";
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import {
   createControlPlaneBackend,
   createControlPlaneOpenWorkflow,
 } from "@mistle/workflows/control-plane";
-import { Hono } from "hono";
 import { Pool } from "pg";
 
 import type { AppContextBindings, ControlPlaneApiConfig, ControlPlaneApp } from "./types.js";
@@ -12,6 +12,11 @@ import { createAuthApp } from "./auth/app.js";
 import { createControlPlaneAuth } from "./auth/index.js";
 import { createAppContextMiddleware } from "./middleware/app-context.js";
 import { createCorsMiddleware } from "./middleware/cors.js";
+import { withAuthSession } from "./middleware/with-auth-session.js";
+import {
+  createSandboxProfilesApp,
+  createSandboxProfilesService,
+} from "./sandbox-profiles/index.js";
 
 type AppRuntimeResources = {
   db: ControlPlaneDatabase;
@@ -32,8 +37,9 @@ function getAppResources(app: ControlPlaneApp): AppRuntimeResources {
 }
 
 export async function createApp(config: ControlPlaneApiConfig): Promise<ControlPlaneApp> {
-  const app = new Hono<AppContextBindings>();
+  const app = new OpenAPIHono<AppContextBindings>();
   const authApp = createAuthApp();
+  const sandboxProfilesApp = withAuthSession(createSandboxProfilesApp());
   const dbPool = new Pool({
     connectionString: config.database.url,
   });
@@ -56,6 +62,10 @@ export async function createApp(config: ControlPlaneApiConfig): Promise<ControlP
     db,
     openWorkflow,
   });
+  const sandboxProfiles = createSandboxProfilesService({
+    db,
+    openWorkflow,
+  });
 
   app.use("*", createCorsMiddleware({ trustedOrigins: config.auth.trustedOrigins }));
   app.use(
@@ -63,10 +73,18 @@ export async function createApp(config: ControlPlaneApiConfig): Promise<ControlP
     createAppContextMiddleware({
       config,
       db,
-      services: { auth },
+      services: { auth, sandboxProfiles },
     }),
   );
+  app.doc("/openapi.json", {
+    openapi: "3.0.0",
+    info: {
+      title: "Mistle Control Plane API",
+      version: "0.0.0",
+    },
+  });
   app.route(authApp.basePath, authApp.routes);
+  app.route(sandboxProfilesApp.basePath, sandboxProfilesApp.routes);
 
   app.get("/__healthz", (c) => {
     return c.json({ ok: true });

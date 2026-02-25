@@ -21,15 +21,17 @@ Root export is also available:
 
 ### `@mistle/workflows/control-plane`
 
-| Export                                  | Type            | Purpose                                                                            |
-| --------------------------------------- | --------------- | ---------------------------------------------------------------------------------- |
-| `ControlPlaneOpenWorkflow.SCHEMA`       | `string`        | Dedicated OpenWorkflow schema name (`control_plane_openworkflow`).                 |
-| `createControlPlaneBackend`             | `function`      | Creates a Postgres backend configured to the control-plane schema.                 |
-| `createControlPlaneOpenWorkflow`        | `function`      | Creates an OpenWorkflow client for producers and workers.                          |
-| `createControlPlaneWorker`              | `function`      | Registers control-plane workflows and returns a worker instance.                   |
-| `createControlPlaneWorkflowDefinitions` | `function`      | Builds control-plane workflow implementations from explicit dependencies.          |
-| `SendVerificationOTPWorkflowSpec`       | `workflow spec` | Spec for OTP email delivery workflow (`control-plane.auth.send-verification-otp`). |
-| `createSendVerificationOTPWorkflow`     | `function`      | Creates the OTP workflow implementation with injected email dependencies.          |
+| Export                                      | Type            | Purpose                                                                                               |
+| ------------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------- |
+| `ControlPlaneOpenWorkflow.SCHEMA`           | `string`        | Dedicated OpenWorkflow schema name (`control_plane_openworkflow`).                                    |
+| `createControlPlaneBackend`                 | `function`      | Creates a Postgres backend configured to the control-plane schema.                                    |
+| `createControlPlaneOpenWorkflow`            | `function`      | Creates an OpenWorkflow client for producers and workers.                                             |
+| `createControlPlaneWorker`                  | `function`      | Registers control-plane workflows and returns a worker instance.                                      |
+| `createControlPlaneWorkflowDefinitions`     | `function`      | Builds control-plane workflow implementations from explicit dependencies.                             |
+| `SendVerificationOTPWorkflowSpec`           | `workflow spec` | Spec for OTP email delivery workflow (`control-plane.auth.send-verification-otp`).                    |
+| `RequestDeleteSandboxProfileWorkflowSpec`   | `workflow spec` | Spec for sandbox profile deletion workflow (`control-plane.sandbox-profiles.request-delete-profile`). |
+| `createSendVerificationOTPWorkflow`         | `function`      | Creates the OTP workflow implementation with injected email dependencies.                             |
+| `createRequestDeleteSandboxProfileWorkflow` | `function`      | Creates the sandbox profile deletion workflow implementation.                                         |
 
 ### `@mistle/workflows/data-plane`
 
@@ -51,8 +53,15 @@ import {
   createControlPlaneOpenWorkflow,
   createControlPlaneWorker,
 } from "@mistle/workflows/control-plane";
+import { createControlPlaneDatabase, sandboxProfiles } from "@mistle/db/control-plane";
 import { SMTPEmailSender } from "@mistle/emails";
+import { and, eq } from "drizzle-orm";
+import { Pool } from "pg";
 
+const dbPool = new Pool({
+  connectionString: process.env.CONTROL_PLANE_DATABASE_URL!,
+});
+const db = createControlPlaneDatabase(dbPool);
 const backend = await createControlPlaneBackend({
   url: process.env.CONTROL_PLANE_DATABASE_URL!,
   namespaceId: "production",
@@ -81,6 +90,18 @@ const worker = createControlPlaneWorker({
         name: "Mistle",
       },
     },
+    requestDeleteSandboxProfile: {
+      deleteSandboxProfile: async (input) => {
+        await db
+          .delete(sandboxProfiles)
+          .where(
+            and(
+              eq(sandboxProfiles.id, input.profileId),
+              eq(sandboxProfiles.organizationId, input.organizationId),
+            ),
+          );
+      },
+    },
   },
 });
 
@@ -92,6 +113,7 @@ await worker.start();
 ```ts
 import {
   createControlPlaneOpenWorkflow,
+  RequestDeleteSandboxProfileWorkflowSpec,
   SendVerificationOTPWorkflowSpec,
 } from "@mistle/workflows/control-plane";
 
@@ -102,6 +124,11 @@ await ow.runWorkflow(SendVerificationOTPWorkflowSpec, {
   otp: "123456",
   type: "sign-in",
   expiresInSeconds: 300,
+});
+
+await ow.runWorkflow(RequestDeleteSandboxProfileWorkflowSpec, {
+  organizationId: "org_123",
+  profileId: "sbp_123",
 });
 ```
 
@@ -143,10 +170,14 @@ Example registry wiring:
 
 ```ts
 // src/control-plane/workflows/index.ts
+import { createRequestDeleteSandboxProfileWorkflow } from "./request-delete-sandbox-profile/index.js";
 import { createSendVerificationOTPWorkflow } from "./send-verification-otp/index.js";
 
 export function createControlPlaneWorkflowDefinitions(input) {
-  return [createSendVerificationOTPWorkflow(input.sendVerificationOTP)];
+  return [
+    createSendVerificationOTPWorkflow(input.sendVerificationOTP),
+    createRequestDeleteSandboxProfileWorkflow(input.requestDeleteSandboxProfile),
+  ];
 }
 ```
 

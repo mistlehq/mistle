@@ -1,4 +1,9 @@
-import { CONTROL_PLANE_SCHEMA_NAME, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import {
+  CONTROL_PLANE_SCHEMA_NAME,
+  createControlPlaneDatabase,
+  sandboxProfiles,
+  type ControlPlaneDatabase,
+} from "@mistle/db/control-plane";
 import {
   CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
   MigrationTracking,
@@ -16,11 +21,15 @@ import {
   createControlPlaneOpenWorkflow,
   createControlPlaneWorker,
 } from "@mistle/workflows/control-plane";
+import { and, eq } from "drizzle-orm";
+import { Pool } from "pg";
 import { it as vitestIt } from "vitest";
 
 import type { ControlPlaneApiConfig } from "../src/types.js";
+import type { AuthenticatedSession } from "./helpers/auth-session.js";
 
 import { createControlPlaneApiRuntime } from "../src/runtime.js";
+import { createAuthenticatedSession } from "./helpers/auth-session.js";
 
 export type ControlPlaneApiIntegrationFixture = {
   config: ControlPlaneApiConfig;
@@ -28,6 +37,7 @@ export type ControlPlaneApiIntegrationFixture = {
   mailpitService: MailpitService;
   databaseStack: PostgresWithPgBouncerService;
   request: (path: string, init?: RequestInit) => Promise<Response>;
+  authSession: (input?: { email?: string }) => Promise<AuthenticatedSession>;
 };
 
 export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }>({
@@ -66,6 +76,13 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
           await workflowBackend.stop();
         });
         const openWorkflow = createControlPlaneOpenWorkflow({ backend: workflowBackend });
+        const workflowDbPool = new Pool({
+          connectionString: databaseStack.pooledUrl,
+        });
+        cleanupTasks.unshift(async () => {
+          await workflowDbPool.end();
+        });
+        const workflowDb = createControlPlaneDatabase(workflowDbPool);
         const emailSender = SMTPEmailSender.fromTransportOptions({
           host: mailpitService.smtpHost,
           port: mailpitService.smtpPort,
@@ -81,6 +98,18 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
               from: {
                 email: "no-reply@mistle.dev",
                 name: "Mistle",
+              },
+            },
+            requestDeleteSandboxProfile: {
+              deleteSandboxProfile: async (input) => {
+                await workflowDb
+                  .delete(sandboxProfiles)
+                  .where(
+                    and(
+                      eq(sandboxProfiles.id, input.profileId),
+                      eq(sandboxProfiles.organizationId, input.organizationId),
+                    ),
+                  );
               },
             },
           },
@@ -123,6 +152,14 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
           mailpitService,
           databaseStack,
           request: runtime.request,
+          authSession: async (input) =>
+            createAuthenticatedSession({
+              request: runtime.request,
+              db: runtime.db,
+              mailpitService,
+              otpLength: config.auth.otpLength,
+              ...(input?.email === undefined ? {} : { email: input.email }),
+            }),
         });
       } finally {
         for (const cleanupTask of cleanupTasks) {

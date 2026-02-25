@@ -1,9 +1,12 @@
+import { createControlPlaneDatabase, sandboxProfiles } from "@mistle/db/control-plane";
 import { SMTPEmailSender } from "@mistle/emails";
 import {
   createControlPlaneBackend,
   createControlPlaneOpenWorkflow,
   createControlPlaneWorker,
 } from "@mistle/workflows/control-plane";
+import { and, eq } from "drizzle-orm";
+import { Pool } from "pg";
 
 import type {
   ControlPlaneWorkerConfig,
@@ -18,11 +21,21 @@ export async function createControlPlaneWorkerRuntime(
   config: ControlPlaneWorkerConfig,
 ): Promise<ControlPlaneWorkerRuntime> {
   const app = createApp();
-  const backend = await createControlPlaneBackend({
-    url: config.workflow.databaseUrl,
-    namespaceId: config.workflow.namespaceId,
-    runMigrations: config.workflow.runMigrations,
+  const dbPool = new Pool({
+    connectionString: config.workflow.databaseUrl,
   });
+  const db = createControlPlaneDatabase(dbPool);
+  let backend: Awaited<ReturnType<typeof createControlPlaneBackend>>;
+  try {
+    backend = await createControlPlaneBackend({
+      url: config.workflow.databaseUrl,
+      namespaceId: config.workflow.namespaceId,
+      runMigrations: config.workflow.runMigrations,
+    });
+  } catch (error) {
+    await dbPool.end();
+    throw error;
+  }
   const openWorkflow = createControlPlaneOpenWorkflow({ backend });
   const emailSender = SMTPEmailSender.fromTransportOptions({
     host: config.email.smtpHost,
@@ -44,6 +57,18 @@ export async function createControlPlaneWorkerRuntime(
           name: config.email.fromName,
         },
       },
+      requestDeleteSandboxProfile: {
+        deleteSandboxProfile: async (input) => {
+          await db
+            .delete(sandboxProfiles)
+            .where(
+              and(
+                eq(sandboxProfiles.id, input.profileId),
+                eq(sandboxProfiles.organizationId, input.organizationId),
+              ),
+            );
+        },
+      },
     },
   });
   let startedServer: StartedServer | undefined;
@@ -62,7 +87,7 @@ export async function createControlPlaneWorkerRuntime(
       startedServer = undefined;
     }
 
-    await backend.stop();
+    await Promise.all([backend.stop(), dbPool.end()]);
     stopped = true;
   }
 

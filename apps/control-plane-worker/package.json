@@ -17,11 +17,15 @@
   "dependencies": {
     "@hono/node-server": "^1.19.4",
     "@mistle/config": "workspace:*",
+    "@mistle/db": "workspace:*",
     "@mistle/emails": "workspace:*",
     "@mistle/workflows": "workspace:*",
-    "hono": "^4.10.6"
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.10.6",
+    "pg": "^8.18.0"
   },
   "devDependencies": {
-    "@mistle/test-harness": "workspace:*"
+    "@mistle/test-harness": "workspace:*",
+    "@types/pg": "^8.15.6"
   }
 }

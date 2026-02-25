@@ -26,8 +26,15 @@ export const sandboxProfiles = controlPlaneSchema.table(
       .notNull()
       .$type<SandboxProfileStatus>()
       .default(SandboxProfileStatuses.ACTIVE),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [index("sandbox_profiles_organization_id_idx").on(table.organizationId)],
 );
+
+export type SandboxProfile = typeof sandboxProfiles.$inferSelect;
+export type InsertSandboxProfile = typeof sandboxProfiles.$inferInsert;

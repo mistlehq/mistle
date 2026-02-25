@@ -16,9 +16,14 @@ export type CreateControlPlaneWorkerInput = {
  */
 export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): Worker {
   const workflows = createControlPlaneWorkflowDefinitions(input.workflowInputs);
-  for (const workflow of workflows) {
-    input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
-  }
+  input.openWorkflow.implementWorkflow(
+    workflows.sendVerificationOTP.spec,
+    workflows.sendVerificationOTP.fn,
+  );
+  input.openWorkflow.implementWorkflow(
+    workflows.requestDeleteSandboxProfile.spec,
+    workflows.requestDeleteSandboxProfile.fn,
+  );
 
   return input.openWorkflow.newWorker({ concurrency: input.concurrency });
 }
