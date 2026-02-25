@@ -117,6 +117,15 @@ importers:
       '@hono/node-server':
         specifier: ^1.19.4
         version: 1.19.9(hono@4.12.2)
+      '@mistle/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@mistle/emails':
+        specifier: workspace:*
+        version: link:../../packages/emails
+      '@mistle/workflows':
+        specifier: workspace:*
+        version: link:../../packages/workflows
       hono:
         specifier: ^4.10.6
         version: 4.12.2

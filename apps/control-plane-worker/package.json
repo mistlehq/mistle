@@ -15,6 +15,9 @@
   },
   "dependencies": {
     "@hono/node-server": "^1.19.4",
+    "@mistle/config": "workspace:*",
+    "@mistle/emails": "workspace:*",
+    "@mistle/workflows": "workspace:*",
     "hono": "^4.10.6"
   }
 }

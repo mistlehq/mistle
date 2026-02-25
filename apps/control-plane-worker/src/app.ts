@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 
-export function createApp(): Hono {
-  const app = new Hono();
+import type { AppContextBindings, ControlPlaneWorkerApp } from "./types.js";
+
+export function createApp(): ControlPlaneWorkerApp {
+  const app = new Hono<AppContextBindings>();
 
   app.get("/__healthz", (c) => {
     return c.json({ ok: true });
