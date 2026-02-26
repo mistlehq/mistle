@@ -10,6 +10,7 @@ import {
 import { AuthScreen } from "./features/auth/auth-screen.js";
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
 import { HomePage } from "./features/pages/home-page.js";
+import { InvitationAcceptPage } from "./features/pages/invitation-accept-page.js";
 import { OrganizationGeneralSettingsPage } from "./features/pages/organization-general-settings-page.js";
 import { OrganizationMembersSettingsPage } from "./features/pages/organization-members-settings-page.js";
 import { OrganizationProvidersSettingsPage } from "./features/pages/organization-providers-settings-page.js";
@@ -29,6 +30,11 @@ export function App(): React.JSX.Element {
 export const APP_ROUTES = createRoutesFromElements(
   <>
     <Route element={<AuthScreen />} errorElement={<RouteErrorBoundary />} path="/auth/login" />
+    <Route
+      element={<InvitationAcceptPage />}
+      errorElement={<RouteErrorBoundary />}
+      path="/invitations/accept"
+    />
     <Route element={<RequireAuth />} errorElement={<RouteErrorBoundary />}>
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
         <Route
