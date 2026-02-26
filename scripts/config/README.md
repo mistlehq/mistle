@@ -5,7 +5,7 @@ Maintainer docs for local config initialization scripts.
 ## Development Init Script
 
 - Command: `pnpm config:init:dev`
-- Script: `scripts/config/init-development.mjs`
+- Script: `scripts/config/init-development.ts`
 - Output: `config/config.development.toml`
 - Behavior:
   - Reads `config/config.sample.toml`.
@@ -17,7 +17,7 @@ Maintainer docs for local config initialization scripts.
 ## CI Init Script
 
 - Command: `pnpm config:init:ci`
-- Script: `scripts/config/init-ci.mjs`
+- Script: `scripts/config/init-ci.ts`
 - Output: `config/config.ci.toml`
 - Behavior:
   - Reads `config/config.sample.toml`.
@@ -55,7 +55,7 @@ Each module exports:
 - `defaults`: static values merged onto the sample config.
 - `generators`: dynamic value rules for computed values (for example secrets).
 
-`scripts/config/presets/development/index.mjs` composes these modules into
+`scripts/config/presets/development/index.ts` composes these modules into
 `developmentPresetModules`.
 
 ## Generator Contract

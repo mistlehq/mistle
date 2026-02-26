@@ -1,3 +1,5 @@
+import type { DevelopmentPresetModule } from "./types.ts";
+
 export const dataPlaneWorkerDevelopmentPreset = {
   defaults: {
     apps: {
@@ -19,4 +21,4 @@ export const dataPlaneWorkerDevelopmentPreset = {
     },
   },
   generators: [],
-};
+} satisfies DevelopmentPresetModule;

@@ -126,7 +126,7 @@ Use module ownership to keep config changes localized:
 4. Update [`src/conversion-mappings.ts`](./src/conversion-mappings.ts) so env <-> TOML conversion helpers include the new key mapping.
 5. Update the module `README.md` table (Type, TOML key, Env key, defaults).
 6. Update [`../../config/config.sample.toml`](../../config/config.sample.toml) with the production-centric sample value.
-7. If development init should populate the key, update `scripts/config/presets/development/*.mjs` defaults and/or generators.
+7. If development init should populate the key, update `scripts/config/presets/development/*.ts` defaults and/or generators.
 8. Add or update tests:
    - unit tests in `src/**/*test.ts` for parsing/merge/validation behavior
    - integration coverage in `integration/load-config.integration.test.ts` (and fixture updates if needed)

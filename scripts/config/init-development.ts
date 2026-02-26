@@ -3,28 +3,9 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
 
-import { developmentPresetModules } from "./presets/development/index.mjs";
+import type { ConfigRecord } from "./presets/development/types.ts";
 
-/**
- * @typedef {Record<string, unknown>} ConfigRecord
- */
-
-/**
- * @typedef {"missing" | "always"} DevelopmentGeneratorWhen
- */
-
-/**
- * @typedef DevelopmentGenerator
- * @property {string[]} path Dot-path segments to the config field to populate.
- * @property {DevelopmentGeneratorWhen | undefined} [when] When to run the generator.
- * @property {(input: { config: ConfigRecord; currentValue: unknown }) => unknown} generate Generator callback.
- */
-
-/**
- * @typedef DevelopmentPresetModule
- * @property {ConfigRecord | undefined} [defaults] Static default overrides merged into sample config.
- * @property {DevelopmentGenerator[] | undefined} [generators] Dynamic value generators for derived values.
- */
+import { developmentPresetModules } from "./presets/development/index.ts";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
@@ -36,15 +17,11 @@ const GENERATED_HEADER = [
   "",
 ].join("\n");
 
-function isRecord(value) {
+function isRecord(value: unknown): value is ConfigRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * @param {unknown} value
- * @returns {ConfigRecord}
- */
-function asRecord(value) {
+function asRecord(value: unknown): ConfigRecord {
   if (!isRecord(value)) {
     return {};
   }
@@ -52,22 +29,26 @@ function asRecord(value) {
   return value;
 }
 
-function deepClone(value) {
+function deepClone(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map((item) => deepClone(item));
   }
 
   if (isRecord(value)) {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entryValue]) => [key, deepClone(entryValue)]),
-    );
+    const clonedEntries: [string, unknown][] = [];
+
+    for (const [key, entryValue] of Object.entries(value)) {
+      clonedEntries.push([key, deepClone(entryValue)]);
+    }
+
+    return Object.fromEntries(clonedEntries);
   }
 
   return value;
 }
 
-function mergeRecords(base, override) {
-  const merged = { ...base };
+function mergeRecords(base: ConfigRecord, override: ConfigRecord): ConfigRecord {
+  const merged: ConfigRecord = { ...base };
 
   for (const [key, overrideValue] of Object.entries(override)) {
     const baseValue = merged[key];
@@ -83,19 +64,18 @@ function mergeRecords(base, override) {
   return merged;
 }
 
-function buildDevelopmentDefaults() {
-  /** @type {ConfigRecord} */
-  let defaults = {};
+function buildDevelopmentDefaults(): ConfigRecord {
+  let defaults: ConfigRecord = {};
 
-  for (const presetModule of /** @type {DevelopmentPresetModule[]} */ (developmentPresetModules)) {
+  for (const presetModule of developmentPresetModules) {
     defaults = mergeRecords(defaults, asRecord(presetModule.defaults));
   }
 
   return defaults;
 }
 
-function getValueAtPath(root, path) {
-  let current = root;
+function getValueAtPath(root: ConfigRecord, path: readonly string[]): unknown {
+  let current: unknown = root;
 
   for (const segment of path) {
     if (!isRecord(current)) {
@@ -108,41 +88,49 @@ function getValueAtPath(root, path) {
   return current;
 }
 
-function setValueAtPath(root, path, value) {
+function setValueAtPath(root: ConfigRecord, path: readonly string[], value: unknown): ConfigRecord {
   if (path.length === 0) {
     return root;
   }
 
-  const nextRoot = { ...root };
-  let cursor = nextRoot;
+  const nextRoot: ConfigRecord = { ...root };
+  let cursor: ConfigRecord = nextRoot;
 
   for (let index = 0; index < path.length - 1; index += 1) {
     const segment = path[index];
+    if (segment === undefined) {
+      throw new Error("Generator path contained an undefined segment.");
+    }
+
     const existing = cursor[segment];
-    const nextSegment = isRecord(existing) ? { ...existing } : {};
+    const nextSegment: ConfigRecord = isRecord(existing) ? { ...existing } : {};
     cursor[segment] = nextSegment;
     cursor = nextSegment;
   }
 
   const finalSegment = path[path.length - 1];
-  cursor[finalSegment] = value;
+  if (finalSegment === undefined) {
+    throw new Error("Generator path contained an undefined segment.");
+  }
 
+  cursor[finalSegment] = value;
   return nextRoot;
 }
 
-function applyDevelopmentGenerators(configRoot) {
-  let nextRoot = configRoot;
+function applyDevelopmentGenerators(configRoot: ConfigRecord): ConfigRecord {
+  let nextRoot: ConfigRecord = configRoot;
 
-  for (const presetModule of /** @type {DevelopmentPresetModule[]} */ (developmentPresetModules)) {
-    const generators = Array.isArray(presetModule.generators) ? presetModule.generators : [];
+  for (const presetModule of developmentPresetModules) {
+    const generators = presetModule.generators ?? [];
 
     for (const generator of generators) {
-      if (!Array.isArray(generator.path) || generator.path.length === 0) {
+      if (generator.path.length === 0) {
         throw new Error("Generator path must be a non-empty array.");
       }
 
       const currentValue = getValueAtPath(nextRoot, generator.path);
       const when = generator.when ?? "missing";
+
       if (when === "missing" && currentValue !== undefined) {
         continue;
       }
@@ -159,7 +147,7 @@ function applyDevelopmentGenerators(configRoot) {
   return nextRoot;
 }
 
-function main() {
+function main(): void {
   if (process.argv.length > 2) {
     throw new Error("This script does not accept arguments.");
   }
