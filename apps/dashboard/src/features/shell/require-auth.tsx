@@ -1,27 +1,26 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, Spinner } from "@mistle/ui";
-import { useEffect, useState } from "react";
-import { Navigate, Outlet, useLocation, useOutletContext } from "react-router";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mistle/ui";
+import { Navigate, Outlet, useLocation } from "react-router";
 
 import type { SessionData } from "../auth/types.js";
 
-import { authClient } from "../../lib/auth/client.js";
-import { resolveErrorMessage } from "../auth/messages.js";
 import {
   MISSING_ACTIVE_ORGANIZATION_ERROR_MESSAGE,
   resolveActiveOrganizationIdFromSession,
 } from "./active-organization.js";
 import { NoOrganizationRecoveryCard } from "./no-organization-recovery-card.js";
-import { resolveRequireAuthViewState } from "./require-auth-view-state.js";
+import { PendingSessionShell } from "./pending-session-shell.js";
+import { requireAuthenticatedSession } from "./session-context.js";
+import { useSessionQuery } from "./session-query.js";
 
 type AuthenticatedSession = Exclude<SessionData, null>;
 
-type AuthenticatedOutletContext = {
-  session: AuthenticatedSession;
-};
-
 export function useRequiredSession(): AuthenticatedSession {
-  const context = useOutletContext<AuthenticatedOutletContext>();
-  return context.session;
+  const sessionQuery = useSessionQuery();
+  if (sessionQuery.isError) {
+    throw sessionQuery.error;
+  }
+
+  return requireAuthenticatedSession(sessionQuery.data ?? null);
 }
 
 export function useRequiredOrganizationId(): string {
@@ -35,91 +34,14 @@ export function useRequiredOrganizationId(): string {
 }
 
 export function RequireAuth(): React.JSX.Element {
-  const [session, setSession] = useState<SessionData>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const sessionQuery = useSessionQuery();
   const location = useLocation();
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadSession(): Promise<void> {
-      setIsLoading(true);
-      let response;
-      try {
-        response = await authClient.getSession();
-      } catch {
-        if (!active) {
-          return;
-        }
-
-        setSession(null);
-        setErrorMessage("Unable to load session.");
-        setIsLoading(false);
-        return;
-      }
-
-      if (!active) {
-        return;
-      }
-
-      if (response.error) {
-        if (response.error.status === 401) {
-          setSession(null);
-          setErrorMessage(null);
-          setIsLoading(false);
-          return;
-        }
-
-        setSession(null);
-        setErrorMessage(resolveErrorMessage(response.error, "Unable to load session."));
-        setIsLoading(false);
-        return;
-      }
-
-      setSession(response.data);
-      setErrorMessage(null);
-      setIsLoading(false);
-    }
-
-    void loadSession();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const hasActiveOrganization =
-    session !== null && resolveActiveOrganizationIdFromSession(session) !== null;
-  const viewState = resolveRequireAuthViewState({
-    isLoading,
-    errorMessage,
-    hasSession: session !== null,
-    hasActiveOrganization,
-  });
-
-  if (viewState === "loading") {
-    return (
-      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Mistle dashboard</CardTitle>
-              <CardDescription>Preparing your session.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-muted-foreground gap-2 flex items-center">
-                <Spinner />
-                Loading session...
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    );
+  if (sessionQuery.isPending) {
+    return <PendingSessionShell />;
   }
 
-  if (viewState === "error") {
+  if (sessionQuery.isError) {
     return (
       <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
         <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
@@ -129,7 +51,7 @@ export function RequireAuth(): React.JSX.Element {
               <CardDescription>Session error</CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-destructive text-sm">{errorMessage}</p>
+              <p className="text-destructive text-sm">{sessionQuery.error.message}</p>
             </CardContent>
           </Card>
         </div>
@@ -137,13 +59,13 @@ export function RequireAuth(): React.JSX.Element {
     );
   }
 
-  if (viewState === "unauthenticated") {
+  if (sessionQuery.data === null) {
     return <Navigate replace state={{ from: location }} to="/auth/login" />;
   }
 
-  if (viewState === "missing-organization") {
+  if (resolveActiveOrganizationIdFromSession(sessionQuery.data) === null) {
     return <NoOrganizationRecoveryCard />;
   }
 
-  return <Outlet context={{ session }} />;
+  return <Outlet />;
 }
