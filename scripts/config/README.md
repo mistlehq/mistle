@@ -24,6 +24,28 @@ Maintainer docs for local config initialization scripts.
   - Applies deterministic CI overrides.
   - Writes `config/config.ci.toml` (overwrites on each run).
 
+## Conversion Scripts
+
+- Env file to TOML:
+  - Command:
+    - `pnpm config:convert:env-to-toml -- --input .env.development --output config/config.development.toml`
+  - Behavior:
+    - Reads dotenv-style key/value pairs.
+    - Converts known runtime config env vars into TOML keys.
+    - Writes the target TOML file.
+- TOML to env file:
+  - Command:
+    - `pnpm config:convert:toml-to-env -- --input config/config.development.toml --output .env.development`
+  - Behavior:
+    - Reads TOML config.
+    - Converts known runtime config TOML keys into env vars.
+    - Writes the target dotenv file.
+
+Notes:
+
+- Conversion currently covers `@mistle/config` managed runtime modules (global plus control/data plane apps).
+- Unknown keys are ignored.
+
 ## Preset Modules
 
 Development preset modules live under `scripts/config/presets/development/`.
