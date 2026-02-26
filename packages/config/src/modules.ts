@@ -5,6 +5,7 @@ import type { ConfigModule } from "./core/module.js";
 import { controlPlaneApiConfigModule } from "./apps/control-plane-api/index.js";
 import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/index.js";
 import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
+import { dataPlaneGatewayConfigModule } from "./apps/data-plane-gateway/index.js";
 import { dataPlaneWorkerConfigModule } from "./apps/data-plane-worker/index.js";
 import { globalConfigModule } from "./global/index.js";
 
@@ -12,6 +13,7 @@ export const AppIds = {
   CONTROL_PLANE_API: "control-plane-api",
   CONTROL_PLANE_WORKER: "control-plane-worker",
   DATA_PLANE_API: "data-plane-api",
+  DATA_PLANE_GATEWAY: "data-plane-gateway",
   DATA_PLANE_WORKER: "data-plane-worker",
 } as const;
 
@@ -21,6 +23,7 @@ export const appConfigModules = {
   [AppIds.CONTROL_PLANE_API]: controlPlaneApiConfigModule,
   [AppIds.CONTROL_PLANE_WORKER]: controlPlaneWorkerConfigModule,
   [AppIds.DATA_PLANE_API]: dataPlaneApiConfigModule,
+  [AppIds.DATA_PLANE_GATEWAY]: dataPlaneGatewayConfigModule,
   [AppIds.DATA_PLANE_WORKER]: dataPlaneWorkerConfigModule,
 } as const;
 
@@ -29,6 +32,7 @@ type AppConfigById = {
   [AppIds.CONTROL_PLANE_API]: z.infer<typeof controlPlaneApiConfigModule.schema>;
   [AppIds.CONTROL_PLANE_WORKER]: z.infer<typeof controlPlaneWorkerConfigModule.schema>;
   [AppIds.DATA_PLANE_API]: z.infer<typeof dataPlaneApiConfigModule.schema>;
+  [AppIds.DATA_PLANE_GATEWAY]: z.infer<typeof dataPlaneGatewayConfigModule.schema>;
   [AppIds.DATA_PLANE_WORKER]: z.infer<typeof dataPlaneWorkerConfigModule.schema>;
 };
 

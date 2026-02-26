@@ -117,10 +117,25 @@ const dataPlaneApiFixtureConfig = {
   },
 } as const;
 
-const dataPlaneWorkerEnvConfig = {
+const dataPlaneGatewayEnvConfig = {
   server: {
     host: "127.0.0.1",
     port: 5003,
+  },
+} as const;
+
+const dataPlaneGatewayFixtureConfig = {
+  ...dataPlaneGatewayEnvConfig,
+  server: {
+    host: "0.0.0.0",
+    port: 5302,
+  },
+} as const;
+
+const dataPlaneWorkerEnvConfig = {
+  server: {
+    host: "127.0.0.1",
+    port: 5004,
   },
   database: {
     url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
@@ -137,7 +152,7 @@ const dataPlaneWorkerFixtureConfig = {
   ...dataPlaneWorkerEnvConfig,
   server: {
     host: "0.0.0.0",
-    port: 5301,
+    port: 5303,
   },
   workflow: {
     ...dataPlaneWorkerEnvConfig.workflow,
@@ -348,6 +363,73 @@ describe("loadConfig integrations", () => {
     });
   });
 
+  it("loads data-plane-gateway purely from a config file fixture", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_GATEWAY,
+      configPath: configFixturePath,
+    });
+
+    expect(config).toEqual({
+      global: globalDevelopmentConfig,
+      app: dataPlaneGatewayFixtureConfig,
+    });
+  });
+
+  it("loads data-plane-gateway purely from env", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_GATEWAY,
+      env: createIntegrationEnv({
+        NODE_ENV: "production",
+        MISTLE_APPS_DATA_PLANE_GATEWAY_HOST: "localhost",
+        MISTLE_APPS_DATA_PLANE_GATEWAY_PORT: "5303",
+      }),
+    });
+
+    expect(config).toEqual({
+      global: globalProductionConfig,
+      app: {
+        ...dataPlaneGatewayEnvConfig,
+        server: {
+          host: "localhost",
+          port: 5303,
+        },
+      },
+    });
+  });
+
+  it("loads data-plane-gateway from both config file and env, with env precedence", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_GATEWAY,
+      configPath: configFixturePath,
+      env: {
+        MISTLE_APPS_DATA_PLANE_GATEWAY_HOST: "localhost",
+      },
+    });
+
+    expect(config).toEqual({
+      global: globalDevelopmentConfig,
+      app: {
+        ...dataPlaneGatewayFixtureConfig,
+        server: {
+          host: "localhost",
+          port: 5302,
+        },
+      },
+    });
+  });
+
+  it("returns only data-plane-gateway app config when includeGlobal is false", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_GATEWAY,
+      includeGlobal: false,
+      configPath: configFixturePath,
+    });
+
+    expect(config).toEqual({
+      app: dataPlaneGatewayFixtureConfig,
+    });
+  });
+
   it("loads data-plane-worker purely from a config file fixture", () => {
     const config = loadConfig({
       app: AppIds.DATA_PLANE_WORKER,
@@ -366,7 +448,7 @@ describe("loadConfig integrations", () => {
       env: createIntegrationEnv({
         NODE_ENV: "production",
         MISTLE_APPS_DATA_PLANE_WORKER_HOST: "localhost",
-        MISTLE_APPS_DATA_PLANE_WORKER_PORT: "5303",
+        MISTLE_APPS_DATA_PLANE_WORKER_PORT: "5304",
       }),
     });
 
@@ -376,7 +458,7 @@ describe("loadConfig integrations", () => {
         ...dataPlaneWorkerEnvConfig,
         server: {
           host: "localhost",
-          port: 5303,
+          port: 5304,
         },
       },
     });

@@ -83,6 +83,12 @@ describe("parseConfigRecord", () => {
             concurrency: 1,
           },
         },
+        data_plane_gateway: {
+          server: {
+            host: "127.0.0.1",
+            port: 5202,
+          },
+        },
       },
     };
     const config = parseConfigRecord(configRecord);
