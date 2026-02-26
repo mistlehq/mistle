@@ -4,6 +4,12 @@ pre-commit:
     lint-staged:
       run: pnpm lint-staged
 
+commit-msg:
+  parallel: false
+  commands:
+    commitlint:
+      run: pnpm exec commitlint --edit {1}
+
 pre-push:
   parallel: false
   commands:
