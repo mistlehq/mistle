@@ -132,16 +132,21 @@ export const APP_ROUTES = createRoutesFromElements(
               path="members"
             />
             <Route
-              element={
-                <PagePlaceholder
-                  description="Manage provider connections for this organization."
-                  title="Providers"
-                />
-              }
+              element={<RouteOutlet />}
               errorElement={<RouteErrorBoundary />}
               handle={ROUTE_HANDLES.settingsOrganizationProviders}
               path="providers"
             >
+              <Route
+                element={
+                  <PagePlaceholder
+                    description="Manage provider connections for this organization."
+                    title="Providers"
+                  />
+                }
+                errorElement={<RouteErrorBoundary />}
+                index
+              />
               <Route
                 element={
                   <PagePlaceholder
