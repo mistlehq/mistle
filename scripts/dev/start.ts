@@ -334,7 +334,7 @@ function start(): void {
   console.log("");
   console.log("Public tunnel URLs:");
   console.log(`- control-plane-api: ${controlPlaneApiPublicUrl}`);
-  console.log(`- data-plane tunnel base: ${dataPlaneEdgePublicUrl}`);
+  console.log(`- data-plane-api (edge): ${dataPlaneEdgePublicUrl}`);
   console.log(`- data-plane tunnel route: ${dataPlaneEdgePublicUrl}/tunnel`);
   console.log("- mailpit ui: http://127.0.0.1:8025");
   console.log("");
