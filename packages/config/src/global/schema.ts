@@ -3,6 +3,11 @@ import { z } from "zod";
 export const GlobalConfigSchema = z
   .object({
     env: z.enum(["development", "production"]),
+    internalAuth: z
+      .object({
+        serviceToken: z.string().trim().min(1),
+      })
+      .strict(),
   })
   .strict();
 

@@ -1,6 +1,9 @@
 [global]
 env = "development"
 
+[global.internal_auth]
+service_token = "fixture-service-token"
+
 [apps.control_plane_api.server]
 host = "0.0.0.0"
 port = 5100

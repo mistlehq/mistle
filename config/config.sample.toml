@@ -4,6 +4,9 @@
 [global]
 env = "production"
 
+[global.internal_auth]
+service_token = "replace-with-internal-service-token"
+
 [apps.control_plane_api.server]
 host = "0.0.0.0"
 port = 8080

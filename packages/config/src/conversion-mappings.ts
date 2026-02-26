@@ -14,6 +14,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "NODE_ENV",
   },
   {
+    configPath: ["global", "internalAuth", "serviceToken"],
+    tomlPath: ["global", "internal_auth", "service_token"],
+    envVar: "MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN",
+  },
+  {
     configPath: ["apps", "control_plane_api", "server", "host"],
     tomlPath: ["apps", "control_plane_api", "server", "host"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_HOST",

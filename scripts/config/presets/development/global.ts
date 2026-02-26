@@ -1,3 +1,5 @@
+import { randomBytes } from "node:crypto";
+
 import type { DevelopmentPresetModule } from "./types.ts";
 
 export const globalDevelopmentPreset = {
@@ -6,5 +8,11 @@ export const globalDevelopmentPreset = {
       env: "development",
     },
   },
-  generators: [],
+  generators: [
+    {
+      path: ["global", "internal_auth", "service_token"],
+      when: "always",
+      generate: () => randomBytes(32).toString("base64url"),
+    },
+  ],
 } satisfies DevelopmentPresetModule;
