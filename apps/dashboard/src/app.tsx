@@ -19,6 +19,7 @@ import { ProvidersCallbackResultPage } from "./features/pages/providers-callback
 import { SandboxProfileEditorPage } from "./features/pages/sandbox-profile-editor-page.js";
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
 import { SessionsPage } from "./features/pages/sessions-page.js";
+import { createSettingsRoutes } from "./features/settings/settings-routes.js";
 import { AppShell } from "./features/shell/app-shell.js";
 import { RequireAuth } from "./features/shell/require-auth.js";
 import { RouteErrorBoundary } from "./features/shell/route-error-boundary.js";
@@ -77,63 +78,15 @@ export const APP_ROUTES = createRoutesFromElements(
           handle={ROUTE_HANDLES.sessions}
           path="sessions"
         />
-        <Route
-          element={<RouteOutlet />}
-          errorElement={<RouteErrorBoundary />}
-          handle={ROUTE_HANDLES.settings}
-          path="settings"
-        >
-          <Route
-            element={<RouteOutlet />}
-            errorElement={<RouteErrorBoundary />}
-            handle={ROUTE_HANDLES.settingsAccount}
-            path="account"
-          >
-            <Route
-              element={<ProfileSettingsPage />}
-              errorElement={<RouteErrorBoundary />}
-              handle={ROUTE_HANDLES.settingsProfile}
-              path="profile"
-            />
-          </Route>
-          <Route
-            element={<RouteOutlet />}
-            errorElement={<RouteErrorBoundary />}
-            handle={ROUTE_HANDLES.settingsOrganization}
-            path="organization"
-          >
-            <Route
-              element={<OrganizationGeneralSettingsPage />}
-              errorElement={<RouteErrorBoundary />}
-              handle={ROUTE_HANDLES.settingsOrganizationGeneral}
-              path="general"
-            />
-            <Route
-              element={<OrganizationMembersSettingsPage />}
-              errorElement={<RouteErrorBoundary />}
-              handle={ROUTE_HANDLES.settingsOrganizationMembers}
-              path="members"
-            />
-            <Route
-              element={<RouteOutlet />}
-              errorElement={<RouteErrorBoundary />}
-              handle={ROUTE_HANDLES.settingsOrganizationProviders}
-              path="providers"
-            >
-              <Route
-                element={<OrganizationProvidersSettingsPage />}
-                errorElement={<RouteErrorBoundary />}
-                index
-              />
-              <Route
-                element={<ProvidersCallbackResultPage />}
-                errorElement={<RouteErrorBoundary />}
-                handle={ROUTE_HANDLES.settingsOrganizationProviderCallbackResult}
-                path=":providerId/callback-result"
-              />
-            </Route>
-          </Route>
-        </Route>
+        {createSettingsRoutes({
+          settingsRoot: <RouteOutlet />,
+          profile: <ProfileSettingsPage />,
+          organizationGeneral: <OrganizationGeneralSettingsPage />,
+          organizationMembers: <OrganizationMembersSettingsPage />,
+          organizationProviders: <OrganizationProvidersSettingsPage />,
+          organizationProviderCallbackResult: <ProvidersCallbackResultPage />,
+          errorElement: <RouteErrorBoundary />,
+        })}
       </Route>
     </Route>
     <Route element={<Navigate replace to="/" />} path="*" />
