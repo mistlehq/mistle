@@ -9,8 +9,15 @@ import {
 
 import { AuthScreen } from "./features/auth/auth-screen.js";
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
-import { DummyPage } from "./features/pages/dummy-page.js";
-import { PagePlaceholder } from "./features/pages/page-placeholder.js";
+import { HomePage } from "./features/pages/home-page.js";
+import { OrganizationGeneralSettingsPage } from "./features/pages/organization-general-settings-page.js";
+import { OrganizationMembersSettingsPage } from "./features/pages/organization-members-settings-page.js";
+import { OrganizationProvidersSettingsPage } from "./features/pages/organization-providers-settings-page.js";
+import { ProfileSettingsPage } from "./features/pages/profile-settings-page.js";
+import { ProvidersCallbackResultPage } from "./features/pages/providers-callback-result-page.js";
+import { SandboxProfileEditorPage } from "./features/pages/sandbox-profile-editor-page.js";
+import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
+import { SessionsPage } from "./features/pages/sessions-page.js";
 import { AppShell } from "./features/shell/app-shell.js";
 import { RequireAuth } from "./features/shell/require-auth.js";
 import { RouteErrorBoundary } from "./features/shell/route-error-boundary.js";
@@ -25,7 +32,7 @@ export const APP_ROUTES = createRoutesFromElements(
     <Route element={<RequireAuth />} errorElement={<RouteErrorBoundary />}>
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
         <Route
-          element={<DummyPage />}
+          element={<HomePage />}
           errorElement={<RouteErrorBoundary />}
           handle={ROUTE_HANDLES.dashboard}
           index
@@ -36,32 +43,14 @@ export const APP_ROUTES = createRoutesFromElements(
           handle={ROUTE_HANDLES.sandboxProfiles}
           path="sandbox-profiles"
         >
+          <Route element={<SandboxProfilesPage />} index />
           <Route
-            element={
-              <PagePlaceholder
-                description="Browse and manage sandbox profiles."
-                title="Sandbox profiles"
-              />
-            }
-            index
-          />
-          <Route
-            element={
-              <PagePlaceholder
-                description="Create a new sandbox profile."
-                title="Create sandbox profile"
-              />
-            }
+            element={<SandboxProfileEditorPage mode="create" />}
             handle={ROUTE_HANDLES.sandboxProfilesNew}
             path="new"
           />
           <Route
-            element={
-              <PagePlaceholder
-                description="Edit sandbox profile configuration."
-                title="Edit sandbox profile"
-              />
-            }
+            element={<SandboxProfileEditorPage mode="edit" />}
             handle={ROUTE_HANDLES.sandboxProfilesDetail}
             loader={({ params }) => {
               const profileId = params["profileId"];
@@ -77,7 +66,7 @@ export const APP_ROUTES = createRoutesFromElements(
           />
         </Route>
         <Route
-          element={<PagePlaceholder description="Review session activity." title="Sessions" />}
+          element={<SessionsPage />}
           errorElement={<RouteErrorBoundary />}
           handle={ROUTE_HANDLES.sessions}
           path="sessions"
@@ -95,12 +84,7 @@ export const APP_ROUTES = createRoutesFromElements(
             path="account"
           >
             <Route
-              element={
-                <PagePlaceholder
-                  description="Manage your personal profile settings."
-                  title="Profile"
-                />
-              }
+              element={<ProfileSettingsPage />}
               errorElement={<RouteErrorBoundary />}
               handle={ROUTE_HANDLES.settingsProfile}
               path="profile"
@@ -113,20 +97,13 @@ export const APP_ROUTES = createRoutesFromElements(
             path="organization"
           >
             <Route
-              element={
-                <PagePlaceholder
-                  description="Manage organization details and naming."
-                  title="General"
-                />
-              }
+              element={<OrganizationGeneralSettingsPage />}
               errorElement={<RouteErrorBoundary />}
               handle={ROUTE_HANDLES.settingsOrganizationGeneral}
               path="general"
             />
             <Route
-              element={
-                <PagePlaceholder description="Manage organization membership." title="Members" />
-              }
+              element={<OrganizationMembersSettingsPage />}
               errorElement={<RouteErrorBoundary />}
               handle={ROUTE_HANDLES.settingsOrganizationMembers}
               path="members"
@@ -138,22 +115,12 @@ export const APP_ROUTES = createRoutesFromElements(
               path="providers"
             >
               <Route
-                element={
-                  <PagePlaceholder
-                    description="Manage provider connections for this organization."
-                    title="Providers"
-                  />
-                }
+                element={<OrganizationProvidersSettingsPage />}
                 errorElement={<RouteErrorBoundary />}
                 index
               />
               <Route
-                element={
-                  <PagePlaceholder
-                    description="Review provider callback results."
-                    title="Provider callback result"
-                  />
-                }
+                element={<ProvidersCallbackResultPage />}
                 errorElement={<RouteErrorBoundary />}
                 handle={ROUTE_HANDLES.settingsOrganizationProviderCallbackResult}
                 path=":providerId/callback-result"
