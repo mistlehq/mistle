@@ -260,12 +260,6 @@ process.once("SIGTERM", () => {
 function start(): void {
   loadDevelopmentEnvFile();
 
-  console.log("Initializing development config...");
-  runOrThrow({
-    command: "pnpm",
-    args: ["config:init:dev"],
-  });
-
   console.log("Starting local infra dependencies (Postgres 18, PgBouncer, Caddy, Mailpit)...");
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const dataPlaneApiLocalPort = readDataPlaneApiLocalPort(DEV_CONFIG_PATH);
