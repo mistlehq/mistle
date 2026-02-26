@@ -25,6 +25,8 @@ import {
   resolveSettingsBackDestination,
   SETTINGS_DEFAULT_PATH,
 } from "../settings/model.js";
+import { SettingsBackButton } from "../settings/settings-back-button.js";
+import { SettingsSectionNav } from "../settings/settings-section-nav.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 import { clearAuthenticatedSessionCache } from "./session-cache.js";
 import { TopLoadingBar } from "./top-loading-bar.js";
@@ -69,6 +71,12 @@ export function AppShell(): React.JSX.Element {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const inSettings = isSettingsPath(location.pathname);
+  const inSandboxProfiles =
+    location.pathname === "/sandbox-profiles" || location.pathname.startsWith("/sandbox-profiles/");
+  const inDashboardRoot = location.pathname === "/";
+  const inSessions =
+    location.pathname === "/sessions" || location.pathname.startsWith("/sessions/");
+  const showBreadcrumbs = inSettings || inSandboxProfiles || inDashboardRoot || inSessions;
 
   useEffect(() => {
     if (!isSettingsPath(location.pathname)) {
@@ -107,15 +115,11 @@ export function AppShell(): React.JSX.Element {
         <SidebarHeader className={inSettings ? "pb-0" : undefined}>
           <div>
             {inSettings ? (
-              <button
-                className="text-muted-foreground hover:text-foreground text-sm"
-                onClick={() => {
+              <SettingsBackButton
+                onBack={() => {
                   void handleBackToApp();
                 }}
-                type="button"
-              >
-                Back to app
-              </button>
+              />
             ) : (
               <OrganizationMenuTrigger
                 isSigningOut={isSigningOut}
@@ -132,11 +136,15 @@ export function AppShell(): React.JSX.Element {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <SidebarNavGroups
-            groups={MAIN_NAV_GROUPS}
-            pathname={location.pathname}
-            showGroupLabel={false}
-          />
+          {inSettings ? (
+            <SettingsSectionNav />
+          ) : (
+            <SidebarNavGroups
+              groups={MAIN_NAV_GROUPS}
+              pathname={location.pathname}
+              showGroupLabel={false}
+            />
+          )}
         </SidebarContent>
         <SidebarFooter>
           <ErrorNotice message={signOutError} />
@@ -148,9 +156,11 @@ export function AppShell(): React.JSX.Element {
         <TopLoadingBar />
         <header className="bg-background/80 sticky top-0 z-10 flex h-12 items-center border-b px-4 backdrop-blur-sm">
           <SidebarTrigger className="-ml-1" />
-          <div className="ml-2 min-w-0 flex-1">
-            <AppBreadcrumbs />
-          </div>
+          {showBreadcrumbs ? (
+            <div className="ml-2 min-w-0 flex-1">
+              <AppBreadcrumbs />
+            </div>
+          ) : null}
         </header>
         <div className="min-w-0 flex flex-1 flex-col px-4 py-6">
           <div className="min-w-0 flex-1">
