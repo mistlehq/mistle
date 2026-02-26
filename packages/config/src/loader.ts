@@ -6,6 +6,7 @@ import { parse as parseToml } from "smol-toml";
 import { controlPlaneApiConfigModule } from "./apps/control-plane-api/index.js";
 import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/index.js";
 import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
+import { dataPlaneGatewayConfigModule } from "./apps/data-plane-gateway/index.js";
 import { dataPlaneWorkerConfigModule } from "./apps/data-plane-worker/index.js";
 import { mergeConfigRoots } from "./core/merge.js";
 import { type ConfigModule } from "./core/module.js";
@@ -99,6 +100,10 @@ function parseAppConfig(
   root: Record<string, unknown>,
 ): AppConfigModuleValue<typeof AppIds.DATA_PLANE_API>;
 function parseAppConfig(
+  appId: typeof AppIds.DATA_PLANE_GATEWAY,
+  root: Record<string, unknown>,
+): AppConfigModuleValue<typeof AppIds.DATA_PLANE_GATEWAY>;
+function parseAppConfig(
   appId: typeof AppIds.DATA_PLANE_WORKER,
   root: Record<string, unknown>,
 ): AppConfigModuleValue<typeof AppIds.DATA_PLANE_WORKER>;
@@ -122,7 +127,15 @@ function parseAppConfig(
     return parseModuleValue(dataPlaneApiConfigModule, root);
   }
 
-  return parseModuleValue(dataPlaneWorkerConfigModule, root);
+  if (appId === AppIds.DATA_PLANE_GATEWAY) {
+    return parseModuleValue(dataPlaneGatewayConfigModule, root);
+  }
+
+  if (appId === AppIds.DATA_PLANE_WORKER) {
+    return parseModuleValue(dataPlaneWorkerConfigModule, root);
+  }
+
+  throw new Error("Unsupported app id.");
 }
 
 export function loadConfig<TApp extends AppConfigModuleKey>(

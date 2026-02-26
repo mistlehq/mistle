@@ -3,6 +3,7 @@ import { z } from "zod";
 import { ControlPlaneApiConfigSchema } from "./apps/control-plane-api/schema.js";
 import { ControlPlaneWorkerConfigSchema } from "./apps/control-plane-worker/schema.js";
 import { DataPlaneApiConfigSchema } from "./apps/data-plane-api/schema.js";
+import { DataPlaneGatewayConfigSchema } from "./apps/data-plane-gateway/schema.js";
 import { DataPlaneWorkerConfigSchema } from "./apps/data-plane-worker/schema.js";
 import { GlobalConfigSchema } from "./global/schema.js";
 
@@ -14,6 +15,7 @@ export const ConfigSchema = z
         control_plane_api: ControlPlaneApiConfigSchema,
         control_plane_worker: ControlPlaneWorkerConfigSchema,
         data_plane_api: DataPlaneApiConfigSchema,
+        data_plane_gateway: DataPlaneGatewayConfigSchema,
         data_plane_worker: DataPlaneWorkerConfigSchema,
       })
       .strict(),
