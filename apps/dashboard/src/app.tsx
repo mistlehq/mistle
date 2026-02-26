@@ -40,15 +40,9 @@ export const APP_ROUTES = createRoutesFromElements(
     />
     <Route element={<RequireAuth />} errorElement={<RouteErrorBoundary />}>
       <Route element={<AppShell />} errorElement={<RouteErrorBoundary />}>
-        <Route
-          element={<HomePage />}
-          errorElement={<RouteErrorBoundary />}
-          handle={ROUTE_HANDLES.dashboard}
-          index
-        />
+        <Route element={<HomePage />} handle={ROUTE_HANDLES.dashboard} index />
         <Route
           element={<RouteOutlet />}
-          errorElement={<RouteErrorBoundary />}
           handle={ROUTE_HANDLES.sandboxProfiles}
           path="sandbox-profiles"
         >
@@ -74,12 +68,7 @@ export const APP_ROUTES = createRoutesFromElements(
             path=":profileId"
           />
         </Route>
-        <Route
-          element={<SessionsPage />}
-          errorElement={<RouteErrorBoundary />}
-          handle={ROUTE_HANDLES.sessions}
-          path="sessions"
-        />
+        <Route element={<SessionsPage />} handle={ROUTE_HANDLES.sessions} path="sessions" />
         {createSettingsRoutes({
           settingsRoot: <SettingsLayout />,
           profile: <ProfileSettingsPage />,
@@ -87,7 +76,6 @@ export const APP_ROUTES = createRoutesFromElements(
           organizationMembers: <OrganizationMembersSettingsPage />,
           organizationProviders: <OrganizationProvidersSettingsPage />,
           organizationProviderCallbackResult: <ProvidersCallbackResultPage />,
-          errorElement: <RouteErrorBoundary />,
         })}
       </Route>
     </Route>
