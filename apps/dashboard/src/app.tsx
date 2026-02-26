@@ -20,6 +20,7 @@ import { SandboxProfileEditorPage } from "./features/pages/sandbox-profile-edito
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
 import { SessionsPage } from "./features/pages/sessions-page.js";
 import { resolveScaffoldProfileDisplayName } from "./features/sandbox-profiles/scaffold-profiles.js";
+import { SettingsLayout } from "./features/settings/settings-layout.js";
 import { createSettingsRoutes } from "./features/settings/settings-routes.js";
 import { AppShell } from "./features/shell/app-shell.js";
 import { RequireAuth } from "./features/shell/require-auth.js";
@@ -80,7 +81,7 @@ export const APP_ROUTES = createRoutesFromElements(
           path="sessions"
         />
         {createSettingsRoutes({
-          settingsRoot: <RouteOutlet />,
+          settingsRoot: <SettingsLayout />,
           profile: <ProfileSettingsPage />,
           organizationGeneral: <OrganizationGeneralSettingsPage />,
           organizationMembers: <OrganizationMembersSettingsPage />,
