@@ -42,6 +42,19 @@ describe("sandbox profiles create integration", () => {
     expect(persistedProfile.organizationId).toBe(authenticatedSession.organizationId);
     expect(persistedProfile.displayName).toBe("Created Profile");
     expect(persistedProfile.status).toBe(SandboxProfileStatuses.ACTIVE);
+
+    const persistedVersions = await fixture.db.query.sandboxProfileVersions.findMany({
+      where: (table, { eq }) => eq(table.sandboxProfileId, body.id),
+    });
+    expect(persistedVersions).toHaveLength(1);
+
+    const [initialVersion] = persistedVersions;
+    if (initialVersion === undefined) {
+      throw new Error("Expected initial sandbox profile version to exist.");
+    }
+    expect(initialVersion.sandboxProfileId).toBe(body.id);
+    expect(initialVersion.version).toBe(1);
+    expect(initialVersion.manifest).toEqual({});
   }, 60_000);
 
   it("creates a sandbox profile with explicit status", async ({ fixture }) => {
