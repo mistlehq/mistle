@@ -272,6 +272,18 @@ async function start() {
   });
   localInfraStarted = true;
 
+  console.log("Building migration dependencies...");
+  runOrThrow({
+    command: "pnpm",
+    args: ["--filter", "@mistle/config", "build"],
+    env: sharedDevEnv,
+  });
+  runOrThrow({
+    command: "pnpm",
+    args: ["--filter", "@mistle/db", "build"],
+    env: sharedDevEnv,
+  });
+
   console.log("Running control-plane DB migrations...");
   runOrThrow({
     command: "pnpm",
