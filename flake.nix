@@ -19,6 +19,7 @@
             nodejs
             python
             python.pkgs.pip
+            pkgs.pipx
             pkgs.pnpm
             pkgs.rustc
             pkgs.cargo
@@ -32,6 +33,12 @@
 
           shellHook = ''
             export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+            export PIPX_DEFAULT_PYTHON=${python}/bin/python3
+            REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+            export PIPX_HOME="$REPO_ROOT/.pipx/home"
+            export PIPX_BIN_DIR="$REPO_ROOT/.pipx/bin"
+            mkdir -p "$PIPX_HOME" "$PIPX_BIN_DIR"
+            export PATH="$PIPX_BIN_DIR:$PATH"
             if [ ! -f .env.local ]; then
               echo "Tip: copy sample.env.local to .env.local before running pnpm dev."
             fi

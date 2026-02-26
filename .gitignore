@@ -11,6 +11,7 @@ target
 .DS_Store
 .pnpm-debug.log*
 .pkgrep
+.pipx
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
