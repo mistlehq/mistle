@@ -138,13 +138,9 @@ function resolveRouteText(
     return value;
   }
 
-  try {
-    const resolved = Reflect.apply(value, undefined, [input]);
-    if (typeof resolved === "string") {
-      return resolved;
-    }
-  } catch {
-    return null;
+  const resolved = Reflect.apply(value, undefined, [input]);
+  if (typeof resolved === "string") {
+    return resolved;
   }
 
   return null;
@@ -162,12 +158,8 @@ function resolveRouteHref(
     return value;
   }
 
-  try {
-    const resolved = Reflect.apply(value, undefined, [input]);
-    return typeof resolved === "string" ? resolved : null;
-  } catch {
-    return null;
-  }
+  const resolved = Reflect.apply(value, undefined, [input]);
+  return typeof resolved === "string" ? resolved : null;
 }
 
 export function useAppBreadcrumbs(): AppBreadcrumb[] {

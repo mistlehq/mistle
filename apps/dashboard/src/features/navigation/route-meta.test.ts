@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolveAppBreadcrumbsFromMatches } from "./route-meta.js";
+import { resolveAppBreadcrumbsFromMatches, resolveAppPageMetaFromMatches } from "./route-meta.js";
 
 describe("route breadcrumb metadata", () => {
   it("keeps non-page group crumbs non-clickable while preserving page breadcrumb", () => {
@@ -96,5 +96,37 @@ describe("route breadcrumb metadata", () => {
         to: null,
       },
     ]);
+  });
+
+  it("throws when breadcrumb resolver throws", () => {
+    expect(() =>
+      resolveAppBreadcrumbsFromMatches([
+        {
+          handle: {
+            breadcrumb: () => {
+              throw new Error("breadcrumb resolver failure");
+            },
+          },
+          params: {},
+          pathname: "/settings",
+        },
+      ]),
+    ).toThrow("breadcrumb resolver failure");
+  });
+
+  it("throws when page meta resolver throws", () => {
+    expect(() =>
+      resolveAppPageMetaFromMatches([
+        {
+          handle: {
+            title: () => {
+              throw new Error("title resolver failure");
+            },
+          },
+          params: {},
+          pathname: "/settings",
+        },
+      ]),
+    ).toThrow("title resolver failure");
   });
 });
