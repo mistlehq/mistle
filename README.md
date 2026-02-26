@@ -58,6 +58,8 @@ pnpm install
 cp sample.env.local .env.local
 ```
 
+`.env.local` is for local tooling and developer secrets only (for example tunnel tokens, or opt-in test toggles like `MISTLE_SANDBOX_INTEGRATION` and `MISTLE_SANDBOX_INTEGRATION_PROVIDERS`). Application runtime configuration should be set in `config/*.toml` and loaded via `MISTLE_CONFIG_PATH`, not stored in `.env.local`.
+
 4. Fill `CLOUDFLARE_TUNNEL_TOKEN` in `.env.local`:
 
 ```bash
