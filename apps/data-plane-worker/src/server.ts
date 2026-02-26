@@ -1,12 +1,29 @@
-import { serve } from "@hono/node-server";
+import { serve, type ServerType } from "@hono/node-server";
 
-import { createApp } from "./app.js";
+import type { StartServerInput, StartedServer } from "./types.js";
 
-export function startServer(port = 3001): void {
-  const app = createApp();
+function closeServer(server: ServerType): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.close((error) => {
+      if (error !== undefined) {
+        reject(error);
+        return;
+      }
 
-  serve({
-    fetch: app.fetch,
-    port,
+      resolve();
+    });
   });
+}
+
+export function startServer(input: StartServerInput): StartedServer {
+  const server = serve({
+    fetch: input.app.fetch,
+    hostname: input.host,
+    port: input.port,
+  });
+
+  return {
+    server,
+    close: async () => closeServer(server),
+  };
 }

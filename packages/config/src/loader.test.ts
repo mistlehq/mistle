@@ -65,6 +65,21 @@ describe("parseConfigRecord", () => {
             namespaceId: "development",
           },
         },
+        data_plane_worker: {
+          server: {
+            host: "127.0.0.1",
+            port: 5201,
+          },
+          database: {
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
+          },
+          workflow: {
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
+            namespaceId: "development",
+            runMigrations: true,
+            concurrency: 1,
+          },
+        },
       },
     };
     const config = parseConfigRecord(configRecord);
