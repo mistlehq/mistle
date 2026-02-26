@@ -4,19 +4,19 @@ import { Navigate, useLocation } from "react-router";
 
 import type { SessionData } from "./types.js";
 
-import { MistleLogo } from "../../components/MistleLogo.js";
+import { MistleLogo } from "../../components/mistle-logo.js";
 import { authClient } from "../../lib/auth/client.js";
 import {
   createStateForDifferentEmail,
   resolveEmailValidationError,
   resolveOtpValidationError,
   type AuthStep,
-} from "./authFlow.js";
-import { resolvePostLoginPath } from "./authRedirect.js";
-import { EmailStepForm } from "./EmailStepForm.js";
-import { ErrorNotice } from "./ErrorNotice.js";
+} from "./auth-flow.js";
+import { resolvePostLoginPath } from "./auth-redirect.js";
+import { EmailStepForm } from "./email-step-form.js";
+import { ErrorNotice } from "./error-notice.js";
 import { resolveErrorMessage } from "./messages.js";
-import { OtpStepForm } from "./OtpStepForm.js";
+import { OtpStepForm } from "./otp-step-form.js";
 
 export function AuthScreen(): React.JSX.Element {
   const location = useLocation();

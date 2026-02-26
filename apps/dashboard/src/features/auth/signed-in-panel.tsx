@@ -12,7 +12,7 @@ import {
 
 import type { SessionData } from "./types.js";
 
-import { ErrorNotice } from "./ErrorNotice.js";
+import { ErrorNotice } from "./error-notice.js";
 
 type SignedInPanelProps = {
   session: SessionData;

@@ -4,7 +4,7 @@ import {
   createStateForDifferentEmail,
   resolveEmailValidationError,
   resolveOtpValidationError,
-} from "./authFlow.js";
+} from "./auth-flow.js";
 
 describe("authFlow", () => {
   it("returns an error for empty email submissions", () => {

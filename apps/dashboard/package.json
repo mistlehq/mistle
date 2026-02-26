@@ -7,7 +7,7 @@
     "dev:e2e": "tsx scripts/vite-with-config.ts dev --host localhost --port 4173 --strictPort",
     "build": "tsx scripts/vite-with-config.ts build",
     "preview": "tsx scripts/vite-with-config.ts preview",
-    "lint": "oxlint --deny-warnings -c ../../.oxlintrc.jsonc . && pnpm run openapi:check",
+    "lint": "tsx scripts/check-file-names.ts && oxlint --deny-warnings -c ../../.oxlintrc.jsonc . && pnpm run openapi:check",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run --passWithNoTests",
     "openapi:generate": "tsx scripts/generate-control-plane-client.ts",

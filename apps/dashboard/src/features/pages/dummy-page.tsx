@@ -11,9 +11,9 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { authClient } from "../../lib/auth/client.js";
-import { ErrorNotice } from "../auth/ErrorNotice.js";
+import { ErrorNotice } from "../auth/error-notice.js";
 import { resolveErrorMessage } from "../auth/messages.js";
-import { useRequiredSession } from "../shell/RequireAuth.js";
+import { useRequiredSession } from "../shell/require-auth.js";
 
 export function DummyPage(): React.JSX.Element {
   const navigate = useNavigate();

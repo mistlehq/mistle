@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { resolvePostLoginPath } from "./authRedirect.js";
+import { resolvePostLoginPath } from "./auth-redirect.js";
 
 describe("resolvePostLoginPath", () => {
   it("returns the requested protected path when present", () => {

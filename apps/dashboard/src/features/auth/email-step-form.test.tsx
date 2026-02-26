@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { EmailStepForm } from "./EmailStepForm.js";
+import { EmailStepForm } from "./email-step-form.js";
 
 describe("EmailStepForm", () => {
   it("provides a programmatic label for the email input", () => {

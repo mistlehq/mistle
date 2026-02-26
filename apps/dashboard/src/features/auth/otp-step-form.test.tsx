@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { OtpStepForm } from "./OtpStepForm.js";
+import { OtpStepForm } from "./otp-step-form.js";
 
 describe("OtpStepForm", () => {
   it("provides a programmatic label for the one-time code input", () => {
