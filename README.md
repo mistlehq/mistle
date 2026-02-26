@@ -35,7 +35,7 @@ Verify:
 
 ```bash
 nix --version
-nix doctor
+nix config check
 ```
 
 ### First-Time Setup
