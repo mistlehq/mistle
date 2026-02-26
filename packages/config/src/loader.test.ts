@@ -8,6 +8,9 @@ describe("parseConfigRecord", () => {
     const configRecord = {
       global: {
         env: "development",
+        internalAuth: {
+          serviceToken: "test-service-token",
+        },
       },
       apps: {
         control_plane_api: {

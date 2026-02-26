@@ -24,7 +24,8 @@ let terminated = false;
 type CloudflaredConfigInput = {
   controlPlaneApiTunnelHostname: string;
   controlPlaneApiLocalPort: number;
-  dataPlaneEdgeTunnelHostname: string;
+  dataPlaneApiLocalPort: number;
+  dataPlaneTunnelHostname: string;
 };
 
 type RunInput = {
@@ -106,8 +107,8 @@ function writeCloudflaredConfig(input: CloudflaredConfigInput): void {
     "ingress:",
     `  - hostname: ${input.controlPlaneApiTunnelHostname}`,
     `    service: http://host.docker.internal:${input.controlPlaneApiLocalPort}`,
-    `  - hostname: ${input.dataPlaneEdgeTunnelHostname}`,
-    "    service: http://edge:8088",
+    `  - hostname: ${input.dataPlaneTunnelHostname}`,
+    `    service: http://host.docker.internal:${input.dataPlaneApiLocalPort}`,
     "  - service: http_status:404",
     "",
   ].join("\n");
@@ -260,17 +261,18 @@ process.once("SIGTERM", () => {
 function start(): void {
   loadDevelopmentEnvFile();
 
-  console.log("Starting local infra dependencies (Postgres 18, PgBouncer, Caddy, Mailpit)...");
+  console.log("Starting local infra dependencies (Postgres 18, PgBouncer, Mailpit)...");
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const dataPlaneApiLocalPort = readDataPlaneApiLocalPort(DEV_CONFIG_PATH);
   const cloudflareTunnelToken = readRequiredEnv("CLOUDFLARE_TUNNEL_TOKEN");
   const controlPlaneApiTunnelHostname = readRequiredEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME");
-  const dataPlaneEdgeTunnelHostname = readRequiredEnv("DATA_PLANE_EDGE_TUNNEL_HOSTNAME");
+  const dataPlaneTunnelHostname = readRequiredEnv("DATA_PLANE_API_TUNNEL_HOSTNAME");
 
   writeCloudflaredConfig({
     controlPlaneApiTunnelHostname,
     controlPlaneApiLocalPort,
-    dataPlaneEdgeTunnelHostname,
+    dataPlaneApiLocalPort,
+    dataPlaneTunnelHostname,
   });
 
   const sharedDevEnv: NodeJS.ProcessEnv = {
@@ -278,9 +280,8 @@ function start(): void {
     CONTROL_PLANE_API_LOCAL_PORT: String(controlPlaneApiLocalPort),
     CLOUDFLARE_TUNNEL_TOKEN: cloudflareTunnelToken,
     CONTROL_PLANE_API_TUNNEL_HOSTNAME: controlPlaneApiTunnelHostname,
-    DATA_PLANE_EDGE_TUNNEL_HOSTNAME: dataPlaneEdgeTunnelHostname,
+    DATA_PLANE_API_TUNNEL_HOSTNAME: dataPlaneTunnelHostname,
     CLOUDFLARED_CONFIG_PATH: DEV_CLOUDFLARED_CONFIG_PATH,
-    DATA_PLANE_API_UPSTREAM: `host.docker.internal:${String(dataPlaneApiLocalPort)}`,
   };
   localInfraEnv = sharedDevEnv;
   localInfraStartAttempted = true;
@@ -296,7 +297,6 @@ function start(): void {
       "--wait",
       "postgres",
       "pgbouncer",
-      "edge",
       "mailpit",
     ],
     env: sharedDevEnv,
@@ -329,13 +329,13 @@ function start(): void {
   });
 
   const controlPlaneApiPublicUrl = `https://${controlPlaneApiTunnelHostname}`;
-  const dataPlaneEdgePublicUrl = `https://${dataPlaneEdgeTunnelHostname}`;
+  const dataPlaneApiPublicUrl = `https://${dataPlaneTunnelHostname}`;
 
   console.log("");
   console.log("Public tunnel URLs:");
   console.log(`- control-plane-api: ${controlPlaneApiPublicUrl}`);
-  console.log(`- data-plane-api (edge): ${dataPlaneEdgePublicUrl}`);
-  console.log(`- data-plane tunnel route: ${dataPlaneEdgePublicUrl}/tunnel`);
+  console.log(`- data-plane-api: ${dataPlaneApiPublicUrl}`);
+  console.log(`- data-plane tunnel route: ${dataPlaneApiPublicUrl}/tunnel`);
   console.log("- mailpit ui: http://127.0.0.1:8025");
   console.log("");
 

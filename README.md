@@ -70,14 +70,14 @@ cloudflared tunnel create <tunnel-name>
 
 ```bash
 cloudflared tunnel route dns <tunnel-name> <control-plane-api-hostname>
-cloudflared tunnel route dns <tunnel-name> <data-plane-edge-hostname>
+cloudflared tunnel route dns <tunnel-name> <data-plane-api-hostname>
 ```
 
 Example naming:
 
 - `<tunnel-name>`: `mistle-<your-suffix>`
 - `<control-plane-api-hostname>`: `control-plane-api-<your-suffix>.<your-zone>`
-- `<data-plane-edge-hostname>`: `data-plane-edge-<your-suffix>.<your-zone>`
+- `<data-plane-api-hostname>`: `data-plane-api-<your-suffix>.<your-zone>`
 
 6. Fill required tunnel values in `.env.local`:
 
@@ -88,7 +88,7 @@ cloudflared tunnel token <tunnel-name>
 ```env
 CLOUDFLARE_TUNNEL_TOKEN=<token-from-command-above>
 CONTROL_PLANE_API_TUNNEL_HOSTNAME=<control-plane-api-hostname>
-DATA_PLANE_EDGE_TUNNEL_HOSTNAME=<data-plane-edge-hostname>
+DATA_PLANE_API_TUNNEL_HOSTNAME=<data-plane-api-hostname>
 ```
 
 7. Start the stack:
@@ -97,7 +97,7 @@ DATA_PLANE_EDGE_TUNNEL_HOSTNAME=<data-plane-edge-hostname>
 pnpm dev
 ```
 
-`pnpm dev` brings up local infra (Postgres, PgBouncer, Caddy, Mailpit), runs control-plane migrations, and starts a named Cloudflare tunnel with stable hostnames.
+`pnpm dev` brings up local infra (Postgres, PgBouncer, Mailpit), runs control-plane migrations, and starts a named Cloudflare tunnel with stable hostnames.
 
 ### Daily Workflow
 

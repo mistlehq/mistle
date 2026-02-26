@@ -6,6 +6,21 @@ import { AppIds } from "../src/modules.js";
 import { createIntegrationEnv } from "./fixtures/env.js";
 
 const configFixturePath = fileURLToPath(new URL("./fixtures/config.toml", import.meta.url));
+const serviceToken = "fixture-service-token";
+
+const globalDevelopmentConfig = {
+  env: "development",
+  internalAuth: {
+    serviceToken,
+  },
+} as const;
+
+const globalProductionConfig = {
+  env: "production",
+  internalAuth: {
+    serviceToken,
+  },
+} as const;
 
 const controlPlaneApiEnvConfig = {
   server: {
@@ -139,9 +154,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        env: "development",
-      },
+      global: globalDevelopmentConfig,
       app: controlPlaneApiFixtureConfig,
     });
   });
@@ -157,9 +170,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        env: "production",
-      },
+      global: globalProductionConfig,
       app: {
         ...controlPlaneApiEnvConfig,
         server: {
@@ -180,9 +191,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        env: "development",
-      },
+      global: globalDevelopmentConfig,
       app: {
         ...controlPlaneApiFixtureConfig,
         server: {
@@ -212,9 +221,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        env: "development",
-      },
+      global: globalDevelopmentConfig,
       app: controlPlaneWorkerFixtureConfig,
     });
   });
@@ -230,9 +237,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        env: "production",
-      },
+      global: globalProductionConfig,
       app: {
         ...controlPlaneWorkerEnvConfig,
         server: {
@@ -253,9 +258,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        env: "development",
-      },
+      global: globalDevelopmentConfig,
       app: {
         ...controlPlaneWorkerFixtureConfig,
         workflow: {
@@ -285,9 +288,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        env: "development",
-      },
+      global: globalDevelopmentConfig,
       app: dataPlaneApiFixtureConfig,
     });
   });
@@ -303,9 +304,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        env: "production",
-      },
+      global: globalProductionConfig,
       app: {
         ...dataPlaneApiEnvConfig,
         server: {
@@ -326,9 +325,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        env: "development",
-      },
+      global: globalDevelopmentConfig,
       app: {
         ...dataPlaneApiFixtureConfig,
         workflow: {
@@ -358,9 +355,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        env: "development",
-      },
+      global: globalDevelopmentConfig,
       app: dataPlaneWorkerFixtureConfig,
     });
   });
@@ -376,9 +371,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        env: "production",
-      },
+      global: globalProductionConfig,
       app: {
         ...dataPlaneWorkerEnvConfig,
         server: {
@@ -399,9 +392,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        env: "development",
-      },
+      global: globalDevelopmentConfig,
       app: {
         ...dataPlaneWorkerFixtureConfig,
         workflow: {
