@@ -11,6 +11,8 @@ import {
 } from "@mistle/ui";
 import { useNavigate } from "react-router";
 
+import { SANDBOX_PROFILE_SCAFFOLD_ROWS } from "../sandbox-profiles/scaffold-profiles.js";
+
 export function SandboxProfilesPage(): React.JSX.Element {
   const navigate = useNavigate();
 
@@ -45,7 +47,7 @@ export function SandboxProfilesPage(): React.JSX.Element {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {SANDBOX_PROFILE_UI_ROWS.map((profile) => (
+          {SANDBOX_PROFILE_SCAFFOLD_ROWS.map((profile) => (
             <TableRow key={profile.id}>
               <TableCell>
                 <button
@@ -81,34 +83,3 @@ export function SandboxProfilesPage(): React.JSX.Element {
     </div>
   );
 }
-
-type SandboxProfileUiRow = {
-  id: string;
-  displayName: string;
-  status: "Active" | "Draft";
-  model: string;
-  executables: number;
-  triggers: number;
-  updated: string;
-};
-
-const SANDBOX_PROFILE_UI_ROWS: SandboxProfileUiRow[] = [
-  {
-    id: "sandboxProfile_ui_active",
-    displayName: "Customer Support Agent",
-    status: "Active",
-    model: "gpt-4.1",
-    executables: 4,
-    triggers: 2,
-    updated: "2h ago",
-  },
-  {
-    id: "sandboxProfile_ui_draft",
-    displayName: "Onboarding Assistant",
-    status: "Draft",
-    model: "gpt-4o-mini",
-    executables: 2,
-    triggers: 1,
-    updated: "Yesterday",
-  },
-];

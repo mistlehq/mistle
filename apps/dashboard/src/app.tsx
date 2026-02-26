@@ -19,6 +19,7 @@ import { ProvidersCallbackResultPage } from "./features/pages/providers-callback
 import { SandboxProfileEditorPage } from "./features/pages/sandbox-profile-editor-page.js";
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
 import { SessionsPage } from "./features/pages/sessions-page.js";
+import { resolveScaffoldProfileDisplayName } from "./features/sandbox-profiles/scaffold-profiles.js";
 import { createSettingsRoutes } from "./features/settings/settings-routes.js";
 import { AppShell } from "./features/shell/app-shell.js";
 import { RequireAuth } from "./features/shell/require-auth.js";
@@ -66,7 +67,7 @@ export const APP_ROUTES = createRoutesFromElements(
               }
 
               return {
-                displayName: profileId,
+                displayName: resolveScaffoldProfileDisplayName(profileId) ?? profileId,
               };
             }}
             path=":profileId"
