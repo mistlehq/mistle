@@ -34,6 +34,15 @@ const baseIntegrationEnv: NodeJS.ProcessEnv = {
   MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL:
     "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
   MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: "development",
+  MISTLE_APPS_DATA_PLANE_WORKER_HOST: "127.0.0.1",
+  MISTLE_APPS_DATA_PLANE_WORKER_PORT: "5003",
+  MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL:
+    "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
+  MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL:
+    "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
+  MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: "development",
+  MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "true",
+  MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY: "1",
 };
 
 export function createIntegrationEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {

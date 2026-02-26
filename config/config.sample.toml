@@ -53,5 +53,18 @@ url = "postgresql://mistle:replace-with-password@db:5432/mistle_data_plane"
 database_url = "postgresql://mistle:replace-with-password@db:6432/mistle_data_plane"
 namespace_id = "production"
 
+[apps.data_plane_worker.server]
+host = "0.0.0.0"
+port = 8083
+
+[apps.data_plane_worker.database]
+url = "postgresql://mistle:replace-with-password@db:5432/mistle_data_plane"
+
+[apps.data_plane_worker.workflow]
+database_url = "postgresql://mistle:replace-with-password@db:5432/mistle_data_plane"
+namespace_id = "production"
+run_migrations = true
+concurrency = 4
+
 [apps.dashboard]
 control_plane_api_origin = "https://api.mistle.example"

@@ -258,9 +258,22 @@ importers:
       '@hono/node-server':
         specifier: ^1.19.4
         version: 1.19.9(hono@4.12.2)
+      '@mistle/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@mistle/workflows':
+        specifier: workspace:*
+        version: link:../../packages/workflows
       hono:
         specifier: ^4.10.6
         version: 4.12.2
+      pg:
+        specifier: ^8.18.0
+        version: 8.18.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.15.6
+        version: 8.16.0
 
   apps/sandbox-runtime: {}
 

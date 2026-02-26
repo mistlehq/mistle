@@ -49,3 +49,16 @@ url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane"
 [apps.data_plane_api.workflow]
 database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane"
 namespace_id = "fixture"
+
+[apps.data_plane_worker.server]
+host = "0.0.0.0"
+port = 5301
+
+[apps.data_plane_worker.database]
+url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane"
+
+[apps.data_plane_worker.workflow]
+database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane"
+namespace_id = "fixture"
+run_migrations = true
+concurrency = 2
