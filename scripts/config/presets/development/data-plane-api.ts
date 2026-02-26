@@ -9,10 +9,10 @@ export const dataPlaneApiDevelopmentPreset = {
           port: 5200,
         },
         database: {
-          url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
+          url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_dev",
         },
         workflow: {
-          database_url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
+          database_url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_dev",
           namespace_id: "development",
         },
       },
