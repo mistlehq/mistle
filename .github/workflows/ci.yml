@@ -36,7 +36,7 @@ jobs:
         run: nix develop --command pnpm run config:init:ci
 
       - name: Build workspace in Nix shell
-        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=config/config.ci.toml pnpm build"
+        run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.ci.toml pnpm build"
 
       - name: Run CI checks in Nix shell
         run: nix develop --command pnpm run ci
