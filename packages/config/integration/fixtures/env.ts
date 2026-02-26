@@ -27,6 +27,13 @@ const baseIntegrationEnv: NodeJS.ProcessEnv = {
   MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE: "false",
   MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_USERNAME: "mailpit",
   MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PASSWORD: "mailpit",
+  MISTLE_APPS_DATA_PLANE_API_HOST: "127.0.0.1",
+  MISTLE_APPS_DATA_PLANE_API_PORT: "5002",
+  MISTLE_APPS_DATA_PLANE_API_DATABASE_URL:
+    "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
+  MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL:
+    "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
+  MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: "development",
 };
 
 export function createIntegrationEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {

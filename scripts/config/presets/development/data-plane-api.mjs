@@ -1,0 +1,20 @@
+export const dataPlaneApiDevelopmentPreset = {
+  defaults: {
+    apps: {
+      data_plane_api: {
+        server: {
+          host: "127.0.0.1",
+          port: 5200,
+        },
+        database: {
+          url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
+        },
+        workflow: {
+          database_url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
+          namespace_id: "development",
+        },
+      },
+    },
+  },
+  generators: [],
+};

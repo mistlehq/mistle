@@ -52,6 +52,19 @@ describe("parseConfigRecord", () => {
             smtpPassword: "mailpit",
           },
         },
+        data_plane_api: {
+          server: {
+            host: "127.0.0.1",
+            port: 5200,
+          },
+          database: {
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
+          },
+          workflow: {
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
+            namespaceId: "development",
+          },
+        },
       },
     };
     const config = parseConfigRecord(configRecord);

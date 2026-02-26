@@ -42,5 +42,16 @@ smtp_secure = false
 smtp_username = "replace-with-smtp-username"
 smtp_password = "replace-with-smtp-password"
 
+[apps.data_plane_api.server]
+host = "0.0.0.0"
+port = 8082
+
+[apps.data_plane_api.database]
+url = "postgresql://mistle:replace-with-password@db:5432/mistle_data_plane"
+
+[apps.data_plane_api.workflow]
+database_url = "postgresql://mistle:replace-with-password@db:6432/mistle_data_plane"
+namespace_id = "production"
+
 [apps.dashboard]
 control_plane_api_origin = "https://api.mistle.example"

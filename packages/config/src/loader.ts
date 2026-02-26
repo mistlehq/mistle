@@ -5,6 +5,7 @@ import { parse as parseToml } from "smol-toml";
 
 import { controlPlaneApiConfigModule } from "./apps/control-plane-api/index.js";
 import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/index.js";
+import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
 import { mergeConfigRoots } from "./core/merge.js";
 import { type ConfigModule } from "./core/module.js";
 import { asObjectRecord, getValueAtPath } from "./core/record.js";
@@ -92,6 +93,10 @@ function parseAppConfig(
   appId: typeof AppIds.CONTROL_PLANE_WORKER,
   root: Record<string, unknown>,
 ): AppConfigModuleValue<typeof AppIds.CONTROL_PLANE_WORKER>;
+function parseAppConfig(
+  appId: typeof AppIds.DATA_PLANE_API,
+  root: Record<string, unknown>,
+): AppConfigModuleValue<typeof AppIds.DATA_PLANE_API>;
 function parseAppConfig<TApp extends AppConfigModuleKey>(
   appId: TApp,
   root: Record<string, unknown>,
@@ -104,7 +109,11 @@ function parseAppConfig(
     return parseModuleValue(controlPlaneApiConfigModule, root);
   }
 
-  return parseModuleValue(controlPlaneWorkerConfigModule, root);
+  if (appId === AppIds.CONTROL_PLANE_WORKER) {
+    return parseModuleValue(controlPlaneWorkerConfigModule, root);
+  }
+
+  return parseModuleValue(dataPlaneApiConfigModule, root);
 }
 
 export function loadConfig<TApp extends AppConfigModuleKey>(

@@ -49,7 +49,7 @@ services:
     ports:
       - "${EDGE_PORT:-8088}:8088"
     environment:
-      DATA_PLANE_API_UPSTREAM: "${DATA_PLANE_API_UPSTREAM:-host.docker.internal:3000}"
+      DATA_PLANE_API_UPSTREAM: "${DATA_PLANE_API_UPSTREAM:-host.docker.internal:5200}"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
     extra_hosts:

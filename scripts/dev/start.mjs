@@ -32,6 +32,19 @@ function readControlPlaneApiLocalPort(configPath) {
   return controlPlaneApiPort;
 }
 
+function readDataPlaneApiLocalPort(configPath) {
+  const parsed = parseToml(readFileSync(configPath, "utf8"));
+  const dataPlaneApiPort = parsed?.apps?.data_plane_api?.server?.port;
+
+  if (typeof dataPlaneApiPort !== "number" || Number.isInteger(dataPlaneApiPort) === false) {
+    throw new Error(
+      "Missing or invalid apps.data_plane_api.server.port in config/config.development.toml.",
+    );
+  }
+
+  return dataPlaneApiPort;
+}
+
 function readRequiredEnv(envVarName) {
   const value = process.env[envVarName];
 
@@ -218,6 +231,7 @@ async function start() {
 
   console.log("Starting local infra dependencies (Postgres 18, PgBouncer, Caddy, Mailpit)...");
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
+  const dataPlaneApiLocalPort = readDataPlaneApiLocalPort(DEV_CONFIG_PATH);
   const cloudflareTunnelToken = readRequiredEnv("CLOUDFLARE_TUNNEL_TOKEN");
   const controlPlaneApiTunnelHostname = readRequiredEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME");
   const dataPlaneEdgeTunnelHostname = readRequiredEnv("DATA_PLANE_EDGE_TUNNEL_HOSTNAME");
@@ -235,6 +249,7 @@ async function start() {
     CONTROL_PLANE_API_TUNNEL_HOSTNAME: controlPlaneApiTunnelHostname,
     DATA_PLANE_EDGE_TUNNEL_HOSTNAME: dataPlaneEdgeTunnelHostname,
     CLOUDFLARED_CONFIG_PATH: DEV_CLOUDFLARED_CONFIG_PATH,
+    DATA_PLANE_API_UPSTREAM: `host.docker.internal:${String(dataPlaneApiLocalPort)}`,
   };
   localInfraEnv = sharedDevEnv;
   localInfraStartAttempted = true;
