@@ -175,9 +175,15 @@ importers:
       '@fontsource-variable/quicksand':
         specifier: ^5.2.8
         version: 5.2.10
+      '@mistle/time':
+        specifier: workspace:*
+        version: link:../../packages/time
       '@mistle/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@phosphor-icons/react':
+        specifier: ^2.1.7
+        version: 2.1.10(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@rjsf/core':
         specifier: ~6.3.1
         version: 6.3.1(@rjsf/utils@6.3.1(react@19.2.4))(react@19.2.4)
@@ -209,6 +215,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.1.14
         version: 4.2.1(vite@7.3.1(@types/node@24.10.13)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
+      '@testing-library/react':
+        specifier: ^16.3.0
+        version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.3(@types/react@19.2.14))(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@vitejs/plugin-react':
         specifier: ^5.1.4
         version: 5.1.4(vite@7.3.1(@types/node@24.10.13)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
