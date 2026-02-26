@@ -6,6 +6,11 @@ import type { SessionData } from "../auth/types.js";
 
 import { authClient } from "../../lib/auth/client.js";
 import { resolveErrorMessage } from "../auth/messages.js";
+import {
+  MISSING_ACTIVE_ORGANIZATION_ERROR_MESSAGE,
+  resolveActiveOrganizationIdFromSession,
+} from "./active-organization.js";
+import { resolveRequireAuthViewState } from "./require-auth-view-state.js";
 
 type AuthenticatedSession = Exclude<SessionData, null>;
 
@@ -16,6 +21,16 @@ type AuthenticatedOutletContext = {
 export function useRequiredSession(): AuthenticatedSession {
   const context = useOutletContext<AuthenticatedOutletContext>();
   return context.session;
+}
+
+export function useRequiredOrganizationId(): string {
+  const session = useRequiredSession();
+  const activeOrganizationId = resolveActiveOrganizationIdFromSession(session);
+  if (activeOrganizationId === null) {
+    throw new Error(MISSING_ACTIVE_ORGANIZATION_ERROR_MESSAGE);
+  }
+
+  return activeOrganizationId;
 }
 
 export function RequireAuth(): React.JSX.Element {
@@ -73,7 +88,16 @@ export function RequireAuth(): React.JSX.Element {
     };
   }, []);
 
-  if (isLoading) {
+  const hasActiveOrganization =
+    session !== null && resolveActiveOrganizationIdFromSession(session) !== null;
+  const viewState = resolveRequireAuthViewState({
+    isLoading,
+    errorMessage,
+    hasSession: session !== null,
+    hasActiveOrganization,
+  });
+
+  if (viewState === "loading") {
     return (
       <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
         <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
@@ -94,7 +118,7 @@ export function RequireAuth(): React.JSX.Element {
     );
   }
 
-  if (errorMessage) {
+  if (viewState === "error") {
     return (
       <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
         <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
@@ -112,8 +136,28 @@ export function RequireAuth(): React.JSX.Element {
     );
   }
 
-  if (!session) {
+  if (viewState === "unauthenticated") {
     return <Navigate replace state={{ from: location }} to="/auth/login" />;
+  }
+
+  if (viewState === "missing-organization") {
+    return (
+      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
+        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
+          <Card className="w-full">
+            <CardHeader>
+              <CardTitle>Mistle dashboard</CardTitle>
+              <CardDescription>Organization context is unavailable.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-sm">
+                {MISSING_ACTIVE_ORGANIZATION_ERROR_MESSAGE}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
+    );
   }
 
   return <Outlet context={{ session }} />;
