@@ -10,6 +10,11 @@ export type {
   SandboxProfile,
   SandboxProfileStatus,
 } from "./sandbox-profiles.js";
+export { sandboxProfileVersions } from "./sandbox-profile-versions.js";
+export type {
+  InsertSandboxProfileVersion,
+  SandboxProfileVersion,
+} from "./sandbox-profile-versions.js";
 export { sessions } from "./sessions.js";
 export { teamMembers } from "./team-members.js";
 export { teams } from "./teams.js";

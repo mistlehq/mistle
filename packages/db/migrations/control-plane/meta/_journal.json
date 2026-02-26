@@ -15,6 +15,13 @@
       "when": 1772006188757,
       "tag": "0001_add-sandbox-profiles",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772104242549,
+      "tag": "0002_add-sandbox-profile-versions",
+      "breakpoints": true
     }
   ]
 }
