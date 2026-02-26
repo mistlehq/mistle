@@ -1,3 +1,5 @@
+import type { DevelopmentPresetModule } from "./types.ts";
+
 export const dataPlaneApiDevelopmentPreset = {
   defaults: {
     apps: {
@@ -17,4 +19,4 @@ export const dataPlaneApiDevelopmentPreset = {
     },
   },
   generators: [],
-};
+} satisfies DevelopmentPresetModule;

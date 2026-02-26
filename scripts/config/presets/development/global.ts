@@ -1,3 +1,5 @@
+import type { DevelopmentPresetModule } from "./types.ts";
+
 export const globalDevelopmentPreset = {
   defaults: {
     global: {
@@ -5,4 +7,4 @@ export const globalDevelopmentPreset = {
     },
   },
   generators: [],
-};
+} satisfies DevelopmentPresetModule;

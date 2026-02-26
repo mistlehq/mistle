@@ -3,9 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
 
-/**
- * @typedef {Record<string, unknown>} ConfigRecord
- */
+import type { ConfigRecord } from "./presets/development/types.ts";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
@@ -17,8 +15,7 @@ const GENERATED_HEADER = [
   "",
 ].join("\n");
 
-/** @type {ConfigRecord} */
-const CI_DEFAULTS = {
+const CI_DEFAULTS: ConfigRecord = {
   global: {
     env: "production",
   },
@@ -29,19 +26,11 @@ const CI_DEFAULTS = {
   },
 };
 
-/**
- * @param {unknown} value
- * @returns {value is ConfigRecord}
- */
-function isRecord(value) {
+function isRecord(value: unknown): value is ConfigRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * @param {unknown} value
- * @returns {ConfigRecord}
- */
-function asRecord(value) {
+function asRecord(value: unknown): ConfigRecord {
   if (!isRecord(value)) {
     return {};
   }
@@ -49,31 +38,26 @@ function asRecord(value) {
   return value;
 }
 
-/**
- * @param {unknown} value
- * @returns {unknown}
- */
-function deepClone(value) {
+function deepClone(value: unknown): unknown {
   if (Array.isArray(value)) {
     return value.map((item) => deepClone(item));
   }
 
   if (isRecord(value)) {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entryValue]) => [key, deepClone(entryValue)]),
-    );
+    const clonedEntries: [string, unknown][] = [];
+
+    for (const [key, entryValue] of Object.entries(value)) {
+      clonedEntries.push([key, deepClone(entryValue)]);
+    }
+
+    return Object.fromEntries(clonedEntries);
   }
 
   return value;
 }
 
-/**
- * @param {ConfigRecord} base
- * @param {ConfigRecord} override
- * @returns {ConfigRecord}
- */
-function mergeRecords(base, override) {
-  const merged = { ...base };
+function mergeRecords(base: ConfigRecord, override: ConfigRecord): ConfigRecord {
+  const merged: ConfigRecord = { ...base };
 
   for (const [key, overrideValue] of Object.entries(override)) {
     const baseValue = merged[key];
@@ -89,7 +73,7 @@ function mergeRecords(base, override) {
   return merged;
 }
 
-function main() {
+function main(): void {
   if (process.argv.length > 2) {
     throw new Error("This script does not accept arguments.");
   }

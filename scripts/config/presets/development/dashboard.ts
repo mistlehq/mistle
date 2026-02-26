@@ -1,3 +1,5 @@
+import type { DevelopmentPresetModule } from "./types.ts";
+
 export const dashboardDevelopmentPreset = {
   defaults: {
     apps: {
@@ -7,4 +9,4 @@ export const dashboardDevelopmentPreset = {
     },
   },
   generators: [],
-};
+} satisfies DevelopmentPresetModule;

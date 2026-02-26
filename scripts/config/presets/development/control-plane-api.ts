@@ -1,5 +1,7 @@
 import { randomBytes } from "node:crypto";
 
+import type { DevelopmentPresetModule } from "./types.ts";
+
 export const controlPlaneApiDevelopmentPreset = {
   defaults: {
     apps: {
@@ -37,4 +39,4 @@ export const controlPlaneApiDevelopmentPreset = {
       generate: () => randomBytes(32).toString("base64url"),
     },
   ],
-};
+} satisfies DevelopmentPresetModule;

@@ -1,3 +1,5 @@
+import type { ChildProcess, SpawnSyncReturns } from "node:child_process";
+
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -13,39 +15,75 @@ const DEV_CLOUDFLARED_CONFIG_DIR = resolve(REPO_ROOT, "infra", "local", ".genera
 const DEV_CLOUDFLARED_CONFIG_PATH = resolve(DEV_CLOUDFLARED_CONFIG_DIR, "cloudflared-config.yml");
 
 const TUNNEL_SERVICE_NAME = "tunnel";
-let localInfraStarted = false;
+
 let localInfraStartAttempted = false;
-let localInfraEnv;
-let appDevProcess;
+let localInfraEnv: NodeJS.ProcessEnv | undefined;
+let appDevProcess: ChildProcess | undefined;
 let terminated = false;
 
-function readControlPlaneApiLocalPort(configPath) {
-  const parsed = parseToml(readFileSync(configPath, "utf8"));
-  const controlPlaneApiPort = parsed?.apps?.control_plane_api?.server?.port;
+type CloudflaredConfigInput = {
+  controlPlaneApiTunnelHostname: string;
+  controlPlaneApiLocalPort: number;
+  dataPlaneEdgeTunnelHostname: string;
+};
 
-  if (typeof controlPlaneApiPort !== "number" || Number.isInteger(controlPlaneApiPort) === false) {
-    throw new Error(
-      "Missing or invalid apps.control_plane_api.server.port in config/config.development.toml.",
-    );
-  }
+type RunInput = {
+  command: string;
+  args: readonly string[];
+  env?: NodeJS.ProcessEnv;
+  stdio?: "inherit" | "pipe";
+};
 
-  return controlPlaneApiPort;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function readDataPlaneApiLocalPort(configPath) {
-  const parsed = parseToml(readFileSync(configPath, "utf8"));
-  const dataPlaneApiPort = parsed?.apps?.data_plane_api?.server?.port;
+function getValueAtPath(root: unknown, path: readonly string[]): unknown {
+  let current: unknown = root;
 
-  if (typeof dataPlaneApiPort !== "number" || Number.isInteger(dataPlaneApiPort) === false) {
-    throw new Error(
-      "Missing or invalid apps.data_plane_api.server.port in config/config.development.toml.",
-    );
+  for (const segment of path) {
+    if (!isRecord(current)) {
+      return undefined;
+    }
+
+    current = current[segment];
   }
 
-  return dataPlaneApiPort;
+  return current;
 }
 
-function readRequiredEnv(envVarName) {
+function readRequiredIntegerTomlValue(
+  configPath: string,
+  path: readonly string[],
+  pathLabel: string,
+): number {
+  const parsed = parseToml(readFileSync(configPath, "utf8"));
+  const resolvedValue = getValueAtPath(parsed, path);
+
+  if (typeof resolvedValue !== "number" || Number.isInteger(resolvedValue) === false) {
+    throw new Error(`Missing or invalid ${pathLabel} in config/config.development.toml.`);
+  }
+
+  return resolvedValue;
+}
+
+function readControlPlaneApiLocalPort(configPath: string): number {
+  return readRequiredIntegerTomlValue(
+    configPath,
+    ["apps", "control_plane_api", "server", "port"],
+    "apps.control_plane_api.server.port",
+  );
+}
+
+function readDataPlaneApiLocalPort(configPath: string): number {
+  return readRequiredIntegerTomlValue(
+    configPath,
+    ["apps", "data_plane_api", "server", "port"],
+    "apps.data_plane_api.server.port",
+  );
+}
+
+function readRequiredEnv(envVarName: string): string {
   const value = process.env[envVarName];
 
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -55,7 +93,7 @@ function readRequiredEnv(envVarName) {
   return value.trim();
 }
 
-function loadDevelopmentEnvFile() {
+function loadDevelopmentEnvFile(): void {
   if (!existsSync(DEV_ENV_LOCAL_PATH)) {
     return;
   }
@@ -63,7 +101,7 @@ function loadDevelopmentEnvFile() {
   process.loadEnvFile(DEV_ENV_LOCAL_PATH);
 }
 
-function writeCloudflaredConfig(input) {
+function writeCloudflaredConfig(input: CloudflaredConfigInput): void {
   const configContent = [
     "ingress:",
     `  - hostname: ${input.controlPlaneApiTunnelHostname}`,
@@ -78,7 +116,7 @@ function writeCloudflaredConfig(input) {
   writeFileSync(DEV_CLOUDFLARED_CONFIG_PATH, configContent, "utf8");
 }
 
-function runOrThrow(input) {
+function runOrThrow(input: RunInput): SpawnSyncReturns<string> {
   const result = spawnSync(input.command, input.args, {
     cwd: REPO_ROOT,
     env: {
@@ -98,7 +136,7 @@ function runOrThrow(input) {
   return result;
 }
 
-function runComposeDown(env) {
+function runComposeDown(env: NodeJS.ProcessEnv | undefined): SpawnSyncReturns<Buffer> {
   return spawnSync("docker", ["compose", "-f", DEV_COMPOSE_PATH, "down", "--remove-orphans"], {
     cwd: REPO_ROOT,
     env: {
@@ -109,7 +147,7 @@ function runComposeDown(env) {
   });
 }
 
-function hasRunningComposeServices(env) {
+function hasRunningComposeServices(env: NodeJS.ProcessEnv | undefined): boolean {
   const result = spawnSync(
     "docker",
     ["compose", "-f", DEV_COMPOSE_PATH, "ps", "--status", "running", "-q"],
@@ -132,7 +170,7 @@ function hasRunningComposeServices(env) {
   return output.trim().length > 0;
 }
 
-function shouldTeardownLocalInfra() {
+function shouldTeardownLocalInfra(): boolean {
   if (localInfraStartAttempted) {
     return true;
   }
@@ -140,11 +178,10 @@ function shouldTeardownLocalInfra() {
   return hasRunningComposeServices(localInfraEnv);
 }
 
-function cleanupAndExit(exitCode) {
+function cleanupAndExit(exitCode: number): never {
   if (shouldTeardownLocalInfra()) {
     try {
       teardownLocalInfra(localInfraEnv);
-      localInfraStarted = false;
       localInfraStartAttempted = false;
     } catch (error) {
       if (error instanceof Error) {
@@ -159,7 +196,7 @@ function cleanupAndExit(exitCode) {
   process.exit(exitCode);
 }
 
-function forwardSignal(signal) {
+function forwardSignal(signal: NodeJS.Signals): void {
   if (terminated) {
     return;
   }
@@ -177,7 +214,7 @@ function forwardSignal(signal) {
   cleanupAndExit(signalExitCode(signal));
 }
 
-function teardownLocalInfra(env) {
+function teardownLocalInfra(env: NodeJS.ProcessEnv | undefined): void {
   const firstAttempt = runComposeDown(env);
 
   if (firstAttempt.status === 0) {
@@ -201,7 +238,7 @@ function teardownLocalInfra(env) {
   );
 }
 
-function signalExitCode(signal) {
+function signalExitCode(signal: NodeJS.Signals): number {
   if (signal === "SIGINT") {
     return 130;
   }
@@ -220,7 +257,7 @@ process.once("SIGTERM", () => {
   forwardSignal("SIGTERM");
 });
 
-async function start() {
+function start(): void {
   loadDevelopmentEnvFile();
 
   console.log("Initializing development config...");
@@ -242,7 +279,7 @@ async function start() {
     dataPlaneEdgeTunnelHostname,
   });
 
-  const sharedDevEnv = {
+  const sharedDevEnv: NodeJS.ProcessEnv = {
     MISTLE_CONFIG_PATH: DEV_CONFIG_PATH,
     CONTROL_PLANE_API_LOCAL_PORT: String(controlPlaneApiLocalPort),
     CLOUDFLARE_TUNNEL_TOKEN: cloudflareTunnelToken,
@@ -270,7 +307,6 @@ async function start() {
     ],
     env: sharedDevEnv,
   });
-  localInfraStarted = true;
 
   console.log("Building migration dependencies...");
   runOrThrow({
@@ -331,7 +367,9 @@ async function start() {
   });
 }
 
-start().catch((error) => {
+try {
+  start();
+} catch (error) {
   if (error instanceof Error) {
     console.error(error.message);
   } else {
@@ -339,4 +377,4 @@ start().catch((error) => {
   }
 
   cleanupAndExit(1);
-});
+}
