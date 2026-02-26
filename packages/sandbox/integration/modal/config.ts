@@ -25,12 +25,6 @@ const ModalAdapterIntegrationConfigSchema = z
       .min(1, {
         message: `MISTLE_SANDBOX_MODAL_APP_NAME is required when ${MODAL_INTEGRATION_ENABLEMENT_MESSAGE}.`,
       }),
-    MISTLE_SANDBOX_MODAL_BASE_IMAGE_ID: z
-      .string()
-      .trim()
-      .min(1, {
-        message: `MISTLE_SANDBOX_MODAL_BASE_IMAGE_ID is required when ${MODAL_INTEGRATION_ENABLEMENT_MESSAGE}.`,
-      }),
     MISTLE_SANDBOX_MODAL_ENVIRONMENT: z
       .string()
       .trim()
@@ -50,7 +44,6 @@ export type ModalAdapterIntegrationSettings =
   | {
       enabled: true;
       modalConfig: ModalSandboxConfig;
-      baseImageId: string;
     };
 
 export function resolveModalAdapterIntegrationSettings(input: {
@@ -75,6 +68,5 @@ export function resolveModalAdapterIntegrationSettings(input: {
       appName: parsed.MISTLE_SANDBOX_MODAL_APP_NAME,
       environmentName: parsed.MISTLE_SANDBOX_MODAL_ENVIRONMENT,
     },
-    baseImageId: parsed.MISTLE_SANDBOX_MODAL_BASE_IMAGE_ID,
   };
 }

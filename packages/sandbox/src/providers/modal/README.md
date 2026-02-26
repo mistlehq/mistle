@@ -64,11 +64,17 @@ Required environment variables when enabled:
 - `MODAL_TOKEN_ID`
 - `MODAL_TOKEN_SECRET`
 - `MISTLE_SANDBOX_MODAL_APP_NAME`
-- `MISTLE_SANDBOX_MODAL_BASE_IMAGE_ID`
 
 Optional:
 
 - `MISTLE_SANDBOX_MODAL_ENVIRONMENT`
+
+The integration fixture ensures the configured app exists (`createIfMissing: true`) before running
+adapter lifecycle operations.
+
+Integration tests derive the base image registry tag from
+`apps/sandbox-runtime/images/base/Dockerfile` (`sandbox-base-prod` stage `FROM` image) and build
+an ephemeral Modal image with a keepalive entrypoint for adapter lifecycle coverage.
 
 Run:
 
