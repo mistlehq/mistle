@@ -11,7 +11,7 @@ export const controlPlaneApiDevelopmentPreset = {
           port: 5100,
         },
         database: {
-          url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane",
+          url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_dev",
         },
         auth: {
           base_url: "http://127.0.0.1:5100",
@@ -26,7 +26,7 @@ export const controlPlaneApiDevelopmentPreset = {
           otp_allowed_attempts: 3,
         },
         workflow: {
-          database_url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_control_plane",
+          database_url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_dev",
           namespace_id: "development",
         },
       },

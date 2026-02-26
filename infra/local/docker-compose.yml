@@ -4,7 +4,7 @@ services:
   postgres:
     image: postgres:18-alpine
     environment:
-      POSTGRES_DB: "${POSTGRES_DB:-mistle_control_plane}"
+      POSTGRES_DB: "${POSTGRES_DB:-mistle_dev}"
       POSTGRES_USER: "${POSTGRES_USER:-mistle}"
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-mistle}"
     ports:
@@ -27,7 +27,7 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: "5432"
-      DB_NAME: "${POSTGRES_DB:-mistle_control_plane}"
+      DB_NAME: "${POSTGRES_DB:-mistle_dev}"
       DB_USER: "${POSTGRES_USER:-mistle}"
       DB_PASSWORD: "${POSTGRES_PASSWORD:-mistle}"
       AUTH_TYPE: plain

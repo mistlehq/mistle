@@ -9,7 +9,7 @@ export const controlPlaneWorkerDevelopmentPreset = {
           port: 5101,
         },
         workflow: {
-          database_url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane",
+          database_url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_dev",
           namespace_id: "development",
           run_migrations: true,
           concurrency: 1,
