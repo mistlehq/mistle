@@ -18,9 +18,6 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
-    "image:build:prod": "test -n \"$IMAGE_TAG\" && docker build --target sandbox-base-prod -f images/base/Dockerfile -t mistle/sandbox-base:$IMAGE_TAG ../..",
-    "image:build:prod:sha": "IMAGE_TAG=$(git rev-parse --short=12 HEAD) pnpm image:build:prod",
-    "image:build:dev": "docker build --target sandbox-base-dev -f images/base/Dockerfile -t mistle/sandbox-base:dev ../..",
     "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run --passWithNoTests",

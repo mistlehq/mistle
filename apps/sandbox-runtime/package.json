@@ -4,6 +4,9 @@
   "scripts": {
     "dev": "SANDBOX_RUNTIME_LISTEN_ADDR=:8090 cargo run --bin sandboxd",
     "build": "cargo build --release --locked --bin sandboxd && mkdir -p dist/bin && cp target/release/sandboxd dist/bin/sandboxd",
+    "image:build:prod": "test -n \"$IMAGE_TAG\" && docker build --target sandbox-base-prod -f images/base/Dockerfile -t mistle/sandbox-base:$IMAGE_TAG ../..",
+    "image:build:prod:sha": "IMAGE_TAG=$(git rev-parse --short=12 HEAD) pnpm image:build:prod",
+    "image:build:dev": "docker build --target sandbox-base-dev -f images/base/Dockerfile -t mistle/sandbox-base:dev ../..",
     "start": "./dist/bin/sandboxd",
     "lint": "cargo clippy --all-targets -- -D warnings",
     "typecheck": "cargo check --all-targets",
