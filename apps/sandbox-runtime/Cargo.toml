@@ -8,14 +8,10 @@ name = "sandboxd"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = "1.0.100"
-axum = "0.8.6"
+anyhow = "1.0.102"
+axum = "0.8.8"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
-tokio = { version = "1.48.0", features = ["macros", "rt-multi-thread", "signal", "time"] }
-tokio-util = "0.7.17"
-tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.20", features = ["fmt", "json"] }
+tokio = { version = "1.49.0", features = ["macros", "net", "rt-multi-thread"] }
 
 [dev-dependencies]
-tower = { version = "0.5.2", features = ["util"] }
+tower = { version = "0.5.3", features = ["util"] }

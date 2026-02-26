@@ -1,8 +1,8 @@
 use axum::http::StatusCode;
 use axum::{routing::get, Json, Router};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Serialize)]
 struct HealthResponse {
     ok: bool,
 }
@@ -21,7 +21,7 @@ mod tests {
     use axum::http::{Request, StatusCode};
     use tower::ServiceExt;
 
-    use super::{router, HealthResponse};
+    use super::router;
 
     #[tokio::test]
     async fn new_handler_healthz() {
@@ -47,9 +47,7 @@ mod tests {
         let body = to_bytes(response.into_body(), usize::MAX)
             .await
             .expect("response body should be readable");
-        let decoded: HealthResponse =
-            serde_json::from_slice(&body).expect("response should decode as health");
-        assert!(decoded.ok);
+        assert_eq!(body.as_ref(), br#"{"ok":true}"#);
     }
 
     #[tokio::test]
