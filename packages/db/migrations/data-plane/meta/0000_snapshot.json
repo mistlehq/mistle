@@ -126,12 +126,8 @@
           "tableFrom": "sandbox_instance_snapshots",
           "tableTo": "sandbox_instances",
           "schemaTo": "data_plane",
-          "columnsFrom": [
-            "source_instance_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_instance_id"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }

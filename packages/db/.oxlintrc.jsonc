@@ -16,5 +16,11 @@
         "jest/no-standalone-expect": "off",
       },
     },
+    {
+      "files": ["integration/data-plane-migrations.integration.test.ts"],
+      "rules": {
+        "jest/no-standalone-expect": "off",
+      },
+    },
   ],
 }

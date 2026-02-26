@@ -248,6 +248,9 @@ importers:
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@mistle/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@mistle/workflows':
         specifier: workspace:*
         version: link:../../packages/workflows
@@ -270,6 +273,9 @@ importers:
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@mistle/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@mistle/workflows':
         specifier: workspace:*
         version: link:../../packages/workflows
