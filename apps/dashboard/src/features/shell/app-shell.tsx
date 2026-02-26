@@ -20,6 +20,11 @@ import { ErrorNotice } from "../auth/error-notice.js";
 import { resolveErrorMessage } from "../auth/messages.js";
 import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { SidebarNavGroups } from "../navigation/sidebar-nav-groups.js";
+import {
+  isSettingsPath,
+  resolveSettingsBackDestination,
+  SETTINGS_DEFAULT_PATH,
+} from "../settings/model.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 import { clearAuthenticatedSessionCache } from "./session-cache.js";
 import { TopLoadingBar } from "./top-loading-bar.js";
@@ -36,11 +41,6 @@ const MAIN_NAV_GROUPS: readonly SidebarNavGroup[] = [
 ];
 
 const DASHBOARD_SIDEBAR_WIDTH = "14rem";
-const SETTINGS_DEFAULT_PATH = "/settings/account/profile";
-
-function isSettingsPath(pathname: string): boolean {
-  return pathname === "/settings" || pathname.startsWith("/settings/");
-}
 
 function HomeNavIcon(props: { className?: string; "aria-hidden"?: boolean }): React.JSX.Element {
   return <HouseIcon {...props} />;
@@ -92,7 +92,9 @@ export function AppShell(): React.JSX.Element {
   }
 
   async function handleBackToApp(): Promise<void> {
-    await navigate(previousNonSettingsPathRef.current, { replace: true });
+    await navigate(resolveSettingsBackDestination(previousNonSettingsPathRef.current), {
+      replace: true,
+    });
   }
 
   async function handleNavigateToSettings(): Promise<void> {
