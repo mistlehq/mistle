@@ -3,16 +3,12 @@
 }
 
 :8088 {
-  handle_path /tunnel/* {
-    reverse_proxy {$DATA_PLANE_API_UPSTREAM}
-  }
-
   handle /__healthz {
     header Content-Type application/json
     respond "{\"ok\":true}" 200
   }
 
   handle {
-    respond "not found" 404
+    reverse_proxy {$DATA_PLANE_API_UPSTREAM}
   }
 }
