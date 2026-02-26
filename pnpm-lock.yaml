@@ -248,12 +248,18 @@ importers:
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@mistle/data-plane-trpc':
+        specifier: workspace:*
+        version: link:../../packages/data-plane-trpc
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
       '@mistle/workflows':
         specifier: workspace:*
         version: link:../../packages/workflows
+      '@trpc/server':
+        specifier: ^11.10.0
+        version: 11.10.0(typescript@5.9.3)
       hono:
         specifier: ^4.10.6
         version: 4.12.2

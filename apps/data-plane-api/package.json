@@ -17,8 +17,10 @@
   "dependencies": {
     "@hono/node-server": "^1.19.4",
     "@mistle/config": "workspace:*",
+    "@mistle/data-plane-trpc": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/workflows": "workspace:*",
+    "@trpc/server": "^11.10.0",
     "hono": "^4.10.6",
     "pg": "^8.18.0"
   },
