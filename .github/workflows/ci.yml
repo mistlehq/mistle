@@ -29,16 +29,11 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Enable Corepack
-        run: corepack enable
-
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
 
+      - name: Build workspace in Nix shell
+        run: nix develop --command pnpm build
+
       - name: Run CI checks in Nix shell
-        run: pnpm run ci:nix
+        run: nix develop --command pnpm run ci
