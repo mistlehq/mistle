@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "db:migrate": "tsx src/scripts/run-data-plane-migrations.ts",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "start": "node dist/index.js",
     "lint": "oxlint --type-aware --deny-warnings -c ../../.oxlintrc.jsonc .",
@@ -16,6 +17,7 @@
   "dependencies": {
     "@hono/node-server": "^1.19.4",
     "@mistle/config": "workspace:*",
+    "@mistle/db": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "hono": "^4.10.6",
     "pg": "^8.18.0"
