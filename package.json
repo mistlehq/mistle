@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx ./scripts/dev/start.ts",
     "dev:nix": "nix develop --command pnpm dev",
-    "dev:workspace": "turbo run dev --ui=tui",
+    "dev:workspace": "turbo run dev --ui=tui --filter=!@mistle/sandbox-runtime",
     "dev:down": "tsx ./scripts/dev/down.ts",
     "build": "turbo run build",
     "format": "oxfmt .",
