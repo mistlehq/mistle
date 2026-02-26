@@ -1,0 +1,279 @@
+import { systemClock } from "@mistle/time";
+import { randomUUID } from "node:crypto";
+import { describe, expect } from "vitest";
+
+import type { ControlPlaneApiIntegrationFixture } from "../../control-plane-api/integration/test-context.js";
+
+import {
+  MemberRoles,
+  invitations,
+  members,
+  users,
+} from "../../../packages/db/src/control-plane/index.js";
+import { it } from "../../control-plane-api/integration/test-context.js";
+import { mapInviteAttemptResult } from "../src/features/settings/members/member-invite-state.js";
+import { MembersApiError } from "../src/features/settings/members/members-api-errors.js";
+import { createMembersInvitationsService } from "../src/features/settings/members/members-invitations-service-core.js";
+
+function readErrorMessage(value: unknown): string | null {
+  if (typeof value === "object" && value !== null) {
+    const direct = Reflect.get(value, "message");
+    if (typeof direct === "string" && direct.length > 0) {
+      return direct;
+    }
+
+    const nested = Reflect.get(value, "error");
+    if (typeof nested === "object" && nested !== null) {
+      const nestedMessage = Reflect.get(nested, "message");
+      if (typeof nestedMessage === "string" && nestedMessage.length > 0) {
+        return nestedMessage;
+      }
+    }
+  }
+
+  return null;
+}
+
+function buildPath(input: { path: string; query?: Record<string, string> }): string {
+  const endpointPath = input.path.startsWith("/") ? input.path : `/${input.path}`;
+  const search = new URLSearchParams();
+
+  if (input.query !== undefined) {
+    for (const [key, value] of Object.entries(input.query)) {
+      search.set(key, value);
+    }
+  }
+
+  const queryString = search.toString();
+  return queryString.length === 0
+    ? `/v1/auth${endpointPath}`
+    : `/v1/auth${endpointPath}?${queryString}`;
+}
+
+function createFixtureMembersFetchClient(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  cookieHeader: string;
+}): {
+  $fetch: (
+    path: string,
+    options: {
+      method: "GET" | "POST";
+      throw: boolean;
+      query?: Record<string, string>;
+      body?: Record<string, string | boolean>;
+    },
+  ) => Promise<unknown>;
+} {
+  return {
+    async $fetch(path, options) {
+      const response = await input.fixture.request(
+        buildPath({
+          path,
+          ...(options.query === undefined
+            ? {}
+            : {
+                query: options.query,
+              }),
+        }),
+        {
+          method: options.method,
+          headers: {
+            "content-type": "application/json",
+            cookie: input.cookieHeader,
+          },
+          body: options.body === undefined ? undefined : JSON.stringify(options.body),
+        },
+      );
+
+      const payload: unknown = await response.json().catch(() => null);
+      if (!response.ok && options.throw) {
+        throw {
+          status: response.status,
+          body: payload,
+          message:
+            readErrorMessage(payload) ??
+            `Request to ${path} failed with ${String(response.status)}.`,
+        };
+      }
+
+      return payload;
+    },
+  };
+}
+
+type AuthenticatedInviteContext = {
+  organizationId: string;
+  service: ReturnType<typeof createMembersInvitationsService>;
+};
+
+async function createAuthenticatedInviteContext(
+  fixture: ControlPlaneApiIntegrationFixture,
+): Promise<AuthenticatedInviteContext> {
+  const session = await fixture.authSession();
+
+  return {
+    organizationId: session.organizationId,
+    service: createMembersInvitationsService(
+      createFixtureMembersFetchClient({
+        fixture,
+        cookieHeader: session.cookie,
+      }),
+    ),
+  };
+}
+
+function mapInviteResultFromUnknownError(input: {
+  error: unknown;
+  selectedRole: "owner" | "admin" | "member";
+}): ReturnType<typeof mapInviteAttemptResult> {
+  if (!(input.error instanceof MembersApiError)) {
+    throw new Error("Expected inviteMember to throw MembersApiError.");
+  }
+
+  return mapInviteAttemptResult({
+    httpStatus: input.error.status,
+    response: {
+      code: null,
+      message: input.error.message,
+      raw: input.error.body,
+      status: null,
+    },
+    selectedRole: input.selectedRole,
+  });
+}
+
+async function inviteAndMap(input: {
+  service: ReturnType<typeof createMembersInvitationsService>;
+  organizationId: string;
+  email: string;
+  role: "owner" | "admin" | "member";
+}): Promise<ReturnType<typeof mapInviteAttemptResult>> {
+  try {
+    const response = await input.service.inviteMember({
+      organizationId: input.organizationId,
+      email: input.email,
+      role: input.role,
+    });
+    return mapInviteAttemptResult({
+      httpStatus: 200,
+      response,
+      selectedRole: input.role,
+    });
+  } catch (error) {
+    return mapInviteResultFromUnknownError({
+      error,
+      selectedRole: input.role,
+    });
+  }
+}
+
+describe("integration dashboard members invitations service", () => {
+  it("maps inviting a new email to invited and persists an invitation row", async ({ fixture }) => {
+    const context = await createAuthenticatedInviteContext(fixture);
+
+    const inviteEmail = `dashboard-new-invite-${randomUUID()}@example.com`;
+    const mapped = await inviteAndMap({
+      service: context.service,
+      organizationId: context.organizationId,
+      email: inviteEmail,
+      role: "member",
+    });
+    expect(mapped.status).toBe("invited");
+
+    const seededInvitations = await fixture.db.query.invitations.findMany({
+      columns: {
+        id: true,
+        status: true,
+      },
+      where: (table, { and: andFn, eq: eqFn }) =>
+        andFn(eqFn(table.organizationId, context.organizationId), eqFn(table.email, inviteEmail)),
+    });
+    expect(seededInvitations.length).toBe(1);
+    expect(seededInvitations[0]?.status).toBe("pending");
+  }, 60_000);
+
+  it("maps reinviting an existing pending invitation to already_invited", async ({ fixture }) => {
+    const context = await createAuthenticatedInviteContext(fixture);
+
+    const inviteEmail = `dashboard-already-invited-${randomUUID()}@example.com`;
+    const inviter = await fixture.db.query.members.findFirst({
+      columns: {
+        userId: true,
+      },
+      where: (table, { and: andFn, eq: eqFn }) =>
+        andFn(
+          eqFn(table.organizationId, context.organizationId),
+          eqFn(table.role, MemberRoles.OWNER),
+        ),
+    });
+    if (inviter === undefined) {
+      throw new Error("Expected an owner member for invitation seeding.");
+    }
+
+    await fixture.db.insert(invitations).values({
+      id: `inv_${randomUUID()}`,
+      organizationId: context.organizationId,
+      email: inviteEmail,
+      role: "member",
+      status: "pending",
+      expiresAt: new Date(systemClock.nowMs() + 86_400_000),
+      inviterId: inviter.userId,
+    });
+
+    const inviteAttempt = await inviteAndMap({
+      service: context.service,
+      organizationId: context.organizationId,
+      email: inviteEmail,
+      role: "member",
+    });
+    expect(inviteAttempt.status).toBe("already_invited");
+
+    const seededInvitations = await fixture.db.query.invitations.findMany({
+      columns: {
+        id: true,
+      },
+      where: (table, { and: andFn, eq: eqFn }) =>
+        andFn(eqFn(table.organizationId, context.organizationId), eqFn(table.email, inviteEmail)),
+    });
+    expect(seededInvitations.length).toBe(1);
+  }, 60_000);
+
+  it("maps invite-member errors for existing members to already_member", async ({ fixture }) => {
+    const context = await createAuthenticatedInviteContext(fixture);
+
+    const existingMemberEmail = `dashboard-existing-member-${randomUUID()}@example.com`;
+    const existingMemberUserId = `usr_${randomUUID()}`;
+    await fixture.db.insert(users).values({
+      id: existingMemberUserId,
+      name: "Existing Member",
+      email: existingMemberEmail,
+      emailVerified: true,
+    });
+    await fixture.db.insert(members).values({
+      id: `mbr_${randomUUID()}`,
+      organizationId: context.organizationId,
+      userId: existingMemberUserId,
+      role: "member",
+    });
+
+    const mapped = await inviteAndMap({
+      service: context.service,
+      organizationId: context.organizationId,
+      email: existingMemberEmail,
+      role: "member",
+    });
+    expect(mapped.status).toBe("already_member");
+  }, 60_000);
+
+  it("maps malformed invite email errors to invalid_email", async ({ fixture }) => {
+    const context = await createAuthenticatedInviteContext(fixture);
+
+    const mapped = await inviteAndMap({
+      service: context.service,
+      organizationId: context.organizationId,
+      email: "not-an-email",
+      role: "member",
+    });
+    expect(mapped.status).toBe("invalid_email");
+  }, 60_000);
+});
