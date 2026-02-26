@@ -16,5 +16,6 @@ yarn-debug.log*
 yarn-error.log*
 test-results
 config/config.development.toml
+config/config.ci.toml
 config/config.production.toml
 infra/local/.generated/

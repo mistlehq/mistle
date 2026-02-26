@@ -12,7 +12,17 @@ Maintainer docs for local config initialization scripts.
   - Applies development preset defaults.
   - Applies development preset generators.
   - Writes `config/config.development.toml` once.
-  - If the target file already exists, it exits without overwriting.
+- If the target file already exists, it exits without overwriting.
+
+## CI Init Script
+
+- Command: `pnpm config:init:ci`
+- Script: `scripts/config/init-ci.mjs`
+- Output: `config/config.ci.toml`
+- Behavior:
+  - Reads `config/config.sample.toml`.
+  - Applies deterministic CI overrides.
+  - Writes `config/config.ci.toml` (overwrites on each run).
 
 ## Preset Modules
 
