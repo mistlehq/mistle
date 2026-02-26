@@ -1,9 +1,11 @@
+import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
 import { createDataPlaneBackend, createDataPlaneOpenWorkflow } from "@mistle/workflows/data-plane";
 import { Pool } from "pg";
 
 import type { DataPlaneWorkerConfig } from "../types.js";
 
 export type WorkerRuntimeResources = {
+  db: DataPlaneDatabase;
   dbPool: Pool;
   workflowBackend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
   openWorkflow: ReturnType<typeof createDataPlaneOpenWorkflow>;
@@ -15,6 +17,7 @@ export async function createWorkerRuntimeResources(
   const dbPool = new Pool({
     connectionString: config.database.url,
   });
+  const db = createDataPlaneDatabase(dbPool);
 
   let workflowBackend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
 
@@ -30,6 +33,7 @@ export async function createWorkerRuntimeResources(
   }
 
   return {
+    db,
     dbPool,
     workflowBackend,
     openWorkflow: createDataPlaneOpenWorkflow({
