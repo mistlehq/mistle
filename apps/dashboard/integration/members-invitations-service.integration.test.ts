@@ -1,3 +1,7 @@
+/* eslint-disable jest/no-standalone-expect --
+ * This suite uses an extended integration `it` fixture imported from control-plane test context.
+ */
+
 import { systemClock } from "@mistle/time";
 import { randomUUID } from "node:crypto";
 import { describe, expect } from "vitest";
