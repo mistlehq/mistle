@@ -67,6 +67,21 @@ function readRequiredIntegerTomlValue(
   return resolvedValue;
 }
 
+function readRequiredStringTomlValue(
+  configPath: string,
+  path: readonly string[],
+  pathLabel: string,
+): string {
+  const parsed = parseToml(readFileSync(configPath, "utf8"));
+  const resolvedValue = getValueAtPath(parsed, path);
+
+  if (typeof resolvedValue !== "string" || resolvedValue.trim().length === 0) {
+    throw new Error(`Missing or invalid ${pathLabel} in config/config.development.toml.`);
+  }
+
+  return resolvedValue.trim();
+}
+
 function readControlPlaneApiLocalPort(configPath: string): number {
   return readRequiredIntegerTomlValue(
     configPath,
@@ -80,6 +95,14 @@ function readDataPlaneApiLocalPort(configPath: string): number {
     configPath,
     ["apps", "data_plane_api", "server", "port"],
     "apps.data_plane_api.server.port",
+  );
+}
+
+function readInternalServiceToken(configPath: string): string {
+  return readRequiredStringTomlValue(
+    configPath,
+    ["global", "internal_auth", "service_token"],
+    "global.internal_auth.service_token",
   );
 }
 
@@ -263,6 +286,7 @@ function start(): void {
   console.log("Starting local infra dependencies (Postgres 18, PgBouncer, Caddy, Mailpit)...");
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const dataPlaneApiLocalPort = readDataPlaneApiLocalPort(DEV_CONFIG_PATH);
+  const internalServiceToken = readInternalServiceToken(DEV_CONFIG_PATH);
   const cloudflareTunnelToken = readRequiredEnv("CLOUDFLARE_TUNNEL_TOKEN");
   const controlPlaneApiTunnelHostname = readRequiredEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME");
   const dataPlaneEdgeTunnelHostname = readRequiredEnv("DATA_PLANE_EDGE_TUNNEL_HOSTNAME");
@@ -281,6 +305,7 @@ function start(): void {
     DATA_PLANE_EDGE_TUNNEL_HOSTNAME: dataPlaneEdgeTunnelHostname,
     CLOUDFLARED_CONFIG_PATH: DEV_CLOUDFLARED_CONFIG_PATH,
     DATA_PLANE_API_UPSTREAM: `host.docker.internal:${String(dataPlaneApiLocalPort)}`,
+    SERVICE_TOKEN: internalServiceToken,
   };
   localInfraEnv = sharedDevEnv;
   localInfraStartAttempted = true;

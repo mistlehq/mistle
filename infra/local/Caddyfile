@@ -8,7 +8,15 @@
     respond "{\"ok\":true}" 200
   }
 
+  @authorized header Authorization "Bearer {$SERVICE_TOKEN}"
+
+  handle @authorized {
+    reverse_proxy {$DATA_PLANE_API_UPSTREAM} {
+      header_up -Authorization
+    }
+  }
+
   handle {
-    reverse_proxy {$DATA_PLANE_API_UPSTREAM}
+    respond "unauthorized" 401
   }
 }
