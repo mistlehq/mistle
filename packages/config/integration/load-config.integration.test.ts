@@ -76,6 +76,32 @@ const controlPlaneWorkerFixtureConfig = {
   },
 } as const;
 
+const dataPlaneApiEnvConfig = {
+  server: {
+    host: "127.0.0.1",
+    port: 5002,
+  },
+  database: {
+    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
+  },
+  workflow: {
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
+    namespaceId: "development",
+  },
+} as const;
+
+const dataPlaneApiFixtureConfig = {
+  ...dataPlaneApiEnvConfig,
+  server: {
+    host: "0.0.0.0",
+    port: 5300,
+  },
+  workflow: {
+    ...dataPlaneApiEnvConfig.workflow,
+    namespaceId: "fixture",
+  },
+} as const;
+
 describe("loadConfig integrations", () => {
   it("loads control-plane-api purely from a config file fixture", () => {
     const config = loadConfig({
@@ -220,6 +246,79 @@ describe("loadConfig integrations", () => {
 
     expect(config).toEqual({
       app: controlPlaneWorkerFixtureConfig,
+    });
+  });
+
+  it("loads data-plane-api purely from a config file fixture", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_API,
+      configPath: configFixturePath,
+    });
+
+    expect(config).toEqual({
+      global: {
+        env: "development",
+      },
+      app: dataPlaneApiFixtureConfig,
+    });
+  });
+
+  it("loads data-plane-api purely from env", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_API,
+      env: createIntegrationEnv({
+        NODE_ENV: "production",
+        MISTLE_APPS_DATA_PLANE_API_HOST: "localhost",
+        MISTLE_APPS_DATA_PLANE_API_PORT: "5302",
+      }),
+    });
+
+    expect(config).toEqual({
+      global: {
+        env: "production",
+      },
+      app: {
+        ...dataPlaneApiEnvConfig,
+        server: {
+          host: "localhost",
+          port: 5302,
+        },
+      },
+    });
+  });
+
+  it("loads data-plane-api from both config file and env, with env precedence", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_API,
+      configPath: configFixturePath,
+      env: {
+        MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: "override",
+      },
+    });
+
+    expect(config).toEqual({
+      global: {
+        env: "development",
+      },
+      app: {
+        ...dataPlaneApiFixtureConfig,
+        workflow: {
+          ...dataPlaneApiFixtureConfig.workflow,
+          namespaceId: "override",
+        },
+      },
+    });
+  });
+
+  it("returns only data-plane-api app config when includeGlobal is false", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_API,
+      includeGlobal: false,
+      configPath: configFixturePath,
+    });
+
+    expect(config).toEqual({
+      app: dataPlaneApiFixtureConfig,
     });
   });
 });

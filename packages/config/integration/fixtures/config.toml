@@ -38,3 +38,14 @@ smtp_port = 1025
 smtp_secure = false
 smtp_username = "mailpit"
 smtp_password = "mailpit"
+
+[apps.data_plane_api.server]
+host = "0.0.0.0"
+port = 5300
+
+[apps.data_plane_api.database]
+url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane"
+
+[apps.data_plane_api.workflow]
+database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane"
+namespace_id = "fixture"
