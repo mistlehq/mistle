@@ -1,1 +1,13 @@
-{"version":"7","dialect":"postgresql","entries":[]}
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1772109047551,
+      "tag": "0000_init-sandbox-instances",
+      "breakpoints": true
+    }
+  ]
+}
