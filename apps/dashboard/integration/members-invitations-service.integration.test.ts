@@ -1,5 +1,7 @@
 /* eslint-disable jest/no-standalone-expect --
  * This suite uses an extended integration `it` fixture imported from control-plane test context.
+ * TODO(migration): Extract a shared control-plane fixture factory and define a local
+ * `it = vitestIt.extend(...)` in this file so lint can identify test blocks without suppression.
  */
 
 import { systemClock } from "@mistle/time";
