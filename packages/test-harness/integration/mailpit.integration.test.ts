@@ -67,7 +67,7 @@ describe("mailpit service integration", () => {
     expect(messages.map((message) => message.Subject)).toEqual(
       expect.arrayContaining(["first subject", "second subject"]),
     );
-  });
+  }, 20_000);
 
   it("throws a timeout error with description when no message matches", async ({
     mailpitService,
