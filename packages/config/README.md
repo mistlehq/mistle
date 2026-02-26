@@ -15,6 +15,12 @@ The package exports these public APIs from [`src/index.ts`](./src/index.ts):
 
 - `loadConfig(options)`
 - `AppIds`
+- `convertEnvToTomlRecord(env)`
+- `convertTomlToEnvRecord(tomlRoot)`
+- `convertDotenvContentToTomlContent(content)`
+- `convertTomlContentToDotenvContent(content)`
+- `parseDotenvContent(content)`
+- `stringifyDotenvContent(env)`
 
 ## Usage
 
@@ -50,6 +56,49 @@ Return shape:
 
 `app` is type-safe and inferred from `options.app` (for example, `AppIds.CONTROL_PLANE_API` returns the control-plane-api app config shape).
 
+## Conversion Helpers
+
+`@mistle/config` includes helpers for converting between runtime env and TOML shapes:
+
+- Env record to TOML record:
+
+```ts
+import { convertEnvToTomlRecord } from "@mistle/config";
+
+const tomlRoot = convertEnvToTomlRecord(process.env);
+```
+
+- TOML record to env record:
+
+```ts
+import { convertTomlToEnvRecord } from "@mistle/config";
+
+const env = convertTomlToEnvRecord({
+  global: { env: "development" },
+});
+```
+
+- Dotenv content to TOML content:
+
+```ts
+import { convertDotenvContentToTomlContent } from "@mistle/config";
+
+const tomlContent = convertDotenvContentToTomlContent("NODE_ENV=production\n");
+```
+
+- TOML content to dotenv content:
+
+```ts
+import { convertTomlContentToDotenvContent } from "@mistle/config";
+
+const dotenvContent = convertTomlContentToDotenvContent('[global]\nenv = "production"\n');
+```
+
+Scope:
+
+- Conversion covers keys managed by `@mistle/config` modules (`global`, `apps.control_plane_api`, `apps.control_plane_worker`, `apps.data_plane_api`, `apps.data_plane_worker`).
+- Unknown keys are ignored.
+
 ## Merge Rules
 
 - TOML is loaded first.
@@ -74,10 +123,11 @@ Use module ownership to keep config changes localized:
 1. Update the module schema in `schema.ts` (source of truth for runtime validation and types).
 2. Update `load-toml.ts` with the TOML path and parsing logic for the new key.
 3. Update `load-env.ts` with the env mapping and parsing logic for the new key.
-4. Update the module `README.md` table (Type, TOML key, Env key, defaults).
-5. Update [`../../config/config.sample.toml`](../../config/config.sample.toml) with the production-centric sample value.
-6. If development init should populate the key, update `scripts/config/presets/development/*.mjs` defaults and/or generators.
-7. Add or update tests:
+4. Update [`src/conversion-mappings.ts`](./src/conversion-mappings.ts) so env <-> TOML conversion helpers include the new key mapping.
+5. Update the module `README.md` table (Type, TOML key, Env key, defaults).
+6. Update [`../../config/config.sample.toml`](../../config/config.sample.toml) with the production-centric sample value.
+7. If development init should populate the key, update `scripts/config/presets/development/*.mjs` defaults and/or generators.
+8. Add or update tests:
    - unit tests in `src/**/*test.ts` for parsing/merge/validation behavior
    - integration coverage in `integration/load-config.integration.test.ts` (and fixture updates if needed)
 
@@ -93,9 +143,10 @@ Use module ownership to keep config changes localized:
    - add `AppIds.<NEW_APP>`
    - add to `appConfigModules`
 3. Update `src/loader.ts` app parsing branch/map so `loadConfig` can parse and return the app config for the new app id.
-4. Add the app section in [`../../config/config.sample.toml`](../../config/config.sample.toml).
-5. Add module docs link in this README.
-6. Add integration test coverage for TOML-only, env-only, and merged precedence cases.
+4. Update [`src/conversion-mappings.ts`](./src/conversion-mappings.ts) with env <-> TOML mappings for the app module keys.
+5. Add the app section in [`../../config/config.sample.toml`](../../config/config.sample.toml).
+6. Add module docs link in this README.
+7. Add integration test coverage for TOML-only, env-only, and merged precedence cases.
 
 ### Quick Validation
 

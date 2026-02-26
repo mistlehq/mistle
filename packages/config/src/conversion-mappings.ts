@@ -1,0 +1,197 @@
+export type EnvValueFormat = "default" | "csv";
+
+export type ConfigEnvTomlMapping = {
+  configPath: readonly string[];
+  tomlPath: readonly string[];
+  envVar: string;
+  envValueFormat?: EnvValueFormat;
+};
+
+export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
+  {
+    configPath: ["global", "env"],
+    tomlPath: ["global", "env"],
+    envVar: "NODE_ENV",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "server", "host"],
+    tomlPath: ["apps", "control_plane_api", "server", "host"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_HOST",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "server", "port"],
+    tomlPath: ["apps", "control_plane_api", "server", "port"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_PORT",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "database", "url"],
+    tomlPath: ["apps", "control_plane_api", "database", "url"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "auth", "baseUrl"],
+    tomlPath: ["apps", "control_plane_api", "auth", "base_url"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "auth", "secret"],
+    tomlPath: ["apps", "control_plane_api", "auth", "secret"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_SECRET",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "auth", "trustedOrigins"],
+    tomlPath: ["apps", "control_plane_api", "auth", "trusted_origins"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS",
+    envValueFormat: "csv",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "auth", "otpLength"],
+    tomlPath: ["apps", "control_plane_api", "auth", "otp_length"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_LENGTH",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "auth", "otpExpiresInSeconds"],
+    tomlPath: ["apps", "control_plane_api", "auth", "otp_expires_in_seconds"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_EXPIRES_IN_SECONDS",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "auth", "otpAllowedAttempts"],
+    tomlPath: ["apps", "control_plane_api", "auth", "otp_allowed_attempts"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_ALLOWED_ATTEMPTS",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "workflow", "databaseUrl"],
+    tomlPath: ["apps", "control_plane_api", "workflow", "database_url"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "workflow", "namespaceId"],
+    tomlPath: ["apps", "control_plane_api", "workflow", "namespace_id"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "server", "host"],
+    tomlPath: ["apps", "control_plane_worker", "server", "host"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_HOST",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "server", "port"],
+    tomlPath: ["apps", "control_plane_worker", "server", "port"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_PORT",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "workflow", "databaseUrl"],
+    tomlPath: ["apps", "control_plane_worker", "workflow", "database_url"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "workflow", "namespaceId"],
+    tomlPath: ["apps", "control_plane_worker", "workflow", "namespace_id"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "workflow", "runMigrations"],
+    tomlPath: ["apps", "control_plane_worker", "workflow", "run_migrations"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "workflow", "concurrency"],
+    tomlPath: ["apps", "control_plane_worker", "workflow", "concurrency"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "email", "fromAddress"],
+    tomlPath: ["apps", "control_plane_worker", "email", "from_address"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_EMAIL_FROM_ADDRESS",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "email", "fromName"],
+    tomlPath: ["apps", "control_plane_worker", "email", "from_name"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_EMAIL_FROM_NAME",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "email", "smtpHost"],
+    tomlPath: ["apps", "control_plane_worker", "email", "smtp_host"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_HOST",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "email", "smtpPort"],
+    tomlPath: ["apps", "control_plane_worker", "email", "smtp_port"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "email", "smtpSecure"],
+    tomlPath: ["apps", "control_plane_worker", "email", "smtp_secure"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "email", "smtpUsername"],
+    tomlPath: ["apps", "control_plane_worker", "email", "smtp_username"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_USERNAME",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "email", "smtpPassword"],
+    tomlPath: ["apps", "control_plane_worker", "email", "smtp_password"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PASSWORD",
+  },
+  {
+    configPath: ["apps", "data_plane_api", "server", "host"],
+    tomlPath: ["apps", "data_plane_api", "server", "host"],
+    envVar: "MISTLE_APPS_DATA_PLANE_API_HOST",
+  },
+  {
+    configPath: ["apps", "data_plane_api", "server", "port"],
+    tomlPath: ["apps", "data_plane_api", "server", "port"],
+    envVar: "MISTLE_APPS_DATA_PLANE_API_PORT",
+  },
+  {
+    configPath: ["apps", "data_plane_api", "database", "url"],
+    tomlPath: ["apps", "data_plane_api", "database", "url"],
+    envVar: "MISTLE_APPS_DATA_PLANE_API_DATABASE_URL",
+  },
+  {
+    configPath: ["apps", "data_plane_api", "workflow", "databaseUrl"],
+    tomlPath: ["apps", "data_plane_api", "workflow", "database_url"],
+    envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL",
+  },
+  {
+    configPath: ["apps", "data_plane_api", "workflow", "namespaceId"],
+    tomlPath: ["apps", "data_plane_api", "workflow", "namespace_id"],
+    envVar: "MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "server", "host"],
+    tomlPath: ["apps", "data_plane_worker", "server", "host"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_HOST",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "server", "port"],
+    tomlPath: ["apps", "data_plane_worker", "server", "port"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_PORT",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "database", "url"],
+    tomlPath: ["apps", "data_plane_worker", "database", "url"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "workflow", "databaseUrl"],
+    tomlPath: ["apps", "data_plane_worker", "workflow", "database_url"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "workflow", "namespaceId"],
+    tomlPath: ["apps", "data_plane_worker", "workflow", "namespace_id"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "workflow", "runMigrations"],
+    tomlPath: ["apps", "data_plane_worker", "workflow", "run_migrations"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "workflow", "concurrency"],
+    tomlPath: ["apps", "data_plane_worker", "workflow", "concurrency"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY",
+  },
+];
