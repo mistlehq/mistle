@@ -4,7 +4,7 @@ The base image includes a single sandbox runtime entrypoint that every sandbox w
 
 ## Current Responsibilities
 
-- Build `sandboxd` from `apps/sandbox-runtime`
+- Build Rust `sandboxd` from `apps/sandbox-runtime`
 - Start `sandboxd` under `tini`
 - Install `mise` as the runtime manager at `/usr/local/bin/mise`
 

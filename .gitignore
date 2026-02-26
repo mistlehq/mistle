@@ -1,6 +1,7 @@
 node_modules
 coverage
 dist
+target
 .turbo
 .direnv
 .env

@@ -2,15 +2,15 @@
   "name": "@mistle/sandbox-runtime",
   "private": true,
   "scripts": {
-    "dev": "SANDBOX_RUNTIME_LISTEN_ADDR=:8090 go run ./cmd/sandboxd",
-    "build": "mkdir -p dist/bin && go build -trimpath -o dist/bin/sandboxd ./cmd/sandboxd",
+    "dev": "SANDBOX_RUNTIME_LISTEN_ADDR=:8090 cargo run --bin sandboxd",
+    "build": "cargo build --release --locked --bin sandboxd && mkdir -p dist/bin && cp target/release/sandboxd dist/bin/sandboxd",
     "start": "./dist/bin/sandboxd",
-    "lint": "go vet ./...",
-    "typecheck": "go test ./... -run '^$'",
-    "test": "go test ./...",
-    "test:property": "go test ./...",
-    "test:integration": "go test ./...",
-    "format": "gofmt -w .",
-    "format:check": "test -z \"$(gofmt -l .)\""
+    "lint": "cargo clippy --all-targets -- -D warnings",
+    "typecheck": "cargo check --all-targets",
+    "test": "cargo test --all-targets",
+    "test:property": "cargo test --all-targets",
+    "test:integration": "cargo test --all-targets",
+    "format": "cargo fmt",
+    "format:check": "cargo fmt --check"
   }
 }

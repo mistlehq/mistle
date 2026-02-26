@@ -11,14 +11,16 @@
       let
         pkgs = import nixpkgs { inherit system; };
         nodejs = if pkgs ? nodejs_24 then pkgs.nodejs_24 else pkgs.nodejs;
-        golang = if pkgs ? go_1_26 then pkgs.go_1_26 else pkgs.go;
       in
       {
         devShells.default = pkgs.mkShell {
           packages = [
             nodejs
             pkgs.pnpm
-            golang
+            pkgs.rustc
+            pkgs.cargo
+            pkgs.clippy
+            pkgs.rustfmt
             pkgs.cloudflared
             pkgs.docker
             pkgs.git
