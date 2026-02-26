@@ -10,6 +10,7 @@ import {
   MISSING_ACTIVE_ORGANIZATION_ERROR_MESSAGE,
   resolveActiveOrganizationIdFromSession,
 } from "./active-organization.js";
+import { NoOrganizationRecoveryCard } from "./no-organization-recovery-card.js";
 import { resolveRequireAuthViewState } from "./require-auth-view-state.js";
 
 type AuthenticatedSession = Exclude<SessionData, null>;
@@ -141,23 +142,7 @@ export function RequireAuth(): React.JSX.Element {
   }
 
   if (viewState === "missing-organization") {
-    return (
-      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Mistle dashboard</CardTitle>
-              <CardDescription>Organization context is unavailable.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-sm">
-                {MISSING_ACTIVE_ORGANIZATION_ERROR_MESSAGE}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    );
+    return <NoOrganizationRecoveryCard />;
   }
 
   return <Outlet context={{ session }} />;
