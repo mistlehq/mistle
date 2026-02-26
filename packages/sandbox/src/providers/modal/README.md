@@ -50,3 +50,30 @@ SDK and gRPC errors are mapped to `ModalClientError` with:
 - `retryable`: retry hint for caller policy
 
 See implementation details in `client-errors.ts`.
+
+## Integration Tests
+
+Modal adapter integration tests call the real Modal API and are opt-in.
+They cover the full adapter lifecycle surface: `start`, mutate filesystem state, `snapshot`, `stop`,
+`start` from a snapshot image, and verify restored filesystem state.
+
+Required environment variables when enabled:
+
+- `MISTLE_SANDBOX_INTEGRATION=1`
+- `MISTLE_SANDBOX_INTEGRATION_PROVIDERS` includes `modal`
+- `MODAL_TOKEN_ID`
+- `MODAL_TOKEN_SECRET`
+- `MISTLE_SANDBOX_MODAL_APP_NAME`
+- `MISTLE_SANDBOX_MODAL_BASE_IMAGE_ID`
+
+Optional:
+
+- `MISTLE_SANDBOX_MODAL_ENVIRONMENT`
+
+Run:
+
+```bash
+pnpm --filter @mistle/sandbox test:integration
+```
+
+Note: snapshot integration creates a new Modal image and currently does not delete it.

@@ -14,6 +14,18 @@ Provider-specific documentation lives with each provider:
 
 - [`src/providers/modal/README.md`](./src/providers/modal/README.md)
 
+Provider-scoped integration tests live under `integration/<provider>/` (for example `integration/modal/`).
+Integration test execution is gated at package level with `MISTLE_SANDBOX_INTEGRATION=1`, then narrowed by provider using `MISTLE_SANDBOX_INTEGRATION_PROVIDERS` (CSV). For example:
+
+```bash
+MISTLE_SANDBOX_INTEGRATION=1 MISTLE_SANDBOX_INTEGRATION_PROVIDERS=modal pnpm --filter @mistle/sandbox test:integration
+```
+
+List of valid providers for MISTLE_SANDBOX_INTEGRATION_PROVIDERS:
+
+- `modal`
+  Unknown provider names fail fast during integration config parsing.
+
 ## Public API
 
 The package root exports:
@@ -60,6 +72,16 @@ await adapter.stop({ sandboxId: sandbox.sandboxId });
 - `image.kind` can be `base` or `snapshot`; provider implementations decide how they interpret it.
 - Operations may throw `SandboxError` subclasses. Configuration failures throw `SandboxConfigurationError`.
 
+## Responsibility Boundary
+
+`@mistle/sandbox` is responsible only for sandbox lifecycle operations exposed by the adapter interface:
+
+- start a sandbox from an image handle
+- snapshot a running sandbox
+- stop a sandbox
+
+It is not responsible for provisioning or managing provider infrastructure/resources. For current and future adapters (for example Modal, Docker, Kubernetes), platform concerns such as autoscaling, cluster/node lifecycle, scheduling policy, capacity management, and other underlying resource orchestration are out of scope for this package.
+
 ## Adding a New Provider
 
 Use the current Modal provider as the reference implementation.
@@ -72,7 +94,9 @@ Use the current Modal provider as the reference implementation.
 6. Implement `src/providers/<provider>/adapter.ts` that satisfies `SandboxAdapter`.
 7. Create `src/providers/<provider>/index.ts` with a `create<Provider>Adapter(...)` constructor.
 8. Wire the provider into `createSandboxAdapter` in `src/factory.ts`.
-9. Add tests next to each provider module (config, errors, factory wiring, and adapter behavior).
+9. Add unit tests next to each provider module (config, errors, factory wiring, and adapter behavior).
+10. Add provider integration tests in `integration/<provider>/` (for example `integration/modal/modal-adapter.integration.test.ts`).
+11. Integration tests must cover the full lifecycle surface: `start` from a base image, mutate filesystem state, `snapshot`, `stop`, `start` from the snapshot image, verify restored filesystem state, and `stop` again.
 
 Design expectations:
 
