@@ -1,14 +1,67 @@
+import { randomUUID } from "node:crypto";
+
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
+import { mintBootstrapToken } from "@mistle/tunnel-auth";
 import {
   createDataPlaneWorker,
   type CreateDataPlaneWorkflowDefinitionsInput,
 } from "@mistle/workflows/data-plane";
 import { sql } from "drizzle-orm";
 
-import type { DataPlaneWorkerConfig } from "../types.js";
+import type { DataPlaneWorkerRuntimeConfig } from "../types.js";
 import type { WorkerRuntimeResources } from "./resources.js";
 
+const BootstrapTokenEncoder = new TextEncoder();
+
+async function writeSandboxBootstrapToken(input: {
+  config: DataPlaneWorkerRuntimeConfig;
+  resources: Pick<WorkerRuntimeResources, "sandboxAdapter">;
+  sandbox: {
+    sandboxId: string;
+    writeStdin: (input: { payload: Uint8Array<ArrayBufferLike> }) => Promise<void>;
+    closeStdin: () => Promise<void>;
+  };
+}): Promise<void> {
+  const bootstrapToken = await mintBootstrapToken({
+    config: {
+      bootstrapTokenSecret: input.config.tunnel.bootstrapTokenSecret,
+      tokenIssuer: input.config.tunnel.tokenIssuer,
+      tokenAudience: input.config.tunnel.tokenAudience,
+    },
+    jti: randomUUID(),
+    ttlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
+  });
+
+  try {
+    await input.sandbox.writeStdin({
+      payload: BootstrapTokenEncoder.encode(`${bootstrapToken}\n`),
+    });
+    await input.sandbox.closeStdin();
+  } catch (writeError) {
+    try {
+      await input.resources.sandboxAdapter.stop({
+        sandboxId: input.sandbox.sandboxId,
+      });
+    } catch (stopError) {
+      throw new Error(
+        "Failed to write sandbox bootstrap token and failed to stop sandbox after bootstrap failure.",
+        {
+          cause: {
+            writeError,
+            stopError,
+          },
+        },
+      );
+    }
+
+    throw new Error("Failed to write sandbox bootstrap token to sandbox stdin.", {
+      cause: writeError,
+    });
+  }
+}
+
 function createWorkflowInputs(ctx: {
+  config: DataPlaneWorkerRuntimeConfig;
   resources: Pick<WorkerRuntimeResources, "db" | "sandboxAdapter">;
 }): CreateDataPlaneWorkflowDefinitionsInput {
   return {
@@ -16,6 +69,12 @@ function createWorkflowInputs(ctx: {
       startSandbox: async (workflowInput) => {
         const startedSandbox = await ctx.resources.sandboxAdapter.start({
           image: workflowInput.image,
+        });
+
+        await writeSandboxBootstrapToken({
+          config: ctx.config,
+          resources: ctx.resources,
+          sandbox: startedSandbox,
         });
 
         return {
@@ -62,13 +121,14 @@ function createWorkflowInputs(ctx: {
 }
 
 export function createRuntimeWorker(ctx: {
-  config: DataPlaneWorkerConfig;
+  config: DataPlaneWorkerRuntimeConfig;
   resources: Pick<WorkerRuntimeResources, "db" | "openWorkflow" | "sandboxAdapter">;
 }): ReturnType<typeof createDataPlaneWorker> {
   return createDataPlaneWorker({
     openWorkflow: ctx.resources.openWorkflow,
-    concurrency: ctx.config.workflow.concurrency,
+    concurrency: ctx.config.app.workflow.concurrency,
     workflowInputs: createWorkflowInputs({
+      config: ctx.config,
       resources: ctx.resources,
     }),
   });

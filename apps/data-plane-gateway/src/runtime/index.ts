@@ -1,11 +1,30 @@
+import { createNodeWebSocket } from "@hono/node-ws";
+import type { BootstrapTokenConfig } from "@mistle/tunnel-auth";
+
 import { createApp, stopApp } from "../app.js";
 import { startServer } from "../server.js";
-import type { DataPlaneGatewayConfig, DataPlaneGatewayRuntime, StartedServer } from "../types.js";
+import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
+import type {
+  DataPlaneGatewayRuntime,
+  DataPlaneGatewayRuntimeConfig,
+  StartedServer,
+} from "../types.js";
 
 export function createDataPlaneGatewayRuntime(
-  config: DataPlaneGatewayConfig,
+  config: DataPlaneGatewayRuntimeConfig,
 ): DataPlaneGatewayRuntime {
-  const app = createApp(config);
+  const app = createApp(config.app);
+  const nodeWebSocket = createNodeWebSocket({ app });
+
+  registerSandboxTunnelRoute({
+    app,
+    upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
+    bootstrapTokenConfig: {
+      bootstrapTokenSecret: config.tunnel.bootstrapTokenSecret,
+      tokenIssuer: config.tunnel.tokenIssuer,
+      tokenAudience: config.tunnel.tokenAudience,
+    } satisfies BootstrapTokenConfig,
+  });
 
   let startedServer: StartedServer | undefined;
   let stopPromise: Promise<void> | undefined;
@@ -34,9 +53,10 @@ export function createDataPlaneGatewayRuntime(
 
       startedServer = startServer({
         app,
-        host: config.server.host,
-        port: config.server.port,
+        host: config.app.server.host,
+        port: config.app.server.port,
       });
+      nodeWebSocket.injectWebSocket(startedServer.server);
     },
     stop: async () => {
       if (stopped) {

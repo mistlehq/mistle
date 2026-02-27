@@ -1,14 +1,18 @@
 import { createApp } from "../app.js";
 import { startServer } from "../server.js";
-import type { DataPlaneWorkerConfig, DataPlaneWorkerRuntime, StartedServer } from "../types.js";
+import type {
+  DataPlaneWorkerRuntime,
+  DataPlaneWorkerRuntimeConfig,
+  StartedServer,
+} from "../types.js";
 import { createWorkerRuntimeResources, stopWorkerRuntimeResources } from "./resources.js";
 import { createRuntimeWorker } from "./worker.js";
 
 export async function createDataPlaneWorkerRuntime(
-  config: DataPlaneWorkerConfig,
+  config: DataPlaneWorkerRuntimeConfig,
 ): Promise<DataPlaneWorkerRuntime> {
   const app = createApp();
-  const resources = await createWorkerRuntimeResources(config);
+  const resources = await createWorkerRuntimeResources(config.app);
   let worker: ReturnType<typeof createRuntimeWorker>;
 
   try {
@@ -54,8 +58,8 @@ export async function createDataPlaneWorkerRuntime(
 
       startedServer = startServer({
         app,
-        host: config.server.host,
-        port: config.server.port,
+        host: config.app.server.host,
+        port: config.app.server.port,
       });
 
       try {

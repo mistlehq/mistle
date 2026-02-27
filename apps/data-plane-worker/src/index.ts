@@ -6,10 +6,15 @@ import { createDataPlaneWorkerRuntime } from "./runtime/index.js";
 const loadedConfig = loadConfig({
   app: AppIds.DATA_PLANE_WORKER,
   env: process.env,
-  includeGlobal: false,
 });
-const appConfig = loadedConfig.app;
-const runtime = await createDataPlaneWorkerRuntime(appConfig);
+if (loadedConfig.global === undefined) {
+  throw new Error("Expected global tunnel config to be loaded for data-plane-worker.");
+}
+
+const runtime = await createDataPlaneWorkerRuntime({
+  app: loadedConfig.app,
+  tunnel: loadedConfig.global.tunnel,
+});
 
 await runtime.start();
 
@@ -52,8 +57,8 @@ process.once("SIGTERM", () => {
 
 logger.info(
   {
-    host: appConfig.server.host,
-    port: appConfig.server.port,
+    host: loadedConfig.app.server.host,
+    port: loadedConfig.app.server.port,
   },
   "data-plane-worker listening",
 );
