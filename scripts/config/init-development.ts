@@ -156,11 +156,6 @@ function main(): void {
     throw new Error(`Missing sample config file at: ${SAMPLE_PATH}`);
   }
 
-  if (existsSync(TARGET_PATH)) {
-    console.log(`Config already exists: ${TARGET_PATH}`);
-    return;
-  }
-
   const sampleContent = readFileSync(SAMPLE_PATH, "utf8");
   const sampleConfigRoot = asRecord(parseToml(sampleContent));
 

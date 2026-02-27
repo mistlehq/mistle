@@ -11,8 +11,7 @@ Maintainer docs for local config initialization scripts.
   - Reads `config/config.sample.toml`.
   - Applies development preset defaults.
   - Applies development preset generators.
-  - Writes `config/config.development.toml` once.
-- If the target file already exists, it exits without overwriting.
+  - Writes `config/config.development.toml` (overwrites on each run).
 
 ## CI Init Script
 

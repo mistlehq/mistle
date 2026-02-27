@@ -18,12 +18,10 @@ export const dataPlaneWorkerDevelopmentPreset = {
           concurrency: 1,
         },
         sandbox: {
-          provider: "modal",
-          modal: {
-            token_id: "change-me",
-            token_secret: "change-me",
-            app_name: "mistle-sandbox",
-            environment_name: "development",
+          provider: "docker",
+          docker: {
+            socket_path: "/var/run/docker.sock",
+            snapshot_repository: "127.0.0.1:5001/mistle/snapshots",
           },
         },
       },
