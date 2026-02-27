@@ -1,9 +1,5 @@
-import {
-  SandboxInstanceProviders,
-  SandboxInstanceStatuses,
-  sandboxInstances,
-} from "@mistle/db/data-plane";
-import { createSandboxAdapter, SandboxProvider, type SandboxAdapter } from "@mistle/sandbox";
+import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
+import { createSandboxAdapter, type SandboxAdapter } from "@mistle/sandbox";
 import {
   createDataPlaneWorker,
   type CreateDataPlaneWorkflowDefinitionsInput,
@@ -15,7 +11,7 @@ import type { WorkerRuntimeResources } from "./resources.js";
 
 function createSandboxRuntimeAdapter(config: DataPlaneWorkerConfig): SandboxAdapter {
   return createSandboxAdapter({
-    provider: SandboxProvider.MODAL,
+    provider: config.sandbox.provider,
     modal: {
       tokenId: config.sandbox.modal.tokenId,
       tokenSecret: config.sandbox.modal.tokenSecret,
@@ -37,7 +33,7 @@ function createWorkflowInputs(ctx: {
         });
 
         return {
-          provider: SandboxInstanceProviders.MODAL,
+          provider: startedSandbox.provider,
           providerSandboxId: startedSandbox.sandboxId,
         };
       },
