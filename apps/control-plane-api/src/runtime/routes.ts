@@ -7,6 +7,7 @@ import { createAppContextMiddleware } from "../middleware/app-context.js";
 import { createCorsMiddleware } from "../middleware/cors.js";
 import { withAuthSession } from "../middleware/with-auth-session.js";
 import { CONTROL_PLANE_OPENAPI_INFO, CONTROL_PLANE_OPENAPI_PATH } from "../openapi/constants.js";
+import { createOrganizationMembershipCapabilitiesApp } from "../organization-membership-capabilities/index.js";
 import { createSandboxProfilesApp } from "../sandbox-profiles/index.js";
 
 type RegisterAppRoutesInput = {
@@ -40,7 +41,14 @@ export function registerAppRoutes(input: RegisterAppRoutesInput): void {
 
 export function registerApiRouteModules(app: ControlPlaneApp): void {
   const authApp = createAuthApp();
+  const organizationMembershipCapabilitiesApp = withAuthSession(
+    createOrganizationMembershipCapabilitiesApp(),
+  );
   const sandboxProfilesApp = withAuthSession(createSandboxProfilesApp());
   app.route(authApp.basePath, authApp.routes);
+  app.route(
+    organizationMembershipCapabilitiesApp.basePath,
+    organizationMembershipCapabilitiesApp.routes,
+  );
   app.route(sandboxProfilesApp.basePath, sandboxProfilesApp.routes);
 }
