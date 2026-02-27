@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { MistleLogo } from "../../components/mistle-logo.js";
-import { getDashboardConfig } from "../../config.js";
 import { authClient } from "../../lib/auth/client.js";
 import { AuthPageShell, AuthPageWidths } from "../auth/auth-page-shell.js";
 import { EmailStage } from "../auth/email-stage.js";
@@ -12,97 +11,20 @@ import { resolveErrorMessage } from "../auth/messages.js";
 import { OtpStage } from "../auth/otp-stage.js";
 import { SESSION_QUERY_KEY, useSessionQuery } from "../shell/session-query.js";
 import {
+  acceptInvitationAndSetActiveOrganization,
+  fetchInvitation,
+  rejectInvitation,
+} from "./invitation-accept-service.js";
+import {
   formatInvitationRole,
   isInvitationFetchDifferentAccountError,
-  parseInvitationDetails,
   toInvitationFetchErrorMessage,
   toInvitationMutationErrorMessage,
-  type InvitationDetails,
 } from "./invitation-accept-state.js";
 import { InvitationStateCard } from "./invitation-state-card.js";
 import { useInvitationAuth } from "./use-invitation-auth.js";
 
 type InviteDecision = "idle" | "accepted" | "rejected";
-type AuthApiRequestMethod = "GET" | "POST";
-
-const dashboardConfig = getDashboardConfig();
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function readErrorMessage(value: unknown): string | null {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  const message = value["message"];
-  return typeof message === "string" ? message : null;
-}
-
-async function readResponsePayload(response: Response): Promise<unknown> {
-  const contentType = response.headers.get("content-type");
-  if (contentType !== null && contentType.toLowerCase().includes("application/json")) {
-    return response.json();
-  }
-
-  return response.text();
-}
-
-async function fetchAuthApi(input: {
-  path: string;
-  method: AuthApiRequestMethod;
-  query?: Record<string, string>;
-  body?: Record<string, string>;
-}): Promise<unknown> {
-  const url = new URL(
-    `${dashboardConfig.authBasePath}${input.path}`,
-    dashboardConfig.controlPlaneApiOrigin,
-  );
-  if (input.query !== undefined) {
-    for (const [key, value] of Object.entries(input.query)) {
-      url.searchParams.set(key, value);
-    }
-  }
-
-  const response = await fetch(url, {
-    method: input.method,
-    credentials: "include",
-    ...(input.body === undefined
-      ? {}
-      : {
-          headers: {
-            "content-type": "application/json",
-          },
-          body: JSON.stringify(input.body),
-        }),
-  });
-  const payload = await readResponsePayload(response);
-
-  if (!response.ok) {
-    throw {
-      status: response.status,
-      statusCode: response.status,
-      message: readErrorMessage(payload) ?? response.statusText,
-      body: payload,
-    };
-  }
-
-  return payload;
-}
-
-async function fetchInvitation(invitationId: string): Promise<InvitationDetails> {
-  const response = await fetchAuthApi({
-    path: "/organization/get-invitation",
-    method: "GET",
-    query: { id: invitationId },
-  });
-  const parsed = parseInvitationDetails(response);
-  if (parsed === null) {
-    throw new Error("Invalid invitation payload.");
-  }
-  return parsed;
-}
 
 export function InvitationAcceptPage(): React.JSX.Element {
   const [searchParams] = useSearchParams();
@@ -160,16 +82,9 @@ export function InvitationAcceptPage(): React.JSX.Element {
         throw new Error("Invitation details are unavailable.");
       }
 
-      await fetchAuthApi({
-        path: "/organization/accept-invitation",
-        method: "POST",
-        body: { invitationId },
-      });
-
-      await fetchAuthApi({
-        path: "/organization/set-active",
-        method: "POST",
-        body: { organizationId },
+      await acceptInvitationAndSetActiveOrganization({
+        invitationId,
+        organizationId,
       });
     },
     onSuccess: async () => {
@@ -189,11 +104,7 @@ export function InvitationAcceptPage(): React.JSX.Element {
       if (invitationId === null) {
         throw new Error("Missing invitation ID.");
       }
-      await fetchAuthApi({
-        path: "/organization/reject-invitation",
-        method: "POST",
-        body: { invitationId },
-      });
+      await rejectInvitation({ invitationId });
     },
     onSuccess: () => {
       setMutationError(null);
