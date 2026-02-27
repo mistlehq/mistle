@@ -80,6 +80,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID",
   },
   {
+    configPath: ["apps", "control_plane_api", "sandbox", "defaultBaseImage"],
+    tomlPath: ["apps", "control_plane_api", "sandbox", "default_base_image"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE",
+  },
+  {
     configPath: ["apps", "control_plane_worker", "server", "host"],
     tomlPath: ["apps", "control_plane_worker", "server", "host"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_HOST",

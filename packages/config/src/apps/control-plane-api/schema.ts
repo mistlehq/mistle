@@ -32,12 +32,19 @@ export const ControlPlaneApiWorkflowConfigSchema = z
   })
   .strict();
 
+export const ControlPlaneApiSandboxConfigSchema = z
+  .object({
+    defaultBaseImage: z.string().min(1),
+  })
+  .strict();
+
 export const ControlPlaneApiConfigSchema = z
   .object({
     server: ControlPlaneApiServerConfigSchema,
     database: ControlPlaneApiDatabaseConfigSchema,
     auth: ControlPlaneApiAuthConfigSchema,
     workflow: ControlPlaneApiWorkflowConfigSchema,
+    sandbox: ControlPlaneApiSandboxConfigSchema,
   })
   .strict();
 
@@ -47,6 +54,7 @@ export const PartialControlPlaneApiConfigSchema = z
     database: ControlPlaneApiDatabaseConfigSchema.partial().optional(),
     auth: ControlPlaneApiAuthConfigSchema.partial().optional(),
     workflow: ControlPlaneApiWorkflowConfigSchema.partial().optional(),
+    sandbox: ControlPlaneApiSandboxConfigSchema.partial().optional(),
   })
   .strict();
 

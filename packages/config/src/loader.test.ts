@@ -34,6 +34,9 @@ describe("parseConfigRecord", () => {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
           },
+          sandbox: {
+            defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          },
         },
         control_plane_worker: {
           server: {
@@ -138,6 +141,9 @@ describe("parseConfigRecord", () => {
           workflow: {
             databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
+          },
+          sandbox: {
+            defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           },
         },
         control_plane_worker: {

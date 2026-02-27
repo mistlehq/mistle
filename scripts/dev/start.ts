@@ -15,6 +15,9 @@ const DEV_CLOUDFLARED_CONFIG_DIR = resolve(REPO_ROOT, "infra", "local", ".genera
 const DEV_CLOUDFLARED_CONFIG_PATH = resolve(DEV_CLOUDFLARED_CONFIG_DIR, "cloudflared-config.yml");
 
 const TUNNEL_SERVICE_NAME = "tunnel";
+const LOCAL_REGISTRY_HOST = "127.0.0.1:5001";
+const SANDBOX_BASE_IMAGE_TAG = "mistle/sandbox-base:dev";
+const SANDBOX_BASE_IMAGE_REGISTRY_TAG = `${LOCAL_REGISTRY_HOST}/mistle/sandbox-base:dev`;
 
 let localInfraStartAttempted = false;
 let localInfraEnv: NodeJS.ProcessEnv | undefined;
@@ -303,6 +306,23 @@ function start(): void {
     env: sharedDevEnv,
   });
 
+  console.log("Building and pushing sandbox runtime base image...");
+  runOrThrow({
+    command: "pnpm",
+    args: ["--filter", "@mistle/sandbox-runtime", "image:build:dev"],
+    env: sharedDevEnv,
+  });
+  runOrThrow({
+    command: "docker",
+    args: ["tag", SANDBOX_BASE_IMAGE_TAG, SANDBOX_BASE_IMAGE_REGISTRY_TAG],
+    env: sharedDevEnv,
+  });
+  runOrThrow({
+    command: "docker",
+    args: ["push", SANDBOX_BASE_IMAGE_REGISTRY_TAG],
+    env: sharedDevEnv,
+  });
+
   console.log("Building migration dependencies...");
   runOrThrow({
     command: "pnpm",
@@ -338,7 +358,7 @@ function start(): void {
   console.log(`- data-plane-api: ${dataPlaneApiPublicUrl}`);
   console.log(`- data-plane tunnel route: ${dataPlaneApiPublicUrl}/tunnel`);
   console.log("- mailpit ui: http://127.0.0.1:8025");
-  console.log("- local registry: http://127.0.0.1:5001");
+  console.log(`- local registry: http://${LOCAL_REGISTRY_HOST}`);
   console.log("");
 
   appDevProcess = spawn("pnpm", ["dev:workspace"], {
