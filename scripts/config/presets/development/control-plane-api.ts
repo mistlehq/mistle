@@ -15,7 +15,7 @@ export const controlPlaneApiDevelopmentPreset = {
         },
         auth: {
           base_url: "http://127.0.0.1:5100",
-          invitation_accept_base_url: "http://127.0.0.1:5173/settings/members",
+          invitation_accept_base_url: "http://127.0.0.1:5173/invitations/accept",
           trusted_origins: [
             "http://127.0.0.1:3000",
             "http://localhost:3000",

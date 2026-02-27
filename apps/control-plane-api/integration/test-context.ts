@@ -147,15 +147,6 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
             otpExpiresInSeconds: 300,
             otpAllowedAttempts: 3,
           },
-          email: {
-            fromAddress: "no-reply@mistle.local",
-            fromName: "Mistle (Integration)",
-            smtpHost: mailpitService.smtpHost,
-            smtpPort: mailpitService.smtpPort,
-            smtpSecure: false,
-            smtpUsername: "mailpit",
-            smtpPassword: "mailpit",
-          },
         };
 
         const runtime = await createControlPlaneApiRuntime(config);

@@ -13,21 +13,12 @@ url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane"
 
 [apps.control_plane_api.auth]
 base_url = "http://127.0.0.1:5000"
-invitation_accept_base_url = "http://127.0.0.1:5173/settings/members"
+invitation_accept_base_url = "http://127.0.0.1:5173/invitations/accept"
 secret = "test-secret"
 trusted_origins = ["http://127.0.0.1:3000"]
 otp_length = 6
 otp_expires_in_seconds = 300
 otp_allowed_attempts = 3
-
-[apps.control_plane_api.email]
-from_address = "no-reply@mistle.local"
-from_name = "Mistle Local"
-smtp_host = "127.0.0.1"
-smtp_port = 1025
-smtp_secure = false
-smtp_username = "mailpit"
-smtp_password = "mailpit"
 
 [apps.control_plane_api.workflow]
 database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle_control_plane"
