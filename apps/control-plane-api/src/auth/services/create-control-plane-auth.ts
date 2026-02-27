@@ -2,17 +2,14 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 
 import { ControlPlaneDbSchema } from "@mistle/db/control-plane";
-import { systemClock } from "@mistle/time";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP, organization } from "better-auth/plugins";
 
 import { AUTH_ROUTE_BASE_PATH } from "../constants.js";
 import { applyActiveOrganizationToSession } from "./apply-active-organization-to-session.js";
-import { bootstrapUserOrganization } from "./bootstrap-user-organization.js";
 import { createSendOrganizationInvitationService } from "./create-send-organization-invitation.js";
 import { createSendVerificationOTPService } from "./create-send-verification-otp.js";
-import { buildOrganizationName } from "./organization.js";
 
 export type ControlPlaneAuthConfig = {
   authBaseUrl: string;
@@ -67,32 +64,6 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions): 
       modelName: "verifications",
     },
     databaseHooks: {
-      user: {
-        create: {
-          async after(user) {
-            const pendingInvitation = await db.query.invitations.findFirst({
-              columns: {
-                id: true,
-              },
-              where: (invitations, { and, eq, gt }) =>
-                and(
-                  eq(invitations.email, user.email.toLowerCase()),
-                  eq(invitations.status, "pending"),
-                  gt(invitations.expiresAt, systemClock.nowDate()),
-                ),
-            });
-            if (pendingInvitation !== undefined) {
-              return;
-            }
-
-            await bootstrapUserOrganization({
-              db,
-              userId: user.id,
-              name: buildOrganizationName(user.name),
-            });
-          },
-        },
-      },
       session: {
         create: {
           async before(session) {
@@ -142,7 +113,7 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions): 
             modelName: "teams",
           },
           teamMember: {
-            modelName: "team_members",
+            modelName: "teamMembers",
           },
         },
       }),

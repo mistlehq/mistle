@@ -37,6 +37,15 @@ function generateIntegrationAuthEmail(): string {
   return `integration-auth-${randomUUID()}@example.com`;
 }
 
+function readOrganizationIdFromPayload(payload: unknown): string | null {
+  if (typeof payload !== "object" || payload === null) {
+    return null;
+  }
+
+  const id = Reflect.get(payload, "id");
+  return typeof id === "string" && id.length > 0 ? id : null;
+}
+
 export async function createAuthenticatedSession(
   input: CreateAuthenticatedSessionInput,
 ): Promise<AuthenticatedSession> {
@@ -110,16 +119,43 @@ export async function createAuthenticatedSession(
   if (session === undefined) {
     throw new Error("Expected session to exist after OTP sign-in.");
   }
-  if (
-    typeof session.activeOrganizationId !== "string" ||
-    session.activeOrganizationId.length === 0
-  ) {
-    throw new Error("Expected authenticated session to include activeOrganizationId.");
+
+  const requestCookie = extractRequestCookie(setCookie);
+  let activeOrganizationId =
+    typeof session.activeOrganizationId === "string" && session.activeOrganizationId.length > 0
+      ? session.activeOrganizationId
+      : null;
+
+  if (activeOrganizationId === null) {
+    const createOrganizationResponse = await input.request("/v1/auth/organization/create", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: requestCookie,
+      },
+      body: JSON.stringify({
+        name: "Integration Organization",
+        slug: `integration-${randomUUID()}`,
+      }),
+    });
+    if (createOrganizationResponse.status !== 200) {
+      throw new Error(
+        `Expected organization create response status 200, got ${String(createOrganizationResponse.status)}.`,
+      );
+    }
+
+    const createOrganizationPayload: unknown = await createOrganizationResponse
+      .json()
+      .catch(() => null);
+    activeOrganizationId = readOrganizationIdFromPayload(createOrganizationPayload);
+    if (activeOrganizationId === null) {
+      throw new Error("Expected organization create response to include organization id.");
+    }
   }
 
   return {
-    cookie: extractRequestCookie(setCookie),
+    cookie: requestCookie,
     userId: user.id,
-    organizationId: session.activeOrganizationId,
+    organizationId: activeOrganizationId,
   };
 }
