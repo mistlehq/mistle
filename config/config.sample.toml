@@ -73,5 +73,14 @@ namespace_id = "production"
 run_migrations = true
 concurrency = 4
 
+[apps.data_plane_worker.sandbox]
+provider = "modal"
+
+[apps.data_plane_worker.sandbox.modal]
+token_id = "replace-with-modal-token-id"
+token_secret = "replace-with-modal-token-secret"
+app_name = "mistle-sandbox"
+environment_name = "production"
+
 [apps.dashboard]
 control_plane_api_origin = "https://api.mistle.example"

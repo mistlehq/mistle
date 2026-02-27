@@ -69,3 +69,12 @@ database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane"
 namespace_id = "fixture"
 run_migrations = true
 concurrency = 2
+
+[apps.data_plane_worker.sandbox]
+provider = "modal"
+
+[apps.data_plane_worker.sandbox.modal]
+token_id = "fixture-modal-token-id"
+token_secret = "fixture-modal-token-secret"
+app_name = "mistle-sandbox"
+environment_name = "development"

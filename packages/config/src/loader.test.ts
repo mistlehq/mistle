@@ -82,6 +82,15 @@ describe("parseConfigRecord", () => {
             runMigrations: true,
             concurrency: 1,
           },
+          sandbox: {
+            provider: "modal",
+            modal: {
+              tokenId: "fixture-modal-token-id",
+              tokenSecret: "fixture-modal-token-secret",
+              appName: "mistle-sandbox",
+              environmentName: "development",
+            },
+          },
         },
         data_plane_gateway: {
           server: {

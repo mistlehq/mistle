@@ -17,6 +17,15 @@ export const dataPlaneWorkerDevelopmentPreset = {
           run_migrations: true,
           concurrency: 1,
         },
+        sandbox: {
+          provider: "modal",
+          modal: {
+            token_id: "change-me",
+            token_secret: "change-me",
+            app_name: "mistle-sandbox",
+            environment_name: "development",
+          },
+        },
       },
     },
   },
