@@ -23,6 +23,7 @@ describe("parseConfigRecord", () => {
           },
           auth: {
             baseUrl: "http://127.0.0.1:5000",
+            invitationAcceptBaseUrl: "http://127.0.0.1:5173/invitations/accept",
             secret: "test-secret",
             trustedOrigins: ["http://127.0.0.1:3000"],
             otpLength: 6,

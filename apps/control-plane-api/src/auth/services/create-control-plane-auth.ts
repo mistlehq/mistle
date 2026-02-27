@@ -9,11 +9,13 @@ import { emailOTP, organization } from "better-auth/plugins";
 import { AUTH_ROUTE_BASE_PATH } from "../constants.js";
 import { applyActiveOrganizationToSession } from "./apply-active-organization-to-session.js";
 import { bootstrapUserOrganization } from "./bootstrap-user-organization.js";
+import { createSendOrganizationInvitationService } from "./create-send-organization-invitation.js";
 import { createSendVerificationOTPService } from "./create-send-verification-otp.js";
 import { buildOrganizationName } from "./organization.js";
 
 export type ControlPlaneAuthConfig = {
   authBaseUrl: string;
+  authInvitationAcceptBaseUrl: string;
   authSecret: string;
   authTrustedOrigins: string[];
   authOTPLength: number;
@@ -36,6 +38,10 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions): 
   const sendVerificationOTP = createSendVerificationOTPService({
     openWorkflow,
     expiresInSeconds: config.authOTPExpiresInSeconds,
+  });
+  const sendOrganizationInvitation = createSendOrganizationInvitationService({
+    openWorkflow,
+    invitationAcceptBaseUrl: config.authInvitationAcceptBaseUrl,
   });
 
   return betterAuth({
@@ -84,6 +90,21 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions): 
     },
     plugins: [
       organization({
+        sendInvitationEmail: async (invitation) => {
+          const inviterName = invitation.inviter.user.name;
+          const inviterDisplayName =
+            typeof inviterName === "string" && inviterName.trim().length > 0
+              ? inviterName
+              : invitation.inviter.user.email;
+
+          await sendOrganizationInvitation({
+            email: invitation.email,
+            invitationId: invitation.id,
+            organizationName: invitation.organization.name,
+            inviterDisplayName,
+            role: invitation.role,
+          });
+        },
         teams: {
           enabled: true,
           defaultTeam: {

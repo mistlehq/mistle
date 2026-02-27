@@ -13,6 +13,7 @@ url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane"
 
 [apps.control_plane_api.auth]
 base_url = "http://127.0.0.1:5000"
+invitation_accept_base_url = "http://127.0.0.1:5173/invitations/accept"
 secret = "test-secret"
 trusted_origins = ["http://127.0.0.1:3000"]
 otp_length = 6

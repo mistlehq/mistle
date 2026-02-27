@@ -16,6 +16,7 @@ export const ControlPlaneApiDatabaseConfigSchema = z
 export const ControlPlaneApiAuthConfigSchema = z
   .object({
     baseUrl: z.string().min(1),
+    invitationAcceptBaseUrl: z.string().min(1),
     secret: z.string().min(1),
     trustedOrigins: z.array(z.string().min(1)).min(1),
     otpLength: z.number().int().min(4).max(12),

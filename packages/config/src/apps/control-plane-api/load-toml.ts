@@ -24,6 +24,7 @@ export function loadControlPlaneApiFromToml(
     },
     auth: {
       baseUrl: auth.base_url,
+      invitationAcceptBaseUrl: auth.invitation_accept_base_url,
       secret: auth.secret,
       trustedOrigins: auth.trusted_origins,
       otpLength: auth.otp_length,

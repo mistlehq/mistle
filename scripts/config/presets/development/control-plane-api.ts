@@ -15,6 +15,7 @@ export const controlPlaneApiDevelopmentPreset = {
         },
         auth: {
           base_url: "http://127.0.0.1:5100",
+          invitation_accept_base_url: "http://127.0.0.1:5173/invitations/accept",
           trusted_origins: [
             "http://127.0.0.1:3000",
             "http://localhost:3000",
@@ -24,6 +25,15 @@ export const controlPlaneApiDevelopmentPreset = {
           otp_length: 6,
           otp_expires_in_seconds: 300,
           otp_allowed_attempts: 3,
+        },
+        email: {
+          from_address: "no-reply@mistle.local",
+          from_name: "Mistle (Local)",
+          smtp_host: "127.0.0.1",
+          smtp_port: 1025,
+          smtp_secure: false,
+          smtp_username: "mailpit",
+          smtp_password: "mailpit",
         },
         workflow: {
           database_url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_dev",

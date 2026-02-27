@@ -28,8 +28,10 @@ Root export is also available:
 | `createControlPlaneOpenWorkflow`            | `function`      | Creates an OpenWorkflow client for producers and workers.                                             |
 | `createControlPlaneWorker`                  | `function`      | Registers control-plane workflows and returns a worker instance.                                      |
 | `createControlPlaneWorkflowDefinitions`     | `function`      | Builds control-plane workflow implementations from explicit dependencies.                             |
+| `SendOrganizationInvitationWorkflowSpec`    | `workflow spec` | Spec for invitation email delivery workflow (`control-plane.auth.send-organization-invitation`).      |
 | `SendVerificationOTPWorkflowSpec`           | `workflow spec` | Spec for OTP email delivery workflow (`control-plane.auth.send-verification-otp`).                    |
 | `RequestDeleteSandboxProfileWorkflowSpec`   | `workflow spec` | Spec for sandbox profile deletion workflow (`control-plane.sandbox-profiles.request-delete-profile`). |
+| `createSendOrganizationInvitationWorkflow`  | `function`      | Creates the invitation email workflow implementation with injected email dependencies.                |
 | `createSendVerificationOTPWorkflow`         | `function`      | Creates the OTP workflow implementation with injected email dependencies.                             |
 | `createRequestDeleteSandboxProfileWorkflow` | `function`      | Creates the sandbox profile deletion workflow implementation.                                         |
 
@@ -84,6 +86,13 @@ const worker = createControlPlaneWorker({
   openWorkflow: ow,
   concurrency: 4,
   workflowInputs: {
+    sendOrganizationInvitation: {
+      emailSender,
+      from: {
+        email: "noreply@example.com",
+        name: "Mistle",
+      },
+    },
     sendVerificationOTP: {
       emailSender,
       from: {
@@ -115,6 +124,7 @@ await worker.start();
 import {
   createControlPlaneOpenWorkflow,
   RequestDeleteSandboxProfileWorkflowSpec,
+  SendOrganizationInvitationWorkflowSpec,
   SendVerificationOTPWorkflowSpec,
 } from "@mistle/workflows/control-plane";
 
@@ -125,6 +135,14 @@ await ow.runWorkflow(SendVerificationOTPWorkflowSpec, {
   otp: "123456",
   type: "sign-in",
   expiresInSeconds: 300,
+});
+
+await ow.runWorkflow(SendOrganizationInvitationWorkflowSpec, {
+  email: "user@example.com",
+  organizationName: "Acme",
+  inviterDisplayName: "Owner",
+  role: "member",
+  invitationUrl: "https://app.example/invitations/accept?invitationId=inv_123",
 });
 
 await ow.runWorkflow(RequestDeleteSandboxProfileWorkflowSpec, {

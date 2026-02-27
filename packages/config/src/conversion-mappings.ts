@@ -39,6 +39,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL",
   },
   {
+    configPath: ["apps", "control_plane_api", "auth", "invitationAcceptBaseUrl"],
+    tomlPath: ["apps", "control_plane_api", "auth", "invitation_accept_base_url"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_INVITATION_ACCEPT_BASE_URL",
+  },
+  {
     configPath: ["apps", "control_plane_api", "auth", "secret"],
     tomlPath: ["apps", "control_plane_api", "auth", "secret"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_SECRET",

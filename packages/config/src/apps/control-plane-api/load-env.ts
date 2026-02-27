@@ -33,6 +33,10 @@ const loadAuthEnv = createEnvLoader<typeof ControlPlaneApiAuthConfigSchema>([
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL",
   },
   {
+    key: "invitationAcceptBaseUrl",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_INVITATION_ACCEPT_BASE_URL",
+  },
+  {
     key: "secret",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_SECRET",
   },

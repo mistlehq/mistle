@@ -92,6 +92,9 @@ importers:
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@mistle/emails':
+        specifier: workspace:*
+        version: link:../../packages/emails
       '@mistle/http':
         specifier: workspace:*
         version: link:../../packages/http
@@ -126,9 +129,6 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
-      '@mistle/emails':
-        specifier: workspace:*
-        version: link:../../packages/emails
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness

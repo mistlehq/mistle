@@ -4,12 +4,19 @@ export { createControlPlaneWorker } from "./worker.js";
 export {
   createControlPlaneWorkflowDefinitions,
   RequestDeleteSandboxProfileWorkflowSpec,
+  SendOrganizationInvitationWorkflowSpec,
   SendVerificationOTPWorkflowSpec,
 } from "./workflows/index.js";
 export {
   createRequestDeleteSandboxProfileWorkflow,
   type CreateRequestDeleteSandboxProfileWorkflowInput,
 } from "./workflows/request-delete-sandbox-profile/index.js";
+export {
+  createSendOrganizationInvitationWorkflow,
+  type CreateSendOrganizationInvitationWorkflowInput,
+  type SendOrganizationInvitationWorkflowInput,
+  type SendOrganizationInvitationWorkflowOutput,
+} from "./workflows/send-organization-invitation/index.js";
 export {
   createSendVerificationOTPWorkflow,
   type SendVerificationOTPWorkflowInput,
