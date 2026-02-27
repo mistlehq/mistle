@@ -11,9 +11,9 @@ export const DataPlaneSandboxInstanceSources = SandboxInstanceSources;
 
 export const StartSandboxInstanceImageSchema = z
   .object({
-    provider: z.literal(DataPlaneSandboxProviders.MODAL),
+    provider: z.enum(DataPlaneSandboxProviders),
     imageId: z.string().min(1),
-    kind: z.enum([DataPlaneSandboxImageKinds.BASE, DataPlaneSandboxImageKinds.SNAPSHOT]),
+    kind: z.enum(DataPlaneSandboxImageKinds),
     createdAt: z.string().min(1),
   })
   .strict();
@@ -26,11 +26,11 @@ export const StartSandboxInstanceInputSchema = z
     manifest: z.record(z.string(), z.unknown()),
     startedBy: z
       .object({
-        kind: z.literal(DataPlaneSandboxInstanceStarterKinds.USER),
+        kind: z.enum(DataPlaneSandboxInstanceStarterKinds),
         id: z.string().min(1),
       })
       .strict(),
-    source: z.literal(DataPlaneSandboxInstanceSources.DASHBOARD),
+    source: z.enum(DataPlaneSandboxInstanceSources),
     image: StartSandboxInstanceImageSchema,
   })
   .strict();
