@@ -180,10 +180,10 @@ const dataPlaneWorkerDockerFixtureConfig = {
     port: 5305,
   },
   database: {
-    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
+    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
   },
   workflow: {
-    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     namespaceId: "fixture-docker",
     runMigrations: true,
     concurrency: 3,
