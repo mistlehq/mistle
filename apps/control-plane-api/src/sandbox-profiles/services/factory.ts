@@ -1,10 +1,9 @@
-import type { CreateSandboxProfilesServiceInput, SandboxProfilesService } from "./types.js";
-
 import { createProfile } from "./create-profile.js";
 import { getProfile } from "./get-profile.js";
 import { listProfiles } from "./list-profiles.js";
 import { requestDeleteProfile } from "./request-delete-profile.js";
 import { startProfileInstance } from "./start-profile-instance.js";
+import type { CreateSandboxProfilesServiceInput, SandboxProfilesService } from "./types.js";
 import { updateProfile } from "./update-profile.js";
 
 export type { CreateSandboxProfilesServiceInput, SandboxProfilesService } from "./types.js";

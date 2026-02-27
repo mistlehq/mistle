@@ -1,7 +1,6 @@
 import type { OpenWorkflow, Worker } from "openworkflow";
 
 import type { OpenWorkflowDefinition } from "./register-workflows.js";
-
 import { registerWorkflows } from "./register-workflows.js";
 
 export type CreateOpenWorkflowWorkerInput = {

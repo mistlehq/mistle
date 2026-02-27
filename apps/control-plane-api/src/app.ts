@@ -1,7 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 
-import type { AppContextBindings, ControlPlaneApiConfig, ControlPlaneApp } from "./types.js";
-
 import {
   createAppResources,
   getAppDatabase,
@@ -10,6 +8,7 @@ import {
 } from "./runtime/resources.js";
 import { registerAppRoutes } from "./runtime/routes.js";
 import { createAppServices } from "./service.js";
+import type { AppContextBindings, ControlPlaneApiConfig, ControlPlaneApp } from "./types.js";
 
 export async function createApp(config: ControlPlaneApiConfig): Promise<ControlPlaneApp> {
   const app = new OpenAPIHono<AppContextBindings>();

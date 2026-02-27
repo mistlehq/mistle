@@ -1,5 +1,3 @@
-import type { DockerClient } from "./client.js";
-
 import { SandboxConfigurationError, SandboxProviderNotImplementedError } from "../../errors.js";
 import {
   SandboxImageKind,
@@ -11,6 +9,7 @@ import {
   type SandboxStartRequest,
   type SandboxStopRequest,
 } from "../../types.js";
+import type { DockerClient } from "./client.js";
 
 export class DockerSandboxAdapter implements SandboxAdapter {
   readonly #client: DockerClient;

@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
 
 import type { ConfigRecord } from "./presets/development/types.ts";

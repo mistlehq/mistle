@@ -1,5 +1,4 @@
 import type { ConfigModule } from "../core/module.js";
-
 import { loadGlobalFromEnv } from "./load-env.js";
 import { loadGlobalFromToml } from "./load-toml.js";
 import { GlobalConfigSchema } from "./schema.js";

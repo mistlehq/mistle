@@ -1,7 +1,8 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+
+import { drizzle } from "drizzle-orm/node-postgres";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Client } from "pg";
 
 export type RunPostgresMigrationsInput = {

@@ -1,5 +1,4 @@
 import type { ConfigModule } from "../../core/module.js";
-
 import { loadControlPlaneApiFromEnv } from "./load-env.js";
 import { loadControlPlaneApiFromToml } from "./load-toml.js";
 import { ControlPlaneApiConfigSchema } from "./schema.js";

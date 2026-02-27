@@ -1,7 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import type { SessionData } from "../auth/types.js";
-
 import {
   MISSING_ACTIVE_ORGANIZATION_ERROR_MESSAGE,
   resolveActiveOrganizationIdFromSession,

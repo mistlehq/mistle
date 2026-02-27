@@ -1,6 +1,5 @@
-import type { BackendPostgres } from "openworkflow/postgres";
-
 import { OpenWorkflow } from "openworkflow";
+import type { BackendPostgres } from "openworkflow/postgres";
 
 export type CreateOpenWorkflowInput = {
   backend: BackendPostgres;

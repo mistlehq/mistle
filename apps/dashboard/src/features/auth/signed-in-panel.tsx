@@ -10,9 +10,8 @@ import {
   Separator,
 } from "@mistle/ui";
 
-import type { SessionData } from "./types.js";
-
 import { ErrorNotice } from "./error-notice.js";
+import type { SessionData } from "./types.js";
 
 type SignedInPanelProps = {
   session: SessionData;

@@ -1,5 +1,3 @@
-import type { ModalClient } from "./client.js";
-
 import { SandboxConfigurationError, SandboxProviderNotImplementedError } from "../../errors.js";
 import {
   SandboxImageKind,
@@ -11,6 +9,7 @@ import {
   type SandboxStartRequest,
   type SandboxStopRequest,
 } from "../../types.js";
+import type { ModalClient } from "./client.js";
 
 export class ModalSandboxAdapter implements SandboxAdapter {
   readonly #client: ModalClient;

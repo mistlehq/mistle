@@ -13,13 +13,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 
-import type { SidebarNavGroup } from "../navigation/sidebar-nav-model.js";
-
 import { authClient } from "../../lib/auth/client.js";
 import { ErrorNotice } from "../auth/error-notice.js";
 import { resolveErrorMessage } from "../auth/messages.js";
 import { AppBreadcrumbs } from "../navigation/app-breadcrumbs.js";
 import { SidebarNavGroups } from "../navigation/sidebar-nav-groups.js";
+import type { SidebarNavGroup } from "../navigation/sidebar-nav-model.js";
 import {
   isSettingsPath,
   resolveSettingsBackDestination,

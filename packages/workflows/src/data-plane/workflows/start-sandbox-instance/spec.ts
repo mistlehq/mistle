@@ -1,6 +1,5 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import type { SandboxImageHandle } from "@mistle/sandbox";
-
 import { defineWorkflowSpec } from "openworkflow";
 
 export type StartSandboxInstanceWorkflowImageInput = Pick<

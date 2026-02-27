@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import {
   SandboxInstanceStatuses,
   createDataPlaneDatabase,
@@ -19,13 +21,11 @@ import {
   createDataPlaneOpenWorkflow,
   createDataPlaneWorker,
 } from "@mistle/workflows/data-plane";
-import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { it as vitestIt } from "vitest";
 
-import type { DataPlaneApiConfig } from "../src/types.js";
-
 import { createDataPlaneApiRuntime } from "../src/runtime/index.js";
+import type { DataPlaneApiConfig } from "../src/types.js";
 
 export type DataPlaneApiIntegrationFixture = {
   baseUrl: string;

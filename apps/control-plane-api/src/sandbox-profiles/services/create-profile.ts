@@ -1,5 +1,4 @@
 import type { InsertSandboxProfile, SandboxProfile } from "@mistle/db/control-plane";
-
 import { sandboxProfiles, sandboxProfileVersions } from "@mistle/db/control-plane";
 
 import type { CreateSandboxProfilesServiceInput } from "./types.js";

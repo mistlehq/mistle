@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { EmailMessage } from "./types.js";
-
 import { SMTPEmailSender, type SMTPTransport } from "./smtp-email-sender.js";
+import type { EmailMessage } from "./types.js";
 
 function createMessage(): EmailMessage {
   return {

@@ -3,8 +3,9 @@
  * object-destructuring fixture signatures.
  */
 
-import { startIntegrationEnvironment } from "@mistle/test-environments";
 import { randomUUID } from "node:crypto";
+
+import { startIntegrationEnvironment } from "@mistle/test-environments";
 import { it as vitestIt } from "vitest";
 
 type DashboardIntegrationEnvironment = Awaited<ReturnType<typeof startIntegrationEnvironment>>;

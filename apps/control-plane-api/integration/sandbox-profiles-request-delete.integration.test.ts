@@ -2,13 +2,12 @@ import { SandboxProfileStatuses, sandboxProfiles } from "@mistle/db/control-plan
 import { systemClock, systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 
-import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
-
 import {
   NotFoundResponseSchema,
   SandboxProfileDeletionAcceptedResponseSchema,
   ValidationErrorResponseSchema,
 } from "../src/sandbox-profiles/contracts.js";
+import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
 
 const DELETE_WORKFLOW_TIMEOUT_MS = 10_000;

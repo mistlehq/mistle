@@ -1,5 +1,4 @@
-import type { Worker } from "openworkflow";
-import type { BackendPostgres } from "openworkflow/postgres";
+import { randomUUID } from "node:crypto";
 
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import {
@@ -9,7 +8,8 @@ import {
 } from "@mistle/db/migrator";
 import { SandboxProvider, createSandboxAdapter, type SandboxAdapter } from "@mistle/sandbox";
 import { startPostgresWithPgBouncer } from "@mistle/test-core";
-import { randomUUID } from "node:crypto";
+import type { Worker } from "openworkflow";
+import type { BackendPostgres } from "openworkflow/postgres";
 import postgres from "postgres";
 import { it as vitestIt } from "vitest";
 

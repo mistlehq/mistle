@@ -1,12 +1,11 @@
 import type { z } from "zod";
 
-import type { ConfigModule } from "./core/module.js";
-
 import { controlPlaneApiConfigModule } from "./apps/control-plane-api/index.js";
 import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/index.js";
 import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
 import { dataPlaneGatewayConfigModule } from "./apps/data-plane-gateway/index.js";
 import { dataPlaneWorkerConfigModule } from "./apps/data-plane-worker/index.js";
+import type { ConfigModule } from "./core/module.js";
 import { globalConfigModule } from "./global/index.js";
 
 export const AppIds = {

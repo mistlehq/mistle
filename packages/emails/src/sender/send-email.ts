@@ -1,3 +1,7 @@
+import {
+  buildRegisteredEmailTemplate,
+  type EmailTemplateInputById,
+} from "../templates/registry.js";
 import type { EmailTemplateId } from "../templates/template-ids.js";
 import type {
   EmailAddress,
@@ -6,11 +10,6 @@ import type {
   SendEmailFailureResult,
   SendEmailSuccessResult,
 } from "./types.js";
-
-import {
-  buildRegisteredEmailTemplate,
-  type EmailTemplateInputById,
-} from "../templates/registry.js";
 
 export type SendEmailInput<TTemplateId extends EmailTemplateId> = {
   sender: EmailSender;

@@ -1,6 +1,6 @@
-import type { Sandbox as ModalSandbox } from "modal";
-
 import { randomUUID } from "node:crypto";
+
+import type { Sandbox as ModalSandbox } from "modal";
 import { describe, expect } from "vitest";
 
 import { SandboxImageKind, SandboxProvider } from "../../src/index.js";

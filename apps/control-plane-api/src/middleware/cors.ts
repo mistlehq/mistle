@@ -1,5 +1,4 @@
 import type { MiddlewareHandler } from "hono";
-
 import { cors } from "hono/cors";
 
 import type { AppContextBindings } from "../types.js";

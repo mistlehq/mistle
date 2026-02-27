@@ -3,12 +3,11 @@ import { useState } from "react";
 
 import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
 import type { RoleChangeDialogState } from "./members-capability-policy.js";
+import { buildRoleChangeDialogState, canManageInvitations } from "./members-capability-policy.js";
 import type {
   MembersDirectoryInvitationActionState,
   MembersDirectoryPendingMemberOperation,
 } from "./members-directory-model.js";
-
-import { buildRoleChangeDialogState, canManageInvitations } from "./members-capability-policy.js";
 import { parseRoleSelectValue } from "./members-formatters.js";
 import { buildMembersQueryKeys } from "./members-query-keys.js";
 import { defaultMembersSettingsApi, type MembersSettingsApi } from "./members-settings-api.js";

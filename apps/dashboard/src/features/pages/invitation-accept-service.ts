@@ -1,7 +1,6 @@
-import type { InvitationDetails } from "./invitation-accept-state.js";
-
 import { getDashboardConfig } from "../../config.js";
 import { requestControlPlane } from "../api/request-control-plane.js";
+import type { InvitationDetails } from "./invitation-accept-state.js";
 import { parseInvitationDetails } from "./invitation-accept-state.js";
 
 type AuthApiRequestMethod = "GET" | "POST";

@@ -1,6 +1,5 @@
-import type { ReactElement } from "react";
-
 import { render, renderPlainText } from "jsx-email";
+import type { ReactElement } from "react";
 
 export type EmailTemplate = {
   subject: string;

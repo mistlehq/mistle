@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
 import type { EmailMessage } from "../sender/types.js";
-
 import { InMemoryEmailSender } from "./in-memory-email-sender.js";
 
 function createMessage(): EmailMessage {

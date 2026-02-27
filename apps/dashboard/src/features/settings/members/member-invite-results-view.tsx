@@ -1,5 +1,4 @@
 import type { InviteChip, InviteNotSentItem } from "./member-invite-state.js";
-
 import { buildInviteResultsViewModel } from "./member-invite-state.js";
 
 function renderSentSection(chips: readonly InviteChip[]): React.JSX.Element | null {

@@ -1,11 +1,10 @@
-import type { AnyRouter } from "@trpc/server";
-
 import {
   createTRPCClient,
   createTRPCUntypedClient,
   httpBatchLink,
   type TRPCLink,
 } from "@trpc/client";
+import type { AnyRouter } from "@trpc/server";
 
 import { DATA_PLANE_INTERNAL_AUTH_HEADER, DATA_PLANE_TRPC_PATH } from "./constants.js";
 import {

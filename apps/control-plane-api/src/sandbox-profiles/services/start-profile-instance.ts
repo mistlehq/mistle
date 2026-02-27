@@ -1,6 +1,5 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import type { StartSandboxProfileInstanceWorkflowInput } from "@mistle/workflows/control-plane";
-
 import { StartSandboxProfileInstanceWorkflowSpec } from "@mistle/workflows/control-plane";
 
 import type { CreateSandboxProfilesServiceInput } from "./types.js";

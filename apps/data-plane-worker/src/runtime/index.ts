@@ -1,7 +1,6 @@
-import type { DataPlaneWorkerConfig, DataPlaneWorkerRuntime, StartedServer } from "../types.js";
-
 import { createApp } from "../app.js";
 import { startServer } from "../server.js";
+import type { DataPlaneWorkerConfig, DataPlaneWorkerRuntime, StartedServer } from "../types.js";
 import { createWorkerRuntimeResources, stopWorkerRuntimeResources } from "./resources.js";
 import { createRuntimeWorker } from "./worker.js";
 

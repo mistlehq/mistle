@@ -1,6 +1,6 @@
-import type Docker from "dockerode";
-
 import { randomUUID } from "node:crypto";
+
+import type Docker from "dockerode";
 import { describe, expect } from "vitest";
 
 import { SandboxImageKind, SandboxProvider } from "../../src/index.js";

@@ -1,5 +1,4 @@
 import type { App } from "modal";
-
 import { ModalClient as ModalSdkClient } from "modal";
 
 import {

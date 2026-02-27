@@ -1,6 +1,5 @@
-import type NodemailerSMTPTransport from "nodemailer/lib/smtp-transport/index.js";
-
 import nodemailer from "nodemailer";
+import type NodemailerSMTPTransport from "nodemailer/lib/smtp-transport/index.js";
 
 import type {
   EmailMessage,

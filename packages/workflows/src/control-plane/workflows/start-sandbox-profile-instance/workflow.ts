@@ -1,7 +1,6 @@
 import { defineWorkflow, type Workflow } from "openworkflow";
 
 import type { StartSandboxInstanceWorkflowInput } from "../../../data-plane/workflows/start-sandbox-instance/spec.js";
-
 import {
   StartSandboxProfileInstanceWorkflowSpec,
   type StartSandboxProfileInstanceWorkflowInput,

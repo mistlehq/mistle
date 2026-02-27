@@ -1,5 +1,4 @@
 import type { SandboxAdapter } from "../../types.js";
-
 import { createDockerSandboxAdapter } from "./adapter.js";
 import { DockerApiClient } from "./client.js";
 import { validateDockerSandboxConfig, type DockerSandboxConfig } from "./config.js";

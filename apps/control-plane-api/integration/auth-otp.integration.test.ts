@@ -1,10 +1,10 @@
+import { randomUUID } from "node:crypto";
+
 import { MemberRoles, members, verifications } from "@mistle/db/control-plane";
 import { eq } from "drizzle-orm";
-import { randomUUID } from "node:crypto";
 import { describe, expect } from "vitest";
 
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
-
 import { it } from "./test-context.js";
 
 function extractOTPCode(text: string, otpLength: number): string | undefined {

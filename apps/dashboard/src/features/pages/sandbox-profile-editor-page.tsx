@@ -20,8 +20,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
-import type { SandboxProfileStatus } from "../sandbox-profiles/sandbox-profiles-types.js";
-
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
@@ -38,6 +36,7 @@ import {
   getSandboxProfile,
   updateSandboxProfile,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
+import type { SandboxProfileStatus } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { SaveActions } from "../settings/save-actions.js";
 
 type SandboxProfileEditorPageProps = {

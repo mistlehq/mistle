@@ -1,5 +1,4 @@
 import type { EmailTemplate } from "../render.js";
-
 import { buildEmailOTPTemplate, type BuildEmailOTPTemplateOptions } from "./otp/builder.js";
 import { EmailTemplateIds, type EmailTemplateId } from "./template-ids.js";
 

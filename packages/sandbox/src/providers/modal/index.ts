@@ -1,5 +1,4 @@
 import type { SandboxAdapter } from "../../types.js";
-
 import { createModalSandboxAdapter } from "./adapter.js";
 import { ModalApiClient } from "./client.js";
 import { validateModalSandboxConfig, type ModalSandboxConfig } from "./config.js";

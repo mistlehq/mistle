@@ -1,5 +1,4 @@
 import type { SettingsMember } from "./members-api-types.js";
-
 import { parseOrganizationRoleValue, parseTimestampToIsoString } from "./members-parsing.js";
 import { compactMap, readNumber, readString, toRecord } from "./members-records.js";
 

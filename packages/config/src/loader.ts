@@ -1,7 +1,7 @@
-import type { z } from "zod";
-
 import { readFileSync } from "node:fs";
+
 import { parse as parseToml } from "smol-toml";
+import type { z } from "zod";
 
 import { controlPlaneApiConfigModule } from "./apps/control-plane-api/index.js";
 import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/index.js";

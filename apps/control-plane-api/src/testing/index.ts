@@ -6,9 +6,8 @@ import {
 } from "@mistle/db/migrator";
 import { createControlPlaneBackend } from "@mistle/workflows/control-plane";
 
-import type { ControlPlaneApiConfig, ControlPlaneApiRuntime } from "../types.js";
-
 import { createControlPlaneApiRuntime } from "../runtime/index.js";
+import type { ControlPlaneApiConfig, ControlPlaneApiRuntime } from "../types.js";
 
 export type StartControlPlaneApiTestingRuntimeInput = {
   databaseDirectUrl: string;

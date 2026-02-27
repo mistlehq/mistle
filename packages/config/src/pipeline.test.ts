@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import type { ConfigModule } from "./core/module.js";
-
 import { asObjectRecord } from "./core/record.js";
 import { loadFromEnv, loadFromToml, validateModules } from "./pipeline.js";
 

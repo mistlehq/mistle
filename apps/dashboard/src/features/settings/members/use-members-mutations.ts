@@ -10,7 +10,6 @@ import type {
 } from "./members-directory-model.js";
 import type { MembersQueryKeys } from "./members-query-keys.js";
 import type { MembersSettingsApi } from "./members-settings-api.js";
-
 import { toMembersErrorMessage } from "./members-status-messages.js";
 
 const INVITATION_FEEDBACK_DURATION_MS = 3000;

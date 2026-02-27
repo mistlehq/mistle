@@ -1,9 +1,8 @@
 import type { ServerType } from "@hono/node-server";
 import type { OpenAPIHono } from "@hono/zod-openapi";
+import { AppIds, type loadConfig } from "@mistle/config";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { Context, Hono } from "hono";
-
-import { AppIds, type loadConfig } from "@mistle/config";
 
 import type { ControlPlaneAuth } from "./auth/index.js";
 import type { SandboxProfilesService } from "./sandbox-profiles/services/factory.js";

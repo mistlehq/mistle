@@ -1,7 +1,6 @@
-import type { DataPlaneApiRuntime, DataPlaneApiRuntimeConfig, StartedServer } from "../types.js";
-
 import { createApp, stopApp } from "../app.js";
 import { startServer } from "../server.js";
+import type { DataPlaneApiRuntime, DataPlaneApiRuntimeConfig, StartedServer } from "../types.js";
 
 export async function createDataPlaneApiRuntime(
   runtimeConfig: DataPlaneApiRuntimeConfig,

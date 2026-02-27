@@ -1,6 +1,5 @@
-import type React from "react";
-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mistle/ui";
+import type React from "react";
 
 import { AuthPageWidths } from "../auth/auth-page-shell.js";
 

@@ -1,4 +1,5 @@
 import { Socket } from "node:net";
+
 import { describe, expect, test } from "vitest";
 
 import { startPostgresWithPgBouncer } from "../src/index.js";
