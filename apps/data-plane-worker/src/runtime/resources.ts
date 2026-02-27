@@ -13,6 +13,10 @@ export type WorkerRuntimeResources = {
   openWorkflow: ReturnType<typeof createDataPlaneOpenWorkflow>;
 };
 
+function assertUnreachable(_value: never): never {
+  throw new Error("Unsupported sandbox provider.");
+}
+
 function createSandboxRuntimeAdapter(config: DataPlaneWorkerConfig): SandboxAdapter {
   if (config.sandbox.provider === SandboxProvider.MODAL) {
     return createSandboxAdapter({
@@ -36,7 +40,7 @@ function createSandboxRuntimeAdapter(config: DataPlaneWorkerConfig): SandboxAdap
     });
   }
 
-  throw new Error("Unsupported sandbox provider.");
+  return assertUnreachable(config.sandbox);
 }
 
 export async function createWorkerRuntimeResources(
