@@ -39,6 +39,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL",
   },
   {
+    configPath: ["apps", "control_plane_api", "auth", "invitationAcceptBaseUrl"],
+    tomlPath: ["apps", "control_plane_api", "auth", "invitation_accept_base_url"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_INVITATION_ACCEPT_BASE_URL",
+  },
+  {
     configPath: ["apps", "control_plane_api", "auth", "secret"],
     tomlPath: ["apps", "control_plane_api", "auth", "secret"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_SECRET",
@@ -73,6 +78,41 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     configPath: ["apps", "control_plane_api", "workflow", "namespaceId"],
     tomlPath: ["apps", "control_plane_api", "workflow", "namespace_id"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "email", "fromAddress"],
+    tomlPath: ["apps", "control_plane_api", "email", "from_address"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_EMAIL_FROM_ADDRESS",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "email", "fromName"],
+    tomlPath: ["apps", "control_plane_api", "email", "from_name"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_EMAIL_FROM_NAME",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "email", "smtpHost"],
+    tomlPath: ["apps", "control_plane_api", "email", "smtp_host"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SMTP_HOST",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "email", "smtpPort"],
+    tomlPath: ["apps", "control_plane_api", "email", "smtp_port"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SMTP_PORT",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "email", "smtpSecure"],
+    tomlPath: ["apps", "control_plane_api", "email", "smtp_secure"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SMTP_SECURE",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "email", "smtpUsername"],
+    tomlPath: ["apps", "control_plane_api", "email", "smtp_username"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SMTP_USERNAME",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "email", "smtpPassword"],
+    tomlPath: ["apps", "control_plane_api", "email", "smtp_password"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SMTP_PASSWORD",
   },
   {
     configPath: ["apps", "control_plane_worker", "server", "host"],

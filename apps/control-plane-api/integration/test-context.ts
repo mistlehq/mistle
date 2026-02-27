@@ -133,11 +133,21 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
           },
           auth: {
             baseUrl: "http://localhost:3000",
+            invitationAcceptBaseUrl: "http://localhost:5173/settings/members",
             secret: "integration-auth-secret",
             trustedOrigins: ["http://localhost:3000"],
             otpLength: 6,
             otpExpiresInSeconds: 300,
             otpAllowedAttempts: 3,
+          },
+          email: {
+            fromAddress: "no-reply@mistle.local",
+            fromName: "Mistle (Integration)",
+            smtpHost: mailpitService.smtpHost,
+            smtpPort: mailpitService.smtpPort,
+            smtpSecure: false,
+            smtpUsername: "mailpit",
+            smtpPassword: "mailpit",
           },
         };
 

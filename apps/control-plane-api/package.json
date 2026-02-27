@@ -22,6 +22,7 @@
     "@hono/zod-openapi": "^1.2.2",
     "@mistle/config": "workspace:*",
     "@mistle/db": "workspace:*",
+    "@mistle/emails": "workspace:*",
     "@mistle/http": "workspace:*",
     "@mistle/logging": "workspace:*",
     "@mistle/time": "workspace:*",
@@ -35,7 +36,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@mistle/emails": "workspace:*",
     "@mistle/test-harness": "workspace:*",
     "@types/pg": "^8.15.6"
   }

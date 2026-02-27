@@ -16,11 +16,24 @@ export const ControlPlaneApiDatabaseConfigSchema = z
 export const ControlPlaneApiAuthConfigSchema = z
   .object({
     baseUrl: z.string().min(1),
+    invitationAcceptBaseUrl: z.string().min(1),
     secret: z.string().min(1),
     trustedOrigins: z.array(z.string().min(1)).min(1),
     otpLength: z.number().int().min(4).max(12),
     otpExpiresInSeconds: z.number().int().min(30),
     otpAllowedAttempts: z.number().int().min(1).max(10),
+  })
+  .strict();
+
+export const ControlPlaneApiEmailConfigSchema = z
+  .object({
+    fromAddress: z.string().min(1),
+    fromName: z.string().min(1),
+    smtpHost: z.string().min(1),
+    smtpPort: z.number().int().min(1).max(65535),
+    smtpSecure: z.boolean(),
+    smtpUsername: z.string().min(1),
+    smtpPassword: z.string().min(1),
   })
   .strict();
 
@@ -36,6 +49,7 @@ export const ControlPlaneApiConfigSchema = z
     server: ControlPlaneApiServerConfigSchema,
     database: ControlPlaneApiDatabaseConfigSchema,
     auth: ControlPlaneApiAuthConfigSchema,
+    email: ControlPlaneApiEmailConfigSchema,
     workflow: ControlPlaneApiWorkflowConfigSchema,
   })
   .strict();
@@ -45,6 +59,7 @@ export const PartialControlPlaneApiConfigSchema = z
     server: ControlPlaneApiServerConfigSchema.partial().optional(),
     database: ControlPlaneApiDatabaseConfigSchema.partial().optional(),
     auth: ControlPlaneApiAuthConfigSchema.partial().optional(),
+    email: ControlPlaneApiEmailConfigSchema.partial().optional(),
     workflow: ControlPlaneApiWorkflowConfigSchema.partial().optional(),
   })
   .strict();
