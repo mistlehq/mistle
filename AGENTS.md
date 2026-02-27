@@ -2,7 +2,6 @@
 
 ## Dependencies & External APIs
 
-- Prefer using mise for tools. We currently use mise.
 - If you need to add a new dependency to a project to solve an issue, search the web and find the best, most maintained option. Something most other folks use with the best exposed API. We don't want to be in a situation where we are using an unmaintained dependency, that no one else relies on.
 
 ## Fallback Behavior
@@ -101,11 +100,6 @@
 - Do not use `--no-verify` for commits or pushes; fix the underlying hook failure instead.
 - Always commit using Conventional Commits (e.g. `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`). Do not use any other format.
 - Prefer small commits; break changes up into multiple commits if you need to, group related work together.
-
-## Sessions
-
-- Prefer using git worktrees by default and manage their lifecycle (create, clean up, prune, delete local branches) unless the user explicitly names the branch to work on.
-- The goal is to let the user work on multiple tasks in parallel without worrying about branch state.
 
 ## Database Migrations
 
