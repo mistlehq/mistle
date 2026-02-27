@@ -1,4 +1,4 @@
-import { startPostgresWithPgBouncer } from "@mistle/test-harness";
+import { startPostgresWithPgBouncer } from "@mistle/test-core";
 import { describe, expect, it } from "vitest";
 
 import {

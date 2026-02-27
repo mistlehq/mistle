@@ -27,6 +27,9 @@ export type StartControlPlaneApiTestingRuntimeInput = {
     otpExpiresInSeconds?: number;
     otpAllowedAttempts?: number;
   };
+  sandbox?: {
+    defaultBaseImage?: string;
+  };
 };
 
 function createTestingConfig(
@@ -47,6 +50,9 @@ function createTestingConfig(
     workflow: {
       databaseUrl: input.databasePooledUrl,
       namespaceId: input.workflowNamespaceId,
+    },
+    sandbox: {
+      defaultBaseImage: input.sandbox?.defaultBaseImage ?? "127.0.0.1:5001/mistle/sandbox-base:dev",
     },
     auth: {
       baseUrl: authBaseUrl,
