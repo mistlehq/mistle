@@ -14,6 +14,7 @@ import { createDataPlaneApiRuntime } from "../src/runtime/index.js";
 export type DataPlaneApiIntegrationFixture = {
   baseUrl: string;
   config: DataPlaneApiConfig;
+  internalAuthServiceToken: string;
   databaseStack: PostgresWithPgBouncerService;
   dbPool: Pool;
 };
@@ -60,10 +61,11 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
             namespaceId: workflowNamespaceId,
           },
         };
+        const internalAuthServiceToken = "integration-service-token";
 
         const runtime = await createDataPlaneApiRuntime({
           app: config,
-          internalAuthServiceToken: "integration-service-token",
+          internalAuthServiceToken,
         });
         await runtime.start();
         cleanupTasks.unshift(async () => {
@@ -73,6 +75,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
         await use({
           baseUrl: `http://${config.server.host}:${String(config.server.port)}`,
           config,
+          internalAuthServiceToken,
           databaseStack,
           dbPool,
         });

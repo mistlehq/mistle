@@ -15,15 +15,16 @@ export async function createApp(runtimeConfig: DataPlaneApiRuntimeConfig): Promi
     ctx.set("internalAuthServiceToken", runtimeConfig.internalAuthServiceToken);
     await next();
   });
-  const trpcContext = createDataPlaneTrpcContext({
-    config: runtimeConfig.app,
-    internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
-    resources,
-  });
-
   app.all(`${DATA_PLANE_TRPC_PATH}/*`, (c) => {
     return fetchRequestHandler({
-      createContext: () => trpcContext,
+      createContext: ({ req }) => {
+        return createDataPlaneTrpcContext({
+          config: runtimeConfig.app,
+          internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
+          requestHeaders: req.headers,
+          resources,
+        });
+      },
       endpoint: DATA_PLANE_TRPC_PATH,
       req: c.req.raw,
       router: dataPlaneTrpcRouter,
