@@ -8,7 +8,7 @@ import { systemClock } from "@mistle/time";
 import { randomUUID } from "node:crypto";
 import { describe, expect } from "vitest";
 
-import type { ControlPlaneApiIntegrationFixture } from "../../control-plane-api/integration/test-context.js";
+import type { DashboardMembersInvitationsFixture } from "./members-invitations-test-context.js";
 
 import {
   MemberRoles,
@@ -16,10 +16,10 @@ import {
   members,
   users,
 } from "../../../packages/db/src/control-plane/index.js";
-import { it } from "../../control-plane-api/integration/test-context.js";
 import { mapInviteAttemptResult } from "../src/features/settings/members/member-invite-state.js";
 import { MembersApiError } from "../src/features/settings/members/members-api-errors.js";
 import { createMembersInvitationsService } from "../src/features/settings/members/members-invitations-service-core.js";
+import { it } from "./members-invitations-test-context.js";
 
 function readErrorMessage(value: unknown): string | null {
   if (typeof value === "object" && value !== null) {
@@ -57,7 +57,7 @@ function buildPath(input: { path: string; query?: Record<string, string> }): str
 }
 
 function createFixtureMembersFetchClient(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
+  fixture: DashboardMembersInvitationsFixture;
   cookieHeader: string;
 }): {
   $fetch: (
@@ -113,7 +113,7 @@ type AuthenticatedInviteContext = {
 };
 
 async function createAuthenticatedInviteContext(
-  fixture: ControlPlaneApiIntegrationFixture,
+  fixture: DashboardMembersInvitationsFixture,
 ): Promise<AuthenticatedInviteContext> {
   const session = await fixture.authSession();
 
