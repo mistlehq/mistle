@@ -22,6 +22,7 @@ import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-ap
 import {
   formatSandboxProfileStatus,
   formatSandboxProfileUpdatedAt,
+  getSandboxProfileStatusBadgeUi,
 } from "../sandbox-profiles/sandbox-profiles-formatters.js";
 import { sandboxProfilesListQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { listSandboxProfiles } from "../sandbox-profiles/sandbox-profiles-service.js";
@@ -210,36 +211,33 @@ export function SandboxProfilesPage(): React.JSX.Element {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((profile) => (
-                <TableRow key={profile.id}>
-                  <TableCell>
-                    <button
-                      className="text-left font-medium underline-offset-4 hover:underline"
-                      onClick={() => {
-                        navigateToProfileDetail(profile.id);
-                      }}
-                      type="button"
-                    >
-                      {profile.displayName}
-                    </button>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      className={
-                        profile.status === "active"
-                          ? "bg-emerald-600 text-white hover:bg-emerald-600/90"
-                          : undefined
-                      }
-                      variant={profile.status === "active" ? "secondary" : "outline"}
-                    >
-                      {formatSandboxProfileStatus(profile.status)}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {formatSandboxProfileUpdatedAt(profile.updatedAt)}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {items.map((profile) => {
+                const statusBadgeUi = getSandboxProfileStatusBadgeUi(profile.status);
+
+                return (
+                  <TableRow key={profile.id}>
+                    <TableCell>
+                      <button
+                        className="text-left font-medium underline-offset-4 hover:underline"
+                        onClick={() => {
+                          navigateToProfileDetail(profile.id);
+                        }}
+                        type="button"
+                      >
+                        {profile.displayName}
+                      </button>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={statusBadgeUi.className} variant={statusBadgeUi.variant}>
+                        {formatSandboxProfileStatus(profile.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {formatSandboxProfileUpdatedAt(profile.updatedAt)}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
 
