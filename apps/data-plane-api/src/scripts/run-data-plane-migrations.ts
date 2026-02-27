@@ -6,6 +6,8 @@ import {
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
 
+import { logger } from "../logger.js";
+
 async function main(): Promise<void> {
   const loadedConfig = loadConfig({
     app: AppIds.DATA_PLANE_API,
@@ -21,15 +23,10 @@ async function main(): Promise<void> {
     migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
   });
 
-  console.log("Data-plane migrations applied.");
+  logger.info("Data-plane migrations applied.");
 }
 
 void main().catch((error) => {
-  if (error instanceof Error) {
-    console.error("Failed to run data-plane migrations:", error.message);
-  } else {
-    console.error("Failed to run data-plane migrations:", String(error));
-  }
-
+  logger.error({ err: error }, "Failed to run data-plane migrations");
   process.exit(1);
 });

@@ -1,5 +1,6 @@
 import { AppIds, loadConfig } from "@mistle/config";
 
+import { logger } from "./logger.js";
 import { createControlPlaneApiRuntime } from "./runtime/index.js";
 
 async function startControlPlaneApi(): Promise<void> {
@@ -20,7 +21,13 @@ async function startControlPlaneApi(): Promise<void> {
       await runtime.stop();
       process.exit(0);
     } catch (error) {
-      console.error("Failed to gracefully shutdown control-plane-api after", signal, error);
+      logger.error(
+        {
+          err: error,
+          signal,
+        },
+        "Failed to gracefully shutdown control-plane-api",
+      );
       process.exit(1);
     }
   }
@@ -44,17 +51,17 @@ async function startControlPlaneApi(): Promise<void> {
     void shutdownAndExit("SIGTERM");
   });
 
-  console.log(
-    "@mistle/control-plane-api listening on " +
-      appConfig.server.host +
-      ":" +
-      String(appConfig.server.port) +
-      " with auth at " +
-      appConfig.auth.baseUrl,
+  logger.info(
+    {
+      authBaseUrl: appConfig.auth.baseUrl,
+      host: appConfig.server.host,
+      port: appConfig.server.port,
+    },
+    "control-plane-api listening",
   );
 }
 
 void startControlPlaneApi().catch((error) => {
-  console.error("Failed to start control-plane-api", error);
+  logger.error({ err: error }, "Failed to start control-plane-api");
   process.exit(1);
 });

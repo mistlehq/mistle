@@ -161,5 +161,20 @@
       },
     ],
   },
+  "overrides": [
+    {
+      "files": [
+        "apps/control-plane-api/src/**/*.ts",
+        "apps/control-plane-worker/src/**/*.ts",
+        "apps/data-plane-api/src/**/*.ts",
+        "apps/data-plane-worker/src/**/*.ts",
+        "apps/data-plane-gateway/src/**/*.ts",
+        "packages/logging/src/**/*.ts",
+      ],
+      "rules": {
+        "eslint/no-console": "error",
+      },
+    },
+  ],
   "ignorePatterns": ["**/dist/**", "**/node_modules/**", "**/coverage/**", "**/.turbo/**"],
 }

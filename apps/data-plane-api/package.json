@@ -19,6 +19,7 @@
     "@mistle/config": "workspace:*",
     "@mistle/data-plane-trpc": "workspace:*",
     "@mistle/db": "workspace:*",
+    "@mistle/logging": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "@trpc/server": "^11.10.0",
     "hono": "^4.10.6",

@@ -17,6 +17,7 @@
     "@hono/node-server": "^1.19.4",
     "@mistle/config": "workspace:*",
     "@mistle/db": "workspace:*",
+    "@mistle/logging": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "hono": "^4.10.6",
     "pg": "^8.18.0"

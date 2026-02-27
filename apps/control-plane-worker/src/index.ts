@@ -1,5 +1,6 @@
 import { AppIds, loadConfig } from "@mistle/config";
 
+import { logger } from "./logger.js";
 import { createControlPlaneWorkerRuntime } from "./runtime/index.js";
 
 const loadedConfig = loadConfig({
@@ -19,7 +20,13 @@ async function stopRuntimeAndExit(signal: NodeJS.Signals): Promise<void> {
     await runtime.stop();
     process.exit(0);
   } catch (error) {
-    console.error("Failed to gracefully shutdown control-plane-worker after", signal, error);
+    logger.error(
+      {
+        err: error,
+        signal,
+      },
+      "Failed to gracefully shutdown control-plane-worker",
+    );
     process.exit(1);
   }
 }
@@ -43,9 +50,10 @@ process.once("SIGTERM", () => {
   void shutdownAndExit("SIGTERM");
 });
 
-console.log(
-  "@mistle/control-plane-worker listening on " +
-    appConfig.server.host +
-    ":" +
-    String(appConfig.server.port),
+logger.info(
+  {
+    host: appConfig.server.host,
+    port: appConfig.server.port,
+  },
+  "control-plane-worker listening",
 );

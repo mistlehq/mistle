@@ -1,5 +1,6 @@
 import { AppIds, loadConfig } from "@mistle/config";
 
+import { logger } from "./logger.js";
 import { createDataPlaneApiRuntime } from "./runtime/index.js";
 
 async function startDataPlaneApi(): Promise<void> {
@@ -20,7 +21,13 @@ async function startDataPlaneApi(): Promise<void> {
       await runtime.stop();
       process.exit(0);
     } catch (error) {
-      console.error("Failed to gracefully shutdown data-plane-api after", signal, error);
+      logger.error(
+        {
+          err: error,
+          signal,
+        },
+        "Failed to gracefully shutdown data-plane-api",
+      );
       process.exit(1);
     }
   }
@@ -44,15 +51,16 @@ async function startDataPlaneApi(): Promise<void> {
     void shutdownAndExit("SIGTERM");
   });
 
-  console.log(
-    "@mistle/data-plane-api listening on " +
-      appConfig.server.host +
-      ":" +
-      String(appConfig.server.port),
+  logger.info(
+    {
+      host: appConfig.server.host,
+      port: appConfig.server.port,
+    },
+    "data-plane-api listening",
   );
 }
 
 void startDataPlaneApi().catch((error) => {
-  console.error("Failed to start data-plane-api", error);
+  logger.error({ err: error }, "Failed to start data-plane-api");
   process.exit(1);
 });
