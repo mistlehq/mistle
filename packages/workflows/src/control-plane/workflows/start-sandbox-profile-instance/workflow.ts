@@ -11,13 +11,13 @@ import {
 type ResolvedSandboxProfileVersion = Pick<StartSandboxInstanceWorkflowInput, "manifest">;
 
 export type CreateStartSandboxProfileInstanceWorkflowInput = {
-  resolveSandboxProfileVersion: (ctx: {
+  resolveSandboxProfileVersion: (input: {
     organizationId: string;
     sandboxProfileId: string;
     sandboxProfileVersion: number;
   }) => Promise<ResolvedSandboxProfileVersion>;
   startSandboxInstance: (
-    ctx: StartSandboxInstanceWorkflowInput,
+    input: StartSandboxInstanceWorkflowInput,
   ) => Promise<StartSandboxProfileInstanceWorkflowOutput>;
 };
 
@@ -26,28 +26,28 @@ export type CreateStartSandboxProfileInstanceWorkflowInput = {
  * starts a sandbox instance through the data-plane API.
  */
 export function createStartSandboxProfileInstanceWorkflow(
-  createCtx: CreateStartSandboxProfileInstanceWorkflowInput,
+  ctx: CreateStartSandboxProfileInstanceWorkflowInput,
 ): Workflow<
   StartSandboxProfileInstanceWorkflowInput,
   StartSandboxProfileInstanceWorkflowOutput,
   StartSandboxProfileInstanceWorkflowInput
 > {
-  return defineWorkflow(StartSandboxProfileInstanceWorkflowSpec, async (ctx) => {
-    const workflowInput = ctx.input;
-    const resolvedProfileVersion = await ctx.step.run(
+  return defineWorkflow(StartSandboxProfileInstanceWorkflowSpec, async (workflowCtx) => {
+    const workflowInput = workflowCtx.input;
+    const resolvedProfileVersion = await workflowCtx.step.run(
       { name: "resolve-sandbox-profile-version" },
       async () =>
-        createCtx.resolveSandboxProfileVersion({
+        ctx.resolveSandboxProfileVersion({
           organizationId: workflowInput.organizationId,
           sandboxProfileId: workflowInput.sandboxProfileId,
           sandboxProfileVersion: workflowInput.sandboxProfileVersion,
         }),
     );
 
-    const startedSandbox = await ctx.step.run(
+    const startedSandbox = await workflowCtx.step.run(
       { name: "start-sandbox-instance-in-data-plane" },
       async () =>
-        createCtx.startSandboxInstance({
+        ctx.startSandboxInstance({
           organizationId: workflowInput.organizationId,
           sandboxProfileId: workflowInput.sandboxProfileId,
           sandboxProfileVersion: workflowInput.sandboxProfileVersion,

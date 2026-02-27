@@ -76,54 +76,54 @@ async function resolveSandboxStartManifest(
   };
 }
 
-function createWorkflowInputs(createCtx: {
+function createWorkflowInputs(ctx: {
   config: ControlPlaneWorkerConfig;
   internalAuthServiceToken: string;
   db: WorkerRuntimeResources["db"];
   emailSender: SMTPEmailSender;
 }): CreateControlPlaneWorkflowDefinitionsInput {
   const dataPlaneSandboxInstancesClient = createDataPlaneSandboxInstancesClient({
-    baseUrl: createCtx.config.dataPlaneApi.baseUrl,
-    serviceToken: createCtx.internalAuthServiceToken,
+    baseUrl: ctx.config.dataPlaneApi.baseUrl,
+    serviceToken: ctx.internalAuthServiceToken,
   });
 
   return {
     sendOrganizationInvitation: {
-      emailSender: createCtx.emailSender,
+      emailSender: ctx.emailSender,
       from: {
-        email: createCtx.config.email.fromAddress,
-        name: createCtx.config.email.fromName,
+        email: ctx.config.email.fromAddress,
+        name: ctx.config.email.fromName,
       },
     },
     sendVerificationOTP: {
-      emailSender: createCtx.emailSender,
+      emailSender: ctx.emailSender,
       from: {
-        email: createCtx.config.email.fromAddress,
-        name: createCtx.config.email.fromName,
+        email: ctx.config.email.fromAddress,
+        name: ctx.config.email.fromName,
       },
     },
     requestDeleteSandboxProfile: {
-      deleteSandboxProfile: async (ctx) => {
-        await createCtx.db
+      deleteSandboxProfile: async (input) => {
+        await ctx.db
           .delete(sandboxProfiles)
           .where(
             and(
-              eq(sandboxProfiles.id, ctx.profileId),
-              eq(sandboxProfiles.organizationId, ctx.organizationId),
+              eq(sandboxProfiles.id, input.profileId),
+              eq(sandboxProfiles.organizationId, input.organizationId),
             ),
           );
       },
     },
     startSandboxProfileInstance: {
-      resolveSandboxProfileVersion: async (ctx) =>
+      resolveSandboxProfileVersion: async (input) =>
         resolveSandboxStartManifest({
-          db: createCtx.db,
-          organizationId: ctx.organizationId,
-          sandboxProfileId: ctx.sandboxProfileId,
-          sandboxProfileVersion: ctx.sandboxProfileVersion,
+          db: ctx.db,
+          organizationId: input.organizationId,
+          sandboxProfileId: input.sandboxProfileId,
+          sandboxProfileVersion: input.sandboxProfileVersion,
         }),
-      startSandboxInstance: async (ctx) => {
-        const response = await dataPlaneSandboxInstancesClient.startSandboxInstance(ctx);
+      startSandboxInstance: async (input) => {
+        const response = await dataPlaneSandboxInstancesClient.startSandboxInstance(input);
 
         return {
           workflowRunId: response.workflowRunId,

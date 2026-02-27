@@ -58,14 +58,14 @@ describe("start sandbox profile instance workflow integration", () => {
             manifest: resolvedManifest,
           };
         },
-        startSandboxInstance: async (ctx) => {
-          expect(ctx.manifest).toEqual(resolvedManifest);
-          expect(ctx.image).toEqual(workflowInput.image);
+        startSandboxInstance: async (input) => {
+          expect(input.manifest).toEqual(resolvedManifest);
+          expect(input.image).toEqual(workflowInput.image);
 
           return {
-            workflowRunId: `wf-${ctx.organizationId}`,
-            sandboxInstanceId: `sbi-${ctx.startedBy.id}`,
-            providerSandboxId: `${ctx.source}-${ctx.image.imageId}`,
+            workflowRunId: `wf-${input.organizationId}`,
+            sandboxInstanceId: `sbi-${input.startedBy.id}`,
+            providerSandboxId: `${input.source}-${input.image.imageId}`,
           };
         },
       });
