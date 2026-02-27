@@ -2,6 +2,8 @@
 
 Composed integration/system/e2e test environments built on top of `@mistle/test-core`.
 
+For integration test authors, the primary API is `startIntegrationEnvironment(...)`.
+
 ## Intended Consumers
 
 Use this package from:

@@ -30,14 +30,39 @@ This file is the only place that should be manually changed for:
 
 Everything else (types/resolution/runtime wiring) derives from that catalog.
 
-## Public API (Current)
+## Author API
 
-Exported via `@mistle/test-environments`:
+For integration test authors, use:
+
+- `startIntegrationEnvironment(...)`
+
+Most tests only need to choose capabilities and call `startIntegrationEnvironment(...)`.
+You do not need to resolve components directly.
+
+Example:
+
+```ts
+import { startIntegrationEnvironment } from "@mistle/test-environments";
+
+const env = await startIntegrationEnvironment({
+  capabilities: ["members-directory"],
+});
+
+try {
+  const response = await env.request("/__healthz");
+  // assertions...
+} finally {
+  await env.stop();
+}
+```
+
+## Maintainer Utilities
+
+Also exported via `@mistle/test-environments` (maintainer-oriented):
 
 - `IntegrationCapabilities`
 - `IntegrationComponents`
 - `resolveIntegrationComponents(...)`
-- `startIntegrationEnvironment(...)`
 
 Control-plane types:
 
@@ -56,38 +81,11 @@ The environment starts required components based on requested capabilities:
 - `sandbox-profiles-crud`
 - `sandbox-profile-delete-async`
 
-To inspect resolved infrastructure for a capability set:
-
-```ts
-import { resolveIntegrationComponents } from "@mistle/test-environments";
-
-const components = resolveIntegrationComponents(["sandbox-profiles-crud"]);
-```
-
-## Usage
-
 `startIntegrationEnvironment(...)` composes shared infra and starts app runtimes automatically:
 
 - Starts Postgres + PgBouncer automatically.
 - Starts Mailpit automatically when selected capabilities require it.
 - Returns `request(...)` for in-process API calls and `stop()` for teardown.
-
-Example:
-
-```ts
-import { startIntegrationEnvironment } from "@mistle/test-environments";
-
-const env = await startIntegrationEnvironment({
-  capabilities: ["members-directory"],
-});
-
-try {
-  const response = await env.request("/__healthz");
-  // assertions...
-} finally {
-  await env.stop();
-}
-```
 
 ## Lifecycle and Validation Rules
 
