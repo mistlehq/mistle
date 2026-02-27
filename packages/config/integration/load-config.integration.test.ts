@@ -146,6 +146,15 @@ const dataPlaneWorkerEnvConfig = {
     runMigrations: true,
     concurrency: 1,
   },
+  sandbox: {
+    provider: "modal",
+    modal: {
+      tokenId: "fixture-modal-token-id",
+      tokenSecret: "fixture-modal-token-secret",
+      appName: "mistle-sandbox",
+      environmentName: "development",
+    },
+  },
 } as const;
 
 const dataPlaneWorkerFixtureConfig = {

@@ -22,11 +22,39 @@ export const DataPlaneWorkerWorkflowConfigSchema = z
   })
   .strict();
 
+export const DataPlaneWorkerSandboxProviders = {
+  MODAL: "modal",
+} as const;
+
+export const DataPlaneWorkerSandboxModalConfigSchema = z
+  .object({
+    tokenId: z.string().min(1),
+    tokenSecret: z.string().min(1),
+    appName: z.string().min(1),
+    environmentName: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const DataPlaneWorkerSandboxConfigSchema = z
+  .object({
+    provider: z.literal(DataPlaneWorkerSandboxProviders.MODAL),
+    modal: DataPlaneWorkerSandboxModalConfigSchema,
+  })
+  .strict();
+
+export const PartialDataPlaneWorkerSandboxConfigSchema = z
+  .object({
+    provider: z.literal(DataPlaneWorkerSandboxProviders.MODAL).optional(),
+    modal: DataPlaneWorkerSandboxModalConfigSchema.partial().optional(),
+  })
+  .strict();
+
 export const DataPlaneWorkerConfigSchema = z
   .object({
     server: DataPlaneWorkerServerConfigSchema,
     database: DataPlaneWorkerDatabaseConfigSchema,
     workflow: DataPlaneWorkerWorkflowConfigSchema,
+    sandbox: DataPlaneWorkerSandboxConfigSchema,
   })
   .strict();
 
@@ -35,6 +63,7 @@ export const PartialDataPlaneWorkerConfigSchema = z
     server: DataPlaneWorkerServerConfigSchema.partial().optional(),
     database: DataPlaneWorkerDatabaseConfigSchema.partial().optional(),
     workflow: DataPlaneWorkerWorkflowConfigSchema.partial().optional(),
+    sandbox: PartialDataPlaneWorkerSandboxConfigSchema.optional(),
   })
   .strict();
 

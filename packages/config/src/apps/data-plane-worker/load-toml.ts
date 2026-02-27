@@ -12,6 +12,8 @@ export function loadDataPlaneWorkerFromToml(
   const server = asObjectRecord(dataPlaneWorker.server);
   const database = asObjectRecord(dataPlaneWorker.database);
   const workflow = asObjectRecord(dataPlaneWorker.workflow);
+  const sandbox = asObjectRecord(dataPlaneWorker.sandbox);
+  const sandboxModal = asObjectRecord(sandbox.modal);
 
   return PartialDataPlaneWorkerConfigSchema.parse({
     server: {
@@ -26,6 +28,15 @@ export function loadDataPlaneWorkerFromToml(
       namespaceId: workflow.namespace_id,
       runMigrations: workflow.run_migrations,
       concurrency: workflow.concurrency,
+    },
+    sandbox: {
+      provider: sandbox.provider,
+      modal: {
+        tokenId: sandboxModal.token_id,
+        tokenSecret: sandboxModal.token_secret,
+        appName: sandboxModal.app_name,
+        environmentName: sandboxModal.environment_name,
+      },
     },
   });
 }

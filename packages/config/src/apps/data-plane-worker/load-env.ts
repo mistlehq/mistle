@@ -2,6 +2,8 @@ import { createEnvLoader, hasEntries, parseBooleanEnv } from "../../core/load-en
 import {
   type PartialDataPlaneWorkerConfigInput,
   DataPlaneWorkerDatabaseConfigSchema,
+  DataPlaneWorkerSandboxConfigSchema,
+  DataPlaneWorkerSandboxModalConfigSchema,
   DataPlaneWorkerServerConfigSchema,
   DataPlaneWorkerWorkflowConfigSchema,
   PartialDataPlaneWorkerConfigSchema,
@@ -48,6 +50,32 @@ const loadWorkflowEnv = createEnvLoader<typeof DataPlaneWorkerWorkflowConfigSche
   },
 ]);
 
+const loadSandboxModalEnv = createEnvLoader<typeof DataPlaneWorkerSandboxModalConfigSchema>([
+  {
+    key: "tokenId",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID",
+  },
+  {
+    key: "tokenSecret",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET",
+  },
+  {
+    key: "appName",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_APP_NAME",
+  },
+  {
+    key: "environmentName",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME",
+  },
+]);
+
+const loadSandboxEnv = createEnvLoader<typeof DataPlaneWorkerSandboxConfigSchema>([
+  {
+    key: "provider",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_PROVIDER",
+  },
+]);
+
 export function loadDataPlaneWorkerFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialDataPlaneWorkerConfigInput {
@@ -66,6 +94,15 @@ export function loadDataPlaneWorkerFromEnv(
   const workflow = loadWorkflowEnv(env);
   if (hasEntries(workflow)) {
     partialConfig.workflow = workflow;
+  }
+
+  const sandbox = loadSandboxEnv(env);
+  const sandboxModal = loadSandboxModalEnv(env);
+  if (hasEntries(sandbox) || hasEntries(sandboxModal)) {
+    partialConfig.sandbox = {
+      ...sandbox,
+      ...(hasEntries(sandboxModal) ? { modal: sandboxModal } : {}),
+    };
   }
 
   return PartialDataPlaneWorkerConfigSchema.parse(partialConfig);

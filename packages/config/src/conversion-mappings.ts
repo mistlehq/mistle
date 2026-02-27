@@ -209,4 +209,29 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     tomlPath: ["apps", "data_plane_worker", "workflow", "concurrency"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY",
   },
+  {
+    configPath: ["apps", "data_plane_worker", "sandbox", "provider"],
+    tomlPath: ["apps", "data_plane_worker", "sandbox", "provider"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_PROVIDER",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "sandbox", "modal", "tokenId"],
+    tomlPath: ["apps", "data_plane_worker", "sandbox", "modal", "token_id"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "sandbox", "modal", "tokenSecret"],
+    tomlPath: ["apps", "data_plane_worker", "sandbox", "modal", "token_secret"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "sandbox", "modal", "appName"],
+    tomlPath: ["apps", "data_plane_worker", "sandbox", "modal", "app_name"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_APP_NAME",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "sandbox", "modal", "environmentName"],
+    tomlPath: ["apps", "data_plane_worker", "sandbox", "modal", "environment_name"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME",
+  },
 ];
