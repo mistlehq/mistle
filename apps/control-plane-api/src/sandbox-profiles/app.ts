@@ -126,11 +126,14 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
       if (session === null) {
         throw new Error("Expected authenticated session to be available.");
       }
-      const resolvedImage = await resolveSandboxProfileVersionImage({
+      await assertSandboxProfileVersionExists({
         db: ctx.get("db"),
         organizationId: session.session.activeOrganizationId,
         profileId: params.profileId,
         profileVersion: params.version,
+      });
+      const defaultBaseImage = createDefaultSandboxImage({
+        imageId: ctx.get("config").sandbox.defaultBaseImage,
       });
 
       const startedSandboxInstance = await ctx
@@ -144,7 +147,7 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
             id: session.user.id,
           },
           source: SandboxInstanceSources.DASHBOARD,
-          image: resolvedImage,
+          image: defaultBaseImage,
         });
 
       return ctx.json(startedSandboxInstance, 201);
@@ -159,12 +162,23 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
   };
 }
 
-async function resolveSandboxProfileVersionImage(input: {
+function createDefaultSandboxImage(input: {
+  imageId: string;
+}): ReturnType<typeof StartSandboxInstanceInputSchema.shape.image.parse> {
+  return StartSandboxInstanceInputSchema.shape.image.parse({
+    provider: "docker",
+    imageId: input.imageId,
+    kind: "base",
+    createdAt: new Date().toISOString(),
+  });
+}
+
+async function assertSandboxProfileVersionExists(input: {
   db: AppContext["var"]["db"];
   organizationId: string;
   profileId: string;
   profileVersion: number;
-}): Promise<ReturnType<typeof StartSandboxInstanceInputSchema.shape.image.parse>> {
+}): Promise<void> {
   const sandboxProfile = await input.db.query.sandboxProfiles.findFirst({
     columns: {
       id: true,
@@ -182,7 +196,7 @@ async function resolveSandboxProfileVersionImage(input: {
 
   const sandboxProfileVersion = await input.db.query.sandboxProfileVersions.findFirst({
     columns: {
-      manifest: true,
+      sandboxProfileId: true,
     },
     where: (table, { and, eq }) =>
       and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
@@ -194,22 +208,6 @@ async function resolveSandboxProfileVersionImage(input: {
       "Sandbox profile version was not found.",
     );
   }
-
-  const parsedManifest = StartSandboxInstanceInputSchema.shape.manifest.safeParse(
-    sandboxProfileVersion.manifest,
-  );
-  if (!parsedManifest.success) {
-    throw new Error("Sandbox profile version manifest is invalid.");
-  }
-
-  const parsedImage = StartSandboxInstanceInputSchema.shape.image.safeParse(
-    parsedManifest.data.image,
-  );
-  if (!parsedImage.success) {
-    throw new Error("Sandbox profile version image is invalid.");
-  }
-
-  return parsedImage.data;
 }
 
 function handleListProfilesError(ctx: AppContext, error: unknown) {

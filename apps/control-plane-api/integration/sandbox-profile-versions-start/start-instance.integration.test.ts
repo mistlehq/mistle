@@ -23,12 +23,6 @@ describe("sandbox profile version start instance integration", () => {
       sandboxProfileId: "sbp_start_instance_001",
       version: 3,
       manifest: {
-        image: {
-          provider: "modal",
-          imageId: "im_start_instance_001",
-          kind: "base",
-          createdAt: "2026-02-27T00:00:00.000Z",
-        },
         command: ["echo", "hello"],
       },
     });
@@ -53,10 +47,12 @@ describe("sandbox profile version start instance integration", () => {
     const persistedSandboxInstance = await fixture.dataPlaneDb.query.sandboxInstances.findFirst({
       columns: {
         id: true,
+        provider: true,
       },
       where: (table, { eq }) => eq(table.id, body.sandboxInstanceId),
     });
     expect(persistedSandboxInstance).toBeDefined();
+    expect(persistedSandboxInstance?.provider).toBe("docker");
   }, 120_000);
 
   it("returns 404 when the sandbox profile version does not exist", async ({ fixture }) => {
