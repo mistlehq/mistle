@@ -1,5 +1,6 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 
+import { StartSandboxInstanceInputSchema } from "@mistle/data-plane-trpc/contracts";
 import { StartSandboxProfileInstanceWorkflowSpec } from "@mistle/workflows/control-plane";
 
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
@@ -63,8 +64,7 @@ export async function startProfileInstance(
 
   const sandboxProfileVersion = await db.query.sandboxProfileVersions.findFirst({
     columns: {
-      sandboxProfileId: true,
-      version: true,
+      manifest: true,
     },
     where: (table, { and, eq }) =>
       and(
@@ -79,6 +79,20 @@ export async function startProfileInstance(
     );
   }
 
+  const parsedManifest = StartSandboxInstanceInputSchema.shape.manifest.safeParse(
+    sandboxProfileVersion.manifest,
+  );
+  if (!parsedManifest.success) {
+    throw new Error("Sandbox profile version manifest is invalid.");
+  }
+
+  const parsedImage = StartSandboxInstanceInputSchema.shape.image.safeParse(
+    parsedManifest.data.image,
+  );
+  if (!parsedImage.success) {
+    throw new Error("Sandbox profile version manifest image is invalid.");
+  }
+
   const workflowRunHandle = await openWorkflow.runWorkflow(
     StartSandboxProfileInstanceWorkflowSpec,
     {
@@ -87,6 +101,7 @@ export async function startProfileInstance(
       sandboxProfileVersion: serviceInput.profileVersion,
       startedBy: serviceInput.startedBy,
       source: serviceInput.source,
+      image: parsedImage.data,
     },
     {
       idempotencyKey: createIdempotencyKey(serviceInput),

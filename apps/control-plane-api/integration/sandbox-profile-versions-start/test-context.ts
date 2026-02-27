@@ -1,12 +1,10 @@
-import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
-
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
-import { StartSandboxInstanceImageSchema } from "@mistle/data-plane-trpc/contracts";
+import { StartSandboxInstanceInputSchema } from "@mistle/data-plane-trpc/contracts";
 import {
   CONTROL_PLANE_SCHEMA_NAME,
   createControlPlaneDatabase,
   sandboxProfiles,
-  sandboxProfileVersions,
+  type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import {
   SandboxInstanceStatuses,
@@ -40,19 +38,16 @@ import {
 import { and, eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
-import { describe, expect, it as vitestIt } from "vitest";
+import { it as vitestIt } from "vitest";
 
-import type { DataPlaneApiConfig } from "../../data-plane-api/src/types.js";
+import type { DataPlaneApiConfig } from "../../../data-plane-api/src/types.js";
+import type { AuthenticatedSession } from "../helpers/auth-session.js";
 
-import { createDataPlaneApiRuntime } from "../../data-plane-api/src/runtime/index.js";
-import { createControlPlaneApiRuntime } from "../src/runtime/index.js";
-import {
-  StartSandboxProfileInstanceNotFoundResponseSchema,
-  StartSandboxProfileInstanceResponseSchema,
-} from "../src/sandbox-profiles/contracts.js";
-import { createAuthenticatedSession, type AuthenticatedSession } from "./helpers/auth-session.js";
+import { createDataPlaneApiRuntime } from "../../../data-plane-api/src/runtime/index.js";
+import { createControlPlaneApiRuntime } from "../../src/runtime/index.js";
+import { createAuthenticatedSession } from "../helpers/auth-session.js";
 
-type StartSandboxIntegrationFixture = {
+export type StartSandboxIntegrationFixture = {
   controlPlaneDb: ControlPlaneDatabase;
   dataPlaneDb: DataPlaneDatabase;
   request: (path: string, init?: RequestInit) => Promise<Response>;
@@ -66,13 +61,8 @@ type ResolveSandboxProfileVersionInput = {
   sandboxProfileVersion: number;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 async function resolveSandboxProfileVersion(input: ResolveSandboxProfileVersionInput): Promise<{
   manifest: Record<string, unknown>;
-  image: ReturnType<typeof StartSandboxInstanceImageSchema.parse>;
 }> {
   const sandboxProfile = await input.db.query.sandboxProfiles.findFirst({
     columns: {
@@ -100,24 +90,20 @@ async function resolveSandboxProfileVersion(input: ResolveSandboxProfileVersionI
   if (sandboxProfileVersion === undefined) {
     throw new Error("Sandbox profile version was not found.");
   }
-  if (!isRecord(sandboxProfileVersion.manifest)) {
+
+  const parsedManifest = StartSandboxInstanceInputSchema.shape.manifest.safeParse(
+    sandboxProfileVersion.manifest,
+  );
+  if (!parsedManifest.success) {
     throw new Error("Sandbox profile version manifest is invalid.");
   }
 
-  const parsedImage = StartSandboxInstanceImageSchema.safeParse(
-    sandboxProfileVersion.manifest.image,
-  );
-  if (!parsedImage.success) {
-    throw new Error("Sandbox profile version manifest image is invalid.");
-  }
-
   return {
-    manifest: sandboxProfileVersion.manifest,
-    image: parsedImage.data,
+    manifest: parsedManifest.data,
   };
 }
 
-const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
+export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
   fixture: [
     async ({ task }, use) => {
       void task;
@@ -390,84 +376,4 @@ const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
       scope: "file",
     },
   ],
-});
-
-describe("sandbox profile version start instance integration", () => {
-  it("starts a sandbox instance for the selected profile version", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-start-instance@example.com",
-    });
-
-    await fixture.controlPlaneDb.insert(sandboxProfiles).values({
-      id: "sbp_start_instance_001",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Start Instance Profile",
-      status: "active",
-    });
-    await fixture.controlPlaneDb.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_start_instance_001",
-      version: 3,
-      manifest: {
-        image: {
-          provider: "modal",
-          imageId: "im_start_instance_001",
-          kind: "base",
-          createdAt: "2026-02-27T00:00:00.000Z",
-        },
-        command: ["echo", "hello"],
-      },
-    });
-
-    const response = await fixture.request(
-      "/v1/sandbox/profiles/sbp_start_instance_001/versions/3/instances",
-      {
-        method: "POST",
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-      },
-    );
-    expect(response.status).toBe(201);
-
-    const body = StartSandboxProfileInstanceResponseSchema.parse(await response.json());
-    expect(body.status).toBe("completed");
-    expect(body.workflowRunId).not.toBe("");
-    expect(body.sandboxInstanceId).not.toBe("");
-    expect(body.providerSandboxId).not.toBe("");
-
-    const persistedSandboxInstance = await fixture.dataPlaneDb.query.sandboxInstances.findFirst({
-      columns: {
-        id: true,
-      },
-      where: (table, { eq }) => eq(table.id, body.sandboxInstanceId),
-    });
-    expect(persistedSandboxInstance).toBeDefined();
-  }, 120_000);
-
-  it("returns 404 when the sandbox profile version does not exist", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-start-instance-missing-version@example.com",
-    });
-
-    await fixture.controlPlaneDb.insert(sandboxProfiles).values({
-      id: "sbp_start_instance_missing_version",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Missing Version Profile",
-      status: "active",
-    });
-
-    const response = await fixture.request(
-      "/v1/sandbox/profiles/sbp_start_instance_missing_version/versions/9/instances",
-      {
-        method: "POST",
-        headers: {
-          cookie: authenticatedSession.cookie,
-        },
-      },
-    );
-    expect(response.status).toBe(404);
-
-    const body = StartSandboxProfileInstanceNotFoundResponseSchema.parse(await response.json());
-    expect(body.code).toBe("PROFILE_VERSION_NOT_FOUND");
-  }, 120_000);
 });
