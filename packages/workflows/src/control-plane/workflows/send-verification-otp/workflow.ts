@@ -19,7 +19,7 @@ export type CreateSendVerificationOTPWorkflowInput = {
  * Creates the control-plane OTP email workflow implementation.
  */
 export function createSendVerificationOTPWorkflow(
-  input: CreateSendVerificationOTPWorkflowInput,
+  ctx: CreateSendVerificationOTPWorkflowInput,
 ): Workflow<
   SendVerificationOTPWorkflowInput,
   SendVerificationOTPWorkflowOutput,
@@ -28,8 +28,8 @@ export function createSendVerificationOTPWorkflow(
   return defineWorkflow(SendVerificationOTPWorkflowSpec, async ({ input: workflowInput, step }) => {
     const sendResult = await step.run({ name: "send-verification-otp-email" }, async () => {
       return sendEmail({
-        sender: input.emailSender,
-        from: input.from,
+        sender: ctx.emailSender,
+        from: ctx.from,
         to: [
           {
             email: workflowInput.email,

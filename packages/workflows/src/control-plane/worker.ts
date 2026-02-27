@@ -14,16 +14,16 @@ export type CreateControlPlaneWorkerInput = {
 /**
  * Creates a control-plane OpenWorkflow worker and registers all workflows.
  */
-export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): Worker {
-  const workflows = createControlPlaneWorkflowDefinitions(input.workflowInputs);
-  input.openWorkflow.implementWorkflow(
+export function createControlPlaneWorker(ctx: CreateControlPlaneWorkerInput): Worker {
+  const workflows = createControlPlaneWorkflowDefinitions(ctx.workflowInputs);
+  ctx.openWorkflow.implementWorkflow(
     workflows.sendVerificationOTP.spec,
     workflows.sendVerificationOTP.fn,
   );
-  input.openWorkflow.implementWorkflow(
+  ctx.openWorkflow.implementWorkflow(
     workflows.requestDeleteSandboxProfile.spec,
     workflows.requestDeleteSandboxProfile.fn,
   );
 
-  return input.openWorkflow.newWorker({ concurrency: input.concurrency });
+  return ctx.openWorkflow.newWorker({ concurrency: ctx.concurrency });
 }

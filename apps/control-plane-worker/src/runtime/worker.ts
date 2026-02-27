@@ -21,22 +21,22 @@ function createEmailSender(config: ControlPlaneWorkerConfig): SMTPEmailSender {
   });
 }
 
-function createWorkflowInputs(input: {
+function createWorkflowInputs(ctx: {
   config: ControlPlaneWorkerConfig;
   db: WorkerRuntimeResources["db"];
   emailSender: SMTPEmailSender;
 }): CreateControlPlaneWorkflowDefinitionsInput {
   return {
     sendVerificationOTP: {
-      emailSender: input.emailSender,
+      emailSender: ctx.emailSender,
       from: {
-        email: input.config.email.fromAddress,
-        name: input.config.email.fromName,
+        email: ctx.config.email.fromAddress,
+        name: ctx.config.email.fromName,
       },
     },
     requestDeleteSandboxProfile: {
       deleteSandboxProfile: async (deleteInput) => {
-        await input.db
+        await ctx.db
           .delete(sandboxProfiles)
           .where(
             and(
@@ -49,18 +49,18 @@ function createWorkflowInputs(input: {
   };
 }
 
-export function createRuntimeWorker(input: {
+export function createRuntimeWorker(ctx: {
   config: ControlPlaneWorkerConfig;
   resources: Pick<WorkerRuntimeResources, "db" | "openWorkflow">;
 }): ReturnType<typeof createControlPlaneWorker> {
-  const emailSender = createEmailSender(input.config);
+  const emailSender = createEmailSender(ctx.config);
 
   return createControlPlaneWorker({
-    openWorkflow: input.resources.openWorkflow,
-    concurrency: input.config.workflow.concurrency,
+    openWorkflow: ctx.resources.openWorkflow,
+    concurrency: ctx.config.workflow.concurrency,
     workflowInputs: createWorkflowInputs({
-      config: input.config,
-      db: input.resources.db,
+      config: ctx.config,
+      db: ctx.resources.db,
       emailSender,
     }),
   });

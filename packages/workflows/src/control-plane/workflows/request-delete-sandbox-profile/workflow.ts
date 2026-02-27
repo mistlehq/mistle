@@ -14,7 +14,7 @@ export type CreateRequestDeleteSandboxProfileWorkflowInput = {
  * Creates the sandbox profile deletion workflow implementation.
  */
 export function createRequestDeleteSandboxProfileWorkflow(
-  input: CreateRequestDeleteSandboxProfileWorkflowInput,
+  ctx: CreateRequestDeleteSandboxProfileWorkflowInput,
 ): Workflow<
   RequestDeleteSandboxProfileWorkflowInput,
   RequestDeleteSandboxProfileWorkflowOutput,
@@ -24,7 +24,7 @@ export function createRequestDeleteSandboxProfileWorkflow(
     RequestDeleteSandboxProfileWorkflowSpec,
     async ({ input: workflowInput, step }) => {
       await step.run({ name: "delete-sandbox-profile" }, async () => {
-        await input.deleteSandboxProfile({
+        await ctx.deleteSandboxProfile({
           organizationId: workflowInput.organizationId,
           profileId: workflowInput.profileId,
         });
