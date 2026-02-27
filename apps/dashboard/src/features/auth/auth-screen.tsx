@@ -3,7 +3,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Navigate, useLocation } from "react-router";
 
-import { MistleLogo } from "../../components/mistle-logo.js";
 import { authClient } from "../../lib/auth/client.js";
 import { SESSION_QUERY_KEY, useSessionQuery } from "../shell/session-query.js";
 import {
@@ -12,11 +11,11 @@ import {
   resolveOtpValidationError,
   type AuthStep,
 } from "./auth-flow.js";
+import { AuthPageShell, AuthPageWidths } from "./auth-page-shell.js";
 import { resolvePostLoginPath } from "./auth-redirect.js";
-import { EmailStepForm } from "./email-step-form.js";
-import { ErrorNotice } from "./error-notice.js";
+import { EmailStage } from "./email-stage.js";
 import { resolveErrorMessage } from "./messages.js";
-import { OtpStepForm } from "./otp-step-form.js";
+import { OtpStage } from "./otp-stage.js";
 
 export function AuthScreen(): React.JSX.Element {
   const queryClient = useQueryClient();
@@ -127,36 +126,31 @@ export function AuthScreen(): React.JSX.Element {
   }
 
   return (
-    <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-      <div className="mx-auto flex min-h-svh w-full max-w-sm items-center px-4 py-8">
-        <div className="w-full gap-4 flex flex-col">
-          <MistleLogo className="mx-auto" mode="with-text" />
-          {authStep === "email" ? (
-            <h1 className="text-center text-lg font-medium">Log in with email</h1>
-          ) : null}
-          <div className="gap-4 pt-1 flex flex-col">
-            <ErrorNotice message={authError} />
-            {authStep === "email" ? (
-              <EmailStepForm
-                email={email}
-                isSendingOtp={isSendingOtp}
-                onEmailChange={setEmail}
-                onSubmit={handleSendOtp}
-              />
-            ) : (
-              <OtpStepForm
-                email={email}
-                isVerifyingOtp={isVerifyingOtp}
-                onOtpChange={setOtp}
-                onSubmit={handleVerifyOtp}
-                onUseDifferentEmail={handleUseDifferentEmail}
-                otp={otp}
-              />
-            )}
-            <ErrorNotice message={sessionQuery.isError ? sessionQuery.error.message : null} />
-          </div>
-        </div>
-      </div>
-    </main>
+    <AuthPageShell
+      maxWidthClass={AuthPageWidths.SM}
+      title={authStep === "email" ? "Log in with email" : null}
+    >
+      {authStep === "email" ? (
+        <EmailStage
+          authError={authError}
+          email={email}
+          footerError={sessionQuery.isError ? sessionQuery.error.message : null}
+          isSendingOtp={isSendingOtp}
+          onEmailChange={setEmail}
+          onSubmit={handleSendOtp}
+        />
+      ) : (
+        <OtpStage
+          authError={authError}
+          email={email}
+          footerError={sessionQuery.isError ? sessionQuery.error.message : null}
+          isVerifyingOtp={isVerifyingOtp}
+          onOtpChange={setOtp}
+          onSubmit={handleVerifyOtp}
+          onUseDifferentEmail={handleUseDifferentEmail}
+          otp={otp}
+        />
+      )}
+    </AuthPageShell>
   );
 }

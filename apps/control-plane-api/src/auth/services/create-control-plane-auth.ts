@@ -102,6 +102,7 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions): 
             invitationId: invitation.id,
             organizationName: invitation.organization.name,
             inviterDisplayName,
+            inviterEmail: invitation.inviter.user.email,
             role: invitation.role,
           });
         },
