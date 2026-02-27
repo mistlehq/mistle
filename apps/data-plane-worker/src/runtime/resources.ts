@@ -1,5 +1,5 @@
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
-import { createSandboxAdapter, type SandboxAdapter } from "@mistle/sandbox";
+import { createSandboxAdapter, SandboxProvider, type SandboxAdapter } from "@mistle/sandbox";
 import { createDataPlaneBackend, createDataPlaneOpenWorkflow } from "@mistle/workflows/data-plane";
 import { Pool } from "pg";
 
@@ -12,6 +12,26 @@ export type WorkerRuntimeResources = {
   workflowBackend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
   openWorkflow: ReturnType<typeof createDataPlaneOpenWorkflow>;
 };
+
+function assertUnreachable(_value: never): never {
+  throw new Error("Unsupported sandbox provider.");
+}
+
+function createSandboxRuntimeAdapter(config: DataPlaneWorkerConfig): SandboxAdapter {
+  if (config.sandbox.provider === SandboxProvider.MODAL) {
+    return createSandboxAdapter({
+      provider: config.sandbox.provider,
+      modal: {
+        tokenId: config.sandbox.modal.tokenId,
+        tokenSecret: config.sandbox.modal.tokenSecret,
+        appName: config.sandbox.modal.appName,
+        environmentName: config.sandbox.modal.environmentName,
+      },
+    });
+  }
+
+  return assertUnreachable(config.sandbox.provider);
+}
 
 export async function createWorkerRuntimeResources(
   config: DataPlaneWorkerConfig,
@@ -34,15 +54,7 @@ export async function createWorkerRuntimeResources(
     throw error;
   }
 
-  const sandboxAdapter = createSandboxAdapter({
-    provider: config.sandbox.provider,
-    modal: {
-      tokenId: config.sandbox.modal.tokenId,
-      tokenSecret: config.sandbox.modal.tokenSecret,
-      appName: config.sandbox.modal.appName,
-      environmentName: config.sandbox.modal.environmentName,
-    },
-  });
+  const sandboxAdapter = createSandboxRuntimeAdapter(config);
 
   return {
     db,
