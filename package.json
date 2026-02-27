@@ -7,6 +7,7 @@
     "dev:nix": "nix develop --command pnpm dev",
     "dev:workspace": "turbo run dev --ui=tui --filter=!@mistle/sandbox-runtime",
     "dev:down": "tsx ./scripts/dev/down.ts",
+    "dev:reset": "tsx ./scripts/dev/down.ts --volumes",
     "build": "turbo run build",
     "format": "oxfmt .",
     "format:check": "oxfmt --check .",
