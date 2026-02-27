@@ -2,7 +2,10 @@ import { z } from "zod";
 
 import { SandboxProvider, type SandboxProvider as SandboxProviderType } from "../src/index.js";
 
-const SandboxIntegrationProviderSchema = z.literal(SandboxProvider.MODAL);
+const SandboxIntegrationProviderSchema = z.union([
+  z.literal(SandboxProvider.MODAL),
+  z.literal(SandboxProvider.DOCKER),
+]);
 
 const SandboxIntegrationProvidersSchema = z
   .string()
