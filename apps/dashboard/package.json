@@ -10,6 +10,7 @@
     "lint": "tsx scripts/check-file-names.ts && oxlint --deny-warnings -c ../../.oxlintrc.jsonc . && pnpm run openapi:check",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run --passWithNoTests",
+    "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",
     "openapi:generate": "tsx scripts/generate-control-plane-client.ts",
     "openapi:check": "tsx scripts/check-control-plane-client-drift.ts",
     "format": "oxfmt .",
