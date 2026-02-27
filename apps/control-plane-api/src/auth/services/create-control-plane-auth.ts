@@ -2,6 +2,7 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 
 import { ControlPlaneDbSchema } from "@mistle/db/control-plane";
+import { systemClock } from "@mistle/time";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP, organization } from "better-auth/plugins";
@@ -69,6 +70,21 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions): 
       user: {
         create: {
           async after(user) {
+            const pendingInvitation = await db.query.invitations.findFirst({
+              columns: {
+                id: true,
+              },
+              where: (invitations, { and, eq, gt }) =>
+                and(
+                  eq(invitations.email, user.email.toLowerCase()),
+                  eq(invitations.status, "pending"),
+                  gt(invitations.expiresAt, systemClock.nowDate()),
+                ),
+            });
+            if (pendingInvitation !== undefined) {
+              return;
+            }
+
             await bootstrapUserOrganization({
               db,
               userId: user.id,
