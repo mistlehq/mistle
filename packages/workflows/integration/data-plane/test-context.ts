@@ -24,6 +24,7 @@ export type DataPlaneWorkflowFixture = {
   openWorkflow: ReturnType<typeof createDataPlaneOpenWorkflow>;
   sandboxAdapter: SandboxAdapter;
   startedSandboxIds: string[];
+  startedBootstrapTokenJtis: string[];
 };
 
 type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
@@ -45,6 +46,8 @@ function resolveDockerWorkflowIntegrationEnabled(): boolean {
 }
 
 const DEFAULT_DOCKER_SOCKET_PATH = "/var/run/docker.sock";
+const TunnelConnectAckWaitTimeoutMs = 2_000;
+const TunnelConnectAckPollIntervalMs = 100;
 
 function resolveDockerSocketPath(): string {
   const socketPath = process.env.MISTLE_SANDBOX_DOCKER_SOCKET_PATH?.trim();
@@ -97,6 +100,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
 
       const cleanupTasks: Array<() => Promise<void>> = [];
       const startedSandboxIds: string[] = [];
+      const startedBootstrapTokenJtis: string[] = [];
       let sandboxAdapter: SandboxAdapter | undefined;
 
       try {
@@ -151,12 +155,15 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                 const startedSandbox = await dockerSandboxAdapter.start({
                   image: workflowInput.image,
                 });
+                const bootstrapTokenJti = randomUUID();
 
                 startedSandboxIds.push(startedSandbox.sandboxId);
+                startedBootstrapTokenJtis.push(bootstrapTokenJti);
 
                 return {
                   provider: startedSandbox.provider,
                   providerSandboxId: startedSandbox.sandboxId,
+                  bootstrapTokenJti,
                 };
               },
               stopSandbox: async (workflowInput) => {
@@ -181,8 +188,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                       status,
                       started_by_kind,
                       started_by_id,
-                      source,
-                      started_at
+                      source
                     )
                     values (
                       ${sandboxInstanceId},
@@ -192,11 +198,10 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                       ${sql.json(manifest)},
                       ${workflowInput.provider},
                       ${workflowInput.providerSandboxId},
-                      ${SandboxInstanceStatuses.RUNNING},
+                      ${SandboxInstanceStatuses.STARTING},
                       ${workflowInput.startedBy.kind},
                       ${workflowInput.startedBy.id},
-                      ${workflowInput.source},
-                      now()
+                      ${workflowInput.source}
                     )
                     returning id
                   `;
@@ -219,6 +224,70 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                   sandboxInstanceId: insertedRow.id,
                 };
               },
+              waitForSandboxTunnelConnectAck: async (workflowInput) => {
+                const waitDeadlineMs = Date.now() + TunnelConnectAckWaitTimeoutMs;
+
+                while (true) {
+                  const ackRows = await sql<{ bootstrap_token_jti: string }[]>`
+                    select bootstrap_token_jti
+                    from data_plane.sandbox_tunnel_connect_acks
+                    where bootstrap_token_jti = ${workflowInput.bootstrapTokenJti}
+                  `;
+                  if (ackRows[0] !== undefined) {
+                    return true;
+                  }
+
+                  const remainingMs = waitDeadlineMs - Date.now();
+                  if (remainingMs <= 0) {
+                    return false;
+                  }
+
+                  await sql`select pg_sleep(${Math.min(remainingMs, TunnelConnectAckPollIntervalMs) / 1000})`;
+                }
+              },
+              updateSandboxInstanceStatus: async (workflowInput) => {
+                if (workflowInput.status === "running") {
+                  const updatedRows = await sql<{ id: string }[]>`
+                    update data_plane.sandbox_instances
+                    set
+                      status = ${SandboxInstanceStatuses.RUNNING},
+                      started_at = now(),
+                      failed_at = null,
+                      failure_code = null,
+                      failure_message = null,
+                      updated_at = now()
+                    where
+                      id = ${workflowInput.sandboxInstanceId}
+                      and status = ${SandboxInstanceStatuses.STARTING}
+                    returning id
+                  `;
+                  if (updatedRows[0] === undefined) {
+                    throw new Error(
+                      "Failed to transition sandbox instance status from starting to running in integration fixture.",
+                    );
+                  }
+                  return;
+                }
+
+                const updatedRows = await sql<{ id: string }[]>`
+                  update data_plane.sandbox_instances
+                  set
+                    status = ${SandboxInstanceStatuses.FAILED},
+                    failed_at = now(),
+                    failure_code = ${workflowInput.failureCode},
+                    failure_message = ${workflowInput.failureMessage},
+                    updated_at = now()
+                  where
+                    id = ${workflowInput.sandboxInstanceId}
+                    and status = ${SandboxInstanceStatuses.STARTING}
+                  returning id
+                `;
+                if (updatedRows[0] === undefined) {
+                  throw new Error(
+                    "Failed to transition sandbox instance status from starting to failed in integration fixture.",
+                  );
+                }
+              },
             },
           },
         });
@@ -232,6 +301,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
           openWorkflow,
           sandboxAdapter: dockerSandboxAdapter,
           startedSandboxIds,
+          startedBootstrapTokenJtis,
         });
       } finally {
         const uniqueStartedSandboxIds = Array.from(new Set(startedSandboxIds));

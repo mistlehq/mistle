@@ -1,16 +1,63 @@
 import { randomUUID } from "node:crypto";
 
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
+import { systemSleeper } from "@mistle/time";
 import { mintBootstrapToken } from "@mistle/tunnel-auth";
 import {
   createDataPlaneWorker,
   type CreateDataPlaneWorkflowDefinitionsInput,
 } from "@mistle/workflows/data-plane";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../types.js";
 import type { WorkerRuntimeResources } from "./resources.js";
 import { encodeSandboxStartupInput } from "./sandbox-startup-input.js";
+
+const SandboxTunnelConnectAckPollIntervalMs = 250;
+
+function resolveSandboxTunnelConnectAckTimeoutMs(config: DataPlaneWorkerRuntimeConfig): number {
+  const bootstrapTokenTtlSeconds = config.app.tunnel.bootstrapTokenTtlSeconds;
+
+  if (!Number.isFinite(bootstrapTokenTtlSeconds) || bootstrapTokenTtlSeconds <= 0) {
+    throw new Error("Expected tunnel bootstrap token TTL seconds to be a positive number.");
+  }
+
+  return bootstrapTokenTtlSeconds * 1000;
+}
+
+async function waitForSandboxTunnelConnectAck(input: {
+  resources: Pick<WorkerRuntimeResources, "db">;
+  bootstrapTokenJti: string;
+  timeoutMs: number;
+}): Promise<boolean> {
+  if (input.bootstrapTokenJti.trim().length === 0) {
+    throw new Error("Expected bootstrap token JTI to be non-empty when waiting for connect ack.");
+  }
+  if (input.timeoutMs <= 0) {
+    throw new Error("Expected sandbox tunnel connect ack timeout to be positive.");
+  }
+
+  const deadlineMs = Date.now() + input.timeoutMs;
+
+  while (true) {
+    const ack = await input.resources.db.query.sandboxTunnelConnectAcks.findFirst({
+      columns: {
+        bootstrapTokenJti: true,
+      },
+      where: (table, { eq }) => eq(table.bootstrapTokenJti, input.bootstrapTokenJti),
+    });
+    if (ack !== undefined) {
+      return true;
+    }
+
+    const remainingMs = deadlineMs - Date.now();
+    if (remainingMs <= 0) {
+      return false;
+    }
+
+    await systemSleeper.sleep(Math.min(remainingMs, SandboxTunnelConnectAckPollIntervalMs));
+  }
+}
 
 async function writeSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
@@ -20,14 +67,15 @@ async function writeSandboxStartupInput(input: {
     writeStdin: (input: { payload: Uint8Array<ArrayBufferLike> }) => Promise<void>;
     closeStdin: () => Promise<void>;
   };
-}): Promise<void> {
+}): Promise<string> {
+  const bootstrapTokenJti = randomUUID();
   const bootstrapToken = await mintBootstrapToken({
     config: {
       bootstrapTokenSecret: input.config.tunnel.bootstrapTokenSecret,
       tokenIssuer: input.config.tunnel.tokenIssuer,
       tokenAudience: input.config.tunnel.tokenAudience,
     },
-    jti: randomUUID(),
+    jti: bootstrapTokenJti,
     ttlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
   });
 
@@ -39,6 +87,8 @@ async function writeSandboxStartupInput(input: {
       }),
     });
     await input.sandbox.closeStdin();
+
+    return bootstrapTokenJti;
   } catch (writeError) {
     try {
       await input.resources.sandboxAdapter.stop({
@@ -66,6 +116,8 @@ function createWorkflowInputs(ctx: {
   config: DataPlaneWorkerRuntimeConfig;
   resources: Pick<WorkerRuntimeResources, "db" | "sandboxAdapter">;
 }): CreateDataPlaneWorkflowDefinitionsInput {
+  const sandboxTunnelConnectAckTimeoutMs = resolveSandboxTunnelConnectAckTimeoutMs(ctx.config);
+
   return {
     startSandboxInstance: {
       startSandbox: async (workflowInput) => {
@@ -73,7 +125,7 @@ function createWorkflowInputs(ctx: {
           image: workflowInput.image,
         });
 
-        await writeSandboxStartupInput({
+        const bootstrapTokenJti = await writeSandboxStartupInput({
           config: ctx.config,
           resources: ctx.resources,
           sandbox: startedSandbox,
@@ -82,6 +134,7 @@ function createWorkflowInputs(ctx: {
         return {
           provider: startedSandbox.provider,
           providerSandboxId: startedSandbox.sandboxId,
+          bootstrapTokenJti,
         };
       },
       stopSandbox: async (workflowInput) => {
@@ -99,11 +152,10 @@ function createWorkflowInputs(ctx: {
             manifest: workflowInput.manifest,
             provider: workflowInput.provider,
             providerSandboxId: workflowInput.providerSandboxId,
-            status: SandboxInstanceStatuses.RUNNING,
+            status: SandboxInstanceStatuses.STARTING,
             startedByKind: workflowInput.startedBy.kind,
             startedById: workflowInput.startedBy.id,
             source: workflowInput.source,
-            startedAt: sql`now()`,
           })
           .returning({
             id: sandboxInstances.id,
@@ -117,6 +169,66 @@ function createWorkflowInputs(ctx: {
         return {
           sandboxInstanceId: sandboxInstance.id,
         };
+      },
+      waitForSandboxTunnelConnectAck: async (workflowInput) => {
+        return waitForSandboxTunnelConnectAck({
+          resources: ctx.resources,
+          bootstrapTokenJti: workflowInput.bootstrapTokenJti,
+          timeoutMs: sandboxTunnelConnectAckTimeoutMs,
+        });
+      },
+      updateSandboxInstanceStatus: async (workflowInput) => {
+        if (workflowInput.status === "running") {
+          const updatedRows = await ctx.resources.db
+            .update(sandboxInstances)
+            .set({
+              status: SandboxInstanceStatuses.RUNNING,
+              startedAt: sql`now()`,
+              failedAt: null,
+              failureCode: null,
+              failureMessage: null,
+              updatedAt: sql`now()`,
+            })
+            .where(
+              and(
+                eq(sandboxInstances.id, workflowInput.sandboxInstanceId),
+                eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+              ),
+            )
+            .returning({
+              id: sandboxInstances.id,
+            });
+
+          if (updatedRows[0] === undefined) {
+            throw new Error(
+              "Failed to transition sandbox instance status from starting to running.",
+            );
+          }
+          return;
+        }
+
+        const updatedRows = await ctx.resources.db
+          .update(sandboxInstances)
+          .set({
+            status: SandboxInstanceStatuses.FAILED,
+            failedAt: sql`now()`,
+            failureCode: workflowInput.failureCode,
+            failureMessage: workflowInput.failureMessage,
+            updatedAt: sql`now()`,
+          })
+          .where(
+            and(
+              eq(sandboxInstances.id, workflowInput.sandboxInstanceId),
+              eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+            ),
+          )
+          .returning({
+            id: sandboxInstances.id,
+          });
+
+        if (updatedRows[0] === undefined) {
+          throw new Error("Failed to transition sandbox instance status from starting to failed.");
+        }
       },
     },
   };
