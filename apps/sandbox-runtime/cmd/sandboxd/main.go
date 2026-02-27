@@ -1,15 +1,10 @@
 package main
 
 import (
-	"errors"
 	"fmt"
-	"net"
-	"net/http"
 	"os"
-	"strings"
 
-	"github.com/mistle/sandbox-runtime/internal/config"
-	"github.com/mistle/sandbox-runtime/internal/server"
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/runtime"
 )
 
 func main() {
@@ -20,45 +15,12 @@ func main() {
 }
 
 func run() error {
-	cfg, err := config.LoadFromEnv(os.LookupEnv)
-	if err != nil {
-		return err
-	}
-
-	listenAddr, err := parseListenAddr(cfg.ListenAddr)
-	if err != nil {
-		return err
-	}
-
-	listener, err := net.Listen("tcp", listenAddr)
-	if err != nil {
-		return fmt.Errorf("failed to bind listen addr %s: %w", cfg.ListenAddr, err)
-	}
-
-	httpServer := &http.Server{
-		Handler: server.NewRouter(),
-	}
-	if err := httpServer.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return fmt.Errorf("http server failed: %w", err)
-	}
-
-	return nil
+	return runWithInput(runtime.RunInput{
+		LookupEnv: os.LookupEnv,
+		Stdin:     os.Stdin,
+	})
 }
 
-func parseListenAddr(listenAddr string) (string, error) {
-	normalizedListenAddr := listenAddr
-	if strings.HasPrefix(listenAddr, ":") {
-		normalizedListenAddr = "0.0.0.0" + listenAddr
-	}
-
-	if _, err := net.ResolveTCPAddr("tcp", normalizedListenAddr); err != nil {
-		return "", fmt.Errorf(
-			"%s must be a valid socket address, got %s: %w",
-			config.ListenAddrEnv,
-			listenAddr,
-			err,
-		)
-	}
-
-	return normalizedListenAddr, nil
+func runWithInput(input runtime.RunInput) error {
+	return runtime.Run(input)
 }
