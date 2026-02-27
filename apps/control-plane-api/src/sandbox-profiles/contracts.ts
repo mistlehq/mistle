@@ -51,11 +51,27 @@ export const SandboxProfileIdParamsSchema = z
   })
   .strict();
 
+export const SandboxProfileVersionParamsSchema = z
+  .object({
+    profileId: z
+      .string()
+      .min(1)
+      .regex(/^sbp_[a-zA-Z0-9_-]+$/, {
+        message: "`profileId` must be a sandbox profile id.",
+      }),
+    version: z.coerce.number().int().min(1),
+  })
+  .strict();
+
 const BadRequestCodeSchema = z.enum([
   SandboxProfilesBadRequestCodes.INVALID_LIST_PROFILES_INPUT,
   SandboxProfilesBadRequestCodes.INVALID_PAGINATION_CURSOR,
 ]);
 const NotFoundCodeSchema = z.enum([SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND]);
+const StartSandboxProfileInstanceNotFoundCodeSchema = z.enum([
+  SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
+  SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
+]);
 
 export const BadRequestResponseSchema = z
   .object({
@@ -84,6 +100,12 @@ export const NotFoundResponseSchema = z
     message: z.string().min(1),
   })
   .strict();
+export const StartSandboxProfileInstanceNotFoundResponseSchema = z
+  .object({
+    code: StartSandboxProfileInstanceNotFoundCodeSchema,
+    message: z.string().min(1),
+  })
+  .strict();
 
 export const UnauthorizedResponseSchema = z
   .object({
@@ -103,6 +125,14 @@ export const SandboxProfileDeletionAcceptedResponseSchema = z
   .object({
     status: z.literal("accepted"),
     profileId: z.string().min(1),
+  })
+  .strict();
+export const StartSandboxProfileInstanceResponseSchema = z
+  .object({
+    status: z.literal("completed"),
+    workflowRunId: z.string().min(1),
+    sandboxInstanceId: z.string().min(1),
+    providerSandboxId: z.string().min(1),
   })
   .strict();
 
@@ -383,6 +413,65 @@ export const deleteSandboxProfileRoute = createRoute({
       content: {
         "application/json": {
           schema: NotFoundResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: UnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: ForbiddenResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: InternalServerErrorResponseSchema,
+        },
+      },
+    },
+  },
+});
+
+export const startSandboxProfileInstanceRoute = createRoute({
+  method: "post",
+  path: "/{profileId}/versions/{version}/instances",
+  tags: ["Sandbox Profiles"],
+  request: {
+    params: SandboxProfileVersionParamsSchema,
+  },
+  responses: {
+    201: {
+      description: "Start a sandbox instance for the specified sandbox profile version.",
+      content: {
+        "application/json": {
+          schema: StartSandboxProfileInstanceResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ValidationErrorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Sandbox profile or profile version was not found.",
+      content: {
+        "application/json": {
+          schema: StartSandboxProfileInstanceNotFoundResponseSchema,
         },
       },
     },

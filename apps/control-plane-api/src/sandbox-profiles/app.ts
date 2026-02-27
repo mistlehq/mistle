@@ -10,11 +10,14 @@ import {
   getSandboxProfileRoute,
   listSandboxProfilesRoute,
   NotFoundResponseSchema,
+  StartSandboxProfileInstanceNotFoundResponseSchema,
+  startSandboxProfileInstanceRoute,
   updateSandboxProfileRoute,
 } from "./contracts.js";
 import {
   SandboxProfilesBadRequestError,
   SandboxProfilesNotFoundError,
+  SandboxProfilesNotFoundCodes,
 } from "./services/factory.js";
 
 export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_ROUTE_BASE_PATH> {
@@ -65,7 +68,7 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
       });
       return ctx.json(profile, 200);
     } catch (error) {
-      return handleNotFoundError(ctx, error);
+      return handleProfileNotFoundError(ctx, error);
     }
   });
 
@@ -87,7 +90,7 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
       const profile = await ctx.get("services").sandboxProfiles.updateProfile(updateInput);
       return ctx.json(profile, 200);
     } catch (error) {
-      return handleNotFoundError(ctx, error);
+      return handleProfileNotFoundError(ctx, error);
     }
   });
 
@@ -110,7 +113,46 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
 
       return ctx.json(acceptedResponse, 202);
     } catch (error) {
-      return handleNotFoundError(ctx, error);
+      return handleProfileNotFoundError(ctx, error);
+    }
+  });
+
+  routes.openapi(startSandboxProfileInstanceRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+      await assertSandboxProfileVersionExists({
+        db: ctx.get("db"),
+        organizationId: session.session.activeOrganizationId,
+        profileId: params.profileId,
+        profileVersion: params.version,
+      });
+
+      const startedSandboxInstance = await ctx
+        .get("services")
+        .sandboxProfiles.startProfileInstance({
+          organizationId: session.session.activeOrganizationId,
+          profileId: params.profileId,
+          profileVersion: params.version,
+          startedBy: {
+            kind: "user",
+            id: session.user.id,
+          },
+          source: "dashboard",
+          image: {
+            provider: "docker",
+            imageId: ctx.get("config").sandbox.defaultBaseImage,
+            kind: "base",
+            createdAt: new Date().toISOString(),
+          },
+        });
+
+      return ctx.json(startedSandboxInstance, 201);
+    } catch (error) {
+      return handleStartInstanceNotFoundError(ctx, error);
     }
   });
 
@@ -118,6 +160,43 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
     basePath: SANDBOX_PROFILES_ROUTE_BASE_PATH,
     routes,
   };
+}
+
+async function assertSandboxProfileVersionExists(input: {
+  db: AppContext["var"]["db"];
+  organizationId: string;
+  profileId: string;
+  profileVersion: number;
+}): Promise<void> {
+  const sandboxProfile = await input.db.query.sandboxProfiles.findFirst({
+    columns: {
+      id: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.id, input.profileId), eq(table.organizationId, input.organizationId)),
+  });
+
+  if (sandboxProfile === undefined) {
+    throw new SandboxProfilesNotFoundError(
+      SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
+      "Sandbox profile was not found.",
+    );
+  }
+
+  const sandboxProfileVersion = await input.db.query.sandboxProfileVersions.findFirst({
+    columns: {
+      sandboxProfileId: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
+  });
+
+  if (sandboxProfileVersion === undefined) {
+    throw new SandboxProfilesNotFoundError(
+      SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
+      "Sandbox profile version was not found.",
+    );
+  }
 }
 
 function handleListProfilesError(ctx: AppContext, error: unknown) {
@@ -133,9 +212,26 @@ function handleListProfilesError(ctx: AppContext, error: unknown) {
   throw error;
 }
 
-function handleNotFoundError(ctx: AppContext, error: unknown) {
+function handleProfileNotFoundError(ctx: AppContext, error: unknown) {
   if (error instanceof SandboxProfilesNotFoundError) {
+    if (error.code !== SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND) {
+      throw error;
+    }
+
     const responseBody: z.infer<typeof NotFoundResponseSchema> = {
+      code: error.code,
+      message: error.message,
+    };
+
+    return ctx.json(responseBody, 404);
+  }
+
+  throw error;
+}
+
+function handleStartInstanceNotFoundError(ctx: AppContext, error: unknown) {
+  if (error instanceof SandboxProfilesNotFoundError) {
+    const responseBody: z.infer<typeof StartSandboxProfileInstanceNotFoundResponseSchema> = {
       code: error.code,
       message: error.message,
     };

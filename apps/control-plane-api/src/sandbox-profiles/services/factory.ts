@@ -4,6 +4,7 @@ import { createProfile } from "./create-profile.js";
 import { getProfile } from "./get-profile.js";
 import { listProfiles } from "./list-profiles.js";
 import { requestDeleteProfile } from "./request-delete-profile.js";
+import { startProfileInstance } from "./start-profile-instance.js";
 import { updateProfile } from "./update-profile.js";
 
 export type { CreateSandboxProfilesServiceInput, SandboxProfilesService } from "./types.js";
@@ -26,6 +27,13 @@ export function createSandboxProfilesService(
       requestDeleteProfile(
         {
           db: input.db,
+          openWorkflow: input.openWorkflow,
+        },
+        serviceInput,
+      ),
+    startProfileInstance: (serviceInput) =>
+      startProfileInstance(
+        {
           openWorkflow: input.openWorkflow,
         },
         serviceInput,

@@ -46,6 +46,7 @@ export class SandboxProfilesBadRequestError extends Error {
 
 export const SandboxProfilesNotFoundCodes = {
   PROFILE_NOT_FOUND: "PROFILE_NOT_FOUND",
+  PROFILE_VERSION_NOT_FOUND: "PROFILE_VERSION_NOT_FOUND",
 } as const;
 
 export type SandboxProfilesNotFoundCode =
