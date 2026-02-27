@@ -1,5 +1,4 @@
 import { OpenAPIHono, z } from "@hono/zod-openapi";
-import { SandboxInstanceSources, SandboxInstanceStarterKinds } from "@mistle/db/data-plane";
 
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 
@@ -139,10 +138,10 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
           profileId: params.profileId,
           profileVersion: params.version,
           startedBy: {
-            kind: SandboxInstanceStarterKinds.USER,
+            kind: "user",
             id: session.user.id,
           },
-          source: SandboxInstanceSources.DASHBOARD,
+          source: "dashboard",
           image: {
             provider: "docker",
             imageId: ctx.get("config").sandbox.defaultBaseImage,
