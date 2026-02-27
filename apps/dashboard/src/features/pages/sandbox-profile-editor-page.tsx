@@ -22,6 +22,7 @@ import { useNavigate, useParams } from "react-router";
 
 import type { SandboxProfileStatus } from "../sandbox-profiles/sandbox-profiles-types.js";
 
+import { resolveApiErrorMessage } from "../api/error-message.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
   formatSandboxProfileStatus,
@@ -38,7 +39,6 @@ import {
   updateSandboxProfile,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import { SaveActions } from "../settings/save-actions.js";
-import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 
 type SandboxProfileEditorPageProps = {
   mode: "create" | "edit";
@@ -59,18 +59,6 @@ function parseStatusValue(value: string | null): SandboxProfileStatus {
   }
 
   throw new Error(`Unsupported sandbox profile status: ${value}`);
-}
-
-function toErrorMessage(error: unknown, fallbackMessage: string): string {
-  if (error instanceof SandboxProfilesApiError) {
-    return error.message;
-  }
-
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
-  }
-
-  return fallbackMessage;
 }
 
 export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): React.JSX.Element {
@@ -122,7 +110,12 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
       await navigate(`/sandbox-profiles/${createdProfile.id}`);
     },
     onError: (error: unknown) => {
-      setSaveError(toErrorMessage(error, "Could not create sandbox profile."));
+      setSaveError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not create sandbox profile.",
+        }),
+      );
       setSaveSuccess(false);
     },
   });
@@ -155,7 +148,12 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
       });
     },
     onError: (error: unknown) => {
-      setSaveError(toErrorMessage(error, "Could not update sandbox profile."));
+      setSaveError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not update sandbox profile.",
+        }),
+      );
       setSaveSuccess(false);
     },
   });
@@ -177,26 +175,6 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
     setFormState(loadedState);
     setPersistedFormState(loadedState);
   }, [profileQuery.data, props.mode]);
-
-  useEffect(() => {
-    const candidateError =
-      profileQuery.error ?? createMutation.error ?? updateMutation.error ?? undefined;
-
-    if (!(candidateError instanceof SandboxProfilesApiError)) {
-      return;
-    }
-
-    if (candidateError.status === 401) {
-      void navigate("/auth/login", { replace: true });
-      return;
-    }
-
-    if (candidateError.status === 403) {
-      void queryClient.invalidateQueries({
-        queryKey: SESSION_QUERY_KEY,
-      });
-    }
-  }, [createMutation.error, navigate, profileQuery.error, queryClient, updateMutation.error]);
 
   const trimmedDisplayName = formState.displayName.trim();
   const editTitleProfileName =
@@ -302,12 +280,12 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
                 {isNotFoundError ? "Sandbox profile not found" : "Could not load profile"}
               </AlertTitle>
               <AlertDescription>
-                {toErrorMessage(
-                  profileQuery.error,
-                  isNotFoundError
+                {resolveApiErrorMessage({
+                  error: profileQuery.error,
+                  fallbackMessage: isNotFoundError
                     ? "The sandbox profile was not found."
                     : "Could not load sandbox profile.",
-                )}
+                })}
               </AlertDescription>
             </Alert>
             <div>

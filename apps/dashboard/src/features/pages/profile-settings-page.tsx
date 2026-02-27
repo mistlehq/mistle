@@ -13,23 +13,11 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { UserIdentitySummary } from "../account/user-identity-summary.js";
-import { MembersApiError } from "../settings/members/members-api-errors.js";
+import { resolveApiErrorMessage } from "../api/error-message.js";
 import { updateProfileDisplayName } from "../settings/profile/profile-service.js";
 import { SaveActions } from "../settings/save-actions.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof MembersApiError) {
-    return error.message;
-  }
-
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
-  }
-
-  return "Could not update profile.";
-}
 
 export function ProfileSettingsPage(): React.JSX.Element {
   const queryClient = useQueryClient();
@@ -66,7 +54,12 @@ export function ProfileSettingsPage(): React.JSX.Element {
       setSaveSuccess(true);
     },
     onError: (error: unknown) => {
-      setFieldError(toErrorMessage(error));
+      setFieldError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not update profile.",
+        }),
+      );
       setSaveSuccess(false);
     },
   });
@@ -103,7 +96,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
       <Card>
         <CardContent className="gap-4 flex flex-col">
           <p aria-live="polite" className="sr-only" role="status">
-            {saveSuccess ? "Profile updated." : ""}
+            {saveSuccess ? "Personal settings updated." : ""}
           </p>
           <Field>
             <FieldLabel htmlFor="display-name">Display name</FieldLabel>

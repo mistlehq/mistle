@@ -14,11 +14,10 @@ import {
   TableHeader,
   TableRow,
 } from "@mistle/ui";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 
-import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
+import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
   formatSandboxProfileStatus,
   formatSandboxProfileUpdatedAt,
@@ -26,7 +25,6 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-formatters.js";
 import { sandboxProfilesListQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { listSandboxProfiles } from "../sandbox-profiles/sandbox-profiles-service.js";
-import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 
 const DEFAULT_LIST_LIMIT = 20;
 const MAX_LIST_LIMIT = 100;
@@ -61,21 +59,8 @@ function parseCursor(rawValue: string | null): string | null {
   return normalized;
 }
 
-function toErrorMessage(error: unknown): string {
-  if (error instanceof SandboxProfilesApiError) {
-    return error.message;
-  }
-
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
-  }
-
-  return "Could not load sandbox profiles.";
-}
-
 export function SandboxProfilesPage(): React.JSX.Element {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const limit = parseListLimit(searchParams.get("limit"));
@@ -96,28 +81,6 @@ export function SandboxProfilesPage(): React.JSX.Element {
         signal,
       }),
   });
-
-  useEffect(() => {
-    if (!listQuery.isError) {
-      return;
-    }
-
-    const error = listQuery.error;
-    if (!(error instanceof SandboxProfilesApiError)) {
-      return;
-    }
-
-    if (error.status === 401) {
-      void navigate("/auth/login", { replace: true });
-      return;
-    }
-
-    if (error.status === 403) {
-      void queryClient.invalidateQueries({
-        queryKey: SESSION_QUERY_KEY,
-      });
-    }
-  }, [listQuery.error, listQuery.isError, navigate, queryClient]);
 
   function navigateToCreateProfile(): void {
     void navigate("/sandbox-profiles/new");
@@ -183,7 +146,12 @@ export function SandboxProfilesPage(): React.JSX.Element {
       {listQuery.isError ? (
         <Alert variant="destructive">
           <AlertTitle>Could not load sandbox profiles</AlertTitle>
-          <AlertDescription>{toErrorMessage(listQuery.error)}</AlertDescription>
+          <AlertDescription>
+            {resolveApiErrorMessage({
+              error: listQuery.error,
+              fallbackMessage: "Could not load sandbox profiles.",
+            })}
+          </AlertDescription>
         </Alert>
       ) : null}
 
