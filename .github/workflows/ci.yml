@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  ci:
-    name: Validate
+  static:
+    name: Static
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -56,5 +56,46 @@ jobs:
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.ci.toml pnpm build"
 
-      - name: Run CI checks in Nix shell
-        run: nix develop --command pnpm run ci
+      - name: Run static checks in Nix shell
+        run: nix develop --command bash -lc "pnpm format:check && pnpm lint && pnpm typecheck"
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CI: true
+      TURBO_TELEMETRY_DISABLED: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache Turbo local cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.workflow }}-
+            ${{ runner.os }}-turbo-
+
+      - name: Install dependencies in Nix shell
+        run: nix develop --command pnpm install --frozen-lockfile
+
+      - name: Generate CI config
+        run: nix develop --command pnpm run config:init:ci
+
+      - name: Run tests in Nix shell
+        run: nix develop --command pnpm test
