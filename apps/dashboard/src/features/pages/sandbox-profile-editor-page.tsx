@@ -24,6 +24,11 @@ import type { SandboxProfileStatus } from "../sandbox-profiles/sandbox-profiles-
 
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
+  formatSandboxProfileStatus,
+  isSandboxProfileStatus,
+  SANDBOX_PROFILE_STATUS_OPTIONS,
+} from "../sandbox-profiles/sandbox-profiles-formatters.js";
+import {
   sandboxProfileDetailQueryKey,
   SANDBOX_PROFILES_QUERY_KEY_PREFIX,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
@@ -44,20 +49,12 @@ type SandboxProfileEditorFormState = {
   status: SandboxProfileStatus;
 };
 
-function formatStatusLabel(status: SandboxProfileStatus): string {
-  if (status === "active") {
-    return "Active";
-  }
-
-  return "Inactive";
-}
-
 function parseStatusValue(value: string | null): SandboxProfileStatus {
   if (value === null) {
     throw new Error("Sandbox profile status must not be null.");
   }
 
-  if (value === "active" || value === "inactive") {
+  if (isSandboxProfileStatus(value)) {
     return value;
   }
 
@@ -369,12 +366,15 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
               <Select onValueChange={handleStatusChange} value={formState.status}>
                 <SelectTrigger aria-label="Sandbox profile status" id="sandbox-profile-status">
                   <SelectValue placeholder="Select status">
-                    {formatStatusLabel(formState.status)}
+                    {formatSandboxProfileStatus(formState.status)}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
+                  {SANDBOX_PROFILE_STATUS_OPTIONS.map((statusOption) => (
+                    <SelectItem key={statusOption} value={statusOption}>
+                      {formatSandboxProfileStatus(statusOption)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </FieldContent>
