@@ -21,6 +21,18 @@
       "import": "./src/constants.ts",
       "default": "./src/constants.ts"
     },
+    "./contracts": {
+      "types": "./src/contracts/index.ts",
+      "node": "./dist/contracts/index.js",
+      "import": "./src/contracts/index.ts",
+      "default": "./src/contracts/index.ts"
+    },
+    "./contracts/*": {
+      "types": "./src/contracts/*.ts",
+      "node": "./dist/contracts/*.js",
+      "import": "./src/contracts/*.ts",
+      "default": "./src/contracts/*.ts"
+    },
     "./*.js": {
       "types": "./src/*.ts",
       "node": "./dist/*.js",
@@ -37,7 +49,11 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@mistle/db": "workspace:*",
+    "@mistle/sandbox": "workspace:*",
+    "@mistle/workflows": "workspace:*",
     "@trpc/client": "^11.10.0",
-    "@trpc/server": "^11.10.0"
+    "@trpc/server": "^11.10.0",
+    "zod": "^4.3.6"
   }
 }
