@@ -1,5 +1,6 @@
 import { MemberRoles, verifications } from "@mistle/db/control-plane";
 import { eq } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
 import { describe, expect } from "vitest";
 
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
@@ -155,6 +156,95 @@ describe("auth otp integration", () => {
       throw new Error("Expected session to exist after OTP sign-in.");
     }
     expect(session.activeOrganizationId).toBe(organization.id);
+  }, 60_000);
+
+  it("does not bootstrap an organization for a newly invited user", async ({ fixture }) => {
+    const inviterSession = await fixture.authSession({
+      email: "integration-auth-otp-pending-invite-sender@example.com",
+    });
+    const recipient = `integration-auth-otp-pending-invite-${randomUUID()}@example.com`;
+
+    const inviteResponse = await fixture.request("/v1/auth/organization/invite-member", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: inviterSession.cookie,
+      },
+      body: JSON.stringify({
+        organizationId: inviterSession.organizationId,
+        email: recipient,
+        role: "member",
+      }),
+    });
+    expect(inviteResponse.status).toBe(200);
+
+    const sendResponse = await sendOTPRequest({
+      fixture,
+      recipient,
+    });
+    expect(sendResponse.status).toBe(200);
+
+    const listItem = await fixture.mailpitService.waitForMessage({
+      timeoutMs: 15_000,
+      description: `OTP email for ${recipient}`,
+      matcher: ({ message }) =>
+        message.Subject === "Your sign-in code" &&
+        message.To.some((address) => address.Address === recipient),
+    });
+    const message = await fixture.mailpitService.getMessageSummary(listItem.ID);
+    const otp = extractOTPCode(message.Text, fixture.config.auth.otpLength);
+    expect(otp).toBeDefined();
+    if (otp === undefined) {
+      throw new Error("OTP was not found in Mailpit message text.");
+    }
+
+    const signInResponse = await signInWithOTP({
+      fixture,
+      recipient,
+      otp,
+    });
+    expect(signInResponse.status).toBe(200);
+
+    const user = await fixture.db.query.users.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (users, { eq: eqUsers }) => eqUsers(users.email, recipient),
+    });
+    expect(user).toBeDefined();
+    if (user === undefined) {
+      throw new Error("Expected user to be created after OTP sign-in.");
+    }
+
+    const ownerMembership = await fixture.db.query.members.findFirst({
+      columns: {
+        organizationId: true,
+      },
+      where: (members, { and, eq: eqMembers }) =>
+        and(eqMembers(members.userId, user.id), eqMembers(members.role, MemberRoles.OWNER)),
+    });
+    expect(ownerMembership).toBeUndefined();
+
+    const teamMembership = await fixture.db.query.teamMembers.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (teamMembers, { eq: eqTeamMembers }) => eqTeamMembers(teamMembers.userId, user.id),
+    });
+    expect(teamMembership).toBeUndefined();
+
+    const session = await fixture.db.query.sessions.findFirst({
+      columns: {
+        activeOrganizationId: true,
+      },
+      where: (sessions, { eq: eqSessions }) => eqSessions(sessions.userId, user.id),
+      orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
+    });
+    expect(session).toBeDefined();
+    if (session === undefined) {
+      throw new Error("Expected session to exist after OTP sign-in.");
+    }
+    expect(session.activeOrganizationId).toBeNull();
   }, 60_000);
 
   it("rejects sign-in with an incorrect OTP and does not create a user", async ({ fixture }) => {
