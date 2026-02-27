@@ -19,15 +19,19 @@ describe("runtime lifecycle integration", () => {
     );
 
     try {
-      runtime.start();
+      await runtime.start();
       const healthURL = `http://${host}:${String(port)}/__healthz`;
       const healthResponse = await fetch(healthURL);
       expect(healthResponse.status).toBe(200);
 
-      expect(() => runtime.start()).toThrowError("Control plane API server is already started.");
+      await expect(runtime.start()).rejects.toThrowError(
+        "Control plane API server is already started.",
+      );
 
       await Promise.all([runtime.stop(), runtime.stop(), runtime.stop()]);
-      expect(() => runtime.start()).toThrowError("Control plane API runtime is already stopped.");
+      await expect(runtime.start()).rejects.toThrowError(
+        "Control plane API runtime is already stopped.",
+      );
     } finally {
       await runtime.stop();
     }
@@ -47,7 +51,7 @@ describe("runtime lifecycle integration", () => {
     );
     const healthURL = `http://${host}:${String(port)}/__healthz`;
 
-    runtime.start();
+    await runtime.start();
 
     try {
       const response = await fetch(healthURL);

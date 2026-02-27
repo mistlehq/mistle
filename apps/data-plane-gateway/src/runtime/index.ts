@@ -10,11 +10,24 @@ export function createDataPlaneGatewayRuntime(
 
   let startedServer: StartedServer | undefined;
   let stopPromise: Promise<void> | undefined;
+  let stopped = false;
+
+  async function stopRuntimeResources(): Promise<void> {
+    if (startedServer !== undefined) {
+      await startedServer.close();
+      startedServer = undefined;
+    }
+
+    stopped = true;
+  }
 
   return {
     app,
     request: async (path, init) => app.request(path, init),
-    start: () => {
+    start: async () => {
+      if (stopped) {
+        throw new Error("Data plane gateway runtime is already stopped.");
+      }
       if (startedServer !== undefined) {
         throw new Error("Data plane gateway runtime is already started.");
       }
@@ -26,7 +39,7 @@ export function createDataPlaneGatewayRuntime(
       });
     },
     stop: async () => {
-      if (startedServer === undefined) {
+      if (stopped) {
         return;
       }
       if (stopPromise !== undefined) {
@@ -34,11 +47,8 @@ export function createDataPlaneGatewayRuntime(
         return;
       }
 
-      stopPromise = startedServer.close();
-
+      stopPromise = stopRuntimeResources();
       await stopPromise;
-      startedServer = undefined;
-      stopPromise = undefined;
     },
   };
 }

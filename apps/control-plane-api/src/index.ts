@@ -12,7 +12,7 @@ async function startControlPlaneApi(): Promise<void> {
   const appConfig = loadedConfig.app;
   const runtime = await createControlPlaneApiRuntime(appConfig);
 
-  runtime.start();
+  await runtime.start();
 
   let shutdownPromise: Promise<void> | undefined;
 

@@ -33,11 +33,18 @@ export async function createAppResources(
     connectionString: config.database.url,
   });
   const db = createControlPlaneDatabase(dbPool);
-  const workflowBackend = await createControlPlaneBackend({
-    url: config.workflow.databaseUrl,
-    namespaceId: config.workflow.namespaceId,
-    runMigrations: false,
-  });
+  let workflowBackend: Awaited<ReturnType<typeof createControlPlaneBackend>>;
+
+  try {
+    workflowBackend = await createControlPlaneBackend({
+      url: config.workflow.databaseUrl,
+      namespaceId: config.workflow.namespaceId,
+      runMigrations: false,
+    });
+  } catch (error) {
+    await dbPool.end();
+    throw error;
+  }
 
   return {
     db,
