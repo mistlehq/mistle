@@ -105,7 +105,7 @@ export function MemberInviteDialog(input: {
                       {form.selectedRole === null ? undefined : formatRoleLabel(form.selectedRole)}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent alignItemWithTrigger={false}>
                     {input.assignableRoles.map((role) => (
                       <SelectItem key={role} value={role}>
                         {formatRoleLabel(role)}
