@@ -1,11 +1,11 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, Spinner } from "@mistle/ui";
-import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Navigate, useLocation } from "react-router";
-
-import type { SessionData } from "./types.js";
 
 import { MistleLogo } from "../../components/mistle-logo.js";
 import { authClient } from "../../lib/auth/client.js";
+import { SESSION_QUERY_KEY, useSessionQuery } from "../shell/session-query.js";
 import {
   createStateForDifferentEmail,
   resolveEmailValidationError,
@@ -19,10 +19,9 @@ import { resolveErrorMessage } from "./messages.js";
 import { OtpStepForm } from "./otp-step-form.js";
 
 export function AuthScreen(): React.JSX.Element {
+  const queryClient = useQueryClient();
+  const sessionQuery = useSessionQuery();
   const location = useLocation();
-  const [session, setSession] = useState<SessionData>(null);
-  const [isSessionLoading, setIsSessionLoading] = useState(true);
-  const [sessionError, setSessionError] = useState<string | null>(null);
 
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -30,52 +29,7 @@ export function AuthScreen(): React.JSX.Element {
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
-
-  async function refreshSession(): Promise<SessionData> {
-    try {
-      const response = await authClient.getSession();
-
-      if (response.error) {
-        if (response.error.status !== 401) {
-          setSessionError(resolveErrorMessage(response.error, "Unable to load session."));
-        } else {
-          setSessionError(null);
-        }
-        setSession(null);
-        return null;
-      }
-
-      setSessionError(null);
-      setSession(response.data);
-      return response.data;
-    } catch {
-      setSession(null);
-      setSessionError("Unable to load session.");
-      return null;
-    }
-  }
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function loadInitialSession(): Promise<void> {
-      try {
-        await refreshSession();
-      } finally {
-        if (isMounted) {
-          setIsSessionLoading(false);
-        }
-      }
-    }
-
-    void loadInitialSession();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const isSignedIn = session !== null;
+  const isSignedIn = (sessionQuery.data ?? null) !== null;
   const postLoginPath = resolvePostLoginPath(location.state);
 
   async function handleSendOtp(event: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
@@ -124,28 +78,20 @@ export function AuthScreen(): React.JSX.Element {
 
     const otpValue = otp.trim();
     setIsVerifyingOtp(true);
-    try {
-      const signInResponse = await authClient.signIn.emailOtp({
-        email,
-        otp: otpValue,
-      });
+    const signInResponse = await authClient.signIn.emailOtp({
+      email,
+      otp: otpValue,
+    });
+    setIsVerifyingOtp(false);
 
-      if (signInResponse.error) {
-        setAuthError(resolveErrorMessage(signInResponse.error, "Unable to verify OTP."));
-        return;
-      }
-
-      const signedInSession = await refreshSession();
-      if (!signedInSession) {
-        setAuthError(
-          "Sign-in succeeded but no session cookie was established. Use the same hostname for dashboard and API (localhost with localhost, or 127.0.0.1 with 127.0.0.1).",
-        );
-      }
-    } catch {
-      setAuthError("Unable to verify OTP.");
-    } finally {
-      setIsVerifyingOtp(false);
+    if (signInResponse.error) {
+      setAuthError(resolveErrorMessage(signInResponse.error, "Unable to verify OTP."));
+      return;
     }
+
+    await queryClient.invalidateQueries({
+      queryKey: SESSION_QUERY_KEY,
+    });
   }
 
   function handleUseDifferentEmail(): void {
@@ -155,7 +101,7 @@ export function AuthScreen(): React.JSX.Element {
     setAuthStep(nextState.authStep);
   }
 
-  if (isSessionLoading) {
+  if (sessionQuery.isPending) {
     return (
       <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
         <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
@@ -176,7 +122,7 @@ export function AuthScreen(): React.JSX.Element {
     );
   }
 
-  if (isSignedIn && session) {
+  if (isSignedIn) {
     return <Navigate replace to={postLoginPath} />;
   }
 
@@ -207,7 +153,7 @@ export function AuthScreen(): React.JSX.Element {
                 otp={otp}
               />
             )}
-            <ErrorNotice message={sessionError} />
+            <ErrorNotice message={sessionQuery.isError ? sessionQuery.error.message : null} />
           </div>
         </div>
       </div>
