@@ -29,6 +29,27 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
+      - name: Resolve pnpm store path
+        id: pnpm-store
+        run: echo "path=$(nix develop --command pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Cache Turbo local cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-${{ github.workflow }}-
+            ${{ runner.os }}-turbo-
+
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
 
@@ -36,6 +57,7 @@ jobs:
         run: nix develop --command pnpm run config:init:ci
 
       - name: Build workspace in Nix shell
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.ci.toml pnpm build"
 
       - name: Run CI checks in Nix shell
