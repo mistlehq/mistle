@@ -28,10 +28,10 @@ function createWorkflowInputs(ctx: {
 }): CreateControlPlaneWorkflowDefinitionsInput {
   return {
     sendOrganizationInvitation: {
-      emailSender: input.emailSender,
+      emailSender: ctx.emailSender,
       from: {
-        email: input.config.email.fromAddress,
-        name: input.config.email.fromName,
+        email: ctx.config.email.fromAddress,
+        name: ctx.config.email.fromName,
       },
     },
     sendVerificationOTP: {
