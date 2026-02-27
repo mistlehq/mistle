@@ -19,7 +19,6 @@ describe("invitation accept state", () => {
       status: "pending",
       expiresAt: "2026-02-27T00:00:00.000Z",
       organizationName: "Mistle",
-      organizationSlug: "mistle",
       inviterEmail: "owner@example.com",
     });
 
@@ -32,7 +31,6 @@ describe("invitation accept state", () => {
       status: "pending",
       expiresAt: "2026-02-27T00:00:00.000Z",
       organizationName: "Mistle",
-      organizationSlug: "mistle",
       inviterEmail: "owner@example.com",
     });
   });
@@ -61,7 +59,6 @@ describe("invitation accept state", () => {
       status: "pending",
       expiresAt: "2026-02-27T00:00:00.000Z",
       organizationName: null,
-      organizationSlug: null,
       inviterEmail: null,
     });
   });
@@ -97,7 +94,6 @@ describe("invitation accept state", () => {
       status: "pending",
       expiresAt: "2026-02-27T00:00:00.000Z",
       organizationName: "Mistle",
-      organizationSlug: "mistle",
       inviterEmail: "owner@example.com",
     });
   });

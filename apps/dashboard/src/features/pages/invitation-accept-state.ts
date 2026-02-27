@@ -7,7 +7,6 @@ export type InvitationDetails = {
   status: string;
   expiresAt: string;
   organizationName: string | null;
-  organizationSlug: string | null;
   inviterEmail: string | null;
 };
 
@@ -90,10 +89,6 @@ export function parseInvitationDetails(value: unknown): InvitationDetails | null
     readString(invitation, "organizationName") ??
     readString(value, "organizationName") ??
     (organization === null ? null : readString(organization, "name"));
-  const organizationSlug =
-    readString(invitation, "organizationSlug") ??
-    readString(value, "organizationSlug") ??
-    (organization === null ? null : readString(organization, "slug"));
   const inviterEmail =
     readString(invitation, "inviterEmail") ??
     readString(value, "inviterEmail") ??
@@ -122,7 +117,6 @@ export function parseInvitationDetails(value: unknown): InvitationDetails | null
     status,
     expiresAt,
     organizationName,
-    organizationSlug,
     inviterEmail,
   };
 }
