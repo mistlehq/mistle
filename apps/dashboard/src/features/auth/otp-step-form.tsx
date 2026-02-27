@@ -6,7 +6,7 @@ type OtpStepFormProps = {
   isVerifyingOtp: boolean;
   onOtpChange: (value: string) => void;
   onSubmit: (event: React.SyntheticEvent<HTMLFormElement>) => Promise<void>;
-  onUseDifferentEmail: () => void;
+  onUseDifferentEmail?: () => void;
 };
 
 export function OtpStepForm(props: OtpStepFormProps): React.JSX.Element {
@@ -41,15 +41,17 @@ export function OtpStepForm(props: OtpStepFormProps): React.JSX.Element {
       >
         {props.isVerifyingOtp ? "Verifying..." : "Sign in"}
       </Button>
-      <Button
-        className="h-12 w-full text-sm text-zinc-500 hover:text-zinc-700"
-        onClick={props.onUseDifferentEmail}
-        size="lg"
-        type="button"
-        variant="link"
-      >
-        Use a different email
-      </Button>
+      {props.onUseDifferentEmail === undefined ? null : (
+        <Button
+          className="h-12 w-full text-sm text-zinc-500 hover:text-zinc-700"
+          onClick={props.onUseDifferentEmail}
+          size="lg"
+          type="button"
+          variant="link"
+        >
+          Use a different email
+        </Button>
+      )}
     </form>
   );
 }

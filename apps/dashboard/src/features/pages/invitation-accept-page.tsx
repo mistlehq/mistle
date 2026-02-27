@@ -1,27 +1,15 @@
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Spinner,
-} from "@mistle/ui";
+import { Button, Card, CardContent, Spinner } from "@mistle/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
+import { MistleLogo } from "../../components/mistle-logo.js";
 import { getDashboardConfig } from "../../config.js";
 import { authClient } from "../../lib/auth/client.js";
-import {
-  createStateForDifferentEmail,
-  resolveEmailValidationError,
-  resolveOtpValidationError,
-} from "../auth/auth-flow.js";
-import { EmailStepForm } from "../auth/email-step-form.js";
-import { ErrorNotice } from "../auth/error-notice.js";
+import { AuthPageShell, AuthPageWidths } from "../auth/auth-page-shell.js";
+import { EmailStage } from "../auth/email-stage.js";
 import { resolveErrorMessage } from "../auth/messages.js";
-import { OtpStepForm } from "../auth/otp-step-form.js";
+import { OtpStage } from "../auth/otp-stage.js";
 import { SESSION_QUERY_KEY, useSessionQuery } from "../shell/session-query.js";
 import {
   formatInvitationRole,
@@ -31,6 +19,8 @@ import {
   toInvitationMutationErrorMessage,
   type InvitationDetails,
 } from "./invitation-accept-state.js";
+import { InvitationStateCard } from "./invitation-state-card.js";
+import { useInvitationAuth } from "./use-invitation-auth.js";
 
 type InviteDecision = "idle" | "accepted" | "rejected";
 type AuthApiRequestMethod = "GET" | "POST";
@@ -119,20 +109,27 @@ export function InvitationAcceptPage(): React.JSX.Element {
   const invitationId = searchParams.get("invitationId");
   const invitedEmailFromLink = searchParams.get("email");
   const organizationNameFromLink = searchParams.get("organizationName");
-  const invitedByFromLink = searchParams.get("invitedBy");
+  const inviterEmailFromLink = searchParams.get("invitedBy");
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const sessionQuery = useSessionQuery();
   const [decision, setDecision] = useState<InviteDecision>("idle");
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const [email, setEmail] = useState(() =>
-    invitedEmailFromLink === null ? "" : invitedEmailFromLink,
-  );
-  const [otp, setOtp] = useState("");
-  const [authStep, setAuthStep] = useState<"email" | "otp">("email");
-  const [isSendingOtp, setIsSendingOtp] = useState(false);
-  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const invitationAuth = useInvitationAuth({
+    initialEmail: invitedEmailFromLink === null ? "" : invitedEmailFromLink,
+  });
+  const {
+    authError,
+    authStep,
+    email,
+    handleSendOtp,
+    handleVerifyOtp,
+    isSendingOtp,
+    isVerifyingOtp,
+    otp,
+    setEmail,
+    setOtp,
+  } = invitationAuth;
   const [signOutError, setSignOutError] = useState<string | null>(null);
   const normalizedInvitedEmailFromLink = invitedEmailFromLink?.trim().toLowerCase() ?? null;
   const normalizedSessionEmail = sessionQuery.data?.user.email?.trim().toLowerCase() ?? null;
@@ -141,7 +138,6 @@ export function InvitationAcceptPage(): React.JSX.Element {
     normalizedInvitedEmailFromLink.length > 0 &&
     normalizedSessionEmail !== null &&
     normalizedSessionEmail !== normalizedInvitedEmailFromLink;
-
   const invitationQuery = useQuery({
     queryKey: ["auth", "invitation", invitationId],
     enabled:
@@ -221,69 +217,6 @@ export function InvitationAcceptPage(): React.JSX.Element {
     sessionQuery.data !== null &&
     isInvitationFetchDifferentAccountError(invitationQuery.error);
 
-  async function handleSendOtp(event: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    setAuthError(null);
-
-    const emailError = resolveEmailValidationError(email);
-    if (emailError) {
-      setAuthError(emailError);
-      return;
-    }
-
-    const emailValue = email.trim();
-    setIsSendingOtp(true);
-    const response = await authClient.emailOtp.sendVerificationOtp({
-      email: emailValue,
-      type: "sign-in",
-    });
-    setIsSendingOtp(false);
-
-    if (response.error) {
-      setAuthError(resolveErrorMessage(response.error, "Unable to send OTP."));
-      return;
-    }
-
-    setEmail(emailValue);
-    setOtp("");
-    setAuthStep("otp");
-  }
-
-  async function handleVerifyOtp(event: React.SyntheticEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    setAuthError(null);
-
-    const otpError = resolveOtpValidationError(otp);
-    if (otpError) {
-      setAuthError(otpError);
-      return;
-    }
-
-    const otpValue = otp.trim();
-    setIsVerifyingOtp(true);
-    const signInResponse = await authClient.signIn.emailOtp({
-      email,
-      otp: otpValue,
-    });
-    setIsVerifyingOtp(false);
-
-    if (signInResponse.error) {
-      setAuthError(resolveErrorMessage(signInResponse.error, "Unable to verify OTP."));
-      return;
-    }
-
-    await queryClient.invalidateQueries({
-      queryKey: SESSION_QUERY_KEY,
-    });
-  }
-
-  function handleUseDifferentEmail(): void {
-    const nextState = createStateForDifferentEmail();
-    setAuthError(nextState.authError);
-    setOtp(nextState.otp);
-    setAuthStep(nextState.authStep);
-  }
-
   async function handleSignOutAndUseDifferentAccount(): Promise<void> {
     setSignOutError(null);
     const response = await authClient.signOut();
@@ -299,126 +232,146 @@ export function InvitationAcceptPage(): React.JSX.Element {
 
   if (invitationId === null || invitationId.length === 0) {
     return (
-      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Organization invitation</CardTitle>
-              <CardDescription>Invitation ID is missing.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => void navigate("/", { replace: true })} type="button">
-                Go to dashboard
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+      <InvitationStateCard
+        description="Invitation ID is missing."
+        maxWidthClass={AuthPageWidths.LG}
+        title="You've been invited to join Mistle"
+        actions={
+          <Button onClick={() => void navigate("/", { replace: true })} type="button">
+            Go to dashboard
+          </Button>
+        }
+      />
     );
   }
 
   if (sessionQuery.isPending) {
     return (
-      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Organization invitation</CardTitle>
-              <CardDescription>Checking your session.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-muted-foreground gap-2 flex items-center">
-                <Spinner />
-                Loading...
-              </div>
-            </CardContent>
-          </Card>
+      <InvitationStateCard
+        description="Checking your session."
+        maxWidthClass={AuthPageWidths.LG}
+        title="You've been invited to join Mistle"
+      >
+        <div className="text-muted-foreground gap-2 flex items-center">
+          <Spinner />
+          Loading...
         </div>
-      </main>
+      </InvitationStateCard>
     );
   }
 
   if (sessionQuery.isError) {
     return (
-      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Organization invitation</CardTitle>
-              <CardDescription>Session check failed.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-destructive text-sm">{sessionQuery.error.message}</p>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+      <InvitationStateCard
+        description="Session check failed."
+        maxWidthClass={AuthPageWidths.LG}
+        title="You've been invited to join Mistle"
+      >
+        <p className="text-destructive text-sm">{sessionQuery.error.message}</p>
+      </InvitationStateCard>
     );
   }
 
   if (sessionQuery.data === null) {
     return (
-      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Organization invitation</CardTitle>
-              <CardDescription>Sign in to view and respond to this invitation.</CardDescription>
-            </CardHeader>
-            <CardContent className="gap-4 grid">
-              {organizationNameFromLink === null || organizationNameFromLink.length === 0 ? null : (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Organization:</span>{" "}
-                  <span className="font-medium">{organizationNameFromLink}</span>
+      <AuthPageShell
+        maxWidthClass={authStep === "otp" ? AuthPageWidths.SM : AuthPageWidths.LG}
+        title={authStep === "email" ? "You've been invited to join Mistle" : null}
+      >
+        {authStep === "email" ? (
+          <EmailStage
+            authError={authError}
+            beforeForm={
+              <>
+                <Card className="w-full">
+                  <CardContent className="gap-4 grid">
+                    {organizationNameFromLink === null ||
+                    organizationNameFromLink.length === 0 ? null : (
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">Organization:</span>{" "}
+                        <span className="font-medium">{organizationNameFromLink}</span>
+                      </p>
+                    )}
+                    {inviterEmailFromLink === null || inviterEmailFromLink.length === 0 ? null : (
+                      <p className="text-sm">
+                        <span className="text-muted-foreground">Invited by:</span>{" "}
+                        <span className="font-medium">{inviterEmailFromLink}</span>
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+                <p className="text-sm text-center mt-2">
+                  <span className="text-muted-foreground">Sign in as </span>
+                  <span className="font-medium">{email}</span>
+                  <span className="text-muted-foreground"> to accept this invitation.</span>
                 </p>
-              )}
-              {invitedByFromLink === null || invitedByFromLink.length === 0 ? null : (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Invited by:</span>{" "}
-                  <span className="font-medium">{invitedByFromLink}</span>
-                </p>
-              )}
-              <ErrorNotice message={authError} />
-              {authStep === "email" ? (
-                <EmailStepForm
-                  email={email}
-                  isSendingOtp={isSendingOtp}
-                  onEmailChange={setEmail}
-                  onSubmit={handleSendOtp}
-                />
-              ) : (
-                <OtpStepForm
-                  email={email}
-                  isVerifyingOtp={isVerifyingOtp}
-                  onOtpChange={setOtp}
-                  onSubmit={handleVerifyOtp}
-                  onUseDifferentEmail={handleUseDifferentEmail}
-                  otp={otp}
-                />
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+              </>
+            }
+            email={email}
+            footerError={null}
+            isEmailEditable={false}
+            isEmailHidden={true}
+            isSendingOtp={isSendingOtp}
+            onEmailChange={setEmail}
+            onSubmit={handleSendOtp}
+          />
+        ) : (
+          <OtpStage
+            authError={authError}
+            email={email}
+            footerError={null}
+            isVerifyingOtp={isVerifyingOtp}
+            onOtpChange={setOtp}
+            onSubmit={handleVerifyOtp}
+            otp={otp}
+          />
+        )}
+      </AuthPageShell>
     );
   }
 
   if (isWrongAccountFromInviteLink) {
     return (
-      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Organization invitation</CardTitle>
-              <CardDescription>This invitation cannot be opened.</CardDescription>
-            </CardHeader>
-            <CardContent className="gap-4 grid">
-              <p className="text-destructive text-sm">
-                This invitation belongs to a different account.
-              </p>
-              {signOutError === null ? null : (
-                <p className="text-destructive text-sm">{signOutError}</p>
-              )}
+      <InvitationStateCard
+        description="This invitation cannot be opened."
+        maxWidthClass={AuthPageWidths.LG}
+        title="You've been invited to join Mistle"
+        actions={
+          <>
+            <Button
+              onClick={() => {
+                void handleSignOutAndUseDifferentAccount();
+              }}
+              type="button"
+              variant="secondary"
+            >
+              Sign out and use a different account
+            </Button>
+            <Button
+              onClick={() => void navigate("/", { replace: true })}
+              type="button"
+              variant="outline"
+            >
+              Go to dashboard
+            </Button>
+          </>
+        }
+      >
+        <p className="text-destructive text-sm">This invitation belongs to a different account.</p>
+        {signOutError === null ? null : <p className="text-destructive text-sm">{signOutError}</p>}
+      </InvitationStateCard>
+    );
+  }
+
+  if (invitationQuery.isError) {
+    return (
+      <InvitationStateCard
+        description="This invitation cannot be opened."
+        maxWidthClass={AuthPageWidths.LG}
+        title="You've been invited to join Mistle"
+        actions={
+          <>
+            {canSignOutForDifferentAccount ? (
               <Button
                 onClick={() => {
                   void handleSignOutAndUseDifferentAccount();
@@ -428,77 +381,35 @@ export function InvitationAcceptPage(): React.JSX.Element {
               >
                 Sign out and use a different account
               </Button>
-              <Button
-                onClick={() => void navigate("/", { replace: true })}
-                type="button"
-                variant="outline"
-              >
-                Go to dashboard
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    );
-  }
-
-  if (invitationQuery.isError) {
-    return (
-      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Organization invitation</CardTitle>
-              <CardDescription>This invitation cannot be opened.</CardDescription>
-            </CardHeader>
-            <CardContent className="gap-4 grid">
-              <p className="text-destructive text-sm">{invitationErrorMessage}</p>
-              {signOutError === null ? null : (
-                <p className="text-destructive text-sm">{signOutError}</p>
-              )}
-              {canSignOutForDifferentAccount ? (
-                <Button
-                  onClick={() => {
-                    void handleSignOutAndUseDifferentAccount();
-                  }}
-                  type="button"
-                  variant="secondary"
-                >
-                  Sign out and use a different account
-                </Button>
-              ) : null}
-              <Button
-                onClick={() => void navigate("/", { replace: true })}
-                type="button"
-                variant="outline"
-              >
-                Go to dashboard
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+            ) : null}
+            <Button
+              onClick={() => void navigate("/", { replace: true })}
+              type="button"
+              variant="outline"
+            >
+              Go to dashboard
+            </Button>
+          </>
+        }
+      >
+        <p className="text-destructive text-sm">{invitationErrorMessage}</p>
+        {signOutError === null ? null : <p className="text-destructive text-sm">{signOutError}</p>}
+      </InvitationStateCard>
     );
   }
 
   if (invitationQuery.isPending || invitationQuery.data === undefined) {
     return (
-      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Organization invitation</CardTitle>
-              <CardDescription>Loading invitation details.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-muted-foreground gap-2 flex items-center">
-                <Spinner />
-                Loading...
-              </div>
-            </CardContent>
-          </Card>
+      <InvitationStateCard
+        description="Loading invitation details."
+        maxWidthClass={AuthPageWidths.LG}
+        title="You've been invited to join Mistle"
+      >
+        <div className="text-muted-foreground gap-2 flex items-center">
+          <Spinner />
+          Loading...
         </div>
-      </main>
+      </InvitationStateCard>
     );
   }
 
@@ -506,111 +417,103 @@ export function InvitationAcceptPage(): React.JSX.Element {
   const invitationOrganizationName =
     invitation.organizationName ?? organizationNameFromLink ?? "this organization";
   const invitationInviterDisplay =
-    invitation.inviterEmail ?? invitedByFromLink ?? invitation.inviterId;
+    invitation.inviterEmail ?? inviterEmailFromLink ?? invitation.inviterId;
 
   if (decision === "accepted") {
     return (
-      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Invitation accepted</CardTitle>
-              <CardDescription>
-                You now have access to {invitationOrganizationName}.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => void navigate("/", { replace: true })} type="button">
-                Go to dashboard
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+      <InvitationStateCard
+        description={`You now have access to ${invitationOrganizationName}.`}
+        maxWidthClass={AuthPageWidths.LG}
+        title="Invitation accepted"
+        actions={
+          <Button onClick={() => void navigate("/", { replace: true })} type="button">
+            Go to dashboard
+          </Button>
+        }
+      />
     );
   }
 
   if (decision === "rejected") {
     return (
-      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Invitation declined</CardTitle>
-              <CardDescription>You declined this invitation.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                onClick={() => void navigate("/", { replace: true })}
-                type="button"
-                variant="outline"
-              >
-                Go to dashboard
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
+      <InvitationStateCard
+        description="You declined this invitation."
+        maxWidthClass={AuthPageWidths.XL}
+        title="Invitation declined"
+        actions={
+          <Button
+            onClick={() => void navigate("/", { replace: true })}
+            type="button"
+            variant="outline"
+          >
+            Go to dashboard
+          </Button>
+        }
+      />
     );
   }
 
   return (
     <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-      <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle>Organization invitation</CardTitle>
-            <CardDescription>Review and respond to your invitation.</CardDescription>
-          </CardHeader>
-          <CardContent className="gap-4 grid">
-            <dl className="gap-3 grid">
-              <div>
-                <dt className="text-muted-foreground text-xs">Organization</dt>
-                <dd className="text-sm font-medium">{invitationOrganizationName}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground text-xs">Role</dt>
-                <dd className="text-sm">{formatInvitationRole(invitation.role)}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground text-xs">Invited email</dt>
-                <dd className="text-sm">{invitation.email}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground text-xs">Invited by</dt>
-                <dd className="text-sm">{invitationInviterDisplay}</dd>
-              </div>
-            </dl>
-
-            {mutationError === null ? null : (
-              <p className="text-destructive text-sm">{mutationError}</p>
-            )}
-
-            <div className="gap-2 flex flex-wrap">
-              <Button
-                disabled={isSubmitting}
-                onClick={() => {
-                  setMutationError(null);
-                  acceptMutation.mutate();
-                }}
-                type="button"
-              >
-                {acceptMutation.isPending ? "Accepting..." : "Accept invitation"}
-              </Button>
-              <Button
-                disabled={isSubmitting}
-                onClick={() => {
-                  setMutationError(null);
-                  rejectMutation.mutate();
-                }}
-                type="button"
-                variant="outline"
-              >
-                {rejectMutation.isPending ? "Declining..." : "Decline"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="mx-auto flex min-h-svh w-full max-w-lg items-center px-4 py-8">
+        <div className="w-full gap-4 flex flex-col">
+          <MistleLogo className="mx-auto" mode="with-text" />
+          <h1 className="text-center text-lg font-medium">
+            You&apos;ve been invited to join Mistle
+          </h1>
+          <Card className="w-full">
+            <CardContent className="gap-4 grid">
+              <dl className="gap-3 grid">
+                <div>
+                  <dt className="text-muted-foreground text-xs">Organization</dt>
+                  <dd className="text-sm font-medium">{invitationOrganizationName}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Role</dt>
+                  <dd className="text-sm">{formatInvitationRole(invitation.role)}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Invited email</dt>
+                  <dd className="text-sm">{invitation.email}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground text-xs">Invited by</dt>
+                  <dd className="text-sm">{invitationInviterDisplay}</dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+          {mutationError === null ? null : (
+            <p className="text-destructive text-sm">{mutationError}</p>
+          )}
+          <div className="gap-4 flex flex-col">
+            <Button
+              className="h-12 w-full text-sm"
+              disabled={isSubmitting}
+              onClick={() => {
+                setMutationError(null);
+                acceptMutation.mutate();
+              }}
+              size="lg"
+              type="button"
+            >
+              {acceptMutation.isPending ? "Accepting..." : "Accept invitation"}
+            </Button>
+            <Button
+              className="h-12 w-full text-sm text-zinc-500 hover:text-zinc-700"
+              disabled={isSubmitting}
+              onClick={() => {
+                setMutationError(null);
+                rejectMutation.mutate();
+              }}
+              size="lg"
+              type="button"
+              variant="link"
+            >
+              {rejectMutation.isPending ? "Declining..." : "Decline"}
+            </Button>
+          </div>
+        </div>
       </div>
     </main>
   );

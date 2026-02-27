@@ -15,6 +15,7 @@ type SendOrganizationInvitationInput = {
   invitationId: string;
   organizationName: string;
   inviterDisplayName: string;
+  inviterEmail: string;
   role: string;
 };
 
@@ -23,13 +24,13 @@ function buildInvitationUrl(input: {
   invitationId: string;
   email: string;
   organizationName: string;
-  inviterDisplayName: string;
+  inviterEmail: string;
 }): string {
   const url = new URL(input.invitationAcceptBaseUrl);
   url.searchParams.set("invitationId", input.invitationId);
   url.searchParams.set("email", input.email);
   url.searchParams.set("organizationName", input.organizationName);
-  url.searchParams.set("invitedBy", input.inviterDisplayName);
+  url.searchParams.set("invitedBy", input.inviterEmail);
 
   return url.toString();
 }
@@ -43,7 +44,7 @@ export function createSendOrganizationInvitationService(
       invitationId: inviteInput.invitationId,
       email: inviteInput.email,
       organizationName: inviteInput.organizationName,
-      inviterDisplayName: inviteInput.inviterDisplayName,
+      inviterEmail: inviteInput.inviterEmail,
     });
 
     await input.openWorkflow.runWorkflow(SendOrganizationInvitationWorkflowSpec, {
