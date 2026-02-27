@@ -27,12 +27,12 @@ export type CreateControlPlaneWorkflowDefinitionsInput = {
 };
 
 export function createControlPlaneWorkflowDefinitions(
-  input: CreateControlPlaneWorkflowDefinitionsInput,
+  ctx: CreateControlPlaneWorkflowDefinitionsInput,
 ): ControlPlaneWorkflowDefinitions {
   return {
-    sendVerificationOTP: createSendVerificationOTPWorkflow(input.sendVerificationOTP),
+    sendVerificationOTP: createSendVerificationOTPWorkflow(ctx.sendVerificationOTP),
     requestDeleteSandboxProfile: createRequestDeleteSandboxProfileWorkflow(
-      input.requestDeleteSandboxProfile,
+      ctx.requestDeleteSandboxProfile,
     ),
   };
 }
