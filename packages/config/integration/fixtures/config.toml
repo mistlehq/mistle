@@ -9,7 +9,7 @@ host = "0.0.0.0"
 port = 5100
 
 [apps.control_plane_api.database]
-url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane"
+url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 
 [apps.control_plane_api.auth]
 base_url = "http://127.0.0.1:5000"
@@ -21,7 +21,7 @@ otp_expires_in_seconds = 300
 otp_allowed_attempts = 3
 
 [apps.control_plane_api.workflow]
-database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle_control_plane"
+database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle"
 namespace_id = "fixture"
 
 [apps.control_plane_worker.server]
@@ -29,7 +29,7 @@ host = "0.0.0.0"
 port = 5200
 
 [apps.control_plane_worker.workflow]
-database_url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane"
+database_url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 namespace_id = "fixture"
 run_migrations = true
 concurrency = 2
@@ -48,10 +48,10 @@ host = "0.0.0.0"
 port = 5300
 
 [apps.data_plane_api.database]
-url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane"
+url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 
 [apps.data_plane_api.workflow]
-database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane"
+database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle"
 namespace_id = "fixture"
 
 [apps.data_plane_gateway.server]
@@ -63,10 +63,10 @@ host = "0.0.0.0"
 port = 5303
 
 [apps.data_plane_worker.database]
-url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane"
+url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 
 [apps.data_plane_worker.workflow]
-database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane"
+database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle"
 namespace_id = "fixture"
 run_migrations = true
 concurrency = 2

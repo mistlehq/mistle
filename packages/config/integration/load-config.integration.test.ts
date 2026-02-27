@@ -28,7 +28,7 @@ const controlPlaneApiEnvConfig = {
     port: 5000,
   },
   database: {
-    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane",
+    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
   },
   auth: {
     baseUrl: "http://127.0.0.1:5000",
@@ -40,7 +40,7 @@ const controlPlaneApiEnvConfig = {
     otpAllowedAttempts: 3,
   },
   workflow: {
-    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_control_plane",
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     namespaceId: "development",
   },
 } as const;
@@ -63,7 +63,7 @@ const controlPlaneWorkerEnvConfig = {
     port: 5001,
   },
   workflow: {
-    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane",
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
     namespaceId: "development",
     runMigrations: true,
     concurrency: 1,
@@ -98,10 +98,10 @@ const dataPlaneApiEnvConfig = {
     port: 5002,
   },
   database: {
-    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
+    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
   },
   workflow: {
-    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     namespaceId: "development",
   },
 } as const;
@@ -139,10 +139,10 @@ const dataPlaneWorkerEnvConfig = {
     port: 5004,
   },
   database: {
-    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
+    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
   },
   workflow: {
-    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     namespaceId: "development",
     runMigrations: true,
     concurrency: 1,

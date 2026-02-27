@@ -19,7 +19,7 @@ describe("parseConfigRecord", () => {
             port: 5000,
           },
           database: {
-            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane",
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
           },
           auth: {
             baseUrl: "http://127.0.0.1:5000",
@@ -31,7 +31,7 @@ describe("parseConfigRecord", () => {
             otpAllowedAttempts: 3,
           },
           workflow: {
-            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_control_plane",
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
           },
         },
@@ -41,7 +41,7 @@ describe("parseConfigRecord", () => {
             port: 5100,
           },
           workflow: {
-            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_control_plane",
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
             namespaceId: "development",
             runMigrations: true,
             concurrency: 1,
@@ -62,10 +62,10 @@ describe("parseConfigRecord", () => {
             port: 5200,
           },
           database: {
-            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
           },
           workflow: {
-            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
           },
         },
@@ -75,10 +75,10 @@ describe("parseConfigRecord", () => {
             port: 5201,
           },
           database: {
-            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
           },
           workflow: {
-            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
             namespaceId: "development",
             runMigrations: true,
             concurrency: 1,

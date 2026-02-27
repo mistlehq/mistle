@@ -12,7 +12,7 @@ host = "0.0.0.0"
 port = 8080
 
 [apps.control_plane_api.database]
-url = "postgresql://mistle:replace-with-password@db:5432/mistle_control_plane"
+url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 
 [apps.control_plane_api.auth]
 base_url = "https://api.mistle.example"
@@ -24,7 +24,7 @@ otp_expires_in_seconds = 300
 otp_allowed_attempts = 3
 
 [apps.control_plane_api.workflow]
-database_url = "postgresql://mistle:replace-with-password@db:6432/mistle_control_plane"
+database_url = "postgresql://mistle:replace-with-password@db:6432/mistle"
 namespace_id = "production"
 
 [apps.control_plane_worker.server]
@@ -32,7 +32,7 @@ host = "0.0.0.0"
 port = 8081
 
 [apps.control_plane_worker.workflow]
-database_url = "postgresql://mistle:replace-with-password@db:5432/mistle_control_plane"
+database_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 namespace_id = "production"
 run_migrations = true
 concurrency = 4
@@ -51,10 +51,10 @@ host = "0.0.0.0"
 port = 8082
 
 [apps.data_plane_api.database]
-url = "postgresql://mistle:replace-with-password@db:5432/mistle_data_plane"
+url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 
 [apps.data_plane_api.workflow]
-database_url = "postgresql://mistle:replace-with-password@db:6432/mistle_data_plane"
+database_url = "postgresql://mistle:replace-with-password@db:6432/mistle"
 namespace_id = "production"
 
 [apps.data_plane_gateway.server]
@@ -66,10 +66,10 @@ host = "0.0.0.0"
 port = 8083
 
 [apps.data_plane_worker.database]
-url = "postgresql://mistle:replace-with-password@db:5432/mistle_data_plane"
+url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 
 [apps.data_plane_worker.workflow]
-database_url = "postgresql://mistle:replace-with-password@db:5432/mistle_data_plane"
+database_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 namespace_id = "production"
 run_migrations = true
 concurrency = 4
