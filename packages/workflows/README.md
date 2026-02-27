@@ -31,7 +31,7 @@ Root export is also available:
 | `SendOrganizationInvitationWorkflowSpec`    | `workflow spec` | Spec for invitation email delivery workflow (`control-plane.auth.send-organization-invitation`).      |
 | `SendVerificationOTPWorkflowSpec`           | `workflow spec` | Spec for OTP email delivery workflow (`control-plane.auth.send-verification-otp`).                    |
 | `RequestDeleteSandboxProfileWorkflowSpec`   | `workflow spec` | Spec for sandbox profile deletion workflow (`control-plane.sandbox-profiles.request-delete-profile`). |
-| `createSendOrganizationInvitationWorkflow`  | `function`      | Creates the invitation email workflow implementation with injected email dependencies.                 |
+| `createSendOrganizationInvitationWorkflow`  | `function`      | Creates the invitation email workflow implementation with injected email dependencies.                |
 | `createSendVerificationOTPWorkflow`         | `function`      | Creates the OTP workflow implementation with injected email dependencies.                             |
 | `createRequestDeleteSandboxProfileWorkflow` | `function`      | Creates the sandbox profile deletion workflow implementation.                                         |
 
