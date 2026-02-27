@@ -37,7 +37,7 @@ const DockerProgressAuxSchema = z
   .object({
     Digest: z.string().optional(),
   })
-  .strict();
+  .strip();
 
 const DockerProgressMessageSchema = z
   .object({
@@ -47,11 +47,11 @@ const DockerProgressMessageSchema = z
       .object({
         message: z.string().optional(),
       })
-      .strict()
+      .strip()
       .optional(),
     aux: DockerProgressAuxSchema.optional(),
   })
-  .strict();
+  .strip();
 type DockerProgressMessage = z.output<typeof DockerProgressMessageSchema>;
 
 function chunkToUtf8String(chunk: unknown): string {
