@@ -8,6 +8,11 @@ type LoadDataPlaneGatewayConfigResult = ReturnType<
 >;
 
 export type DataPlaneGatewayConfig = LoadDataPlaneGatewayConfigResult["app"];
+export type DataPlaneGatewayGlobalConfig = NonNullable<LoadDataPlaneGatewayConfigResult["global"]>;
+export type DataPlaneGatewayRuntimeConfig = {
+  app: DataPlaneGatewayConfig;
+  tunnel: DataPlaneGatewayGlobalConfig["tunnel"];
+};
 
 export type AppContextBindings = {
   Variables: AppContextVariables;
