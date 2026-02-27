@@ -145,6 +145,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PASSWORD",
   },
   {
+    configPath: ["apps", "control_plane_worker", "dataPlaneApi", "baseUrl"],
+    tomlPath: ["apps", "control_plane_worker", "data_plane_api", "base_url"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL",
+  },
+  {
     configPath: ["apps", "data_plane_api", "server", "host"],
     tomlPath: ["apps", "data_plane_api", "server", "host"],
     envVar: "MISTLE_APPS_DATA_PLANE_API_HOST",

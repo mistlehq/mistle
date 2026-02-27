@@ -12,6 +12,7 @@ export function loadControlPlaneWorkerFromToml(
   const server = asObjectRecord(controlPlaneWorker.server);
   const workflow = asObjectRecord(controlPlaneWorker.workflow);
   const email = asObjectRecord(controlPlaneWorker.email);
+  const dataPlaneApi = asObjectRecord(controlPlaneWorker.data_plane_api);
 
   return PartialControlPlaneWorkerConfigSchema.parse({
     server: {
@@ -32,6 +33,9 @@ export function loadControlPlaneWorkerFromToml(
       smtpSecure: email.smtp_secure,
       smtpUsername: email.smtp_username,
       smtpPassword: email.smtp_password,
+    },
+    dataPlaneApi: {
+      baseUrl: dataPlaneApi.base_url,
     },
   });
 }

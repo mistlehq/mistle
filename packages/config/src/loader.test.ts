@@ -55,6 +55,9 @@ describe("parseConfigRecord", () => {
             smtpUsername: "mailpit",
             smtpPassword: "mailpit",
           },
+          dataPlaneApi: {
+            baseUrl: "http://127.0.0.1:5200",
+          },
         },
         data_plane_api: {
           server: {
@@ -156,6 +159,9 @@ describe("parseConfigRecord", () => {
             smtpSecure: false,
             smtpUsername: "mailpit",
             smtpPassword: "mailpit",
+          },
+          dataPlaneApi: {
+            baseUrl: "http://127.0.0.1:5200",
           },
         },
         data_plane_api: {
