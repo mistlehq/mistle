@@ -52,10 +52,6 @@ jobs:
       - name: Generate CI config
         run: nix develop --command pnpm run config:init:ci
 
-      - name: Build control-plane-api dependencies in Nix shell
-        if: github.event_name == 'pull_request'
-        run: nix develop --command pnpm turbo run build --filter=@mistle/control-plane-api^...
-
       - name: Build workspace in Nix shell
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: nix develop --command bash -lc "MISTLE_CONFIG_PATH=$GITHUB_WORKSPACE/config/config.ci.toml pnpm build"

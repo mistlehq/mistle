@@ -1,12 +1,12 @@
-import { logger } from "../logger.js";
 import { assertOpenApiSpecFileIsCurrent, getOpenApiSpecFilePath } from "./spec-file.js";
 
 async function run(): Promise<void> {
   await assertOpenApiSpecFileIsCurrent();
-  logger.info({ openApiSpecPath: getOpenApiSpecFilePath() }, "OpenAPI spec is current");
+  process.stdout.write(`OpenAPI spec is current: ${getOpenApiSpecFilePath()}\n`);
 }
 
 void run().catch((error: unknown) => {
-  logger.error({ err: error }, "OpenAPI spec drift check failed");
+  const message = error instanceof Error ? (error.stack ?? error.message) : String(error);
+  process.stderr.write(`OpenAPI spec drift check failed: ${message}\n`);
   process.exit(1);
 });
