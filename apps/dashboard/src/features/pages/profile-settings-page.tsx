@@ -13,7 +13,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { UserIdentitySummary } from "../account/user-identity-summary.js";
-import { MembersApiError, updateProfileDisplayName } from "../settings/members/members-api.js";
+import { MembersApiError } from "../settings/members/members-api-errors.js";
+import { updateProfileDisplayName } from "../settings/profile/profile-service.js";
 import { SaveActions } from "../settings/save-actions.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";

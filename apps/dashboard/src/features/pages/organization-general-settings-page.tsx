@@ -3,13 +3,11 @@ import {
   Alert,
   AlertDescription,
   AlertTitle,
-  Badge,
   Button,
   Card,
   CardContent,
   Field,
   FieldContent,
-  FieldDescription,
   FieldError,
   FieldLabel,
   Input,
@@ -18,12 +16,11 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
+import { MembersApiError } from "../settings/members/members-api-errors.js";
 import {
-  checkOrganizationSlug,
   getOrganizationGeneral,
-  MembersApiError,
   updateOrganizationGeneral,
-} from "../settings/members/members-api.js";
+} from "../settings/organization/organization-general-service.js";
 import { SaveActions } from "../settings/save-actions.js";
 import { organizationSummaryQueryKey } from "../shell/organization-summary.js";
 import { useRequiredOrganizationId } from "../shell/require-auth.js";
@@ -33,11 +30,8 @@ const SETTINGS_ORGANIZATION_GENERAL_QUERY_KEY_PREFIX: readonly [
   "organization-general",
 ] = ["settings", "organization-general"];
 
-type SlugAvailability = "unknown" | "checking" | "available" | "unavailable";
-
 type OrganizationFormState = {
   name: string;
-  slug: string;
 };
 
 function settingsOrganizationGeneralQueryKey(
@@ -62,27 +56,17 @@ function toErrorMessage(error: unknown, fallbackMessage: string): string {
   return fallbackMessage;
 }
 
-function normalizeSlug(slug: string): string {
-  return slug.trim().toLowerCase();
-}
-
-function isSlugShapeValid(slug: string): boolean {
-  return /^[a-z0-9-]+$/u.test(slug);
-}
-
 export function OrganizationGeneralSettingsPage(): React.JSX.Element {
   const queryClient = useQueryClient();
   const organizationId = useRequiredOrganizationId();
 
   const [formState, setFormState] = useState<OrganizationFormState>({
     name: "",
-    slug: "",
   });
   const [persistedFormState, setPersistedFormState] = useState<OrganizationFormState>({
     name: "",
-    slug: "",
   });
-  const [slugAvailability, setSlugAvailability] = useState<SlugAvailability>("unknown");
+  const [persistedSlug, setPersistedSlug] = useState("");
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -101,11 +85,10 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
 
     const loadedState = {
       name: organizationQuery.data.name,
-      slug: organizationQuery.data.slug,
     };
     setFormState(loadedState);
     setPersistedFormState(loadedState);
-    setSlugAvailability("unknown");
+    setPersistedSlug(organizationQuery.data.slug);
   }, [organizationQuery.data]);
 
   useEffect(() => {
@@ -122,33 +105,17 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
     };
   }, [showSaveSuccess]);
 
-  const slugCheckMutation = useMutation({
-    mutationFn: async (slug: string) => checkOrganizationSlug({ slug }),
-  });
-
-  async function refreshSlugAvailability(slugValue: string): Promise<boolean> {
-    if (slugValue === persistedFormState.slug) {
-      setSlugAvailability("unknown");
-      return true;
-    }
-
-    setSlugAvailability("checking");
-    const isAvailable = await slugCheckMutation.mutateAsync(slugValue);
-    setSlugAvailability(isAvailable ? "available" : "unavailable");
-    return isAvailable;
-  }
-
   const saveMutation = useMutation({
     mutationFn: async (nextState: OrganizationFormState) =>
       updateOrganizationGeneral({
         organizationId,
         name: nextState.name,
-        slug: nextState.slug,
+        slug: persistedSlug,
       }),
     onSuccess: async (_result, variables) => {
       queryClient.setQueryData(organizationSummaryQueryKey(organizationId), {
         name: variables.name,
-        slug: variables.slug,
+        slug: persistedSlug,
       });
 
       const refetched = await organizationQuery.refetch();
@@ -156,11 +123,14 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
       if (latest) {
         const latestState = {
           name: latest.name,
-          slug: latest.slug,
         };
         setFormState(latestState);
         setPersistedFormState(latestState);
-        queryClient.setQueryData(organizationSummaryQueryKey(organizationId), latestState);
+        setPersistedSlug(latest.slug);
+        queryClient.setQueryData(organizationSummaryQueryKey(organizationId), {
+          name: latest.name,
+          slug: latest.slug,
+        });
       }
 
       await queryClient.invalidateQueries({
@@ -169,7 +139,6 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
 
       setShowSaveSuccess(true);
       setSaveError(null);
-      setSlugAvailability("unknown");
     },
     onError: (error: unknown) => {
       setSaveError(toErrorMessage(error, "Could not update organization settings."));
@@ -224,11 +193,8 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
   }
 
   const normalizedName = formState.name.trim();
-  const normalizedSlug = normalizeSlug(formState.slug);
-  const hasDirtyChanges =
-    normalizedName !== persistedFormState.name.trim() || normalizedSlug !== persistedFormState.slug;
+  const hasDirtyChanges = normalizedName !== persistedFormState.name.trim();
   const hasNameError = normalizedName.length === 0;
-  const hasSlugError = normalizedSlug.length === 0 || !isSlugShapeValid(normalizedSlug);
 
   function handleNameChange(nextValue: string): void {
     setFormState((currentState) => ({
@@ -239,46 +205,19 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
     setShowSaveSuccess(false);
   }
 
-  function handleSlugChange(nextValue: string): void {
-    setFormState((currentState) => ({
-      ...currentState,
-      slug: nextValue,
-    }));
-    setSlugAvailability("unknown");
-    setSaveError(null);
-    setShowSaveSuccess(false);
-  }
-
   function handleCancelChanges(): void {
     setFormState(persistedFormState);
-    setSlugAvailability("unknown");
     setSaveError(null);
     setShowSaveSuccess(false);
   }
 
   function canSubmit(): boolean {
-    return !(
-      !hasDirtyChanges ||
-      hasNameError ||
-      hasSlugError ||
-      saveMutation.isPending ||
-      slugCheckMutation.isPending
-    );
+    return !(!hasDirtyChanges || hasNameError || saveMutation.isPending);
   }
 
   async function saveChanges(): Promise<void> {
-    if (normalizedSlug !== persistedFormState.slug) {
-      const slugIsAvailable = await refreshSlugAvailability(normalizedSlug);
-      if (!slugIsAvailable) {
-        setSaveError("Slug is unavailable. Choose a different slug.");
-        setShowSaveSuccess(false);
-        return;
-      }
-    }
-
     await saveMutation.mutateAsync({
       name: normalizedName,
-      slug: normalizedSlug,
     });
   }
 
@@ -314,49 +253,8 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
           ) : null}
         </Field>
 
-        <Field>
-          <FieldLabel htmlFor="organization-slug">Slug</FieldLabel>
-          <FieldContent>
-            <Input
-              id="organization-slug"
-              onBlur={() => {
-                if (hasSlugError || normalizedSlug === persistedFormState.slug) {
-                  return;
-                }
-
-                void refreshSlugAvailability(normalizedSlug);
-              }}
-              onChange={(event) => handleSlugChange(event.currentTarget.value)}
-              value={formState.slug}
-            />
-          </FieldContent>
-          <FieldDescription className="flex items-center gap-2">
-            <span>Slug availability will be validated before saving.</span>
-            <Badge variant="secondary">
-              {slugAvailability === "unknown"
-                ? "Unknown"
-                : slugAvailability === "checking"
-                  ? "Checking"
-                  : slugAvailability === "available"
-                    ? "Available"
-                    : "Unavailable"}
-            </Badge>
-          </FieldDescription>
-          {normalizedSlug.length === 0 ? (
-            <FieldError errors={[{ message: "Slug is required." }]} />
-          ) : null}
-          {normalizedSlug.length > 0 && !isSlugShapeValid(normalizedSlug) ? (
-            <FieldError
-              errors={[{ message: "Use lowercase letters, numbers, and hyphens only." }]}
-            />
-          ) : null}
-          {slugAvailability === "unavailable" ? (
-            <FieldError errors={[{ message: "This slug is already in use." }]} />
-          ) : null}
-        </Field>
-
         <SaveActions
-          cancelDisabled={!hasDirtyChanges || saveMutation.isPending || slugCheckMutation.isPending}
+          cancelDisabled={!hasDirtyChanges || saveMutation.isPending}
           onCancel={handleCancelChanges}
           onSave={handleSaveChanges}
           saveDisabled={!canSubmit()}

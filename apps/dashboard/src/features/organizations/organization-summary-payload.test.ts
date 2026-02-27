@@ -12,15 +12,15 @@ describe("parseOrganizationSummary", () => {
 
     expect(result).toEqual({
       name: "Acme",
-      slug: "acme",
     });
   });
 
-  it("throws when required fields are missing", () => {
+  it("throws when required name is missing", () => {
     expect(() => {
       parseOrganizationSummary({
         id: "org_123",
+        slug: "acme",
       });
-    }).toThrow("Organization fields were missing.");
+    }).toThrow("Organization name was missing.");
   });
 });

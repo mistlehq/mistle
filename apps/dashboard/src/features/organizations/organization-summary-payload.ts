@@ -1,6 +1,5 @@
 export type OrganizationSummary = {
   name: string;
-  slug: string;
 };
 
 type UnknownRecord = Record<string, unknown>;
@@ -34,13 +33,11 @@ export function parseOrganizationSummary(value: unknown): OrganizationSummary {
   }
 
   const name = readString(organization, "name");
-  const slug = readString(organization, "slug");
-  if (name === null || slug === null) {
-    throw new Error("Organization fields were missing.");
+  if (name === null) {
+    throw new Error("Organization name was missing.");
   }
 
   return {
     name,
-    slug,
   };
 }
