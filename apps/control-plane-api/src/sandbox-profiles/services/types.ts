@@ -14,17 +14,9 @@ import type { ListProfilesInput } from "./list-profiles.js";
 
 export type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
 
-export type ResolveSandboxProfileVersionImage = (input: {
-  organizationId: string;
-  profileId: string;
-  profileVersion: number;
-  manifest: unknown;
-}) => Promise<StartSandboxProfileInstanceWorkflowInput["image"]>;
-
 export type CreateSandboxProfilesServiceInput = {
   db: ControlPlaneDatabase;
   openWorkflow: ControlPlaneOpenWorkflow;
-  resolveSandboxProfileVersionImage: ResolveSandboxProfileVersionImage;
 };
 
 export type SandboxProfilesService = {
@@ -53,6 +45,7 @@ export type SandboxProfilesService = {
       id: string;
     };
     source: SandboxInstanceSource;
+    image: StartSandboxProfileInstanceWorkflowInput["image"];
   }) => Promise<{
     status: "completed";
     workflowRunId: string;

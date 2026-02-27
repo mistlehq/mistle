@@ -1,10 +1,9 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
+import type { StartSandboxProfileInstanceWorkflowInput } from "@mistle/workflows/control-plane";
 
 import { StartSandboxProfileInstanceWorkflowSpec } from "@mistle/workflows/control-plane";
 
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
-
-import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "./errors.js";
 
 const START_SANDBOX_PROFILE_INSTANCE_WAIT_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -17,6 +16,7 @@ type StartProfileInstanceInput = {
     id: string;
   };
   source: SandboxInstanceSource;
+  image: StartSandboxProfileInstanceWorkflowInput["image"];
 };
 
 type StartProfileInstanceOutput = {
@@ -40,58 +40,9 @@ function createIdempotencyKey(input: StartProfileInstanceInput): string {
 }
 
 export async function startProfileInstance(
-  {
-    db,
-    openWorkflow,
-    resolveSandboxProfileVersionImage,
-  }: Pick<
-    CreateSandboxProfilesServiceInput,
-    "db" | "openWorkflow" | "resolveSandboxProfileVersionImage"
-  >,
+  { openWorkflow }: Pick<CreateSandboxProfilesServiceInput, "openWorkflow">,
   serviceInput: StartProfileInstanceInput,
 ): Promise<StartProfileInstanceOutput> {
-  const sandboxProfile = await db.query.sandboxProfiles.findFirst({
-    columns: {
-      id: true,
-    },
-    where: (table, { and, eq }) =>
-      and(
-        eq(table.id, serviceInput.profileId),
-        eq(table.organizationId, serviceInput.organizationId),
-      ),
-  });
-
-  if (sandboxProfile === undefined) {
-    throw new SandboxProfilesNotFoundError(
-      SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
-      "Sandbox profile was not found.",
-    );
-  }
-
-  const sandboxProfileVersion = await db.query.sandboxProfileVersions.findFirst({
-    columns: {
-      manifest: true,
-    },
-    where: (table, { and, eq }) =>
-      and(
-        eq(table.sandboxProfileId, serviceInput.profileId),
-        eq(table.version, serviceInput.profileVersion),
-      ),
-  });
-  if (sandboxProfileVersion === undefined) {
-    throw new SandboxProfilesNotFoundError(
-      SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
-      "Sandbox profile version was not found.",
-    );
-  }
-
-  const resolvedImage = await resolveSandboxProfileVersionImage({
-    organizationId: serviceInput.organizationId,
-    profileId: serviceInput.profileId,
-    profileVersion: serviceInput.profileVersion,
-    manifest: sandboxProfileVersion.manifest,
-  });
-
   const workflowRunHandle = await openWorkflow.runWorkflow(
     StartSandboxProfileInstanceWorkflowSpec,
     {
@@ -100,7 +51,7 @@ export async function startProfileInstance(
       sandboxProfileVersion: serviceInput.profileVersion,
       startedBy: serviceInput.startedBy,
       source: serviceInput.source,
-      image: resolvedImage,
+      image: serviceInput.image,
     },
     {
       idempotencyKey: createIdempotencyKey(serviceInput),

@@ -1,4 +1,5 @@
 import { OpenAPIHono, z } from "@hono/zod-openapi";
+import { StartSandboxInstanceInputSchema } from "@mistle/data-plane-trpc/contracts";
 import { SandboxInstanceSources, SandboxInstanceStarterKinds } from "@mistle/db/data-plane";
 
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
@@ -125,6 +126,12 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
       if (session === null) {
         throw new Error("Expected authenticated session to be available.");
       }
+      const resolvedImage = await resolveSandboxProfileVersionImage({
+        db: ctx.get("db"),
+        organizationId: session.session.activeOrganizationId,
+        profileId: params.profileId,
+        profileVersion: params.version,
+      });
 
       const startedSandboxInstance = await ctx
         .get("services")
@@ -137,6 +144,7 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
             id: session.user.id,
           },
           source: SandboxInstanceSources.DASHBOARD,
+          image: resolvedImage,
         });
 
       return ctx.json(startedSandboxInstance, 201);
@@ -149,6 +157,59 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
     basePath: SANDBOX_PROFILES_ROUTE_BASE_PATH,
     routes,
   };
+}
+
+async function resolveSandboxProfileVersionImage(input: {
+  db: AppContext["var"]["db"];
+  organizationId: string;
+  profileId: string;
+  profileVersion: number;
+}): Promise<ReturnType<typeof StartSandboxInstanceInputSchema.shape.image.parse>> {
+  const sandboxProfile = await input.db.query.sandboxProfiles.findFirst({
+    columns: {
+      id: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.id, input.profileId), eq(table.organizationId, input.organizationId)),
+  });
+
+  if (sandboxProfile === undefined) {
+    throw new SandboxProfilesNotFoundError(
+      SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
+      "Sandbox profile was not found.",
+    );
+  }
+
+  const sandboxProfileVersion = await input.db.query.sandboxProfileVersions.findFirst({
+    columns: {
+      manifest: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
+  });
+
+  if (sandboxProfileVersion === undefined) {
+    throw new SandboxProfilesNotFoundError(
+      SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
+      "Sandbox profile version was not found.",
+    );
+  }
+
+  const parsedManifest = StartSandboxInstanceInputSchema.shape.manifest.safeParse(
+    sandboxProfileVersion.manifest,
+  );
+  if (!parsedManifest.success) {
+    throw new Error("Sandbox profile version manifest is invalid.");
+  }
+
+  const parsedImage = StartSandboxInstanceInputSchema.shape.image.safeParse(
+    parsedManifest.data.image,
+  );
+  if (!parsedImage.success) {
+    throw new Error("Sandbox profile version image is invalid.");
+  }
+
+  return parsedImage.data;
 }
 
 function handleListProfilesError(ctx: AppContext, error: unknown) {
