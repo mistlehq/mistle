@@ -1,4 +1,3 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, Spinner } from "@mistle/ui";
 import { useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Navigate, useLocation } from "react-router";
@@ -98,27 +97,6 @@ export function AuthScreen(): React.JSX.Element {
     setAuthError(nextState.authError);
     setOtp(nextState.otp);
     setAuthStep(nextState.authStep);
-  }
-
-  if (sessionQuery.isPending) {
-    return (
-      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Mistle dashboard</CardTitle>
-              <CardDescription>Preparing your session.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-muted-foreground gap-2 flex items-center">
-                <Spinner />
-                Loading session...
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    );
   }
 
   if (isSignedIn) {
