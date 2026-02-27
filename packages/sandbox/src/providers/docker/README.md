@@ -28,6 +28,7 @@ const adapter = createSandboxAdapter({
 ## Provider Behavior
 
 - `start({ image })` pulls image reference and starts a Docker container.
+- returned `SandboxHandle` supports `writeStdin({ payload })` and `closeStdin()` for container stdin lifecycle.
 - `snapshot({ sandboxId })` commits container filesystem, pushes to `snapshotRepository`, and returns immutable digest reference.
 - `stop({ sandboxId })` force-removes the Docker container.
 
@@ -36,5 +37,5 @@ const adapter = createSandboxAdapter({
 Docker API errors are mapped to `DockerClientError` with:
 
 - `code`: `not_found`, `conflict`, `invalid_argument`, `unauthenticated`, `unknown`
-- `operation`: identifies failing operation (`pull_image`, `create_container`, `push_image`, etc.)
+- `operation`: identifies failing operation (`pull_image`, `create_container`, `attach_stdin`, `write_stdin`, `close_stdin`, etc.)
 - `retryable`: retry hint for caller policy

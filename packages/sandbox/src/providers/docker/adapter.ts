@@ -23,11 +23,25 @@ export class DockerSandboxAdapter implements SandboxAdapter {
       throw new SandboxConfigurationError("Docker adapter received a non-Docker image handle.");
     }
 
-    const response = await this.#client.startSandbox({ imageRef: request.image.imageId });
+    const response = await this.#client.startSandbox({
+      imageRef: request.image.imageId,
+    });
+    const sandboxId = response.sandboxId;
 
     return {
       provider: SandboxProvider.DOCKER,
-      sandboxId: response.sandboxId,
+      sandboxId,
+      writeStdin: async (input) => {
+        await this.#client.writeSandboxStdin({
+          sandboxId,
+          payload: input.payload,
+        });
+      },
+      closeStdin: async () => {
+        await this.#client.closeSandboxStdin({
+          sandboxId,
+        });
+      },
     };
   }
 

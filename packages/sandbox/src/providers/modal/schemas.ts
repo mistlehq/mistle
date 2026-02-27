@@ -32,6 +32,27 @@ export const ModalStartSandboxRequestSchema = z
   .strict();
 export type ModalStartSandboxRequest = z.output<typeof ModalStartSandboxRequestSchema>;
 
+export const ModalWriteSandboxStdinRequestSchema = z
+  .object({
+    sandboxId: z.string().trim().min(1, {
+      message: "Modal request field `sandboxId` is required.",
+    }),
+    payload: z.custom<Uint8Array<ArrayBufferLike>>((value) => value instanceof Uint8Array, {
+      message: "Modal request field `payload` must be a Uint8Array.",
+    }),
+  })
+  .strict();
+export type ModalWriteSandboxStdinRequest = z.output<typeof ModalWriteSandboxStdinRequestSchema>;
+
+export const ModalCloseSandboxStdinRequestSchema = z
+  .object({
+    sandboxId: z.string().trim().min(1, {
+      message: "Modal request field `sandboxId` is required.",
+    }),
+  })
+  .strict();
+export type ModalCloseSandboxStdinRequest = z.output<typeof ModalCloseSandboxStdinRequestSchema>;
+
 export const ModalSnapshotSandboxRequestSchema = z
   .object({
     sandboxId: z.string().trim().min(1, {

@@ -10,13 +10,17 @@ import {
   type DockerClientOperation,
 } from "./client-errors.js";
 import {
+  DockerCloseSandboxStdinRequestSchema,
   DockerSnapshotSandboxRequestSchema,
   DockerStartSandboxRequestSchema,
   DockerStopSandboxRequestSchema,
+  DockerWriteSandboxStdinRequestSchema,
+  type DockerCloseSandboxStdinRequest,
   type DockerSandboxConfig,
   type DockerSnapshotSandboxRequest,
   type DockerStartSandboxRequest,
   type DockerStopSandboxRequest,
+  type DockerWriteSandboxStdinRequest,
 } from "./schemas.js";
 
 export type DockerStartSandboxResponse = {
@@ -30,6 +34,8 @@ export type DockerSnapshotSandboxResponse = {
 
 export interface DockerClient {
   startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse>;
+  writeSandboxStdin(request: DockerWriteSandboxStdinRequest): Promise<void>;
+  closeSandboxStdin(request: DockerCloseSandboxStdinRequest): Promise<void>;
   snapshotSandbox(request: DockerSnapshotSandboxRequest): Promise<DockerSnapshotSandboxResponse>;
   stopSandbox(request: DockerStopSandboxRequest): Promise<void>;
 }
@@ -123,6 +129,7 @@ function resolveRepositoryDigest(
 export class DockerApiClient implements DockerClient {
   readonly #config: DockerSandboxConfig;
   readonly #docker: Docker;
+  readonly #attachedStdinStreams = new Map<string, NodeJS.ReadWriteStream>();
 
   constructor(config: DockerSandboxConfig) {
     this.#config = config;
@@ -136,16 +143,33 @@ export class DockerApiClient implements DockerClient {
 
     await this.#pullImage(parsedRequest.imageRef);
 
+    const createContainerOptions: Docker.ContainerCreateOptions = {
+      Image: parsedRequest.imageRef,
+      OpenStdin: true,
+      AttachStdin: true,
+      AttachStdout: true,
+      AttachStderr: true,
+      Labels: {
+        "mistle.sandbox.provider": "docker",
+      },
+    };
+
     const container = await this.#runDockerClientOperation(
       DockerClientOperationIds.CREATE_CONTAINER,
+      () => this.#docker.createContainer(createContainerOptions),
+    );
+    const attachedStdinStream = await this.#runDockerClientOperation(
+      DockerClientOperationIds.ATTACH_STDIN,
       () =>
-        this.#docker.createContainer({
-          Image: parsedRequest.imageRef,
-          Labels: {
-            "mistle.sandbox.provider": "docker",
-          },
+        container.attach({
+          hijack: true,
+          stdin: true,
+          stream: true,
+          stdout: true,
+          stderr: true,
         }),
     );
+    this.#trackAttachedStdinStream(container.id, attachedStdinStream);
 
     await this.#runDockerClientOperation(DockerClientOperationIds.START_CONTAINER, () =>
       container.start(),
@@ -154,6 +178,29 @@ export class DockerApiClient implements DockerClient {
     return {
       sandboxId: container.id,
     };
+  }
+
+  async writeSandboxStdin(request: DockerWriteSandboxStdinRequest): Promise<void> {
+    const parsedRequest = DockerWriteSandboxStdinRequestSchema.parse(request);
+
+    await this.#runDockerClientOperation(DockerClientOperationIds.WRITE_STDIN, async () => {
+      const attachedStdinStream = await this.#getOrCreateAttachedStdinStream(
+        parsedRequest.sandboxId,
+      );
+      await this.#writeAttachedStdinStream(attachedStdinStream, parsedRequest.payload);
+    });
+  }
+
+  async closeSandboxStdin(request: DockerCloseSandboxStdinRequest): Promise<void> {
+    const parsedRequest = DockerCloseSandboxStdinRequestSchema.parse(request);
+
+    await this.#runDockerClientOperation(DockerClientOperationIds.CLOSE_STDIN, async () => {
+      const attachedStdinStream = await this.#getOrCreateAttachedStdinStream(
+        parsedRequest.sandboxId,
+      );
+      await this.#closeAttachedStdinStream(attachedStdinStream);
+      this.#attachedStdinStreams.delete(parsedRequest.sandboxId);
+    });
   }
 
   async snapshotSandbox(
@@ -210,6 +257,7 @@ export class DockerApiClient implements DockerClient {
 
   async stopSandbox(request: DockerStopSandboxRequest): Promise<void> {
     const parsedRequest = DockerStopSandboxRequestSchema.parse(request);
+    this.#releaseTrackedStdinStream(parsedRequest.sandboxId);
     const container = await this.#resolveContainer(parsedRequest.sandboxId);
 
     await this.#runDockerClientOperation(DockerClientOperationIds.REMOVE_CONTAINER, () =>
@@ -245,6 +293,85 @@ export class DockerApiClient implements DockerClient {
     );
 
     return this.#consumeProgressStream(DockerClientOperationIds.PUSH_IMAGE, pushStream);
+  }
+
+  async #getOrCreateAttachedStdinStream(sandboxId: string): Promise<NodeJS.ReadWriteStream> {
+    const existingAttachedStdinStream = this.#attachedStdinStreams.get(sandboxId);
+    if (existingAttachedStdinStream !== undefined) {
+      return existingAttachedStdinStream;
+    }
+
+    const container = this.#docker.getContainer(sandboxId);
+    const attachedStdinStream = await this.#runDockerClientOperation(
+      DockerClientOperationIds.ATTACH_STDIN,
+      () =>
+        container.attach({
+          hijack: true,
+          stdin: true,
+          stream: true,
+          logs: false,
+          stdout: true,
+          stderr: true,
+        }),
+    );
+    this.#trackAttachedStdinStream(sandboxId, attachedStdinStream);
+
+    return attachedStdinStream;
+  }
+
+  #trackAttachedStdinStream(sandboxId: string, attachedStdinStream: NodeJS.ReadWriteStream): void {
+    attachedStdinStream.on("data", () => {
+      // Drain attached stdout/stderr bytes so stream backpressure cannot block stdin writes.
+    });
+
+    const clearAttachedStdinStream = () => {
+      if (this.#attachedStdinStreams.get(sandboxId) === attachedStdinStream) {
+        this.#attachedStdinStreams.delete(sandboxId);
+      }
+    };
+    attachedStdinStream.once("close", clearAttachedStdinStream);
+    attachedStdinStream.once("error", clearAttachedStdinStream);
+
+    this.#attachedStdinStreams.set(sandboxId, attachedStdinStream);
+  }
+
+  async #writeAttachedStdinStream(
+    attachedStdinStream: NodeJS.ReadWriteStream,
+    payload: Uint8Array<ArrayBufferLike>,
+  ): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      attachedStdinStream.write(Buffer.from(payload), (error?: Error | null) => {
+        if (error !== undefined && error !== null) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+
+  async #closeAttachedStdinStream(attachedStdinStream: NodeJS.ReadWriteStream): Promise<void> {
+    await new Promise<void>((resolve, reject) => {
+      attachedStdinStream.end((error?: Error | null) => {
+        if (error !== undefined && error !== null) {
+          reject(error);
+          return;
+        }
+
+        resolve();
+      });
+    });
+  }
+
+  #releaseTrackedStdinStream(sandboxId: string): void {
+    const trackedAttachedStdinStream = this.#attachedStdinStreams.get(sandboxId);
+    if (trackedAttachedStdinStream === undefined) {
+      return;
+    }
+
+    this.#attachedStdinStreams.delete(sandboxId);
+    trackedAttachedStdinStream.end();
   }
 
   async #consumeProgressStream(

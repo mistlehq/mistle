@@ -12,39 +12,53 @@ export const ModalClientOperationIds = {
   /**
    * `apps.fromName(...)`
    * Source:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/app.ts#L28-L49
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/app.ts#L28-L49
    */
   RESOLVE_APP: "resolve_app",
   /**
    * `images.fromId(...)`
    * Source:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/image.ts#L36-L50
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/image.ts#L36-L50
    */
   RESOLVE_IMAGE: "resolve_image",
   /**
    * `sandboxes.create(...)`
    * Source:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/sandbox.ts#L433-L449
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L433-L449
    */
   START_SANDBOX: "start_sandbox",
   /**
    * `sandboxes.fromId(...)`
    * Source:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/sandbox.ts#L455-L468
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L455-L468
    */
   RESOLVE_SANDBOX: "resolve_sandbox",
   /**
    * `sandbox.snapshotFilesystem(...)`
    * Source:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/sandbox.ts#L1126-L1140
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L1126-L1140
    */
   SNAPSHOT_SANDBOX: "snapshot_sandbox",
   /**
    * `sandbox.terminate(...)`
    * Source:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/sandbox.ts#L1033-L1045
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L1033-L1045
    */
   STOP_SANDBOX: "stop_sandbox",
+  /**
+   * `sandbox.stdin.writeBytes(...)` via `Sandbox.stdin` stream.
+   * Sources:
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L747-L753
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L1390-L1398
+   */
+  WRITE_STDIN: "write_stdin",
+  /**
+   * `WritableStreamDefaultWriter.close()` on `sandbox.stdin`.
+   * Sources:
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L747-L753
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L1398-L1404
+   */
+  CLOSE_STDIN: "close_stdin",
 } as const;
 export type ModalClientOperation =
   (typeof ModalClientOperationIds)[keyof typeof ModalClientOperationIds];
@@ -53,35 +67,35 @@ export const ModalClientErrorCodes = {
   /**
    * Backed by modal-js `NotFoundError` and gRPC `NOT_FOUND`.
    * Sources:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/errors.ts#L25-L30
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/app.ts#L46-L48
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/image.ts#L41-L42
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/sandbox.ts#L462-L463
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/errors.ts#L25-L30
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/app.ts#L46-L48
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/image.ts#L41-L42
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L462-L463
    */
   NOT_FOUND: "not_found",
   /**
    * Backed by modal-js `AlreadyExistsError` and gRPC `ALREADY_EXISTS`.
    * Sources:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/errors.ts#L33-L38
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/sandbox.ts#L437-L439
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/errors.ts#L33-L38
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L437-L439
    */
   ALREADY_EXISTS: "already_exists",
   /**
    * Backed by modal-js `InvalidError`.
    * Source:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/errors.ts#L41-L46
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/errors.ts#L41-L46
    */
   INVALID_ARGUMENT: "invalid_argument",
   /**
    * Backed by observed gRPC `UNAUTHENTICATED` status usage in modal-js middleware.
    * Source:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/task_command_router_client.ts#L461-L463
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/task_command_router_client.ts#L461-L463
    */
   UNAUTHENTICATED: "unauthenticated",
   /**
    * Backed by modal-js `SandboxTimeoutError`.
    * Source:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/errors.ts#L73-L79
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/errors.ts#L73-L79
    */
   TIMEOUT: "timeout",
   /**
@@ -118,27 +132,27 @@ const GrpcStatusCodes = {
   /**
    * gRPC NOT_FOUND (5), surfaced in modal-js for app/image/sandbox lookups.
    * Sources:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/app.ts#L46-L47
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/image.ts#L41-L42
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/sandbox.ts#L462-L463
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/app.ts#L46-L47
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/image.ts#L41-L42
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L462-L463
    */
   NOT_FOUND: 5,
   /**
    * gRPC ALREADY_EXISTS (6), surfaced in modal-js sandbox creation conflicts.
    * Source:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/sandbox.ts#L437-L438
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L437-L438
    */
   ALREADY_EXISTS: 6,
   /**
    * gRPC FAILED_PRECONDITION (9), used by modal-js image lookup fallback handling.
    * Source:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/image.ts#L44-L47
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/image.ts#L44-L47
    */
   FAILED_PRECONDITION: 9,
   /**
    * gRPC UNAUTHENTICATED (16), observed in modal-js auth refresh/retry handling.
    * Source:
-   * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/task_command_router_client.ts#L461-L463
+   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/task_command_router_client.ts#L461-L463
    */
   UNAUTHENTICATED: 16,
 } as const;
@@ -202,7 +216,7 @@ function createMappedError(
 /**
  * modal-js treats FAILED_PRECONDITION with this message pattern as image-not-found.
  * Reference:
- * https://github.com/modal-labs/libmodal/blob/3bb22b71e53bd530e88c25ef01136cd04306589b/modal-js/src/image.ts#L44-L48
+ * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/image.ts#L44-L48
  */
 function isImageNotFoundPreconditionMessage(message: string): boolean {
   return message.includes("Could not find image with ID");

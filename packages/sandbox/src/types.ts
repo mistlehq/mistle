@@ -20,6 +20,8 @@ export interface SandboxImageHandle {
 export interface SandboxHandle {
   readonly provider: SandboxProvider;
   readonly sandboxId: string;
+  writeStdin(input: { payload: Uint8Array<ArrayBufferLike> }): Promise<void>;
+  closeStdin(): Promise<void>;
 }
 
 export interface SandboxStartRequest {

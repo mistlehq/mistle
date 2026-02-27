@@ -72,6 +72,10 @@ const baseImage: SandboxImageHandle = {
 };
 
 const sandbox = await adapter.start({ image: baseImage });
+await sandbox.writeStdin({
+  payload: Buffer.from("bootstrap payload\n", "utf8"),
+});
+await sandbox.closeStdin();
 
 const snapshot = await adapter.snapshot({ sandboxId: sandbox.sandboxId });
 
@@ -82,6 +86,8 @@ await adapter.stop({ sandboxId: sandbox.sandboxId });
 
 - Start and restore use the same semantic path: both are `start({ image })`.
 - `image.kind` can be `base` or `snapshot`; provider implementations decide how they interpret it.
+- `SandboxHandle.writeStdin({ payload })` writes bytes to running sandbox stdin.
+- `SandboxHandle.closeStdin()` closes stdin to signal EOF.
 - Operations may throw `SandboxError` subclasses. Configuration failures throw `SandboxConfigurationError`.
 
 ## Responsibility Boundary
