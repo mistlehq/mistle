@@ -11,7 +11,7 @@ const loadedConfig = loadConfig({
 const appConfig = loadedConfig.app;
 const runtime = createDataPlaneGatewayRuntime(appConfig);
 
-runtime.start();
+await runtime.start();
 
 let shutdownPromise: Promise<void> | undefined;
 

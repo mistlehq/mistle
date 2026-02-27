@@ -12,7 +12,7 @@ async function startDataPlaneApi(): Promise<void> {
   const appConfig = loadedConfig.app;
   const runtime = await createDataPlaneApiRuntime(appConfig);
 
-  runtime.start();
+  await runtime.start();
 
   let shutdownPromise: Promise<void> | undefined;
 

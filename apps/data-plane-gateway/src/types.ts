@@ -34,6 +34,6 @@ export type StartedServer = {
 export type DataPlaneGatewayRuntime = {
   app: DataPlaneGatewayApp;
   request: (path: string, init?: RequestInit) => Promise<Response>;
-  start: () => void;
+  start: () => Promise<void>;
   stop: () => Promise<void>;
 };

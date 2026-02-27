@@ -26,7 +26,7 @@ export async function createControlPlaneApiRuntime(
     app,
     db,
     request: async (path, init) => app.request(path, init),
-    start: () => {
+    start: async () => {
       if (stopped) {
         throw new Error("Control plane API runtime is already stopped.");
       }

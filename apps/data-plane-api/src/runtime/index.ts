@@ -24,7 +24,7 @@ export async function createDataPlaneApiRuntime(
   return {
     app,
     request: async (path, init) => app.request(path, init),
-    start: () => {
+    start: async () => {
       if (stopped) {
         throw new Error("Data plane API runtime is already stopped.");
       }
