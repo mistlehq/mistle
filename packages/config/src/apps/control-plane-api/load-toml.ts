@@ -13,6 +13,7 @@ export function loadControlPlaneApiFromToml(
   const database = asObjectRecord(controlPlaneApi.database);
   const auth = asObjectRecord(controlPlaneApi.auth);
   const workflow = asObjectRecord(controlPlaneApi.workflow);
+  const sandbox = asObjectRecord(controlPlaneApi.sandbox);
 
   return PartialControlPlaneApiConfigSchema.parse({
     server: {
@@ -34,6 +35,9 @@ export function loadControlPlaneApiFromToml(
     workflow: {
       databaseUrl: workflow.database_url,
       namespaceId: workflow.namespace_id,
+    },
+    sandbox: {
+      defaultBaseImage: sandbox.default_base_image,
     },
   });
 }

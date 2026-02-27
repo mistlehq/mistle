@@ -3,6 +3,7 @@ import {
   type PartialControlPlaneApiConfigInput,
   ControlPlaneApiAuthConfigSchema,
   ControlPlaneApiDatabaseConfigSchema,
+  ControlPlaneApiSandboxConfigSchema,
   ControlPlaneApiServerConfigSchema,
   ControlPlaneApiWorkflowConfigSchema,
   PartialControlPlaneApiConfigSchema,
@@ -77,6 +78,13 @@ const loadWorkflowEnv = createEnvLoader<typeof ControlPlaneApiWorkflowConfigSche
   },
 ]);
 
+const loadSandboxEnv = createEnvLoader<typeof ControlPlaneApiSandboxConfigSchema>([
+  {
+    key: "defaultBaseImage",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE",
+  },
+]);
+
 export function loadControlPlaneApiFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialControlPlaneApiConfigInput {
@@ -100,6 +108,11 @@ export function loadControlPlaneApiFromEnv(
   const workflow = loadWorkflowEnv(env);
   if (hasEntries(workflow)) {
     partialConfig.workflow = workflow;
+  }
+
+  const sandbox = loadSandboxEnv(env);
+  if (hasEntries(sandbox)) {
+    partialConfig.sandbox = sandbox;
   }
 
   return PartialControlPlaneApiConfigSchema.parse(partialConfig);

@@ -16,6 +16,8 @@ describe("convertEnvToTomlRecord", () => {
       NODE_ENV: "test",
       MISTLE_APPS_CONTROL_PLANE_API_HOST: "127.0.0.1",
       MISTLE_APPS_CONTROL_PLANE_API_PORT: "5000",
+      MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE:
+        "127.0.0.1:5001/mistle/sandbox-base:dev",
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "http://a.local,http://b.local",
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_LENGTH: "6",
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "true",
@@ -32,6 +34,9 @@ describe("convertEnvToTomlRecord", () => {
           server: {
             host: "127.0.0.1",
             port: 5000,
+          },
+          sandbox: {
+            default_base_image: "127.0.0.1:5001/mistle/sandbox-base:dev",
           },
           auth: {
             trusted_origins: ["http://a.local", "http://b.local"],
@@ -60,6 +65,9 @@ describe("convertTomlToEnvRecord", () => {
       },
       apps: {
         control_plane_api: {
+          sandbox: {
+            default_base_image: "registry.example.com/mistle/sandbox-base:prod",
+          },
           auth: {
             trusted_origins: ["https://a.example", "https://b.example"],
           },
@@ -78,6 +86,8 @@ describe("convertTomlToEnvRecord", () => {
 
     expect(envRecord).toEqual({
       NODE_ENV: "production",
+      MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE:
+        "registry.example.com/mistle/sandbox-base:prod",
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "https://a.example,https://b.example",
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "2",

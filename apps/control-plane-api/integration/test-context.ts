@@ -150,6 +150,9 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
             databaseUrl: databaseStack.pooledUrl,
             namespaceId: workflowNamespaceId,
           },
+          sandbox: {
+            defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          },
           auth: {
             baseUrl: "http://localhost:3000",
             invitationAcceptBaseUrl: "http://localhost:5173/invitations/accept",
