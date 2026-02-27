@@ -58,6 +58,7 @@ function createWorkflowInputs(ctx: {
 
 export function createRuntimeWorker(ctx: {
   config: ControlPlaneWorkerConfig;
+  internalAuthServiceToken: string;
   resources: Pick<WorkerRuntimeResources, "db" | "openWorkflow">;
 }): ReturnType<typeof createControlPlaneWorker> {
   const emailSender = createEmailSender(ctx.config);

@@ -8,6 +8,13 @@ type LoadControlPlaneWorkerConfigResult = ReturnType<
 >;
 
 export type ControlPlaneWorkerConfig = LoadControlPlaneWorkerConfigResult["app"];
+export type ControlPlaneWorkerGlobalConfig = NonNullable<
+  LoadControlPlaneWorkerConfigResult["global"]
+>;
+export type ControlPlaneWorkerRuntimeConfig = {
+  app: ControlPlaneWorkerConfig;
+  internalAuthServiceToken: ControlPlaneWorkerGlobalConfig["internalAuth"]["serviceToken"];
+};
 
 export type AppContextBindings = {
   Variables: AppContextVariables;
@@ -15,6 +22,7 @@ export type AppContextBindings = {
 
 export type AppContextVariables = {
   config: ControlPlaneWorkerConfig;
+  internalAuthServiceToken: string;
 };
 
 export type AppContext = Context<AppContextBindings>;

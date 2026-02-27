@@ -6,6 +6,11 @@ import { AppIds, type loadConfig } from "@mistle/config";
 type LoadDataPlaneApiConfigResult = ReturnType<typeof loadConfig<typeof AppIds.DATA_PLANE_API>>;
 
 export type DataPlaneApiConfig = LoadDataPlaneApiConfigResult["app"];
+export type DataPlaneApiGlobalConfig = NonNullable<LoadDataPlaneApiConfigResult["global"]>;
+export type DataPlaneApiRuntimeConfig = {
+  app: DataPlaneApiConfig;
+  internalAuthServiceToken: DataPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
+};
 
 export type AppContextBindings = {
   Variables: AppContextVariables;
@@ -13,6 +18,7 @@ export type AppContextBindings = {
 
 export type AppContextVariables = {
   config: DataPlaneApiConfig;
+  internalAuthServiceToken: string;
 };
 
 export type AppContext = Context<AppContextBindings>;

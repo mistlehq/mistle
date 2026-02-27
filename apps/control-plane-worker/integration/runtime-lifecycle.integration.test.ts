@@ -9,13 +9,14 @@ describe("runtime lifecycle integration", () => {
   it("enforces start/stop runtime lifecycle semantics", async ({ fixture }) => {
     const host = "127.0.0.1";
     const port = await reserveAvailablePort({ host });
-    const runtime = await createControlPlaneWorkerRuntime(
-      createRuntimeConfigWithPort({
+    const runtime = await createControlPlaneWorkerRuntime({
+      app: createRuntimeConfigWithPort({
         config: fixture.config,
         host,
         port,
       }),
-    );
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+    });
 
     try {
       await runtime.start();
@@ -41,13 +42,14 @@ describe("runtime lifecycle integration", () => {
   }) => {
     const host = "127.0.0.1";
     const port = await reserveAvailablePort({ host });
-    const runtime = await createControlPlaneWorkerRuntime(
-      createRuntimeConfigWithPort({
+    const runtime = await createControlPlaneWorkerRuntime({
+      app: createRuntimeConfigWithPort({
         config: fixture.config,
         host,
         port,
       }),
-    );
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+    });
     const healthURL = `http://${host}:${String(port)}/__healthz`;
 
     await runtime.start();

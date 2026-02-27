@@ -1,6 +1,6 @@
 import type {
-  ControlPlaneWorkerConfig,
   ControlPlaneWorkerRuntime,
+  ControlPlaneWorkerRuntimeConfig,
   StartedServer,
 } from "../types.js";
 
@@ -10,15 +10,16 @@ import { createWorkerRuntimeResources, stopWorkerRuntimeResources } from "./reso
 import { createRuntimeWorker } from "./worker.js";
 
 export async function createControlPlaneWorkerRuntime(
-  config: ControlPlaneWorkerConfig,
+  runtimeConfig: ControlPlaneWorkerRuntimeConfig,
 ): Promise<ControlPlaneWorkerRuntime> {
-  const app = createApp();
-  const resources = await createWorkerRuntimeResources(config);
+  const app = createApp(runtimeConfig);
+  const resources = await createWorkerRuntimeResources(runtimeConfig.app);
   let worker: ReturnType<typeof createRuntimeWorker>;
 
   try {
     worker = createRuntimeWorker({
-      config,
+      config: runtimeConfig.app,
+      internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
       resources,
     });
   } catch (error) {
@@ -58,8 +59,8 @@ export async function createControlPlaneWorkerRuntime(
 
       startedServer = startServer({
         app,
-        host: config.server.host,
-        port: config.server.port,
+        host: runtimeConfig.app.server.host,
+        port: runtimeConfig.app.server.port,
       });
 
       try {
