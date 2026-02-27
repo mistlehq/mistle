@@ -25,14 +25,14 @@ function createSandboxRuntimeAdapter(config: DataPlaneWorkerConfig): SandboxAdap
   });
 }
 
-function createWorkflowInputs(input: {
+function createWorkflowInputs(ctx: {
   resources: Pick<WorkerRuntimeResources, "db">;
   sandboxAdapter: SandboxAdapter;
 }): CreateDataPlaneWorkflowDefinitionsInput {
   return {
     startSandboxInstance: {
       startSandbox: async (workflowInput) => {
-        const startedSandbox = await input.sandboxAdapter.start({
+        const startedSandbox = await ctx.sandboxAdapter.start({
           image: workflowInput.image,
         });
 
@@ -42,12 +42,12 @@ function createWorkflowInputs(input: {
         };
       },
       stopSandbox: async (workflowInput) => {
-        await input.sandboxAdapter.stop({
+        await ctx.sandboxAdapter.stop({
           sandboxId: workflowInput.providerSandboxId,
         });
       },
       insertSandboxInstance: async (workflowInput) => {
-        const insertedRows = await input.resources.db
+        const insertedRows = await ctx.resources.db
           .insert(sandboxInstances)
           .values({
             organizationId: workflowInput.organizationId,
@@ -79,17 +79,17 @@ function createWorkflowInputs(input: {
   };
 }
 
-export function createRuntimeWorker(input: {
+export function createRuntimeWorker(ctx: {
   config: DataPlaneWorkerConfig;
   resources: Pick<WorkerRuntimeResources, "db" | "openWorkflow">;
 }): ReturnType<typeof createDataPlaneWorker> {
-  const sandboxAdapter = createSandboxRuntimeAdapter(input.config);
+  const sandboxAdapter = createSandboxRuntimeAdapter(ctx.config);
 
   return createDataPlaneWorker({
-    openWorkflow: input.resources.openWorkflow,
-    concurrency: input.config.workflow.concurrency,
+    openWorkflow: ctx.resources.openWorkflow,
+    concurrency: ctx.config.workflow.concurrency,
     workflowInputs: createWorkflowInputs({
-      resources: input.resources,
+      resources: ctx.resources,
       sandboxAdapter,
     }),
   });
