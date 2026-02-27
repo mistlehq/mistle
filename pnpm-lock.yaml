@@ -342,6 +342,15 @@ importers:
 
   packages/data-plane-trpc:
     dependencies:
+      '@mistle/db':
+        specifier: workspace:*
+        version: link:../db
+      '@mistle/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox
+      '@mistle/workflows':
+        specifier: workspace:*
+        version: link:../workflows
       '@trpc/client':
         specifier: ^11.10.0
         version: 11.10.0(@trpc/server@11.10.0(typescript@5.9.3))(typescript@5.9.3)

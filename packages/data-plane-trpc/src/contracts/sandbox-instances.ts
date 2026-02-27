@@ -1,21 +1,13 @@
+import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflows/data-plane";
+
+import { SandboxInstanceSources, SandboxInstanceStarterKinds } from "@mistle/db/data-plane";
+import { SandboxImageKind, SandboxProvider } from "@mistle/sandbox";
 import { z } from "zod";
 
-export const DataPlaneSandboxProviders = {
-  MODAL: "modal",
-} as const;
-
-export const DataPlaneSandboxImageKinds = {
-  BASE: "base",
-  SNAPSHOT: "snapshot",
-} as const;
-
-export const DataPlaneSandboxInstanceStarterKinds = {
-  USER: "user",
-} as const;
-
-export const DataPlaneSandboxInstanceSources = {
-  DASHBOARD: "dashboard",
-} as const;
+export const DataPlaneSandboxProviders = SandboxProvider;
+export const DataPlaneSandboxImageKinds = SandboxImageKind;
+export const DataPlaneSandboxInstanceStarterKinds = SandboxInstanceStarterKinds;
+export const DataPlaneSandboxInstanceSources = SandboxInstanceSources;
 
 export const StartSandboxInstanceImageSchema = z
   .object({
@@ -54,3 +46,13 @@ export type StartSandboxInstanceInput = z.infer<typeof StartSandboxInstanceInput
 export type StartSandboxInstanceAcceptedResponse = z.infer<
   typeof StartSandboxInstanceAcceptedResponseSchema
 >;
+
+type ContractMatchesWorkflowInput =
+  StartSandboxInstanceInput extends StartSandboxInstanceWorkflowInput
+    ? StartSandboxInstanceWorkflowInput extends StartSandboxInstanceInput
+      ? true
+      : never
+    : never;
+
+const contractMatchesWorkflowInput: ContractMatchesWorkflowInput = true;
+void contractMatchesWorkflowInput;

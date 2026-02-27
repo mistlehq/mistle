@@ -49,6 +49,9 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@mistle/db": "workspace:*",
+    "@mistle/sandbox": "workspace:*",
+    "@mistle/workflows": "workspace:*",
     "@trpc/client": "^11.10.0",
     "@trpc/server": "^11.10.0",
     "zod": "^4.3.6"
