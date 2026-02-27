@@ -19,6 +19,7 @@
     "@mistle/config": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/emails": "workspace:*",
+    "@mistle/logging": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.10.6",
