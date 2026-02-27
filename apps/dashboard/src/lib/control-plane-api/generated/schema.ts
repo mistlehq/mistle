@@ -3,7 +3,642 @@
  * Do not make direct changes to the file.
  */
 
-export type paths = Record<string, never>;
+export interface paths {
+  "/v1/organizations/{organizationId}/membership-capabilities": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          organizationId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Membership capabilities for the current actor in the organization. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data: {
+                /** @enum {string} */
+                actorRole: "owner" | "admin" | "member";
+                invite: {
+                  assignableRoles: ("owner" | "admin" | "member")[];
+                  canExecute: boolean;
+                };
+                memberRoleUpdate: {
+                  canExecute: boolean;
+                  roleTransitionMatrix: {
+                    admin?: ("owner" | "admin" | "member")[];
+                    member?: ("owner" | "admin" | "member")[];
+                    owner?: ("owner" | "admin" | "member")[];
+                  };
+                };
+                organizationId: string;
+              };
+              error: null;
+              /** @enum {boolean} */
+              ok: true;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Forbidden request. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "ACTIVE_ORGANIZATION_REQUIRED";
+                  message: string;
+                }
+              | {
+                  data: null;
+                  error: {
+                    /** @enum {string} */
+                    code: "FORBIDDEN" | "NOT_FOUND";
+                    message: string;
+                    retryable: boolean;
+                  };
+                  /** @enum {boolean} */
+                  ok: false;
+                };
+          };
+        };
+        /** @description Organization was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              data: null;
+              error: {
+                /** @enum {string} */
+                code: "FORBIDDEN" | "NOT_FOUND";
+                message: string;
+                retryable: boolean;
+              };
+              /** @enum {boolean} */
+              ok: false;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sandbox/profiles": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          after?: string;
+          before?: string;
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List sandbox profiles. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              items: {
+                createdAt: string;
+                displayName: string;
+                id: string;
+                organizationId: string;
+                /** @enum {string} */
+                status: "active" | "inactive";
+                updatedAt: string;
+              }[];
+              nextPage: {
+                after: string;
+                limit: number;
+              } | null;
+              previousPage: {
+                before: string;
+                limit: number;
+              } | null;
+              totalResults: number;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_LIST_PROFILES_INPUT" | "INVALID_PAGINATION_CURSOR";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            displayName: string;
+            /** @enum {string} */
+            status?: "active" | "inactive";
+          };
+        };
+      };
+      responses: {
+        /** @description Create a sandbox profile. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              createdAt: string;
+              displayName: string;
+              id: string;
+              organizationId: string;
+              /** @enum {string} */
+              status: "active" | "inactive";
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              error: {
+                message: string;
+                name: string;
+              } & {
+                [key: string]: unknown;
+              };
+              /** @enum {boolean} */
+              success: false;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sandbox/profiles/{profileId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get a sandbox profile. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              createdAt: string;
+              displayName: string;
+              id: string;
+              organizationId: string;
+              /** @enum {string} */
+              status: "active" | "inactive";
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              error: {
+                message: string;
+                name: string;
+              } & {
+                [key: string]: unknown;
+              };
+              /** @enum {boolean} */
+              success: false;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Accept deletion and enqueue asynchronous sandbox profile resource cleanup workflow. */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              profileId: string;
+              /** @enum {string} */
+              status: "accepted";
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              error: {
+                message: string;
+                name: string;
+              } & {
+                [key: string]: unknown;
+              };
+              /** @enum {boolean} */
+              success: false;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            displayName?: string;
+            /** @enum {string} */
+            status?: "active" | "inactive";
+          };
+        };
+      };
+      responses: {
+        /** @description Update a sandbox profile. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              createdAt: string;
+              displayName: string;
+              id: string;
+              organizationId: string;
+              /** @enum {string} */
+              status: "active" | "inactive";
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              error: {
+                message: string;
+                name: string;
+              } & {
+                [key: string]: unknown;
+              };
+              /** @enum {boolean} */
+              success: false;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+}
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: never;

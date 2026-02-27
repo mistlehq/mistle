@@ -1,17 +1,9 @@
-export type OrganizationRole = "owner" | "admin" | "member";
+import type { paths } from "../../../lib/control-plane-api/generated/schema.js";
 
-export type MembershipCapabilities = {
-  organizationId: string;
-  actorRole: OrganizationRole;
-  invite: {
-    canExecute: boolean;
-    assignableRoles: OrganizationRole[];
-  };
-  memberRoleUpdate: {
-    canExecute: boolean;
-    roleTransitionMatrix: Record<OrganizationRole, OrganizationRole[]>;
-  };
-};
+export type MembershipCapabilitiesResponse =
+  paths["/v1/organizations/{organizationId}/membership-capabilities"]["get"]["responses"][200]["content"]["application/json"];
+export type MembershipCapabilities = MembershipCapabilitiesResponse["data"];
+export type OrganizationRole = MembershipCapabilities["actorRole"];
 
 export type SettingsMember = {
   id: string;

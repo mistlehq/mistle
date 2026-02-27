@@ -1,38 +1,20 @@
-export type SandboxProfileStatus = "active" | "inactive";
+import type { paths } from "../../lib/control-plane-api/generated/schema.js";
 
-export type SandboxProfile = {
-  id: string;
-  organizationId: string;
-  displayName: string;
-  status: SandboxProfileStatus;
-  createdAt: string;
-  updatedAt: string;
-};
+type ListSandboxProfilesResponse =
+  paths["/v1/sandbox/profiles"]["get"]["responses"][200]["content"]["application/json"];
+type GetSandboxProfileResponse =
+  paths["/v1/sandbox/profiles/{profileId}"]["get"]["responses"][200]["content"]["application/json"];
+type CreateSandboxProfileRequest =
+  paths["/v1/sandbox/profiles"]["post"]["requestBody"]["content"]["application/json"];
+type UpdateSandboxProfileRequest =
+  paths["/v1/sandbox/profiles/{profileId}"]["patch"]["requestBody"]["content"]["application/json"];
 
-export type KeysetPageCursor = {
-  limit: number;
-  after: string;
-};
-
-export type KeysetPreviousPageCursor = {
-  limit: number;
-  before: string;
-};
-
-export type SandboxProfilesListResult = {
-  totalResults: number;
-  items: SandboxProfile[];
-  nextPage: KeysetPageCursor | null;
-  previousPage: KeysetPreviousPageCursor | null;
-};
-
-export type CreateSandboxProfileInput = {
-  displayName: string;
-  status?: SandboxProfileStatus;
-};
-
-export type UpdateSandboxProfileInput = {
+export type SandboxProfile = GetSandboxProfileResponse;
+export type SandboxProfileStatus = SandboxProfile["status"];
+export type SandboxProfilesListResult = ListSandboxProfilesResponse;
+export type KeysetPageCursor = NonNullable<SandboxProfilesListResult["nextPage"]>;
+export type KeysetPreviousPageCursor = NonNullable<SandboxProfilesListResult["previousPage"]>;
+export type CreateSandboxProfileInput = CreateSandboxProfileRequest;
+export type UpdateSandboxProfileInput = UpdateSandboxProfileRequest & {
   profileId: string;
-  displayName?: string;
-  status?: SandboxProfileStatus;
 };
