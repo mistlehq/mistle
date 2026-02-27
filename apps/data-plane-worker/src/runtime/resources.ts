@@ -30,14 +30,10 @@ function createSandboxRuntimeAdapter(config: DataPlaneWorkerConfig): SandboxAdap
     });
   }
 
-  if (config.sandbox.provider === SandboxProvider.DOCKER) {
-    return createSandboxAdapter({
-      provider: config.sandbox.provider,
-      docker: {
-        socketPath: config.sandbox.docker.socketPath,
-        snapshotRepository: config.sandbox.docker.snapshotRepository,
-      },
-    });
+  if (config.sandbox.provider === "docker") {
+    throw new Error(
+      "Sandbox provider docker is configured, but docker adapter support is not available in this build.",
+    );
   }
 
   return assertUnreachable(config.sandbox);
