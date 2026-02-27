@@ -72,6 +72,11 @@ export const ROUTE_HANDLES = {
     title: "Sessions",
     description: "",
   },
+  experimentalTerminal: {
+    breadcrumb: "Experimental terminal",
+    title: "Experimental terminal",
+    description: "",
+  },
   sandboxProfiles: {
     breadcrumb: "Sandbox Profiles",
     title: "Sandbox Profiles",
@@ -91,11 +96,12 @@ export const ROUTE_HANDLES = {
     breadcrumb: "Settings",
     breadcrumbClickable: false,
     title: "Settings",
-    description: "Manage account and organization settings.",
+    description: "Manage personal and organization settings.",
   },
-  settingsAccount: {
-    breadcrumb: "Account",
-    breadcrumbClickable: false,
+  settingsPersonal: {
+    breadcrumb: "Personal",
+    title: "Personal",
+    description: "",
   },
   settingsProfile: {
     breadcrumb: "Profile",
@@ -129,7 +135,7 @@ export const ROUTE_HANDLES = {
 } as const satisfies Record<string, AppRouteHandle>;
 
 export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
-  "settingsProfile",
+  "settingsPersonal",
   "settingsOrganizationGeneral",
   "settingsOrganizationMembers",
   "settingsOrganizationProviders",
@@ -139,7 +145,7 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
 export const SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT: {
   [Key in (typeof SETTINGS_PAGE_ROUTE_HANDLE_KEYS)[number]]: SettingsPageRouteHandle;
 } = {
-  settingsProfile: ROUTE_HANDLES.settingsProfile,
+  settingsPersonal: ROUTE_HANDLES.settingsPersonal,
   settingsOrganizationGeneral: ROUTE_HANDLES.settingsOrganizationGeneral,
   settingsOrganizationMembers: ROUTE_HANDLES.settingsOrganizationMembers,
   settingsOrganizationProviders: ROUTE_HANDLES.settingsOrganizationProviders,
