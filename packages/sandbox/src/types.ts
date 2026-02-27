@@ -1,5 +1,6 @@
 export const SandboxProvider = {
   MODAL: "modal",
+  DOCKER: "docker",
 } as const;
 export type SandboxProvider = (typeof SandboxProvider)[keyof typeof SandboxProvider];
 

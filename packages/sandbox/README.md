@@ -8,11 +8,15 @@ Current scope:
 - snapshot a running sandbox to a new image handle
 - stop a running sandbox
 
-A single provider is currently implemented: Modal.
+Currently implemented providers:
+
+- Docker
+- Modal
 
 Provider-specific documentation lives with each provider:
 
 - [`src/providers/modal/README.md`](./src/providers/modal/README.md)
+- [`src/providers/docker/README.md`](./src/providers/docker/README.md)
 
 Provider-scoped integration tests live under `integration/<provider>/` (for example `integration/modal/`).
 Integration test execution is gated at package level with `MISTLE_SANDBOX_INTEGRATION=1`, then narrowed by provider using `MISTLE_SANDBOX_INTEGRATION_PROVIDERS` (CSV). For example:
@@ -24,6 +28,8 @@ MISTLE_SANDBOX_INTEGRATION=1 MISTLE_SANDBOX_INTEGRATION_PROVIDERS=modal pnpm --f
 List of valid providers for MISTLE_SANDBOX_INTEGRATION_PROVIDERS:
 
 - `modal`
+  Unknown provider names fail fast during integration config parsing.
+- `docker` (integration coverage is added in a follow-up PR; include this name only when docker integration tests exist)
   Unknown provider names fail fast during integration config parsing.
 
 ## Public API
