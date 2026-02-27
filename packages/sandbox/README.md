@@ -25,12 +25,18 @@ Integration test execution is gated at package level with `MISTLE_SANDBOX_INTEGR
 MISTLE_SANDBOX_INTEGRATION=1 MISTLE_SANDBOX_INTEGRATION_PROVIDERS=modal pnpm --filter @mistle/sandbox test:integration
 ```
 
+Docker integration tests also require `MISTLE_SANDBOX_DOCKER_SOCKET_PATH` (for example `/var/run/docker.sock`):
+
+```bash
+MISTLE_SANDBOX_INTEGRATION=1 MISTLE_SANDBOX_INTEGRATION_PROVIDERS=docker MISTLE_SANDBOX_DOCKER_SOCKET_PATH=/var/run/docker.sock pnpm --filter @mistle/sandbox test:integration
+```
+
 List of valid providers for MISTLE_SANDBOX_INTEGRATION_PROVIDERS:
 
 - `modal`
-  Unknown provider names fail fast during integration config parsing.
-- `docker` (integration coverage is added in a follow-up PR; include this name only when docker integration tests exist)
-  Unknown provider names fail fast during integration config parsing.
+- `docker`
+
+Unknown provider names fail fast during integration config parsing.
 
 ## Public API
 
