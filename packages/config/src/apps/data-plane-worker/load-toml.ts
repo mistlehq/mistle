@@ -14,6 +14,7 @@ export function loadDataPlaneWorkerFromToml(
   const server = asObjectRecord(dataPlaneWorker.server);
   const database = asObjectRecord(dataPlaneWorker.database);
   const workflow = asObjectRecord(dataPlaneWorker.workflow);
+  const tunnel = asObjectRecord(dataPlaneWorker.tunnel);
   const sandbox = asObjectRecord(dataPlaneWorker.sandbox);
   const sandboxModal = asObjectRecord(sandbox.modal);
   const sandboxDocker = asObjectRecord(sandbox.docker);
@@ -67,6 +68,10 @@ export function loadDataPlaneWorkerFromToml(
       namespaceId: workflow.namespace_id,
       runMigrations: workflow.run_migrations,
       concurrency: workflow.concurrency,
+    },
+    tunnel: {
+      gatewayWsUrl: tunnel.gateway_ws_url,
+      bootstrapTokenTtlSeconds: tunnel.bootstrap_token_ttl_seconds,
     },
     sandbox: sandboxConfig,
   });

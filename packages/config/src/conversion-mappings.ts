@@ -19,6 +19,21 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN",
   },
   {
+    configPath: ["global", "tunnel", "bootstrapTokenSecret"],
+    tomlPath: ["global", "tunnel", "bootstrap_token_secret"],
+    envVar: "MISTLE_GLOBAL_TUNNEL_BOOTSTRAP_TOKEN_SECRET",
+  },
+  {
+    configPath: ["global", "tunnel", "tokenIssuer"],
+    tomlPath: ["global", "tunnel", "token_issuer"],
+    envVar: "MISTLE_GLOBAL_TUNNEL_TOKEN_ISSUER",
+  },
+  {
+    configPath: ["global", "tunnel", "tokenAudience"],
+    tomlPath: ["global", "tunnel", "token_audience"],
+    envVar: "MISTLE_GLOBAL_TUNNEL_TOKEN_AUDIENCE",
+  },
+  {
     configPath: ["apps", "control_plane_api", "server", "host"],
     tomlPath: ["apps", "control_plane_api", "server", "host"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_HOST",
@@ -223,6 +238,16 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     configPath: ["apps", "data_plane_worker", "workflow", "concurrency"],
     tomlPath: ["apps", "data_plane_worker", "workflow", "concurrency"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "tunnel", "gatewayWsUrl"],
+    tomlPath: ["apps", "data_plane_worker", "tunnel", "gateway_ws_url"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_GATEWAY_WS_URL",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "tunnel", "bootstrapTokenTtlSeconds"],
+    tomlPath: ["apps", "data_plane_worker", "tunnel", "bootstrap_token_ttl_seconds"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS",
   },
   {
     configPath: ["apps", "data_plane_worker", "sandbox", "provider"],

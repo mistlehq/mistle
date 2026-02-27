@@ -7,6 +7,7 @@ import {
   DataPlaneWorkerSandboxModalConfigSchema,
   DataPlaneWorkerSandboxProviders,
   DataPlaneWorkerServerConfigSchema,
+  DataPlaneWorkerTunnelConfigSchema,
   DataPlaneWorkerWorkflowConfigSchema,
   PartialDataPlaneWorkerConfigSchema,
 } from "./schema.js";
@@ -48,6 +49,18 @@ const loadWorkflowEnv = createEnvLoader<typeof DataPlaneWorkerWorkflowConfigSche
   {
     key: "concurrency",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY",
+    parse: Number,
+  },
+]);
+
+const loadTunnelEnv = createEnvLoader<typeof DataPlaneWorkerTunnelConfigSchema>([
+  {
+    key: "gatewayWsUrl",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_GATEWAY_WS_URL",
+  },
+  {
+    key: "bootstrapTokenTtlSeconds",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS",
     parse: Number,
   },
 ]);
@@ -107,6 +120,11 @@ export function loadDataPlaneWorkerFromEnv(
   const workflow = loadWorkflowEnv(env);
   if (hasEntries(workflow)) {
     partialConfig.workflow = workflow;
+  }
+
+  const tunnel = loadTunnelEnv(env);
+  if (hasEntries(tunnel)) {
+    partialConfig.tunnel = tunnel;
   }
 
   const sandbox = loadSandboxEnv(env);

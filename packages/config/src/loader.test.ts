@@ -11,6 +11,11 @@ describe("parseConfigRecord", () => {
         internalAuth: {
           serviceToken: "test-service-token",
         },
+        tunnel: {
+          bootstrapTokenSecret: "test-bootstrap-token-secret",
+          tokenIssuer: "data-plane-worker",
+          tokenAudience: "data-plane-gateway",
+        },
       },
       apps: {
         control_plane_api: {
@@ -88,6 +93,10 @@ describe("parseConfigRecord", () => {
             namespaceId: "development",
             runMigrations: true,
             concurrency: 1,
+          },
+          tunnel: {
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+            bootstrapTokenTtlSeconds: 120,
           },
           sandbox: {
             provider: "modal",
@@ -119,6 +128,11 @@ describe("parseConfigRecord", () => {
         internalAuth: {
           serviceToken: "test-service-token",
         },
+        tunnel: {
+          bootstrapTokenSecret: "test-bootstrap-token-secret",
+          tokenIssuer: "data-plane-worker",
+          tokenAudience: "data-plane-gateway",
+        },
       },
       apps: {
         control_plane_api: {
@@ -196,6 +210,10 @@ describe("parseConfigRecord", () => {
             namespaceId: "development",
             runMigrations: true,
             concurrency: 1,
+          },
+          tunnel: {
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+            bootstrapTokenTtlSeconds: 120,
           },
           sandbox: {
             provider: "docker",

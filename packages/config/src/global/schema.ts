@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+export const GlobalTunnelConfigSchema = z
+  .object({
+    bootstrapTokenSecret: z.string().trim().min(1),
+    tokenIssuer: z.string().trim().min(1),
+    tokenAudience: z.string().trim().min(1),
+  })
+  .strict();
+
 export const GlobalConfigSchema = z
   .object({
     env: z.enum(["development", "production"]),
@@ -8,6 +16,7 @@ export const GlobalConfigSchema = z
         serviceToken: z.string().trim().min(1),
       })
       .strict(),
+    tunnel: GlobalTunnelConfigSchema,
   })
   .strict();
 

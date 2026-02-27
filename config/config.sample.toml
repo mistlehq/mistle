@@ -7,6 +7,11 @@ env = "production"
 [global.internal_auth]
 service_token = "replace-with-internal-service-token"
 
+[global.tunnel]
+bootstrap_token_secret = "replace-with-bootstrap-token-secret"
+token_issuer = "data-plane-worker"
+token_audience = "data-plane-gateway"
+
 [apps.control_plane_api.server]
 host = "0.0.0.0"
 port = 8080
@@ -79,6 +84,10 @@ database_url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 namespace_id = "production"
 run_migrations = true
 concurrency = 4
+
+[apps.data_plane_worker.tunnel]
+gateway_ws_url = "wss://gateway.mistle.example/tunnel/sandbox"
+bootstrap_token_ttl_seconds = 120
 
 [apps.data_plane_worker.sandbox]
 provider = "modal"
