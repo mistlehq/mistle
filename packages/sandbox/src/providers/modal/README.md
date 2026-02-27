@@ -38,6 +38,7 @@ const adapter = createSandboxAdapter({
 ## Provider Behavior
 
 - `start({ image })` resolves Modal app and image, then creates a sandbox.
+- returned `SandboxHandle` supports `writeStdin({ payload })` and `closeStdin()` via Modal sandbox stdin stream APIs.
 - `snapshot({ sandboxId })` snapshots sandbox filesystem to a new image handle.
 - `stop({ sandboxId })` resolves sandbox and terminates it.
 

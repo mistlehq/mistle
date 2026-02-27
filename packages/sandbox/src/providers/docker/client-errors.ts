@@ -3,23 +3,98 @@ import { z } from "zod";
 import { SandboxError } from "../../errors.js";
 
 export const DockerClientOperationIds = {
+  /**
+   * `docker.pull(...)` delegates to `createImage(...)`.
+   * Sources:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/docker.js#L1480-L1492
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/docker.js#L44-L59
+   */
   PULL_IMAGE: "pull_image",
+  /**
+   * `docker.createContainer(...)`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/docker.js#L44-L79
+   */
   CREATE_CONTAINER: "create_container",
+  /**
+   * `container.start(...)`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L388-L420
+   */
   START_CONTAINER: "start_container",
+  /**
+   * `container.attach({ stdin: true, ... })`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L737-L770
+   */
+  ATTACH_STDIN: "attach_stdin",
+  WRITE_STDIN: "write_stdin",
+  CLOSE_STDIN: "close_stdin",
+  /**
+   * `container.inspect(...)`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L47-L76
+   */
   RESOLVE_CONTAINER: "resolve_container",
+  /**
+   * `container.commit(...)`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L544-L576
+   */
   COMMIT_CONTAINER: "commit_container",
+  /**
+   * `image.push(...)`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/image.js#L163-L200
+   */
   PUSH_IMAGE: "push_image",
+  /**
+   * `image.inspect(...)`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/image.js#L21-L51
+   */
   INSPECT_IMAGE: "inspect_image",
+  /**
+   * `container.remove(...)`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L815-L847
+   */
   REMOVE_CONTAINER: "remove_container",
 } as const;
 export type DockerClientOperation =
   (typeof DockerClientOperationIds)[keyof typeof DockerClientOperationIds];
 
 export const DockerClientErrorCodes = {
+  /**
+   * Backed by dockerode status code maps that include `404`.
+   * Sources:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L56-L60
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/image.js#L29-L33
+   */
   NOT_FOUND: "not_found",
+  /**
+   * Backed by dockerode status code maps that include `409`.
+   * Sources:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/image.js#L219
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/network.js#L68
+   */
   CONFLICT: "conflict",
+  /**
+   * Backed by dockerode status code maps that include `400`.
+   * Sources:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/docker.js#L55
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L825
+   */
   INVALID_ARGUMENT: "invalid_argument",
+  /**
+   * Backed by dockerode status code maps that include `401`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/image.js#L68
+   */
   UNAUTHENTICATED: "unauthenticated",
+  /**
+   * Default for statuses without explicit mapping/evidence in this package call path.
+   */
   UNKNOWN: "unknown",
 } as const;
 export type DockerClientErrorCode =
@@ -48,6 +123,9 @@ export class DockerClientError extends SandboxError {
 }
 
 const ErrorShapeSchema = z.looseObject({
+  // docker-modem sets `statusCode` and `reason` on request errors.
+  // Source:
+  // https://github.com/apocas/docker-modem/blob/main/lib/modem.js#L375-L390
   statusCode: z.number().optional(),
   reason: z.string().optional(),
   message: z.string().optional(),

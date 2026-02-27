@@ -24,10 +24,22 @@ export class ModalSandboxAdapter implements SandboxAdapter {
     }
 
     const response = await this.#client.startSandbox({ imageId: request.image.imageId });
+    const sandboxId = response.sandboxId;
 
     return {
       provider: SandboxProvider.MODAL,
-      sandboxId: response.sandboxId,
+      sandboxId,
+      writeStdin: async (input) => {
+        await this.#client.writeSandboxStdin({
+          sandboxId,
+          payload: input.payload,
+        });
+      },
+      closeStdin: async () => {
+        await this.#client.closeSandboxStdin({
+          sandboxId,
+        });
+      },
     };
   }
 

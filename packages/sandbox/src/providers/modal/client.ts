@@ -1,4 +1,4 @@
-import type { App } from "modal";
+import type { App, ModalWriteStream } from "modal";
 import { ModalClient as ModalSdkClient } from "modal";
 
 import {
@@ -7,13 +7,17 @@ import {
   type ModalClientOperation,
 } from "./client-errors.js";
 import {
+  ModalCloseSandboxStdinRequestSchema,
   ModalSnapshotSandboxRequestSchema,
   ModalStartSandboxRequestSchema,
   ModalStopSandboxRequestSchema,
+  ModalWriteSandboxStdinRequestSchema,
+  type ModalCloseSandboxStdinRequest,
   type ModalSandboxConfig,
   type ModalSnapshotSandboxRequest,
   type ModalStartSandboxRequest,
   type ModalStopSandboxRequest,
+  type ModalWriteSandboxStdinRequest,
 } from "./schemas.js";
 
 export type ModalStartSandboxResponse = {
@@ -27,6 +31,8 @@ export type ModalSnapshotSandboxResponse = {
 
 export interface ModalClient {
   startSandbox(request: ModalStartSandboxRequest): Promise<ModalStartSandboxResponse>;
+  writeSandboxStdin(request: ModalWriteSandboxStdinRequest): Promise<void>;
+  closeSandboxStdin(request: ModalCloseSandboxStdinRequest): Promise<void>;
   snapshotSandbox(request: ModalSnapshotSandboxRequest): Promise<ModalSnapshotSandboxResponse>;
   stopSandbox(request: ModalStopSandboxRequest): Promise<void>;
 }
@@ -34,6 +40,7 @@ export interface ModalClient {
 export class ModalApiClient implements ModalClient {
   readonly #config: ModalSandboxConfig;
   readonly #modalClient: ModalSdkClient;
+  readonly #stdinStreams = new Map<string, ModalWriteStream<string>>();
   #appPromise: Promise<App> | undefined;
 
   constructor(config: ModalSandboxConfig) {
@@ -82,8 +89,33 @@ export class ModalApiClient implements ModalClient {
     };
   }
 
+  async writeSandboxStdin(request: ModalWriteSandboxStdinRequest): Promise<void> {
+    const parsedRequest = ModalWriteSandboxStdinRequestSchema.parse(request);
+    const stdinStream = await this.#getOrCreateSandboxStdinStream(parsedRequest.sandboxId);
+
+    await this.#runModalClientOperation(ModalClientOperationIds.WRITE_STDIN, () =>
+      stdinStream.writeBytes(new Uint8Array(parsedRequest.payload)),
+    );
+  }
+
+  async closeSandboxStdin(request: ModalCloseSandboxStdinRequest): Promise<void> {
+    const parsedRequest = ModalCloseSandboxStdinRequestSchema.parse(request);
+    const stdinStream = await this.#getOrCreateSandboxStdinStream(parsedRequest.sandboxId);
+    const stdinWriter = stdinStream.getWriter();
+
+    try {
+      await this.#runModalClientOperation(ModalClientOperationIds.CLOSE_STDIN, () =>
+        stdinWriter.close(),
+      );
+      this.#stdinStreams.delete(parsedRequest.sandboxId);
+    } finally {
+      stdinWriter.releaseLock();
+    }
+  }
+
   async stopSandbox(request: ModalStopSandboxRequest): Promise<void> {
     const parsedRequest = ModalStopSandboxRequestSchema.parse(request);
+    this.#stdinStreams.delete(parsedRequest.sandboxId);
 
     const sandbox = await this.#runModalClientOperation(
       ModalClientOperationIds.RESOLVE_SANDBOX,
@@ -129,5 +161,21 @@ export class ModalApiClient implements ModalClient {
     } catch (error) {
       throw mapModalClientError(operation, error);
     }
+  }
+
+  async #getOrCreateSandboxStdinStream(sandboxId: string): Promise<ModalWriteStream<string>> {
+    const existingStdinStream = this.#stdinStreams.get(sandboxId);
+    if (existingStdinStream !== undefined) {
+      return existingStdinStream;
+    }
+
+    const sandbox = await this.#runModalClientOperation(
+      ModalClientOperationIds.RESOLVE_SANDBOX,
+      () => this.#modalClient.sandboxes.fromId(sandboxId),
+    );
+    const stdinStream = sandbox.stdin;
+    this.#stdinStreams.set(sandboxId, stdinStream);
+
+    return stdinStream;
   }
 }

@@ -33,6 +33,8 @@ const SANDBOX_RUNTIME_BASE_DOCKERFILE_PATH = fileURLToPath(
 );
 const SANDBOX_RUNTIME_BASE_STAGE_NAME = "sandbox-base-prod";
 const SANDBOX_KEEPALIVE_ENTRYPOINT_COMMAND = 'ENTRYPOINT ["/bin/sh", "-c", "sleep infinity"]';
+const SANDBOX_STDIN_PROBE_ENTRYPOINT_COMMAND =
+  'ENTRYPOINT ["/bin/sh", "-c", "cat > /tmp/mistle-stdin-bootstrap.sh && /bin/sh /tmp/mistle-stdin-bootstrap.sh"]';
 
 type EnabledModalAdapterIntegrationSettings = Extract<
   ModalAdapterIntegrationSettings,
@@ -42,6 +44,7 @@ type EnabledModalAdapterIntegrationSettings = Extract<
 export type ModalAdapterIntegrationFixture = {
   adapter: SandboxAdapter;
   baseImage: SandboxImageHandle;
+  stdinProbeImage: SandboxImageHandle;
   modalClient: ModalSdkClient;
 };
 
@@ -72,11 +75,18 @@ export const it = vitestIt.extend<{ fixture: ModalAdapterIntegrationFixture }>({
         const baseImage = await resolveModalBaseImageHandle({
           modalClient,
           settings,
+          entrypointCommand: SANDBOX_KEEPALIVE_ENTRYPOINT_COMMAND,
+        });
+        const stdinProbeImage = await resolveModalBaseImageHandle({
+          modalClient,
+          settings,
+          entrypointCommand: SANDBOX_STDIN_PROBE_ENTRYPOINT_COMMAND,
         });
 
         await use({
           adapter,
           baseImage,
+          stdinProbeImage,
           modalClient,
         });
       } finally {
@@ -102,6 +112,7 @@ export function createBaseImageHandle(baseImageId: string): SandboxImageHandle {
 async function resolveModalBaseImageHandle(input: {
   modalClient: ModalSdkClient;
   settings: EnabledModalAdapterIntegrationSettings;
+  entrypointCommand: string;
 }): Promise<SandboxImageHandle> {
   const runtimeBaseRegistryTag = await readSandboxRuntimeBaseRegistryTag();
   const appLookupOptions =
@@ -117,7 +128,7 @@ async function resolveModalBaseImageHandle(input: {
   );
   const derivedImage = input.modalClient.images
     .fromRegistry(runtimeBaseRegistryTag)
-    .dockerfileCommands([SANDBOX_KEEPALIVE_ENTRYPOINT_COMMAND]);
+    .dockerfileCommands([input.entrypointCommand]);
   const builtImage = await derivedImage.build(app);
 
   return createBaseImageHandle(builtImage.imageId);

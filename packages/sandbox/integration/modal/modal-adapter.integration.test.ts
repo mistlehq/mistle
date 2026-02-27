@@ -10,6 +10,7 @@ const describeModalAdapterIntegration = modalAdapterIntegrationEnabled ? describ
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const SNAPSHOT_MARKER_FILE_PATH = "/tmp/mistle-snapshot-marker.txt";
+const STDIN_MARKER_FILE_PATH = "/tmp/mistle-stdin-marker.txt";
 
 function formatUnknownError(error: unknown): string {
   if (error instanceof Error) {
@@ -134,6 +135,31 @@ describeModalAdapterIntegration("modal adapter integration", () => {
 
     if (cleanupFailureMessage !== undefined) {
       throw new Error(cleanupFailureMessage);
+    }
+  }, 300_000);
+
+  it("writes and closes stdin via the sandbox handle", async ({ fixture }) => {
+    const stdinMarker = `mistle-modal-stdin-${randomUUID()}`;
+    const stdinScript = textEncoder.encode(
+      `printf '%s' '${stdinMarker}' > ${STDIN_MARKER_FILE_PATH}\nsleep 300\n`,
+    );
+    let sandboxId: string | undefined;
+
+    try {
+      const sandbox = await fixture.adapter.start({ image: fixture.stdinProbeImage });
+      sandboxId = sandbox.sandboxId;
+      await sandbox.writeStdin({
+        payload: stdinScript,
+      });
+      await sandbox.closeStdin();
+
+      const startedSandbox = await fixture.modalClient.sandboxes.fromId(sandbox.sandboxId);
+      const markerFromSandbox = await readSandboxFile(startedSandbox, STDIN_MARKER_FILE_PATH);
+      expect(markerFromSandbox).toBe(stdinMarker);
+    } finally {
+      if (sandboxId !== undefined) {
+        await fixture.adapter.stop({ sandboxId });
+      }
     }
   }, 300_000);
 });

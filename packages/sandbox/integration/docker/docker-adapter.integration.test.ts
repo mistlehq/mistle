@@ -214,4 +214,33 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       throw new Error(cleanupFailureMessage);
     }
   }, 300_000);
+
+  it("writes and closes stdin via the sandbox handle", async ({ fixture }) => {
+    const startupToken = `mistle-startup-stdin-${randomUUID()}`;
+    const startupScript = Buffer.from(
+      `printf '%s' '${startupToken}' > /tmp/mistle-startup-token\nsleep 300\n`,
+      "utf8",
+    );
+    let sandboxId: string | undefined;
+
+    try {
+      const sandbox = await fixture.adapter.start({ image: fixture.startupStdinProbeImage });
+      sandboxId = sandbox.sandboxId;
+      await sandbox.writeStdin({
+        payload: startupScript,
+      });
+      await sandbox.closeStdin();
+
+      const tokenFromSandbox = await readSandboxFile({
+        dockerClient: fixture.dockerClient,
+        sandboxId: sandbox.sandboxId,
+        path: "/tmp/mistle-startup-token",
+      });
+      expect(tokenFromSandbox).toBe(startupToken);
+    } finally {
+      if (sandboxId !== undefined) {
+        await fixture.adapter.stop({ sandboxId });
+      }
+    }
+  }, 300_000);
 });
