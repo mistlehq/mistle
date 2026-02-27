@@ -1,3 +1,5 @@
+import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
+import { StartSandboxInstanceInputSchema } from "@mistle/data-plane-trpc/contracts";
 import { sandboxProfiles } from "@mistle/db/control-plane";
 import { SMTPEmailSender } from "@mistle/emails";
 import {
@@ -21,11 +23,70 @@ function createEmailSender(config: ControlPlaneWorkerConfig): SMTPEmailSender {
   });
 }
 
+type ResolveSandboxProfileVersionInput = {
+  db: WorkerRuntimeResources["db"];
+  organizationId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+};
+
+type ResolvedSandboxStartManifest = {
+  manifest: Record<string, unknown>;
+};
+
+async function resolveSandboxStartManifest(
+  ctx: ResolveSandboxProfileVersionInput,
+): Promise<ResolvedSandboxStartManifest> {
+  const sandboxProfile = await ctx.db.query.sandboxProfiles.findFirst({
+    columns: {
+      id: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.id, ctx.sandboxProfileId), eq(table.organizationId, ctx.organizationId)),
+  });
+
+  if (sandboxProfile === undefined) {
+    throw new Error("Sandbox profile was not found.");
+  }
+
+  const sandboxProfileVersion = await ctx.db.query.sandboxProfileVersions.findFirst({
+    columns: {
+      manifest: true,
+    },
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.sandboxProfileId, ctx.sandboxProfileId),
+        eq(table.version, ctx.sandboxProfileVersion),
+      ),
+  });
+
+  if (sandboxProfileVersion === undefined) {
+    throw new Error("Sandbox profile version was not found.");
+  }
+
+  const parsedManifest = StartSandboxInstanceInputSchema.shape.manifest.safeParse(
+    sandboxProfileVersion.manifest,
+  );
+  if (!parsedManifest.success) {
+    throw new Error("Sandbox profile version manifest is invalid.");
+  }
+
+  return {
+    manifest: parsedManifest.data,
+  };
+}
+
 function createWorkflowInputs(ctx: {
   config: ControlPlaneWorkerConfig;
+  internalAuthServiceToken: string;
   db: WorkerRuntimeResources["db"];
   emailSender: SMTPEmailSender;
 }): CreateControlPlaneWorkflowDefinitionsInput {
+  const dataPlaneSandboxInstancesClient = createDataPlaneSandboxInstancesClient({
+    baseUrl: ctx.config.dataPlaneApi.baseUrl,
+    serviceToken: ctx.internalAuthServiceToken,
+  });
+
   return {
     sendOrganizationInvitation: {
       emailSender: ctx.emailSender,
@@ -42,15 +103,33 @@ function createWorkflowInputs(ctx: {
       },
     },
     requestDeleteSandboxProfile: {
-      deleteSandboxProfile: async (deleteInput) => {
+      deleteSandboxProfile: async (input) => {
         await ctx.db
           .delete(sandboxProfiles)
           .where(
             and(
-              eq(sandboxProfiles.id, deleteInput.profileId),
-              eq(sandboxProfiles.organizationId, deleteInput.organizationId),
+              eq(sandboxProfiles.id, input.profileId),
+              eq(sandboxProfiles.organizationId, input.organizationId),
             ),
           );
+      },
+    },
+    startSandboxProfileInstance: {
+      resolveSandboxProfileVersion: async (input) =>
+        resolveSandboxStartManifest({
+          db: ctx.db,
+          organizationId: input.organizationId,
+          sandboxProfileId: input.sandboxProfileId,
+          sandboxProfileVersion: input.sandboxProfileVersion,
+        }),
+      startSandboxInstance: async (input) => {
+        const response = await dataPlaneSandboxInstancesClient.startSandboxInstance(input);
+
+        return {
+          workflowRunId: response.workflowRunId,
+          sandboxInstanceId: response.sandboxInstanceId,
+          providerSandboxId: response.providerSandboxId,
+        };
       },
     },
   };
@@ -68,6 +147,7 @@ export function createRuntimeWorker(ctx: {
     concurrency: ctx.config.workflow.concurrency,
     workflowInputs: createWorkflowInputs({
       config: ctx.config,
+      internalAuthServiceToken: ctx.internalAuthServiceToken,
       db: ctx.resources.db,
       emailSender,
     }),

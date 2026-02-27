@@ -8,7 +8,7 @@ import {
   type StartSandboxProfileInstanceWorkflowOutput,
 } from "./spec.js";
 
-type ResolvedSandboxProfileVersion = Pick<StartSandboxInstanceWorkflowInput, "manifest" | "image">;
+type ResolvedSandboxProfileVersion = Pick<StartSandboxInstanceWorkflowInput, "manifest">;
 
 export type CreateStartSandboxProfileInstanceWorkflowInput = {
   resolveSandboxProfileVersion: (input: {
@@ -32,34 +32,32 @@ export function createStartSandboxProfileInstanceWorkflow(
   StartSandboxProfileInstanceWorkflowOutput,
   StartSandboxProfileInstanceWorkflowInput
 > {
-  return defineWorkflow(
-    StartSandboxProfileInstanceWorkflowSpec,
-    async ({ input: workflowInput, step }) => {
-      const resolvedProfileVersion = await step.run(
-        { name: "resolve-sandbox-profile-version" },
-        async () =>
-          ctx.resolveSandboxProfileVersion({
-            organizationId: workflowInput.organizationId,
-            sandboxProfileId: workflowInput.sandboxProfileId,
-            sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-          }),
-      );
+  return defineWorkflow(StartSandboxProfileInstanceWorkflowSpec, async (workflowCtx) => {
+    const workflowInput = workflowCtx.input;
+    const resolvedProfileVersion = await workflowCtx.step.run(
+      { name: "resolve-sandbox-profile-version" },
+      async () =>
+        ctx.resolveSandboxProfileVersion({
+          organizationId: workflowInput.organizationId,
+          sandboxProfileId: workflowInput.sandboxProfileId,
+          sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+        }),
+    );
 
-      const startedSandbox = await step.run(
-        { name: "start-sandbox-instance-in-data-plane" },
-        async () =>
-          ctx.startSandboxInstance({
-            organizationId: workflowInput.organizationId,
-            sandboxProfileId: workflowInput.sandboxProfileId,
-            sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-            manifest: resolvedProfileVersion.manifest,
-            startedBy: workflowInput.startedBy,
-            source: workflowInput.source,
-            image: resolvedProfileVersion.image,
-          }),
-      );
+    const startedSandbox = await workflowCtx.step.run(
+      { name: "start-sandbox-instance-in-data-plane" },
+      async () =>
+        ctx.startSandboxInstance({
+          organizationId: workflowInput.organizationId,
+          sandboxProfileId: workflowInput.sandboxProfileId,
+          sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+          manifest: resolvedProfileVersion.manifest,
+          startedBy: workflowInput.startedBy,
+          source: workflowInput.source,
+          image: workflowInput.image,
+        }),
+    );
 
-      return startedSandbox;
-    },
-  );
+    return startedSandbox;
+  });
 }

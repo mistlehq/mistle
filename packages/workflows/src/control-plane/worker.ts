@@ -28,6 +28,10 @@ export function createControlPlaneWorker(ctx: CreateControlPlaneWorkerInput): Wo
     workflows.requestDeleteSandboxProfile.spec,
     workflows.requestDeleteSandboxProfile.fn,
   );
+  ctx.openWorkflow.implementWorkflow(
+    workflows.startSandboxProfileInstance.spec,
+    workflows.startSandboxProfileInstance.fn,
+  );
 
   return ctx.openWorkflow.newWorker({ concurrency: ctx.concurrency });
 }

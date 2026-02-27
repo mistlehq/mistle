@@ -1,4 +1,3 @@
-import { SandboxImageKind, SandboxProvider } from "@mistle/sandbox";
 import { startPostgresWithPgBouncer } from "@mistle/test-harness";
 import { describe, expect, it } from "vitest";
 
@@ -36,28 +35,32 @@ describe("start sandbox profile instance workflow integration", () => {
         app: "resolved-profile-version",
         command: ["echo", "hello"],
       };
-      const resolvedImage: {
-        provider: SandboxProvider;
-        imageId: string;
-        kind: SandboxImageKind;
-        createdAt: string;
-      } = {
-        provider: SandboxProvider.MODAL,
-        imageId: "im_control_plane_workflow_001",
-        kind: SandboxImageKind.BASE,
-        createdAt: "2026-02-27T00:00:00.000Z",
+      const workflowInput: StartSandboxProfileInstanceWorkflowInput = {
+        organizationId: "org_control_plane_start_001",
+        sandboxProfileId: "sbp_control_plane_start_001",
+        sandboxProfileVersion: 3,
+        startedBy: {
+          kind: "user",
+          id: "usr_control_plane_start_001",
+        },
+        source: "dashboard",
+        image: {
+          provider: "modal",
+          imageId: "im_control_plane_workflow_001",
+          kind: "base",
+          createdAt: "2026-02-27T00:00:00.000Z",
+        },
       };
 
       const workflow = createStartSandboxProfileInstanceWorkflow({
         resolveSandboxProfileVersion: async () => {
           return {
             manifest: resolvedManifest,
-            image: resolvedImage,
           };
         },
         startSandboxInstance: async (input) => {
           expect(input.manifest).toEqual(resolvedManifest);
-          expect(input.image).toEqual(resolvedImage);
+          expect(input.image).toEqual(workflowInput.image);
 
           return {
             workflowRunId: `wf-${input.organizationId}`,
@@ -74,17 +77,6 @@ describe("start sandbox profile instance workflow integration", () => {
       });
       await worker.start();
 
-      const workflowInput: StartSandboxProfileInstanceWorkflowInput = {
-        organizationId: "org_control_plane_start_001",
-        sandboxProfileId: "sbp_control_plane_start_001",
-        sandboxProfileVersion: 3,
-        startedBy: {
-          kind: "user",
-          id: "usr_control_plane_start_001",
-        },
-        source: "dashboard",
-      };
-
       const handle = await openWorkflow.runWorkflow(
         StartSandboxProfileInstanceWorkflowSpec,
         workflowInput,
@@ -94,7 +86,7 @@ describe("start sandbox profile instance workflow integration", () => {
       expect(result).toEqual({
         workflowRunId: `wf-${workflowInput.organizationId}`,
         sandboxInstanceId: `sbi-${workflowInput.startedBy.id}`,
-        providerSandboxId: `${workflowInput.source}-${resolvedImage.imageId}`,
+        providerSandboxId: `${workflowInput.source}-${workflowInput.image.imageId}`,
       });
     } finally {
       for (const cleanupTask of cleanupTasks) {

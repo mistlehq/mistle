@@ -144,6 +144,9 @@ importers:
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@mistle/data-plane-trpc':
+        specifier: workspace:*
+        version: link:../../packages/data-plane-trpc
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
