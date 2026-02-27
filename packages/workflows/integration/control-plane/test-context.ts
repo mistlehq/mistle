@@ -8,11 +8,7 @@ import {
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
 import { SMTPEmailSender } from "@mistle/emails";
-import {
-  startMailpit,
-  startPostgresWithPgBouncer,
-  type MailpitService,
-} from "@mistle/test-harness";
+import { startMailpit, startPostgresWithPgBouncer, type MailpitService } from "@mistle/test-core";
 import postgres from "postgres";
 import { it as vitestIt } from "vitest";
 

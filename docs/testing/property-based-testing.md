@@ -10,10 +10,10 @@ This repository uses `fast-check` with Vitest integration for property-based tes
 
 ## Shared Helper
 
-Use `@mistle/test-harness`:
+Use `@mistle/test-core`:
 
 ```ts
-import { assertProperty, fc } from "@mistle/test-harness";
+import { assertProperty, fc } from "@mistle/test-core";
 
 assertProperty(
   fc.property(fc.string(), (value) => {

@@ -13,7 +13,7 @@ import {
   reserveAvailablePort,
   startPostgresWithPgBouncer,
   type PostgresWithPgBouncerService,
-} from "@mistle/test-harness";
+} from "@mistle/test-core";
 import {
   createDataPlaneBackend,
   createDataPlaneOpenWorkflow,

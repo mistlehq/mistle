@@ -39,7 +39,7 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@mistle/test-harness": "workspace:*",
+    "@mistle/test-core": "workspace:*",
     "@types/nodemailer": "^7.0.11"
   }
 }

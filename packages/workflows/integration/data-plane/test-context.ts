@@ -8,7 +8,7 @@ import {
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
 import { SandboxProvider, createSandboxAdapter, type SandboxAdapter } from "@mistle/sandbox";
-import { startPostgresWithPgBouncer } from "@mistle/test-harness";
+import { startPostgresWithPgBouncer } from "@mistle/test-core";
 import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { it as vitestIt } from "vitest";
