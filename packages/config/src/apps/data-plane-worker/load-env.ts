@@ -3,7 +3,9 @@ import {
   type PartialDataPlaneWorkerConfigInput,
   DataPlaneWorkerDatabaseConfigSchema,
   DataPlaneWorkerSandboxConfigSchema,
+  DataPlaneWorkerSandboxDockerConfigSchema,
   DataPlaneWorkerSandboxModalConfigSchema,
+  DataPlaneWorkerSandboxProviders,
   DataPlaneWorkerServerConfigSchema,
   DataPlaneWorkerWorkflowConfigSchema,
   PartialDataPlaneWorkerConfigSchema,
@@ -69,6 +71,17 @@ const loadSandboxModalEnv = createEnvLoader<typeof DataPlaneWorkerSandboxModalCo
   },
 ]);
 
+const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneWorkerSandboxDockerConfigSchema>([
+  {
+    key: "socketPath",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH",
+  },
+  {
+    key: "snapshotRepository",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY",
+  },
+]);
+
 const loadSandboxEnv = createEnvLoader<typeof DataPlaneWorkerSandboxConfigSchema>([
   {
     key: "provider",
@@ -98,11 +111,30 @@ export function loadDataPlaneWorkerFromEnv(
 
   const sandbox = loadSandboxEnv(env);
   const sandboxModal = loadSandboxModalEnv(env);
-  if (hasEntries(sandbox) || hasEntries(sandboxModal)) {
-    partialConfig.sandbox = {
+  const sandboxDocker = loadSandboxDockerEnv(env);
+
+  if (hasEntries(sandbox) || hasEntries(sandboxModal) || hasEntries(sandboxDocker)) {
+    const sandboxConfig: PartialDataPlaneWorkerConfigInput["sandbox"] = {
       ...sandbox,
-      ...(hasEntries(sandboxModal) ? { modal: sandboxModal } : {}),
     };
+
+    if (sandbox.provider === DataPlaneWorkerSandboxProviders.MODAL && hasEntries(sandboxModal)) {
+      sandboxConfig.modal = sandboxModal;
+    } else if (
+      sandbox.provider === DataPlaneWorkerSandboxProviders.DOCKER &&
+      hasEntries(sandboxDocker)
+    ) {
+      sandboxConfig.docker = sandboxDocker;
+    } else if (sandbox.provider === undefined) {
+      if (hasEntries(sandboxModal)) {
+        sandboxConfig.modal = sandboxModal;
+      }
+      if (hasEntries(sandboxDocker)) {
+        sandboxConfig.docker = sandboxDocker;
+      }
+    }
+
+    partialConfig.sandbox = sandboxConfig;
   }
 
   return PartialDataPlaneWorkerConfigSchema.parse(partialConfig);

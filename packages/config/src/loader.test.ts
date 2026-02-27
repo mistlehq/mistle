@@ -105,6 +105,106 @@ describe("parseConfigRecord", () => {
 
     expect(config).toEqual(configRecord);
   });
+
+  it("parses a config record with docker sandbox provider", () => {
+    const configRecord = {
+      global: {
+        env: "development",
+        internalAuth: {
+          serviceToken: "test-service-token",
+        },
+      },
+      apps: {
+        control_plane_api: {
+          server: {
+            host: "127.0.0.1",
+            port: 5000,
+          },
+          database: {
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+          },
+          auth: {
+            baseUrl: "http://127.0.0.1:5000",
+            invitationAcceptBaseUrl: "http://127.0.0.1:5173/invitations/accept",
+            secret: "test-secret",
+            trustedOrigins: ["http://127.0.0.1:3000"],
+            otpLength: 6,
+            otpExpiresInSeconds: 300,
+            otpAllowedAttempts: 3,
+          },
+          workflow: {
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+            namespaceId: "development",
+          },
+        },
+        control_plane_worker: {
+          server: {
+            host: "127.0.0.1",
+            port: 5100,
+          },
+          workflow: {
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+            namespaceId: "development",
+            runMigrations: true,
+            concurrency: 1,
+          },
+          email: {
+            fromAddress: "no-reply@mistle.local",
+            fromName: "Mistle Local",
+            smtpHost: "127.0.0.1",
+            smtpPort: 1025,
+            smtpSecure: false,
+            smtpUsername: "mailpit",
+            smtpPassword: "mailpit",
+          },
+        },
+        data_plane_api: {
+          server: {
+            host: "127.0.0.1",
+            port: 5200,
+          },
+          database: {
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+          },
+          workflow: {
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+            namespaceId: "development",
+          },
+        },
+        data_plane_worker: {
+          server: {
+            host: "127.0.0.1",
+            port: 5201,
+          },
+          database: {
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+          },
+          workflow: {
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+            namespaceId: "development",
+            runMigrations: true,
+            concurrency: 1,
+          },
+          sandbox: {
+            provider: "docker",
+            docker: {
+              socketPath: "/var/run/docker.sock",
+              snapshotRepository: "localhost:5001/mistle/snapshots",
+            },
+          },
+        },
+        data_plane_gateway: {
+          server: {
+            host: "127.0.0.1",
+            port: 5202,
+          },
+        },
+      },
+    };
+    const config = parseConfigRecord(configRecord);
+
+    expect(config).toEqual(configRecord);
+  });
 });
 
 describe("loadConfig", () => {

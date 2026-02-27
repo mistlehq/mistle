@@ -1,0 +1,25 @@
+[global]
+env = "development"
+
+[global.internal_auth]
+service_token = "fixture-service-token"
+
+[apps.data_plane_worker.server]
+host = "0.0.0.0"
+port = 5305
+
+[apps.data_plane_worker.database]
+url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
+
+[apps.data_plane_worker.workflow]
+database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle"
+namespace_id = "fixture-docker"
+run_migrations = true
+concurrency = 3
+
+[apps.data_plane_worker.sandbox]
+provider = "docker"
+
+[apps.data_plane_worker.sandbox.docker]
+socket_path = "/var/run/docker.sock"
+snapshot_repository = "localhost:5001/mistle/snapshots"

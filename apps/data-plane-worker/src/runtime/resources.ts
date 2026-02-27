@@ -30,7 +30,13 @@ function createSandboxRuntimeAdapter(config: DataPlaneWorkerConfig): SandboxAdap
     });
   }
 
-  return assertUnreachable(config.sandbox.provider);
+  if (config.sandbox.provider === "docker") {
+    throw new Error(
+      "Sandbox provider docker is configured, but docker adapter support is not available in this build.",
+    );
+  }
+
+  return assertUnreachable(config.sandbox);
 }
 
 export async function createWorkerRuntimeResources(
