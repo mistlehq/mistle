@@ -36,6 +36,7 @@ export function createSandboxProfilesService(
         {
           db: input.db,
           openWorkflow: input.openWorkflow,
+          resolveSandboxProfileVersionImage: input.resolveSandboxProfileVersionImage,
         },
         serviceInput,
       ),

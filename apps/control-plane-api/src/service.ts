@@ -1,3 +1,5 @@
+import { StartSandboxInstanceInputSchema } from "@mistle/data-plane-trpc/contracts";
+
 import type { AppRuntimeResources } from "./runtime/resources.js";
 import type { AppServices, ControlPlaneApiConfig } from "./types.js";
 
@@ -29,6 +31,23 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
     sandboxProfiles: createSandboxProfilesService({
       db: resources.db,
       openWorkflow: resources.openWorkflow,
+      resolveSandboxProfileVersionImage: async (resolverInput) => {
+        const parsedManifest = StartSandboxInstanceInputSchema.shape.manifest.safeParse(
+          resolverInput.manifest,
+        );
+        if (!parsedManifest.success) {
+          throw new Error("Sandbox profile version manifest is invalid.");
+        }
+
+        const parsedImage = StartSandboxInstanceInputSchema.shape.image.safeParse(
+          parsedManifest.data.image,
+        );
+        if (!parsedImage.success) {
+          throw new Error("Sandbox profile version image is invalid.");
+        }
+
+        return parsedImage.data;
+      },
     }),
   };
 }

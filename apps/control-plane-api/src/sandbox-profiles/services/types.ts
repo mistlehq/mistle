@@ -5,15 +5,26 @@ import type {
 } from "@mistle/db/control-plane";
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
-import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
+import type {
+  StartSandboxProfileInstanceWorkflowInput,
+  createControlPlaneOpenWorkflow,
+} from "@mistle/workflows/control-plane";
 
 import type { ListProfilesInput } from "./list-profiles.js";
 
 export type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
 
+export type ResolveSandboxProfileVersionImage = (input: {
+  organizationId: string;
+  profileId: string;
+  profileVersion: number;
+  manifest: unknown;
+}) => Promise<StartSandboxProfileInstanceWorkflowInput["image"]>;
+
 export type CreateSandboxProfilesServiceInput = {
   db: ControlPlaneDatabase;
   openWorkflow: ControlPlaneOpenWorkflow;
+  resolveSandboxProfileVersionImage: ResolveSandboxProfileVersionImage;
 };
 
 export type SandboxProfilesService = {

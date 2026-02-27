@@ -1,6 +1,5 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 
-import { StartSandboxInstanceInputSchema } from "@mistle/data-plane-trpc/contracts";
 import { StartSandboxProfileInstanceWorkflowSpec } from "@mistle/workflows/control-plane";
 
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
@@ -41,7 +40,14 @@ function createIdempotencyKey(input: StartProfileInstanceInput): string {
 }
 
 export async function startProfileInstance(
-  { db, openWorkflow }: Pick<CreateSandboxProfilesServiceInput, "db" | "openWorkflow">,
+  {
+    db,
+    openWorkflow,
+    resolveSandboxProfileVersionImage,
+  }: Pick<
+    CreateSandboxProfilesServiceInput,
+    "db" | "openWorkflow" | "resolveSandboxProfileVersionImage"
+  >,
   serviceInput: StartProfileInstanceInput,
 ): Promise<StartProfileInstanceOutput> {
   const sandboxProfile = await db.query.sandboxProfiles.findFirst({
@@ -79,19 +85,12 @@ export async function startProfileInstance(
     );
   }
 
-  const parsedManifest = StartSandboxInstanceInputSchema.shape.manifest.safeParse(
-    sandboxProfileVersion.manifest,
-  );
-  if (!parsedManifest.success) {
-    throw new Error("Sandbox profile version manifest is invalid.");
-  }
-
-  const parsedImage = StartSandboxInstanceInputSchema.shape.image.safeParse(
-    parsedManifest.data.image,
-  );
-  if (!parsedImage.success) {
-    throw new Error("Sandbox profile version manifest image is invalid.");
-  }
+  const resolvedImage = await resolveSandboxProfileVersionImage({
+    organizationId: serviceInput.organizationId,
+    profileId: serviceInput.profileId,
+    profileVersion: serviceInput.profileVersion,
+    manifest: sandboxProfileVersion.manifest,
+  });
 
   const workflowRunHandle = await openWorkflow.runWorkflow(
     StartSandboxProfileInstanceWorkflowSpec,
@@ -101,7 +100,7 @@ export async function startProfileInstance(
       sandboxProfileVersion: serviceInput.profileVersion,
       startedBy: serviceInput.startedBy,
       source: serviceInput.source,
-      image: parsedImage.data,
+      image: resolvedImage,
     },
     {
       idempotencyKey: createIdempotencyKey(serviceInput),
