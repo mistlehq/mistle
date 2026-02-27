@@ -16,7 +16,7 @@ export function MembersDirectoryToolbar(input: {
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-      <div className="relative w-full sm:w-80 md:w-[26rem]">
+      <div className="relative w-full sm:w-72 md:w-[22rem]">
         <MagnifyingGlassIcon
           aria-hidden
           className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-5 -translate-y-1/2"

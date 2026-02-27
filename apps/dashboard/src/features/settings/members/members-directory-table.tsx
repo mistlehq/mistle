@@ -90,7 +90,14 @@ export function MembersDirectoryTable(input: {
         searchValue={searchValue}
       />
 
-      <Table>
+      <Table className="min-w-[48rem] table-fixed">
+        <colgroup>
+          <col className="w-[26%]" />
+          <col className="w-[30%]" />
+          <col className="w-[14%]" />
+          <col className="w-[14%]" />
+          <col className="w-36" />
+        </colgroup>
         <TableHeader className="bg-muted/60">
           <TableRow className="h-9 border-b">
             <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
