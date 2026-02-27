@@ -2,17 +2,17 @@
   "name": "@mistle/sandbox-runtime",
   "private": true,
   "scripts": {
-    "dev": "SANDBOX_RUNTIME_LISTEN_ADDR=:8090 cargo run --bin sandboxd",
-    "build": "cargo build --release --locked --bin sandboxd && mkdir -p dist/bin && cp target/release/sandboxd dist/bin/sandboxd",
+    "dev": "SANDBOX_RUNTIME_LISTEN_ADDR=:8090 go run ./cmd/sandboxd",
+    "build": "mkdir -p dist/bin && go build -trimpath -o dist/bin/sandboxd ./cmd/sandboxd",
     "image:build:prod": "test -n \"$IMAGE_TAG\" && docker build --target sandbox-base-prod -f images/base/Dockerfile -t mistle/sandbox-base:$IMAGE_TAG ../..",
     "image:build:prod:sha": "IMAGE_TAG=$(git rev-parse --short=12 HEAD) pnpm image:build:prod",
     "image:build:dev": "docker build --target sandbox-base-dev -f images/base/Dockerfile -t mistle/sandbox-base:dev ../..",
     "start": "./dist/bin/sandboxd",
-    "lint": "cargo clippy --all-targets -- -D warnings",
-    "typecheck": "cargo check --all-targets",
-    "test": "cargo test --all-targets",
-    "test:integration": "cargo test --all-targets",
-    "format": "cargo fmt",
-    "format:check": "cargo fmt --check"
+    "lint": "go vet ./...",
+    "typecheck": "go test -run '^$' ./...",
+    "test": "go test ./...",
+    "test:integration": "go test ./...",
+    "format": "gofmt -w ./cmd ./internal",
+    "format:check": "formatted_files=$(gofmt -l ./cmd ./internal) && test -z \"$formatted_files\" || (echo \"$formatted_files\"; exit 1)"
   }
 }
