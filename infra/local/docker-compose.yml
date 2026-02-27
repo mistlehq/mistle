@@ -50,6 +50,15 @@ services:
       - "${DEV_MAILPIT_SMTP_PORT:-1025}:1025"
       - "${DEV_MAILPIT_UI_PORT:-8025}:8025"
 
+  registry:
+    image: registry:3
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    ports:
+      - "${DEV_REGISTRY_PORT:-5001}:5000"
+    volumes:
+      - mistle_local_registry_data:/var/lib/registry
+
   tunnel:
     image: "${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}"
     volumes:
@@ -66,3 +75,4 @@ services:
 
 volumes:
   mistle_local_postgres_data:
+  mistle_local_registry_data:
