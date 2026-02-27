@@ -8,6 +8,9 @@ export const dataPlaneGatewayDevelopmentPreset = {
           host: "127.0.0.1",
           port: 5202,
         },
+        database: {
+          url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_dev",
+        },
       },
     },
   },

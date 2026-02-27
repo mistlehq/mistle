@@ -16,7 +16,12 @@
   "dependencies": {
     "@hono/node-server": "^1.19.4",
     "@mistle/config": "workspace:*",
+    "@mistle/db": "workspace:*",
     "@mistle/logging": "workspace:*",
-    "hono": "^4.12.3"
+    "hono": "^4.12.3",
+    "pg": "^8.19.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.6"
   }
 }

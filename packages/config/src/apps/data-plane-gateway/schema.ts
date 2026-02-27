@@ -7,15 +7,23 @@ export const DataPlaneGatewayServerConfigSchema = z
   })
   .strict();
 
+export const DataPlaneGatewayDatabaseConfigSchema = z
+  .object({
+    url: z.string().min(1),
+  })
+  .strict();
+
 export const DataPlaneGatewayConfigSchema = z
   .object({
     server: DataPlaneGatewayServerConfigSchema,
+    database: DataPlaneGatewayDatabaseConfigSchema,
   })
   .strict();
 
 export const PartialDataPlaneGatewayConfigSchema = z
   .object({
     server: DataPlaneGatewayServerConfigSchema.partial().optional(),
+    database: DataPlaneGatewayDatabaseConfigSchema.partial().optional(),
   })
   .strict();
 

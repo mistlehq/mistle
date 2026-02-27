@@ -72,6 +72,9 @@ namespace_id = "production"
 host = "0.0.0.0"
 port = 8084
 
+[apps.data_plane_gateway.database]
+url = "postgresql://mistle:replace-with-password@db:5432/mistle"
+
 [apps.data_plane_worker.server]
 host = "0.0.0.0"
 port = 8083

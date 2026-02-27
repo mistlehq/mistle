@@ -152,6 +152,9 @@ const dataPlaneGatewayEnvConfig = {
     host: "127.0.0.1",
     port: 5003,
   },
+  database: {
+    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+  },
 } as const;
 
 const dataPlaneGatewayFixtureConfig = {

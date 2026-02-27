@@ -1,11 +1,11 @@
-import { createApp } from "../app.js";
+import { createApp, stopApp } from "../app.js";
 import { startServer } from "../server.js";
 import type { DataPlaneGatewayConfig, DataPlaneGatewayRuntime, StartedServer } from "../types.js";
 
 export function createDataPlaneGatewayRuntime(
   config: DataPlaneGatewayConfig,
 ): DataPlaneGatewayRuntime {
-  const app = createApp();
+  const app = createApp(config);
 
   let startedServer: StartedServer | undefined;
   let stopPromise: Promise<void> | undefined;
@@ -17,6 +17,7 @@ export function createDataPlaneGatewayRuntime(
       startedServer = undefined;
     }
 
+    await stopApp(app);
     stopped = true;
   }
 

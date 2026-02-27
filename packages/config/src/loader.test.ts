@@ -113,6 +113,9 @@ describe("parseConfigRecord", () => {
             host: "127.0.0.1",
             port: 5202,
           },
+          database: {
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+          },
         },
       },
     };
@@ -227,6 +230,9 @@ describe("parseConfigRecord", () => {
           server: {
             host: "127.0.0.1",
             port: 5202,
+          },
+          database: {
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
           },
         },
       },

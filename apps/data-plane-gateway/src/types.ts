@@ -1,5 +1,6 @@
 import type { ServerType } from "@hono/node-server";
 import { AppIds, type loadConfig } from "@mistle/config";
+import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import type { Context, Hono } from "hono";
 
 type LoadDataPlaneGatewayConfigResult = ReturnType<
@@ -14,6 +15,7 @@ export type AppContextBindings = {
 
 export type AppContextVariables = {
   config: DataPlaneGatewayConfig;
+  db: DataPlaneDatabase;
 };
 
 export type AppContext = Context<AppContextBindings>;
