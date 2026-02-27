@@ -1,11 +1,12 @@
+import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
+import type { SandboxImageHandle } from "@mistle/sandbox";
+
 import { defineWorkflowSpec } from "openworkflow";
 
-export type StartSandboxInstanceWorkflowImageInput = {
-  provider: "modal";
-  imageId: string;
-  kind: "base" | "snapshot";
-  createdAt: string;
-};
+export type StartSandboxInstanceWorkflowImageInput = Pick<
+  SandboxImageHandle,
+  "provider" | "imageId" | "kind" | "createdAt"
+>;
 
 export type StartSandboxInstanceWorkflowInput = {
   organizationId: string;
@@ -13,10 +14,10 @@ export type StartSandboxInstanceWorkflowInput = {
   sandboxProfileVersion: number;
   manifest: Record<string, unknown>;
   startedBy: {
-    kind: "user";
+    kind: SandboxInstanceStarterKind;
     id: string;
   };
-  source: "dashboard";
+  source: SandboxInstanceSource;
   image: StartSandboxInstanceWorkflowImageInput;
 };
 

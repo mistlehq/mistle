@@ -2,28 +2,29 @@ import { defineWorkflow, type Workflow } from "openworkflow";
 
 import {
   StartSandboxInstanceWorkflowSpec,
+  type StartSandboxInstanceWorkflowImageInput,
   type StartSandboxInstanceWorkflowInput,
   type StartSandboxInstanceWorkflowOutput,
 } from "./spec.js";
 
 export type CreateStartSandboxInstanceWorkflowInput = {
   startSandbox: (input: { image: StartSandboxInstanceWorkflowInput["image"] }) => Promise<{
-    provider: "modal";
+    provider: StartSandboxInstanceWorkflowImageInput["provider"];
     providerSandboxId: string;
   }>;
-  stopSandbox: (input: { provider: "modal"; providerSandboxId: string }) => Promise<void>;
+  stopSandbox: (input: {
+    provider: StartSandboxInstanceWorkflowImageInput["provider"];
+    providerSandboxId: string;
+  }) => Promise<void>;
   insertSandboxInstance: (input: {
     organizationId: string;
     sandboxProfileId: string;
     sandboxProfileVersion: number;
     manifest: Record<string, unknown>;
-    provider: "modal";
+    provider: StartSandboxInstanceWorkflowImageInput["provider"];
     providerSandboxId: string;
-    startedBy: {
-      kind: "user";
-      id: string;
-    };
-    source: "dashboard";
+    startedBy: StartSandboxInstanceWorkflowInput["startedBy"];
+    source: StartSandboxInstanceWorkflowInput["source"];
   }) => Promise<{
     sandboxInstanceId: string;
   }>;

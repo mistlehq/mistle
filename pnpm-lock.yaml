@@ -524,6 +524,9 @@ importers:
       '@mistle/emails':
         specifier: workspace:*
         version: link:../emails
+      '@mistle/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox
       openworkflow:
         specifier: ^0.7.3
         version: 0.7.3(postgres@3.4.8)
