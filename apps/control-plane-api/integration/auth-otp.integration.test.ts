@@ -1,4 +1,4 @@
-import { MemberRoles, verifications } from "@mistle/db/control-plane";
+import { MemberRoles, members, verifications } from "@mistle/db/control-plane";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "node:crypto";
 import { describe, expect } from "vitest";
@@ -48,7 +48,7 @@ async function signInWithOTP(input: {
 }
 
 describe("auth otp integration", () => {
-  it("sends OTP, signs in, and bootstraps organization state", async ({ fixture }) => {
+  it("sends OTP, signs in, and leaves organization context empty", async ({ fixture }) => {
     const recipient = "integration-auth-otp@example.com";
 
     const sendResponse = await sendOTPRequest({
@@ -104,45 +104,15 @@ describe("auth otp integration", () => {
       where: (members, { and, eq }) =>
         and(eq(members.userId, user.id), eq(members.role, MemberRoles.OWNER)),
     });
-    expect(ownerMembership).toBeDefined();
-    if (ownerMembership === undefined) {
-      throw new Error("Expected owner membership to exist after OTP sign-in.");
-    }
-
-    const organization = await fixture.db.query.organizations.findFirst({
-      columns: {
-        id: true,
-        slug: true,
-      },
-      where: (organizations, { eq }) => eq(organizations.id, ownerMembership.organizationId),
-    });
-    expect(organization).toBeDefined();
-    if (organization === undefined) {
-      throw new Error("Expected organization to exist after OTP sign-in.");
-    }
-    expect(organization.slug).toBe(organization.id);
-
-    const teams = await fixture.db.query.teams.findMany({
-      columns: {
-        id: true,
-      },
-      where: (teams, { eq }) => eq(teams.organizationId, organization.id),
-    });
-    expect(teams).toHaveLength(1);
-
-    const defaultTeam = teams[0];
-    if (defaultTeam === undefined) {
-      throw new Error("Expected default team to exist after OTP sign-in.");
-    }
+    expect(ownerMembership).toBeUndefined();
 
     const teamMembership = await fixture.db.query.teamMembers.findFirst({
       columns: {
         id: true,
       },
-      where: (teamMembers, { and, eq }) =>
-        and(eq(teamMembers.userId, user.id), eq(teamMembers.teamId, defaultTeam.id)),
+      where: (teamMembers, { eq }) => eq(teamMembers.userId, user.id),
     });
-    expect(teamMembership).toBeDefined();
+    expect(teamMembership).toBeUndefined();
 
     const session = await fixture.db.query.sessions.findFirst({
       columns: {
@@ -155,7 +125,7 @@ describe("auth otp integration", () => {
     if (session === undefined) {
       throw new Error("Expected session to exist after OTP sign-in.");
     }
-    expect(session.activeOrganizationId).toBe(organization.id);
+    expect(session.activeOrganizationId).toBeNull();
   }, 60_000);
 
   it("does not bootstrap an organization for a newly invited user", async ({ fixture }) => {
@@ -428,7 +398,7 @@ describe("auth otp integration", () => {
     expect(user).toBeUndefined();
   }, 60_000);
 
-  it("does not duplicate bootstrap records on repeated sign-ins", async ({ fixture }) => {
+  it("does not create organization bootstrap records on repeated sign-ins", async ({ fixture }) => {
     const recipient = "integration-auth-otp-idempotent-bootstrap@example.com";
 
     const firstSendResponse = await sendOTPRequest({
@@ -477,25 +447,24 @@ describe("auth otp integration", () => {
       where: (members, { and, eq }) =>
         and(eq(members.userId, user.id), eq(members.role, MemberRoles.OWNER)),
     });
-    expect(firstOwnerMemberships).toHaveLength(1);
-
-    const firstOwnerMembership = firstOwnerMemberships[0];
-    if (firstOwnerMembership === undefined) {
-      throw new Error("Expected owner membership after first sign-in.");
-    }
+    expect(firstOwnerMemberships).toHaveLength(0);
 
     const firstTeams = await fixture.db.query.teams.findMany({
       columns: {
         id: true,
       },
-      where: (teams, { eq }) => eq(teams.organizationId, firstOwnerMembership.organizationId),
+      where: (teams, { inArray }) =>
+        inArray(
+          teams.organizationId,
+          fixture.db
+            .select({
+              organizationId: members.organizationId,
+            })
+            .from(members)
+            .where(eq(members.userId, user.id)),
+        ),
     });
-    expect(firstTeams).toHaveLength(1);
-
-    const firstTeam = firstTeams[0];
-    if (firstTeam === undefined) {
-      throw new Error("Expected one default team after first sign-in.");
-    }
+    expect(firstTeams).toHaveLength(0);
 
     const firstTeamMemberships = await fixture.db.query.teamMembers.findMany({
       columns: {
@@ -503,7 +472,20 @@ describe("auth otp integration", () => {
       },
       where: (teamMembers, { eq }) => eq(teamMembers.userId, user.id),
     });
-    expect(firstTeamMemberships).toHaveLength(1);
+    expect(firstTeamMemberships).toHaveLength(0);
+
+    const firstSession = await fixture.db.query.sessions.findFirst({
+      columns: {
+        activeOrganizationId: true,
+      },
+      where: (sessions, { eq }) => eq(sessions.userId, user.id),
+      orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
+    });
+    expect(firstSession).toBeDefined();
+    if (firstSession === undefined) {
+      throw new Error("Expected session to exist after first sign-in.");
+    }
+    expect(firstSession.activeOrganizationId).toBeNull();
 
     const secondSendResponse = await sendOTPRequest({
       fixture,
@@ -541,17 +523,24 @@ describe("auth otp integration", () => {
       where: (members, { and, eq }) =>
         and(eq(members.userId, user.id), eq(members.role, MemberRoles.OWNER)),
     });
-    expect(secondOwnerMemberships).toHaveLength(1);
-    expect(secondOwnerMemberships[0]?.organizationId).toBe(firstOwnerMembership.organizationId);
+    expect(secondOwnerMemberships).toHaveLength(0);
 
     const secondTeams = await fixture.db.query.teams.findMany({
       columns: {
         id: true,
       },
-      where: (teams, { eq }) => eq(teams.organizationId, firstOwnerMembership.organizationId),
+      where: (teams, { inArray }) =>
+        inArray(
+          teams.organizationId,
+          fixture.db
+            .select({
+              organizationId: members.organizationId,
+            })
+            .from(members)
+            .where(eq(members.userId, user.id)),
+        ),
     });
-    expect(secondTeams).toHaveLength(1);
-    expect(secondTeams[0]?.id).toBe(firstTeam.id);
+    expect(secondTeams).toHaveLength(0);
 
     const secondTeamMemberships = await fixture.db.query.teamMembers.findMany({
       columns: {
@@ -559,7 +548,19 @@ describe("auth otp integration", () => {
       },
       where: (teamMembers, { eq }) => eq(teamMembers.userId, user.id),
     });
-    expect(secondTeamMemberships).toHaveLength(1);
-    expect(secondTeamMemberships[0]?.teamId).toBe(firstTeam.id);
+    expect(secondTeamMemberships).toHaveLength(0);
+
+    const secondSession = await fixture.db.query.sessions.findFirst({
+      columns: {
+        activeOrganizationId: true,
+      },
+      where: (sessions, { eq }) => eq(sessions.userId, user.id),
+      orderBy: (sessions, { desc }) => [desc(sessions.createdAt)],
+    });
+    expect(secondSession).toBeDefined();
+    if (secondSession === undefined) {
+      throw new Error("Expected session to exist after second sign-in.");
+    }
+    expect(secondSession.activeOrganizationId).toBeNull();
   }, 60_000);
 });
