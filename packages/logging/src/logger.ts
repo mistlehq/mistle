@@ -1,6 +1,8 @@
 import pino, { type Logger } from "pino";
 
-export function createLogger(name: string): Logger {
+export type MistleLogger = Logger;
+
+export function createLogger(name: string): MistleLogger {
   return pino({
     name,
   });

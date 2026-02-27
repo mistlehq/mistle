@@ -1,3 +1,3 @@
-import { createLogger } from "@mistle/logging";
+import { createLogger, type MistleLogger } from "@mistle/logging";
 
-export const logger = createLogger("@mistle/control-plane-api");
+export const logger: MistleLogger = createLogger("@mistle/control-plane-api");
