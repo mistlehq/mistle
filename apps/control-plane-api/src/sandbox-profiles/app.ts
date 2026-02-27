@@ -1,5 +1,4 @@
 import { OpenAPIHono, z } from "@hono/zod-openapi";
-import { StartSandboxInstanceInputSchema } from "@mistle/data-plane-trpc/contracts";
 import { SandboxInstanceSources, SandboxInstanceStarterKinds } from "@mistle/db/data-plane";
 
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
@@ -132,9 +131,6 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
         profileId: params.profileId,
         profileVersion: params.version,
       });
-      const defaultBaseImage = createDefaultSandboxImage({
-        imageId: ctx.get("config").sandbox.defaultBaseImage,
-      });
 
       const startedSandboxInstance = await ctx
         .get("services")
@@ -147,7 +143,12 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
             id: session.user.id,
           },
           source: SandboxInstanceSources.DASHBOARD,
-          image: defaultBaseImage,
+          image: {
+            provider: "docker",
+            imageId: ctx.get("config").sandbox.defaultBaseImage,
+            kind: "base",
+            createdAt: new Date().toISOString(),
+          },
         });
 
       return ctx.json(startedSandboxInstance, 201);
@@ -160,17 +161,6 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
     basePath: SANDBOX_PROFILES_ROUTE_BASE_PATH,
     routes,
   };
-}
-
-function createDefaultSandboxImage(input: {
-  imageId: string;
-}): ReturnType<typeof StartSandboxInstanceInputSchema.shape.image.parse> {
-  return StartSandboxInstanceInputSchema.shape.image.parse({
-    provider: "docker",
-    imageId: input.imageId,
-    kind: "base",
-    createdAt: new Date().toISOString(),
-  });
 }
 
 async function assertSandboxProfileVersionExists(input: {
