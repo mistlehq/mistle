@@ -22,6 +22,13 @@ export const DataPlaneWorkerWorkflowConfigSchema = z
   })
   .strict();
 
+export const DataPlaneWorkerTunnelConfigSchema = z
+  .object({
+    gatewayWsUrl: z.string().min(1),
+    bootstrapTokenTtlSeconds: z.number().int().min(1),
+  })
+  .strict();
+
 export const DataPlaneWorkerSandboxProviders = {
   MODAL: "modal",
   DOCKER: "docker",
@@ -73,6 +80,7 @@ export const DataPlaneWorkerConfigSchema = z
     server: DataPlaneWorkerServerConfigSchema,
     database: DataPlaneWorkerDatabaseConfigSchema,
     workflow: DataPlaneWorkerWorkflowConfigSchema,
+    tunnel: DataPlaneWorkerTunnelConfigSchema,
     sandbox: DataPlaneWorkerSandboxConfigSchema,
   })
   .strict();
@@ -82,6 +90,7 @@ export const PartialDataPlaneWorkerConfigSchema = z
     server: DataPlaneWorkerServerConfigSchema.partial().optional(),
     database: DataPlaneWorkerDatabaseConfigSchema.partial().optional(),
     workflow: DataPlaneWorkerWorkflowConfigSchema.partial().optional(),
+    tunnel: DataPlaneWorkerTunnelConfigSchema.partial().optional(),
     sandbox: PartialDataPlaneWorkerSandboxConfigSchema.optional(),
   })
   .strict();

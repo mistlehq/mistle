@@ -14,6 +14,9 @@ describe("convertEnvToTomlRecord", () => {
     const tomlRecord = convertEnvToTomlRecord({
       IGNORED_VALUE: "ignored",
       NODE_ENV: "test",
+      MISTLE_GLOBAL_TUNNEL_BOOTSTRAP_TOKEN_SECRET: "fixture-bootstrap-secret",
+      MISTLE_GLOBAL_TUNNEL_TOKEN_ISSUER: "data-plane-worker",
+      MISTLE_GLOBAL_TUNNEL_TOKEN_AUDIENCE: "data-plane-gateway",
       MISTLE_APPS_CONTROL_PLANE_API_HOST: "127.0.0.1",
       MISTLE_APPS_CONTROL_PLANE_API_PORT: "5000",
       MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE:
@@ -23,11 +26,17 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "true",
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "4",
       MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
+      MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
     });
 
     expect(tomlRecord).toEqual({
       global: {
         env: "development",
+        tunnel: {
+          bootstrap_token_secret: "fixture-bootstrap-secret",
+          token_issuer: "data-plane-worker",
+          token_audience: "data-plane-gateway",
+        },
       },
       apps: {
         control_plane_api: {
@@ -52,6 +61,11 @@ describe("convertEnvToTomlRecord", () => {
             base_url: "http://127.0.0.1:5300",
           },
         },
+        data_plane_worker: {
+          tunnel: {
+            bootstrap_token_ttl_seconds: 120,
+          },
+        },
       },
     });
   });
@@ -62,6 +76,11 @@ describe("convertTomlToEnvRecord", () => {
     const envRecord = convertTomlToEnvRecord({
       global: {
         env: "production",
+        tunnel: {
+          bootstrap_token_secret: "prod-bootstrap-secret",
+          token_issuer: "data-plane-worker",
+          token_audience: "data-plane-gateway",
+        },
       },
       apps: {
         control_plane_api: {
@@ -86,6 +105,9 @@ describe("convertTomlToEnvRecord", () => {
 
     expect(envRecord).toEqual({
       NODE_ENV: "production",
+      MISTLE_GLOBAL_TUNNEL_BOOTSTRAP_TOKEN_SECRET: "prod-bootstrap-secret",
+      MISTLE_GLOBAL_TUNNEL_TOKEN_ISSUER: "data-plane-worker",
+      MISTLE_GLOBAL_TUNNEL_TOKEN_AUDIENCE: "data-plane-gateway",
       MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE:
         "registry.example.com/mistle/sandbox-base:prod",
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "https://a.example,https://b.example",

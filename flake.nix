@@ -30,6 +30,7 @@
 
           shellHook = ''
             export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+            export GOTOOLCHAIN=auto
             export PIPX_DEFAULT_PYTHON=${python}/bin/python3
             REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
             export PIPX_HOME="$REPO_ROOT/.pipx/home"

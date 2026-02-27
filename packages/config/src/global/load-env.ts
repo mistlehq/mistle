@@ -1,5 +1,9 @@
-import { createEnvLoader } from "../core/load-env.js";
-import { type PartialGlobalConfigInput, GlobalConfigSchema } from "./schema.js";
+import { createEnvLoader, hasEntries } from "../core/load-env.js";
+import {
+  type PartialGlobalConfigInput,
+  GlobalConfigSchema,
+  GlobalTunnelConfigSchema,
+} from "./schema.js";
 
 const loadGlobalEnv = createEnvLoader<typeof GlobalConfigSchema>([
   {
@@ -16,6 +20,28 @@ const loadGlobalEnv = createEnvLoader<typeof GlobalConfigSchema>([
   },
 ]);
 
+const loadTunnelEnv = createEnvLoader<typeof GlobalTunnelConfigSchema>([
+  {
+    key: "bootstrapTokenSecret",
+    envVar: "MISTLE_GLOBAL_TUNNEL_BOOTSTRAP_TOKEN_SECRET",
+  },
+  {
+    key: "tokenIssuer",
+    envVar: "MISTLE_GLOBAL_TUNNEL_TOKEN_ISSUER",
+  },
+  {
+    key: "tokenAudience",
+    envVar: "MISTLE_GLOBAL_TUNNEL_TOKEN_AUDIENCE",
+  },
+]);
+
 export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigInput {
-  return GlobalConfigSchema.partial().parse(loadGlobalEnv(env));
+  const partialGlobal = loadGlobalEnv(env);
+  const partialTunnel = loadTunnelEnv(env);
+
+  if (hasEntries(partialTunnel)) {
+    partialGlobal.tunnel = partialTunnel;
+  }
+
+  return GlobalConfigSchema.partial().parse(partialGlobal);
 }

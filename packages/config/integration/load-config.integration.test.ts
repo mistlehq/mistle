@@ -10,11 +10,19 @@ const dataPlaneWorkerDockerConfigFixturePath = fileURLToPath(
   new URL("./fixtures/data-plane-worker-docker.toml", import.meta.url),
 );
 const serviceToken = "fixture-service-token";
+const bootstrapTokenSecret = "fixture-bootstrap-token-secret";
+const tokenIssuer = "data-plane-worker";
+const tokenAudience = "data-plane-gateway";
 
 const globalDevelopmentConfig = {
   env: "development",
   internalAuth: {
     serviceToken,
+  },
+  tunnel: {
+    bootstrapTokenSecret,
+    tokenIssuer,
+    tokenAudience,
   },
 } as const;
 
@@ -22,6 +30,11 @@ const globalProductionConfig = {
   env: "production",
   internalAuth: {
     serviceToken,
+  },
+  tunnel: {
+    bootstrapTokenSecret,
+    tokenIssuer,
+    tokenAudience,
   },
 } as const;
 
@@ -162,6 +175,10 @@ const dataPlaneWorkerEnvConfig = {
     runMigrations: true,
     concurrency: 1,
   },
+  tunnel: {
+    gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+    bootstrapTokenTtlSeconds: 120,
+  },
   sandbox: {
     provider: "modal",
     modal: {
@@ -184,6 +201,10 @@ const dataPlaneWorkerFixtureConfig = {
     namespaceId: "fixture",
     concurrency: 2,
   },
+  tunnel: {
+    gatewayWsUrl: "ws://127.0.0.1:5302/tunnel/sandbox",
+    bootstrapTokenTtlSeconds: 120,
+  },
 } as const;
 
 const dataPlaneWorkerDockerFixtureConfig = {
@@ -199,6 +220,10 @@ const dataPlaneWorkerDockerFixtureConfig = {
     namespaceId: "fixture-docker",
     runMigrations: true,
     concurrency: 3,
+  },
+  tunnel: {
+    gatewayWsUrl: "ws://127.0.0.1:5302/tunnel/sandbox",
+    bootstrapTokenTtlSeconds: 120,
   },
   sandbox: {
     provider: "docker",
