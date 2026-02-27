@@ -8,6 +8,7 @@ import type { ControlPlaneWorkerConfig } from "../src/types.js";
 
 export type ControlPlaneWorkerIntegrationFixture = {
   config: ControlPlaneWorkerConfig;
+  internalAuthServiceToken: string;
   databaseStack: PostgresWithPgBouncerService;
 };
 
@@ -45,6 +46,7 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkerIntegrationFixtur
 
       await use({
         config,
+        internalAuthServiceToken: "integration-service-token",
         databaseStack,
       });
 

@@ -61,7 +61,10 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
           },
         };
 
-        const runtime = await createDataPlaneApiRuntime(config);
+        const runtime = await createDataPlaneApiRuntime({
+          app: config,
+          internalAuthServiceToken: "integration-service-token",
+        });
         await runtime.start();
         cleanupTasks.unshift(async () => {
           await runtime.stop();

@@ -2,16 +2,22 @@ import { DATA_PLANE_TRPC_PATH } from "@mistle/data-plane-trpc/constants";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { Hono } from "hono";
 
-import type { AppContextBindings, DataPlaneApiConfig, DataPlaneApp } from "./types.js";
+import type { AppContextBindings, DataPlaneApiRuntimeConfig, DataPlaneApp } from "./types.js";
 
 import { createAppResources, setAppResources, stopAppResources } from "./runtime/resources.js";
 import { createDataPlaneTrpcContext, dataPlaneTrpcRouter } from "./trpc/index.js";
 
-export async function createApp(config: DataPlaneApiConfig): Promise<DataPlaneApp> {
+export async function createApp(runtimeConfig: DataPlaneApiRuntimeConfig): Promise<DataPlaneApp> {
   const app = new Hono<AppContextBindings>();
-  const resources = await createAppResources(config);
+  const resources = await createAppResources(runtimeConfig.app);
+  app.use("*", async (ctx, next) => {
+    ctx.set("config", runtimeConfig.app);
+    ctx.set("internalAuthServiceToken", runtimeConfig.internalAuthServiceToken);
+    await next();
+  });
   const trpcContext = createDataPlaneTrpcContext({
-    config,
+    config: runtimeConfig.app,
+    internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
     resources,
   });
 

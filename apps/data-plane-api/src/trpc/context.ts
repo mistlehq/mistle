@@ -3,6 +3,7 @@ import type { DataPlaneApiConfig } from "../types.js";
 
 export interface DataPlaneTrpcContext {
   config: DataPlaneApiConfig;
+  internalAuthServiceToken: string;
   resources: AppRuntimeResources;
 }
 

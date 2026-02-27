@@ -1,12 +1,12 @@
-import type { DataPlaneApiConfig, DataPlaneApiRuntime, StartedServer } from "../types.js";
+import type { DataPlaneApiRuntime, DataPlaneApiRuntimeConfig, StartedServer } from "../types.js";
 
 import { createApp, stopApp } from "../app.js";
 import { startServer } from "../server.js";
 
 export async function createDataPlaneApiRuntime(
-  config: DataPlaneApiConfig,
+  runtimeConfig: DataPlaneApiRuntimeConfig,
 ): Promise<DataPlaneApiRuntime> {
-  const app = await createApp(config);
+  const app = await createApp(runtimeConfig);
   let startedServer: StartedServer | undefined;
   let stopPromise: Promise<void> | undefined;
   let stopped = false;
@@ -34,8 +34,8 @@ export async function createDataPlaneApiRuntime(
 
       startedServer = startServer({
         app,
-        host: config.server.host,
-        port: config.server.port,
+        host: runtimeConfig.app.server.host,
+        port: runtimeConfig.app.server.port,
       });
     },
     stop: async () => {

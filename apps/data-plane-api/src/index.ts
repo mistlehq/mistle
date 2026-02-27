@@ -7,10 +7,14 @@ async function startDataPlaneApi(): Promise<void> {
   const loadedConfig = loadConfig({
     app: AppIds.DATA_PLANE_API,
     env: process.env,
-    includeGlobal: false,
   });
-  const appConfig = loadedConfig.app;
-  const runtime = await createDataPlaneApiRuntime(appConfig);
+  if (loadedConfig.global === undefined) {
+    throw new Error("Expected global config to be loaded for data-plane-api.");
+  }
+  const runtime = await createDataPlaneApiRuntime({
+    app: loadedConfig.app,
+    internalAuthServiceToken: loadedConfig.global.internalAuth.serviceToken,
+  });
 
   await runtime.start();
 
@@ -53,8 +57,8 @@ async function startDataPlaneApi(): Promise<void> {
 
   logger.info(
     {
-      host: appConfig.server.host,
-      port: appConfig.server.port,
+      host: loadedConfig.app.server.host,
+      port: loadedConfig.app.server.port,
     },
     "data-plane-api listening",
   );

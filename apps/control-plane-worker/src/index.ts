@@ -6,10 +6,14 @@ import { createControlPlaneWorkerRuntime } from "./runtime/index.js";
 const loadedConfig = loadConfig({
   app: AppIds.CONTROL_PLANE_WORKER,
   env: process.env,
-  includeGlobal: false,
 });
-const appConfig = loadedConfig.app;
-const runtime = await createControlPlaneWorkerRuntime(appConfig);
+if (loadedConfig.global === undefined) {
+  throw new Error("Expected global config to be loaded for control-plane-worker.");
+}
+const runtime = await createControlPlaneWorkerRuntime({
+  app: loadedConfig.app,
+  internalAuthServiceToken: loadedConfig.global.internalAuth.serviceToken,
+});
 
 await runtime.start();
 
@@ -52,8 +56,8 @@ process.once("SIGTERM", () => {
 
 logger.info(
   {
-    host: appConfig.server.host,
-    port: appConfig.server.port,
+    host: loadedConfig.app.server.host,
+    port: loadedConfig.app.server.port,
   },
   "control-plane-worker listening",
 );
