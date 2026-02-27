@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/bootstrap"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/config"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/server"
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/tunnel"
 )
 
 type RunInput struct {
@@ -30,9 +32,9 @@ func Run(input RunInput) error {
 		return err
 	}
 
-	bootstrapToken, err := bootstrap.ReadBootstrapToken(bootstrap.ReadBootstrapTokenInput{
+	startupInput, err := bootstrap.ReadStartupInput(bootstrap.ReadStartupInputInput{
 		Reader:   input.Stdin,
-		MaxBytes: bootstrap.DefaultBootstrapTokenMaxBytes,
+		MaxBytes: bootstrap.DefaultStartupInputMaxBytes,
 	})
 	if err != nil {
 		return err
@@ -50,12 +52,41 @@ func Run(input RunInput) error {
 
 	httpServer := &http.Server{
 		Handler: server.NewRouter(server.RouterInput{
-			BootstrapTokenLoaded: len(bootstrapToken) > 0,
+			BootstrapTokenLoaded: startupInput.BootstrapToken != "",
 		}),
 	}
-	if err := httpServer.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		return fmt.Errorf("http server failed: %w", err)
-	}
 
-	return nil
+	tunnelCtx, cancelTunnel := context.WithCancel(context.Background())
+	defer cancelTunnel()
+
+	tunnelErrCh := make(chan error, 1)
+	go func() {
+		tunnelErrCh <- tunnel.Run(tunnel.RunInput{
+			Context:        tunnelCtx,
+			GatewayWSURL:   startupInput.TunnelGatewayURL,
+			BootstrapToken: []byte(startupInput.BootstrapToken),
+		})
+	}()
+
+	httpServerErrCh := make(chan error, 1)
+	go func() {
+		httpServerErrCh <- httpServer.Serve(listener)
+	}()
+
+	select {
+	case tunnelErr := <-tunnelErrCh:
+		_ = httpServer.Close()
+		if tunnelErr != nil {
+			return fmt.Errorf("sandbox tunnel failed: %w", tunnelErr)
+		}
+
+		return nil
+	case httpServerErr := <-httpServerErrCh:
+		cancelTunnel()
+		if httpServerErr != nil && !errors.Is(httpServerErr, http.ErrServerClosed) {
+			return fmt.Errorf("http server failed: %w", httpServerErr)
+		}
+
+		return nil
+	}
 }

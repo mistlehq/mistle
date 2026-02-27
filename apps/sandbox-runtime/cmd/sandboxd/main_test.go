@@ -11,7 +11,9 @@ import (
 func TestRunWithInput(t *testing.T) {
 	t.Run("fails when runtime listen addr env is missing", func(t *testing.T) {
 		err := runWithInput(runtime.RunInput{
-			Stdin: bytes.NewBufferString("test-token"),
+			Stdin: bytes.NewBufferString(
+				`{"bootstrapToken":"test-token","tunnelGatewayWsUrl":"ws://127.0.0.1:5003/tunnel/sandbox"}`,
+			),
 			LookupEnv: func(string) (string, bool) {
 				return "", false
 			},
@@ -28,7 +30,6 @@ func TestRunWithInput(t *testing.T) {
 				if key == config.ListenAddrEnv {
 					return ":8090", true
 				}
-
 				return "", false
 			},
 		})
