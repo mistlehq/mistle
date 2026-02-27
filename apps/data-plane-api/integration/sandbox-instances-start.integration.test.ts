@@ -1,6 +1,6 @@
 import type {
+  StartSandboxInstanceCompletedResponse,
   StartSandboxInstanceInput,
-  StartSandboxInstanceAcceptedResponse,
 } from "@mistle/data-plane-trpc/contracts";
 
 import { DATA_PLANE_INTERNAL_AUTH_HEADER } from "@mistle/data-plane-trpc/constants";
@@ -17,6 +17,10 @@ type WorkflowRunRow = {
   workflow_name: string;
   status: string;
   input: StartSandboxInstanceInput;
+  output: {
+    sandboxInstanceId: string;
+    providerSandboxId: string;
+  } | null;
 };
 
 function createTrpcClient(
@@ -36,7 +40,7 @@ function createTrpcClient(
 }
 
 describe("sandboxInstances.start integration", () => {
-  it("enqueues a start-sandbox workflow run and returns accepted response", async ({ fixture }) => {
+  it("waits for workflow completion and returns completed response", async ({ fixture }) => {
     const client = createTrpcClient(fixture.baseUrl, fixture.internalAuthServiceToken);
     const workflowInput: StartSandboxInstanceInput = {
       organizationId: "org_dp_api_integration_001",
@@ -59,15 +63,17 @@ describe("sandboxInstances.start integration", () => {
       },
     };
 
-    const response: StartSandboxInstanceAcceptedResponse =
+    const response: StartSandboxInstanceCompletedResponse =
       await client.sandboxInstances.start.mutate(workflowInput);
 
-    expect(response.status).toBe("accepted");
+    expect(response.status).toBe("completed");
     expect(response.workflowRunId).not.toBe("");
+    expect(response.sandboxInstanceId).not.toBe("");
+    expect(response.providerSandboxId).not.toBe("");
 
     const workflowRowsResult = await fixture.dbPool.query<WorkflowRunRow>(
       `
-        select id, namespace_id, workflow_name, status, input
+        select id, namespace_id, workflow_name, status, input, output
         from data_plane_openworkflow.workflow_runs
         where namespace_id = $1 and id = $2
       `,
@@ -83,8 +89,70 @@ describe("sandboxInstances.start integration", () => {
 
     expect(workflowRun.namespace_id).toBe(fixture.config.workflow.namespaceId);
     expect(workflowRun.workflow_name).toBe("data-plane.sandbox-instances.start");
-    expect(workflowRun.status).toBe("pending");
+    expect(workflowRun.status).toBe("completed");
     expect(workflowRun.input).toEqual(workflowInput);
+    expect(workflowRun.output).toEqual({
+      sandboxInstanceId: response.sandboxInstanceId,
+      providerSandboxId: response.providerSandboxId,
+    });
+
+    const persistedSandboxInstance = await fixture.db.query.sandboxInstances.findFirst({
+      columns: {
+        id: true,
+        providerSandboxId: true,
+      },
+      where: (table, { eq }) => eq(table.id, response.sandboxInstanceId),
+    });
+    if (persistedSandboxInstance === undefined) {
+      throw new Error("Expected persisted sandbox instance row to exist.");
+    }
+    expect(persistedSandboxInstance.providerSandboxId).toBe(response.providerSandboxId);
+  }, 60_000);
+
+  it("deduplicates duplicate start requests via idempotency key", async ({ fixture }) => {
+    const client = createTrpcClient(fixture.baseUrl, fixture.internalAuthServiceToken);
+    const workflowInput: StartSandboxInstanceInput = {
+      organizationId: "org_dp_api_integration_idempotent",
+      sandboxProfileId: "sbp_dp_api_integration_idempotent",
+      sandboxProfileVersion: 11,
+      manifest: {
+        app: "demo-idempotent",
+      },
+      startedBy: {
+        kind: "user",
+        id: "usr_dp_api_integration_idempotent",
+      },
+      source: "dashboard",
+      image: {
+        provider: "modal",
+        imageId: "im_dp_api_integration_idempotent",
+        kind: "base",
+        createdAt: "2026-02-27T00:00:00.000Z",
+      },
+    };
+
+    const firstResponse: StartSandboxInstanceCompletedResponse =
+      await client.sandboxInstances.start.mutate(workflowInput);
+    const secondResponse: StartSandboxInstanceCompletedResponse =
+      await client.sandboxInstances.start.mutate(workflowInput);
+
+    expect(secondResponse).toEqual(firstResponse);
+
+    const persistedSandboxInstances = await fixture.db.query.sandboxInstances.findMany({
+      columns: {
+        id: true,
+      },
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, workflowInput.organizationId),
+          eq(table.sandboxProfileId, workflowInput.sandboxProfileId),
+          eq(table.sandboxProfileVersion, workflowInput.sandboxProfileVersion),
+          eq(table.startedByKind, workflowInput.startedBy.kind),
+          eq(table.startedById, workflowInput.startedBy.id),
+          eq(table.source, workflowInput.source),
+        ),
+    });
+    expect(persistedSandboxInstances).toHaveLength(1);
   }, 60_000);
 
   it("rejects requests missing service token", async ({ fixture }) => {
@@ -116,7 +184,7 @@ describe("sandboxInstances.start integration", () => {
           createdAt: "2026-02-27T00:00:00.000Z",
         },
       }),
-    ).rejects.toThrow("UNAUTHORIZED");
+    ).rejects.toThrow("Internal service authentication failed.");
   }, 60_000);
 
   it("rejects requests with invalid service token", async ({ fixture }) => {
@@ -142,6 +210,6 @@ describe("sandboxInstances.start integration", () => {
           createdAt: "2026-02-27T00:00:00.000Z",
         },
       }),
-    ).rejects.toThrow("UNAUTHORIZED");
+    ).rejects.toThrow("Internal service authentication failed.");
   }, 60_000);
 });

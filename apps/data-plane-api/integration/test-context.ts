@@ -1,9 +1,25 @@
 import {
+  SandboxInstanceStatuses,
+  createDataPlaneDatabase,
+  sandboxInstances,
+  type DataPlaneDatabase,
+} from "@mistle/db/data-plane";
+import {
+  DATA_PLANE_MIGRATIONS_FOLDER_PATH,
+  MigrationTracking,
+  runDataPlaneMigrations,
+} from "@mistle/db/migrator";
+import {
   reserveAvailablePort,
   startPostgresWithPgBouncer,
   type PostgresWithPgBouncerService,
 } from "@mistle/test-harness";
-import { createDataPlaneBackend } from "@mistle/workflows/data-plane";
+import {
+  createDataPlaneBackend,
+  createDataPlaneOpenWorkflow,
+  createDataPlaneWorker,
+} from "@mistle/workflows/data-plane";
+import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { it as vitestIt } from "vitest";
 
@@ -16,6 +32,7 @@ export type DataPlaneApiIntegrationFixture = {
   config: DataPlaneApiConfig;
   internalAuthServiceToken: string;
   databaseStack: PostgresWithPgBouncerService;
+  db: DataPlaneDatabase;
   dbPool: Pool;
 };
 
@@ -32,6 +49,13 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
         cleanupTasks.unshift(async () => {
           await databaseStack.stop();
         });
+        await runDataPlaneMigrations({
+          connectionString: databaseStack.directUrl,
+          schemaName: MigrationTracking.DATA_PLANE.SCHEMA_NAME,
+          migrationsFolder: DATA_PLANE_MIGRATIONS_FOLDER_PATH,
+          migrationsSchema: MigrationTracking.DATA_PLANE.SCHEMA_NAME,
+          migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
+        });
 
         const workflowNamespaceId = "integration";
         const migrationBackend = await createDataPlaneBackend({
@@ -46,6 +70,66 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
         });
         cleanupTasks.unshift(async () => {
           await dbPool.end();
+        });
+        const db = createDataPlaneDatabase(dbPool);
+
+        const workflowBackend = await createDataPlaneBackend({
+          url: databaseStack.directUrl,
+          namespaceId: workflowNamespaceId,
+          runMigrations: false,
+        });
+        cleanupTasks.unshift(async () => {
+          await workflowBackend.stop();
+        });
+        const openWorkflow = createDataPlaneOpenWorkflow({
+          backend: workflowBackend,
+        });
+        const workflowWorker = createDataPlaneWorker({
+          openWorkflow,
+          concurrency: 1,
+          workflowInputs: {
+            startSandboxInstance: {
+              startSandbox: async (workflowInput) => {
+                return {
+                  provider: workflowInput.image.provider,
+                  providerSandboxId: `integration-${randomUUID()}`,
+                };
+              },
+              stopSandbox: async () => {},
+              insertSandboxInstance: async (workflowInput) => {
+                const insertedRows = await db
+                  .insert(sandboxInstances)
+                  .values({
+                    organizationId: workflowInput.organizationId,
+                    sandboxProfileId: workflowInput.sandboxProfileId,
+                    sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+                    manifest: workflowInput.manifest,
+                    provider: workflowInput.provider,
+                    providerSandboxId: workflowInput.providerSandboxId,
+                    status: SandboxInstanceStatuses.RUNNING,
+                    startedByKind: workflowInput.startedBy.kind,
+                    startedById: workflowInput.startedBy.id,
+                    source: workflowInput.source,
+                  })
+                  .returning({
+                    id: sandboxInstances.id,
+                  });
+
+                const insertedSandboxInstance = insertedRows[0];
+                if (insertedSandboxInstance === undefined) {
+                  throw new Error("Expected sandbox instance insert to return one row.");
+                }
+
+                return {
+                  sandboxInstanceId: insertedSandboxInstance.id,
+                };
+              },
+            },
+          },
+        });
+        await workflowWorker.start();
+        cleanupTasks.unshift(async () => {
+          await workflowWorker.stop();
         });
 
         const config: DataPlaneApiConfig = {
@@ -77,6 +161,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
           config,
           internalAuthServiceToken,
           databaseStack,
+          db,
           dbPool,
         });
       } finally {

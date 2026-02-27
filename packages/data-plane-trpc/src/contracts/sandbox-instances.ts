@@ -35,16 +35,18 @@ export const StartSandboxInstanceInputSchema = z
   })
   .strict();
 
-export const StartSandboxInstanceAcceptedResponseSchema = z
+export const StartSandboxInstanceCompletedResponseSchema = z
   .object({
-    status: z.literal("accepted"),
+    status: z.literal("completed"),
+    sandboxInstanceId: z.string().min(1),
+    providerSandboxId: z.string().min(1),
     workflowRunId: z.string().min(1),
   })
   .strict();
 
 export type StartSandboxInstanceInput = z.infer<typeof StartSandboxInstanceInputSchema>;
-export type StartSandboxInstanceAcceptedResponse = z.infer<
-  typeof StartSandboxInstanceAcceptedResponseSchema
+export type StartSandboxInstanceCompletedResponse = z.infer<
+  typeof StartSandboxInstanceCompletedResponseSchema
 >;
 
 type ContractMatchesWorkflowInput =
