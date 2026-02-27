@@ -12,6 +12,8 @@ The base image includes a single sandbox runtime entrypoint that every sandbox w
 
 - Entry point: `/usr/local/bin/sandboxd`
 - Default listen address: `SANDBOX_RUNTIME_LISTEN_ADDR=:8090`
-- Bootstrap token: token must be provided via process `stdin` during startup
+- Startup input: JSON must be provided via process `stdin` during startup with required fields:
+  - `bootstrapToken`
+  - `tunnelGatewayWsUrl`
 - Health endpoint: `GET /__healthz` returns 200 only after bootstrap token is loaded
 - `PATH` includes `mise` shims at `/home/sandbox/.local/share/mise/shims`

@@ -10,10 +10,9 @@ import { sql } from "drizzle-orm";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../types.js";
 import type { WorkerRuntimeResources } from "./resources.js";
+import { encodeSandboxStartupInput } from "./sandbox-startup-input.js";
 
-const BootstrapTokenEncoder = new TextEncoder();
-
-async function writeSandboxBootstrapToken(input: {
+async function writeSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
   resources: Pick<WorkerRuntimeResources, "sandboxAdapter">;
   sandbox: {
@@ -34,7 +33,10 @@ async function writeSandboxBootstrapToken(input: {
 
   try {
     await input.sandbox.writeStdin({
-      payload: BootstrapTokenEncoder.encode(`${bootstrapToken}\n`),
+      payload: encodeSandboxStartupInput({
+        bootstrapToken,
+        tunnelGatewayWsUrl: input.config.app.tunnel.gatewayWsUrl,
+      }),
     });
     await input.sandbox.closeStdin();
   } catch (writeError) {
@@ -44,7 +46,7 @@ async function writeSandboxBootstrapToken(input: {
       });
     } catch (stopError) {
       throw new Error(
-        "Failed to write sandbox bootstrap token and failed to stop sandbox after bootstrap failure.",
+        "Failed to write sandbox startup input and failed to stop sandbox after startup write failure.",
         {
           cause: {
             writeError,
@@ -54,7 +56,7 @@ async function writeSandboxBootstrapToken(input: {
       );
     }
 
-    throw new Error("Failed to write sandbox bootstrap token to sandbox stdin.", {
+    throw new Error("Failed to write sandbox startup input to sandbox stdin.", {
       cause: writeError,
     });
   }
@@ -71,7 +73,7 @@ function createWorkflowInputs(ctx: {
           image: workflowInput.image,
         });
 
-        await writeSandboxBootstrapToken({
+        await writeSandboxStartupInput({
           config: ctx.config,
           resources: ctx.resources,
           sandbox: startedSandbox,
