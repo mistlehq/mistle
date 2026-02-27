@@ -276,6 +276,12 @@ importers:
         specifier: ^8.18.0
         version: 8.18.0
     devDependencies:
+      '@mistle/test-harness':
+        specifier: workspace:*
+        version: link:../../packages/test-harness
+      '@trpc/client':
+        specifier: ^11.10.0
+        version: 11.10.0(@trpc/server@11.10.0(typescript@5.9.3))(typescript@5.9.3)
       '@types/pg':
         specifier: ^8.15.6
         version: 8.16.0
