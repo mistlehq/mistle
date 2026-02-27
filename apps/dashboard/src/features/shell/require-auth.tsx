@@ -1,4 +1,3 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@mistle/ui";
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import type { SessionData } from "../auth/types.js";
@@ -42,21 +41,7 @@ export function RequireAuth(): React.JSX.Element {
   }
 
   if (sessionQuery.isError) {
-    return (
-      <main className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <div className="mx-auto flex min-h-svh w-full max-w-xl items-center px-4 py-8">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Mistle dashboard</CardTitle>
-              <CardDescription>Session error</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-destructive text-sm">{sessionQuery.error.message}</p>
-            </CardContent>
-          </Card>
-        </div>
-      </main>
-    );
+    throw sessionQuery.error;
   }
 
   if (sessionQuery.data === null) {
