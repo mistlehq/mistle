@@ -6,6 +6,9 @@ import { AppIds } from "../src/modules.js";
 import { createIntegrationEnv } from "./fixtures/env.js";
 
 const configFixturePath = fileURLToPath(new URL("./fixtures/config.toml", import.meta.url));
+const dataPlaneWorkerDockerConfigFixturePath = fileURLToPath(
+  new URL("./fixtures/data-plane-worker-docker.toml", import.meta.url),
+);
 const serviceToken = "fixture-service-token";
 
 const globalDevelopmentConfig = {
@@ -168,6 +171,29 @@ const dataPlaneWorkerFixtureConfig = {
     ...dataPlaneWorkerEnvConfig.workflow,
     namespaceId: "fixture",
     concurrency: 2,
+  },
+} as const;
+
+const dataPlaneWorkerDockerFixtureConfig = {
+  server: {
+    host: "0.0.0.0",
+    port: 5305,
+  },
+  database: {
+    url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_data_plane",
+  },
+  workflow: {
+    databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_data_plane",
+    namespaceId: "fixture-docker",
+    runMigrations: true,
+    concurrency: 3,
+  },
+  sandbox: {
+    provider: "docker",
+    docker: {
+      socketPath: "/var/run/docker.sock",
+      snapshotRepository: "localhost:5001/mistle/snapshots",
+    },
   },
 } as const;
 
@@ -471,6 +497,43 @@ describe("loadConfig integrations", () => {
           port: 5304,
         },
       },
+    });
+  });
+
+  it("loads data-plane-worker with docker sandbox config from env", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_WORKER,
+      env: createIntegrationEnv({
+        NODE_ENV: "production",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_PROVIDER: "docker",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY:
+          "localhost:5001/mistle/snapshots",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID: undefined,
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET: undefined,
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_APP_NAME: undefined,
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME: undefined,
+      }),
+    });
+
+    expect(config).toEqual({
+      global: globalProductionConfig,
+      app: {
+        ...dataPlaneWorkerEnvConfig,
+        sandbox: dataPlaneWorkerDockerFixtureConfig.sandbox,
+      },
+    });
+  });
+
+  it("loads data-plane-worker with docker sandbox config from a config file fixture", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_WORKER,
+      configPath: dataPlaneWorkerDockerConfigFixturePath,
+    });
+
+    expect(config).toEqual({
+      global: globalDevelopmentConfig,
+      app: dataPlaneWorkerDockerFixtureConfig,
     });
   });
 

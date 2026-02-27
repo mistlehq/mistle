@@ -24,6 +24,7 @@ export const DataPlaneWorkerWorkflowConfigSchema = z
 
 export const DataPlaneWorkerSandboxProviders = {
   MODAL: "modal",
+  DOCKER: "docker",
 } as const;
 
 export const DataPlaneWorkerSandboxModalConfigSchema = z
@@ -35,17 +36,35 @@ export const DataPlaneWorkerSandboxModalConfigSchema = z
   })
   .strict();
 
-export const DataPlaneWorkerSandboxConfigSchema = z
+export const DataPlaneWorkerSandboxDockerConfigSchema = z
   .object({
-    provider: z.literal(DataPlaneWorkerSandboxProviders.MODAL),
-    modal: DataPlaneWorkerSandboxModalConfigSchema,
+    socketPath: z.string().min(1),
+    snapshotRepository: z.string().min(1),
   })
   .strict();
 
+export const DataPlaneWorkerSandboxConfigSchema = z.discriminatedUnion("provider", [
+  z
+    .object({
+      provider: z.literal(DataPlaneWorkerSandboxProviders.MODAL),
+      modal: DataPlaneWorkerSandboxModalConfigSchema,
+    })
+    .strict(),
+  z
+    .object({
+      provider: z.literal(DataPlaneWorkerSandboxProviders.DOCKER),
+      docker: DataPlaneWorkerSandboxDockerConfigSchema,
+    })
+    .strict(),
+]);
+
 export const PartialDataPlaneWorkerSandboxConfigSchema = z
   .object({
-    provider: z.literal(DataPlaneWorkerSandboxProviders.MODAL).optional(),
+    provider: z
+      .enum([DataPlaneWorkerSandboxProviders.MODAL, DataPlaneWorkerSandboxProviders.DOCKER])
+      .optional(),
     modal: DataPlaneWorkerSandboxModalConfigSchema.partial().optional(),
+    docker: DataPlaneWorkerSandboxDockerConfigSchema.partial().optional(),
   })
   .strict();
 
