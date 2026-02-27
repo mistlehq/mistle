@@ -1,0 +1,1 @@
+export const ORGANIZATION_MEMBERSHIP_CAPABILITIES_ROUTE_BASE_PATH = "/v1/organizations";
