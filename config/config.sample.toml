@@ -49,6 +49,9 @@ smtp_secure = false
 smtp_username = "replace-with-smtp-username"
 smtp_password = "replace-with-smtp-password"
 
+[apps.control_plane_worker.data_plane_api]
+base_url = "http://data-plane-api:8082"
+
 [apps.data_plane_api.server]
 host = "0.0.0.0"
 port = 8082
