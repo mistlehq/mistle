@@ -52,7 +52,7 @@
   },
   "dependencies": {
     "drizzle-orm": "^0.45.1",
-    "pg": "^8.18.0",
+    "pg": "^8.19.0",
     "typeid-js": "^1.2.0"
   },
   "devDependencies": {
