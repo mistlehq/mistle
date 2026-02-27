@@ -103,6 +103,10 @@ export const ROUTE_HANDLES = {
     title: "Personal",
     description: "",
   },
+  settingsAccount: {
+    breadcrumb: "Account",
+    breadcrumbClickable: false,
+  },
   settingsProfile: {
     breadcrumb: "Profile",
     title: "Profile",
