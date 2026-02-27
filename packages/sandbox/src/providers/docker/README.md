@@ -1,0 +1,40 @@
+# Docker Provider
+
+Docker implementation for `@mistle/sandbox`.
+
+## Config
+
+`createSandboxAdapter({ provider: SandboxProvider.DOCKER, docker: ... })` expects:
+
+- `socketPath`: Docker daemon socket path (for example `/var/run/docker.sock`)
+- `snapshotRepository`: OCI repository used for snapshot push/pull by digest
+
+All config fields are validated with Zod and fail fast when invalid.
+
+## Usage
+
+```ts
+import { createSandboxAdapter, SandboxProvider } from "@mistle/sandbox";
+
+const adapter = createSandboxAdapter({
+  provider: SandboxProvider.DOCKER,
+  docker: {
+    socketPath: "/var/run/docker.sock",
+    snapshotRepository: "localhost:5001/mistle/snapshots",
+  },
+});
+```
+
+## Provider Behavior
+
+- `start({ image })` pulls image reference and starts a Docker container.
+- `snapshot({ sandboxId })` commits container filesystem, pushes to `snapshotRepository`, and returns immutable digest reference.
+- `stop({ sandboxId })` force-removes the Docker container.
+
+## Error Surface
+
+Docker API errors are mapped to `DockerClientError` with:
+
+- `code`: `not_found`, `conflict`, `invalid_argument`, `unauthenticated`, `unknown`
+- `operation`: identifies failing operation (`pull_image`, `create_container`, `push_image`, etc.)
+- `retryable`: retry hint for caller policy

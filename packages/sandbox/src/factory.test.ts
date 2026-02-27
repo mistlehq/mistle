@@ -27,4 +27,26 @@ describe("createSandboxAdapter", () => {
       }),
     ).toThrowError(SandboxConfigurationError);
   });
+
+  it("creates a docker adapter when docker config is provided", () => {
+    const adapter = createSandboxAdapter({
+      provider: SandboxProvider.DOCKER,
+      docker: {
+        socketPath: "/var/run/docker.sock",
+        snapshotRepository: "localhost:5001/mistle/snapshots",
+      },
+    });
+
+    expect(typeof adapter.start).toBe("function");
+    expect(typeof adapter.snapshot).toBe("function");
+    expect(typeof adapter.stop).toBe("function");
+  });
+
+  it("throws when docker config is missing", () => {
+    expect(() =>
+      createSandboxAdapter({
+        provider: SandboxProvider.DOCKER,
+      }),
+    ).toThrowError(SandboxConfigurationError);
+  });
 });
