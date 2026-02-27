@@ -81,6 +81,13 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
           openWorkflow,
           concurrency: 1,
           workflowInputs: {
+            sendOrganizationInvitation: {
+              emailSender,
+              from: {
+                email: "no-reply@mistle.dev",
+                name: "Mistle",
+              },
+            },
             sendVerificationOTP: {
               emailSender,
               from: {

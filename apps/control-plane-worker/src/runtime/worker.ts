@@ -27,6 +27,13 @@ function createWorkflowInputs(ctx: {
   emailSender: SMTPEmailSender;
 }): CreateControlPlaneWorkflowDefinitionsInput {
   return {
+    sendOrganizationInvitation: {
+      emailSender: input.emailSender,
+      from: {
+        email: input.config.email.fromAddress,
+        name: input.config.email.fromName,
+      },
+    },
     sendVerificationOTP: {
       emailSender: ctx.emailSender,
       from: {

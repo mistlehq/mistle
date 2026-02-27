@@ -16,7 +16,7 @@ url = "postgresql://mistle:replace-with-password@db:5432/mistle_control_plane"
 
 [apps.control_plane_api.auth]
 base_url = "https://api.mistle.example"
-invitation_accept_base_url = "https://app.mistle.example/settings/members"
+invitation_accept_base_url = "https://app.mistle.example/invitations/accept"
 secret = "replace-with-strong-secret"
 trusted_origins = ["https://app.mistle.example"]
 otp_length = 6

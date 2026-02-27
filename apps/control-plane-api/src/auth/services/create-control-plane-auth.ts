@@ -2,7 +2,6 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 
 import { ControlPlaneDbSchema } from "@mistle/db/control-plane";
-import { SMTPEmailSender } from "@mistle/emails";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP, organization } from "better-auth/plugins";
@@ -22,13 +21,6 @@ export type ControlPlaneAuthConfig = {
   authOTPLength: number;
   authOTPExpiresInSeconds: number;
   authOTPAllowedAttempts: number;
-  emailFromAddress: string;
-  emailFromName: string;
-  emailSMTPHost: string;
-  emailSMTPPort: number;
-  emailSMTPSecure: boolean;
-  emailSMTPUsername: string;
-  emailSMTPPassword: string;
 };
 
 type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
@@ -43,23 +35,12 @@ export type ControlPlaneAuth = ReturnType<typeof betterAuth>;
 
 export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions): ControlPlaneAuth {
   const { config, db, openWorkflow } = options;
-  const emailSender = SMTPEmailSender.fromTransportOptions({
-    host: config.emailSMTPHost,
-    port: config.emailSMTPPort,
-    secure: config.emailSMTPSecure,
-    auth: {
-      user: config.emailSMTPUsername,
-      pass: config.emailSMTPPassword,
-    },
-  });
   const sendVerificationOTP = createSendVerificationOTPService({
     openWorkflow,
     expiresInSeconds: config.authOTPExpiresInSeconds,
   });
   const sendOrganizationInvitation = createSendOrganizationInvitationService({
-    emailSender,
-    fromAddress: config.emailFromAddress,
-    fromName: config.emailFromName,
+    openWorkflow,
     invitationAcceptBaseUrl: config.authInvitationAcceptBaseUrl,
   });
 

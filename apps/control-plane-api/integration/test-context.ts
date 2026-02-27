@@ -93,6 +93,13 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
           openWorkflow,
           concurrency: 1,
           workflowInputs: {
+            sendOrganizationInvitation: {
+              emailSender,
+              from: {
+                email: "no-reply@mistle.dev",
+                name: "Mistle",
+              },
+            },
             sendVerificationOTP: {
               emailSender,
               from: {
@@ -133,7 +140,7 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
           },
           auth: {
             baseUrl: "http://localhost:3000",
-            invitationAcceptBaseUrl: "http://localhost:5173/settings/members",
+            invitationAcceptBaseUrl: "http://localhost:5173/invitations/accept",
             secret: "integration-auth-secret",
             trustedOrigins: ["http://localhost:3000"],
             otpLength: 6,

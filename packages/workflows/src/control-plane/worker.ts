@@ -17,6 +17,10 @@ export type CreateControlPlaneWorkerInput = {
 export function createControlPlaneWorker(ctx: CreateControlPlaneWorkerInput): Worker {
   const workflows = createControlPlaneWorkflowDefinitions(ctx.workflowInputs);
   ctx.openWorkflow.implementWorkflow(
+    workflows.sendOrganizationInvitation.spec,
+    workflows.sendOrganizationInvitation.fn,
+  );
+  ctx.openWorkflow.implementWorkflow(
     workflows.sendVerificationOTP.spec,
     workflows.sendVerificationOTP.fn,
   );
