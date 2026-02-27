@@ -31,7 +31,7 @@ export type CreateStartSandboxInstanceWorkflowInput = {
 };
 
 export function createStartSandboxInstanceWorkflow(
-  input: CreateStartSandboxInstanceWorkflowInput,
+  ctx: CreateStartSandboxInstanceWorkflowInput,
 ): Workflow<
   StartSandboxInstanceWorkflowInput,
   StartSandboxInstanceWorkflowOutput,
@@ -41,7 +41,7 @@ export function createStartSandboxInstanceWorkflow(
     StartSandboxInstanceWorkflowSpec,
     async ({ input: workflowInput, step }) => {
       const startedSandbox = await step.run({ name: "start-sandbox" }, async () => {
-        return input.startSandbox({
+        return ctx.startSandbox({
           image: workflowInput.image,
         });
       });
@@ -50,7 +50,7 @@ export function createStartSandboxInstanceWorkflow(
         const persistedSandboxInstance = await step.run(
           { name: "insert-sandbox-instance" },
           async () => {
-            return input.insertSandboxInstance({
+            return ctx.insertSandboxInstance({
               organizationId: workflowInput.organizationId,
               sandboxProfileId: workflowInput.sandboxProfileId,
               sandboxProfileVersion: workflowInput.sandboxProfileVersion,
@@ -69,7 +69,7 @@ export function createStartSandboxInstanceWorkflow(
         };
       } catch (error) {
         await step.run({ name: "rollback-stop-sandbox" }, async () => {
-          await input.stopSandbox({
+          await ctx.stopSandbox({
             provider: startedSandbox.provider,
             providerSandboxId: startedSandbox.providerSandboxId,
           });
