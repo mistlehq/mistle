@@ -1,7 +1,7 @@
 import type { Worker } from "openworkflow";
 import type { BackendPostgres } from "openworkflow/postgres";
 
-import { DATA_PLANE_SCHEMA_NAME, SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import {
   DATA_PLANE_MIGRATIONS_FOLDER_PATH,
   MigrationTracking,
@@ -9,6 +9,7 @@ import {
 } from "@mistle/db/migrator";
 import { SandboxProvider, createSandboxAdapter, type SandboxAdapter } from "@mistle/sandbox";
 import { startPostgresWithPgBouncer } from "@mistle/test-harness";
+import { randomUUID } from "node:crypto";
 import postgres from "postgres";
 import { it as vitestIt } from "vitest";
 
@@ -25,6 +26,11 @@ export type DataPlaneWorkflowFixture = {
   startedSandboxIds: string[];
 };
 
+type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
+type JsonObject = {
+  [key: string]: JsonValue;
+};
+
 function resolveDockerWorkflowIntegrationEnabled(): boolean {
   if (process.env.MISTLE_SANDBOX_INTEGRATION !== "1") {
     return false;
@@ -38,13 +44,13 @@ function resolveDockerWorkflowIntegrationEnabled(): boolean {
   return configuredProviders.includes(SandboxProvider.DOCKER);
 }
 
-function requireDockerSocketPath(): string {
+const DEFAULT_DOCKER_SOCKET_PATH = "/var/run/docker.sock";
+
+function resolveDockerSocketPath(): string {
   const socketPath = process.env.MISTLE_SANDBOX_DOCKER_SOCKET_PATH?.trim();
 
   if (socketPath === undefined || socketPath.length === 0) {
-    throw new Error(
-      'MISTLE_SANDBOX_DOCKER_SOCKET_PATH is required when workflow Docker integration is enabled via MISTLE_SANDBOX_INTEGRATION=1 and MISTLE_SANDBOX_INTEGRATION_PROVIDERS includes "docker".',
-    );
+    return DEFAULT_DOCKER_SOCKET_PATH;
   }
 
   return socketPath;
@@ -52,6 +58,33 @@ function requireDockerSocketPath(): string {
 
 export const dockerStartSandboxWorkflowIntegrationEnabled =
   resolveDockerWorkflowIntegrationEnabled();
+
+function toJsonValue(value: unknown): JsonValue {
+  if (value === null) {
+    return null;
+  }
+
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => toJsonValue(item));
+  }
+
+  if (typeof value === "object") {
+    const objectValue: JsonObject = {};
+    const entries = Object.entries(value);
+
+    for (const [key, entryValue] of entries) {
+      objectValue[key] = toJsonValue(entryValue);
+    }
+
+    return objectValue;
+  }
+
+  throw new Error("Manifest contains a non-JSON-serializable value.");
+}
 
 export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
   fixture: [
@@ -67,7 +100,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
       let sandboxAdapter: SandboxAdapter | undefined;
 
       try {
-        const dockerSocketPath = requireDockerSocketPath();
+        const dockerSocketPath = resolveDockerSocketPath();
         const databaseStack = await startPostgresWithPgBouncer({
           databaseName: "mistle_workflows_test",
         });
@@ -77,7 +110,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
 
         await runDataPlaneMigrations({
           connectionString: databaseStack.directUrl,
-          schemaName: DATA_PLANE_SCHEMA_NAME,
+          schemaName: MigrationTracking.DATA_PLANE.SCHEMA_NAME,
           migrationsFolder: DATA_PLANE_MIGRATIONS_FOLDER_PATH,
           migrationsSchema: MigrationTracking.DATA_PLANE.SCHEMA_NAME,
           migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
@@ -132,35 +165,50 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                 });
               },
               insertSandboxInstance: async (workflowInput) => {
-                const insertedRows = await sql<{ id: string }[]>`
-                  insert into data_plane.sandbox_instances (
-                    organization_id,
-                    sandbox_profile_id,
-                    sandbox_profile_version,
-                    manifest,
-                    provider,
-                    provider_sandbox_id,
-                    status,
-                    started_by_kind,
-                    started_by_id,
-                    source,
-                    started_at
-                  )
-                  values (
-                    ${workflowInput.organizationId},
-                    ${workflowInput.sandboxProfileId},
-                    ${workflowInput.sandboxProfileVersion},
-                    ${JSON.stringify(workflowInput.manifest)}::jsonb,
-                    ${workflowInput.provider},
-                    ${workflowInput.providerSandboxId},
-                    ${SandboxInstanceStatuses.RUNNING},
-                    ${workflowInput.startedBy.kind},
-                    ${workflowInput.startedBy.id},
-                    ${workflowInput.source},
-                    now()
-                  )
-                  returning id
-                `;
+                const sandboxInstanceId = `sbi_${randomUUID().replaceAll("-", "")}`;
+                const manifest = toJsonValue(workflowInput.manifest);
+                let insertedRows: Array<{ id: string }>;
+                try {
+                  insertedRows = await sql<{ id: string }[]>`
+                    insert into data_plane.sandbox_instances (
+                      id,
+                      organization_id,
+                      sandbox_profile_id,
+                      sandbox_profile_version,
+                      manifest,
+                      provider,
+                      provider_sandbox_id,
+                      status,
+                      started_by_kind,
+                      started_by_id,
+                      source,
+                      started_at
+                    )
+                    values (
+                      ${sandboxInstanceId},
+                      ${workflowInput.organizationId},
+                      ${workflowInput.sandboxProfileId},
+                      ${workflowInput.sandboxProfileVersion},
+                      ${sql.json(manifest)},
+                      ${workflowInput.provider},
+                      ${workflowInput.providerSandboxId},
+                      ${SandboxInstanceStatuses.RUNNING},
+                      ${workflowInput.startedBy.kind},
+                      ${workflowInput.startedBy.id},
+                      ${workflowInput.source},
+                      now()
+                    )
+                    returning id
+                  `;
+                } catch (error) {
+                  const rawErrorMessage =
+                    error instanceof Error
+                      ? `${error.name}: ${error.message}`
+                      : `unknown error: ${String(error)}`;
+                  throw new Error(
+                    `Failed to insert sandbox instance row in integration fixture. ${rawErrorMessage}`,
+                  );
+                }
 
                 const insertedRow = insertedRows[0];
                 if (insertedRow === undefined) {

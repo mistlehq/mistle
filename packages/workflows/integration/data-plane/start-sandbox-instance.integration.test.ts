@@ -24,6 +24,14 @@ function createDockerBaseImageHandle(imageId: string): StartSandboxInstanceWorkf
   };
 }
 
+function normalizePersistedManifest(manifest: unknown): unknown {
+  if (typeof manifest === "string") {
+    return JSON.parse(manifest);
+  }
+
+  return manifest;
+}
+
 describeDockerWorkflowIntegration("start sandbox instance workflow integration", () => {
   it("starts a docker sandbox and persists sandbox instance state", async ({ fixture }) => {
     const manifest: Record<string, unknown> = {
@@ -91,7 +99,7 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
       throw new Error("Expected one persisted sandbox instance row.");
     }
 
-    expect(JSON.stringify(persistedRow.manifest)).toBe(JSON.stringify(manifest));
+    expect(normalizePersistedManifest(persistedRow.manifest)).toEqual(manifest);
     expect(persistedRow.provider).toBe("docker");
     expect(persistedRow.provider_sandbox_id).toBe(result.providerSandboxId);
     expect(persistedRow.status).toBe("running");
