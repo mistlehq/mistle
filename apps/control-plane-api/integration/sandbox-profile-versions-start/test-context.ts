@@ -171,6 +171,7 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
                 return {
                   provider: workflowInput.image.provider,
                   providerSandboxId: `integration-${randomUUID()}`,
+                  bootstrapTokenJti: randomUUID(),
                 };
               },
               stopSandbox: async () => {},
@@ -184,7 +185,7 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
                     manifest: workflowInput.manifest,
                     provider: workflowInput.provider,
                     providerSandboxId: workflowInput.providerSandboxId,
-                    status: SandboxInstanceStatuses.RUNNING,
+                    status: SandboxInstanceStatuses.STARTING,
                     startedByKind: workflowInput.startedBy.kind,
                     startedById: workflowInput.startedBy.id,
                     source: workflowInput.source,
@@ -201,6 +202,55 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
                 return {
                   sandboxInstanceId: insertedSandboxInstance.id,
                 };
+              },
+              waitForSandboxTunnelConnectAck: async () => {
+                return true;
+              },
+              updateSandboxInstanceStatus: async (workflowInput) => {
+                if (workflowInput.status === "running") {
+                  const updatedRows = await dataPlaneDb
+                    .update(sandboxInstances)
+                    .set({
+                      status: SandboxInstanceStatuses.RUNNING,
+                    })
+                    .where(
+                      and(
+                        eq(sandboxInstances.id, workflowInput.sandboxInstanceId),
+                        eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+                      ),
+                    )
+                    .returning({
+                      id: sandboxInstances.id,
+                    });
+                  if (updatedRows[0] === undefined) {
+                    throw new Error(
+                      "Expected sandbox instance status transition from starting to running.",
+                    );
+                  }
+                  return;
+                }
+
+                const updatedRows = await dataPlaneDb
+                  .update(sandboxInstances)
+                  .set({
+                    status: SandboxInstanceStatuses.FAILED,
+                    failureCode: workflowInput.failureCode,
+                    failureMessage: workflowInput.failureMessage,
+                  })
+                  .where(
+                    and(
+                      eq(sandboxInstances.id, workflowInput.sandboxInstanceId),
+                      eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+                    ),
+                  )
+                  .returning({
+                    id: sandboxInstances.id,
+                  });
+                if (updatedRows[0] === undefined) {
+                  throw new Error(
+                    "Expected sandbox instance status transition from starting to failed.",
+                  );
+                }
               },
             },
           },

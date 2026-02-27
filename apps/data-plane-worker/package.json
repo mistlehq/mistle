@@ -19,6 +19,7 @@
     "@mistle/db": "workspace:*",
     "@mistle/logging": "workspace:*",
     "@mistle/sandbox": "workspace:*",
+    "@mistle/time": "workspace:*",
     "@mistle/tunnel-auth": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "drizzle-orm": "^0.45.1",
