@@ -20,5 +20,7 @@ Reference catalog of control-plane workflows in `@mistle/workflows`.
 - `sendVerificationOTP.emailSender`
 - `sendVerificationOTP.from`
 - `requestDeleteSandboxProfile.deleteSandboxProfile`
+- `startSandboxProfileInstance.resolveSandboxProfileVersion`
+- `startSandboxProfileInstance.startSandboxInstance`
 
 When adding a new workflow, update this file with the new workflow contract and runtime dependencies.
