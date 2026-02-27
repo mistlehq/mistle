@@ -10,11 +10,15 @@ export function loadDataPlaneGatewayFromToml(
   const apps = asObjectRecord(tomlRoot.apps);
   const dataPlaneGateway = asObjectRecord(apps.data_plane_gateway);
   const server = asObjectRecord(dataPlaneGateway.server);
+  const database = asObjectRecord(dataPlaneGateway.database);
 
   return PartialDataPlaneGatewayConfigSchema.parse({
     server: {
       host: server.host,
       port: server.port,
+    },
+    database: {
+      url: database.url,
     },
   });
 }

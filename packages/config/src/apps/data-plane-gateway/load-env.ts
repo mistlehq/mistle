@@ -1,5 +1,6 @@
 import { createEnvLoader, hasEntries } from "../../core/load-env.js";
 import {
+  DataPlaneGatewayDatabaseConfigSchema,
   type PartialDataPlaneGatewayConfigInput,
   DataPlaneGatewayServerConfigSchema,
   PartialDataPlaneGatewayConfigSchema,
@@ -17,6 +18,13 @@ const loadServerEnv = createEnvLoader<typeof DataPlaneGatewayServerConfigSchema>
   },
 ]);
 
+const loadDatabaseEnv = createEnvLoader<typeof DataPlaneGatewayDatabaseConfigSchema>([
+  {
+    key: "url",
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL",
+  },
+]);
+
 export function loadDataPlaneGatewayFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialDataPlaneGatewayConfigInput {
@@ -25,6 +33,11 @@ export function loadDataPlaneGatewayFromEnv(
   const server = loadServerEnv(env);
   if (hasEntries(server)) {
     partialConfig.server = server;
+  }
+
+  const database = loadDatabaseEnv(env);
+  if (hasEntries(database)) {
+    partialConfig.database = database;
   }
 
   return PartialDataPlaneGatewayConfigSchema.parse(partialConfig);

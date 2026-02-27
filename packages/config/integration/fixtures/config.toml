@@ -69,6 +69,9 @@ namespace_id = "fixture"
 host = "0.0.0.0"
 port = 5302
 
+[apps.data_plane_gateway.database]
+url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
+
 [apps.data_plane_worker.server]
 host = "0.0.0.0"
 port = 5303

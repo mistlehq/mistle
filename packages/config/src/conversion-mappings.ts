@@ -205,6 +205,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_PORT",
   },
   {
+    configPath: ["apps", "data_plane_gateway", "database", "url"],
+    tomlPath: ["apps", "data_plane_gateway", "database", "url"],
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL",
+  },
+  {
     configPath: ["apps", "data_plane_worker", "server", "host"],
     tomlPath: ["apps", "data_plane_worker", "server", "host"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_HOST",
