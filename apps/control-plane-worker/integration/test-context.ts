@@ -38,6 +38,9 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkerIntegrationFixtur
           smtpUsername: "mailpit",
           smtpPassword: "mailpit",
         },
+        dataPlaneApi: {
+          baseUrl: "http://127.0.0.1:5300",
+        },
       };
 
       await use({

@@ -80,6 +80,9 @@ const controlPlaneWorkerEnvConfig = {
     smtpUsername: "mailpit",
     smtpPassword: "mailpit",
   },
+  dataPlaneApi: {
+    baseUrl: "http://127.0.0.1:5002",
+  },
 } as const;
 
 const controlPlaneWorkerFixtureConfig = {
@@ -92,6 +95,9 @@ const controlPlaneWorkerFixtureConfig = {
     ...controlPlaneWorkerEnvConfig.workflow,
     namespaceId: "fixture",
     concurrency: 2,
+  },
+  dataPlaneApi: {
+    baseUrl: "http://127.0.0.1:5300",
   },
 } as const;
 

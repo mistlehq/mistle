@@ -20,6 +20,7 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_LENGTH: "6",
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "true",
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "4",
+      MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
     });
 
     expect(tomlRecord).toEqual({
@@ -42,6 +43,9 @@ describe("convertEnvToTomlRecord", () => {
             run_migrations: true,
             concurrency: 4,
           },
+          data_plane_api: {
+            base_url: "http://127.0.0.1:5300",
+          },
         },
       },
     });
@@ -61,6 +65,9 @@ describe("convertTomlToEnvRecord", () => {
           },
         },
         control_plane_worker: {
+          data_plane_api: {
+            base_url: "http://127.0.0.1:5300",
+          },
           workflow: {
             run_migrations: false,
             concurrency: 2,
@@ -74,6 +81,7 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "https://a.example,https://b.example",
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "2",
+      MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
     });
   });
 });

@@ -1,5 +1,6 @@
 import { createEnvLoader, hasEntries, parseBooleanEnv } from "../../core/load-env.js";
 import {
+  ControlPlaneWorkerDataPlaneApiConfigSchema,
   type PartialControlPlaneWorkerConfigInput,
   ControlPlaneWorkerEmailConfigSchema,
   ControlPlaneWorkerServerConfigSchema,
@@ -74,6 +75,13 @@ const loadEmailEnv = createEnvLoader<typeof ControlPlaneWorkerEmailConfigSchema>
   },
 ]);
 
+const loadDataPlaneApiEnv = createEnvLoader<typeof ControlPlaneWorkerDataPlaneApiConfigSchema>([
+  {
+    key: "baseUrl",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL",
+  },
+]);
+
 export function loadControlPlaneWorkerFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialControlPlaneWorkerConfigInput {
@@ -92,6 +100,11 @@ export function loadControlPlaneWorkerFromEnv(
   const email = loadEmailEnv(env);
   if (hasEntries(email)) {
     partialConfig.email = email;
+  }
+
+  const dataPlaneApi = loadDataPlaneApiEnv(env);
+  if (hasEntries(dataPlaneApi)) {
+    partialConfig.dataPlaneApi = dataPlaneApi;
   }
 
   return PartialControlPlaneWorkerConfigSchema.parse(partialConfig);
