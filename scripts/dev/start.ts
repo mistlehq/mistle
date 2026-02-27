@@ -261,7 +261,7 @@ process.once("SIGTERM", () => {
 function start(): void {
   loadDevelopmentEnvFile();
 
-  console.log("Starting local infra dependencies (Postgres 18, PgBouncer, Mailpit)...");
+  console.log("Starting local infra dependencies (Postgres 18, PgBouncer, Mailpit, Registry)...");
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const dataPlaneApiLocalPort = readDataPlaneApiLocalPort(DEV_CONFIG_PATH);
   const cloudflareTunnelToken = readRequiredEnv("CLOUDFLARE_TUNNEL_TOKEN");
@@ -298,6 +298,7 @@ function start(): void {
       "postgres",
       "pgbouncer",
       "mailpit",
+      "registry",
     ],
     env: sharedDevEnv,
   });
@@ -337,6 +338,7 @@ function start(): void {
   console.log(`- data-plane-api: ${dataPlaneApiPublicUrl}`);
   console.log(`- data-plane tunnel route: ${dataPlaneApiPublicUrl}/tunnel`);
   console.log("- mailpit ui: http://127.0.0.1:8025");
+  console.log("- local registry: http://127.0.0.1:5001");
   console.log("");
 
   appDevProcess = spawn("pnpm", ["dev:workspace"], {

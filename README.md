@@ -97,7 +97,7 @@ DATA_PLANE_API_TUNNEL_HOSTNAME=<data-plane-api-hostname>
 pnpm dev
 ```
 
-`pnpm dev` brings up local infra (Postgres, PgBouncer, Mailpit), runs control-plane migrations, and starts a named Cloudflare tunnel with stable hostnames.
+`pnpm dev` brings up local infra (Postgres, PgBouncer, Mailpit, local registry), runs control-plane migrations, and starts a named Cloudflare tunnel with stable hostnames.
 
 ### Daily Workflow
 
