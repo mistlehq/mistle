@@ -19,7 +19,8 @@ import { ProvidersCallbackResultPage } from "./features/pages/providers-callback
 import { SandboxProfileEditorPage } from "./features/pages/sandbox-profile-editor-page.js";
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
 import { SessionsPage } from "./features/pages/sessions-page.js";
-import { resolveScaffoldProfileDisplayName } from "./features/sandbox-profiles/scaffold-profiles.js";
+import { SandboxProfilesApiError } from "./features/sandbox-profiles/sandbox-profiles-api-errors.js";
+import { getSandboxProfile } from "./features/sandbox-profiles/sandbox-profiles-service.js";
 import { SettingsLayout } from "./features/settings/settings-layout.js";
 import { createSettingsRoutes } from "./features/settings/settings-routes.js";
 import { AppShell } from "./features/shell/app-shell.js";
@@ -55,15 +56,31 @@ export const APP_ROUTES = createRoutesFromElements(
           <Route
             element={<SandboxProfileEditorPage mode="edit" />}
             handle={ROUTE_HANDLES.sandboxProfilesDetail}
-            loader={({ params }) => {
+            loader={async ({ params, request }) => {
               const profileId = params["profileId"];
               if (profileId === undefined) {
                 throw new Error("profileId is required.");
               }
 
-              return {
-                displayName: resolveScaffoldProfileDisplayName(profileId) ?? profileId,
-              };
+              try {
+                const profile = await getSandboxProfile({
+                  profileId,
+                  signal: request.signal,
+                });
+
+                return {
+                  displayName: profile.displayName,
+                };
+              } catch (error) {
+                if (error instanceof SandboxProfilesApiError) {
+                  throw new Response(error.message, {
+                    status: error.status,
+                    statusText: error.message,
+                  });
+                }
+
+                throw error;
+              }
             }}
             path=":profileId"
           />
@@ -71,7 +88,7 @@ export const APP_ROUTES = createRoutesFromElements(
         <Route element={<SessionsPage />} handle={ROUTE_HANDLES.sessions} path="sessions" />
         {createSettingsRoutes({
           settingsRoot: <SettingsLayout />,
-          profile: <ProfileSettingsPage />,
+          personal: <ProfileSettingsPage />,
           organizationGeneral: <OrganizationGeneralSettingsPage />,
           organizationMembers: <OrganizationMembersSettingsPage />,
           organizationProviders: <OrganizationProvidersSettingsPage />,

@@ -5,7 +5,7 @@ import { SETTINGS_DEFAULT_PATH } from "./model.js";
 
 export type SettingsRouteElements = {
   settingsRoot: React.JSX.Element;
-  profile: React.JSX.Element;
+  personal: React.JSX.Element;
   organizationGeneral: React.JSX.Element;
   organizationMembers: React.JSX.Element;
   organizationProviders: React.JSX.Element;
@@ -18,7 +18,7 @@ export function createSettingsRoutes(elements: SettingsRouteElements): React.JSX
       <Route element={<Navigate replace to={SETTINGS_DEFAULT_PATH} />} index />
       <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.settingsAccount} path="account">
         <Route element={<Navigate replace to={SETTINGS_DEFAULT_PATH} />} index />
-        <Route element={elements.profile} handle={ROUTE_HANDLES.settingsProfile} path="profile" />
+        <Route element={elements.personal} handle={ROUTE_HANDLES.settingsProfile} path="profile" />
       </Route>
       <Route
         element={<RouteOutlet />}

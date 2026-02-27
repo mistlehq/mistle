@@ -27,9 +27,7 @@ describe("app routing breadcrumb integration", () => {
   const settingsRoutes = createRoutesFromElements(
     <Route element={<Outlet />} path="/">
       <Route element={<Outlet />} handle={ROUTE_HANDLES.settings} path="settings">
-        <Route element={<Outlet />} handle={ROUTE_HANDLES.settingsAccount} path="account">
-          <Route element={<PageHarness />} handle={ROUTE_HANDLES.settingsProfile} path="profile" />
-        </Route>
+        <Route element={<PageHarness />} handle={ROUTE_HANDLES.settingsPersonal} path="personal" />
         <Route element={<Outlet />} handle={ROUTE_HANDLES.settingsOrganization} path="organization">
           <Route
             element={<PageHarness />}
@@ -81,15 +79,14 @@ describe("app routing breadcrumb integration", () => {
 
   it("updates breadcrumbs when moving across settings routes and respects click targets", async () => {
     const router = createMemoryRouter(settingsRoutes, {
-      initialEntries: ["/settings/account/profile"],
+      initialEntries: ["/settings/personal"],
     });
     let markup = renderToStaticMarkup(<RouterProvider router={router} />);
 
     expect(markup).toContain("Settings");
-    expect(markup).toContain("Account");
-    expect(markup).toContain("Profile");
+    expect(markup).toContain("Personal");
     expect(markup).toContain("meta-title");
-    expect(markup).toContain("Profile");
+    expect(markup).toContain("Personal");
     expect(markup).toContain('data-slot="meta-description"></p>');
 
     await router.navigate("/settings/organization/providers/github/callback-result");
@@ -107,7 +104,7 @@ describe("app routing breadcrumb integration", () => {
 
   it("enforces breadcrumb and page metadata coverage for settings destinations", () => {
     const settingsDestinations = [
-      "/settings/account/profile",
+      "/settings/personal",
       "/settings/organization/general",
       "/settings/organization/members",
       "/settings/organization/providers",
@@ -136,12 +133,12 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain('data-slot="meta-title">Create');
     expect(markup).toContain("Create a sandbox profile.");
 
-    await router.navigate("/sandbox-profiles/sandboxProfile_abc");
+    await router.navigate("/sandbox-profiles/sbp_abc");
     markup = renderToStaticMarkup(<RouterProvider router={router} />);
 
     expect(markup).toContain('href="/sandbox-profiles"');
     expect(markup).toContain("Sandbox Profiles");
-    expect(markup).toContain("sandboxProfile_abc");
+    expect(markup).toContain("sbp_abc");
     expect(markup).toContain('data-slot="meta-title">Edit profile');
     expect(markup).toContain("Edit sandbox profile configuration.");
   });

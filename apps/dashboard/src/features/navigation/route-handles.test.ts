@@ -22,8 +22,8 @@ describe("route handles", () => {
       "Edit sandbox profile configuration.",
     );
 
-    expect(ROUTE_HANDLES.settingsProfile.title).toBe("Profile");
-    expect(ROUTE_HANDLES.settingsProfile.description).toBe("");
+    expect(ROUTE_HANDLES.settingsPersonal.title).toBe("Personal");
+    expect(ROUTE_HANDLES.settingsPersonal.description).toBe("");
 
     expect(ROUTE_HANDLES.settingsOrganizationGeneral.title).toBe("General");
     expect(ROUTE_HANDLES.settingsOrganizationGeneral.description).toBe("");
@@ -44,7 +44,6 @@ describe("route handles", () => {
 
   it("defines intended breadcrumb clickability for parent crumbs", () => {
     expect(ROUTE_HANDLES.settings.breadcrumbClickable).toBe(false);
-    expect(ROUTE_HANDLES.settingsAccount.breadcrumbClickable).toBe(false);
     expect(ROUTE_HANDLES.settingsOrganization.breadcrumbTo).toBe("/settings/organization/general");
   });
 
@@ -80,9 +79,7 @@ describe("route handles", () => {
       throw new Error("sandboxProfilesDetail breadcrumb must be a function");
     }
 
-    expect(detailBreadcrumb({ params: { profileId: "sandboxProfile_123" } })).toBe(
-      "sandboxProfile_123",
-    );
+    expect(detailBreadcrumb({ params: { profileId: "sbp_123" } })).toBe("sbp_123");
     expect(detailBreadcrumb({ params: {} })).toBe("Profile");
   });
 });
