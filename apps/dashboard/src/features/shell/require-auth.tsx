@@ -6,7 +6,7 @@ import {
   MISSING_ACTIVE_ORGANIZATION_ERROR_MESSAGE,
   resolveActiveOrganizationIdFromSession,
 } from "./active-organization.js";
-import { NoOrganizationRecoveryCard } from "./no-organization-recovery-card.js";
+import { NoOrganizationAccessView } from "./no-organization-access-view.js";
 import { PendingSessionShell } from "./pending-session-shell.js";
 import { requireAuthenticatedSession } from "./session-context.js";
 import { useSessionQuery } from "./session-query.js";
@@ -49,7 +49,7 @@ export function RequireAuth(): React.JSX.Element {
   }
 
   if (resolveActiveOrganizationIdFromSession(sessionQuery.data) === null) {
-    return <NoOrganizationRecoveryCard />;
+    return <NoOrganizationAccessView />;
   }
 
   return <Outlet />;
