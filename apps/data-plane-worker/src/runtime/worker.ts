@@ -1,5 +1,4 @@
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
-import { createSandboxAdapter, type SandboxAdapter } from "@mistle/sandbox";
 import {
   createDataPlaneWorker,
   type CreateDataPlaneWorkflowDefinitionsInput,
@@ -9,26 +8,13 @@ import { sql } from "drizzle-orm";
 import type { DataPlaneWorkerConfig } from "../types.js";
 import type { WorkerRuntimeResources } from "./resources.js";
 
-function createSandboxRuntimeAdapter(config: DataPlaneWorkerConfig): SandboxAdapter {
-  return createSandboxAdapter({
-    provider: config.sandbox.provider,
-    modal: {
-      tokenId: config.sandbox.modal.tokenId,
-      tokenSecret: config.sandbox.modal.tokenSecret,
-      appName: config.sandbox.modal.appName,
-      environmentName: config.sandbox.modal.environmentName,
-    },
-  });
-}
-
 function createWorkflowInputs(ctx: {
-  resources: Pick<WorkerRuntimeResources, "db">;
-  sandboxAdapter: SandboxAdapter;
+  resources: Pick<WorkerRuntimeResources, "db" | "sandboxAdapter">;
 }): CreateDataPlaneWorkflowDefinitionsInput {
   return {
     startSandboxInstance: {
       startSandbox: async (workflowInput) => {
-        const startedSandbox = await ctx.sandboxAdapter.start({
+        const startedSandbox = await ctx.resources.sandboxAdapter.start({
           image: workflowInput.image,
         });
 
@@ -38,7 +24,7 @@ function createWorkflowInputs(ctx: {
         };
       },
       stopSandbox: async (workflowInput) => {
-        await ctx.sandboxAdapter.stop({
+        await ctx.resources.sandboxAdapter.stop({
           sandboxId: workflowInput.providerSandboxId,
         });
       },
@@ -77,16 +63,13 @@ function createWorkflowInputs(ctx: {
 
 export function createRuntimeWorker(ctx: {
   config: DataPlaneWorkerConfig;
-  resources: Pick<WorkerRuntimeResources, "db" | "openWorkflow">;
+  resources: Pick<WorkerRuntimeResources, "db" | "openWorkflow" | "sandboxAdapter">;
 }): ReturnType<typeof createDataPlaneWorker> {
-  const sandboxAdapter = createSandboxRuntimeAdapter(ctx.config);
-
   return createDataPlaneWorker({
     openWorkflow: ctx.resources.openWorkflow,
     concurrency: ctx.config.workflow.concurrency,
     workflowInputs: createWorkflowInputs({
       resources: ctx.resources,
-      sandboxAdapter,
     }),
   });
 }

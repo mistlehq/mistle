@@ -1,4 +1,5 @@
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
+import { createSandboxAdapter, type SandboxAdapter } from "@mistle/sandbox";
 import { createDataPlaneBackend, createDataPlaneOpenWorkflow } from "@mistle/workflows/data-plane";
 import { Pool } from "pg";
 
@@ -7,6 +8,7 @@ import type { DataPlaneWorkerConfig } from "../types.js";
 export type WorkerRuntimeResources = {
   db: DataPlaneDatabase;
   dbPool: Pool;
+  sandboxAdapter: SandboxAdapter;
   workflowBackend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
   openWorkflow: ReturnType<typeof createDataPlaneOpenWorkflow>;
 };
@@ -32,9 +34,20 @@ export async function createWorkerRuntimeResources(
     throw error;
   }
 
+  const sandboxAdapter = createSandboxAdapter({
+    provider: config.sandbox.provider,
+    modal: {
+      tokenId: config.sandbox.modal.tokenId,
+      tokenSecret: config.sandbox.modal.tokenSecret,
+      appName: config.sandbox.modal.appName,
+      environmentName: config.sandbox.modal.environmentName,
+    },
+  });
+
   return {
     db,
     dbPool,
+    sandboxAdapter,
     workflowBackend,
     openWorkflow: createDataPlaneOpenWorkflow({
       backend: workflowBackend,
