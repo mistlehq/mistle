@@ -1,5 +1,5 @@
-import { ProviderCatalogPanel } from "../providers/provider-catalog-panel.js";
+import { ProvidersPage } from "./providers-page.js";
 
 export function OrganizationProvidersSettingsPage(): React.JSX.Element {
-  return <ProviderCatalogPanel />;
+  return <ProvidersPage />;
 }
