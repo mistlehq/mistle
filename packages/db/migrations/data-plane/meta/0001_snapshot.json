@@ -1,6 +1,6 @@
 {
-  "id": "a33b0ef4-be5f-46fe-bd99-3f23a172440c",
-  "prevId": "00000000-0000-0000-0000-000000000000",
+  "id": "d70764e8-6c5b-482a-8e19-e9e73d0abd3f",
+  "prevId": "a33b0ef4-be5f-46fe-bd99-3f23a172440c",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -341,6 +341,48 @@
             }
           ],
           "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "data_plane.sandbox_tunnel_connect_acks": {
+      "name": "sandbox_tunnel_connect_acks",
+      "schema": "data_plane",
+      "columns": {
+        "bootstrap_token_jti": {
+          "name": "bootstrap_token_jti",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "connected_at": {
+          "name": "connected_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "sandbox_tunnel_connect_acks_connected_at_idx": {
+          "name": "sandbox_tunnel_connect_acks_connected_at_idx",
+          "columns": [
+            {
+              "expression": "connected_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}

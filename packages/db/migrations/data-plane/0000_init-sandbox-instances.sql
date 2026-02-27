@@ -14,7 +14,7 @@ CREATE TABLE "data_plane"."sandbox_instances" (
 	"id" text PRIMARY KEY NOT NULL,
 	"organization_id" text NOT NULL,
 	"sandbox_profile_id" text NOT NULL,
-	"sandbox_profile_version" integer NOT NULL,
+	"sandbox_profile_version" bigint NOT NULL,
 	"manifest" jsonb NOT NULL,
 	"provider" text NOT NULL,
 	"provider_sandbox_id" text,

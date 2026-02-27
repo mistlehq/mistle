@@ -5,8 +5,15 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1772109047551,
+      "when": 1772212274110,
       "tag": "0000_init-sandbox-instances",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1772212294118,
+      "tag": "0001_add-sandbox-tunnel-connect-acks",
       "breakpoints": true
     }
   ]
