@@ -34,10 +34,27 @@ type ResolveSandboxProfileVersionInput = {
   sandboxProfileVersion: number;
 };
 
-async function resolveSandboxProfileVersion(input: ResolveSandboxProfileVersionInput): Promise<{
+type ResolvedSandboxStartSpec = {
   manifest: Record<string, unknown>;
   image: ReturnType<typeof StartSandboxInstanceImageSchema.parse>;
-}> {
+};
+
+function resolveSandboxStartImage(input: {
+  manifest: Record<string, unknown>;
+}): ReturnType<typeof StartSandboxInstanceImageSchema.parse> {
+  // Keep image selection isolated behind this resolver so we can add
+  // snapshot/base/default strategies without changing workflow wiring.
+  const parsedImage = StartSandboxInstanceImageSchema.safeParse(input.manifest.image);
+  if (!parsedImage.success) {
+    throw new Error("Sandbox profile version image is invalid.");
+  }
+
+  return parsedImage.data;
+}
+
+async function resolveSandboxStartSpec(
+  input: ResolveSandboxProfileVersionInput,
+): Promise<ResolvedSandboxStartSpec> {
   const sandboxProfile = await input.db.query.sandboxProfiles.findFirst({
     columns: {
       id: true,
@@ -68,16 +85,12 @@ async function resolveSandboxProfileVersion(input: ResolveSandboxProfileVersionI
   if (!isRecord(sandboxProfileVersion.manifest)) {
     throw new Error("Sandbox profile version manifest is invalid.");
   }
-  const parsedImage = StartSandboxInstanceImageSchema.safeParse(
-    sandboxProfileVersion.manifest.image,
-  );
-  if (!parsedImage.success) {
-    throw new Error("Sandbox profile version manifest image is invalid.");
-  }
 
   return {
     manifest: sandboxProfileVersion.manifest,
-    image: parsedImage.data,
+    image: resolveSandboxStartImage({
+      manifest: sandboxProfileVersion.manifest,
+    }),
   };
 }
 
@@ -121,7 +134,7 @@ function createWorkflowInputs(ctx: {
     },
     startSandboxProfileInstance: {
       resolveSandboxProfileVersion: async (resolveInput) =>
-        resolveSandboxProfileVersion({
+        resolveSandboxStartSpec({
           db: ctx.db,
           organizationId: resolveInput.organizationId,
           sandboxProfileId: resolveInput.sandboxProfileId,
