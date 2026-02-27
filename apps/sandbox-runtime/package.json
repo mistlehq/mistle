@@ -2,7 +2,7 @@
   "name": "@mistle/sandbox-runtime",
   "private": true,
   "scripts": {
-    "dev": "SANDBOX_RUNTIME_LISTEN_ADDR=:8090 go run ./cmd/sandboxd",
+    "dev": "printf '%s' 'dev-connect-token' | SANDBOX_RUNTIME_LISTEN_ADDR=:8090 go run ./cmd/sandboxd",
     "build": "mkdir -p dist/bin && go build -trimpath -o dist/bin/sandboxd ./cmd/sandboxd",
     "image:build:prod": "test -n \"$IMAGE_TAG\" && docker build --target sandbox-base-prod -f images/base/Dockerfile -t mistle/sandbox-base:$IMAGE_TAG ../..",
     "image:build:prod:sha": "IMAGE_TAG=$(git rev-parse --short=12 HEAD) pnpm image:build:prod",
