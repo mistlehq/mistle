@@ -1,4 +1,5 @@
 import { OpenAPIHono, z } from "@hono/zod-openapi";
+import { SandboxInstanceSources, SandboxInstanceStarterKinds } from "@mistle/db/data-plane";
 
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 
@@ -10,11 +11,14 @@ import {
   getSandboxProfileRoute,
   listSandboxProfilesRoute,
   NotFoundResponseSchema,
+  StartSandboxProfileInstanceNotFoundResponseSchema,
+  startSandboxProfileInstanceRoute,
   updateSandboxProfileRoute,
 } from "./contracts.js";
 import {
   SandboxProfilesBadRequestError,
   SandboxProfilesNotFoundError,
+  SandboxProfilesNotFoundCodes,
 } from "./services/factory.js";
 
 export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_ROUTE_BASE_PATH> {
@@ -65,7 +69,7 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
       });
       return ctx.json(profile, 200);
     } catch (error) {
-      return handleNotFoundError(ctx, error);
+      return handleProfileNotFoundError(ctx, error);
     }
   });
 
@@ -87,7 +91,7 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
       const profile = await ctx.get("services").sandboxProfiles.updateProfile(updateInput);
       return ctx.json(profile, 200);
     } catch (error) {
-      return handleNotFoundError(ctx, error);
+      return handleProfileNotFoundError(ctx, error);
     }
   });
 
@@ -110,7 +114,34 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
 
       return ctx.json(acceptedResponse, 202);
     } catch (error) {
-      return handleNotFoundError(ctx, error);
+      return handleProfileNotFoundError(ctx, error);
+    }
+  });
+
+  routes.openapi(startSandboxProfileInstanceRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+
+      const startedSandboxInstance = await ctx
+        .get("services")
+        .sandboxProfiles.startProfileInstance({
+          organizationId: session.session.activeOrganizationId,
+          profileId: params.profileId,
+          profileVersion: params.version,
+          startedBy: {
+            kind: SandboxInstanceStarterKinds.USER,
+            id: session.user.id,
+          },
+          source: SandboxInstanceSources.DASHBOARD,
+        });
+
+      return ctx.json(startedSandboxInstance, 201);
+    } catch (error) {
+      return handleStartInstanceNotFoundError(ctx, error);
     }
   });
 
@@ -133,9 +164,26 @@ function handleListProfilesError(ctx: AppContext, error: unknown) {
   throw error;
 }
 
-function handleNotFoundError(ctx: AppContext, error: unknown) {
+function handleProfileNotFoundError(ctx: AppContext, error: unknown) {
   if (error instanceof SandboxProfilesNotFoundError) {
+    if (error.code !== SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND) {
+      throw error;
+    }
+
     const responseBody: z.infer<typeof NotFoundResponseSchema> = {
+      code: error.code,
+      message: error.message,
+    };
+
+    return ctx.json(responseBody, 404);
+  }
+
+  throw error;
+}
+
+function handleStartInstanceNotFoundError(ctx: AppContext, error: unknown) {
+  if (error instanceof SandboxProfilesNotFoundError) {
+    const responseBody: z.infer<typeof StartSandboxProfileInstanceNotFoundResponseSchema> = {
       code: error.code,
       message: error.message,
     };

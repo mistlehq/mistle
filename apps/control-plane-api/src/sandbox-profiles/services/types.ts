@@ -3,6 +3,7 @@ import type {
   SandboxProfile,
   SandboxProfileStatus,
 } from "@mistle/db/control-plane";
+import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 
@@ -31,5 +32,20 @@ export type SandboxProfilesService = {
   }) => Promise<SandboxProfile>;
   requestDeleteProfile: (input: { organizationId: string; profileId: string }) => Promise<{
     profileId: string;
+  }>;
+  startProfileInstance: (input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+    startedBy: {
+      kind: SandboxInstanceStarterKind;
+      id: string;
+    };
+    source: SandboxInstanceSource;
+  }) => Promise<{
+    status: "completed";
+    workflowRunId: string;
+    sandboxInstanceId: string;
+    providerSandboxId: string;
   }>;
 };
