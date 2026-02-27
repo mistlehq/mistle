@@ -16,7 +16,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { MembersApiError } from "../settings/members/members-api-errors.js";
+import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
   getOrganizationGeneral,
   updateOrganizationGeneral,
@@ -42,18 +42,6 @@ function settingsOrganizationGeneralQueryKey(
     SETTINGS_ORGANIZATION_GENERAL_QUERY_KEY_PREFIX[1],
     organizationId,
   ];
-}
-
-function toErrorMessage(error: unknown, fallbackMessage: string): string {
-  if (error instanceof MembersApiError) {
-    return error.message;
-  }
-
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
-  }
-
-  return fallbackMessage;
 }
 
 export function OrganizationGeneralSettingsPage(): React.JSX.Element {
@@ -141,7 +129,12 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
       setSaveError(null);
     },
     onError: (error: unknown) => {
-      setSaveError(toErrorMessage(error, "Could not update organization settings."));
+      setSaveError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not update organization settings.",
+        }),
+      );
       setShowSaveSuccess(false);
     },
   });
@@ -175,7 +168,10 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
           <Alert variant="destructive">
             <AlertTitle>Could not load organization settings</AlertTitle>
             <AlertDescription>
-              {toErrorMessage(organizationQuery.error, "Could not load organization settings.")}
+              {resolveApiErrorMessage({
+                error: organizationQuery.error,
+                fallbackMessage: "Could not load organization settings.",
+              })}
             </AlertDescription>
           </Alert>
           <div>
