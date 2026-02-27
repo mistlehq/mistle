@@ -35,13 +35,14 @@ Root export is also available:
 
 ### `@mistle/workflows/data-plane`
 
-| Export                               | Type       | Purpose                                                         |
-| ------------------------------------ | ---------- | --------------------------------------------------------------- |
-| `DataPlaneOpenWorkflow.SCHEMA`       | `string`   | Dedicated OpenWorkflow schema name (`data_plane_openworkflow`). |
-| `createDataPlaneBackend`             | `function` | Creates a Postgres backend configured to the data-plane schema. |
-| `createDataPlaneOpenWorkflow`        | `function` | Creates an OpenWorkflow client for producers and workers.       |
-| `createDataPlaneWorker`              | `function` | Registers data-plane workflows and returns a worker instance.   |
-| `createDataPlaneWorkflowDefinitions` | `function` | Builds data-plane workflow implementations.                     |
+| Export                               | Type            | Purpose                                                                              |
+| ------------------------------------ | --------------- | ------------------------------------------------------------------------------------ |
+| `DataPlaneOpenWorkflow.SCHEMA`       | `string`        | Dedicated OpenWorkflow schema name (`data_plane_openworkflow`).                      |
+| `createDataPlaneBackend`             | `function`      | Creates a Postgres backend configured to the data-plane schema.                      |
+| `createDataPlaneOpenWorkflow`        | `function`      | Creates an OpenWorkflow client for producers and workers.                            |
+| `createDataPlaneWorker`              | `function`      | Registers data-plane workflows and returns a worker instance.                        |
+| `createDataPlaneWorkflowDefinitions` | `function`      | Builds data-plane workflow implementations.                                          |
+| `StartSandboxInstanceWorkflowSpec`   | `workflow spec` | Spec for data-plane sandbox instance startup (`data-plane.sandbox-instances.start`). |
 
 ## Example Usage
 
@@ -152,6 +153,13 @@ const ow = createDataPlaneOpenWorkflow({ backend });
 const worker = createDataPlaneWorker({
   openWorkflow: ow,
   concurrency: 4,
+  workflowInputs: {
+    startSandboxInstance: {
+      startSandbox: async () => ({ provider: "modal", providerSandboxId: "sb_123" }),
+      stopSandbox: async () => {},
+      insertSandboxInstance: async () => ({ sandboxInstanceId: "sbi_123" }),
+    },
+  },
 });
 
 await worker.start();

@@ -309,9 +309,15 @@ importers:
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@mistle/sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox
       '@mistle/workflows':
         specifier: workspace:*
         version: link:../../packages/workflows
+      drizzle-orm:
+        specifier: ^0.45.1
+        version: 0.45.1(@types/pg@8.16.0)(kysely@0.28.11)(pg@8.18.0)(postgres@3.4.8)
       hono:
         specifier: ^4.10.6
         version: 4.12.2
@@ -518,6 +524,9 @@ importers:
       '@mistle/emails':
         specifier: workspace:*
         version: link:../emails
+      '@mistle/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox
       openworkflow:
         specifier: ^0.7.3
         version: 0.7.3(postgres@3.4.8)

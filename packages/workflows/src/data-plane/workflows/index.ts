@@ -1,10 +1,28 @@
-import type { OpenWorkflowDefinition } from "../../core/register-workflows.js";
+import {
+  createStartSandboxInstanceWorkflow,
+  StartSandboxInstanceWorkflowSpec,
+  type CreateStartSandboxInstanceWorkflowInput,
+} from "./start-sandbox-instance/index.js";
 
 /**
  * Data-plane workflow implementations.
  */
-export type DataPlaneWorkflowDefinition = OpenWorkflowDefinition;
+export type DataPlaneWorkflowDefinition = ReturnType<typeof createStartSandboxInstanceWorkflow>;
 
-export function createDataPlaneWorkflowDefinitions(): ReadonlyArray<DataPlaneWorkflowDefinition> {
-  return [];
+export type DataPlaneWorkflowDefinitions = {
+  startSandboxInstance: ReturnType<typeof createStartSandboxInstanceWorkflow>;
+};
+
+export type CreateDataPlaneWorkflowDefinitionsInput = {
+  startSandboxInstance: CreateStartSandboxInstanceWorkflowInput;
+};
+
+export function createDataPlaneWorkflowDefinitions(
+  input: CreateDataPlaneWorkflowDefinitionsInput,
+): DataPlaneWorkflowDefinitions {
+  return {
+    startSandboxInstance: createStartSandboxInstanceWorkflow(input.startSandboxInstance),
+  };
 }
+
+export { StartSandboxInstanceWorkflowSpec };
