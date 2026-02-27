@@ -1,5 +1,5 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
-import type { MailpitService } from "@mistle/test-harness";
+import type { MailpitService } from "@mistle/test-core";
 
 import { randomUUID } from "node:crypto";
 

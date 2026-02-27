@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../.oxlintrc.jsonc"],
+  "overrides": [
+    {
+      "files": ["integration/*.integration.test.ts"],
+      "rules": {
+        "jest/no-standalone-expect": "off",
+      },
+    },
+  ],
+}

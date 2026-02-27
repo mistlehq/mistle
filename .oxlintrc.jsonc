@@ -164,6 +164,41 @@
   "overrides": [
     {
       "files": [
+        "apps/control-plane-api/**/*.ts",
+        "apps/control-plane-api/**/*.tsx",
+        "apps/control-plane-worker/**/*.ts",
+        "apps/control-plane-worker/**/*.tsx",
+        "apps/data-plane-api/**/*.ts",
+        "apps/data-plane-api/**/*.tsx",
+        "apps/data-plane-worker/**/*.ts",
+        "apps/data-plane-worker/**/*.tsx",
+        "apps/data-plane-gateway/**/*.ts",
+        "apps/data-plane-gateway/**/*.tsx",
+      ],
+      "rules": {
+        "eslint/no-restricted-syntax": [
+          "error",
+          {
+            "selector": "ImportDeclaration[source.value=/^@mistle\\/test-environments(?:\\/.*)?$/]",
+            "message": "Do not import @mistle/test-environments in backend app workspaces. Use app-local integration fixtures or @mistle/test-core. @mistle/test-environments is reserved for dashboard and tests/system/e2e.",
+          },
+          {
+            "selector": "ExportNamedDeclaration[source.value=/^@mistle\\/test-environments(?:\\/.*)?$/]",
+            "message": "Do not re-export @mistle/test-environments from backend app workspaces. @mistle/test-environments is reserved for dashboard and tests/system/e2e.",
+          },
+          {
+            "selector": "ExportAllDeclaration[source.value=/^@mistle\\/test-environments(?:\\/.*)?$/]",
+            "message": "Do not re-export @mistle/test-environments from backend app workspaces. @mistle/test-environments is reserved for dashboard and tests/system/e2e.",
+          },
+          {
+            "selector": "ImportExpression[source.value=/^@mistle\\/test-environments(?:\\/.*)?$/]",
+            "message": "Do not import @mistle/test-environments in backend app workspaces. Use app-local integration fixtures or @mistle/test-core. @mistle/test-environments is reserved for dashboard and tests/system/e2e.",
+          },
+        ],
+      },
+    },
+    {
+      "files": [
         "apps/control-plane-api/src/**/*.ts",
         "apps/control-plane-worker/src/**/*.ts",
         "apps/data-plane-api/src/**/*.ts",

@@ -21,7 +21,7 @@ From [`index.ts`](./index.ts):
 Use file-scoped setup in Vitest and always stop in teardown.
 
 ```ts
-import { startMailpit, type MailpitService } from "@mistle/test-harness";
+import { startMailpit, type MailpitService } from "@mistle/test-core";
 import { it as vitestIt } from "vitest";
 
 export const it = vitestIt.extend<{ mailpitService: MailpitService }>({

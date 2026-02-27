@@ -1,5 +1,5 @@
 {
-  "name": "@mistle/test-harness",
+  "name": "@mistle/test-environments",
   "private": true,
   "type": "module",
   "exports": {
@@ -20,9 +20,8 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@mistle/time": "workspace:*",
-    "@testcontainers/postgresql": "^11.12.0",
-    "mailpit-api": "^1.7.1",
-    "testcontainers": "^11.7.2"
+    "@mistle/control-plane-api": "workspace:*",
+    "@mistle/control-plane-worker": "workspace:*",
+    "@mistle/test-core": "workspace:*"
   }
 }

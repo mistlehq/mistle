@@ -1,4 +1,4 @@
-import { reserveAvailablePort } from "@mistle/test-harness";
+import { reserveAvailablePort } from "@mistle/test-core";
 import { describe, expect } from "vitest";
 
 import { createApp, getAppDatabase, stopApp } from "../src/app.js";

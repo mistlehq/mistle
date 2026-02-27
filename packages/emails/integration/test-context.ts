@@ -1,4 +1,4 @@
-import { startMailpit, type MailpitService } from "@mistle/test-harness";
+import { startMailpit, type MailpitService } from "@mistle/test-core";
 import { it as vitestIt } from "vitest";
 
 export const it = vitestIt.extend<{ mailpitService: MailpitService }>({

@@ -132,9 +132,9 @@ importers:
       '@mistle/data-plane-trpc':
         specifier: workspace:*
         version: link:../../packages/data-plane-trpc
-      '@mistle/test-harness':
+      '@mistle/test-core':
         specifier: workspace:*
-        version: link:../../packages/test-harness
+        version: link:../../packages/test-core
       '@types/pg':
         specifier: ^8.15.6
         version: 8.16.0
@@ -172,9 +172,9 @@ importers:
         specifier: ^8.18.0
         version: 8.18.0
     devDependencies:
-      '@mistle/test-harness':
+      '@mistle/test-core':
         specifier: workspace:*
-        version: link:../../packages/test-harness
+        version: link:../../packages/test-core
       '@types/pg':
         specifier: ^8.15.6
         version: 8.16.0
@@ -282,9 +282,9 @@ importers:
         specifier: ^8.18.0
         version: 8.18.0
     devDependencies:
-      '@mistle/test-harness':
+      '@mistle/test-core':
         specifier: workspace:*
-        version: link:../../packages/test-harness
+        version: link:../../packages/test-core
       '@trpc/client':
         specifier: ^11.10.0
         version: 11.10.0(@trpc/server@11.10.0(typescript@5.9.3))(typescript@5.9.3)
@@ -385,9 +385,9 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0
     devDependencies:
-      '@mistle/test-harness':
+      '@mistle/test-core':
         specifier: workspace:*
-        version: link:../test-harness
+        version: link:../test-core
       '@types/pg':
         specifier: ^8.15.6
         version: 8.16.0
@@ -413,9 +413,9 @@ importers:
         specifier: ^19.2.0
         version: 19.2.4(react@19.2.4)
     devDependencies:
-      '@mistle/test-harness':
+      '@mistle/test-core':
         specifier: workspace:*
-        version: link:../test-harness
+        version: link:../test-core
       '@types/nodemailer':
         specifier: ^7.0.11
         version: 7.0.11
@@ -451,7 +451,7 @@ importers:
         specifier: ^11.7.2
         version: 11.12.0
 
-  packages/test-harness:
+  packages/test-core:
     dependencies:
       '@mistle/time':
         specifier: workspace:*
@@ -465,6 +465,18 @@ importers:
       testcontainers:
         specifier: ^11.7.2
         version: 11.12.0
+
+  packages/test-environments:
+    dependencies:
+      '@mistle/control-plane-api':
+        specifier: workspace:*
+        version: link:../../apps/control-plane-api
+      '@mistle/control-plane-worker':
+        specifier: workspace:*
+        version: link:../../apps/control-plane-worker
+      '@mistle/test-core':
+        specifier: workspace:*
+        version: link:../test-core
 
   packages/time: {}
 
@@ -571,9 +583,9 @@ importers:
       '@mistle/db':
         specifier: workspace:*
         version: link:../db
-      '@mistle/test-harness':
+      '@mistle/test-core':
         specifier: workspace:*
-        version: link:../test-harness
+        version: link:../test-core
 
   tests: {}
 

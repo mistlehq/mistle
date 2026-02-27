@@ -27,7 +27,7 @@ This prevents migration behavior from being affected by pooling mode while keepi
 ## Usage Pattern
 
 ```ts
-import { startPostgresWithPgBouncer } from "@mistle/test-harness";
+import { startPostgresWithPgBouncer } from "@mistle/test-core";
 
 const database = await startPostgresWithPgBouncer();
 

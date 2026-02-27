@@ -1,7 +1,4 @@
-import {
-  startPostgresWithPgBouncer,
-  type PostgresWithPgBouncerService,
-} from "@mistle/test-harness";
+import { startPostgresWithPgBouncer, type PostgresWithPgBouncerService } from "@mistle/test-core";
 import { it as vitestIt } from "vitest";
 
 export const it = vitestIt.extend<{ databaseStack: PostgresWithPgBouncerService }>({
