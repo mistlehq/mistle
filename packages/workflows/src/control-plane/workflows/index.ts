@@ -51,3 +51,4 @@ export function createControlPlaneWorkflowDefinitions(
 export { SendOrganizationInvitationWorkflowSpec };
 export { SendVerificationOTPWorkflowSpec };
 export { RequestDeleteSandboxProfileWorkflowSpec };
+export { StartSandboxProfileInstanceWorkflowSpec } from "./start-sandbox-profile-instance/index.js";
