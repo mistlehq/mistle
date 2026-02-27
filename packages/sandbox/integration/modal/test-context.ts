@@ -1,6 +1,7 @@
-import { ModalClient as ModalSdkClient } from "modal";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
+
+import { ModalClient as ModalSdkClient } from "modal";
 import { it as vitestIt } from "vitest";
 
 import {

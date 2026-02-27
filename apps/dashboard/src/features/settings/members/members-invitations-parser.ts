@@ -3,7 +3,6 @@ import type {
   InviteMemberResponse,
   SettingsInvitation,
 } from "./members-api-types.js";
-
 import { parseOrganizationRoleValue, parseTimestampToIsoString } from "./members-parsing.js";
 import { compactMap, readArray, readString, toRecord } from "./members-records.js";
 

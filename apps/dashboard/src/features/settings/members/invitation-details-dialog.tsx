@@ -1,7 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@mistle/ui";
 
 import type { SettingsInvitation } from "./members-api.js";
-
 import { resolveInvitationDisplayStatus } from "./members-directory-model.js";
 import { formatDate, invitationStatusLabel } from "./members-formatters.js";
 

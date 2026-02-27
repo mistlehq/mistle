@@ -1,8 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 
-import type { AppContextBindings } from "../types.js";
-
 import { registerApiRouteModules } from "../runtime/routes.js";
+import type { AppContextBindings } from "../types.js";
 import { CONTROL_PLANE_OPENAPI_INFO } from "./constants.js";
 
 export function createControlPlaneOpenApiDocument(): ReturnType<

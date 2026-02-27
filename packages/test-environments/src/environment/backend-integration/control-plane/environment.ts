@@ -1,12 +1,12 @@
+import { randomUUID } from "node:crypto";
+
 import { startControlPlaneApiTestingRuntime } from "@mistle/control-plane-api/testing";
 import { startControlPlaneWorkerTestingRuntime } from "@mistle/control-plane-worker/testing";
 import { startMailpit, startPostgresWithPgBouncer } from "@mistle/test-core";
-import { randomUUID } from "node:crypto";
-
-import type { IntegrationEnvironment, StartIntegrationEnvironmentInput } from "./types.js";
 
 import { runCleanupTasks, type CleanupTask } from "../cleanup.js";
 import { hasIntegrationComponent, resolveIntegrationComponents } from "./capabilities.js";
+import type { IntegrationEnvironment, StartIntegrationEnvironmentInput } from "./types.js";
 
 function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));

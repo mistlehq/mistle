@@ -1,8 +1,7 @@
 import { FieldError, Input } from "@mistle/ui";
 
-import type { InviteChip } from "./member-invite-state.js";
-
 import { InviteChipBadge } from "./invite-chip-badge.js";
+import type { InviteChip } from "./member-invite-state.js";
 import { parseInviteTokens } from "./member-invite-state.js";
 
 const EMAIL_INPUT_PLACEHOLDER =

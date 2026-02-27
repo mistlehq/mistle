@@ -1,5 +1,4 @@
 import type { MiddlewareHandler } from "hono";
-
 import { z } from "zod";
 
 import type { AppContextBindings, AppSession } from "../types.js";

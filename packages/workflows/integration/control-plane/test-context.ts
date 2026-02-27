@@ -1,6 +1,3 @@
-import type { Worker } from "openworkflow";
-import type { BackendPostgres } from "openworkflow/postgres";
-
 import { CONTROL_PLANE_SCHEMA_NAME } from "@mistle/db/control-plane";
 import {
   CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
@@ -9,6 +6,8 @@ import {
 } from "@mistle/db/migrator";
 import { SMTPEmailSender } from "@mistle/emails";
 import { startMailpit, startPostgresWithPgBouncer, type MailpitService } from "@mistle/test-core";
+import type { Worker } from "openworkflow";
+import type { BackendPostgres } from "openworkflow/postgres";
 import postgres from "postgres";
 import { it as vitestIt } from "vitest";
 

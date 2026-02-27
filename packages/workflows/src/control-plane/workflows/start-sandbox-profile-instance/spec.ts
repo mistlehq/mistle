@@ -1,5 +1,4 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
-
 import { defineWorkflowSpec } from "openworkflow";
 
 import type { StartSandboxInstanceWorkflowImageInput } from "../../../data-plane/workflows/start-sandbox-instance/spec.js";

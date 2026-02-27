@@ -4,11 +4,10 @@
  * `it = vitestIt.extend(...)` in this file so lint can identify test blocks without suppression.
  */
 
-import { systemClock } from "@mistle/time";
 import { randomUUID } from "node:crypto";
-import { describe, expect } from "vitest";
 
-import type { DashboardMembersInvitationsFixture } from "./members-invitations-test-context.js";
+import { systemClock } from "@mistle/time";
+import { describe, expect } from "vitest";
 
 import {
   MemberRoles,
@@ -19,6 +18,7 @@ import {
 import { mapInviteAttemptResult } from "../src/features/settings/members/member-invite-state.js";
 import { MembersApiError } from "../src/features/settings/members/members-api-errors.js";
 import { createMembersInvitationsService } from "../src/features/settings/members/members-invitations-service-core.js";
+import type { DashboardMembersInvitationsFixture } from "./members-invitations-test-context.js";
 import { it } from "./members-invitations-test-context.js";
 
 function readErrorMessage(value: unknown): string | null {

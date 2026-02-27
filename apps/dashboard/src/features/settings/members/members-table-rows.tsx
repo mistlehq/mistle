@@ -1,11 +1,10 @@
 import { DropdownMenuItem, TableCell, TableRow } from "@mistle/ui";
 
+import { MoreActionsMenu } from "../../../components/more-actions-menu.js";
 import type {
   MembersDirectoryActionDescriptor,
   MembersDirectoryActionFeedback,
 } from "./members-directory-model.js";
-
-import { MoreActionsMenu } from "../../../components/more-actions-menu.js";
 
 export type MembersTableAction = {
   key: MembersDirectoryActionDescriptor["key"];

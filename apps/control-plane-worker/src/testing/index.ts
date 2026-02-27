@@ -1,6 +1,5 @@
-import type { ControlPlaneWorkerRuntime, ControlPlaneWorkerRuntimeConfig } from "../types.js";
-
 import { createControlPlaneWorkerRuntime } from "../runtime/index.js";
+import type { ControlPlaneWorkerRuntime, ControlPlaneWorkerRuntimeConfig } from "../types.js";
 
 export type StartControlPlaneWorkerTestingRuntimeInput = {
   databaseDirectUrl: string;

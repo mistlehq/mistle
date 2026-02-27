@@ -1,6 +1,4 @@
 import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
-import type { MembersTableAction } from "./members-table-rows.js";
-
 import {
   buildMembersDirectoryRowActionDescriptors,
   directoryRowActionsContentClassName,
@@ -13,6 +11,7 @@ import {
   type MembersDirectoryPendingMemberOperation,
   type MembersDirectoryRow,
 } from "./members-directory-model.js";
+import type { MembersTableAction } from "./members-table-rows.js";
 
 export type MembersDirectoryTableRowViewModel = {
   key: string;

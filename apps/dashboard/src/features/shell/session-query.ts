@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
-import type { SessionData } from "../auth/types.js";
-
 import { authClient } from "../../lib/auth/client.js";
+import type { SessionData } from "../auth/types.js";
 import { SESSION_QUERY_KEY } from "./session-query-key.js";
 import { resolveSessionFromAuthPayload } from "./session-query-result.js";
 

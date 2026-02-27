@@ -1,14 +1,12 @@
+import { DATA_PLANE_INTERNAL_AUTH_HEADER } from "@mistle/data-plane-trpc/constants";
 import type {
   StartSandboxInstanceCompletedResponse,
   StartSandboxInstanceInput,
 } from "@mistle/data-plane-trpc/contracts";
-
-import { DATA_PLANE_INTERNAL_AUTH_HEADER } from "@mistle/data-plane-trpc/constants";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { describe, expect } from "vitest";
 
 import type { DataPlaneTrpcRouter } from "../src/trpc/router.js";
-
 import { it } from "./test-context.js";
 
 type WorkflowRunRow = {

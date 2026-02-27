@@ -1,6 +1,5 @@
-import type { CSSProperties, ReactElement } from "react";
-
 import { Body, Container, Head, Html, Preview, Section, Text } from "jsx-email";
+import type { CSSProperties, ReactElement } from "react";
 
 export type EmailOTPTemplateProps = {
   otp: string;

@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { InviteChip } from "./member-invite-state.js";
-import type { InviteMemberResponse, OrganizationRole } from "./members-api-types.js";
-
 import {
   appendInviteChips,
   isValidInviteEmailShape,
@@ -11,6 +9,7 @@ import {
   summarizeInviteOutcomes,
 } from "./member-invite-state.js";
 import { MembersApiError } from "./members-api-errors.js";
+import type { InviteMemberResponse, OrganizationRole } from "./members-api-types.js";
 
 export type MemberInviteDialogPhase = "compose" | "results";
 type InviteSubmissionTarget = {

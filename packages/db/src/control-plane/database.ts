@@ -1,6 +1,5 @@
-import type { Pool } from "pg";
-
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import type { Pool } from "pg";
 
 import * as controlPlaneSchema from "./schema/index.js";
 

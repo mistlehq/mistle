@@ -1,10 +1,8 @@
 import type { Client } from "openapi-fetch";
-
 import createClient from "openapi-fetch";
 
-import type { paths } from "./generated/schema.js";
-
 import { getDashboardConfig } from "../../config.js";
+import type { paths } from "./generated/schema.js";
 
 let controlPlaneApiClient: Client<paths> | null = null;
 

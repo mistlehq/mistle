@@ -1,5 +1,6 @@
-import { SandboxImageKind, SandboxProvider } from "@mistle/sandbox";
 import { randomUUID } from "node:crypto";
+
+import { SandboxImageKind, SandboxProvider } from "@mistle/sandbox";
 import { describe, expect } from "vitest";
 
 import {

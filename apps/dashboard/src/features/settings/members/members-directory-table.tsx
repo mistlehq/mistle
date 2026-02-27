@@ -1,9 +1,8 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
 import { useCallback, useMemo } from "react";
 
-import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
-
 import { InvitationDetailsDialog } from "./invitation-details-dialog.js";
+import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
 import {
   type MembersDirectoryInvitationActionState,
   type MembersDirectoryPendingMemberOperation,

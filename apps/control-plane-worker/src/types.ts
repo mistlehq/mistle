@@ -1,7 +1,6 @@
 import type { ServerType } from "@hono/node-server";
-import type { Context, Hono } from "hono";
-
 import { AppIds, type loadConfig } from "@mistle/config";
+import type { Context, Hono } from "hono";
 
 type LoadControlPlaneWorkerConfigResult = ReturnType<
   typeof loadConfig<typeof AppIds.CONTROL_PLANE_WORKER>

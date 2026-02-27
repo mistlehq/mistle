@@ -2,11 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
-import type { MembersQueryKeys } from "./members-query-keys.js";
-import type { MembersSettingsApi } from "./members-settings-api.js";
-
 import { canResendInvitation, resolveInvitationDisplayStatus } from "./members-directory-model.js";
 import { formatMemberDisplayName } from "./members-formatters.js";
+import type { MembersQueryKeys } from "./members-query-keys.js";
+import type { MembersSettingsApi } from "./members-settings-api.js";
 
 export function useMembersQueries(input: {
   organizationId: string;

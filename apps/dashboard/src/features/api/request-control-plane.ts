@@ -1,6 +1,5 @@
-import type { HttpApiErrorInput } from "./http-api-error.js";
-
 import { getDashboardConfig } from "../../config.js";
+import type { HttpApiErrorInput } from "./http-api-error.js";
 import { HttpApiError, readApiErrorMessage, readHttpErrorCode } from "./http-api-error.js";
 
 type ControlPlaneQueryValue = string | number | boolean;

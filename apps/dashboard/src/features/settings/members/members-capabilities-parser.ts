@@ -1,5 +1,4 @@
 import type { MembershipCapabilities, OrganizationRole } from "./members-api-types.js";
-
 import { parseOrganizationRoleValue } from "./members-parsing.js";
 import { readArray, readBoolean, readString, toRecord } from "./members-records.js";
 

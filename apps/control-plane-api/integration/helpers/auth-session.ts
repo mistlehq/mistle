@@ -1,7 +1,7 @@
+import { randomUUID } from "node:crypto";
+
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { MailpitService } from "@mistle/test-core";
-
-import { randomUUID } from "node:crypto";
 
 export type AuthenticatedSession = {
   cookie: string;

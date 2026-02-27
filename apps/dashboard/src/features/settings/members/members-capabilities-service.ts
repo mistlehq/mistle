@@ -1,8 +1,7 @@
-import type { MembershipCapabilities } from "./members-api-types.js";
-
 import { getControlPlaneApiClient } from "../../../lib/control-plane-api/client.js";
 import { normalizeHttpApiError } from "../../api/http-api-error.js";
 import { MembersApiError } from "./members-api-errors.js";
+import type { MembershipCapabilities } from "./members-api-types.js";
 
 export async function getMembershipCapabilities(input: {
   organizationId: string;

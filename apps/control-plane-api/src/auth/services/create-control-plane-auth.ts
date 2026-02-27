@@ -1,7 +1,6 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
-import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
-
 import { ControlPlaneDbSchema } from "@mistle/db/control-plane";
+import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP, organization } from "better-auth/plugins";

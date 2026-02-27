@@ -1,10 +1,9 @@
+import { executeMembersOperation } from "./members-api-errors.js";
 import type {
   InviteMemberResponse,
   OrganizationRole,
   SettingsInvitation,
 } from "./members-api-types.js";
-
-import { executeMembersOperation } from "./members-api-errors.js";
 import {
   parseInviteMemberResponse,
   parseInvitationsResponse,

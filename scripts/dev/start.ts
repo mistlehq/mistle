@@ -1,9 +1,9 @@
 import type { ChildProcess, SpawnSyncReturns } from "node:child_process";
-
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { parse as parseToml } from "smol-toml";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));

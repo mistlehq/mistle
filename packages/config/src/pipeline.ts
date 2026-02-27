@@ -1,5 +1,4 @@
 import type { ConfigModule } from "./core/module.js";
-
 import { getValueAtPath, setValueAtPath } from "./core/record.js";
 
 export function loadFromToml(

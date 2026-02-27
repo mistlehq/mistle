@@ -1,7 +1,6 @@
-import type { ControlPlaneApiConfig, ControlPlaneApiRuntime, StartedServer } from "../types.js";
-
 import { createApp, getAppDatabase, stopApp } from "../app.js";
 import { startServer } from "../server.js";
+import type { ControlPlaneApiConfig, ControlPlaneApiRuntime, StartedServer } from "../types.js";
 
 export async function createControlPlaneApiRuntime(
   config: ControlPlaneApiConfig,

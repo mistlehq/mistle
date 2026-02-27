@@ -19,10 +19,9 @@ import {
   SelectValue,
 } from "@mistle/ui";
 
-import type { InviteMemberResponse, OrganizationRole } from "./members-api.js";
-
 import { MemberInviteChipInput } from "./member-invite-chip-input.js";
 import { MemberInviteResultsView } from "./member-invite-results-view.js";
+import type { InviteMemberResponse, OrganizationRole } from "./members-api.js";
 import { formatRoleLabel, parseRoleSelectValue } from "./members-formatters.js";
 import {
   canRetryFailedInvites,

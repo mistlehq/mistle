@@ -1,5 +1,4 @@
 import type { ConfigModule } from "../../core/module.js";
-
 import { loadControlPlaneWorkerFromEnv } from "./load-env.js";
 import { loadControlPlaneWorkerFromToml } from "./load-toml.js";
 import { ControlPlaneWorkerConfigSchema } from "./schema.js";

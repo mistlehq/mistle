@@ -25,10 +25,9 @@ import { and, eq } from "drizzle-orm";
 import { Pool } from "pg";
 import { it as vitestIt } from "vitest";
 
+import { createControlPlaneApiRuntime } from "../src/runtime/index.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
 import type { AuthenticatedSession } from "./helpers/auth-session.js";
-
-import { createControlPlaneApiRuntime } from "../src/runtime/index.js";
 import { createAuthenticatedSession } from "./helpers/auth-session.js";
 
 export type ControlPlaneApiIntegrationFixture = {

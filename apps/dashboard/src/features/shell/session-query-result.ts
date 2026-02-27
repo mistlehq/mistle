@@ -1,6 +1,5 @@
-import type { SessionData } from "../auth/types.js";
-
 import { resolveErrorMessage } from "../auth/messages.js";
+import type { SessionData } from "../auth/types.js";
 
 type UnknownRecord = Record<string, unknown>;
 

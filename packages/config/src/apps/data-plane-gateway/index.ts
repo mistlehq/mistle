@@ -1,5 +1,4 @@
 import type { ConfigModule } from "../../core/module.js";
-
 import { loadDataPlaneGatewayFromEnv } from "./load-env.js";
 import { loadDataPlaneGatewayFromToml } from "./load-toml.js";
 import { DataPlaneGatewayConfigSchema } from "./schema.js";

@@ -1,7 +1,6 @@
-import type { OrganizationRole, SettingsMember } from "./members-api-types.js";
-
 import { authClient } from "../../../lib/auth/client.js";
 import { executeMembersOperation } from "./members-api-errors.js";
+import type { OrganizationRole, SettingsMember } from "./members-api-types.js";
 import { parseMembersPageResponse } from "./members-directory-parser.js";
 
 export async function listMembers(input: { organizationId: string }): Promise<SettingsMember[]> {

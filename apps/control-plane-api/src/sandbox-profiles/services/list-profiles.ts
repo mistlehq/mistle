@@ -1,7 +1,6 @@
 import type { SandboxProfile } from "@mistle/db/control-plane";
-import type { KeysetPaginatedResult } from "@mistle/http/pagination";
-
 import { sandboxProfiles } from "@mistle/db/control-plane";
+import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import {
   decodeKeysetCursorOrThrow,
   encodeKeysetCursor,
@@ -15,9 +14,8 @@ import {
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { CreateSandboxProfilesServiceInput } from "./types.js";
-
 import { SandboxProfilesBadRequestCodes, SandboxProfilesBadRequestError } from "./errors.js";
+import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;

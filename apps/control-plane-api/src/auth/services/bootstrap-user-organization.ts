@@ -1,5 +1,4 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
-
 import { ControlPlaneDbSchema, MemberRoles } from "@mistle/db/control-plane";
 import { typeid } from "typeid-js";
 

@@ -1,7 +1,6 @@
-import type { DataPlaneGatewayConfig, DataPlaneGatewayRuntime, StartedServer } from "../types.js";
-
 import { createApp } from "../app.js";
 import { startServer } from "../server.js";
+import type { DataPlaneGatewayConfig, DataPlaneGatewayRuntime, StartedServer } from "../types.js";
 
 export function createDataPlaneGatewayRuntime(
   config: DataPlaneGatewayConfig,

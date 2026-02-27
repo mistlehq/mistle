@@ -1,13 +1,12 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 
-import type { AppContextBindings, AppRoutes } from "../types.js";
-
 import {
   buildMembershipCapabilities,
   parseOrganizationRole,
   type OrganizationRole,
 } from "../auth/services/organization-policy.js";
+import type { AppContextBindings, AppRoutes } from "../types.js";
 import { ORGANIZATION_MEMBERSHIP_CAPABILITIES_ROUTE_BASE_PATH } from "./constants.js";
 import {
   getOrganizationMembershipCapabilitiesRoute,

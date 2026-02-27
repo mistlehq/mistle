@@ -1,5 +1,4 @@
 import type { EmailSender } from "@mistle/emails";
-
 import { defineWorkflow, type Workflow } from "openworkflow";
 
 import {

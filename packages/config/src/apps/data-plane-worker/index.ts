@@ -1,5 +1,4 @@
 import type { ConfigModule } from "../../core/module.js";
-
 import { loadDataPlaneWorkerFromEnv } from "./load-env.js";
 import { loadDataPlaneWorkerFromToml } from "./load-toml.js";
 import { DataPlaneWorkerConfigSchema } from "./schema.js";

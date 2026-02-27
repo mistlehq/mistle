@@ -18,7 +18,6 @@ import {
 } from "@mistle/ui";
 
 import type { RoleChangeDialogState } from "./members-capability-policy.js";
-
 import { formatRoleLabel, formatRoleSelectValue } from "./members-formatters.js";
 
 export function MemberRoleChangeDialog(input: {

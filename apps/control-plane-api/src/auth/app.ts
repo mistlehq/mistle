@@ -1,7 +1,6 @@
 import { Hono } from "hono";
 
 import type { AppContextBindings, AppRoutes } from "../types.js";
-
 import { AUTH_ROUTE_BASE_PATH } from "./constants.js";
 
 export function createAuthApp(): AppRoutes<typeof AUTH_ROUTE_BASE_PATH> {

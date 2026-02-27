@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 
 import type { SettingsInvitation, SettingsMember } from "./members-api.js";
-
 import {
   buildMembersDirectoryRows,
   filterMembersDirectoryRows,
