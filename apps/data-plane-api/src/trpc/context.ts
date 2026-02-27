@@ -4,6 +4,7 @@ import type { DataPlaneApiConfig } from "../types.js";
 export interface DataPlaneTrpcContext {
   config: DataPlaneApiConfig;
   internalAuthServiceToken: string;
+  requestHeaders: Headers;
   resources: AppRuntimeResources;
 }
 
