@@ -62,7 +62,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
         };
 
         const runtime = await createDataPlaneApiRuntime(config);
-        runtime.start();
+        await runtime.start();
         cleanupTasks.unshift(async () => {
           await runtime.stop();
         });
