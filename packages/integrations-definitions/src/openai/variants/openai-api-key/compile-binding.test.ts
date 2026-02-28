@@ -31,6 +31,12 @@ describe("compileOpenAiApiKeyBinding", () => {
           reasoningEffort: "medium",
         },
       },
+      refs: {
+        egressUrl: {
+          kind: "egress_url",
+          routeId: "route_ibd_123",
+        },
+      },
       runtimeContext: {
         sandboxProvider: "docker",
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
@@ -39,8 +45,6 @@ describe("compileOpenAiApiKeyBinding", () => {
 
     expect(compiled.egressRoutes).toEqual([
       {
-        routeId: "route_ibd_123",
-        bindingId: "ibd_123",
         match: {
           hosts: ["api.openai.com"],
           pathPrefixes: ["/v1"],
@@ -62,13 +66,18 @@ describe("compileOpenAiApiKeyBinding", () => {
 
     expect(compiled.runtimeClientSetups).toHaveLength(1);
     expect(compiled.runtimeClientSetups[0]?.env).toEqual({
-      OPENAI_BASE_URL: "http://sandboxd.internal/egress/routes/route_ibd_123",
+      OPENAI_BASE_URL: {
+        kind: "egress_url",
+        routeId: "route_ibd_123",
+      },
       OPENAI_MODEL: "gpt-5.3-codex",
       OPENAI_REASONING_EFFORT: "medium",
     });
+    expect(compiled.runtimeClientSetups[0]?.files[0]?.fileId).toBe("codex_config");
     expect(compiled.runtimeClientSetups[0]?.files[0]?.path).toBe("/workspace/.codex/config.toml");
-    expect(compiled.runtimeClientSetups[0]?.files[0]?.content).toContain(
-      'base_url = "http://sandboxd.internal/egress/routes/route_ibd_123"',
+    expect(compiled.runtimeClientSetups[0]?.files[0]?.content).not.toContain("base_url =");
+    expect(compiled.runtimeClientSetups[0]?.files[0]?.content).not.toContain(
+      "[model_providers.openai]",
     );
   });
 
@@ -100,6 +109,12 @@ describe("compileOpenAiApiKeyBinding", () => {
           reasoningEffort: "high",
         },
       },
+      refs: {
+        egressUrl: {
+          kind: "egress_url",
+          routeId: "route_ibd_123",
+        },
+      },
       runtimeContext: {
         sandboxProvider: "docker",
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress/",
@@ -108,8 +123,9 @@ describe("compileOpenAiApiKeyBinding", () => {
 
     expect(compiled.egressRoutes[0]?.match.hosts).toEqual(["proxy.example.com"]);
     expect(compiled.egressRoutes[0]?.match.pathPrefixes).toEqual(["/openai-v2"]);
-    expect(compiled.runtimeClientSetups[0]?.env.OPENAI_BASE_URL).toBe(
-      "http://sandboxd.internal/egress/routes/route_ibd_123",
-    );
+    expect(compiled.runtimeClientSetups[0]?.env.OPENAI_BASE_URL).toEqual({
+      kind: "egress_url",
+      routeId: "route_ibd_123",
+    });
   });
 });

@@ -24,6 +24,7 @@ describe("integration registry", () => {
       bindingConfigSchema: ConfigSchema,
       supportedAuthSchemes: ["api-key"],
       triggerEventTypes: [],
+      userConfigSlots: [],
       compileBinding: () => ({
         egressRoutes: [],
         artifacts: [],
@@ -51,6 +52,7 @@ describe("integration registry", () => {
       bindingConfigSchema: ConfigSchema,
       supportedAuthSchemes: ["api-key"],
       triggerEventTypes: [],
+      userConfigSlots: [],
       compileBinding: () => ({
         egressRoutes: [],
         artifacts: [],
@@ -86,6 +88,7 @@ describe("integration registry", () => {
         bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["oauth"],
         triggerEventTypes: ["github.issue_comment.created"],
+        userConfigSlots: [],
         compileBinding: () => ({
           egressRoutes: [],
           artifacts: [],
@@ -102,6 +105,7 @@ describe("integration registry", () => {
         bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["api-key"],
         triggerEventTypes: [],
+        userConfigSlots: [],
         compileBinding: () => ({
           egressRoutes: [],
           artifacts: [],
@@ -116,5 +120,54 @@ describe("integration registry", () => {
       "github",
       "openai",
     ]);
+  });
+
+  it("fails when user config slots have duplicate keys", () => {
+    const registry = new IntegrationRegistry();
+
+    expect(() =>
+      registry.register({
+        familyId: "openai",
+        variantId: "openai-api-key",
+        kind: "agent",
+        displayName: "OpenAI",
+        logoKey: "openai",
+        targetConfigSchema: ConfigSchema,
+        bindingConfigSchema: ConfigSchema,
+        supportedAuthSchemes: ["api-key"],
+        triggerEventTypes: [],
+        userConfigSlots: [
+          {
+            kind: "env",
+            key: "model",
+            label: "Model",
+            valueSchema: {
+              parse: (input: unknown) => z.string().min(1).parse(input),
+            },
+            applyTo: {
+              clientId: "codex-cli",
+              envKey: "OPENAI_MODEL",
+            },
+          },
+          {
+            kind: "env",
+            key: "model",
+            label: "Model override",
+            valueSchema: {
+              parse: (input: unknown) => z.string().min(1).parse(input),
+            },
+            applyTo: {
+              clientId: "codex-cli",
+              envKey: "OPENAI_MODEL",
+            },
+          },
+        ],
+        compileBinding: () => ({
+          egressRoutes: [],
+          artifacts: [],
+          runtimeClientSetups: [],
+        }),
+      }),
+    ).toThrowError(IntegrationDefinitionRegistryError);
   });
 });

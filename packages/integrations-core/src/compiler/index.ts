@@ -1,12 +1,22 @@
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { assembleCompiledRuntimePlan } from "../runtime-plan/index.js";
 import {
+  egressUrlRef,
   IntegrationConnectionStatuses,
+  type CompileBindingResult,
   type CompileRuntimePlanInput,
   type CompiledBindingResult,
   type CompiledRuntimePlan,
 } from "../types/index.js";
 import { validateCompiledBindingResults } from "../validation/index.js";
+
+function resolveRouteId(input: { bindingId: string; routeIndex: number }): string {
+  if (input.routeIndex === 0) {
+    return `route_${input.bindingId}`;
+  }
+
+  return `route_${input.bindingId}_${input.routeIndex + 1}`;
+}
 
 export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRuntimePlan {
   const compiledBindingResults: CompiledBindingResult[] = [];
@@ -67,7 +77,7 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
       );
     }
 
-    const compiledBindingResult = definition.compileBinding({
+    const compileBindingResult: CompileBindingResult = definition.compileBinding({
       organizationId: input.organizationId,
       sandboxProfileId: input.sandboxProfileId,
       version: input.version,
@@ -82,8 +92,24 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
         kind: bindingInput.binding.kind,
         config: parsedBindingConfig,
       },
+      refs: {
+        egressUrl: egressUrlRef(`route_${bindingInput.binding.id}`),
+      },
       runtimeContext: input.runtimeContext,
     });
+
+    const compiledBindingResult: CompiledBindingResult = {
+      egressRoutes: compileBindingResult.egressRoutes.map((route, routeIndex) => ({
+        ...route,
+        routeId: resolveRouteId({
+          bindingId: bindingInput.binding.id,
+          routeIndex,
+        }),
+        bindingId: bindingInput.binding.id,
+      })),
+      artifacts: compileBindingResult.artifacts,
+      runtimeClientSetups: compileBindingResult.runtimeClientSetups,
+    };
 
     compiledBindingResults.push(compiledBindingResult);
   }
@@ -96,6 +122,7 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     image: input.image,
+    runtimeContext: input.runtimeContext,
     compiledBindingResults,
   });
 }

@@ -97,17 +97,11 @@ describe("sandbox profile compile runtime plan integration", () => {
         },
         files: [
           {
+            fileId: "codex_config",
             path: "/workspace/.codex/config.toml",
             mode: 384,
             content: `model = "gpt-5.3-codex"
 model_reasoning_effort = "medium"
-model_provider = "openai"
-
-[model_providers.openai]
-name = "OpenAI"
-base_url = "http://sandboxd.internal/egress/routes/route_ibd_compile_success"
-env_key = "OPENAI_API_KEY"
-wire_api = "responses"
 `,
           },
         ],

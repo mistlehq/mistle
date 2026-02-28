@@ -41,8 +41,8 @@ function createCompiledBindingResult(input: {
   artifactInstallPath: string;
   runtimeClientSetup?: {
     clientId: string;
-    env: Record<string, string>;
-    files: Array<{ path: string; mode: number; content: string }>;
+    env: Record<string, string | { kind: "egress_url"; routeId: string }>;
+    files: Array<{ fileId: string; path: string; mode: number; content: string }>;
   };
 }): CompiledBindingResult {
   return {
@@ -86,6 +86,7 @@ describe("validateCompiledBindingResults", () => {
         },
         files: [
           {
+            fileId: "codex_config",
             path: "/workspace/.codex/config.toml",
             mode: 384,
             content: 'model = "gpt-5.3-codex"',
@@ -197,5 +198,111 @@ describe("validateCompiledBindingResults", () => {
         expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
       }
     }
+  });
+
+  it("fails on runtime client fileId conflicts", () => {
+    const resultA = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactInstallPath: "/tmp/a",
+      runtimeClientSetup: {
+        clientId: "codex-cli",
+        env: {},
+        files: [
+          {
+            fileId: "codex_config",
+            path: "/workspace/.codex/config.toml",
+            mode: 384,
+            content: 'model = "gpt-5.3-codex"',
+          },
+        ],
+      },
+    });
+    const resultB = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_b",
+        bindingId: "bind_b",
+        hosts: ["api.github.com"],
+      }),
+      artifactInstallPath: "/tmp/b",
+      runtimeClientSetup: {
+        clientId: "codex-cli",
+        env: {},
+        files: [
+          {
+            fileId: "codex_config",
+            path: "/workspace/.codex/override.toml",
+            mode: 384,
+            content: 'model = "gpt-5.3-codex"',
+          },
+        ],
+      },
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [resultA, resultB],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+
+    try {
+      validateCompiledBindingResults({
+        compiledBindingResults: [resultA, resultB],
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(IntegrationCompilerError);
+      if (error instanceof IntegrationCompilerError) {
+        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
+      }
+    }
+  });
+
+  it("accepts runtime client env refs that are structurally equivalent", () => {
+    const resultA = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactInstallPath: "/tmp/a",
+      runtimeClientSetup: {
+        clientId: "codex-cli",
+        env: {
+          OPENAI_BASE_URL: {
+            kind: "egress_url",
+            routeId: "route_a",
+          },
+        },
+        files: [],
+      },
+    });
+
+    const resultB = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_b",
+        bindingId: "bind_b",
+        hosts: ["api.github.com"],
+      }),
+      artifactInstallPath: "/tmp/b",
+      runtimeClientSetup: {
+        clientId: "codex-cli",
+        env: {
+          OPENAI_BASE_URL: {
+            kind: "egress_url",
+            routeId: "route_a",
+          },
+        },
+        files: [],
+      },
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [resultA, resultB],
+      }),
+    ).not.toThrow();
   });
 });

@@ -12,6 +12,11 @@ describe("integrations-definitions index", () => {
 
     expect(definition?.displayName).toBe("OpenAI");
     expect(definition?.kind).toBe("agent");
+    expect(definition?.userConfigSlots.map((slot) => slot.key)).toEqual([
+      "codex_config",
+      "openai_model",
+      "openai_reasoning_effort",
+    ]);
   });
 
   it("lists registered definitions", () => {
