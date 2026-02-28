@@ -1,6 +1,7 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 
 import { createAuthApp } from "../auth/app.js";
+import { createIntegrationTargetsApp } from "../integration-targets/index.js";
 import { createAppContextMiddleware } from "../middleware/app-context.js";
 import { createCorsMiddleware } from "../middleware/cors.js";
 import { withAuthSession } from "../middleware/with-auth-session.js";
@@ -40,11 +41,13 @@ export function registerAppRoutes(input: RegisterAppRoutesInput): void {
 
 export function registerApiRouteModules(app: ControlPlaneApp): void {
   const authApp = createAuthApp();
+  const integrationTargetsApp = withAuthSession(createIntegrationTargetsApp());
   const organizationMembershipCapabilitiesApp = withAuthSession(
     createOrganizationMembershipCapabilitiesApp(),
   );
   const sandboxProfilesApp = withAuthSession(createSandboxProfilesApp());
   app.route(authApp.basePath, authApp.routes);
+  app.route(integrationTargetsApp.basePath, integrationTargetsApp.routes);
   app.route(
     organizationMembershipCapabilitiesApp.basePath,
     organizationMembershipCapabilitiesApp.routes,

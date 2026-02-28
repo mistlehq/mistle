@@ -1,6 +1,7 @@
 import { index, jsonb, text, timestamp } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
+import { integrationTargets } from "./integration-targets.js";
 import { controlPlaneSchema } from "./namespace.js";
 import { organizations } from "./organizations.js";
 
@@ -22,7 +23,9 @@ export const integrationConnections = controlPlaneSchema.table(
     organizationId: text("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
-    targetKey: text("target_key").notNull(),
+    targetKey: text("target_key")
+      .notNull()
+      .references(() => integrationTargets.targetKey, { onDelete: "restrict" }),
     status: text("status")
       .notNull()
       .$type<IntegrationConnectionStatus>()
