@@ -1,3 +1,4 @@
+import { compileProfileVersionRuntimePlan } from "./compile-profile-version-runtime-plan.js";
 import { createProfile } from "./create-profile.js";
 import { getProfile } from "./get-profile.js";
 import { listProfiles } from "./list-profiles.js";
@@ -34,6 +35,13 @@ export function createSandboxProfilesService(
       startProfileInstance(
         {
           openWorkflow: input.openWorkflow,
+        },
+        serviceInput,
+      ),
+    compileProfileVersionRuntimePlan: (serviceInput) =>
+      compileProfileVersionRuntimePlan(
+        {
+          db: input.db,
         },
         serviceInput,
       ),
