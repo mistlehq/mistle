@@ -6,6 +6,11 @@ import type {
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import type {
+  CompiledRuntimePlan,
+  IntegrationDefinitionResolver,
+  ResolvedSandboxImage,
+} from "@mistle/integrations-core";
+import type {
   StartSandboxProfileInstanceWorkflowInput,
   createControlPlaneOpenWorkflow,
 } from "@mistle/workflows/control-plane";
@@ -52,4 +57,15 @@ export type SandboxProfilesService = {
     sandboxInstanceId: string;
     providerSandboxId: string;
   }>;
+  compileProfileVersionRuntimePlan: (input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+    image: ResolvedSandboxImage;
+    runtimeContext: {
+      sandboxProvider: string;
+      sandboxdEgressBaseUrl: string;
+    };
+    registry: IntegrationDefinitionResolver;
+  }) => Promise<CompiledRuntimePlan>;
 };
