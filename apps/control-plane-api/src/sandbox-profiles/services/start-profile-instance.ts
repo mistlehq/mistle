@@ -2,9 +2,11 @@ import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/
 import type { StartSandboxProfileInstanceWorkflowInput } from "@mistle/workflows/control-plane";
 import { StartSandboxProfileInstanceWorkflowSpec } from "@mistle/workflows/control-plane";
 
+import { compileProfileVersionRuntimePlan } from "./compile-profile-version-runtime-plan.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 const START_SANDBOX_PROFILE_INSTANCE_WAIT_TIMEOUT_MS = 5 * 60 * 1000;
+const SandboxdEgressBaseUrl = "http://sandboxd.internal/egress";
 
 type StartProfileInstanceInput = {
   organizationId: string;
@@ -39,9 +41,28 @@ function createIdempotencyKey(input: StartProfileInstanceInput): string {
 }
 
 export async function startProfileInstance(
-  { openWorkflow }: Pick<CreateSandboxProfilesServiceInput, "openWorkflow">,
+  { db, openWorkflow }: Pick<CreateSandboxProfilesServiceInput, "db" | "openWorkflow">,
   serviceInput: StartProfileInstanceInput,
 ): Promise<StartProfileInstanceOutput> {
+  await compileProfileVersionRuntimePlan(
+    {
+      db,
+    },
+    {
+      organizationId: serviceInput.organizationId,
+      profileId: serviceInput.profileId,
+      profileVersion: serviceInput.profileVersion,
+      image: {
+        source: "default-base",
+        imageRef: serviceInput.image.imageId,
+      },
+      runtimeContext: {
+        sandboxProvider: serviceInput.image.provider,
+        sandboxdEgressBaseUrl: SandboxdEgressBaseUrl,
+      },
+    },
+  );
+
   const workflowRunHandle = await openWorkflow.runWorkflow(
     StartSandboxProfileInstanceWorkflowSpec,
     {

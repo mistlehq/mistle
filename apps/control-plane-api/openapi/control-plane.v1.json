@@ -1894,30 +1894,62 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean",
-                      "enum": [false]
-                    },
-                    "error": {
+                  "anyOf": [
+                    {
                       "type": "object",
                       "properties": {
-                        "name": {
+                        "code": {
                           "type": "string",
-                          "minLength": 1
+                          "enum": [
+                            "INVALID_BINDING_CONNECTION_REFERENCE",
+                            "INVALID_CONNECTION_TARGET_REFERENCE",
+                            "CONNECTION_MISMATCH",
+                            "TARGET_DISABLED",
+                            "CONNECTION_NOT_ACTIVE",
+                            "KIND_MISMATCH",
+                            "INVALID_TARGET_CONFIG",
+                            "INVALID_BINDING_CONFIG",
+                            "ROUTE_CONFLICT",
+                            "ARTIFACT_CONFLICT",
+                            "RUNTIME_CLIENT_SETUP_CONFLICT",
+                            "RUNTIME_CLIENT_SETUP_INVALID_REF"
+                          ]
                         },
                         "message": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": ["name", "message"],
-                      "additionalProperties": {}
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [false]
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["name", "message"],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": ["success", "error"],
+                      "additionalProperties": false
                     }
-                  },
-                  "required": ["success", "error"],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }

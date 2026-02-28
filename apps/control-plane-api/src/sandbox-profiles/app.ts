@@ -3,6 +3,7 @@ import { OpenAPIHono, z } from "@hono/zod-openapi";
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 import { SANDBOX_PROFILES_ROUTE_BASE_PATH } from "./constants.js";
 import {
+  StartSandboxProfileInstanceBadRequestResponseSchema,
   createSandboxProfileRoute,
   BadRequestResponseSchema,
   deleteSandboxProfileRoute,
@@ -14,6 +15,7 @@ import {
   updateSandboxProfileRoute,
 } from "./contracts.js";
 import {
+  SandboxProfilesCompileError,
   SandboxProfilesBadRequestError,
   SandboxProfilesNotFoundError,
   SandboxProfilesNotFoundCodes,
@@ -123,12 +125,6 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
       if (session === null) {
         throw new Error("Expected authenticated session to be available.");
       }
-      await assertSandboxProfileVersionExists({
-        db: ctx.get("db"),
-        organizationId: session.session.activeOrganizationId,
-        profileId: params.profileId,
-        profileVersion: params.version,
-      });
 
       const startedSandboxInstance = await ctx
         .get("services")
@@ -151,7 +147,7 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
 
       return ctx.json(startedSandboxInstance, 201);
     } catch (error) {
-      return handleStartInstanceNotFoundError(ctx, error);
+      return handleStartInstanceError(ctx, error);
     }
   });
 
@@ -159,43 +155,6 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
     basePath: SANDBOX_PROFILES_ROUTE_BASE_PATH,
     routes,
   };
-}
-
-async function assertSandboxProfileVersionExists(input: {
-  db: AppContext["var"]["db"];
-  organizationId: string;
-  profileId: string;
-  profileVersion: number;
-}): Promise<void> {
-  const sandboxProfile = await input.db.query.sandboxProfiles.findFirst({
-    columns: {
-      id: true,
-    },
-    where: (table, { and, eq }) =>
-      and(eq(table.id, input.profileId), eq(table.organizationId, input.organizationId)),
-  });
-
-  if (sandboxProfile === undefined) {
-    throw new SandboxProfilesNotFoundError(
-      SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
-      "Sandbox profile was not found.",
-    );
-  }
-
-  const sandboxProfileVersion = await input.db.query.sandboxProfileVersions.findFirst({
-    columns: {
-      sandboxProfileId: true,
-    },
-    where: (table, { and, eq }) =>
-      and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
-  });
-
-  if (sandboxProfileVersion === undefined) {
-    throw new SandboxProfilesNotFoundError(
-      SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
-      "Sandbox profile version was not found.",
-    );
-  }
 }
 
 function handleListProfilesError(ctx: AppContext, error: unknown) {
@@ -228,7 +187,16 @@ function handleProfileNotFoundError(ctx: AppContext, error: unknown) {
   throw error;
 }
 
-function handleStartInstanceNotFoundError(ctx: AppContext, error: unknown) {
+function handleStartInstanceError(ctx: AppContext, error: unknown) {
+  if (error instanceof SandboxProfilesCompileError) {
+    const responseBody: z.infer<typeof StartSandboxProfileInstanceBadRequestResponseSchema> = {
+      code: error.code,
+      message: error.message,
+    };
+
+    return ctx.json(responseBody, 400);
+  }
+
   if (error instanceof SandboxProfilesNotFoundError) {
     const responseBody: z.infer<typeof StartSandboxProfileInstanceNotFoundResponseSchema> = {
       code: error.code,

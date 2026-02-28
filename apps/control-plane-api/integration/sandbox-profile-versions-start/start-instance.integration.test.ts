@@ -1,7 +1,13 @@
-import { sandboxProfiles, sandboxProfileVersions } from "@mistle/db/control-plane";
+import {
+  IntegrationBindingKinds,
+  sandboxProfiles,
+  sandboxProfileVersionIntegrationBindings,
+  sandboxProfileVersions,
+} from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
 
 import {
+  StartSandboxProfileInstanceBadRequestResponseSchema,
   StartSandboxProfileInstanceNotFoundResponseSchema,
   StartSandboxProfileInstanceResponseSchema,
 } from "../../src/sandbox-profiles/contracts.js";
@@ -80,5 +86,50 @@ describe("sandbox profile version start instance integration", () => {
 
     const body = StartSandboxProfileInstanceNotFoundResponseSchema.parse(await response.json());
     expect(body.code).toBe("PROFILE_VERSION_NOT_FOUND");
+  }, 120_000);
+
+  it("returns 400 when compile preflight fails", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-start-instance-compile-error@example.com",
+    });
+
+    await fixture.controlPlaneDb.insert(sandboxProfiles).values({
+      id: "sbp_start_instance_compile_error",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Compile Error Profile",
+      status: "active",
+    });
+    await fixture.controlPlaneDb.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_start_instance_compile_error",
+      version: 1,
+      manifest: {},
+    });
+    await fixture.controlPlaneDb.insert(sandboxProfileVersionIntegrationBindings).values({
+      id: "ibd_start_instance_compile_error",
+      sandboxProfileId: "sbp_start_instance_compile_error",
+      sandboxProfileVersion: 1,
+      connectionId: "icn_missing_connection",
+      kind: IntegrationBindingKinds.AGENT,
+      config: {
+        runtime: "codex-cli",
+      },
+    });
+
+    const response = await fixture.request(
+      "/v1/sandbox/profiles/sbp_start_instance_compile_error/versions/1/instances",
+      {
+        method: "POST",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      },
+    );
+    expect(response.status).toBe(400);
+
+    const body = StartSandboxProfileInstanceBadRequestResponseSchema.parse(await response.json());
+    if (!("code" in body)) {
+      throw new Error("Expected sandbox profile compile error response.");
+    }
+    expect(body.code).toBe("INVALID_BINDING_CONNECTION_REFERENCE");
   }, 120_000);
 });
