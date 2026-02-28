@@ -3,10 +3,6 @@ import { z } from "zod";
 import { IntegrationManifestError, ManifestErrorCodes } from "../errors/index.js";
 import type { TriggerFilter, TriggerRule } from "../types/index.js";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 type ValidationIssue = {
   path: ReadonlyArray<PropertyKey>;
   message: string;
@@ -17,6 +13,7 @@ function formatIssues(issues: ReadonlyArray<ValidationIssue>): string {
 }
 
 const TriggerScalarValueSchema = z.union([z.string(), z.number(), z.boolean()]);
+const TriggerPathCursorSchema = z.record(z.string(), z.unknown());
 
 export const TriggerFilterSchema: z.ZodType<TriggerFilter> = z.lazy(() =>
   z.union([
@@ -105,11 +102,12 @@ function getValueAtPath(input: { payload: unknown; path: string }): unknown {
   let cursor: unknown = input.payload;
 
   for (const segment of segments) {
-    if (!isRecord(cursor)) {
+    const parsedCursor = TriggerPathCursorSchema.safeParse(cursor);
+    if (!parsedCursor.success) {
       return undefined;
     }
 
-    cursor = cursor[segment];
+    cursor = parsedCursor.data[segment];
   }
 
   return cursor;

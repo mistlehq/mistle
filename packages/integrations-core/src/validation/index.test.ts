@@ -175,7 +175,7 @@ describe("validateCompiledBindingResults", () => {
       runtimeClientSetup: {
         clientId: "codex-cli",
         env: {
-          OPENAI_BASE_URL: "https://api.openai.com/v2",
+          OPENAI_BASE_URL: "https://example.invalid/openai-v2",
         },
         files: [],
       },
