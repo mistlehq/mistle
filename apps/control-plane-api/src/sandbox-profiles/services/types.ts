@@ -5,11 +5,7 @@ import type {
 } from "@mistle/db/control-plane";
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
-import type {
-  CompiledRuntimePlan,
-  IntegrationDefinitionResolver,
-  ResolvedSandboxImage,
-} from "@mistle/integrations-core";
+import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
 import type {
   StartSandboxProfileInstanceWorkflowInput,
   createControlPlaneOpenWorkflow,
@@ -66,6 +62,5 @@ export type SandboxProfilesService = {
       sandboxProvider: string;
       sandboxdEgressBaseUrl: string;
     };
-    registry: IntegrationDefinitionResolver;
   }) => Promise<CompiledRuntimePlan>;
 };

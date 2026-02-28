@@ -1,9 +1,9 @@
 import {
   compileRuntimePlan,
   type CompiledRuntimePlan,
-  type IntegrationDefinitionResolver,
   type ResolvedSandboxImage,
 } from "@mistle/integrations-core";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 
 import {
   SandboxProfilesCompileError,
@@ -22,8 +22,9 @@ type CompileProfileVersionRuntimePlanInput = {
     sandboxProvider: string;
     sandboxdEgressBaseUrl: string;
   };
-  registry: IntegrationDefinitionResolver;
 };
+
+const registry = createIntegrationRegistry();
 
 function normalizeConnectionConfig(
   connectionConfig: Record<string, unknown> | null,
@@ -146,7 +147,7 @@ export async function compileProfileVersionRuntimePlan(
     image: input.image,
     runtimeContext: input.runtimeContext,
     bindings: compileBindings,
-    registry: input.registry,
+    registry,
   });
 }
 
