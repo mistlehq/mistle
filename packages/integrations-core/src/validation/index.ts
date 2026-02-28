@@ -4,17 +4,18 @@ import type {
   CompiledBindingResult,
   EgressCredentialRoute,
   RuntimeArtifactSpec,
-  RuntimeClientSetup,
+  CompiledRuntimeClientSetup,
+  EgressUrlRef,
 } from "../types/index.js";
 
 function flattenCompiledBindingResults(input: ReadonlyArray<CompiledBindingResult>): {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<RuntimeArtifactSpec>;
-  runtimeClientSetups: ReadonlyArray<RuntimeClientSetup>;
+  runtimeClientSetups: ReadonlyArray<CompiledRuntimeClientSetup>;
 } {
   const egressRoutes: EgressCredentialRoute[] = [];
   const artifacts: RuntimeArtifactSpec[] = [];
-  const runtimeClientSetups: RuntimeClientSetup[] = [];
+  const runtimeClientSetups: CompiledRuntimeClientSetup[] = [];
 
   for (const compiledBindingResult of input) {
     egressRoutes.push(...compiledBindingResult.egressRoutes);
@@ -97,9 +98,24 @@ function validateArtifacts(input: ReadonlyArray<RuntimeArtifactSpec>): void {
   }
 }
 
-function validateRuntimeClientSetups(input: ReadonlyArray<RuntimeClientSetup>): void {
-  const clientEnvByClientId = new Map<string, Map<string, string>>();
-  const clientFilesByClientId = new Map<string, Map<string, { mode: number; content: string }>>();
+function runtimeClientSetupValueEquals(left: string | EgressUrlRef, right: string | EgressUrlRef) {
+  if (typeof left === "string" || typeof right === "string") {
+    return left === right;
+  }
+
+  return left.kind === right.kind && left.routeId === right.routeId;
+}
+
+function validateRuntimeClientSetups(input: ReadonlyArray<CompiledRuntimeClientSetup>): void {
+  const clientEnvByClientId = new Map<string, Map<string, string | EgressUrlRef>>();
+  const clientFilesByPathByClientId = new Map<
+    string,
+    Map<string, { fileId: string; mode: number; content: string }>
+  >();
+  const clientFilesByIdByClientId = new Map<
+    string,
+    Map<string, { path: string; mode: number; content: string }>
+  >();
 
   for (const runtimeClientSetup of input) {
     let envByKey = clientEnvByClientId.get(runtimeClientSetup.clientId);
@@ -110,7 +126,7 @@ function validateRuntimeClientSetups(input: ReadonlyArray<RuntimeClientSetup>): 
 
     for (const [envKey, envValue] of Object.entries(runtimeClientSetup.env)) {
       const existingValue = envByKey.get(envKey);
-      if (existingValue !== undefined && existingValue !== envValue) {
+      if (existingValue !== undefined && !runtimeClientSetupValueEquals(existingValue, envValue)) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
           `Runtime client env conflict for client '${runtimeClientSetup.clientId}' and key '${envKey}'.`,
@@ -120,17 +136,25 @@ function validateRuntimeClientSetups(input: ReadonlyArray<RuntimeClientSetup>): 
       envByKey.set(envKey, envValue);
     }
 
-    let filesByPath = clientFilesByClientId.get(runtimeClientSetup.clientId);
+    let filesByPath = clientFilesByPathByClientId.get(runtimeClientSetup.clientId);
     if (filesByPath === undefined) {
       filesByPath = new Map();
-      clientFilesByClientId.set(runtimeClientSetup.clientId, filesByPath);
+      clientFilesByPathByClientId.set(runtimeClientSetup.clientId, filesByPath);
+    }
+
+    let filesById = clientFilesByIdByClientId.get(runtimeClientSetup.clientId);
+    if (filesById === undefined) {
+      filesById = new Map();
+      clientFilesByIdByClientId.set(runtimeClientSetup.clientId, filesById);
     }
 
     for (const file of runtimeClientSetup.files) {
-      const existingFile = filesByPath.get(file.path);
+      const existingFileByPath = filesByPath.get(file.path);
       if (
-        existingFile !== undefined &&
-        (existingFile.mode !== file.mode || existingFile.content !== file.content)
+        existingFileByPath !== undefined &&
+        (existingFileByPath.fileId !== file.fileId ||
+          existingFileByPath.mode !== file.mode ||
+          existingFileByPath.content !== file.content)
       ) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
@@ -138,7 +162,26 @@ function validateRuntimeClientSetups(input: ReadonlyArray<RuntimeClientSetup>): 
         );
       }
 
+      const existingFileById = filesById.get(file.fileId);
+      if (
+        existingFileById !== undefined &&
+        (existingFileById.path !== file.path ||
+          existingFileById.mode !== file.mode ||
+          existingFileById.content !== file.content)
+      ) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+          `Runtime client file conflict for client '${runtimeClientSetup.clientId}' and fileId '${file.fileId}'.`,
+        );
+      }
+
       filesByPath.set(file.path, {
+        fileId: file.fileId,
+        mode: file.mode,
+        content: file.content,
+      });
+      filesById.set(file.fileId, {
+        path: file.path,
         mode: file.mode,
         content: file.content,
       });

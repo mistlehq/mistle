@@ -60,6 +60,70 @@ export type IntegrationConfigSchema<TOutput> = {
 type ParsedSchemaOutput<TSchema extends IntegrationConfigSchema<unknown>> =
   TSchema extends IntegrationConfigSchema<infer TOutput> ? TOutput : never;
 
+export type RuntimeFileFormat = "toml" | "json" | "yaml" | "env" | "text";
+
+export type RuntimeFileMergeStrategy = "replace" | "structured-merge";
+
+export type RuntimeFileMergePolicy = {
+  strategy?: RuntimeFileMergeStrategy;
+  preservePaths?: ReadonlyArray<string>;
+  replacePaths?: ReadonlyArray<string>;
+  protectedPaths?: ReadonlyArray<string>;
+};
+
+export type IntegrationUserConfigSlotValueSchema = IntegrationConfigSchema<string>;
+
+export type IntegrationFileUserConfigSlot = {
+  kind: "file";
+  key: string;
+  label: string;
+  description?: string;
+  format: RuntimeFileFormat;
+  required?: boolean;
+  valueSchema: IntegrationUserConfigSlotValueSchema;
+  applyTo: {
+    clientId: string;
+    fileId: string;
+  };
+  mergePolicy?: RuntimeFileMergePolicy;
+};
+
+export type IntegrationEnvUserConfigSlot = {
+  kind: "env";
+  key: string;
+  label: string;
+  description?: string;
+  required?: boolean;
+  valueSchema: IntegrationUserConfigSlotValueSchema;
+  applyTo: {
+    clientId: string;
+    envKey: string;
+  };
+  policy?: {
+    mutable: "user-overrides" | "base-wins";
+  };
+};
+
+export type IntegrationUserConfigSlot =
+  | IntegrationFileUserConfigSlot
+  | IntegrationEnvUserConfigSlot;
+
+export type EgressUrlRef = {
+  kind: "egress_url";
+  routeId: string;
+};
+
+export function egressUrlRef(routeId: string): EgressUrlRef {
+  return {
+    kind: "egress_url",
+    routeId,
+  };
+}
+
+export type CompileBindingRefs = {
+  egressUrl: EgressUrlRef;
+};
+
 export type CompileBindingInput<
   TTargetConfig = Record<string, unknown>,
   TBindingConfig = Record<string, unknown>,
@@ -71,6 +135,7 @@ export type CompileBindingInput<
   target: Omit<IntegrationTarget, "config"> & { config: TTargetConfig };
   connection: IntegrationConnection;
   binding: Pick<IntegrationBinding, "id" | "kind"> & { config: TBindingConfig };
+  refs: CompileBindingRefs;
   runtimeContext: {
     sandboxProvider: string;
     sandboxdEgressBaseUrl: string;
@@ -106,17 +171,29 @@ export type RuntimeArtifactSpec = {
   executable: boolean;
 };
 
-export type RuntimeClientSetup = {
+type RuntimeClientSetupBase<TEnvValue> = {
   clientId: string;
-  env: Record<string, string>;
-  files: ReadonlyArray<{ path: string; mode: number; content: string }>;
+  env: Record<string, TEnvValue>;
+  files: ReadonlyArray<{ fileId: string; path: string; mode: number; content: string }>;
   launchArgs?: ReadonlyArray<string>;
+};
+
+export type CompiledRuntimeClientSetup = RuntimeClientSetupBase<string | EgressUrlRef>;
+
+export type RuntimeClientSetup = RuntimeClientSetupBase<string>;
+
+export type CompileBindingEgressRoute = Omit<EgressCredentialRoute, "routeId" | "bindingId">;
+
+export type CompileBindingResult = {
+  egressRoutes: ReadonlyArray<CompileBindingEgressRoute>;
+  artifacts: ReadonlyArray<RuntimeArtifactSpec>;
+  runtimeClientSetups: ReadonlyArray<CompiledRuntimeClientSetup>;
 };
 
 export type CompiledBindingResult = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<RuntimeArtifactSpec>;
-  runtimeClientSetups: ReadonlyArray<RuntimeClientSetup>;
+  runtimeClientSetups: ReadonlyArray<CompiledRuntimeClientSetup>;
 };
 
 export type IntegrationDefinition<
@@ -137,12 +214,13 @@ export type IntegrationDefinition<
   bindingConfigSchema: TBindingConfigSchema;
   supportedAuthSchemes: ReadonlyArray<IntegrationSupportedAuthScheme>;
   triggerEventTypes: ReadonlyArray<string>;
+  userConfigSlots: ReadonlyArray<IntegrationUserConfigSlot>;
   compileBinding(
     input: CompileBindingInput<
       ParsedSchemaOutput<TTargetConfigSchema>,
       ParsedSchemaOutput<TBindingConfigSchema>
     >,
-  ): CompiledBindingResult;
+  ): CompileBindingResult;
 };
 
 export type IntegrationManifest = {

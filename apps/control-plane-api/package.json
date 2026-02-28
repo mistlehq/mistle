@@ -33,6 +33,7 @@
     "@mistle/emails": "workspace:*",
     "@mistle/http": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
+    "@mistle/integrations-definitions": "workspace:*",
     "@mistle/logging": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/workflows": "workspace:*",

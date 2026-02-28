@@ -1,0 +1,38 @@
+import { describe, expect, it } from "vitest";
+
+import { OpenAiApiKeyBindingConfigSchema, OpenAiRuntimes } from "./binding-config-schema.js";
+
+describe("OpenAiApiKeyBindingConfigSchema", () => {
+  it("parses a valid codex binding config", () => {
+    const parsed = OpenAiApiKeyBindingConfigSchema.parse({
+      runtime: OpenAiRuntimes.CODEX_CLI,
+      defaultModel: "gpt-5.3-codex",
+      reasoningEffort: "medium",
+    });
+
+    expect(parsed).toEqual({
+      runtime: "codex-cli",
+      defaultModel: "gpt-5.3-codex",
+      reasoningEffort: "medium",
+    });
+  });
+
+  it("fails when runtime is not codex-cli", () => {
+    expect(() =>
+      OpenAiApiKeyBindingConfigSchema.parse({
+        runtime: "other",
+        defaultModel: "gpt-5.3-codex",
+        reasoningEffort: "medium",
+      }),
+    ).toThrowError();
+  });
+
+  it("fails when reasoning effort is missing", () => {
+    expect(() =>
+      OpenAiApiKeyBindingConfigSchema.parse({
+        runtime: "codex-cli",
+        defaultModel: "gpt-5.3-codex",
+      }),
+    ).toThrowError();
+  });
+});

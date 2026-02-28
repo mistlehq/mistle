@@ -7,14 +7,7 @@ import {
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
-import {
-  type CompileBindingInput,
-  IntegrationKinds,
-  IntegrationRegistry,
-  IntegrationSupportedAuthSchemes,
-} from "@mistle/integrations-core";
 import { describe, expect } from "vitest";
-import { z } from "zod";
 
 import { compileProfileVersionRuntimePlan } from "../src/sandbox-profiles/services/compile-profile-version-runtime-plan.js";
 import {
@@ -24,72 +17,6 @@ import {
   SandboxProfilesNotFoundError,
 } from "../src/sandbox-profiles/services/errors.js";
 import { it } from "./test-context.js";
-
-function createCompileRegistry(): IntegrationRegistry {
-  const registry = new IntegrationRegistry();
-
-  const targetConfigSchema = z
-    .object({
-      apiBaseUrl: z.url(),
-    })
-    .strict();
-  const bindingConfigSchema = z
-    .object({
-      defaultModel: z.string().min(1),
-    })
-    .strict();
-
-  registry.register({
-    familyId: "openai",
-    variantId: "openai-api-key",
-    kind: IntegrationKinds.AGENT,
-    displayName: "OpenAI",
-    logoKey: "openai",
-    targetConfigSchema,
-    bindingConfigSchema,
-    supportedAuthSchemes: [IntegrationSupportedAuthSchemes.API_KEY],
-    triggerEventTypes: [],
-    compileBinding: (
-      input: CompileBindingInput<{ apiBaseUrl: string }, { defaultModel: string }>,
-    ) => ({
-      egressRoutes: [
-        {
-          routeId: `route_${input.binding.id}`,
-          bindingId: input.binding.id,
-          match: {
-            hosts: ["api.openai.com"],
-            pathPrefixes: ["/v1"],
-            methods: ["POST"],
-          },
-          upstream: {
-            baseUrl: input.target.config.apiBaseUrl,
-          },
-          authInjection: {
-            type: "bearer",
-            target: "authorization",
-          },
-          credentialResolver: {
-            connectionId: input.connection.id,
-            secretType: "api_key",
-          },
-        },
-      ],
-      artifacts: [],
-      runtimeClientSetups: [
-        {
-          clientId: "codex-cli",
-          env: {
-            OPENAI_BASE_URL: input.target.config.apiBaseUrl,
-            OPENAI_MODEL: input.binding.config.defaultModel,
-          },
-          files: [],
-        },
-      ],
-    }),
-  });
-
-  return registry;
-}
 
 describe("sandbox profile compile runtime plan integration", () => {
   it("compiles runtime plan from version bindings, connections, and targets", async ({
@@ -116,7 +43,7 @@ describe("sandbox profile compile runtime plan integration", () => {
       variantId: "openai-api-key",
       enabled: true,
       config: {
-        apiBaseUrl: "https://api.openai.com",
+        api_base_url: "https://api.openai.com/v1",
       },
     });
     await fixture.db.insert(integrationConnections).values({
@@ -132,7 +59,9 @@ describe("sandbox profile compile runtime plan integration", () => {
       connectionId: "icn_compile_success",
       kind: IntegrationBindingKinds.AGENT,
       config: {
+        runtime: "codex-cli",
         defaultModel: "gpt-5.3-codex",
+        reasoningEffort: "medium",
       },
     });
 
@@ -150,9 +79,8 @@ describe("sandbox profile compile runtime plan integration", () => {
         },
         runtimeContext: {
           sandboxProvider: "docker",
-          sandboxdEgressBaseUrl: "http://sandboxd.internal",
+          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
         },
-        registry: createCompileRegistry(),
       },
     );
 
@@ -163,10 +91,20 @@ describe("sandbox profile compile runtime plan integration", () => {
       {
         clientId: "codex-cli",
         env: {
-          OPENAI_BASE_URL: "https://api.openai.com",
+          OPENAI_BASE_URL: "http://sandboxd.internal/egress/routes/route_ibd_compile_success",
           OPENAI_MODEL: "gpt-5.3-codex",
+          OPENAI_REASONING_EFFORT: "medium",
         },
-        files: [],
+        files: [
+          {
+            fileId: "codex_config",
+            path: "/workspace/.codex/config.toml",
+            mode: 384,
+            content: `model = "gpt-5.3-codex"
+model_reasoning_effort = "medium"
+`,
+          },
+        ],
       },
     ]);
   }, 60_000);
@@ -191,9 +129,8 @@ describe("sandbox profile compile runtime plan integration", () => {
           },
           runtimeContext: {
             sandboxProvider: "docker",
-            sandboxdEgressBaseUrl: "http://sandboxd.internal",
+            sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
-          registry: createCompileRegistry(),
         },
       );
       throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
@@ -233,9 +170,8 @@ describe("sandbox profile compile runtime plan integration", () => {
           },
           runtimeContext: {
             sandboxProvider: "docker",
-            sandboxdEgressBaseUrl: "http://sandboxd.internal",
+            sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
-          registry: createCompileRegistry(),
         },
       );
       throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
@@ -271,7 +207,9 @@ describe("sandbox profile compile runtime plan integration", () => {
       connectionId: "icn_missing",
       kind: IntegrationBindingKinds.AGENT,
       config: {
+        runtime: "codex-cli",
         defaultModel: "gpt-5.3-codex",
+        reasoningEffort: "medium",
       },
     });
 
@@ -290,9 +228,8 @@ describe("sandbox profile compile runtime plan integration", () => {
           },
           runtimeContext: {
             sandboxProvider: "docker",
-            sandboxdEgressBaseUrl: "http://sandboxd.internal",
+            sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
-          registry: createCompileRegistry(),
         },
       );
       throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
@@ -336,7 +273,9 @@ describe("sandbox profile compile runtime plan integration", () => {
       connectionId: "icn_compile_missing_target",
       kind: IntegrationBindingKinds.AGENT,
       config: {
+        runtime: "codex-cli",
         defaultModel: "gpt-5.3-codex",
+        reasoningEffort: "medium",
       },
     });
 
@@ -355,9 +294,8 @@ describe("sandbox profile compile runtime plan integration", () => {
           },
           runtimeContext: {
             sandboxProvider: "docker",
-            sandboxdEgressBaseUrl: "http://sandboxd.internal",
+            sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
-          registry: createCompileRegistry(),
         },
       );
       throw new Error("Expected compileProfileVersionRuntimePlan to throw.");

@@ -28,11 +28,10 @@ function createOpenAiDefinition(): IntegrationDefinition<
     bindingConfigSchema: OpenAiBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
     triggerEventTypes: [],
+    userConfigSlots: [],
     compileBinding: (input) => ({
       egressRoutes: [
         {
-          routeId: `route_${input.binding.id}`,
-          bindingId: input.binding.id,
           match: {
             hosts: ["api.openai.com"],
             methods: ["POST"],
@@ -64,11 +63,12 @@ function createOpenAiDefinition(): IntegrationDefinition<
         {
           clientId: "codex-cli",
           env: {
-            OPENAI_BASE_URL: input.target.config.apiBaseUrl,
+            OPENAI_BASE_URL: input.refs.egressUrl,
             OPENAI_MODEL: input.binding.config.defaultModel,
           },
           files: [
             {
+              fileId: "codex_config",
               path: "/workspace/.codex/config.toml",
               mode: 384,
               content: 'model = "gpt-5.3-codex"',
@@ -129,8 +129,15 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.sandboxProfileId).toBe("sbp_123");
     expect(runtimePlan.version).toBe(12);
     expect(runtimePlan.egressRoutes).toHaveLength(1);
+    expect(runtimePlan.egressRoutes[0]).toMatchObject({
+      routeId: "route_bind_openai_agent",
+      bindingId: "bind_openai_agent",
+    });
     expect(runtimePlan.artifacts).toHaveLength(1);
     expect(runtimePlan.runtimeClientSetups).toHaveLength(1);
+    expect(runtimePlan.runtimeClientSetups[0]?.env.OPENAI_BASE_URL).toBe(
+      "http://127.0.0.1:8090/egress/routes/route_bind_openai_agent",
+    );
   });
 
   it("fails when target is disabled", () => {
@@ -528,6 +535,7 @@ describe("compileRuntimePlan", () => {
         bindingConfigSchema,
         supportedAuthSchemes: ["api-key"],
         triggerEventTypes: [],
+        userConfigSlots: [],
         compileBinding: (input) => ({
           egressRoutes: [],
           artifacts: [],
@@ -537,6 +545,7 @@ describe("compileRuntimePlan", () => {
               env: {
                 API_HOST: input.target.config.apiHost,
                 MODEL: input.binding.config.normalizedModel,
+                ROUTE_ID: input.refs.egressUrl.routeId,
               },
               files: [],
             },
@@ -594,6 +603,7 @@ describe("compileRuntimePlan", () => {
         env: {
           API_HOST: "api.openai.com",
           MODEL: "gpt-5.3-codex",
+          ROUTE_ID: "route_bind_openai_agent",
         },
         files: [],
       },
