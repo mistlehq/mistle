@@ -42,12 +42,20 @@ export const controlPlaneApiDevelopmentPreset = {
         sandbox: {
           default_base_image: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
+        integrations: {
+          active_master_encryption_key_version: 1,
+        },
       },
     },
   },
   generators: [
     {
       path: ["apps", "control_plane_api", "auth", "secret"],
+      when: "always",
+      generate: () => randomBytes(32).toString("base64url"),
+    },
+    {
+      path: ["apps", "control_plane_api", "integrations", "master_encryption_keys", "1"],
       when: "always",
       generate: () => randomBytes(32).toString("base64url"),
     },

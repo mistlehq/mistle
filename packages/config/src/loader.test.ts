@@ -42,6 +42,12 @@ describe("parseConfigRecord", () => {
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           },
+          integrations: {
+            activeMasterEncryptionKeyVersion: 1,
+            masterEncryptionKeys: {
+              "1": "integration-master-key-test",
+            },
+          },
         },
         control_plane_worker: {
           server: {
@@ -161,6 +167,12 @@ describe("parseConfigRecord", () => {
           },
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          },
+          integrations: {
+            activeMasterEncryptionKeyVersion: 1,
+            masterEncryptionKeys: {
+              "1": "integration-master-key-test",
+            },
           },
         },
         control_plane_worker: {

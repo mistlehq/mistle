@@ -1,8 +1,10 @@
 import { createEnvLoader, hasEntries } from "../../core/load-env.js";
+import { asObjectRecord } from "../../core/record.js";
 import {
   type PartialControlPlaneApiConfigInput,
   ControlPlaneApiAuthConfigSchema,
   ControlPlaneApiDatabaseConfigSchema,
+  ControlPlaneApiIntegrationsConfigSchema,
   ControlPlaneApiSandboxConfigSchema,
   ControlPlaneApiServerConfigSchema,
   ControlPlaneApiWorkflowConfigSchema,
@@ -85,6 +87,42 @@ const loadSandboxEnv = createEnvLoader<typeof ControlPlaneApiSandboxConfigSchema
   },
 ]);
 
+const loadIntegrationsEnv = createEnvLoader<typeof ControlPlaneApiIntegrationsConfigSchema>([
+  {
+    key: "activeMasterEncryptionKeyVersion",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION",
+    parse: Number,
+  },
+  {
+    key: "masterEncryptionKeys",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON",
+    parse: (value): Record<string, string> => {
+      try {
+        const parsedValue = asObjectRecord(JSON.parse(value));
+        const normalizedValue: Record<string, string> = {};
+
+        for (const [version, keyValue] of Object.entries(parsedValue)) {
+          if (typeof keyValue !== "string") {
+            throw new Error(
+              `Invalid value for version '${version}'. Expected a string key material value.`,
+            );
+          }
+
+          normalizedValue[version] = keyValue;
+        }
+
+        return normalizedValue;
+      } catch (error) {
+        throw new Error(
+          `Invalid MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    },
+  },
+]);
+
 export function loadControlPlaneApiFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialControlPlaneApiConfigInput {
@@ -113,6 +151,11 @@ export function loadControlPlaneApiFromEnv(
   const sandbox = loadSandboxEnv(env);
   if (hasEntries(sandbox)) {
     partialConfig.sandbox = sandbox;
+  }
+
+  const integrations = loadIntegrationsEnv(env);
+  if (hasEntries(integrations)) {
+    partialConfig.integrations = integrations;
   }
 
   return PartialControlPlaneApiConfigSchema.parse(partialConfig);

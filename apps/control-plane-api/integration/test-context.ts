@@ -152,6 +152,12 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           },
+          integrations: {
+            activeMasterEncryptionKeyVersion: 1,
+            masterEncryptionKeys: {
+              "1": "integration-master-key-testing",
+            },
+          },
           auth: {
             baseUrl: "http://localhost:3000",
             invitationAcceptBaseUrl: "http://localhost:5173/invitations/accept",

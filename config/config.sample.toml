@@ -35,6 +35,12 @@ namespace_id = "production"
 [apps.control_plane_api.sandbox]
 default_base_image = "registry.example.com/mistle/sandbox-base:prod"
 
+[apps.control_plane_api.integrations]
+active_master_encryption_key_version = 1
+
+[apps.control_plane_api.integrations.master_encryption_keys]
+"1" = "replace-with-master-encryption-key"
+
 [apps.control_plane_worker.server]
 host = "0.0.0.0"
 port = 8081

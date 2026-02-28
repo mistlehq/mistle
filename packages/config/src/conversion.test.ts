@@ -21,6 +21,9 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_API_PORT: "5000",
       MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE:
         "127.0.0.1:5001/mistle/sandbox-base:dev",
+      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "3",
+      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON:
+        '{"3":"integration-master-key"}',
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "http://a.local,http://b.local",
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_LENGTH: "6",
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "true",
@@ -46,6 +49,12 @@ describe("convertEnvToTomlRecord", () => {
           },
           sandbox: {
             default_base_image: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          },
+          integrations: {
+            active_master_encryption_key_version: 3,
+            master_encryption_keys: {
+              "3": "integration-master-key",
+            },
           },
           auth: {
             trusted_origins: ["http://a.local", "http://b.local"],
@@ -90,6 +99,12 @@ describe("convertTomlToEnvRecord", () => {
           auth: {
             trusted_origins: ["https://a.example", "https://b.example"],
           },
+          integrations: {
+            active_master_encryption_key_version: 9,
+            master_encryption_keys: {
+              "9": "integration-master-key",
+            },
+          },
         },
         control_plane_worker: {
           data_plane_api: {
@@ -111,6 +126,9 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE:
         "registry.example.com/mistle/sandbox-base:prod",
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "https://a.example,https://b.example",
+      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "9",
+      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON:
+        '{"9":"integration-master-key"}',
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "2",
       MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",

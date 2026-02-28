@@ -1,3 +1,4 @@
+import { hasEntries } from "../../core/load-env.js";
 import { asObjectRecord } from "../../core/record.js";
 import {
   type PartialControlPlaneApiConfigInput,
@@ -14,8 +15,9 @@ export function loadControlPlaneApiFromToml(
   const auth = asObjectRecord(controlPlaneApi.auth);
   const workflow = asObjectRecord(controlPlaneApi.workflow);
   const sandbox = asObjectRecord(controlPlaneApi.sandbox);
+  const integrations = asObjectRecord(controlPlaneApi.integrations);
 
-  return PartialControlPlaneApiConfigSchema.parse({
+  let partialConfig: Record<string, unknown> = {
     server: {
       host: server.host,
       port: server.port,
@@ -39,5 +41,17 @@ export function loadControlPlaneApiFromToml(
     sandbox: {
       defaultBaseImage: sandbox.default_base_image,
     },
-  });
+  };
+
+  if (hasEntries(integrations)) {
+    partialConfig = {
+      ...partialConfig,
+      integrations: {
+        activeMasterEncryptionKeyVersion: integrations.active_master_encryption_key_version,
+        masterEncryptionKeys: asObjectRecord(integrations.master_encryption_keys),
+      },
+    };
+  }
+
+  return PartialControlPlaneApiConfigSchema.parse(partialConfig);
 }

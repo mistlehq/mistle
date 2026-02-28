@@ -1,4 +1,4 @@
-export type EnvValueFormat = "default" | "csv";
+export type EnvValueFormat = "default" | "csv" | "json";
 
 export type ConfigEnvTomlMapping = {
   configPath: readonly string[];
@@ -98,6 +98,17 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     configPath: ["apps", "control_plane_api", "sandbox", "defaultBaseImage"],
     tomlPath: ["apps", "control_plane_api", "sandbox", "default_base_image"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "integrations", "activeMasterEncryptionKeyVersion"],
+    tomlPath: ["apps", "control_plane_api", "integrations", "active_master_encryption_key_version"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "integrations", "masterEncryptionKeys"],
+    tomlPath: ["apps", "control_plane_api", "integrations", "master_encryption_keys"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON",
+    envValueFormat: "json",
   },
   {
     configPath: ["apps", "control_plane_worker", "server", "host"],

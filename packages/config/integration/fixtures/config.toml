@@ -32,6 +32,12 @@ namespace_id = "fixture"
 [apps.control_plane_api.sandbox]
 default_base_image = "127.0.0.1:5001/mistle/sandbox-base:fixture"
 
+[apps.control_plane_api.integrations]
+active_master_encryption_key_version = 2
+
+[apps.control_plane_api.integrations.master_encryption_keys]
+"2" = "integration-master-key-fixture"
+
 [apps.control_plane_worker.server]
 host = "0.0.0.0"
 port = 5200
