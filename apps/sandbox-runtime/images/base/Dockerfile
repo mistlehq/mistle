@@ -2,6 +2,8 @@ FROM golang:1.26-bookworm AS sandbox-runtime-builder
 
 WORKDIR /src/apps/sandbox-runtime
 COPY apps/sandbox-runtime/go.mod ./go.mod
+COPY apps/sandbox-runtime/go.sum ./go.sum
+RUN go mod download
 COPY apps/sandbox-runtime/cmd ./cmd
 COPY apps/sandbox-runtime/internal ./internal
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/sandboxd ./cmd/sandboxd
