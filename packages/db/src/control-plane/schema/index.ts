@@ -1,5 +1,17 @@
 export { accounts } from "./accounts.js";
 export {
+  integrationConnectionCredentials,
+  type InsertIntegrationConnectionCredential,
+  type IntegrationConnectionCredential,
+} from "./integration-connection-credentials.js";
+export {
+  integrationConnections,
+  IntegrationConnectionStatuses,
+  type InsertIntegrationConnection,
+  type IntegrationConnection,
+  type IntegrationConnectionStatus,
+} from "./integration-connections.js";
+export {
   integrationCredentials,
   IntegrationCredentialSecretKinds,
   type InsertIntegrationCredential,
