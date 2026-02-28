@@ -10,16 +10,14 @@ export const IntegrationKinds: {
   CONNECTOR: "connector",
 };
 
-export type IntegrationSupportedAuthScheme = "oauth" | "api-key" | "pat";
+export type IntegrationSupportedAuthScheme = "oauth" | "api-key";
 
 export const IntegrationSupportedAuthSchemes: {
   OAUTH: IntegrationSupportedAuthScheme;
   API_KEY: IntegrationSupportedAuthScheme;
-  PAT: IntegrationSupportedAuthScheme;
 } = {
   OAUTH: "oauth",
   API_KEY: "api-key",
-  PAT: "pat",
 };
 
 export type IntegrationDeployment = {
