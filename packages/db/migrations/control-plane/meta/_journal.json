@@ -71,6 +71,13 @@
       "when": 1772292081688,
       "tag": "0009_add-integration-conversation-routes",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1772294151232,
+      "tag": "0010_add-integration-targets",
+      "breakpoints": true
     }
   ]
 }

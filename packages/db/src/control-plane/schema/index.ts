@@ -24,6 +24,11 @@ export {
   type IntegrationCredentialSecretKind,
 } from "./integration-credentials.js";
 export {
+  integrationTargets,
+  type InsertIntegrationTarget,
+  type IntegrationTarget,
+} from "./integration-targets.js";
+export {
   integrationOauthSessions,
   type InsertIntegrationOauthSession,
   type IntegrationOauthSession,

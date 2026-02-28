@@ -1,6 +1,7 @@
 import { index, jsonb, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
+import { integrationTargets } from "./integration-targets.js";
 import { controlPlaneSchema } from "./namespace.js";
 
 export const IntegrationWebhookEventStatuses = {
@@ -21,7 +22,9 @@ export const integrationWebhookEvents = controlPlaneSchema.table(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => typeid("iwe").toString()),
-    targetKey: text("target_key").notNull(),
+    targetKey: text("target_key")
+      .notNull()
+      .references(() => integrationTargets.targetKey, { onDelete: "restrict" }),
     externalEventId: text("external_event_id").notNull(),
     externalDeliveryId: text("external_delivery_id"),
     eventType: text("event_type").notNull(),
