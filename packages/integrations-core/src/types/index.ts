@@ -1,0 +1,219 @@
+export type IntegrationKind = "agent" | "git" | "connector";
+
+export const IntegrationKinds: {
+  AGENT: IntegrationKind;
+  GIT: IntegrationKind;
+  CONNECTOR: IntegrationKind;
+} = {
+  AGENT: "agent",
+  GIT: "git",
+  CONNECTOR: "connector",
+};
+
+export type IntegrationSupportedAuthScheme = "oauth" | "api-key";
+
+export const IntegrationSupportedAuthSchemes: {
+  OAUTH: IntegrationSupportedAuthScheme;
+  API_KEY: IntegrationSupportedAuthScheme;
+} = {
+  OAUTH: "oauth",
+  API_KEY: "api-key",
+};
+
+export type IntegrationDeployment = {
+  familyId: string;
+  variantId: string;
+  enabled: boolean;
+  config: Record<string, unknown>;
+};
+
+export type IntegrationConnectionStatus = "active" | "error" | "revoked";
+
+export const IntegrationConnectionStatuses: {
+  ACTIVE: IntegrationConnectionStatus;
+  ERROR: IntegrationConnectionStatus;
+  REVOKED: IntegrationConnectionStatus;
+} = {
+  ACTIVE: "active",
+  ERROR: "error",
+  REVOKED: "revoked",
+};
+
+export type IntegrationConnection = {
+  id: string;
+  status: IntegrationConnectionStatus;
+  externalSubjectId?: string;
+  config: Record<string, unknown>;
+};
+
+export type IntegrationBinding = {
+  id: string;
+  kind: IntegrationKind;
+  connectionId: string;
+  config: Record<string, unknown>;
+};
+
+export type CompileBindingInput = {
+  organizationId: string;
+  sandboxProfileId: string;
+  version: number;
+  deploymentKey: string;
+  deployment: IntegrationDeployment;
+  connection: IntegrationConnection;
+  binding: Pick<IntegrationBinding, "id" | "kind" | "config">;
+  runtimeContext: {
+    sandboxProvider: string;
+    sandboxdEgressBaseUrl: string;
+  };
+};
+
+export type EgressCredentialRoute = {
+  routeId: string;
+  bindingId: string;
+  match: {
+    hosts: ReadonlyArray<string>;
+    pathPrefixes?: ReadonlyArray<string>;
+    methods?: ReadonlyArray<string>;
+  };
+  upstream: {
+    baseUrl: string;
+  };
+  authInjection: {
+    type: "bearer" | "basic" | "header" | "query";
+    target: string;
+  };
+  credentialResolver: {
+    connectionId: string;
+    secretType: string;
+  };
+};
+
+export type RuntimeArtifactSpec = {
+  artifactId: string;
+  uri: string;
+  sha256: string;
+  installPath: string;
+  executable: boolean;
+};
+
+export type RuntimeClientSetup = {
+  clientId: string;
+  env: Record<string, string>;
+  files: ReadonlyArray<{ path: string; mode: number; content: string }>;
+  launchArgs?: ReadonlyArray<string>;
+};
+
+export type CompiledBindingResult = {
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+  artifacts: ReadonlyArray<RuntimeArtifactSpec>;
+  runtimeClientSetups: ReadonlyArray<RuntimeClientSetup>;
+};
+
+export type IntegrationDefinition = {
+  familyId: string;
+  variantId: string;
+  kind: IntegrationKind;
+  displayName: string;
+  description?: string;
+  logoKey: string;
+  deploymentConfigSchema: unknown;
+  bindingConfigSchema: unknown;
+  supportedAuthSchemes: ReadonlyArray<IntegrationSupportedAuthScheme>;
+  triggerEventTypes: ReadonlyArray<string>;
+  compileBinding: (input: CompileBindingInput) => CompiledBindingResult;
+};
+
+export type IntegrationManifest = {
+  schemaVersion: 1;
+  integrations: ReadonlyArray<{
+    bindingId: string;
+    kind: IntegrationKind;
+    connectionId: string;
+    config: Record<string, unknown>;
+  }>;
+};
+
+export type TriggerFilter =
+  | { op: "all"; filters: ReadonlyArray<TriggerFilter> }
+  | { op: "any"; filters: ReadonlyArray<TriggerFilter> }
+  | { op: "not"; filter: TriggerFilter }
+  | { op: "eq"; path: string; value: string | number | boolean }
+  | { op: "in"; path: string; values: ReadonlyArray<string | number> }
+  | { op: "contains"; path: string; value: string }
+  | { op: "startsWith"; path: string; value: string }
+  | { op: "exists"; path: string };
+
+export type TriggerAction = {
+  type: "deliver-input";
+  inputTemplate: string;
+  conversationKeyTemplate: string;
+  idempotencyKeyTemplate?: string | undefined;
+};
+
+export type TriggerRule = {
+  id: string;
+  sourceBindingId: string;
+  eventType: string;
+  filter: TriggerFilter;
+  action: TriggerAction;
+  enabled: boolean;
+};
+
+export type ResolvedSandboxImage =
+  | {
+      source: "instance-latest-snapshot";
+      imageRef: string;
+      instanceId: string;
+    }
+  | {
+      source: "profile-version-base";
+      imageRef: string;
+      sandboxProfileId: string;
+      version: number;
+    }
+  | {
+      source: "default-base";
+      imageRef: string;
+    };
+
+export type CompiledRuntimePlan = {
+  sandboxProfileId: string;
+  version: number;
+  image: ResolvedSandboxImage;
+  egressRoutes: ReadonlyArray<EgressCredentialRoute>;
+  artifacts: ReadonlyArray<RuntimeArtifactSpec>;
+  runtimeClientSetups: ReadonlyArray<RuntimeClientSetup>;
+};
+
+export type IntegrationDefinitionLocator = {
+  familyId: string;
+  variantId: string;
+};
+
+export interface IntegrationDefinitionReader {
+  getDefinition(input: IntegrationDefinitionLocator): IntegrationDefinition | undefined;
+}
+
+export interface IntegrationDefinitionResolver extends IntegrationDefinitionReader {
+  getDefinitionOrThrow(input: IntegrationDefinitionLocator): IntegrationDefinition;
+}
+
+export type CompileRuntimePlanBindingInput = {
+  deploymentKey: string;
+  deployment: IntegrationDeployment;
+  connection: IntegrationConnection;
+  binding: IntegrationBinding;
+};
+
+export type CompileRuntimePlanInput = {
+  organizationId: string;
+  sandboxProfileId: string;
+  version: number;
+  image: ResolvedSandboxImage;
+  runtimeContext: {
+    sandboxProvider: string;
+    sandboxdEgressBaseUrl: string;
+  };
+  bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
+  registry: IntegrationDefinitionResolver;
+};
