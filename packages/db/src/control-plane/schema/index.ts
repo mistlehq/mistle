@@ -39,6 +39,18 @@ export type {
   InsertSandboxProfileVersion,
   SandboxProfileVersion,
 } from "./sandbox-profile-versions.js";
+export {
+  sandboxProfileVersionIntegrationBindings,
+  IntegrationBindingKinds,
+  type InsertSandboxProfileVersionIntegrationBinding,
+  type SandboxProfileVersionIntegrationBinding,
+  type IntegrationBindingKind,
+} from "./sandbox-profile-version-integration-bindings.js";
+export {
+  sandboxProfileVersionTriggerRules,
+  type InsertSandboxProfileVersionTriggerRule,
+  type SandboxProfileVersionTriggerRule,
+} from "./sandbox-profile-version-trigger-rules.js";
 export { sessions } from "./sessions.js";
 export { teamMembers } from "./team-members.js";
 export { teams } from "./teams.js";
