@@ -36,6 +36,13 @@
       "when": 1772263385595,
       "tag": "0004_add-integration-credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1772288521704,
+      "tag": "0005_add-integration-connections",
+      "breakpoints": true
     }
   ]
 }
