@@ -1,4 +1,11 @@
 export { accounts } from "./accounts.js";
+export {
+  integrationCredentials,
+  IntegrationCredentialSecretKinds,
+  type InsertIntegrationCredential,
+  type IntegrationCredential,
+  type IntegrationCredentialSecretKind,
+} from "./integration-credentials.js";
 export { invitations } from "./invitations.js";
 export { members, MemberRoles } from "./members.js";
 export type { MemberRole } from "./members.js";
