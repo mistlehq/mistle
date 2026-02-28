@@ -6,7 +6,7 @@ import { IntegrationRegistry } from "../registry/index.js";
 import type { IntegrationDefinition } from "../types/index.js";
 import { compileRuntimePlan } from "./index.js";
 
-const OpenAiDeploymentConfigSchema = z.object({
+const OpenAiTargetConfigSchema = z.object({
   apiBaseUrl: z.url(),
 });
 
@@ -15,7 +15,7 @@ const OpenAiBindingConfigSchema = z.object({
 });
 
 function createOpenAiDefinition(): IntegrationDefinition<
-  typeof OpenAiDeploymentConfigSchema,
+  typeof OpenAiTargetConfigSchema,
   typeof OpenAiBindingConfigSchema
 > {
   return {
@@ -24,7 +24,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
     kind: "agent",
     displayName: "OpenAI",
     logoKey: "openai",
-    deploymentConfigSchema: OpenAiDeploymentConfigSchema,
+    targetConfigSchema: OpenAiTargetConfigSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
     triggerEventTypes: [],
@@ -64,7 +64,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
         {
           clientId: "codex-cli",
           env: {
-            OPENAI_BASE_URL: input.deployment.config.apiBaseUrl,
+            OPENAI_BASE_URL: input.target.config.apiBaseUrl,
             OPENAI_MODEL: input.binding.config.defaultModel,
           },
           files: [
@@ -100,8 +100,8 @@ describe("compileRuntimePlan", () => {
       registry,
       bindings: [
         {
-          deploymentKey: "openai_default",
-          deployment: {
+          targetKey: "openai_default",
+          target: {
             familyId: "openai",
             variantId: "openai_default",
             enabled: true,
@@ -133,7 +133,7 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.runtimeClientSetups).toHaveLength(1);
   });
 
-  it("fails when deployment is disabled", () => {
+  it("fails when target is disabled", () => {
     const registry = new IntegrationRegistry();
     registry.register(createOpenAiDefinition());
 
@@ -153,8 +153,8 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            deploymentKey: "openai_default",
-            deployment: {
+            targetKey: "openai_default",
+            target: {
               familyId: "openai",
               variantId: "openai_default",
               enabled: false,
@@ -192,8 +192,8 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            deploymentKey: "openai_default",
-            deployment: {
+            targetKey: "openai_default",
+            target: {
               familyId: "openai",
               variantId: "openai_default",
               enabled: false,
@@ -216,7 +216,7 @@ describe("compileRuntimePlan", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(IntegrationCompilerError);
       if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.DEPLOYMENT_DISABLED);
+        expect(error.code).toBe(CompilerErrorCodes.TARGET_DISABLED);
       }
     }
   });
@@ -241,8 +241,8 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            deploymentKey: "openai_default",
-            deployment: {
+            targetKey: "openai_default",
+            target: {
               familyId: "openai",
               variantId: "openai_default",
               enabled: true,
@@ -280,8 +280,8 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            deploymentKey: "openai_default",
-            deployment: {
+            targetKey: "openai_default",
+            target: {
               familyId: "openai",
               variantId: "openai_default",
               enabled: true,
@@ -309,7 +309,7 @@ describe("compileRuntimePlan", () => {
     }
   });
 
-  it("fails when deployment config does not satisfy schema", () => {
+  it("fails when target config does not satisfy schema", () => {
     const registry = new IntegrationRegistry();
     registry.register(createOpenAiDefinition());
 
@@ -329,8 +329,8 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            deploymentKey: "openai_default",
-            deployment: {
+            targetKey: "openai_default",
+            target: {
               familyId: "openai",
               variantId: "openai_default",
               enabled: true,
@@ -372,8 +372,8 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            deploymentKey: "openai_default",
-            deployment: {
+            targetKey: "openai_default",
+            target: {
               familyId: "openai",
               variantId: "openai_default",
               enabled: true,
@@ -400,7 +400,7 @@ describe("compileRuntimePlan", () => {
     } catch (error) {
       expect(error).toBeInstanceOf(IntegrationCompilerError);
       if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.INVALID_DEPLOYMENT_CONFIG);
+        expect(error.code).toBe(CompilerErrorCodes.INVALID_TARGET_CONFIG);
       }
     }
   });
@@ -425,8 +425,8 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            deploymentKey: "openai_default",
-            deployment: {
+            targetKey: "openai_default",
+            target: {
               familyId: "openai",
               variantId: "openai_default",
               enabled: true,
@@ -468,8 +468,8 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            deploymentKey: "openai_default",
-            deployment: {
+            targetKey: "openai_default",
+            target: {
               familyId: "openai",
               variantId: "openai_default",
               enabled: true,
@@ -502,7 +502,7 @@ describe("compileRuntimePlan", () => {
   });
 
   it("passes parsed schema outputs into compileBinding", () => {
-    const deploymentConfigSchema = z
+    const targetConfigSchema = z
       .object({
         apiBaseUrl: z.url(),
       })
@@ -517,34 +517,32 @@ describe("compileRuntimePlan", () => {
         normalizedModel: config.defaultModel.trim().toLowerCase(),
       }));
 
-    const definition: IntegrationDefinition<
-      typeof deploymentConfigSchema,
-      typeof bindingConfigSchema
-    > = {
-      familyId: "openai",
-      variantId: "openai_default",
-      kind: "agent",
-      displayName: "OpenAI",
-      logoKey: "openai",
-      deploymentConfigSchema,
-      bindingConfigSchema,
-      supportedAuthSchemes: ["api-key"],
-      triggerEventTypes: [],
-      compileBinding: (input) => ({
-        egressRoutes: [],
-        artifacts: [],
-        runtimeClientSetups: [
-          {
-            clientId: "typed-config",
-            env: {
-              API_HOST: input.deployment.config.apiHost,
-              MODEL: input.binding.config.normalizedModel,
+    const definition: IntegrationDefinition<typeof targetConfigSchema, typeof bindingConfigSchema> =
+      {
+        familyId: "openai",
+        variantId: "openai_default",
+        kind: "agent",
+        displayName: "OpenAI",
+        logoKey: "openai",
+        targetConfigSchema,
+        bindingConfigSchema,
+        supportedAuthSchemes: ["api-key"],
+        triggerEventTypes: [],
+        compileBinding: (input) => ({
+          egressRoutes: [],
+          artifacts: [],
+          runtimeClientSetups: [
+            {
+              clientId: "typed-config",
+              env: {
+                API_HOST: input.target.config.apiHost,
+                MODEL: input.binding.config.normalizedModel,
+              },
+              files: [],
             },
-            files: [],
-          },
-        ],
-      }),
-    };
+          ],
+        }),
+      };
 
     const registry = new IntegrationRegistry();
     registry.register(definition);
@@ -564,8 +562,8 @@ describe("compileRuntimePlan", () => {
       registry,
       bindings: [
         {
-          deploymentKey: "openai_default",
-          deployment: {
+          targetKey: "openai_default",
+          target: {
             familyId: "openai",
             variantId: "openai_default",
             enabled: true,

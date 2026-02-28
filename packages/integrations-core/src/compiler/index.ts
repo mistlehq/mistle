@@ -19,10 +19,10 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
       );
     }
 
-    if (!bindingInput.deployment.enabled) {
+    if (!bindingInput.target.enabled) {
       throw new IntegrationCompilerError(
-        CompilerErrorCodes.DEPLOYMENT_DISABLED,
-        `Deployment '${bindingInput.deploymentKey}' is disabled.`,
+        CompilerErrorCodes.TARGET_DISABLED,
+        `Target '${bindingInput.targetKey}' is disabled.`,
       );
     }
 
@@ -34,8 +34,8 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
     }
 
     const definition = input.registry.getDefinitionOrThrow({
-      familyId: bindingInput.deployment.familyId,
-      variantId: bindingInput.deployment.variantId,
+      familyId: bindingInput.target.familyId,
+      variantId: bindingInput.target.variantId,
     });
 
     if (definition.kind !== bindingInput.binding.kind) {
@@ -45,15 +45,13 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
       );
     }
 
-    let parsedDeploymentConfig: ReturnType<typeof definition.deploymentConfigSchema.parse>;
+    let parsedTargetConfig: ReturnType<typeof definition.targetConfigSchema.parse>;
     try {
-      parsedDeploymentConfig = definition.deploymentConfigSchema.parse(
-        bindingInput.deployment.config,
-      );
+      parsedTargetConfig = definition.targetConfigSchema.parse(bindingInput.target.config);
     } catch (error) {
       throw new IntegrationCompilerError(
-        CompilerErrorCodes.INVALID_DEPLOYMENT_CONFIG,
-        `Deployment config for '${bindingInput.deploymentKey}' did not satisfy '${definition.familyId}::${definition.variantId}' schema.`,
+        CompilerErrorCodes.INVALID_TARGET_CONFIG,
+        `Target config for '${bindingInput.targetKey}' did not satisfy '${definition.familyId}::${definition.variantId}' schema.`,
         { cause: error },
       );
     }
@@ -73,10 +71,10 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
       organizationId: input.organizationId,
       sandboxProfileId: input.sandboxProfileId,
       version: input.version,
-      deploymentKey: bindingInput.deploymentKey,
-      deployment: {
-        ...bindingInput.deployment,
-        config: parsedDeploymentConfig,
+      targetKey: bindingInput.targetKey,
+      target: {
+        ...bindingInput.target,
+        config: parsedTargetConfig,
       },
       connection: bindingInput.connection,
       binding: {

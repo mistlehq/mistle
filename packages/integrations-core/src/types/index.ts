@@ -20,7 +20,7 @@ export const IntegrationSupportedAuthSchemes: {
   API_KEY: "api-key",
 };
 
-export type IntegrationDeployment = {
+export type IntegrationTarget = {
   familyId: string;
   variantId: string;
   enabled: boolean;
@@ -61,14 +61,14 @@ type ParsedSchemaOutput<TSchema extends IntegrationConfigSchema<unknown>> =
   TSchema extends IntegrationConfigSchema<infer TOutput> ? TOutput : never;
 
 export type CompileBindingInput<
-  TDeploymentConfig = Record<string, unknown>,
+  TTargetConfig = Record<string, unknown>,
   TBindingConfig = Record<string, unknown>,
 > = {
   organizationId: string;
   sandboxProfileId: string;
   version: number;
-  deploymentKey: string;
-  deployment: Omit<IntegrationDeployment, "config"> & { config: TDeploymentConfig };
+  targetKey: string;
+  target: Omit<IntegrationTarget, "config"> & { config: TTargetConfig };
   connection: IntegrationConnection;
   binding: Pick<IntegrationBinding, "id" | "kind"> & { config: TBindingConfig };
   runtimeContext: {
@@ -120,7 +120,7 @@ export type CompiledBindingResult = {
 };
 
 export type IntegrationDefinition<
-  TDeploymentConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
+  TTargetConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
     Record<string, unknown>
   >,
   TBindingConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
@@ -133,13 +133,13 @@ export type IntegrationDefinition<
   displayName: string;
   description?: string;
   logoKey: string;
-  deploymentConfigSchema: TDeploymentConfigSchema;
+  targetConfigSchema: TTargetConfigSchema;
   bindingConfigSchema: TBindingConfigSchema;
   supportedAuthSchemes: ReadonlyArray<IntegrationSupportedAuthScheme>;
   triggerEventTypes: ReadonlyArray<string>;
   compileBinding(
     input: CompileBindingInput<
-      ParsedSchemaOutput<TDeploymentConfigSchema>,
+      ParsedSchemaOutput<TTargetConfigSchema>,
       ParsedSchemaOutput<TBindingConfigSchema>
     >,
   ): CompiledBindingResult;
@@ -221,8 +221,8 @@ export interface IntegrationDefinitionResolver extends IntegrationDefinitionRead
 }
 
 export type CompileRuntimePlanBindingInput = {
-  deploymentKey: string;
-  deployment: IntegrationDeployment;
+  targetKey: string;
+  target: IntegrationTarget;
   connection: IntegrationConnection;
   binding: IntegrationBinding;
 };
