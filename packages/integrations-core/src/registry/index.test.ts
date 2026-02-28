@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import {
   DefinitionRegistryErrorCodes,
@@ -6,6 +7,8 @@ import {
 } from "../errors/index.js";
 import type { IntegrationDefinition } from "../types/index.js";
 import { IntegrationRegistry } from "./index.js";
+
+const ConfigSchema = z.record(z.string(), z.unknown());
 
 describe("integration registry", () => {
   it("registers and resolves definitions by family + variant", () => {
@@ -17,8 +20,8 @@ describe("integration registry", () => {
       kind: "agent",
       displayName: "OpenAI",
       logoKey: "openai",
-      deploymentConfigSchema: {},
-      bindingConfigSchema: {},
+      deploymentConfigSchema: ConfigSchema,
+      bindingConfigSchema: ConfigSchema,
       supportedAuthSchemes: ["api-key"],
       triggerEventTypes: [],
       compileBinding: () => ({
@@ -44,8 +47,8 @@ describe("integration registry", () => {
       kind: "agent",
       displayName: "OpenAI",
       logoKey: "openai",
-      deploymentConfigSchema: {},
-      bindingConfigSchema: {},
+      deploymentConfigSchema: ConfigSchema,
+      bindingConfigSchema: ConfigSchema,
       supportedAuthSchemes: ["api-key"],
       triggerEventTypes: [],
       compileBinding: () => ({
@@ -79,8 +82,8 @@ describe("integration registry", () => {
         kind: "git",
         displayName: "GitHub",
         logoKey: "github",
-        deploymentConfigSchema: {},
-        bindingConfigSchema: {},
+        deploymentConfigSchema: ConfigSchema,
+        bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["oauth"],
         triggerEventTypes: ["github.issue_comment.created"],
         compileBinding: () => ({
@@ -95,8 +98,8 @@ describe("integration registry", () => {
         kind: "agent",
         displayName: "OpenAI",
         logoKey: "openai",
-        deploymentConfigSchema: {},
-        bindingConfigSchema: {},
+        deploymentConfigSchema: ConfigSchema,
+        bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["api-key"],
         triggerEventTypes: [],
         compileBinding: () => ({

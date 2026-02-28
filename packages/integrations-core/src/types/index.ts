@@ -53,14 +53,24 @@ export type IntegrationBinding = {
   config: Record<string, unknown>;
 };
 
-export type CompileBindingInput = {
+export type IntegrationConfigSchema<TOutput> = {
+  parse: (input: unknown) => TOutput;
+};
+
+type ParsedSchemaOutput<TSchema extends IntegrationConfigSchema<unknown>> =
+  TSchema extends IntegrationConfigSchema<infer TOutput> ? TOutput : never;
+
+export type CompileBindingInput<
+  TDeploymentConfig = Record<string, unknown>,
+  TBindingConfig = Record<string, unknown>,
+> = {
   organizationId: string;
   sandboxProfileId: string;
   version: number;
   deploymentKey: string;
-  deployment: IntegrationDeployment;
+  deployment: Omit<IntegrationDeployment, "config"> & { config: TDeploymentConfig };
   connection: IntegrationConnection;
-  binding: Pick<IntegrationBinding, "id" | "kind" | "config">;
+  binding: Pick<IntegrationBinding, "id" | "kind"> & { config: TBindingConfig };
   runtimeContext: {
     sandboxProvider: string;
     sandboxdEgressBaseUrl: string;
@@ -109,18 +119,30 @@ export type CompiledBindingResult = {
   runtimeClientSetups: ReadonlyArray<RuntimeClientSetup>;
 };
 
-export type IntegrationDefinition = {
+export type IntegrationDefinition<
+  TDeploymentConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
+    Record<string, unknown>
+  >,
+  TBindingConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
+    Record<string, unknown>
+  >,
+> = {
   familyId: string;
   variantId: string;
   kind: IntegrationKind;
   displayName: string;
   description?: string;
   logoKey: string;
-  deploymentConfigSchema: unknown;
-  bindingConfigSchema: unknown;
+  deploymentConfigSchema: TDeploymentConfigSchema;
+  bindingConfigSchema: TBindingConfigSchema;
   supportedAuthSchemes: ReadonlyArray<IntegrationSupportedAuthScheme>;
   triggerEventTypes: ReadonlyArray<string>;
-  compileBinding: (input: CompileBindingInput) => CompiledBindingResult;
+  compileBinding(
+    input: CompileBindingInput<
+      ParsedSchemaOutput<TDeploymentConfigSchema>,
+      ParsedSchemaOutput<TBindingConfigSchema>
+    >,
+  ): CompiledBindingResult;
 };
 
 export type IntegrationManifest = {

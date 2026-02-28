@@ -45,17 +45,44 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
       );
     }
 
+    let parsedDeploymentConfig: ReturnType<typeof definition.deploymentConfigSchema.parse>;
+    try {
+      parsedDeploymentConfig = definition.deploymentConfigSchema.parse(
+        bindingInput.deployment.config,
+      );
+    } catch (error) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.INVALID_DEPLOYMENT_CONFIG,
+        `Deployment config for '${bindingInput.deploymentKey}' did not satisfy '${definition.familyId}::${definition.variantId}' schema.`,
+        { cause: error },
+      );
+    }
+
+    let parsedBindingConfig: ReturnType<typeof definition.bindingConfigSchema.parse>;
+    try {
+      parsedBindingConfig = definition.bindingConfigSchema.parse(bindingInput.binding.config);
+    } catch (error) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.INVALID_BINDING_CONFIG,
+        `Binding config for '${bindingInput.binding.id}' did not satisfy '${definition.familyId}::${definition.variantId}' schema.`,
+        { cause: error },
+      );
+    }
+
     const compiledBindingResult = definition.compileBinding({
       organizationId: input.organizationId,
       sandboxProfileId: input.sandboxProfileId,
       version: input.version,
       deploymentKey: bindingInput.deploymentKey,
-      deployment: bindingInput.deployment,
+      deployment: {
+        ...bindingInput.deployment,
+        config: parsedDeploymentConfig,
+      },
       connection: bindingInput.connection,
       binding: {
         id: bindingInput.binding.id,
         kind: bindingInput.binding.kind,
-        config: bindingInput.binding.config,
+        config: parsedBindingConfig,
       },
       runtimeContext: input.runtimeContext,
     });
