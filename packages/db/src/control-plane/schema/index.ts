@@ -3,6 +3,11 @@ export { invitations } from "./invitations.js";
 export { members, MemberRoles } from "./members.js";
 export type { MemberRole } from "./members.js";
 export { CONTROL_PLANE_SCHEMA_NAME } from "./namespace.js";
+export {
+  organizationCredentialKeys,
+  type InsertOrganizationCredentialKey,
+  type OrganizationCredentialKey,
+} from "./organization-credential-keys.js";
 export { organizations } from "./organizations.js";
 export { sandboxProfiles, SandboxProfileStatuses } from "./sandbox-profiles.js";
 export type {
