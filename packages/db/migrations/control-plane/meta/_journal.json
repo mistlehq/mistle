@@ -50,6 +50,27 @@
       "when": 1772289380120,
       "tag": "0006_add-profile-version-bindings-and-trigger-rules",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1772292000637,
+      "tag": "0007_add-integration-oauth-sessions",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1772292045018,
+      "tag": "0008_add-integration-webhook-events",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1772292081688,
+      "tag": "0009_add-integration-conversation-routes",
+      "breakpoints": true
     }
   ]
 }

@@ -12,12 +12,29 @@ export {
   type IntegrationConnectionStatus,
 } from "./integration-connections.js";
 export {
+  integrationConversationRoutes,
+  type InsertIntegrationConversationRoute,
+  type IntegrationConversationRoute,
+} from "./integration-conversation-routes.js";
+export {
   integrationCredentials,
   IntegrationCredentialSecretKinds,
   type InsertIntegrationCredential,
   type IntegrationCredential,
   type IntegrationCredentialSecretKind,
 } from "./integration-credentials.js";
+export {
+  integrationOauthSessions,
+  type InsertIntegrationOauthSession,
+  type IntegrationOauthSession,
+} from "./integration-oauth-sessions.js";
+export {
+  integrationWebhookEvents,
+  IntegrationWebhookEventStatuses,
+  type InsertIntegrationWebhookEvent,
+  type IntegrationWebhookEvent,
+  type IntegrationWebhookEventStatus,
+} from "./integration-webhook-events.js";
 export { invitations } from "./invitations.js";
 export { members, MemberRoles } from "./members.js";
 export type { MemberRole } from "./members.js";
