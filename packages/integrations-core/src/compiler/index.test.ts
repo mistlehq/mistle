@@ -20,7 +20,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
 > {
   return {
     familyId: "openai",
-    variantId: "openai-api-key",
+    variantId: "openai-default",
     kind: "agent",
     displayName: "OpenAI",
     logoKey: "openai",
@@ -103,7 +103,7 @@ describe("compileRuntimePlan", () => {
           targetKey: "openai_default",
           target: {
             familyId: "openai",
-            variantId: "openai-api-key",
+            variantId: "openai-default",
             enabled: true,
             config: {
               apiBaseUrl: "https://api.openai.com",
@@ -163,7 +163,7 @@ describe("compileRuntimePlan", () => {
             targetKey: "openai_default",
             target: {
               familyId: "openai",
-              variantId: "openai-api-key",
+              variantId: "openai-default",
               enabled: false,
               config: {},
             },
@@ -202,7 +202,7 @@ describe("compileRuntimePlan", () => {
             targetKey: "openai_default",
             target: {
               familyId: "openai",
-              variantId: "openai-api-key",
+              variantId: "openai-default",
               enabled: false,
               config: {},
             },
@@ -251,7 +251,7 @@ describe("compileRuntimePlan", () => {
             targetKey: "openai_default",
             target: {
               familyId: "openai",
-              variantId: "openai-api-key",
+              variantId: "openai-default",
               enabled: true,
               config: {},
             },
@@ -290,7 +290,7 @@ describe("compileRuntimePlan", () => {
             targetKey: "openai_default",
             target: {
               familyId: "openai",
-              variantId: "openai-api-key",
+              variantId: "openai-default",
               enabled: true,
               config: {},
             },
@@ -339,7 +339,7 @@ describe("compileRuntimePlan", () => {
             targetKey: "openai_default",
             target: {
               familyId: "openai",
-              variantId: "openai-api-key",
+              variantId: "openai-default",
               enabled: true,
               config: {
                 apiBaseUrl: "not-a-url",
@@ -382,7 +382,7 @@ describe("compileRuntimePlan", () => {
             targetKey: "openai_default",
             target: {
               familyId: "openai",
-              variantId: "openai-api-key",
+              variantId: "openai-default",
               enabled: true,
               config: {
                 apiBaseUrl: "not-a-url",
@@ -435,7 +435,7 @@ describe("compileRuntimePlan", () => {
             targetKey: "openai_default",
             target: {
               familyId: "openai",
-              variantId: "openai-api-key",
+              variantId: "openai-default",
               enabled: true,
               config: {
                 apiBaseUrl: "https://api.openai.com",
@@ -478,7 +478,7 @@ describe("compileRuntimePlan", () => {
             targetKey: "openai_default",
             target: {
               familyId: "openai",
-              variantId: "openai-api-key",
+              variantId: "openai-default",
               enabled: true,
               config: {
                 apiBaseUrl: "https://api.openai.com",
@@ -527,7 +527,7 @@ describe("compileRuntimePlan", () => {
     const definition: IntegrationDefinition<typeof targetConfigSchema, typeof bindingConfigSchema> =
       {
         familyId: "openai",
-        variantId: "openai-api-key",
+        variantId: "openai-default",
         kind: "agent",
         displayName: "OpenAI",
         logoKey: "openai",
@@ -574,7 +574,7 @@ describe("compileRuntimePlan", () => {
           targetKey: "openai_default",
           target: {
             familyId: "openai",
-            variantId: "openai-api-key",
+            variantId: "openai-default",
             enabled: true,
             config: {
               apiBaseUrl: "https://api.openai.com/v1",

@@ -7,7 +7,7 @@ describe("integrations-definitions index", () => {
     const registry = createIntegrationRegistry();
     const definition = registry.getDefinition({
       familyId: "openai",
-      variantId: "openai-api-key",
+      variantId: "openai-default",
     });
 
     expect(definition?.displayName).toBe("OpenAI");
@@ -25,7 +25,7 @@ describe("integrations-definitions index", () => {
     expect(definitions).toHaveLength(1);
     expect(definitions[0]).toMatchObject({
       familyId: "openai",
-      variantId: "openai-api-key",
+      variantId: "openai-default",
     });
   });
 });

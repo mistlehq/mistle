@@ -30,7 +30,7 @@ const OpenAiUserReasoningEffortSchema = z.enum([
 
 export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   familyId: "openai",
-  variantId: "openai-api-key",
+  variantId: "openai-default",
   kind: IntegrationKinds.AGENT,
   displayName: "OpenAI",
   description: "OpenAI API key based integration for Codex runtime sessions.",

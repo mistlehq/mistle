@@ -35,7 +35,7 @@ describe("integration targets discovery integration", () => {
       {
         targetKey: "openai_default",
         familyId: "openai",
-        variantId: "openai-api-key",
+        variantId: "openai-default",
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com",
@@ -112,7 +112,7 @@ describe("integration targets discovery integration", () => {
       {
         targetKey: "openai_default",
         familyId: "openai",
-        variantId: "openai-api-key",
+        variantId: "openai-default",
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com",

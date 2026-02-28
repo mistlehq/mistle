@@ -11,7 +11,7 @@ describe("compileOpenAiApiKeyBinding", () => {
       targetKey: "openai_default",
       target: {
         familyId: "openai",
-        variantId: "openai-api-key",
+        variantId: "openai-default",
         enabled: true,
         config: {
           apiBaseUrl: "https://api.openai.com/v1",
@@ -89,7 +89,7 @@ describe("compileOpenAiApiKeyBinding", () => {
       targetKey: "openai_proxy",
       target: {
         familyId: "openai",
-        variantId: "openai-api-key",
+        variantId: "openai-default",
         enabled: true,
         config: {
           apiBaseUrl: "https://proxy.example.com/openai-v2",

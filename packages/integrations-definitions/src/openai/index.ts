@@ -1,1 +1,1 @@
-export * from "./variants/openai-api-key/index.js";
+export * from "./variants/openai-default/index.js";

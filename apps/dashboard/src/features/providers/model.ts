@@ -191,7 +191,7 @@ export const PROVIDER_SCAFFOLD_ENTRIES: readonly ProviderScaffoldEntry[] = [
     providerInstanceId: "openai",
     displayName: "OpenAI",
     description: "Primary LLM provider for assistant responses.",
-    authMethods: [{ id: "openai-api-key", label: "API key" }],
+    authMethods: [{ id: "openai-default", label: "API key" }],
     connections: [
       {
         id: "conn_openai_primary",
