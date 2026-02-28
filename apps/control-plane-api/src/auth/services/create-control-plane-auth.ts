@@ -4,9 +4,11 @@ import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-p
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP, organization } from "better-auth/plugins";
+import { eq } from "drizzle-orm";
 
 import { AUTH_ROUTE_BASE_PATH } from "../constants.js";
 import { applyActiveOrganizationToSession } from "./apply-active-organization-to-session.js";
+import { createInitialOrganizationCredentialKey } from "./create-initial-organization-credential-key.js";
 import { createSendOrganizationInvitationService } from "./create-send-organization-invitation.js";
 import { createSendVerificationOTPService } from "./create-send-verification-otp.js";
 
@@ -18,6 +20,8 @@ export type ControlPlaneAuthConfig = {
   authOTPLength: number;
   authOTPExpiresInSeconds: number;
   authOTPAllowedAttempts: number;
+  activeMasterEncryptionKeyVersion: number;
+  masterEncryptionKeys: Record<string, string>;
 };
 
 type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
@@ -91,6 +95,26 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions): 
             inviterEmail: invitation.inviter.user.email,
             role: invitation.role,
           });
+        },
+        organizationHooks: {
+          afterCreateOrganization: async ({ organization }) => {
+            try {
+              await createInitialOrganizationCredentialKey({
+                db,
+                organizationId: organization.id,
+                activeMasterEncryptionKeyVersion: config.activeMasterEncryptionKeyVersion,
+                masterEncryptionKeys: config.masterEncryptionKeys,
+              });
+            } catch (error) {
+              await db
+                .delete(ControlPlaneDbSchema.organizations)
+                .where(eq(ControlPlaneDbSchema.organizations.id, organization.id));
+              throw new Error(
+                `Failed to initialize credential key for organization '${organization.id}'.`,
+                { cause: error },
+              );
+            }
+          },
         },
         teams: {
           enabled: true,
