@@ -32,8 +32,8 @@ type CreatedConnection = {
   externalSubjectId?: string;
   config?: Record<string, unknown>;
   targetSnapshotConfig?: Record<string, unknown>;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 };
 
 export async function createApiKeyConnection(

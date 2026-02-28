@@ -34,7 +34,7 @@ export const integrationWebhookEvents = controlPlaneSchema.table(
       .notNull()
       .$type<IntegrationWebhookEventStatus>()
       .default(IntegrationWebhookEventStatuses.RECEIVED),
-    finalizedAt: timestamp("finalized_at", { withTimezone: true }),
+    finalizedAt: timestamp("finalized_at", { withTimezone: true, mode: "string" }),
   },
   (table) => [
     uniqueIndex("integration_webhook_events_target_key_external_event_id_uidx").on(
