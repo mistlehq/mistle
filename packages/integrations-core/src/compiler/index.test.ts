@@ -1,19 +1,31 @@
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { IntegrationRegistry } from "../registry/index.js";
 import type { IntegrationDefinition } from "../types/index.js";
 import { compileRuntimePlan } from "./index.js";
 
-function createOpenAiDefinition(): IntegrationDefinition {
+const OpenAiDeploymentConfigSchema = z.object({
+  apiBaseUrl: z.url(),
+});
+
+const OpenAiBindingConfigSchema = z.object({
+  defaultModel: z.string().min(1),
+});
+
+function createOpenAiDefinition(): IntegrationDefinition<
+  typeof OpenAiDeploymentConfigSchema,
+  typeof OpenAiBindingConfigSchema
+> {
   return {
     familyId: "openai",
     variantId: "openai_default",
     kind: "agent",
     displayName: "OpenAI",
     logoKey: "openai",
-    deploymentConfigSchema: {},
-    bindingConfigSchema: {},
+    deploymentConfigSchema: OpenAiDeploymentConfigSchema,
+    bindingConfigSchema: OpenAiBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
     triggerEventTypes: [],
     compileBinding: (input) => ({
@@ -52,7 +64,8 @@ function createOpenAiDefinition(): IntegrationDefinition {
         {
           clientId: "codex-cli",
           env: {
-            OPENAI_BASE_URL: "https://api.openai.com",
+            OPENAI_BASE_URL: input.deployment.config.apiBaseUrl,
+            OPENAI_MODEL: input.binding.config.defaultModel,
           },
           files: [
             {
@@ -294,5 +307,298 @@ describe("compileRuntimePlan", () => {
         expect(error.code).toBe(CompilerErrorCodes.CONNECTION_MISMATCH);
       }
     }
+  });
+
+  it("fails when deployment config does not satisfy schema", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createOpenAiDefinition());
+
+    expect(() =>
+      compileRuntimePlan({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        image: {
+          source: "default-base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        runtimeContext: {
+          sandboxProvider: "docker",
+          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
+        },
+        registry,
+        bindings: [
+          {
+            deploymentKey: "openai_default",
+            deployment: {
+              familyId: "openai",
+              variantId: "openai_default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "not-a-url",
+              },
+            },
+            connection: {
+              id: "conn_openai_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_openai_agent",
+              kind: "agent",
+              connectionId: "conn_openai_org_123",
+              config: {
+                defaultModel: "gpt-5.3-codex",
+              },
+            },
+          },
+        ],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+
+    try {
+      compileRuntimePlan({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        image: {
+          source: "default-base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        runtimeContext: {
+          sandboxProvider: "docker",
+          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
+        },
+        registry,
+        bindings: [
+          {
+            deploymentKey: "openai_default",
+            deployment: {
+              familyId: "openai",
+              variantId: "openai_default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "not-a-url",
+              },
+            },
+            connection: {
+              id: "conn_openai_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_openai_agent",
+              kind: "agent",
+              connectionId: "conn_openai_org_123",
+              config: {
+                defaultModel: "gpt-5.3-codex",
+              },
+            },
+          },
+        ],
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(IntegrationCompilerError);
+      if (error instanceof IntegrationCompilerError) {
+        expect(error.code).toBe(CompilerErrorCodes.INVALID_DEPLOYMENT_CONFIG);
+      }
+    }
+  });
+
+  it("fails when binding config does not satisfy schema", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createOpenAiDefinition());
+
+    expect(() =>
+      compileRuntimePlan({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        image: {
+          source: "default-base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        runtimeContext: {
+          sandboxProvider: "docker",
+          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
+        },
+        registry,
+        bindings: [
+          {
+            deploymentKey: "openai_default",
+            deployment: {
+              familyId: "openai",
+              variantId: "openai_default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://api.openai.com",
+              },
+            },
+            connection: {
+              id: "conn_openai_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_openai_agent",
+              kind: "agent",
+              connectionId: "conn_openai_org_123",
+              config: {
+                defaultModel: "",
+              },
+            },
+          },
+        ],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+
+    try {
+      compileRuntimePlan({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        image: {
+          source: "default-base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        runtimeContext: {
+          sandboxProvider: "docker",
+          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
+        },
+        registry,
+        bindings: [
+          {
+            deploymentKey: "openai_default",
+            deployment: {
+              familyId: "openai",
+              variantId: "openai_default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://api.openai.com",
+              },
+            },
+            connection: {
+              id: "conn_openai_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_openai_agent",
+              kind: "agent",
+              connectionId: "conn_openai_org_123",
+              config: {
+                defaultModel: "",
+              },
+            },
+          },
+        ],
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(IntegrationCompilerError);
+      if (error instanceof IntegrationCompilerError) {
+        expect(error.code).toBe(CompilerErrorCodes.INVALID_BINDING_CONFIG);
+      }
+    }
+  });
+
+  it("passes parsed schema outputs into compileBinding", () => {
+    const deploymentConfigSchema = z
+      .object({
+        apiBaseUrl: z.url(),
+      })
+      .transform((config) => ({
+        apiHost: new URL(config.apiBaseUrl).host,
+      }));
+    const bindingConfigSchema = z
+      .object({
+        defaultModel: z.string().min(1),
+      })
+      .transform((config) => ({
+        normalizedModel: config.defaultModel.trim().toLowerCase(),
+      }));
+
+    const definition: IntegrationDefinition<
+      typeof deploymentConfigSchema,
+      typeof bindingConfigSchema
+    > = {
+      familyId: "openai",
+      variantId: "openai_default",
+      kind: "agent",
+      displayName: "OpenAI",
+      logoKey: "openai",
+      deploymentConfigSchema,
+      bindingConfigSchema,
+      supportedAuthSchemes: ["api-key"],
+      triggerEventTypes: [],
+      compileBinding: (input) => ({
+        egressRoutes: [],
+        artifacts: [],
+        runtimeClientSetups: [
+          {
+            clientId: "typed-config",
+            env: {
+              API_HOST: input.deployment.config.apiHost,
+              MODEL: input.binding.config.normalizedModel,
+            },
+            files: [],
+          },
+        ],
+      }),
+    };
+
+    const registry = new IntegrationRegistry();
+    registry.register(definition);
+
+    const runtimePlan = compileRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      image: {
+        source: "default-base",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      },
+      runtimeContext: {
+        sandboxProvider: "docker",
+        sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
+      },
+      registry,
+      bindings: [
+        {
+          deploymentKey: "openai_default",
+          deployment: {
+            familyId: "openai",
+            variantId: "openai_default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://api.openai.com/v1",
+            },
+          },
+          connection: {
+            id: "conn_openai_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_openai_agent",
+            kind: "agent",
+            connectionId: "conn_openai_org_123",
+            config: {
+              defaultModel: " GPT-5.3-CODEX ",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(runtimePlan.runtimeClientSetups).toEqual([
+      {
+        clientId: "typed-config",
+        env: {
+          API_HOST: "api.openai.com",
+          MODEL: "gpt-5.3-codex",
+        },
+        files: [],
+      },
+    ]);
   });
 });
