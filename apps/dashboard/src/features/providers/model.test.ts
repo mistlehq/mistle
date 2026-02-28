@@ -80,9 +80,9 @@ describe("providers model", () => {
 
     expect(
       resolveAutoSelectedAuthMethod({ methods: openAiMethods, selectedAuthMethodId: null }),
-    ).toBe("openai-api-key");
+    ).toBe("openai-default");
     expect(
-      canStartConnection({ methods: openAiMethods, selectedAuthMethodId: "openai-api-key" }),
+      canStartConnection({ methods: openAiMethods, selectedAuthMethodId: "openai-default" }),
     ).toEqual({
       canStart: true,
       errorMessage: null,

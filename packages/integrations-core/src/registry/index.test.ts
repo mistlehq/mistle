@@ -16,7 +16,7 @@ describe("integration registry", () => {
 
     registry.register({
       familyId: "openai",
-      variantId: "openai-api-key",
+      variantId: "openai-default",
       kind: "agent",
       displayName: "OpenAI",
       logoKey: "openai",
@@ -34,7 +34,7 @@ describe("integration registry", () => {
 
     const definition = registry.getDefinition({
       familyId: "openai",
-      variantId: "openai-api-key",
+      variantId: "openai-default",
     });
 
     expect(definition?.displayName).toBe("OpenAI");
@@ -44,7 +44,7 @@ describe("integration registry", () => {
     const registry = new IntegrationRegistry();
     const definition: IntegrationDefinition = {
       familyId: "openai",
-      variantId: "openai-api-key",
+      variantId: "openai-default",
       kind: "agent",
       displayName: "OpenAI",
       logoKey: "openai",
@@ -97,7 +97,7 @@ describe("integration registry", () => {
       },
       {
         familyId: "openai",
-        variantId: "openai-api-key",
+        variantId: "openai-default",
         kind: "agent",
         displayName: "OpenAI",
         logoKey: "openai",
@@ -128,7 +128,7 @@ describe("integration registry", () => {
     expect(() =>
       registry.register({
         familyId: "openai",
-        variantId: "openai-api-key",
+        variantId: "openai-default",
         kind: "agent",
         displayName: "OpenAI",
         logoKey: "openai",

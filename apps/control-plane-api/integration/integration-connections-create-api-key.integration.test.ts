@@ -28,7 +28,7 @@ describe("integration connections create api key integration", () => {
     await fixture.db.insert(integrationTargets).values({
       targetKey: "openai_default",
       familyId: "openai",
-      variantId: "openai-api-key",
+      variantId: "openai-default",
       enabled: true,
       config: {
         api_base_url: "https://api.openai.com",
@@ -154,7 +154,7 @@ describe("integration connections create api key integration", () => {
     await fixture.db.insert(integrationTargets).values({
       targetKey: "openai_disabled",
       familyId: "openai",
-      variantId: "openai-api-key",
+      variantId: "openai-default",
       enabled: false,
       config: {
         api_base_url: "https://api.openai.com",
@@ -185,7 +185,7 @@ describe("integration connections create api key integration", () => {
     await fixture.db.insert(integrationTargets).values({
       targetKey: "openai_default",
       familyId: "openai",
-      variantId: "openai-api-key",
+      variantId: "openai-default",
       enabled: true,
       config: {
         api_base_url: "https://api.openai.com",
