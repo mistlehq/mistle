@@ -14,7 +14,9 @@ export const integrationConnectionCredentials = controlPlaneSchema.table(
       .notNull()
       .references(() => integrationCredentials.id, { onDelete: "restrict" }),
     purpose: text("purpose").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     primaryKey({

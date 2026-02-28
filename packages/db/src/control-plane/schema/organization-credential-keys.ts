@@ -16,7 +16,9 @@ export const organizationCredentialKeys = controlPlaneSchema.table(
     version: bigint("version", { mode: "number" }).notNull(),
     masterKeyVersion: bigint("master_key_version", { mode: "number" }).notNull(),
     ciphertext: text("ciphertext").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     index("organization_credential_keys_organization_id_idx").on(table.organizationId),

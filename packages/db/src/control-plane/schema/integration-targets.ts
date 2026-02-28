@@ -12,8 +12,12 @@ export const integrationTargets = controlPlaneSchema.table(
     config: jsonb("config").$type<Record<string, unknown>>().notNull(),
     displayNameOverride: text("display_name_override"),
     descriptionOverride: text("description_override"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     index("integration_targets_family_id_variant_id_idx").on(table.familyId, table.variantId),

@@ -33,8 +33,12 @@ export const integrationConnections = controlPlaneSchema.table(
     externalSubjectId: text("external_subject_id"),
     config: jsonb("config").$type<Record<string, unknown>>(),
     targetSnapshotConfig: jsonb("target_snapshot_config").$type<Record<string, unknown>>(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     index("integration_connections_organization_id_idx").on(table.organizationId),

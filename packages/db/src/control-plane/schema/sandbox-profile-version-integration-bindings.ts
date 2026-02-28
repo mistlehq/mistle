@@ -29,8 +29,12 @@ export const sandboxProfileVersionIntegrationBindings = controlPlaneSchema.table
       .references(() => integrationConnections.id, { onDelete: "restrict" }),
     kind: text("kind").$type<IntegrationBindingKind>().notNull(),
     config: jsonb("config").$type<Record<string, unknown>>().notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     foreignKey({

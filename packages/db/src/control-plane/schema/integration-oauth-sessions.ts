@@ -19,9 +19,11 @@ export const integrationOauthSessions = controlPlaneSchema.table(
       .references(() => integrationTargets.targetKey, { onDelete: "restrict" }),
     state: text("state").notNull(),
     pkceVerifierEncrypted: text("pkce_verifier_encrypted"),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
-    usedAt: timestamp("used_at", { withTimezone: true }),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }).notNull(),
+    usedAt: timestamp("used_at", { withTimezone: true, mode: "string" }),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     index("integration_oauth_sessions_organization_id_idx").on(table.organizationId),

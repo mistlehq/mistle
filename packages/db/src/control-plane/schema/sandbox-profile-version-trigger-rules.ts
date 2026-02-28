@@ -20,8 +20,12 @@ export const sandboxProfileVersionTriggerRules = controlPlaneSchema.table(
     filter: jsonb("filter").$type<Record<string, unknown>>().notNull(),
     action: jsonb("action").$type<Record<string, unknown>>().notNull(),
     enabled: boolean("enabled").notNull().default(true),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     foreignKey({

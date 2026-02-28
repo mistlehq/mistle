@@ -25,8 +25,12 @@ export const integrationConversationRoutes = controlPlaneSchema.table(
     sandboxInstanceId: text("sandbox_instance_id").notNull(),
     providerConversationId: text("provider_conversation_id").notNull(),
     status: text("status").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true, mode: "string" })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     uniqueIndex("integration_conversation_routes_org_binding_key_uidx").on(
