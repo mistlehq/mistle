@@ -79,7 +79,7 @@ describe("sandbox profile compile runtime plan integration", () => {
         },
         runtimeContext: {
           sandboxProvider: "docker",
-          sandboxdEgressBaseUrl: "http://sandboxd.internal",
+          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
         },
       },
     );
@@ -91,7 +91,7 @@ describe("sandbox profile compile runtime plan integration", () => {
       {
         clientId: "codex-cli",
         env: {
-          OPENAI_BASE_URL: "https://api.openai.com/v1",
+          OPENAI_BASE_URL: "http://sandboxd.internal/egress/routes/route_ibd_compile_success",
           OPENAI_MODEL: "gpt-5.3-codex",
           OPENAI_REASONING_EFFORT: "medium",
         },
@@ -105,7 +105,7 @@ model_provider = "openai"
 
 [model_providers.openai]
 name = "OpenAI"
-base_url = "https://api.openai.com/v1"
+base_url = "http://sandboxd.internal/egress/routes/route_ibd_compile_success"
 env_key = "OPENAI_API_KEY"
 wire_api = "responses"
 `,
@@ -135,7 +135,7 @@ wire_api = "responses"
           },
           runtimeContext: {
             sandboxProvider: "docker",
-            sandboxdEgressBaseUrl: "http://sandboxd.internal",
+            sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
         },
       );
@@ -176,7 +176,7 @@ wire_api = "responses"
           },
           runtimeContext: {
             sandboxProvider: "docker",
-            sandboxdEgressBaseUrl: "http://sandboxd.internal",
+            sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
         },
       );
@@ -234,7 +234,7 @@ wire_api = "responses"
           },
           runtimeContext: {
             sandboxProvider: "docker",
-            sandboxdEgressBaseUrl: "http://sandboxd.internal",
+            sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
         },
       );
@@ -300,7 +300,7 @@ wire_api = "responses"
           },
           runtimeContext: {
             sandboxProvider: "docker",
-            sandboxdEgressBaseUrl: "http://sandboxd.internal",
+            sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
         },
       );
