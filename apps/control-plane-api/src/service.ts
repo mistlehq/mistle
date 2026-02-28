@@ -21,6 +21,8 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
         authOTPLength: config.auth.otpLength,
         authOTPExpiresInSeconds: config.auth.otpExpiresInSeconds,
         authOTPAllowedAttempts: config.auth.otpAllowedAttempts,
+        activeMasterEncryptionKeyVersion: config.integrations.activeMasterEncryptionKeyVersion,
+        masterEncryptionKeys: config.integrations.masterEncryptionKeys,
       },
       db: resources.db,
       openWorkflow: resources.openWorkflow,
