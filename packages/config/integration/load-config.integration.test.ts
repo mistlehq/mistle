@@ -63,6 +63,12 @@ const controlPlaneApiEnvConfig = {
   sandbox: {
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
   },
+  integrations: {
+    activeMasterEncryptionKeyVersion: 1,
+    masterEncryptionKeys: {
+      "1": "integration-master-key-development",
+    },
+  },
 } as const;
 
 const controlPlaneApiFixtureConfig = {
@@ -77,6 +83,12 @@ const controlPlaneApiFixtureConfig = {
   },
   sandbox: {
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:fixture",
+  },
+  integrations: {
+    activeMasterEncryptionKeyVersion: 2,
+    masterEncryptionKeys: {
+      "2": "integration-master-key-fixture",
+    },
   },
 } as const;
 

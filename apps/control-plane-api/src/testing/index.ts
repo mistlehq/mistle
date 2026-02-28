@@ -29,6 +29,10 @@ export type StartControlPlaneApiTestingRuntimeInput = {
   sandbox?: {
     defaultBaseImage?: string;
   };
+  integrations?: {
+    activeMasterEncryptionKeyVersion?: number;
+    masterEncryptionKeys?: Record<string, string>;
+  };
 };
 
 function createTestingConfig(
@@ -52,6 +56,12 @@ function createTestingConfig(
     },
     sandbox: {
       defaultBaseImage: input.sandbox?.defaultBaseImage ?? "127.0.0.1:5001/mistle/sandbox-base:dev",
+    },
+    integrations: {
+      activeMasterEncryptionKeyVersion: input.integrations?.activeMasterEncryptionKeyVersion ?? 1,
+      masterEncryptionKeys: input.integrations?.masterEncryptionKeys ?? {
+        "1": "integration-master-key-testing",
+      },
     },
     auth: {
       baseUrl: authBaseUrl,

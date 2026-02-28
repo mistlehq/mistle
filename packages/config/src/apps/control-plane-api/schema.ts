@@ -38,6 +38,32 @@ export const ControlPlaneApiSandboxConfigSchema = z
   })
   .strict();
 
+const ControlPlaneApiIntegrationsConfigObjectSchema = z
+  .object({
+    activeMasterEncryptionKeyVersion: z.number().int().min(1),
+    masterEncryptionKeys: z.record(z.string().regex(/^[1-9]\d*$/), z.string().min(1)),
+  })
+  .strict();
+
+export const ControlPlaneApiIntegrationsConfigSchema =
+  ControlPlaneApiIntegrationsConfigObjectSchema.refine(
+    (config) => Object.keys(config.masterEncryptionKeys).length > 0,
+    {
+      message: "At least one master encryption key must be configured.",
+      path: ["masterEncryptionKeys"],
+    },
+  ).refine(
+    (config) =>
+      Object.prototype.hasOwnProperty.call(
+        config.masterEncryptionKeys,
+        String(config.activeMasterEncryptionKeyVersion),
+      ),
+    {
+      message: "Active master encryption key version must exist in masterEncryptionKeys.",
+      path: ["activeMasterEncryptionKeyVersion"],
+    },
+  );
+
 export const ControlPlaneApiConfigSchema = z
   .object({
     server: ControlPlaneApiServerConfigSchema,
@@ -45,6 +71,7 @@ export const ControlPlaneApiConfigSchema = z
     auth: ControlPlaneApiAuthConfigSchema,
     workflow: ControlPlaneApiWorkflowConfigSchema,
     sandbox: ControlPlaneApiSandboxConfigSchema,
+    integrations: ControlPlaneApiIntegrationsConfigSchema,
   })
   .strict();
 
@@ -55,6 +82,7 @@ export const PartialControlPlaneApiConfigSchema = z
     auth: ControlPlaneApiAuthConfigSchema.partial().optional(),
     workflow: ControlPlaneApiWorkflowConfigSchema.partial().optional(),
     sandbox: ControlPlaneApiSandboxConfigSchema.partial().optional(),
+    integrations: ControlPlaneApiIntegrationsConfigObjectSchema.partial().optional(),
   })
   .strict();
 

@@ -59,6 +59,15 @@ function formatCsvEnvValue(value: unknown, envVar: string): string {
   return expectStringArrayValue(value, envVar).join(",");
 }
 
+function formatJsonEnvValue(value: unknown, envVar: string): string {
+  const jsonValue = JSON.stringify(value);
+  if (jsonValue === undefined) {
+    throw new Error(`Invalid value for ${envVar}. Expected a JSON-serializable value.`);
+  }
+
+  return jsonValue;
+}
+
 function formatEnvValue(
   value: unknown,
   envVar: string,
@@ -66,6 +75,10 @@ function formatEnvValue(
 ): string {
   if (envValueFormat === "csv") {
     return formatCsvEnvValue(value, envVar);
+  }
+
+  if (envValueFormat === "json") {
+    return formatJsonEnvValue(value, envVar);
   }
 
   return formatDefaultEnvValue(value, envVar);
