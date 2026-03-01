@@ -43,7 +43,7 @@ export const SandboxProfileVersionIntegrationBindingSchema = createSelectSchema(
   },
 ).strict();
 
-export const PatchSandboxProfileVersionIntegrationBindingsBodySchema = z
+export const PutSandboxProfileVersionIntegrationBindingsBodySchema = z
   .object({
     bindings: z.array(
       z
@@ -58,7 +58,7 @@ export const PatchSandboxProfileVersionIntegrationBindingsBodySchema = z
   })
   .strict();
 
-export const PatchSandboxProfileVersionIntegrationBindingsResponseSchema = z
+export const PutSandboxProfileVersionIntegrationBindingsResponseSchema = z
   .object({
     bindings: z.array(SandboxProfileVersionIntegrationBindingSchema),
   })
@@ -509,8 +509,8 @@ export const deleteSandboxProfileRoute = createRoute({
   },
 });
 
-export const patchSandboxProfileVersionIntegrationBindingsRoute = createRoute({
-  method: "patch",
+export const putSandboxProfileVersionIntegrationBindingsRoute = createRoute({
+  method: "put",
   path: "/{profileId}/versions/{version}/integration-bindings",
   tags: ["Sandbox Profiles"],
   request: {
@@ -519,7 +519,7 @@ export const patchSandboxProfileVersionIntegrationBindingsRoute = createRoute({
       required: true,
       content: {
         "application/json": {
-          schema: PatchSandboxProfileVersionIntegrationBindingsBodySchema,
+          schema: PutSandboxProfileVersionIntegrationBindingsBodySchema,
         },
       },
     },
@@ -529,7 +529,7 @@ export const patchSandboxProfileVersionIntegrationBindingsRoute = createRoute({
       description: "Replace integration bindings for the specified sandbox profile version.",
       content: {
         "application/json": {
-          schema: PatchSandboxProfileVersionIntegrationBindingsResponseSchema,
+          schema: PutSandboxProfileVersionIntegrationBindingsResponseSchema,
         },
       },
     },
