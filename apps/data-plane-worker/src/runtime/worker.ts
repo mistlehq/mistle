@@ -10,6 +10,7 @@ import { mintBootstrapToken } from "@mistle/tunnel-auth";
 import {
   createDataPlaneWorker,
   type CreateDataPlaneWorkflowDefinitionsInput,
+  type StartSandboxInstanceWorkflowInput,
 } from "@mistle/workflows/data-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -66,6 +67,7 @@ async function waitForSandboxTunnelConnectAck(input: {
 async function writeSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
   resources: Pick<WorkerRuntimeResources, "sandboxAdapter">;
+  runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   sandbox: {
     sandboxId: string;
     writeStdin: (input: { payload: Uint8Array<ArrayBufferLike> }) => Promise<void>;
@@ -88,6 +90,7 @@ async function writeSandboxStartupInput(input: {
       payload: encodeSandboxStartupInput({
         bootstrapToken,
         tunnelGatewayWsUrl: input.config.app.tunnel.gatewayWsUrl,
+        runtimePlan: input.runtimePlan,
       }),
     });
     await input.sandbox.closeStdin();
@@ -135,6 +138,7 @@ function createWorkflowInputs(ctx: {
         const bootstrapTokenJti = await writeSandboxStartupInput({
           config: ctx.config,
           resources: ctx.resources,
+          runtimePlan: workflowInput.runtimePlan,
           sandbox: startedSandbox,
         });
 

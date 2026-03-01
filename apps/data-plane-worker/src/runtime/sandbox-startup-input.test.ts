@@ -1,22 +1,143 @@
+import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflows/data-plane";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
 import { encodeSandboxStartupInput } from "./sandbox-startup-input.js";
 
 const Decoder = new TextDecoder();
 
+const RuntimePlanSchema = z.object({
+  sandboxProfileId: z.string().min(1),
+  version: z.number().int(),
+  image: z.discriminatedUnion("source", [
+    z.object({
+      source: z.literal("instance-latest-snapshot"),
+      imageRef: z.string().min(1),
+      instanceId: z.string().min(1),
+    }),
+    z.object({
+      source: z.literal("profile-version-base"),
+      imageRef: z.string().min(1),
+      sandboxProfileId: z.string().min(1),
+      version: z.number().int(),
+    }),
+    z.object({
+      source: z.literal("default-base"),
+      imageRef: z.string().min(1),
+    }),
+  ]),
+  egressRoutes: z.array(
+    z.object({
+      routeId: z.string().min(1),
+      bindingId: z.string().min(1),
+      match: z.object({
+        hosts: z.array(z.string().min(1)),
+        pathPrefixes: z.array(z.string()).optional(),
+        methods: z.array(z.string()).optional(),
+      }),
+      upstream: z.object({
+        baseUrl: z.string().min(1),
+      }),
+      authInjection: z.object({
+        type: z.enum(["bearer", "basic", "header", "query"]),
+        target: z.string().min(1),
+      }),
+      credentialResolver: z.object({
+        connectionId: z.string().min(1),
+        secretType: z.string().min(1),
+      }),
+    }),
+  ),
+  artifacts: z.array(
+    z.object({
+      artifactKey: z.string().min(1),
+      name: z.string().min(1),
+      description: z.string().optional(),
+      lifecycle: z.object({
+        install: z.array(
+          z.object({
+            args: z.array(z.string()),
+            env: z.record(z.string(), z.string()).optional(),
+            cwd: z.string().optional(),
+            timeoutMs: z.number().int().optional(),
+          }),
+        ),
+        update: z
+          .array(
+            z.object({
+              args: z.array(z.string()),
+              env: z.record(z.string(), z.string()).optional(),
+              cwd: z.string().optional(),
+              timeoutMs: z.number().int().optional(),
+            }),
+          )
+          .optional(),
+        remove: z
+          .array(
+            z.object({
+              args: z.array(z.string()),
+              env: z.record(z.string(), z.string()).optional(),
+              cwd: z.string().optional(),
+              timeoutMs: z.number().int().optional(),
+            }),
+          )
+          .optional(),
+      }),
+    }),
+  ),
+  runtimeClientSetups: z.array(
+    z.object({
+      clientId: z.string().min(1),
+      env: z.record(z.string(), z.string()),
+      files: z.array(
+        z.object({
+          fileId: z.string().min(1),
+          path: z.string().min(1),
+          mode: z.number().int(),
+          content: z.string(),
+        }),
+      ),
+      launchArgs: z.array(z.string()).optional(),
+    }),
+  ),
+});
+
+const SandboxStartupInputSchema = z.object({
+  bootstrapToken: z.string().min(1),
+  tunnelGatewayWsUrl: z.string().min(1),
+  runtimePlan: RuntimePlanSchema,
+});
+
+function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
+  return {
+    sandboxProfileId: "sbp_runtime_plan_001",
+    version: 1,
+    image: {
+      source: "default-base",
+      imageRef: "registry:3",
+    },
+    egressRoutes: [],
+    artifacts: [],
+    runtimeClientSetups: [],
+  };
+}
+
 describe("encodeSandboxStartupInput", () => {
-  it("encodes bootstrap token and tunnel gateway ws url as newline-delimited json", () => {
+  it("encodes bootstrap token, tunnel gateway ws url, and runtime plan as newline-delimited json", () => {
     const encoded = encodeSandboxStartupInput({
       bootstrapToken: "bootstrap-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      runtimePlan: createRuntimePlan(),
     });
 
     const encodedText = Decoder.decode(encoded);
     expect(encodedText.endsWith("\n")).toBe(true);
 
-    const trimmedText = encodedText.trimEnd();
-    expect(trimmedText).toBe(
-      '{"bootstrapToken":"bootstrap-token-value","tunnelGatewayWsUrl":"ws://127.0.0.1:5003/tunnel/sandbox"}',
-    );
+    const decoded = SandboxStartupInputSchema.parse(JSON.parse(encodedText.trimEnd()));
+    expect(decoded).toEqual({
+      bootstrapToken: "bootstrap-token-value",
+      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      runtimePlan: createRuntimePlan(),
+    });
   });
 });
