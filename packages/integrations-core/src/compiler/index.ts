@@ -26,10 +26,6 @@ function resolveRouteId(input: { bindingId: string; routeIndex: number }): strin
   return `route_${input.bindingId}_${input.routeIndex + 1}`;
 }
 
-function shellEscape(value: string): string {
-  return quote([value]);
-}
-
 function renderInstallLatestGithubReleaseBinaryScript(
   input: RuntimeArtifactGithubReleaseInstallInput,
 ): string {
@@ -38,18 +34,18 @@ function renderInstallLatestGithubReleaseBinaryScript(
 
   return [
     'arch="$(uname -m)"',
-    "repo=" + shellEscape(input.repository),
-    "install_path=" + shellEscape(input.installPath),
+    "repo=" + quote([input.repository]),
+    "install_path=" + quote([input.installPath]),
     'case "$arch" in',
     "  x86_64)",
-    `    asset_name=${shellEscape(input.assets.x86_64.fileName)}`,
-    `    binary_path=${shellEscape(input.assets.x86_64.binaryPath)}`,
-    `    asset_format=${shellEscape(x86AssetFormat)}`,
+    `    asset_name=${quote([input.assets.x86_64.fileName])}`,
+    `    binary_path=${quote([input.assets.x86_64.binaryPath])}`,
+    `    asset_format=${quote([x86AssetFormat])}`,
     "    ;;",
     "  aarch64|arm64)",
-    `    asset_name=${shellEscape(input.assets.aarch64.fileName)}`,
-    `    binary_path=${shellEscape(input.assets.aarch64.binaryPath)}`,
-    `    asset_format=${shellEscape(aarch64AssetFormat)}`,
+    `    asset_name=${quote([input.assets.aarch64.fileName])}`,
+    `    binary_path=${quote([input.assets.aarch64.binaryPath])}`,
+    `    asset_format=${quote([aarch64AssetFormat])}`,
     "    ;;",
     "  *)",
     '    echo "Unsupported architecture: $arch" >&2',
