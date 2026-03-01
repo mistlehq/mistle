@@ -21,7 +21,9 @@ describe("compileGitHubEnterpriseServerBinding", () => {
       connection: {
         id: "icn_123",
         status: "active",
-        config: {},
+        config: {
+          auth_scheme: "api-key",
+        },
       },
       binding: {
         id: "ibd_123",
@@ -86,7 +88,9 @@ describe("compileGitHubEnterpriseServerBinding", () => {
       connection: {
         id: "icn_123",
         status: "active",
-        config: {},
+        config: {
+          auth_scheme: "api-key",
+        },
       },
       binding: {
         id: "ibd_123",
@@ -112,5 +116,96 @@ describe("compileGitHubEnterpriseServerBinding", () => {
       "/api/v3/repos/acme/repo-a",
       "/api/v3/repos/acme/repo-b",
     ]);
+  });
+
+  it("uses oauth access token secret type for github app-style oauth connections", () => {
+    const compiled = compileGitHubEnterpriseServerBinding({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "github_enterprise_server",
+      target: {
+        familyId: "github",
+        variantId: "github-enterprise-server",
+        enabled: true,
+        config: {
+          apiBaseUrl: "https://ghe.example.com/api/v3",
+          webBaseUrl: "https://ghe.example.com",
+        },
+      },
+      connection: {
+        id: "icn_123",
+        status: "active",
+        config: {
+          auth_scheme: "oauth",
+          installation_id: "12345",
+        },
+      },
+      binding: {
+        id: "ibd_123",
+        kind: "git",
+        config: {
+          repositories: ["acme/repo"],
+          includeGhCli: false,
+        },
+      },
+      refs: {
+        egressUrl: {
+          kind: "egress_url",
+          routeId: "route_ibd_123",
+        },
+      },
+      runtimeContext: {
+        sandboxProvider: "docker",
+        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
+      },
+    });
+
+    expect(compiled.egressRoutes[0]?.credentialResolver.secretType).toBe("oauth_access_token");
+  });
+
+  it("fails fast when oauth config omits installation_id", () => {
+    expect(() =>
+      compileGitHubEnterpriseServerBinding({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        targetKey: "github_enterprise_server",
+        target: {
+          familyId: "github",
+          variantId: "github-enterprise-server",
+          enabled: true,
+          config: {
+            apiBaseUrl: "https://ghe.example.com/api/v3",
+            webBaseUrl: "https://ghe.example.com",
+          },
+        },
+        connection: {
+          id: "icn_123",
+          status: "active",
+          config: {
+            auth_scheme: "oauth",
+          },
+        },
+        binding: {
+          id: "ibd_123",
+          kind: "git",
+          config: {
+            repositories: ["acme/repo"],
+            includeGhCli: false,
+          },
+        },
+        refs: {
+          egressUrl: {
+            kind: "egress_url",
+            routeId: "route_ibd_123",
+          },
+        },
+        runtimeContext: {
+          sandboxProvider: "docker",
+          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
+        },
+      }),
+    ).toThrowError();
   });
 });

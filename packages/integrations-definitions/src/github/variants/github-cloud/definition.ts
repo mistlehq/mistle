@@ -22,7 +22,7 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
   variantId: "github-cloud",
   kind: IntegrationKinds.GIT,
   displayName: "GitHub",
-  description: "GitHub Cloud PAT-based integration scaffold for git/runtime routing.",
+  description: "GitHub Cloud integration scaffold for PAT and GitHub App auth modes.",
   logoKey: "github",
   targetConfigSchema: GitHubCloudTargetConfigSchema,
   bindingConfigSchema: GitHubCloudBindingConfigSchema,

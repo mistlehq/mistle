@@ -1,6 +1,6 @@
 import type { CompileBindingInput, CompileBindingResult } from "@mistle/integrations-core";
 
-import { GitHubCredentialSecretTypes } from "./auth.js";
+import { resolveGitHubCredentialSecretType } from "./auth.js";
 import type { GitHubBindingConfig } from "./binding-config-schema.js";
 import { GitHubApiMethods } from "./constants.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
@@ -28,9 +28,10 @@ function createRepositoryPathPrefix(input: { apiPathPrefix: string; repository: 
   return `${input.apiPathPrefix}/repos/${input.repository}`;
 }
 
-export function compileGitHubApiKeyBinding(input: GitHubCompileBindingInput): CompileBindingResult {
+export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileBindingResult {
   const routeHost = new URL(input.target.config.apiBaseUrl).host;
   const apiPathPrefix = resolveApiPathPrefix(input.target.config.apiBaseUrl);
+  const credentialSecretType = resolveGitHubCredentialSecretType(input.connection.config);
   const repositoryPathPrefixes = [...new Set(input.binding.config.repositories)]
     .sort((left, right) => left.localeCompare(right))
     .map((repository) =>
@@ -57,7 +58,7 @@ export function compileGitHubApiKeyBinding(input: GitHubCompileBindingInput): Co
         },
         credentialResolver: {
           connectionId: input.connection.id,
-          secretType: GitHubCredentialSecretTypes.API_KEY,
+          secretType: credentialSecretType,
         },
       },
     ],

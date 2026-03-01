@@ -21,7 +21,9 @@ describe("compileGitHubCloudBinding", () => {
       connection: {
         id: "icn_123",
         status: "active",
-        config: {},
+        config: {
+          auth_scheme: "api-key",
+        },
       },
       binding: {
         id: "ibd_123",
@@ -86,7 +88,9 @@ describe("compileGitHubCloudBinding", () => {
       connection: {
         id: "icn_123",
         status: "active",
-        config: {},
+        config: {
+          auth_scheme: "api-key",
+        },
       },
       binding: {
         id: "ibd_123",
@@ -112,5 +116,94 @@ describe("compileGitHubCloudBinding", () => {
     expect(compiled.egressRoutes[0]?.match.pathPrefixes).toEqual([
       "/github/api/v3/repos/acme/repo",
     ]);
+  });
+
+  it("uses oauth access token secret type for github app-style oauth connections", () => {
+    const compiled = compileGitHubCloudBinding({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "github_cloud",
+      target: {
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          apiBaseUrl: "https://api.github.com",
+          webBaseUrl: "https://github.com",
+        },
+      },
+      connection: {
+        id: "icn_123",
+        status: "active",
+        config: {
+          auth_scheme: "oauth",
+          installation_id: "12345",
+        },
+      },
+      binding: {
+        id: "ibd_123",
+        kind: "git",
+        config: {
+          repositories: ["acme/repo"],
+          includeGhCli: false,
+        },
+      },
+      refs: {
+        egressUrl: {
+          kind: "egress_url",
+          routeId: "route_ibd_123",
+        },
+      },
+      runtimeContext: {
+        sandboxProvider: "docker",
+        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
+      },
+    });
+
+    expect(compiled.egressRoutes[0]?.credentialResolver.secretType).toBe("oauth_access_token");
+  });
+
+  it("fails fast when connection auth_scheme is missing", () => {
+    expect(() =>
+      compileGitHubCloudBinding({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        targetKey: "github_cloud",
+        target: {
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            apiBaseUrl: "https://api.github.com",
+            webBaseUrl: "https://github.com",
+          },
+        },
+        connection: {
+          id: "icn_123",
+          status: "active",
+          config: {},
+        },
+        binding: {
+          id: "ibd_123",
+          kind: "git",
+          config: {
+            repositories: ["acme/repo"],
+            includeGhCli: false,
+          },
+        },
+        refs: {
+          egressUrl: {
+            kind: "egress_url",
+            routeId: "route_ibd_123",
+          },
+        },
+        runtimeContext: {
+          sandboxProvider: "docker",
+          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
+        },
+      }),
+    ).toThrowError();
   });
 });
