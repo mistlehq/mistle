@@ -8,9 +8,9 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/bootstrap"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/config"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/server"
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/tunnel"
 )
 
@@ -32,9 +32,9 @@ func Run(input RunInput) error {
 		return err
 	}
 
-	startupInput, err := bootstrap.ReadStartupInput(bootstrap.ReadStartupInputInput{
+	startupInput, err := startup.ReadStartupInput(startup.ReadStartupInputInput{
 		Reader:   input.Stdin,
-		MaxBytes: bootstrap.DefaultStartupInputMaxBytes,
+		MaxBytes: startup.DefaultStartupInputMaxBytes,
 	})
 	if err != nil {
 		return err
