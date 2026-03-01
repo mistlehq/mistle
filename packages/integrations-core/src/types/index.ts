@@ -137,7 +137,6 @@ export type CompileBindingInput<
   binding: Pick<IntegrationBinding, "id" | "kind"> & { config: TBindingConfig };
   refs: CompileBindingRefs;
   runtimeContext: {
-    sandboxProvider: string;
     sandboxdEgressBaseUrl: string;
   };
 };
@@ -206,7 +205,6 @@ export type RuntimeArtifactRefs = {
     version: number;
     targetKey: string;
     bindingId: string;
-    sandboxProvider: string;
   };
 };
 
@@ -366,7 +364,6 @@ export type CompileRuntimePlanInput = {
   version: number;
   image: ResolvedSandboxImage;
   runtimeContext: {
-    sandboxProvider: string;
     sandboxdEgressBaseUrl: string;
   };
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;

@@ -39,7 +39,6 @@ function createRuntimeArtifactRefs(): RuntimeArtifactRefs {
       version: 1,
       targetKey: "openai_default",
       bindingId: "ibd_123",
-      sandboxProvider: "docker",
     },
   };
 }
@@ -94,7 +93,6 @@ describe("compileOpenAiApiKeyBinding", () => {
         },
       },
       runtimeContext: {
-        sandboxProvider: "docker",
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });
@@ -198,7 +196,6 @@ describe("compileOpenAiApiKeyBinding", () => {
         },
       },
       runtimeContext: {
-        sandboxProvider: "docker",
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress/",
       },
     });

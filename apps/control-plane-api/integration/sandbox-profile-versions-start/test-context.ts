@@ -155,9 +155,9 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
           concurrency: 1,
           workflowInputs: {
             startSandboxInstance: {
-              startSandbox: async (workflowInput) => {
+              startSandbox: async () => {
                 return {
-                  provider: workflowInput.image.provider,
+                  provider: "docker",
                   providerSandboxId: `integration-${randomUUID()}`,
                   bootstrapTokenJti: randomUUID(),
                 };

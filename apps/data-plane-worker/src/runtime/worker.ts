@@ -122,7 +122,10 @@ function createWorkflowInputs(ctx: {
     startSandboxInstance: {
       startSandbox: async (workflowInput) => {
         const startedSandbox = await ctx.resources.sandboxAdapter.start({
-          image: workflowInput.image,
+          image: {
+            ...workflowInput.image,
+            provider: ctx.config.app.sandbox.provider,
+          },
         });
 
         const bootstrapTokenJti = await writeSandboxStartupInput({

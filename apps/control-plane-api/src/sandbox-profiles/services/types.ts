@@ -59,7 +59,6 @@ export type SandboxProfilesService = {
     profileVersion: number;
     image: ResolvedSandboxImage;
     runtimeContext: {
-      sandboxProvider: string;
       sandboxdEgressBaseUrl: string;
     };
   }) => Promise<CompiledRuntimePlan>;

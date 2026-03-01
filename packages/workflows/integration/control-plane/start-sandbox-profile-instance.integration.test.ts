@@ -41,7 +41,6 @@ describe("start sandbox profile instance workflow integration", () => {
         },
         source: "dashboard",
         image: {
-          provider: "modal",
           imageId: "im_control_plane_workflow_001",
           kind: "base",
           createdAt: "2026-02-27T00:00:00.000Z",

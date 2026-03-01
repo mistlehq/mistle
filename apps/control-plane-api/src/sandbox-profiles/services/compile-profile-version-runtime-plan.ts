@@ -22,7 +22,6 @@ type CompileProfileVersionRuntimePlanInput = {
   profileVersion: number;
   image: ResolvedSandboxImage;
   runtimeContext: {
-    sandboxProvider: string;
     sandboxdEgressBaseUrl: string;
   };
 };
