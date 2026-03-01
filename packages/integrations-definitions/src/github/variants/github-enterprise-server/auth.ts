@@ -1,9 +1,5 @@
-import { IntegrationSupportedAuthSchemes } from "@mistle/integrations-core";
+import { GitHubCredentialSecretTypes, GitHubSupportedAuthSchemes } from "../../shared/auth.js";
 
-export const GitHubEnterpriseServerCredentialSecretTypes: {
-  API_KEY: "api_key";
-} = {
-  API_KEY: "api_key",
-};
+export const GitHubEnterpriseServerCredentialSecretTypes = GitHubCredentialSecretTypes;
 
-export const GitHubEnterpriseServerSupportedAuthSchemes = [IntegrationSupportedAuthSchemes.API_KEY];
+export const GitHubEnterpriseServerSupportedAuthSchemes = GitHubSupportedAuthSchemes;
