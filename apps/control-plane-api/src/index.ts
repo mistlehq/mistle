@@ -7,14 +7,9 @@ async function startControlPlaneApi(): Promise<void> {
   const loadedConfig = loadConfig({
     app: AppIds.CONTROL_PLANE_API,
     env: process.env,
+    includeGlobal: false,
   });
-  if (loadedConfig.global === undefined) {
-    throw new Error("Expected global sandbox config to be loaded for control-plane-api.");
-  }
-  const appConfig = {
-    ...loadedConfig.app,
-    sandboxProvider: loadedConfig.global.sandbox.provider,
-  };
+  const appConfig = loadedConfig.app;
   const runtime = await createControlPlaneApiRuntime(appConfig);
 
   await runtime.start();

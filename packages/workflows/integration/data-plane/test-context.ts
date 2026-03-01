@@ -121,7 +121,10 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
             startSandboxInstance: {
               startSandbox: async (workflowInput) => {
                 const startedSandbox = await dockerSandboxAdapter.start({
-                  image: workflowInput.image,
+                  image: {
+                    ...workflowInput.image,
+                    provider: SandboxProvider.DOCKER,
+                  },
                 });
                 const bootstrapTokenJti = randomUUID();
 

@@ -79,7 +79,6 @@ function createRuntimeArtifactRefs(input: {
   version: number;
   targetKey: string;
   bindingId: string;
-  sandboxProvider: string;
 }): RuntimeArtifactRefs {
   const exec = (execInput: {
     args: ReadonlyArray<string>;
@@ -124,7 +123,6 @@ function createRuntimeArtifactRefs(input: {
       version: input.version,
       targetKey: input.targetKey,
       bindingId: input.bindingId,
-      sandboxProvider: input.sandboxProvider,
     },
   };
 }
@@ -165,7 +163,6 @@ function resolveRuntimeArtifacts(input: {
   version: number;
   targetKey: string;
   bindingId: string;
-  sandboxProvider: string;
 }): ReadonlyArray<CompiledRuntimeArtifactSpec> {
   const refs = createRuntimeArtifactRefs({
     organizationId: input.organizationId,
@@ -173,7 +170,6 @@ function resolveRuntimeArtifacts(input: {
     version: input.version,
     targetKey: input.targetKey,
     bindingId: input.bindingId,
-    sandboxProvider: input.sandboxProvider,
   });
 
   return input.artifacts.map((artifact) => {
@@ -313,7 +309,6 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
         version: input.version,
         targetKey: bindingInput.targetKey,
         bindingId: bindingInput.binding.id,
-        sandboxProvider: input.runtimeContext.sandboxProvider,
       }),
       runtimeClientSetups: compileBindingResult.runtimeClientSetups,
     };

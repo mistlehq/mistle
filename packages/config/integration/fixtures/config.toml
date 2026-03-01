@@ -9,9 +9,6 @@ bootstrap_token_secret = "fixture-bootstrap-token-secret"
 token_issuer = "data-plane-worker"
 token_audience = "data-plane-gateway"
 
-[global.sandbox]
-provider = "modal"
-
 [apps.control_plane_api.server]
 host = "0.0.0.0"
 port = 5100
@@ -97,6 +94,9 @@ concurrency = 2
 [apps.data_plane_worker.tunnel]
 gateway_ws_url = "ws://127.0.0.1:5302/tunnel/sandbox"
 bootstrap_token_ttl_seconds = 120
+
+[apps.data_plane_worker.sandbox]
+provider = "modal"
 
 [apps.data_plane_worker.sandbox.modal]
 token_id = "fixture-modal-token-id"

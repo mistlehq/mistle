@@ -89,9 +89,9 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
           concurrency: 1,
           workflowInputs: {
             startSandboxInstance: {
-              startSandbox: async (workflowInput) => {
+              startSandbox: async () => {
                 return {
-                  provider: workflowInput.image.provider,
+                  provider: "docker",
                   providerSandboxId: `integration-${randomUUID()}`,
                   bootstrapTokenJti: randomUUID(),
                 };

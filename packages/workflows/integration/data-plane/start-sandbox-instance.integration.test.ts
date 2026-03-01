@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { SandboxImageKind, SandboxProvider } from "@mistle/sandbox";
+import { SandboxImageKind } from "@mistle/sandbox";
 import { describe, expect } from "vitest";
 
 import {
@@ -20,7 +20,6 @@ const StartedBootstrapTokenJtiPollIntervalMs = 100;
 
 function createDockerBaseImageHandle(imageId: string): StartSandboxInstanceWorkflowInput["image"] {
   return {
-    provider: SandboxProvider.DOCKER,
     imageId,
     kind: SandboxImageKind.BASE,
     createdAt: new Date().toISOString(),

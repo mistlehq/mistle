@@ -38,7 +38,6 @@ describe("compileGitHubCloudBinding", () => {
         },
       },
       runtimeContext: {
-        sandboxProvider: "docker",
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });
@@ -103,7 +102,6 @@ describe("compileGitHubCloudBinding", () => {
         },
       },
       runtimeContext: {
-        sandboxProvider: "docker",
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });

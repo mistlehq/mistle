@@ -50,7 +50,6 @@ describe("sandboxInstances.start integration", () => {
       },
       source: "dashboard",
       image: {
-        provider: "modal",
         imageId: "im_dp_api_integration_001",
         kind: "base",
         createdAt: "2026-02-27T00:00:00.000Z",
@@ -115,7 +114,6 @@ describe("sandboxInstances.start integration", () => {
       },
       source: "dashboard",
       image: {
-        provider: "modal",
         imageId: "im_dp_api_integration_idempotent",
         kind: "base",
         createdAt: "2026-02-27T00:00:00.000Z",
@@ -166,7 +164,6 @@ describe("sandboxInstances.start integration", () => {
         },
         source: "dashboard",
         image: {
-          provider: "modal",
           imageId: "im_dp_api_integration_unauth_missing",
           kind: "base",
           createdAt: "2026-02-27T00:00:00.000Z",
@@ -189,7 +186,6 @@ describe("sandboxInstances.start integration", () => {
         },
         source: "dashboard",
         image: {
-          provider: "modal",
           imageId: "im_dp_api_integration_unauth_invalid",
           kind: "base",
           createdAt: "2026-02-27T00:00:00.000Z",

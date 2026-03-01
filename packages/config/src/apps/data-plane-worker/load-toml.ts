@@ -1,6 +1,7 @@
 import { hasEntries } from "../../core/load-env.js";
 import { asObjectRecord } from "../../core/record.js";
 import {
+  DataPlaneWorkerSandboxProviders,
   type PartialDataPlaneWorkerConfigInput,
   PartialDataPlaneWorkerConfigSchema,
 } from "./schema.js";
@@ -18,24 +19,43 @@ export function loadDataPlaneWorkerFromToml(
   const sandboxModal = asObjectRecord(sandbox.modal);
   const sandboxDocker = asObjectRecord(sandbox.docker);
 
-  const sandboxConfig: Record<string, unknown> = {};
+  const sandboxConfig: Record<string, unknown> = {
+    provider: sandbox.provider,
+  };
 
-  if (hasEntries(sandboxModal)) {
+  if (sandbox.provider === DataPlaneWorkerSandboxProviders.MODAL && hasEntries(sandboxModal)) {
     sandboxConfig.modal = {
       tokenId: sandboxModal.token_id,
       tokenSecret: sandboxModal.token_secret,
       appName: sandboxModal.app_name,
       environmentName: sandboxModal.environment_name,
     };
-  }
-  if (hasEntries(sandboxDocker)) {
+  } else if (
+    sandbox.provider === DataPlaneWorkerSandboxProviders.DOCKER &&
+    hasEntries(sandboxDocker)
+  ) {
     sandboxConfig.docker = {
       socketPath: sandboxDocker.socket_path,
       snapshotRepository: sandboxDocker.snapshot_repository,
     };
+  } else if (sandbox.provider === undefined) {
+    if (hasEntries(sandboxModal)) {
+      sandboxConfig.modal = {
+        tokenId: sandboxModal.token_id,
+        tokenSecret: sandboxModal.token_secret,
+        appName: sandboxModal.app_name,
+        environmentName: sandboxModal.environment_name,
+      };
+    }
+    if (hasEntries(sandboxDocker)) {
+      sandboxConfig.docker = {
+        socketPath: sandboxDocker.socket_path,
+        snapshotRepository: sandboxDocker.snapshot_repository,
+      };
+    }
   }
 
-  const partialConfig: Record<string, unknown> = {
+  return PartialDataPlaneWorkerConfigSchema.parse({
     server: {
       host: server.host,
       port: server.port,
@@ -53,11 +73,6 @@ export function loadDataPlaneWorkerFromToml(
       gatewayWsUrl: tunnel.gateway_ws_url,
       bootstrapTokenTtlSeconds: tunnel.bootstrap_token_ttl_seconds,
     },
-  };
-
-  if (hasEntries(sandboxConfig)) {
-    partialConfig.sandbox = sandboxConfig;
-  }
-
-  return PartialDataPlaneWorkerConfigSchema.parse(partialConfig);
+    sandbox: sandboxConfig,
+  });
 }

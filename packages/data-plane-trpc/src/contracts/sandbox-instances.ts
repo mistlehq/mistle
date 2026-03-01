@@ -1,16 +1,14 @@
 import { SandboxInstanceSources, SandboxInstanceStarterKinds } from "@mistle/db/data-plane";
-import { SandboxImageKind, SandboxProvider } from "@mistle/sandbox";
+import { SandboxImageKind } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflows/data-plane";
 import { z } from "zod";
 
-export const DataPlaneSandboxProviders = SandboxProvider;
 export const DataPlaneSandboxImageKinds = SandboxImageKind;
 export const DataPlaneSandboxInstanceStarterKinds = SandboxInstanceStarterKinds;
 export const DataPlaneSandboxInstanceSources = SandboxInstanceSources;
 
 export const StartSandboxInstanceImageSchema = z
   .object({
-    provider: z.enum(DataPlaneSandboxProviders),
     imageId: z.string().min(1),
     kind: z.enum(DataPlaneSandboxImageKinds),
     createdAt: z.string().min(1),

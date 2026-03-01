@@ -3,7 +3,7 @@ import { createSandboxAdapter, SandboxProvider, type SandboxAdapter } from "@mis
 import { createDataPlaneBackend, createDataPlaneOpenWorkflow } from "@mistle/workflows/data-plane";
 import { Pool } from "pg";
 
-import type { DataPlaneWorkerRuntimeConfig } from "../types.js";
+import type { DataPlaneWorkerConfig } from "../types.js";
 
 export type WorkerRuntimeResources = {
   db: DataPlaneDatabase;
@@ -17,51 +17,37 @@ function assertUnreachable(_value: never): never {
   throw new Error("Unsupported sandbox provider.");
 }
 
-function createSandboxRuntimeAdapter(
-  config: Pick<DataPlaneWorkerRuntimeConfig, "app" | "sandboxProvider">,
-): SandboxAdapter {
-  if (config.sandboxProvider === SandboxProvider.MODAL) {
-    if (config.app.sandbox.modal === undefined) {
-      throw new Error(
-        "Missing apps.data_plane_worker.sandbox.modal config for global sandbox provider modal.",
-      );
-    }
-
+function createSandboxRuntimeAdapter(config: DataPlaneWorkerConfig): SandboxAdapter {
+  if (config.sandbox.provider === SandboxProvider.MODAL) {
     return createSandboxAdapter({
-      provider: config.sandboxProvider,
+      provider: config.sandbox.provider,
       modal: {
-        tokenId: config.app.sandbox.modal.tokenId,
-        tokenSecret: config.app.sandbox.modal.tokenSecret,
-        appName: config.app.sandbox.modal.appName,
-        environmentName: config.app.sandbox.modal.environmentName,
+        tokenId: config.sandbox.modal.tokenId,
+        tokenSecret: config.sandbox.modal.tokenSecret,
+        appName: config.sandbox.modal.appName,
+        environmentName: config.sandbox.modal.environmentName,
       },
     });
   }
 
-  if (config.sandboxProvider === SandboxProvider.DOCKER) {
-    if (config.app.sandbox.docker === undefined) {
-      throw new Error(
-        "Missing apps.data_plane_worker.sandbox.docker config for global sandbox provider docker.",
-      );
-    }
-
+  if (config.sandbox.provider === "docker") {
     return createSandboxAdapter({
-      provider: config.sandboxProvider,
+      provider: config.sandbox.provider,
       docker: {
-        socketPath: config.app.sandbox.docker.socketPath,
-        snapshotRepository: config.app.sandbox.docker.snapshotRepository,
+        socketPath: config.sandbox.docker.socketPath,
+        snapshotRepository: config.sandbox.docker.snapshotRepository,
       },
     });
   }
 
-  return assertUnreachable(config.sandboxProvider);
+  return assertUnreachable(config.sandbox);
 }
 
 export async function createWorkerRuntimeResources(
-  config: DataPlaneWorkerRuntimeConfig,
+  config: DataPlaneWorkerConfig,
 ): Promise<WorkerRuntimeResources> {
   const dbPool = new Pool({
-    connectionString: config.app.database.url,
+    connectionString: config.database.url,
   });
   const db = createDataPlaneDatabase(dbPool);
 
@@ -69,9 +55,9 @@ export async function createWorkerRuntimeResources(
 
   try {
     workflowBackend = await createDataPlaneBackend({
-      url: config.app.workflow.databaseUrl,
-      namespaceId: config.app.workflow.namespaceId,
-      runMigrations: config.app.workflow.runMigrations,
+      url: config.workflow.databaseUrl,
+      namespaceId: config.workflow.namespaceId,
+      runMigrations: config.workflow.runMigrations,
     });
   } catch (error) {
     await dbPool.end();

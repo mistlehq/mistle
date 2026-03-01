@@ -2,8 +2,10 @@ import { createEnvLoader, hasEntries, parseBooleanEnv } from "../../core/load-en
 import {
   type PartialDataPlaneWorkerConfigInput,
   DataPlaneWorkerDatabaseConfigSchema,
+  DataPlaneWorkerSandboxConfigSchema,
   DataPlaneWorkerSandboxDockerConfigSchema,
   DataPlaneWorkerSandboxModalConfigSchema,
+  DataPlaneWorkerSandboxProviders,
   DataPlaneWorkerServerConfigSchema,
   DataPlaneWorkerTunnelConfigSchema,
   DataPlaneWorkerWorkflowConfigSchema,
@@ -93,6 +95,13 @@ const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneWorkerSandboxDocker
   },
 ]);
 
+const loadSandboxEnv = createEnvLoader<typeof DataPlaneWorkerSandboxConfigSchema>([
+  {
+    key: "provider",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_PROVIDER",
+  },
+]);
+
 export function loadDataPlaneWorkerFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialDataPlaneWorkerConfigInput {
@@ -118,17 +127,29 @@ export function loadDataPlaneWorkerFromEnv(
     partialConfig.tunnel = tunnel;
   }
 
+  const sandbox = loadSandboxEnv(env);
   const sandboxModal = loadSandboxModalEnv(env);
   const sandboxDocker = loadSandboxDockerEnv(env);
 
-  if (hasEntries(sandboxModal) || hasEntries(sandboxDocker)) {
-    const sandboxConfig: Record<string, unknown> = {};
+  if (hasEntries(sandbox) || hasEntries(sandboxModal) || hasEntries(sandboxDocker)) {
+    const sandboxConfig: PartialDataPlaneWorkerConfigInput["sandbox"] = {
+      ...sandbox,
+    };
 
-    if (hasEntries(sandboxModal)) {
+    if (sandbox.provider === DataPlaneWorkerSandboxProviders.MODAL && hasEntries(sandboxModal)) {
       sandboxConfig.modal = sandboxModal;
-    }
-    if (hasEntries(sandboxDocker)) {
+    } else if (
+      sandbox.provider === DataPlaneWorkerSandboxProviders.DOCKER &&
+      hasEntries(sandboxDocker)
+    ) {
       sandboxConfig.docker = sandboxDocker;
+    } else if (sandbox.provider === undefined) {
+      if (hasEntries(sandboxModal)) {
+        sandboxConfig.modal = sandboxModal;
+      }
+      if (hasEntries(sandboxDocker)) {
+        sandboxConfig.docker = sandboxDocker;
+      }
     }
 
     partialConfig.sandbox = sandboxConfig;

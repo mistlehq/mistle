@@ -5,7 +5,6 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
   const global = asObjectRecord(tomlRoot.global);
   const internalAuth = asObjectRecord(global.internal_auth);
   const tunnel = asObjectRecord(global.tunnel);
-  const sandbox = asObjectRecord(global.sandbox);
 
   return GlobalConfigSchema.partial().parse({
     env: global.env,
@@ -22,13 +21,6 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
             bootstrapTokenSecret: tunnel.bootstrap_token_secret,
             tokenIssuer: tunnel.token_issuer,
             tokenAudience: tunnel.token_audience,
-          },
-        }
-      : {}),
-    ...(typeof sandbox.provider === "string"
-      ? {
-          sandbox: {
-            provider: sandbox.provider,
           },
         }
       : {}),

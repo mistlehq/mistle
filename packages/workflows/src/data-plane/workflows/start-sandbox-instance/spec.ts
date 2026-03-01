@@ -4,7 +4,7 @@ import { defineWorkflowSpec } from "openworkflow";
 
 export type StartSandboxInstanceWorkflowImageInput = Pick<
   SandboxImageHandle,
-  "provider" | "imageId" | "kind" | "createdAt"
+  "imageId" | "kind" | "createdAt"
 >;
 
 export type StartSandboxInstanceWorkflowInput = {

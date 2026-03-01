@@ -77,7 +77,6 @@ describe("sandbox profile compile runtime plan integration", () => {
           imageRef: "mistle/sandbox-base:dev",
         },
         runtimeContext: {
-          sandboxProvider: "docker",
           sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
         },
       },
@@ -144,7 +143,6 @@ model_reasoning_effort = "medium"
             imageRef: "mistle/sandbox-base:dev",
           },
           runtimeContext: {
-            sandboxProvider: "docker",
             sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
         },
@@ -185,7 +183,6 @@ model_reasoning_effort = "medium"
             imageRef: "mistle/sandbox-base:dev",
           },
           runtimeContext: {
-            sandboxProvider: "docker",
             sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
         },
@@ -242,7 +239,6 @@ model_reasoning_effort = "medium"
             imageRef: "mistle/sandbox-base:dev",
           },
           runtimeContext: {
-            sandboxProvider: "docker",
             sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
         },
@@ -307,7 +303,6 @@ model_reasoning_effort = "medium"
             imageRef: "mistle/sandbox-base:dev",
           },
           runtimeContext: {
-            sandboxProvider: "docker",
             sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
         },

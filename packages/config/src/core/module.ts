@@ -1,15 +1,13 @@
 import type { z } from "zod";
 
-type DeepOptionalValue<TValue> = TValue extends readonly (infer Item)[]
-  ? Item[] | undefined
-  : TValue extends (infer Item)[]
-    ? Item[] | undefined
-    : TValue extends object
-      ? DeepOptional<TValue> | undefined
-      : TValue | undefined;
-
 type DeepOptional<TValue> = {
-  [Key in keyof TValue]?: DeepOptionalValue<TValue[Key]>;
+  [Key in keyof TValue]?: TValue[Key] extends readonly (infer Item)[]
+    ? Item[] | undefined
+    : TValue[Key] extends (infer Item)[]
+      ? Item[] | undefined
+      : TValue[Key] extends object
+        ? DeepOptional<TValue[Key]> | undefined
+        : TValue[Key] | undefined;
 };
 
 export type OptionalInput<TSchema extends z.ZodType> = DeepOptional<z.input<TSchema>>;

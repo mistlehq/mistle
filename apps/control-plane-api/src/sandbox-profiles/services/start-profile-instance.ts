@@ -57,7 +57,6 @@ export async function startProfileInstance(
         imageRef: serviceInput.image.imageId,
       },
       runtimeContext: {
-        sandboxProvider: serviceInput.image.provider,
         sandboxdEgressBaseUrl: SandboxdEgressBaseUrl,
       },
     },

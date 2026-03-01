@@ -1,8 +1,8 @@
+import type { SandboxProvider } from "@mistle/sandbox";
 import { defineWorkflow, type Workflow } from "openworkflow";
 
 import {
   StartSandboxInstanceWorkflowSpec,
-  type StartSandboxInstanceWorkflowImageInput,
   type StartSandboxInstanceWorkflowInput,
   type StartSandboxInstanceWorkflowOutput,
 } from "./spec.js";
@@ -27,19 +27,16 @@ type UpdateSandboxInstanceStatusInput =
 
 export type CreateStartSandboxInstanceWorkflowInput = {
   startSandbox: (input: { image: StartSandboxInstanceWorkflowInput["image"] }) => Promise<{
-    provider: StartSandboxInstanceWorkflowImageInput["provider"];
+    provider: SandboxProvider;
     providerSandboxId: string;
     bootstrapTokenJti: string;
   }>;
-  stopSandbox: (input: {
-    provider: StartSandboxInstanceWorkflowImageInput["provider"];
-    providerSandboxId: string;
-  }) => Promise<void>;
+  stopSandbox: (input: { provider: SandboxProvider; providerSandboxId: string }) => Promise<void>;
   insertSandboxInstance: (input: {
     organizationId: string;
     sandboxProfileId: string;
     sandboxProfileVersion: number;
-    provider: StartSandboxInstanceWorkflowImageInput["provider"];
+    provider: SandboxProvider;
     providerSandboxId: string;
     startedBy: StartSandboxInstanceWorkflowInput["startedBy"];
     source: StartSandboxInstanceWorkflowInput["source"];
@@ -62,7 +59,7 @@ export function createStartSandboxInstanceWorkflow(
     async ({ input: workflowInput, step }) => {
       async function handleFailedStartup(input: {
         sandboxInstanceId: string;
-        provider: StartSandboxInstanceWorkflowImageInput["provider"];
+        provider: SandboxProvider;
         providerSandboxId: string;
         failureCode: string;
         failureMessage: string;
