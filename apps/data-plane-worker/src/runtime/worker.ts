@@ -1,6 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
+import {
+  SandboxInstanceStatuses,
+  sandboxInstanceRuntimePlans,
+  sandboxInstances,
+} from "@mistle/db/data-plane";
 import { systemSleeper } from "@mistle/time";
 import { mintBootstrapToken } from "@mistle/tunnel-auth";
 import {
@@ -146,31 +150,41 @@ function createWorkflowInputs(ctx: {
         });
       },
       insertSandboxInstance: async (workflowInput) => {
-        const insertedRows = await ctx.resources.db
-          .insert(sandboxInstances)
-          .values({
-            organizationId: workflowInput.organizationId,
-            sandboxProfileId: workflowInput.sandboxProfileId,
-            sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-            provider: workflowInput.provider,
-            providerSandboxId: workflowInput.providerSandboxId,
-            status: SandboxInstanceStatuses.STARTING,
-            startedByKind: workflowInput.startedBy.kind,
-            startedById: workflowInput.startedBy.id,
-            source: workflowInput.source,
-          })
-          .returning({
-            id: sandboxInstances.id,
+        return ctx.resources.db.transaction(async (tx) => {
+          const insertedRows = await tx
+            .insert(sandboxInstances)
+            .values({
+              organizationId: workflowInput.organizationId,
+              sandboxProfileId: workflowInput.sandboxProfileId,
+              sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+              provider: workflowInput.provider,
+              providerSandboxId: workflowInput.providerSandboxId,
+              status: SandboxInstanceStatuses.STARTING,
+              startedByKind: workflowInput.startedBy.kind,
+              startedById: workflowInput.startedBy.id,
+              source: workflowInput.source,
+            })
+            .returning({
+              id: sandboxInstances.id,
+            });
+
+          const sandboxInstance = insertedRows[0];
+          if (sandboxInstance === undefined) {
+            throw new Error("Failed to insert sandbox instance row.");
+          }
+
+          await tx.insert(sandboxInstanceRuntimePlans).values({
+            sandboxInstanceId: sandboxInstance.id,
+            revision: 1,
+            compiledRuntimePlan: workflowInput.runtimePlan,
+            compiledFromProfileId: workflowInput.sandboxProfileId,
+            compiledFromProfileVersion: workflowInput.sandboxProfileVersion,
           });
 
-        const sandboxInstance = insertedRows[0];
-        if (sandboxInstance === undefined) {
-          throw new Error("Failed to insert sandbox instance row.");
-        }
-
-        return {
-          sandboxInstanceId: sandboxInstance.id,
-        };
+          return {
+            sandboxInstanceId: sandboxInstance.id,
+          };
+        });
       },
       waitForSandboxTunnelConnectAck: async (workflowInput) => {
         return waitForSandboxTunnelConnectAck({

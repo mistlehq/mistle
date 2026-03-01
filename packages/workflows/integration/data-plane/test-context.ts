@@ -173,6 +173,25 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                     )
                     returning id
                   `;
+
+                  await sql`
+                    insert into data_plane.sandbox_instance_runtime_plans (
+                      id,
+                      sandbox_instance_id,
+                      revision,
+                      compiled_runtime_plan,
+                      compiled_from_profile_id,
+                      compiled_from_profile_version
+                    )
+                    values (
+                      ${`srp_${randomUUID().replaceAll("-", "")}`},
+                      ${sandboxInstanceId},
+                      ${1},
+                      ${sql.json(workflowInput.runtimePlan)},
+                      ${workflowInput.sandboxProfileId},
+                      ${workflowInput.sandboxProfileVersion}
+                    )
+                  `;
                 } catch (error) {
                   const rawErrorMessage =
                     error instanceof Error

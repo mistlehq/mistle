@@ -1,4 +1,5 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
+import type { CompiledRuntimePlan } from "@mistle/integrations-core";
 import { defineWorkflowSpec } from "openworkflow";
 
 import type { StartSandboxInstanceWorkflowImageInput } from "../../../data-plane/workflows/start-sandbox-instance/spec.js";
@@ -7,6 +8,7 @@ export type StartSandboxProfileInstanceWorkflowInput = {
   organizationId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
+  runtimePlan: CompiledRuntimePlan;
   startedBy: {
     kind: SandboxInstanceStarterKind;
     id: string;

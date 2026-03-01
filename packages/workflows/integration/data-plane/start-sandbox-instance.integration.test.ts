@@ -26,14 +26,36 @@ function createDockerBaseImageHandle(imageId: string): StartSandboxInstanceWorkf
   };
 }
 
+function createRuntimePlan(input: {
+  sandboxProfileId: string;
+  version: number;
+}): StartSandboxInstanceWorkflowInput["runtimePlan"] {
+  return {
+    sandboxProfileId: input.sandboxProfileId,
+    version: input.version,
+    image: {
+      source: "default-base",
+      imageRef: "registry:3",
+    },
+    egressRoutes: [],
+    artifacts: [],
+    runtimeClientSetups: [],
+  };
+}
+
 describeDockerWorkflowIntegration("start sandbox instance workflow integration", () => {
   it("starts a docker sandbox and persists sandbox instance state", async ({ fixture }) => {
     const startedBootstrapTokenJtiCountBefore = fixture.startedBootstrapTokenJtis.length;
+    const sandboxProfileId = `sbp-${randomUUID()}`;
 
     const handle = await fixture.openWorkflow.runWorkflow(StartSandboxInstanceWorkflowSpec, {
       organizationId: `org-${randomUUID()}`,
-      sandboxProfileId: `sbp-${randomUUID()}`,
+      sandboxProfileId,
       sandboxProfileVersion: 1,
+      runtimePlan: createRuntimePlan({
+        sandboxProfileId,
+        version: 1,
+      }),
       startedBy: {
         kind: "user",
         id: `usr-${randomUUID()}`,
@@ -110,6 +132,31 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
     expect(persistedRow.source).toBe("dashboard");
     expect(persistedRow.started_at).not.toBeNull();
 
+    const runtimePlanRows = await fixture.sql<
+      {
+        sandbox_instance_id: string;
+        revision: number;
+        compiled_from_profile_id: string;
+        compiled_from_profile_version: number;
+      }[]
+    >`
+      select
+        sandbox_instance_id,
+        revision,
+        compiled_from_profile_id,
+        compiled_from_profile_version
+      from data_plane.sandbox_instance_runtime_plans
+      where sandbox_instance_id = ${result.sandboxInstanceId}
+    `;
+    expect(runtimePlanRows).toHaveLength(1);
+    const runtimePlanRow = runtimePlanRows[0];
+    if (runtimePlanRow === undefined) {
+      throw new Error("Expected one persisted runtime plan row.");
+    }
+    expect(runtimePlanRow.revision).toBe(1);
+    expect(runtimePlanRow.compiled_from_profile_id).toBe(sandboxProfileId);
+    expect(runtimePlanRow.compiled_from_profile_version).toBe(1);
+
     await fixture.sandboxAdapter.stop({ sandboxId: result.providerSandboxId });
   }, 120_000);
 
@@ -124,6 +171,10 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
       organizationId,
       sandboxProfileId,
       sandboxProfileVersion: 1,
+      runtimePlan: createRuntimePlan({
+        sandboxProfileId,
+        version: 1,
+      }),
       startedBy: {
         kind: "user",
         id: `usr-${randomUUID()}`,
@@ -191,10 +242,15 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
     const startedSandboxCountBefore = fixture.startedSandboxIds.length;
 
     try {
+      const sandboxProfileId = `sbp-${randomUUID()}`;
       const handle = await fixture.openWorkflow.runWorkflow(StartSandboxInstanceWorkflowSpec, {
         organizationId: FORBIDDEN_ORGANIZATION_ID,
-        sandboxProfileId: `sbp-${randomUUID()}`,
+        sandboxProfileId,
         sandboxProfileVersion: 1,
+        runtimePlan: createRuntimePlan({
+          sandboxProfileId,
+          version: 1,
+        }),
         startedBy: {
           kind: "user",
           id: `usr-${randomUUID()}`,

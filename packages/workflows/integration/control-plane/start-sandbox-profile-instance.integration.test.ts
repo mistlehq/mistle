@@ -9,6 +9,23 @@ import {
   type StartSandboxProfileInstanceWorkflowInput,
 } from "../../src/control-plane/index.js";
 
+function createRuntimePlan(input: {
+  sandboxProfileId: string;
+  version: number;
+}): StartSandboxProfileInstanceWorkflowInput["runtimePlan"] {
+  return {
+    sandboxProfileId: input.sandboxProfileId,
+    version: input.version,
+    image: {
+      source: "default-base",
+      imageRef: "registry:3",
+    },
+    egressRoutes: [],
+    artifacts: [],
+    runtimeClientSetups: [],
+  };
+}
+
 describe("start sandbox profile instance workflow integration", () => {
   it("resolves profile-version data and starts sandbox through data-plane step", async () => {
     const cleanupTasks: Array<() => Promise<void>> = [];
@@ -35,6 +52,10 @@ describe("start sandbox profile instance workflow integration", () => {
         organizationId: "org_control_plane_start_001",
         sandboxProfileId: "sbp_control_plane_start_001",
         sandboxProfileVersion: 3,
+        runtimePlan: createRuntimePlan({
+          sandboxProfileId: "sbp_control_plane_start_001",
+          version: 3,
+        }),
         startedBy: {
           kind: "user",
           id: "usr_control_plane_start_001",
@@ -50,6 +71,7 @@ describe("start sandbox profile instance workflow integration", () => {
       const workflow = createStartSandboxProfileInstanceWorkflow({
         startSandboxInstance: async (input) => {
           expect(input.image).toEqual(workflowInput.image);
+          expect(input.runtimePlan).toEqual(workflowInput.runtimePlan);
 
           return {
             workflowRunId: `wf-${input.organizationId}`,

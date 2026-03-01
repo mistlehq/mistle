@@ -22,6 +22,8 @@ function createStartSandboxIdempotencyKey(input: StartSandboxInstanceInput): str
       id: input.startedBy.id,
     },
     source: input.source,
+    image: input.image,
+    runtimePlan: input.runtimePlan,
   });
 }
 
