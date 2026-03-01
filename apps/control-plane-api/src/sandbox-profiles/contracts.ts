@@ -15,6 +15,7 @@ import {
   SandboxProfilesAuthErrorCodes,
   SandboxProfilesBadRequestCodes,
   SandboxProfilesCompileErrorCodes,
+  SandboxProfilesIntegrationBindingsBadRequestCodes,
   SandboxProfilesNotFoundCodes,
 } from "./services/errors.js";
 
@@ -127,6 +128,10 @@ const StartSandboxProfileInstanceBadRequestCodeSchema = z.enum([
   SandboxProfilesCompileErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
   SandboxProfilesCompileErrorCodes.RUNTIME_CLIENT_SETUP_INVALID_REF,
 ]);
+const PutSandboxProfileVersionIntegrationBindingsBadRequestCodeSchema = z.enum([
+  SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_REFERENCE,
+  SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONNECTION_REFERENCE,
+]);
 
 export const BadRequestResponseSchema = z
   .object({
@@ -167,6 +172,15 @@ export const StartSandboxProfileInstanceBadRequestResponseSchema = z.union([
   z
     .object({
       code: StartSandboxProfileInstanceBadRequestCodeSchema,
+      message: z.string().min(1),
+    })
+    .strict(),
+  ValidationErrorResponseSchema,
+]);
+export const PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema = z.union([
+  z
+    .object({
+      code: PutSandboxProfileVersionIntegrationBindingsBadRequestCodeSchema,
       message: z.string().min(1),
     })
     .strict(),
@@ -537,7 +551,7 @@ export const putSandboxProfileVersionIntegrationBindingsRoute = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: ValidationErrorResponseSchema,
+          schema: PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema,
         },
       },
     },
