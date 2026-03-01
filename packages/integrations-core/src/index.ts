@@ -1,7 +1,6 @@
 export * from "./types/index.js";
 export * from "./errors/index.js";
 export * from "./registry/index.js";
-export * from "./manifest/index.js";
 export * from "./triggers/index.js";
 export * from "./egress/index.js";
 export * from "./validation/index.js";

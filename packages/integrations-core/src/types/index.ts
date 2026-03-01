@@ -288,16 +288,6 @@ export type IntegrationDefinition<
   ): CompileBindingResult;
 };
 
-export type IntegrationManifest = {
-  schemaVersion: 1;
-  integrations: ReadonlyArray<{
-    bindingId: string;
-    kind: IntegrationKind;
-    connectionId: string;
-    config: Record<string, unknown>;
-  }>;
-};
-
 export type TriggerFilter =
   | { op: "all"; filters: ReadonlyArray<TriggerFilter> }
   | { op: "any"; filters: ReadonlyArray<TriggerFilter> }
