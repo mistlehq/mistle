@@ -1,14 +1,8 @@
-import { z } from "zod";
+import {
+  GitHubBindingConfigSchema,
+  type GitHubBindingConfig,
+} from "../../shared/binding-config-schema.js";
 
-const GitHubRepositorySchema = z
-  .string()
-  .regex(/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, "Repository must be in <owner>/<repo> format.");
+export const GitHubCloudBindingConfigSchema = GitHubBindingConfigSchema;
 
-export const GitHubCloudBindingConfigSchema = z
-  .object({
-    repositories: z.array(GitHubRepositorySchema).min(1),
-    includeGhCli: z.boolean(),
-  })
-  .strict();
-
-export type GitHubCloudBindingConfig = z.output<typeof GitHubCloudBindingConfigSchema>;
+export type GitHubCloudBindingConfig = GitHubBindingConfig;
