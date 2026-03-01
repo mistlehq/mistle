@@ -13,6 +13,7 @@ Namespace in final config:
 | `tunnel.bootstrapTokenSecret` | `string`                        | Shared signing secret for sandbox bootstrap JWT.          | None    | `[global.tunnel].bootstrap_token_secret` | `MISTLE_GLOBAL_TUNNEL_BOOTSTRAP_TOKEN_SECRET` |
 | `tunnel.tokenIssuer`          | `string`                        | Shared JWT issuer used by worker mint + gateway verify.   | None    | `[global.tunnel].token_issuer`           | `MISTLE_GLOBAL_TUNNEL_TOKEN_ISSUER`           |
 | `tunnel.tokenAudience`        | `string`                        | Shared JWT audience used by worker mint + gateway verify. | None    | `[global.tunnel].token_audience`         | `MISTLE_GLOBAL_TUNNEL_TOKEN_AUDIENCE`         |
+| `sandbox.provider`            | `"modal" \| "docker"`           | Shared sandbox provider used across control/data planes.  | None    | `[global.sandbox].provider`              | `MISTLE_GLOBAL_SANDBOX_PROVIDER`              |
 
 Env behavior:
 

@@ -57,6 +57,7 @@ function createTestingConfig(
     sandbox: {
       defaultBaseImage: input.sandbox?.defaultBaseImage ?? "127.0.0.1:5001/mistle/sandbox-base:dev",
     },
+    sandboxProvider: "docker",
     integrations: {
       activeMasterEncryptionKeyVersion: input.integrations?.activeMasterEncryptionKeyVersion ?? 1,
       masterEncryptionKeys: input.integrations?.masterEncryptionKeys ?? {

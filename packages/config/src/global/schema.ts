@@ -8,6 +8,17 @@ export const GlobalTunnelConfigSchema = z
   })
   .strict();
 
+export const GlobalSandboxProviders = {
+  MODAL: "modal",
+  DOCKER: "docker",
+} as const;
+
+export const GlobalSandboxConfigSchema = z
+  .object({
+    provider: z.enum([GlobalSandboxProviders.MODAL, GlobalSandboxProviders.DOCKER]),
+  })
+  .strict();
+
 export const GlobalConfigSchema = z
   .object({
     env: z.enum(["development", "production"]),
@@ -17,6 +28,7 @@ export const GlobalConfigSchema = z
       })
       .strict(),
     tunnel: GlobalTunnelConfigSchema,
+    sandbox: GlobalSandboxConfigSchema,
   })
   .strict();
 

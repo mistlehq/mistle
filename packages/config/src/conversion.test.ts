@@ -17,6 +17,7 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_GLOBAL_TUNNEL_BOOTSTRAP_TOKEN_SECRET: "fixture-bootstrap-secret",
       MISTLE_GLOBAL_TUNNEL_TOKEN_ISSUER: "data-plane-worker",
       MISTLE_GLOBAL_TUNNEL_TOKEN_AUDIENCE: "data-plane-gateway",
+      MISTLE_GLOBAL_SANDBOX_PROVIDER: "modal",
       MISTLE_APPS_CONTROL_PLANE_API_HOST: "127.0.0.1",
       MISTLE_APPS_CONTROL_PLANE_API_PORT: "5000",
       MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE:
@@ -39,6 +40,9 @@ describe("convertEnvToTomlRecord", () => {
           bootstrap_token_secret: "fixture-bootstrap-secret",
           token_issuer: "data-plane-worker",
           token_audience: "data-plane-gateway",
+        },
+        sandbox: {
+          provider: "modal",
         },
       },
       apps: {
@@ -90,6 +94,9 @@ describe("convertTomlToEnvRecord", () => {
           token_issuer: "data-plane-worker",
           token_audience: "data-plane-gateway",
         },
+        sandbox: {
+          provider: "docker",
+        },
       },
       apps: {
         control_plane_api: {
@@ -123,6 +130,7 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_GLOBAL_TUNNEL_BOOTSTRAP_TOKEN_SECRET: "prod-bootstrap-secret",
       MISTLE_GLOBAL_TUNNEL_TOKEN_ISSUER: "data-plane-worker",
       MISTLE_GLOBAL_TUNNEL_TOKEN_AUDIENCE: "data-plane-gateway",
+      MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
       MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE:
         "registry.example.com/mistle/sandbox-base:prod",
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "https://a.example,https://b.example",
