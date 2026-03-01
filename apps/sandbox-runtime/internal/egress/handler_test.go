@@ -85,7 +85,7 @@ func TestHandlerServeHTTP(t *testing.T) {
 
 		request := httptest.NewRequest(
 			http.MethodPost,
-			"/egress/routes/route_openai/v1/chat/completions?stream=true",
+			"/egress/routes/route_openai/v1/responses?stream=true",
 			strings.NewReader(`{"model":"gpt-5"}`),
 		)
 		request.Header.Set("Content-Type", "application/json")
@@ -103,7 +103,7 @@ func TestHandlerServeHTTP(t *testing.T) {
 		if captured.Method != http.MethodPost {
 			t.Fatalf("expected forwarded method POST, got %s", captured.Method)
 		}
-		if captured.Path != "/tokenizer-egress/routes/route_openai/v1/chat/completions" {
+		if captured.Path != "/tokenizer-egress/routes/route_openai/v1/responses" {
 			t.Fatalf("unexpected forwarded path: %s", captured.Path)
 		}
 		if captured.Query != "stream=true" {
@@ -153,7 +153,7 @@ func TestHandlerServeHTTP(t *testing.T) {
 		}
 
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/egress/routes/route_missing/v1/chat/completions", nil)
+		request := httptest.NewRequest(http.MethodPost, "/egress/routes/route_missing/v1/responses", nil)
 		handler.ServeHTTP(recorder, request)
 
 		if recorder.Code != http.StatusNotFound {
@@ -172,7 +172,7 @@ func TestHandlerServeHTTP(t *testing.T) {
 		}
 
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodGet, "/egress/routes/route_openai/v1/chat/completions", nil)
+		request := httptest.NewRequest(http.MethodGet, "/egress/routes/route_openai/v1/responses", nil)
 		handler.ServeHTTP(recorder, request)
 
 		if recorder.Code != http.StatusMethodNotAllowed {
@@ -191,7 +191,7 @@ func TestHandlerServeHTTP(t *testing.T) {
 		}
 
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/egress/routes/route_openai/v2/chat/completions", nil)
+		request := httptest.NewRequest(http.MethodPost, "/egress/routes/route_openai/v2/responses", nil)
 		handler.ServeHTTP(recorder, request)
 
 		if recorder.Code != http.StatusForbidden {
@@ -210,7 +210,7 @@ func TestHandlerServeHTTP(t *testing.T) {
 		}
 
 		recorder := httptest.NewRecorder()
-		request := httptest.NewRequest(http.MethodPost, "/egress/routes/route_openai/v1/chat/completions", nil)
+		request := httptest.NewRequest(http.MethodPost, "/egress/routes/route_openai/v1/responses", nil)
 		handler.ServeHTTP(recorder, request)
 
 		if recorder.Code != http.StatusBadGateway {

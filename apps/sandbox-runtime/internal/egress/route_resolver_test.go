@@ -47,7 +47,7 @@ func TestResolverResolveRoute(t *testing.T) {
 		route, err := resolver.ResolveRoute(ResolveRouteInput{
 			RouteID:    "route_openai",
 			Method:     "POST",
-			TargetPath: "/v1/chat/completions",
+			TargetPath: "/v1/responses",
 		})
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
@@ -61,7 +61,7 @@ func TestResolverResolveRoute(t *testing.T) {
 		_, err := resolver.ResolveRoute(ResolveRouteInput{
 			RouteID:    "route_missing",
 			Method:     "POST",
-			TargetPath: "/v1/chat/completions",
+			TargetPath: "/v1/responses",
 		})
 		if err == nil {
 			t.Fatal("expected route not found error")
@@ -80,7 +80,7 @@ func TestResolverResolveRoute(t *testing.T) {
 		_, err := resolver.ResolveRoute(ResolveRouteInput{
 			RouteID:    "route_openai",
 			Method:     "GET",
-			TargetPath: "/v1/chat/completions",
+			TargetPath: "/v1/responses",
 		})
 		if err == nil {
 			t.Fatal("expected method forbidden error")
@@ -99,7 +99,7 @@ func TestResolverResolveRoute(t *testing.T) {
 		_, err := resolver.ResolveRoute(ResolveRouteInput{
 			RouteID:    "route_openai",
 			Method:     "POST",
-			TargetPath: "/v2/chat/completions",
+			TargetPath: "/v2/responses",
 		})
 		if err == nil {
 			t.Fatal("expected path forbidden error")

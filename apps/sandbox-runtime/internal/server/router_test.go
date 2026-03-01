@@ -58,7 +58,7 @@ func TestNewRouter(t *testing.T) {
 			if request.Method != http.MethodPost {
 				t.Fatalf("expected forwarded request method POST, got %s", request.Method)
 			}
-			if request.URL.Path != "/egress/routes/route_openai/v1/chat/completions" {
+			if request.URL.Path != "/egress/routes/route_openai/v1/responses" {
 				t.Fatalf("unexpected forwarded path: %s", request.URL.Path)
 			}
 
@@ -69,7 +69,7 @@ func TestNewRouter(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		request := httptest.NewRequest(
 			http.MethodPost,
-			"/egress/routes/route_openai/v1/chat/completions",
+			"/egress/routes/route_openai/v1/responses",
 			nil,
 		)
 
