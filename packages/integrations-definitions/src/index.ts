@@ -1,10 +1,14 @@
 import { IntegrationRegistry, type IntegrationDefinition } from "@mistle/integrations-core";
 
+import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/index.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
 
+export * from "./github/index.js";
 export * from "./openai/index.js";
 
 const RegisteredIntegrationDefinitions: ReadonlyArray<IntegrationDefinition> = [
+  GitHubCloudDefinition,
+  GitHubEnterpriseServerDefinition,
   OpenAiApiKeyDefinition,
 ];
 
