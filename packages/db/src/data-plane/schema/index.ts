@@ -14,6 +14,11 @@ export type {
   SandboxInstanceStarterKind,
   SandboxInstanceStatus,
 } from "./sandbox-instances.js";
+export { sandboxInstanceRuntimePlans } from "./sandbox-instance-runtime-plans.js";
+export type {
+  InsertSandboxInstanceRuntimePlan,
+  SandboxInstanceRuntimePlan,
+} from "./sandbox-instance-runtime-plans.js";
 export {
   sandboxInstanceSnapshots,
   SandboxSnapshotArtifactKinds,

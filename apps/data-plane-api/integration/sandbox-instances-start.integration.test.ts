@@ -21,6 +21,26 @@ type WorkflowRunRow = {
   } | null;
 };
 
+const ForbiddenProfileIdForRuntimePlanInsertFailure = "sbp_dp_api_runtime_plan_insert_failure";
+const RuntimePlanInsertFailureConstraint = "sandbox_instance_runtime_plans_forbidden_profile_check";
+
+function createRuntimePlan(input: {
+  sandboxProfileId: string;
+  version: number;
+}): StartSandboxInstanceInput["runtimePlan"] {
+  return {
+    sandboxProfileId: input.sandboxProfileId,
+    version: input.version,
+    image: {
+      source: "default-base",
+      imageRef: "registry:3",
+    },
+    egressRoutes: [],
+    artifacts: [],
+    runtimeClientSetups: [],
+  };
+}
+
 function createTrpcClient(
   baseUrl: string,
   serviceToken: string,
@@ -40,10 +60,15 @@ function createTrpcClient(
 describe("sandboxInstances.start integration", () => {
   it("waits for workflow completion and returns completed response", async ({ fixture }) => {
     const client = createTrpcClient(fixture.baseUrl, fixture.internalAuthServiceToken);
+    const sandboxProfileId = "sbp_dp_api_integration_001";
     const workflowInput: StartSandboxInstanceInput = {
       organizationId: "org_dp_api_integration_001",
-      sandboxProfileId: "sbp_dp_api_integration_001",
+      sandboxProfileId,
       sandboxProfileVersion: 7,
+      runtimePlan: createRuntimePlan({
+        sandboxProfileId,
+        version: 7,
+      }),
       startedBy: {
         kind: "user",
         id: "usr_dp_api_integration_001",
@@ -100,14 +125,39 @@ describe("sandboxInstances.start integration", () => {
       throw new Error("Expected persisted sandbox instance row to exist.");
     }
     expect(persistedSandboxInstance.providerSandboxId).toBe(response.providerSandboxId);
+
+    const persistedRuntimePlan = await fixture.db.query.sandboxInstanceRuntimePlans.findFirst({
+      columns: {
+        sandboxInstanceId: true,
+        revision: true,
+        compiledFromProfileId: true,
+        compiledFromProfileVersion: true,
+      },
+      where: (table, { and, eq, isNull }) =>
+        and(
+          eq(table.sandboxInstanceId, response.sandboxInstanceId),
+          eq(table.revision, 1),
+          isNull(table.supersededAt),
+        ),
+    });
+    if (persistedRuntimePlan === undefined) {
+      throw new Error("Expected persisted sandbox instance runtime plan row to exist.");
+    }
+    expect(persistedRuntimePlan.compiledFromProfileId).toBe(sandboxProfileId);
+    expect(persistedRuntimePlan.compiledFromProfileVersion).toBe(7);
   }, 60_000);
 
   it("deduplicates duplicate start requests via idempotency key", async ({ fixture }) => {
     const client = createTrpcClient(fixture.baseUrl, fixture.internalAuthServiceToken);
+    const sandboxProfileId = "sbp_dp_api_integration_idempotent";
     const workflowInput: StartSandboxInstanceInput = {
       organizationId: "org_dp_api_integration_idempotent",
-      sandboxProfileId: "sbp_dp_api_integration_idempotent",
+      sandboxProfileId,
       sandboxProfileVersion: 11,
+      runtimePlan: createRuntimePlan({
+        sandboxProfileId,
+        version: 11,
+      }),
       startedBy: {
         kind: "user",
         id: "usr_dp_api_integration_idempotent",
@@ -158,6 +208,10 @@ describe("sandboxInstances.start integration", () => {
         organizationId: "org_dp_api_integration_unauth_missing",
         sandboxProfileId: "sbp_dp_api_integration_unauth_missing",
         sandboxProfileVersion: 1,
+        runtimePlan: createRuntimePlan({
+          sandboxProfileId: "sbp_dp_api_integration_unauth_missing",
+          version: 1,
+        }),
         startedBy: {
           kind: "user",
           id: "usr_dp_api_integration_unauth_missing",
@@ -180,6 +234,10 @@ describe("sandboxInstances.start integration", () => {
         organizationId: "org_dp_api_integration_unauth_invalid",
         sandboxProfileId: "sbp_dp_api_integration_unauth_invalid",
         sandboxProfileVersion: 1,
+        runtimePlan: createRuntimePlan({
+          sandboxProfileId: "sbp_dp_api_integration_unauth_invalid",
+          version: 1,
+        }),
         startedBy: {
           kind: "user",
           id: "usr_dp_api_integration_unauth_invalid",
@@ -192,5 +250,68 @@ describe("sandboxInstances.start integration", () => {
         },
       }),
     ).rejects.toThrow("Internal service authentication failed.");
+  }, 60_000);
+
+  it("rolls back sandbox instance insert when runtime plan insert fails", async ({ fixture }) => {
+    const client = createTrpcClient(fixture.baseUrl, fixture.internalAuthServiceToken);
+    const organizationId = "org_dp_api_runtime_plan_insert_failure";
+
+    await fixture.dbPool.query(`
+      alter table data_plane.sandbox_instance_runtime_plans
+      add constraint ${RuntimePlanInsertFailureConstraint}
+      check (compiled_from_profile_id <> '${ForbiddenProfileIdForRuntimePlanInsertFailure}')
+    `);
+
+    try {
+      await expect(
+        client.sandboxInstances.start.mutate({
+          organizationId,
+          sandboxProfileId: ForbiddenProfileIdForRuntimePlanInsertFailure,
+          sandboxProfileVersion: 1,
+          runtimePlan: createRuntimePlan({
+            sandboxProfileId: ForbiddenProfileIdForRuntimePlanInsertFailure,
+            version: 1,
+          }),
+          startedBy: {
+            kind: "user",
+            id: "usr_dp_api_runtime_plan_insert_failure",
+          },
+          source: "dashboard",
+          image: {
+            imageId: "im_dp_api_runtime_plan_insert_failure",
+            kind: "base",
+            createdAt: "2026-02-27T00:00:00.000Z",
+          },
+        }),
+      ).rejects.toThrow(
+        "Failed to persist sandbox instance after provider sandbox start. Provider sandbox was stopped.",
+      );
+
+      const persistedSandboxInstances = await fixture.db.query.sandboxInstances.findMany({
+        columns: {
+          id: true,
+        },
+        where: (table, { and, eq }) =>
+          and(
+            eq(table.organizationId, organizationId),
+            eq(table.sandboxProfileId, ForbiddenProfileIdForRuntimePlanInsertFailure),
+          ),
+      });
+      expect(persistedSandboxInstances).toHaveLength(0);
+
+      const persistedRuntimePlans = await fixture.db.query.sandboxInstanceRuntimePlans.findMany({
+        columns: {
+          id: true,
+        },
+        where: (table, { eq }) =>
+          eq(table.compiledFromProfileId, ForbiddenProfileIdForRuntimePlanInsertFailure),
+      });
+      expect(persistedRuntimePlans).toHaveLength(0);
+    } finally {
+      await fixture.dbPool.query(`
+        alter table data_plane.sandbox_instance_runtime_plans
+        drop constraint if exists ${RuntimePlanInsertFailureConstraint}
+      `);
+    }
   }, 60_000);
 });

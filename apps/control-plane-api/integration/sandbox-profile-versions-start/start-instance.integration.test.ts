@@ -1,5 +1,8 @@
 import {
   IntegrationBindingKinds,
+  integrationConnections,
+  IntegrationConnectionStatuses,
+  integrationTargets,
   sandboxProfiles,
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
@@ -56,6 +59,25 @@ describe("sandbox profile version start instance integration", () => {
     });
     expect(persistedSandboxInstance).toBeDefined();
     expect(persistedSandboxInstance?.provider).toBe("docker");
+
+    const persistedRuntimePlan =
+      await fixture.dataPlaneDb.query.sandboxInstanceRuntimePlans.findFirst({
+        columns: {
+          sandboxInstanceId: true,
+          revision: true,
+          compiledFromProfileId: true,
+          compiledFromProfileVersion: true,
+        },
+        where: (table, { and, eq, isNull }) =>
+          and(
+            eq(table.sandboxInstanceId, body.sandboxInstanceId),
+            eq(table.revision, 1),
+            isNull(table.supersededAt),
+          ),
+      });
+    expect(persistedRuntimePlan).toBeDefined();
+    expect(persistedRuntimePlan?.compiledFromProfileId).toBe("sbp_start_instance_001");
+    expect(persistedRuntimePlan?.compiledFromProfileVersion).toBe(3);
   }, 120_000);
 
   it("returns 404 when the sandbox profile version does not exist", async ({ fixture }) => {
@@ -89,6 +111,9 @@ describe("sandbox profile version start instance integration", () => {
     const authenticatedSession = await fixture.authSession({
       email: "integration-sandbox-profile-start-instance-compile-error@example.com",
     });
+    const otherOrganizationSession = await fixture.authSession({
+      email: "integration-sandbox-profile-start-instance-compile-error-other-org@example.com",
+    });
 
     await fixture.controlPlaneDb.insert(sandboxProfiles).values({
       id: "sbp_start_instance_compile_error",
@@ -99,6 +124,21 @@ describe("sandbox profile version start instance integration", () => {
     await fixture.controlPlaneDb.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_start_instance_compile_error",
       version: 1,
+    });
+    await fixture.controlPlaneDb.insert(integrationTargets).values({
+      targetKey: "openai_default",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com/v1",
+      },
+    });
+    await fixture.controlPlaneDb.insert(integrationConnections).values({
+      id: "icn_missing_connection",
+      organizationId: otherOrganizationSession.organizationId,
+      targetKey: "openai_default",
+      status: IntegrationConnectionStatuses.ACTIVE,
     });
     await fixture.controlPlaneDb.insert(sandboxProfileVersionIntegrationBindings).values({
       id: "ibd_start_instance_compile_error",

@@ -32,6 +32,7 @@ export function createStartSandboxProfileInstanceWorkflow(
           organizationId: workflowInput.organizationId,
           sandboxProfileId: workflowInput.sandboxProfileId,
           sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+          runtimePlan: workflowInput.runtimePlan,
           startedBy: workflowInput.startedBy,
           source: workflowInput.source,
           image: workflowInput.image,

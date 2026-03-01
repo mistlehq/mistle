@@ -15,6 +15,13 @@
       "when": 1772212294118,
       "tag": "0001_add-sandbox-tunnel-connect-acks",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1772379371610,
+      "tag": "0002_add-sandbox-instance-runtime-plans",
+      "breakpoints": true
     }
   ]
 }

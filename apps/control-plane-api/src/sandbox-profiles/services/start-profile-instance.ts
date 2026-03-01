@@ -27,16 +27,21 @@ type StartProfileInstanceOutput = {
   providerSandboxId: string;
 };
 
-function createIdempotencyKey(input: StartProfileInstanceInput): string {
+function createIdempotencyKey(input: {
+  serviceInput: StartProfileInstanceInput;
+  runtimePlan: StartSandboxProfileInstanceWorkflowInput["runtimePlan"];
+}): string {
   return JSON.stringify({
-    organizationId: input.organizationId,
-    sandboxProfileId: input.profileId,
-    sandboxProfileVersion: input.profileVersion,
+    organizationId: input.serviceInput.organizationId,
+    sandboxProfileId: input.serviceInput.profileId,
+    sandboxProfileVersion: input.serviceInput.profileVersion,
     startedBy: {
-      kind: input.startedBy.kind,
-      id: input.startedBy.id,
+      kind: input.serviceInput.startedBy.kind,
+      id: input.serviceInput.startedBy.id,
     },
-    source: input.source,
+    source: input.serviceInput.source,
+    image: input.serviceInput.image,
+    runtimePlan: input.runtimePlan,
   });
 }
 
@@ -44,7 +49,7 @@ export async function startProfileInstance(
   { db, openWorkflow }: Pick<CreateSandboxProfilesServiceInput, "db" | "openWorkflow">,
   serviceInput: StartProfileInstanceInput,
 ): Promise<StartProfileInstanceOutput> {
-  await compileProfileVersionRuntimePlan(
+  const runtimePlan = await compileProfileVersionRuntimePlan(
     {
       db,
     },
@@ -68,12 +73,16 @@ export async function startProfileInstance(
       organizationId: serviceInput.organizationId,
       sandboxProfileId: serviceInput.profileId,
       sandboxProfileVersion: serviceInput.profileVersion,
+      runtimePlan,
       startedBy: serviceInput.startedBy,
       source: serviceInput.source,
       image: serviceInput.image,
     },
     {
-      idempotencyKey: createIdempotencyKey(serviceInput),
+      idempotencyKey: createIdempotencyKey({
+        serviceInput,
+        runtimePlan,
+      }),
     },
   );
   const workflowResult = await workflowRunHandle.result({
