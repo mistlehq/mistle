@@ -7,11 +7,15 @@ import (
 
 type RouterInput struct {
 	BootstrapTokenLoaded bool
+	EgressHandler        http.Handler
 }
 
 func NewRouter(input RouterInput) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/__healthz", healthHandler(input))
+	if input.EgressHandler != nil {
+		mux.Handle("/egress/routes/", input.EgressHandler)
+	}
 	return mux
 }
 

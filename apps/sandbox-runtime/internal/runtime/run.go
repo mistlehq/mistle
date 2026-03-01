@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/config"
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/egress"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/server"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/tunnel"
@@ -50,9 +51,19 @@ func Run(input RunInput) error {
 		return fmt.Errorf("failed to bind listen addr %s: %w", cfg.ListenAddr, err)
 	}
 
+	egressHandler, err := egress.NewHandler(egress.NewHandlerInput{
+		RuntimePlan:                 startupInput.RuntimePlan,
+		TokenizerProxyEgressBaseURL: cfg.TokenizerProxyEgressBaseURL,
+		HTTPClient:                  http.DefaultClient,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to construct egress handler: %w", err)
+	}
+
 	httpServer := &http.Server{
 		Handler: server.NewRouter(server.RouterInput{
 			BootstrapTokenLoaded: startupInput.BootstrapToken != "",
+			EgressHandler:        egressHandler,
 		}),
 	}
 
