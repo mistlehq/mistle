@@ -1,5 +1,10 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { SandboxProfileStatuses, sandboxProfiles } from "@mistle/db/control-plane";
+import {
+  IntegrationBindingKinds,
+  SandboxProfileStatuses,
+  sandboxProfileVersionIntegrationBindings,
+  sandboxProfiles,
+} from "@mistle/db/control-plane";
 import {
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
@@ -17,12 +22,47 @@ const SandboxProfileStatusSchema = z.enum([
   SandboxProfileStatuses.ACTIVE,
   SandboxProfileStatuses.INACTIVE,
 ]);
+const IntegrationBindingKindSchema = z.enum([
+  IntegrationBindingKinds.AGENT,
+  IntegrationBindingKinds.GIT,
+  IntegrationBindingKinds.CONNECTOR,
+]);
 
 export const SandboxProfileSchema = createSelectSchema(sandboxProfiles, {
   status: SandboxProfileStatusSchema,
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
 }).strict();
+export const SandboxProfileVersionIntegrationBindingSchema = createSelectSchema(
+  sandboxProfileVersionIntegrationBindings,
+  {
+    kind: IntegrationBindingKindSchema,
+    config: z.record(z.string(), z.unknown()),
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+  },
+).strict();
+
+export const PutSandboxProfileVersionIntegrationBindingsBodySchema = z
+  .object({
+    bindings: z.array(
+      z
+        .object({
+          id: z.string().min(1).optional(),
+          connectionId: z.string().min(1),
+          kind: IntegrationBindingKindSchema,
+          config: z.record(z.string(), z.unknown()),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
+export const PutSandboxProfileVersionIntegrationBindingsResponseSchema = z
+  .object({
+    bindings: z.array(SandboxProfileVersionIntegrationBindingSchema),
+  })
+  .strict();
 
 export const CreateSandboxProfileBodySchema = z
   .object({
@@ -69,7 +109,7 @@ const BadRequestCodeSchema = z.enum([
   SandboxProfilesBadRequestCodes.INVALID_PAGINATION_CURSOR,
 ]);
 const NotFoundCodeSchema = z.enum([SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND]);
-const StartSandboxProfileInstanceNotFoundCodeSchema = z.enum([
+const SandboxProfileVersionNotFoundCodeSchema = z.enum([
   SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
   SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
 ]);
@@ -115,12 +155,14 @@ export const NotFoundResponseSchema = z
     message: z.string().min(1),
   })
   .strict();
-export const StartSandboxProfileInstanceNotFoundResponseSchema = z
+export const SandboxProfileVersionNotFoundResponseSchema = z
   .object({
-    code: StartSandboxProfileInstanceNotFoundCodeSchema,
+    code: SandboxProfileVersionNotFoundCodeSchema,
     message: z.string().min(1),
   })
   .strict();
+export const StartSandboxProfileInstanceNotFoundResponseSchema =
+  SandboxProfileVersionNotFoundResponseSchema;
 export const StartSandboxProfileInstanceBadRequestResponseSchema = z.union([
   z
     .object({
@@ -437,6 +479,73 @@ export const deleteSandboxProfileRoute = createRoute({
       content: {
         "application/json": {
           schema: NotFoundResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: UnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: ForbiddenResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: InternalServerErrorResponseSchema,
+        },
+      },
+    },
+  },
+});
+
+export const putSandboxProfileVersionIntegrationBindingsRoute = createRoute({
+  method: "put",
+  path: "/{profileId}/versions/{version}/integration-bindings",
+  tags: ["Sandbox Profiles"],
+  request: {
+    params: SandboxProfileVersionParamsSchema,
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: PutSandboxProfileVersionIntegrationBindingsBodySchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Replace integration bindings for the specified sandbox profile version.",
+      content: {
+        "application/json": {
+          schema: PutSandboxProfileVersionIntegrationBindingsResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ValidationErrorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Sandbox profile or profile version was not found.",
+      content: {
+        "application/json": {
+          schema: SandboxProfileVersionNotFoundResponseSchema,
         },
       },
     },
