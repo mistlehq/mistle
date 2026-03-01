@@ -26,7 +26,7 @@ describe("integration connections create api key integration", () => {
     fixture,
   }) => {
     await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai_default",
+      targetKey: "openai-default",
       familyId: "openai",
       variantId: "openai-default",
       enabled: true,
@@ -43,7 +43,7 @@ describe("integration connections create api key integration", () => {
       apiKey: "sk-test-connection-api-key",
     });
 
-    const response = await fixture.request("/v1/integration/connections/openai_default/api-key", {
+    const response = await fixture.request("/v1/integration/connections/openai-default/api-key", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -55,7 +55,7 @@ describe("integration connections create api key integration", () => {
     expect(response.status).toBe(201);
     const responseBody = IntegrationConnectionSchema.parse(await response.json());
 
-    expect(responseBody.targetKey).toBe("openai_default");
+    expect(responseBody.targetKey).toBe("openai-default");
     expect(responseBody.status).toBe("active");
     expect(responseBody.targetSnapshotConfig).toEqual({
       api_base_url: "https://api.openai.com",
@@ -152,7 +152,7 @@ describe("integration connections create api key integration", () => {
 
   it("returns 404 when target exists but is disabled", async ({ fixture }) => {
     await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai_disabled",
+      targetKey: "openai-disabled",
       familyId: "openai",
       variantId: "openai-default",
       enabled: false,
@@ -165,7 +165,7 @@ describe("integration connections create api key integration", () => {
       email: "integration-connections-create-api-key-disabled-target@example.com",
     });
 
-    const response = await fixture.request("/v1/integration/connections/openai_disabled/api-key", {
+    const response = await fixture.request("/v1/integration/connections/openai-disabled/api-key", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -183,7 +183,7 @@ describe("integration connections create api key integration", () => {
 
   it("returns 400 for invalid create body payload", async ({ fixture }) => {
     await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai_default",
+      targetKey: "openai-default",
       familyId: "openai",
       variantId: "openai-default",
       enabled: true,
@@ -196,7 +196,7 @@ describe("integration connections create api key integration", () => {
       email: "integration-connections-create-api-key-validation@example.com",
     });
 
-    const response = await fixture.request("/v1/integration/connections/openai_default/api-key", {
+    const response = await fixture.request("/v1/integration/connections/openai-default/api-key", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -214,7 +214,7 @@ describe("integration connections create api key integration", () => {
   }, 60_000);
 
   it("returns 401 when request is unauthenticated", async ({ fixture }) => {
-    const response = await fixture.request("/v1/integration/connections/openai_default/api-key", {
+    const response = await fixture.request("/v1/integration/connections/openai-default/api-key", {
       method: "POST",
       headers: {
         "content-type": "application/json",

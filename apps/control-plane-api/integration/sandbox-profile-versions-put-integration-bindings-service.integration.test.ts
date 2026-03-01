@@ -22,7 +22,7 @@ describe("sandbox profile version put integration bindings service integration",
     });
 
     await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai_default",
+      targetKey: "openai-default",
       familyId: "openai",
       variantId: "openai-default",
       enabled: true,
@@ -37,12 +37,12 @@ describe("sandbox profile version put integration bindings service integration",
         {
           id: "icn_put_bindings_service_001",
           organizationId: authenticatedSession.organizationId,
-          targetKey: "openai_default",
+          targetKey: "openai-default",
         },
         {
           id: "icn_put_bindings_service_002",
           organizationId: authenticatedSession.organizationId,
-          targetKey: "openai_default",
+          targetKey: "openai-default",
         },
       ])
       .returning();
@@ -200,7 +200,7 @@ describe("sandbox profile version put integration bindings service integration",
     });
 
     await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai_default_connection_reference",
+      targetKey: "openai-default-connection-reference",
       familyId: "openai",
       variantId: "openai-default",
       enabled: true,
@@ -225,7 +225,7 @@ describe("sandbox profile version put integration bindings service integration",
       .values({
         id: "icn_put_bindings_other_org_001",
         organizationId: secondOrgSession.organizationId,
-        targetKey: "openai_default_connection_reference",
+        targetKey: "openai-default-connection-reference",
       })
       .returning();
 
@@ -264,7 +264,7 @@ describe("sandbox profile version put integration bindings service integration",
     });
 
     await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai_default_binding_reference",
+      targetKey: "openai-default-binding-reference",
       familyId: "openai",
       variantId: "openai-default",
       enabled: true,
@@ -288,7 +288,7 @@ describe("sandbox profile version put integration bindings service integration",
       .values({
         id: "icn_put_bindings_valid_reference_001",
         organizationId: authenticatedSession.organizationId,
-        targetKey: "openai_default_binding_reference",
+        targetKey: "openai-default-binding-reference",
       })
       .returning();
 

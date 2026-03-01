@@ -33,7 +33,7 @@ describe("integration targets discovery integration", () => {
         },
       },
       {
-        targetKey: "openai_default",
+        targetKey: "openai-default",
         familyId: "openai",
         variantId: "openai-default",
         enabled: true,
@@ -110,7 +110,7 @@ describe("integration targets discovery integration", () => {
     expect(secondPage.totalResults).toBe(3);
     expect(secondPage.items).toEqual([
       {
-        targetKey: "openai_default",
+        targetKey: "openai-default",
         familyId: "openai",
         variantId: "openai-default",
         enabled: true,

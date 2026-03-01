@@ -33,7 +33,7 @@ describe("integration connections list integration", () => {
         },
       },
       {
-        targetKey: "openai_default",
+        targetKey: "openai-default",
         familyId: "openai",
         variantId: "openai-default",
         enabled: true,
@@ -66,7 +66,7 @@ describe("integration connections list integration", () => {
       {
         id: "icn_002",
         organizationId: firstOrgSession.organizationId,
-        targetKey: "openai_default",
+        targetKey: "openai-default",
         status: IntegrationConnectionStatuses.ERROR,
         createdAt: secondConnectionCreatedAt.toISOString(),
         updatedAt: secondConnectionCreatedAt.toISOString(),
@@ -117,7 +117,7 @@ describe("integration connections list integration", () => {
       },
       {
         id: "icn_002",
-        targetKey: "openai_default",
+        targetKey: "openai-default",
         status: IntegrationConnectionStatuses.ERROR,
         createdAt: secondConnectionCreatedAt.toISOString(),
         updatedAt: secondConnectionCreatedAt.toISOString(),
