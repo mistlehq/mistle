@@ -1,3 +1,5 @@
+import { quote } from "shell-quote";
+
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { assembleCompiledRuntimePlan } from "../runtime-plan/index.js";
 import {
@@ -25,7 +27,7 @@ function resolveRouteId(input: { bindingId: string; routeIndex: number }): strin
 }
 
 function shellEscape(value: string): string {
-  return `'${value.split("'").join("'\"'\"'")}'`;
+  return quote([value]);
 }
 
 function renderInstallLatestGithubReleaseBinaryScript(
