@@ -11,7 +11,6 @@ export type StartSandboxInstanceWorkflowInput = {
   organizationId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
-  manifest: Record<string, unknown>;
   startedBy: {
     kind: SandboxInstanceStarterKind;
     id: string;

@@ -35,7 +35,6 @@ describe("sandbox profile compile runtime plan integration", () => {
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_compile_success",
       version: 1,
-      manifest: {},
     });
     await fixture.db.insert(integrationTargets).values({
       targetKey: "openai_default",
@@ -215,7 +214,6 @@ model_reasoning_effort = "medium"
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_compile_missing_connection",
       version: 1,
-      manifest: {},
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
       id: "ibd_compile_missing_connection",
@@ -275,7 +273,6 @@ model_reasoning_effort = "medium"
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_compile_missing_target",
       version: 1,
-      manifest: {},
     });
     await fixture.db.insert(integrationConnections).values({
       id: "icn_compile_missing_target",

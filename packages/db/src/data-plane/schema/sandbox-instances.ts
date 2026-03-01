@@ -1,4 +1,4 @@
-import { bigint, index, jsonb, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { bigint, index, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
 import { dataPlaneSchema } from "./namespace.js";
@@ -44,7 +44,6 @@ export const sandboxInstances = dataPlaneSchema.table(
     organizationId: text("organization_id").notNull(),
     sandboxProfileId: text("sandbox_profile_id").notNull(),
     sandboxProfileVersion: bigint("sandbox_profile_version", { mode: "number" }).notNull(),
-    manifest: jsonb("manifest").notNull(),
     provider: text("provider").notNull().$type<SandboxInstanceProvider>(),
     providerSandboxId: text("provider_sandbox_id"),
     status: text("status")

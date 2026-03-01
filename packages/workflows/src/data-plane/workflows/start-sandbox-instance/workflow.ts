@@ -39,7 +39,6 @@ export type CreateStartSandboxInstanceWorkflowInput = {
     organizationId: string;
     sandboxProfileId: string;
     sandboxProfileVersion: number;
-    manifest: Record<string, unknown>;
     provider: StartSandboxInstanceWorkflowImageInput["provider"];
     providerSandboxId: string;
     startedBy: StartSandboxInstanceWorkflowInput["startedBy"];
@@ -134,7 +133,6 @@ export function createStartSandboxInstanceWorkflow(
             organizationId: workflowInput.organizationId,
             sandboxProfileId: workflowInput.sandboxProfileId,
             sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-            manifest: workflowInput.manifest,
             provider: startedSandbox.provider,
             providerSandboxId: startedSandbox.providerSandboxId,
             startedBy: workflowInput.startedBy,

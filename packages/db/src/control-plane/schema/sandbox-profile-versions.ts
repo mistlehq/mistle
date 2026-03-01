@@ -1,4 +1,4 @@
-import { bigint, jsonb, primaryKey, text } from "drizzle-orm/pg-core";
+import { bigint, primaryKey, text } from "drizzle-orm/pg-core";
 
 import { controlPlaneSchema } from "./namespace.js";
 import { sandboxProfiles } from "./sandbox-profiles.js";
@@ -10,7 +10,6 @@ export const sandboxProfileVersions = controlPlaneSchema.table(
       .notNull()
       .references(() => sandboxProfiles.id, { onDelete: "cascade" }),
     version: bigint("version", { mode: "number" }).notNull(),
-    manifest: jsonb("manifest").notNull(),
   },
   (table) => [
     primaryKey({

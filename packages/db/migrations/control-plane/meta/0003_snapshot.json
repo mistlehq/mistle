@@ -588,12 +588,6 @@
           "type": "bigint",
           "primaryKey": false,
           "notNull": true
-        },
-        "manifest": {
-          "name": "manifest",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
         }
       },
       "indexes": {},

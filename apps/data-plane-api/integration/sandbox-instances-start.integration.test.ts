@@ -44,10 +44,6 @@ describe("sandboxInstances.start integration", () => {
       organizationId: "org_dp_api_integration_001",
       sandboxProfileId: "sbp_dp_api_integration_001",
       sandboxProfileVersion: 7,
-      manifest: {
-        app: "demo",
-        version: "v1",
-      },
       startedBy: {
         kind: "user",
         id: "usr_dp_api_integration_001",
@@ -113,9 +109,6 @@ describe("sandboxInstances.start integration", () => {
       organizationId: "org_dp_api_integration_idempotent",
       sandboxProfileId: "sbp_dp_api_integration_idempotent",
       sandboxProfileVersion: 11,
-      manifest: {
-        app: "demo-idempotent",
-      },
       startedBy: {
         kind: "user",
         id: "usr_dp_api_integration_idempotent",
@@ -167,9 +160,6 @@ describe("sandboxInstances.start integration", () => {
         organizationId: "org_dp_api_integration_unauth_missing",
         sandboxProfileId: "sbp_dp_api_integration_unauth_missing",
         sandboxProfileVersion: 1,
-        manifest: {
-          app: "demo",
-        },
         startedBy: {
           kind: "user",
           id: "usr_dp_api_integration_unauth_missing",
@@ -193,9 +183,6 @@ describe("sandboxInstances.start integration", () => {
         organizationId: "org_dp_api_integration_unauth_invalid",
         sandboxProfileId: "sbp_dp_api_integration_unauth_invalid",
         sandboxProfileVersion: 1,
-        manifest: {
-          app: "demo",
-        },
         startedBy: {
           kind: "user",
           id: "usr_dp_api_integration_unauth_invalid",

@@ -166,12 +166,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "manifest": {
-          "name": "manifest",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
         "provider": {
           "name": "provider",
           "type": "text",
