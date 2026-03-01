@@ -117,16 +117,24 @@ describe("compileOpenAiApiKeyBinding", () => {
     const codexArtifact = compiled.artifacts[0];
     expect(codexArtifact?.artifactKey).toBe("codex-cli");
     expect(codexArtifact?.name).toBe("Codex CLI");
-    expect(resolveArtifactLifecycleHook(codexArtifact?.lifecycle.install)).toEqual([
+    const installCommands = resolveArtifactLifecycleHook(codexArtifact?.lifecycle.install);
+    expect(installCommands).toHaveLength(1);
+    expect(installCommands?.[0]?.args[0]).toBe("sh");
+    expect(installCommands?.[0]?.args[1]).toBe("-euc");
+    expect(installCommands?.[0]?.args[2]).toContain(
+      "https://github.com/openai/codex/releases/latest/download",
+    );
+    expect(installCommands?.[0]?.args[2]).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
+    expect(installCommands?.[0]?.args[2]).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
+    expect(installCommands?.[0]?.args[2]).toContain("/usr/local/bin/codex");
+    expect(installCommands?.[0]?.timeoutMs).toBe(120_000);
+
+    const updateCommands = resolveArtifactLifecycleHook(codexArtifact?.lifecycle.update);
+    expect(updateCommands).toEqual(installCommands);
+
+    expect(resolveArtifactLifecycleHook(codexArtifact?.lifecycle.remove)).toEqual([
       {
-        args: ["mise", "install", "npm:@openai/codex@latest"],
-        timeoutMs: 120_000,
-      },
-    ]);
-    expect(resolveArtifactLifecycleHook(codexArtifact?.lifecycle.update)).toEqual([
-      {
-        args: ["mise", "install", "--force", "npm:@openai/codex@latest"],
-        timeoutMs: 120_000,
+        args: ["rm", "-f", "/usr/local/bin/codex"],
       },
     ]);
 
