@@ -29,6 +29,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/shell-quote": "^1.7.5"
+    "@types/shell-quote": "^1.7.5",
+    "testcontainers": "^11.12.0"
   }
 }
