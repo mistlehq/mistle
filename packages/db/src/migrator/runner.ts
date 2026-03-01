@@ -11,11 +11,16 @@ export type RunPostgresMigrationsInput = {
   migrationsFolder: string;
   migrationsSchema: string;
   migrationsTable: string;
+  /**
+   * When true, ensures the target schema exists before running migrations.
+   * Defaults to true.
+   */
+  ensureSchemaExists?: boolean;
 };
 
 /**
  * Runs Drizzle migrations against a Postgres schema.
- * The target schema is created if it does not already exist.
+ * The target schema can be created before migrations when enabled.
  */
 export async function runPostgresMigrations(input: RunPostgresMigrationsInput): Promise<void> {
   const migrationJournalPath = join(input.migrationsFolder, "meta", "_journal.json");
@@ -31,7 +36,10 @@ export async function runPostgresMigrations(input: RunPostgresMigrationsInput): 
   await databaseClient.connect();
 
   try {
-    await databaseClient.query(`create schema if not exists "${input.schemaName}"`);
+    const ensureSchemaExists = input.ensureSchemaExists ?? true;
+    if (ensureSchemaExists) {
+      await databaseClient.query(`create schema if not exists "${input.schemaName}"`);
+    }
 
     const database = drizzle(databaseClient);
 
