@@ -30,20 +30,18 @@ export class IntegrationDefinitionRegistryError extends IntegrationsCoreError {
   }
 }
 
-export type ManifestErrorCode = "INVALID_MANIFEST" | "INVALID_TRIGGER_RULES";
+export type TriggerRulesErrorCode = "INVALID_TRIGGER_RULES";
 
-export const ManifestErrorCodes: {
-  INVALID_MANIFEST: ManifestErrorCode;
-  INVALID_TRIGGER_RULES: ManifestErrorCode;
+export const TriggerRulesErrorCodes: {
+  INVALID_TRIGGER_RULES: TriggerRulesErrorCode;
 } = {
-  INVALID_MANIFEST: "INVALID_MANIFEST",
   INVALID_TRIGGER_RULES: "INVALID_TRIGGER_RULES",
 };
 
-export class IntegrationManifestError extends IntegrationsCoreError {
-  constructor(code: ManifestErrorCode, message: string, options?: ErrorOptions) {
+export class IntegrationTriggerRulesError extends IntegrationsCoreError {
+  constructor(code: TriggerRulesErrorCode, message: string, options?: ErrorOptions) {
     super(code, message, options);
-    this.name = "IntegrationManifestError";
+    this.name = "IntegrationTriggerRulesError";
   }
 }
 

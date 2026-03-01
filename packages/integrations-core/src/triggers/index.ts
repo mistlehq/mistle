@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { IntegrationManifestError, ManifestErrorCodes } from "../errors/index.js";
+import { IntegrationTriggerRulesError, TriggerRulesErrorCodes } from "../errors/index.js";
 import type { TriggerFilter, TriggerRule } from "../types/index.js";
 
 type ValidationIssue = {
@@ -190,8 +190,8 @@ export function parseTriggerRules(input: unknown): ReadonlyArray<TriggerRule> {
   const parsedRules = TriggerRulesSchema.safeParse(input);
 
   if (!parsedRules.success) {
-    throw new IntegrationManifestError(
-      ManifestErrorCodes.INVALID_TRIGGER_RULES,
+    throw new IntegrationTriggerRulesError(
+      TriggerRulesErrorCodes.INVALID_TRIGGER_RULES,
       `Trigger rule validation failed. ${formatIssues(parsedRules.error.issues)}`,
     );
   }

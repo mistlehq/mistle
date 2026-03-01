@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { IntegrationManifestError, ManifestErrorCodes } from "../errors/index.js";
+import { IntegrationTriggerRulesError, TriggerRulesErrorCodes } from "../errors/index.js";
 import { evaluateTriggerFilter, parseTriggerRules } from "./index.js";
 
 describe("trigger rules", () => {
@@ -114,7 +114,7 @@ describe("trigger rules", () => {
           enabled: true,
         },
       ]),
-    ).toThrowError(IntegrationManifestError);
+    ).toThrowError(IntegrationTriggerRulesError);
 
     try {
       parseTriggerRules([
@@ -135,9 +135,9 @@ describe("trigger rules", () => {
         },
       ]);
     } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationManifestError);
-      if (error instanceof IntegrationManifestError) {
-        expect(error.code).toBe(ManifestErrorCodes.INVALID_TRIGGER_RULES);
+      expect(error).toBeInstanceOf(IntegrationTriggerRulesError);
+      if (error instanceof IntegrationTriggerRulesError) {
+        expect(error.code).toBe(TriggerRulesErrorCodes.INVALID_TRIGGER_RULES);
       }
     }
   });
