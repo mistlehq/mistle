@@ -56,8 +56,19 @@ function createOpenAiDefinition(): IntegrationDefinition<
           name: "Codex CLI",
           lifecycle: {
             install: ({ refs }) => [
-              refs.mise.install({
-                tools: ["npm:@openai/codex@latest"],
+              refs.githubReleases.installLatestBinary({
+                repository: "openai/codex",
+                assets: {
+                  x86_64: {
+                    fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
+                    binaryPath: "codex-x86_64-unknown-linux-musl",
+                  },
+                  aarch64: {
+                    fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
+                    binaryPath: "codex-aarch64-unknown-linux-musl",
+                  },
+                },
+                installPath: "/usr/local/bin/codex",
                 timeoutMs: 120_000,
               }),
               refs.command.exec({
@@ -189,20 +200,15 @@ describe("compileRuntimePlan", () => {
       bindingId: "bind_openai_agent",
     });
     expect(runtimePlan.artifacts).toHaveLength(1);
-    expect(runtimePlan.artifacts[0]).toEqual({
-      artifactKey: "codex-cli",
-      name: "Codex CLI",
-      lifecycle: {
-        install: [
-          {
-            args: ["mise", "install", "npm:@openai/codex@latest"],
-            timeoutMs: 120_000,
-          },
-          {
-            args: ["echo", "binding:bind_openai_agent"],
-          },
-        ],
-      },
+    expect(runtimePlan.artifacts[0]?.artifactKey).toBe("codex-cli");
+    expect(runtimePlan.artifacts[0]?.name).toBe("Codex CLI");
+    expect(runtimePlan.artifacts[0]?.lifecycle.install).toHaveLength(2);
+    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[0]).toBe("sh");
+    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[1]).toBe("-euc");
+    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[2]).toContain("openai/codex");
+    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.timeoutMs).toBe(120_000);
+    expect(runtimePlan.artifacts[0]?.lifecycle.install[1]).toEqual({
+      args: ["echo", "binding:bind_openai_agent"],
     });
     expect(runtimePlan.runtimeClientSetups).toHaveLength(1);
     expect(runtimePlan.runtimeClientSetups[0]?.env.OPENAI_BASE_URL).toBe(

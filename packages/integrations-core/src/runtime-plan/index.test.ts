@@ -88,7 +88,7 @@ describe("assembleCompiledRuntimePlan", () => {
               artifactKey: "codex-cli",
               name: "Codex CLI",
               lifecycle: {
-                install: [{ args: ["mise", "install", "npm:@openai/codex@latest"] }],
+                install: [{ args: ["sh", "-euc", "install-codex-latest"] }],
               },
             },
           ],

@@ -333,7 +333,7 @@ describe("validateCompiledBindingResults", () => {
       }),
       artifactKey: "codex-cli",
       artifactName: "Codex CLI",
-      artifactInstallCommands: [{ args: ["mise", "install", "npm:@openai/codex@latest"] }],
+      artifactInstallCommands: [{ args: ["sh", "-euc", "install-codex-latest"] }],
     });
 
     const resultB = createCompiledBindingResult({
@@ -344,7 +344,7 @@ describe("validateCompiledBindingResults", () => {
       }),
       artifactKey: "codex-cli",
       artifactName: "Codex CLI",
-      artifactInstallCommands: [{ args: ["mise", "install", "npm:@openai/codex@0.100.0"] }],
+      artifactInstallCommands: [{ args: ["sh", "-euc", "install-codex-v0.100.0"] }],
     });
 
     expect(() =>
