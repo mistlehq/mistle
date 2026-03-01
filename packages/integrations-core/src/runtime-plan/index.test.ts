@@ -39,11 +39,11 @@ describe("assembleCompiledRuntimePlan", () => {
           ],
           artifacts: [
             {
-              artifactId: "gh",
-              uri: "https://artifacts.example.com/gh",
-              sha256: "sha256_gh",
-              installPath: "/usr/local/bin/gh",
-              executable: true,
+              artifactKey: "gh-cli",
+              name: "GitHub CLI",
+              lifecycle: {
+                onSandboxCreate: [{ run: "mise install gh@latest" }],
+              },
             },
           ],
           runtimeClientSetups: [
@@ -85,11 +85,11 @@ describe("assembleCompiledRuntimePlan", () => {
           ],
           artifacts: [
             {
-              artifactId: "codex",
-              uri: "https://artifacts.example.com/codex",
-              sha256: "sha256_codex",
-              installPath: "/usr/local/bin/codex",
-              executable: true,
+              artifactKey: "codex-cli",
+              name: "Codex CLI",
+              lifecycle: {
+                onSandboxCreate: [{ run: "mise install npm:@openai/codex@latest" }],
+              },
             },
           ],
           runtimeClientSetups: [
@@ -114,10 +114,7 @@ describe("assembleCompiledRuntimePlan", () => {
     });
 
     expect(plan.egressRoutes[0]?.routeId).toBe("route_a");
-    expect(plan.artifacts.map((artifact) => artifact.installPath)).toEqual([
-      "/usr/local/bin/codex",
-      "/usr/local/bin/gh",
-    ]);
+    expect(plan.artifacts.map((artifact) => artifact.artifactKey)).toEqual(["codex-cli", "gh-cli"]);
 
     const mergedSetup = plan.runtimeClientSetups[0];
     expect(mergedSetup?.clientId).toBe("codex-cli");

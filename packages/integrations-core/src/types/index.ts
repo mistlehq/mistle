@@ -163,12 +163,63 @@ export type EgressCredentialRoute = {
   };
 };
 
+export type RuntimeArtifactCommand = {
+  run: string;
+  timeoutMs?: number;
+};
+
+type RuntimeArtifactCommandExecInput = {
+  args: ReadonlyArray<string>;
+  env?: Record<string, string>;
+  cwd?: string;
+  timeoutMs?: number;
+};
+
+export type RuntimeArtifactRefs = {
+  command: {
+    exec(input: RuntimeArtifactCommandExecInput): RuntimeArtifactCommand;
+  };
+  mise: {
+    install(input: {
+      tools: ReadonlyArray<string>;
+      force?: boolean;
+      timeoutMs?: number;
+    }): RuntimeArtifactCommand;
+  };
+  compileContext: {
+    organizationId: string;
+    sandboxProfileId: string;
+    version: number;
+    targetKey: string;
+    bindingId: string;
+    sandboxProvider: string;
+  };
+};
+
+export type RuntimeArtifactLifecycleBuilder = (input: {
+  refs: RuntimeArtifactRefs;
+}) => ReadonlyArray<RuntimeArtifactCommand>;
+
+type RuntimeArtifactLifecycle<THook> = {
+  onSandboxCreate: THook;
+  onSandboxResume?: THook;
+  onSandboxShutdown?: THook;
+};
+
 export type RuntimeArtifactSpec = {
-  artifactId: string;
-  uri: string;
-  sha256: string;
-  installPath: string;
-  executable: boolean;
+  artifactKey: string;
+  name: string;
+  description?: string;
+  lifecycle: RuntimeArtifactLifecycle<
+    ReadonlyArray<RuntimeArtifactCommand> | RuntimeArtifactLifecycleBuilder
+  >;
+};
+
+export type CompiledRuntimeArtifactSpec = {
+  artifactKey: string;
+  name: string;
+  description?: string;
+  lifecycle: RuntimeArtifactLifecycle<ReadonlyArray<RuntimeArtifactCommand>>;
 };
 
 type RuntimeClientSetupBase<TEnvValue> = {
@@ -192,7 +243,7 @@ export type CompileBindingResult = {
 
 export type CompiledBindingResult = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
-  artifacts: ReadonlyArray<RuntimeArtifactSpec>;
+  artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClientSetups: ReadonlyArray<CompiledRuntimeClientSetup>;
 };
 
@@ -281,7 +332,7 @@ export type CompiledRuntimePlan = {
   version: number;
   image: ResolvedSandboxImage;
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
-  artifacts: ReadonlyArray<RuntimeArtifactSpec>;
+  artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClientSetups: ReadonlyArray<RuntimeClientSetup>;
 };
 

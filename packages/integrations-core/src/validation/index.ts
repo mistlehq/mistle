@@ -1,20 +1,20 @@
 import { routesOverlap } from "../egress/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import type {
+  CompiledRuntimeArtifactSpec,
   CompiledBindingResult,
   EgressCredentialRoute,
-  RuntimeArtifactSpec,
   CompiledRuntimeClientSetup,
   EgressUrlRef,
 } from "../types/index.js";
 
 function flattenCompiledBindingResults(input: ReadonlyArray<CompiledBindingResult>): {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
-  artifacts: ReadonlyArray<RuntimeArtifactSpec>;
+  artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClientSetups: ReadonlyArray<CompiledRuntimeClientSetup>;
 } {
   const egressRoutes: EgressCredentialRoute[] = [];
-  const artifacts: RuntimeArtifactSpec[] = [];
+  const artifacts: CompiledRuntimeArtifactSpec[] = [];
   const runtimeClientSetups: CompiledRuntimeClientSetup[] = [];
 
   for (const compiledBindingResult of input) {
@@ -72,30 +72,92 @@ function validateRoutes(input: ReadonlyArray<EgressCredentialRoute>): void {
   }
 }
 
-function validateArtifacts(input: ReadonlyArray<RuntimeArtifactSpec>): void {
-  const installPathToArtifact = new Map<string, RuntimeArtifactSpec>();
+function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): void {
+  const artifactByKey = new Map<string, CompiledRuntimeArtifactSpec>();
 
   for (const artifact of input) {
-    const existingArtifact = installPathToArtifact.get(artifact.installPath);
+    if (artifact.lifecycle.onSandboxCreate.length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.ARTIFACT_CONFLICT,
+        `Artifact '${artifact.artifactKey}' must include at least one onSandboxCreate command.`,
+      );
+    }
 
+    const lifecycleHooks: ReadonlyArray<ReadonlyArray<{ run: string; timeoutMs?: number }>> = [
+      artifact.lifecycle.onSandboxCreate,
+      artifact.lifecycle.onSandboxResume ?? [],
+      artifact.lifecycle.onSandboxShutdown ?? [],
+    ];
+
+    for (const hookCommands of lifecycleHooks) {
+      for (const command of hookCommands) {
+        if (command.run.trim().length === 0) {
+          throw new IntegrationCompilerError(
+            CompilerErrorCodes.ARTIFACT_CONFLICT,
+            `Artifact '${artifact.artifactKey}' contains an empty lifecycle command.`,
+          );
+        }
+      }
+    }
+
+    const existingArtifact = artifactByKey.get(artifact.artifactKey);
     if (existingArtifact === undefined) {
-      installPathToArtifact.set(artifact.installPath, artifact);
+      artifactByKey.set(artifact.artifactKey, artifact);
       continue;
     }
 
     const hasEquivalentSpec =
-      existingArtifact.artifactId === artifact.artifactId &&
-      existingArtifact.uri === artifact.uri &&
-      existingArtifact.sha256 === artifact.sha256 &&
-      existingArtifact.executable === artifact.executable;
+      existingArtifact.name === artifact.name &&
+      existingArtifact.description === artifact.description &&
+      artifactLifecycleEquals(existingArtifact.lifecycle, artifact.lifecycle);
 
     if (!hasEquivalentSpec) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.ARTIFACT_CONFLICT,
-        `Artifact install path conflict detected at '${artifact.installPath}'.`,
+        `Artifact key conflict detected for '${artifact.artifactKey}'.`,
       );
     }
   }
+}
+
+function artifactCommandsEqual(
+  left: ReadonlyArray<{ run: string; timeoutMs?: number }>,
+  right: ReadonlyArray<{ run: string; timeoutMs?: number }>,
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftCommand = left[index];
+    const rightCommand = right[index];
+
+    if (leftCommand === undefined || rightCommand === undefined) {
+      return false;
+    }
+
+    if (leftCommand.run !== rightCommand.run || leftCommand.timeoutMs !== rightCommand.timeoutMs) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function artifactLifecycleEquals(
+  left: CompiledRuntimeArtifactSpec["lifecycle"],
+  right: CompiledRuntimeArtifactSpec["lifecycle"],
+): boolean {
+  const leftResume = left.onSandboxResume ?? [];
+  const rightResume = right.onSandboxResume ?? [];
+  const leftShutdown = left.onSandboxShutdown ?? [];
+  const rightShutdown = right.onSandboxShutdown ?? [];
+
+  return (
+    artifactCommandsEqual(left.onSandboxCreate, right.onSandboxCreate) &&
+    artifactCommandsEqual(leftResume, rightResume) &&
+    artifactCommandsEqual(leftShutdown, rightShutdown)
+  );
 }
 
 function runtimeClientSetupValueEquals(left: string | EgressUrlRef, right: string | EgressUrlRef) {

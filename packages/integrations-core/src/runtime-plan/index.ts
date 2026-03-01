@@ -2,10 +2,10 @@ import { orderRoutesForMatching } from "../egress/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import type {
   CompiledBindingResult,
+  CompiledRuntimeArtifactSpec,
   CompiledRuntimeClientSetup,
   CompiledRuntimePlan,
   EgressUrlRef,
-  RuntimeArtifactSpec,
   RuntimeClientSetup,
 } from "../types/index.js";
 
@@ -21,8 +21,8 @@ type AssembleCompiledRuntimePlanInput = {
 
 function flattenArtifacts(
   input: ReadonlyArray<CompiledBindingResult>,
-): ReadonlyArray<RuntimeArtifactSpec> {
-  const artifacts: RuntimeArtifactSpec[] = [];
+): ReadonlyArray<CompiledRuntimeArtifactSpec> {
+  const artifacts: CompiledRuntimeArtifactSpec[] = [];
 
   for (const compiledBindingResult of input) {
     artifacts.push(...compiledBindingResult.artifacts);
@@ -232,16 +232,9 @@ function mergeRuntimeClientSetups(
 }
 
 function sortArtifacts(
-  input: ReadonlyArray<RuntimeArtifactSpec>,
-): ReadonlyArray<RuntimeArtifactSpec> {
-  return [...input].sort((left, right) => {
-    const installPathComparison = left.installPath.localeCompare(right.installPath);
-    if (installPathComparison !== 0) {
-      return installPathComparison;
-    }
-
-    return left.artifactId.localeCompare(right.artifactId);
-  });
+  input: ReadonlyArray<CompiledRuntimeArtifactSpec>,
+): ReadonlyArray<CompiledRuntimeArtifactSpec> {
+  return [...input].sort((left, right) => left.artifactKey.localeCompare(right.artifactKey));
 }
 
 export function assembleCompiledRuntimePlan(

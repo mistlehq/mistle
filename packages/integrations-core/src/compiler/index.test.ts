@@ -52,11 +52,19 @@ function createOpenAiDefinition(): IntegrationDefinition<
       ],
       artifacts: [
         {
-          artifactId: "codex",
-          uri: "https://artifacts.example.com/codex",
-          sha256: "sha256_codex",
-          installPath: "/usr/local/bin/codex",
-          executable: true,
+          artifactKey: "codex-cli",
+          name: "Codex CLI",
+          lifecycle: {
+            onSandboxCreate: ({ refs }) => [
+              refs.mise.install({
+                tools: ["npm:@openai/codex@latest"],
+                timeoutMs: 120_000,
+              }),
+              refs.command.exec({
+                args: ["echo", `binding:${refs.compileContext.bindingId}`],
+              }),
+            ],
+          },
         },
       ],
       runtimeClientSetups: [
@@ -134,6 +142,21 @@ describe("compileRuntimePlan", () => {
       bindingId: "bind_openai_agent",
     });
     expect(runtimePlan.artifacts).toHaveLength(1);
+    expect(runtimePlan.artifacts[0]).toEqual({
+      artifactKey: "codex-cli",
+      name: "Codex CLI",
+      lifecycle: {
+        onSandboxCreate: [
+          {
+            run: "mise install npm:@openai/codex@latest",
+            timeoutMs: 120_000,
+          },
+          {
+            run: "echo binding:bind_openai_agent",
+          },
+        ],
+      },
+    });
     expect(runtimePlan.runtimeClientSetups).toHaveLength(1);
     expect(runtimePlan.runtimeClientSetups[0]?.env.OPENAI_BASE_URL).toBe(
       "http://127.0.0.1:8090/egress/routes/route_bind_openai_agent",
