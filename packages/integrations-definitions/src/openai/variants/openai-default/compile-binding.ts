@@ -9,6 +9,10 @@ export type OpenAiApiKeyCompileBindingInput = CompileBindingInput<
   OpenAiApiKeyBindingConfig
 >;
 
+const CodexCliArtifactKey = "codex-cli";
+const CodexCliMiseTool = "npm:@openai/codex@latest";
+const ArtifactCommandTimeoutMs = 120_000;
+
 function resolveRoutePathPrefix(baseUrl: string): string {
   const parsedUrl = new URL(baseUrl);
   const pathname = parsedUrl.pathname;
@@ -55,7 +59,27 @@ export function compileOpenAiApiKeyBinding(
         },
       },
     ],
-    artifacts: [],
+    artifacts: [
+      {
+        artifactKey: CodexCliArtifactKey,
+        name: "Codex CLI",
+        lifecycle: {
+          install: ({ refs }) => [
+            refs.mise.install({
+              tools: [CodexCliMiseTool],
+              timeoutMs: ArtifactCommandTimeoutMs,
+            }),
+          ],
+          update: ({ refs }) => [
+            refs.mise.install({
+              tools: [CodexCliMiseTool],
+              force: true,
+              timeoutMs: ArtifactCommandTimeoutMs,
+            }),
+          ],
+        },
+      },
+    ],
     runtimeClientSetups: [
       {
         clientId: input.binding.config.runtime,

@@ -87,6 +87,26 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(runtimePlan.sandboxProfileId).toBe("sbp_compile_success");
     expect(runtimePlan.version).toBe(1);
     expect(runtimePlan.egressRoutes).toHaveLength(1);
+    expect(runtimePlan.artifacts).toEqual([
+      {
+        artifactKey: "codex-cli",
+        name: "Codex CLI",
+        lifecycle: {
+          install: [
+            {
+              args: ["mise", "install", "npm:@openai/codex@latest"],
+              timeoutMs: 120_000,
+            },
+          ],
+          update: [
+            {
+              args: ["mise", "install", "--force", "npm:@openai/codex@latest"],
+              timeoutMs: 120_000,
+            },
+          ],
+        },
+      },
+    ]);
     expect(runtimePlan.runtimeClientSetups).toEqual([
       {
         clientId: "codex-cli",
