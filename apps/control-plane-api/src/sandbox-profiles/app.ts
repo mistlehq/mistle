@@ -3,20 +3,24 @@ import { OpenAPIHono, z } from "@hono/zod-openapi";
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 import { SANDBOX_PROFILES_ROUTE_BASE_PATH } from "./constants.js";
 import {
+  PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema,
+  SandboxProfileVersionNotFoundResponseSchema,
   StartSandboxProfileInstanceBadRequestResponseSchema,
-  createSandboxProfileRoute,
   BadRequestResponseSchema,
+  createSandboxProfileRoute,
   deleteSandboxProfileRoute,
   getSandboxProfileRoute,
   listSandboxProfilesRoute,
   NotFoundResponseSchema,
   StartSandboxProfileInstanceNotFoundResponseSchema,
+  putSandboxProfileVersionIntegrationBindingsRoute,
   startSandboxProfileInstanceRoute,
   updateSandboxProfileRoute,
 } from "./contracts.js";
 import {
-  SandboxProfilesCompileError,
   SandboxProfilesBadRequestError,
+  SandboxProfilesCompileError,
+  SandboxProfilesIntegrationBindingsBadRequestError,
   SandboxProfilesNotFoundError,
   SandboxProfilesNotFoundCodes,
 } from "./services/factory.js";
@@ -118,6 +122,47 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
     }
   });
 
+  routes.openapi(putSandboxProfileVersionIntegrationBindingsRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const body = ctx.req.valid("json");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+
+      const normalizedBindings = body.bindings.map((binding) => {
+        if (binding.id === undefined) {
+          return {
+            connectionId: binding.connectionId,
+            kind: binding.kind,
+            config: binding.config,
+          };
+        }
+
+        return {
+          id: binding.id,
+          connectionId: binding.connectionId,
+          kind: binding.kind,
+          config: binding.config,
+        };
+      });
+
+      const updatedBindings = await ctx
+        .get("services")
+        .sandboxProfiles.putProfileVersionIntegrationBindings({
+          organizationId: session.session.activeOrganizationId,
+          profileId: params.profileId,
+          profileVersion: params.version,
+          bindings: normalizedBindings,
+        });
+
+      return ctx.json(updatedBindings, 200);
+    } catch (error) {
+      return handlePutIntegrationBindingsError(ctx, error);
+    }
+  });
+
   routes.openapi(startSandboxProfileInstanceRoute, async (ctx) => {
     try {
       const params = ctx.req.valid("param");
@@ -198,6 +243,30 @@ function handleStartInstanceError(ctx: AppContext, error: unknown) {
 
   if (error instanceof SandboxProfilesNotFoundError) {
     const responseBody: z.infer<typeof StartSandboxProfileInstanceNotFoundResponseSchema> = {
+      code: error.code,
+      message: error.message,
+    };
+
+    return ctx.json(responseBody, 404);
+  }
+
+  throw error;
+}
+
+function handlePutIntegrationBindingsError(ctx: AppContext, error: unknown) {
+  if (error instanceof SandboxProfilesIntegrationBindingsBadRequestError) {
+    const responseBody: z.infer<
+      typeof PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema
+    > = {
+      code: error.code,
+      message: error.message,
+    };
+
+    return ctx.json(responseBody, 400);
+  }
+
+  if (error instanceof SandboxProfilesNotFoundError) {
+    const responseBody: z.infer<typeof SandboxProfileVersionNotFoundResponseSchema> = {
       code: error.code,
       message: error.message,
     };
