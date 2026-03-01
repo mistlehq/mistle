@@ -164,11 +164,6 @@ export type EgressCredentialRoute = {
 };
 
 export type RuntimeArtifactCommand = {
-  run: string;
-  timeoutMs?: number;
-};
-
-type RuntimeArtifactCommandExecInput = {
   args: ReadonlyArray<string>;
   env?: Record<string, string>;
   cwd?: string;
@@ -177,7 +172,7 @@ type RuntimeArtifactCommandExecInput = {
 
 export type RuntimeArtifactRefs = {
   command: {
-    exec(input: RuntimeArtifactCommandExecInput): RuntimeArtifactCommand;
+    exec(input: RuntimeArtifactCommand): RuntimeArtifactCommand;
   };
   mise: {
     install(input: {

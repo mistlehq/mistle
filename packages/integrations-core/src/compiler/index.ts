@@ -23,22 +23,6 @@ function resolveRouteId(input: { bindingId: string; routeIndex: number }): strin
   return `route_${input.bindingId}_${input.routeIndex + 1}`;
 }
 
-function escapeShellArg(input: string): string {
-  if (/^[A-Za-z0-9_@%+=:,./-]+$/.test(input)) {
-    return input;
-  }
-
-  if (input.length === 0) {
-    return "''";
-  }
-
-  return `'${input.replaceAll("'", "'\"'\"'")}'`;
-}
-
-function toShellCommand(args: ReadonlyArray<string>): string {
-  return args.map((arg) => escapeShellArg(arg)).join(" ");
-}
-
 function createRuntimeArtifactRefs(input: {
   organizationId: string;
   sandboxProfileId: string;
@@ -53,16 +37,10 @@ function createRuntimeArtifactRefs(input: {
     cwd?: string;
     timeoutMs?: number;
   }): RuntimeArtifactCommand => {
-    const envPrefix =
-      execInput.env === undefined
-        ? ""
-        : `${Object.entries(execInput.env)
-            .map(([key, value]) => `${key}=${escapeShellArg(value)}`)
-            .join(" ")} `;
-    const cwdPrefix = execInput.cwd === undefined ? "" : `cd ${escapeShellArg(execInput.cwd)} && `;
-
     return {
-      run: `${envPrefix}${cwdPrefix}${toShellCommand(execInput.args)}`,
+      args: [...execInput.args],
+      ...(execInput.env === undefined ? {} : { env: execInput.env }),
+      ...(execInput.cwd === undefined ? {} : { cwd: execInput.cwd }),
       ...(execInput.timeoutMs === undefined ? {} : { timeoutMs: execInput.timeoutMs }),
     };
   };

@@ -40,8 +40,18 @@ function createCompiledBindingResult(input: {
   route: EgressCredentialRoute;
   artifactKey: string;
   artifactName?: string;
-  artifactCreateCommands?: ReadonlyArray<{ run: string; timeoutMs?: number }>;
-  artifactResumeCommands?: ReadonlyArray<{ run: string; timeoutMs?: number }>;
+  artifactCreateCommands?: ReadonlyArray<{
+    args: ReadonlyArray<string>;
+    env?: Record<string, string>;
+    cwd?: string;
+    timeoutMs?: number;
+  }>;
+  artifactResumeCommands?: ReadonlyArray<{
+    args: ReadonlyArray<string>;
+    env?: Record<string, string>;
+    cwd?: string;
+    timeoutMs?: number;
+  }>;
   runtimeClientSetup?: {
     clientId: string;
     env: Record<string, string | { kind: "egress_url"; routeId: string }>;
@@ -56,7 +66,7 @@ function createCompiledBindingResult(input: {
         name: input.artifactName ?? `${input.route.routeId} artifact`,
         lifecycle: {
           onSandboxCreate: input.artifactCreateCommands ?? [
-            { run: `echo install ${input.route.routeId}` },
+            { args: ["echo", "install", input.route.routeId] },
           ],
           ...(input.artifactResumeCommands === undefined
             ? {}
@@ -323,7 +333,7 @@ describe("validateCompiledBindingResults", () => {
       }),
       artifactKey: "codex-cli",
       artifactName: "Codex CLI",
-      artifactCreateCommands: [{ run: "mise install npm:@openai/codex@latest" }],
+      artifactCreateCommands: [{ args: ["mise", "install", "npm:@openai/codex@latest"] }],
     });
 
     const resultB = createCompiledBindingResult({
@@ -334,7 +344,7 @@ describe("validateCompiledBindingResults", () => {
       }),
       artifactKey: "codex-cli",
       artifactName: "Codex CLI",
-      artifactCreateCommands: [{ run: "mise install npm:@openai/codex@0.100.0" }],
+      artifactCreateCommands: [{ args: ["mise", "install", "npm:@openai/codex@0.100.0"] }],
     });
 
     expect(() =>
@@ -353,6 +363,24 @@ describe("validateCompiledBindingResults", () => {
       }),
       artifactKey: "codex-cli",
       artifactCreateCommands: [],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+  });
+
+  it("fails when an artifact command has empty args", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      artifactCreateCommands: [{ args: [] }],
     });
 
     expect(() =>

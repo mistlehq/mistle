@@ -83,7 +83,9 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
       );
     }
 
-    const lifecycleHooks: ReadonlyArray<ReadonlyArray<{ run: string; timeoutMs?: number }>> = [
+    const lifecycleHooks: ReadonlyArray<
+      ReadonlyArray<CompiledRuntimeArtifactSpec["lifecycle"]["onSandboxCreate"][number]>
+    > = [
       artifact.lifecycle.onSandboxCreate,
       artifact.lifecycle.onSandboxResume ?? [],
       artifact.lifecycle.onSandboxShutdown ?? [],
@@ -91,7 +93,15 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
 
     for (const hookCommands of lifecycleHooks) {
       for (const command of hookCommands) {
-        if (command.run.trim().length === 0) {
+        if (command.args.length === 0) {
+          throw new IntegrationCompilerError(
+            CompilerErrorCodes.ARTIFACT_CONFLICT,
+            `Artifact '${artifact.artifactKey}' contains a lifecycle command with no args.`,
+          );
+        }
+
+        const commandName = command.args[0];
+        if (commandName === undefined || commandName.trim().length === 0) {
           throw new IntegrationCompilerError(
             CompilerErrorCodes.ARTIFACT_CONFLICT,
             `Artifact '${artifact.artifactKey}' contains an empty lifecycle command.`,
@@ -121,8 +131,8 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
 }
 
 function artifactCommandsEqual(
-  left: ReadonlyArray<{ run: string; timeoutMs?: number }>,
-  right: ReadonlyArray<{ run: string; timeoutMs?: number }>,
+  left: ReadonlyArray<CompiledRuntimeArtifactSpec["lifecycle"]["onSandboxCreate"][number]>,
+  right: ReadonlyArray<CompiledRuntimeArtifactSpec["lifecycle"]["onSandboxCreate"][number]>,
 ): boolean {
   if (left.length !== right.length) {
     return false;
@@ -136,7 +146,53 @@ function artifactCommandsEqual(
       return false;
     }
 
-    if (leftCommand.run !== rightCommand.run || leftCommand.timeoutMs !== rightCommand.timeoutMs) {
+    if (
+      !stringArrayEquals(leftCommand.args, rightCommand.args) ||
+      !stringRecordEquals(leftCommand.env, rightCommand.env) ||
+      leftCommand.cwd !== rightCommand.cwd ||
+      leftCommand.timeoutMs !== rightCommand.timeoutMs
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function stringArrayEquals(left: ReadonlyArray<string>, right: ReadonlyArray<string>): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  for (let index = 0; index < left.length; index += 1) {
+    const leftValue = left[index];
+    const rightValue = right[index];
+
+    if (leftValue === undefined || rightValue === undefined || leftValue !== rightValue) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function stringRecordEquals(
+  left: Record<string, string> | undefined,
+  right: Record<string, string> | undefined,
+): boolean {
+  if (left === undefined || right === undefined) {
+    return left === right;
+  }
+
+  const leftEntries = Object.entries(left);
+  const rightEntries = Object.entries(right);
+
+  if (leftEntries.length !== rightEntries.length) {
+    return false;
+  }
+
+  for (const [key, value] of leftEntries) {
+    if (right[key] !== value) {
       return false;
     }
   }

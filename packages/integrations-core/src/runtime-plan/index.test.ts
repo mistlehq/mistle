@@ -42,7 +42,7 @@ describe("assembleCompiledRuntimePlan", () => {
               artifactKey: "gh-cli",
               name: "GitHub CLI",
               lifecycle: {
-                onSandboxCreate: [{ run: "mise install gh@latest" }],
+                onSandboxCreate: [{ args: ["mise", "install", "gh@latest"] }],
               },
             },
           ],
@@ -88,7 +88,7 @@ describe("assembleCompiledRuntimePlan", () => {
               artifactKey: "codex-cli",
               name: "Codex CLI",
               lifecycle: {
-                onSandboxCreate: [{ run: "mise install npm:@openai/codex@latest" }],
+                onSandboxCreate: [{ args: ["mise", "install", "npm:@openai/codex@latest"] }],
               },
             },
           ],

@@ -148,11 +148,11 @@ describe("compileRuntimePlan", () => {
       lifecycle: {
         onSandboxCreate: [
           {
-            run: "mise install npm:@openai/codex@latest",
+            args: ["mise", "install", "npm:@openai/codex@latest"],
             timeoutMs: 120_000,
           },
           {
-            run: "echo binding:bind_openai_agent",
+            args: ["echo", "binding:bind_openai_agent"],
           },
         ],
       },
