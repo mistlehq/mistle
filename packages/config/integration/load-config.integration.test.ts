@@ -25,9 +25,6 @@ const globalDevelopmentConfig = {
     tokenIssuer,
     tokenAudience,
   },
-  sandbox: {
-    provider: "modal",
-  },
 } as const;
 
 const globalProductionConfig = {
@@ -39,9 +36,6 @@ const globalProductionConfig = {
     bootstrapTokenSecret,
     tokenIssuer,
     tokenAudience,
-  },
-  sandbox: {
-    provider: "modal",
   },
 } as const;
 
@@ -202,6 +196,7 @@ const dataPlaneWorkerEnvConfig = {
     bootstrapTokenTtlSeconds: 120,
   },
   sandbox: {
+    provider: "modal",
     modal: {
       tokenId: "fixture-modal-token-id",
       tokenSecret: "fixture-modal-token-secret",
@@ -247,6 +242,7 @@ const dataPlaneWorkerDockerFixtureConfig = {
     bootstrapTokenTtlSeconds: 120,
   },
   sandbox: {
+    provider: "docker",
     docker: {
       socketPath: "/var/run/docker.sock",
       snapshotRepository: "localhost:5001/mistle/snapshots",
@@ -562,7 +558,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_WORKER,
       env: createIntegrationEnv({
         NODE_ENV: "production",
-        MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_PROVIDER: "docker",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY:
           "localhost:5001/mistle/snapshots",
@@ -574,12 +570,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        ...globalProductionConfig,
-        sandbox: {
-          provider: "docker",
-        },
-      },
+      global: globalProductionConfig,
       app: {
         ...dataPlaneWorkerEnvConfig,
         sandbox: dataPlaneWorkerDockerFixtureConfig.sandbox,
@@ -594,12 +585,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: {
-        ...globalDevelopmentConfig,
-        sandbox: {
-          provider: "docker",
-        },
-      },
+      global: globalDevelopmentConfig,
       app: dataPlaneWorkerDockerFixtureConfig,
     });
   });

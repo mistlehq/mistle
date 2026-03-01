@@ -11,12 +11,7 @@ type LoadControlPlaneApiConfigResult = ReturnType<
   typeof loadConfig<typeof AppIds.CONTROL_PLANE_API>
 >;
 
-type ControlPlaneApiAppConfig = LoadControlPlaneApiConfigResult["app"];
-type ControlPlaneApiGlobalConfig = NonNullable<LoadControlPlaneApiConfigResult["global"]>;
-
-export type ControlPlaneApiConfig = ControlPlaneApiAppConfig & {
-  sandboxProvider: ControlPlaneApiGlobalConfig["sandbox"]["provider"];
-};
+export type ControlPlaneApiConfig = LoadControlPlaneApiConfigResult["app"];
 
 export type AppContextBindings = {
   Variables: AppContextVariables;

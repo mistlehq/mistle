@@ -29,6 +29,11 @@ export const DataPlaneWorkerTunnelConfigSchema = z
   })
   .strict();
 
+export const DataPlaneWorkerSandboxProviders = {
+  MODAL: "modal",
+  DOCKER: "docker",
+} as const;
+
 export const DataPlaneWorkerSandboxModalConfigSchema = z
   .object({
     tokenId: z.string().min(1),
@@ -45,18 +50,26 @@ export const DataPlaneWorkerSandboxDockerConfigSchema = z
   })
   .strict();
 
-export const DataPlaneWorkerSandboxConfigSchema = z
-  .object({
-    modal: DataPlaneWorkerSandboxModalConfigSchema.optional(),
-    docker: DataPlaneWorkerSandboxDockerConfigSchema.optional(),
-  })
-  .strict()
-  .refine((config) => config.modal !== undefined || config.docker !== undefined, {
-    message: "At least one sandbox provider config must be configured.",
-  });
+export const DataPlaneWorkerSandboxConfigSchema = z.discriminatedUnion("provider", [
+  z
+    .object({
+      provider: z.literal(DataPlaneWorkerSandboxProviders.MODAL),
+      modal: DataPlaneWorkerSandboxModalConfigSchema,
+    })
+    .strict(),
+  z
+    .object({
+      provider: z.literal(DataPlaneWorkerSandboxProviders.DOCKER),
+      docker: DataPlaneWorkerSandboxDockerConfigSchema,
+    })
+    .strict(),
+]);
 
 export const PartialDataPlaneWorkerSandboxConfigSchema = z
   .object({
+    provider: z
+      .enum([DataPlaneWorkerSandboxProviders.MODAL, DataPlaneWorkerSandboxProviders.DOCKER])
+      .optional(),
     modal: DataPlaneWorkerSandboxModalConfigSchema.partial().optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.partial().optional(),
   })

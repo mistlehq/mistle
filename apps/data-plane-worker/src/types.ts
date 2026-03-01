@@ -11,7 +11,6 @@ export type DataPlaneWorkerGlobalConfig = NonNullable<LoadDataPlaneWorkerConfigR
 export type DataPlaneWorkerRuntimeConfig = {
   app: DataPlaneWorkerConfig;
   tunnel: DataPlaneWorkerGlobalConfig["tunnel"];
-  sandboxProvider: DataPlaneWorkerGlobalConfig["sandbox"]["provider"];
 };
 
 export type AppContextBindings = {

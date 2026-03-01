@@ -39,7 +39,6 @@ import { it as vitestIt } from "vitest";
 import { createDataPlaneApiRuntime } from "../../../data-plane-api/src/runtime/index.js";
 import type { DataPlaneApiConfig } from "../../../data-plane-api/src/types.js";
 import { createControlPlaneApiRuntime } from "../../src/runtime/index.js";
-import type { ControlPlaneApiConfig } from "../../src/types.js";
 import type { AuthenticatedSession } from "../helpers/auth-session.js";
 import { createAuthenticatedSession } from "../helpers/auth-session.js";
 
@@ -360,7 +359,7 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
           await controlPlaneWorkflowWorker.stop();
         });
 
-        const controlPlaneConfig: ControlPlaneApiConfig = {
+        const controlPlaneConfig = {
           server: {
             host: "127.0.0.1",
             port: 3000,
@@ -375,7 +374,6 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           },
-          sandboxProvider: "docker",
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
             masterEncryptionKeys: {
