@@ -15,5 +15,6 @@ The base image includes a single sandbox runtime entrypoint that every sandbox w
 - Startup input: JSON must be provided via process `stdin` during startup with required fields:
   - `bootstrapToken`
   - `tunnelGatewayWsUrl`
+  - `runtimePlan`
 - Health endpoint: `GET /__healthz` returns 200 only after bootstrap token is loaded
 - `PATH` includes `mise` shims at `/home/sandbox/.local/share/mise/shims`
