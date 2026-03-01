@@ -26,7 +26,10 @@ type UpdateSandboxInstanceStatusInput =
     };
 
 export type CreateStartSandboxInstanceWorkflowInput = {
-  startSandbox: (input: { image: StartSandboxInstanceWorkflowInput["image"] }) => Promise<{
+  startSandbox: (input: {
+    image: StartSandboxInstanceWorkflowInput["image"];
+    runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+  }) => Promise<{
     provider: SandboxProvider;
     providerSandboxId: string;
     bootstrapTokenJti: string;
@@ -119,6 +122,7 @@ export function createStartSandboxInstanceWorkflow(
       const startedSandbox = await step.run({ name: "start-sandbox" }, async () => {
         return ctx.startSandbox({
           image: workflowInput.image,
+          runtimePlan: workflowInput.runtimePlan,
         });
       });
 
