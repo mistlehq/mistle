@@ -1,5 +1,7 @@
 import {
+  CompilerErrorCodes,
   compileRuntimePlan,
+  IntegrationCompilerError,
   type CompiledRuntimePlan,
   type ResolvedSandboxImage,
 } from "@mistle/integrations-core";
@@ -7,6 +9,7 @@ import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 
 import {
   SandboxProfilesCompileError,
+  type SandboxProfilesCompileErrorCode,
   SandboxProfilesCompileErrorCodes,
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
@@ -25,6 +28,35 @@ type CompileProfileVersionRuntimePlanInput = {
 };
 
 const registry = createIntegrationRegistry();
+
+function mapCompilerErrorCodeToSandboxProfilesCompileErrorCode(
+  code: IntegrationCompilerError["code"],
+): SandboxProfilesCompileErrorCode {
+  switch (code) {
+    case CompilerErrorCodes.CONNECTION_MISMATCH:
+      return SandboxProfilesCompileErrorCodes.CONNECTION_MISMATCH;
+    case CompilerErrorCodes.TARGET_DISABLED:
+      return SandboxProfilesCompileErrorCodes.TARGET_DISABLED;
+    case CompilerErrorCodes.CONNECTION_NOT_ACTIVE:
+      return SandboxProfilesCompileErrorCodes.CONNECTION_NOT_ACTIVE;
+    case CompilerErrorCodes.KIND_MISMATCH:
+      return SandboxProfilesCompileErrorCodes.KIND_MISMATCH;
+    case CompilerErrorCodes.INVALID_TARGET_CONFIG:
+      return SandboxProfilesCompileErrorCodes.INVALID_TARGET_CONFIG;
+    case CompilerErrorCodes.INVALID_BINDING_CONFIG:
+      return SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONFIG;
+    case CompilerErrorCodes.ROUTE_CONFLICT:
+      return SandboxProfilesCompileErrorCodes.ROUTE_CONFLICT;
+    case CompilerErrorCodes.ARTIFACT_CONFLICT:
+      return SandboxProfilesCompileErrorCodes.ARTIFACT_CONFLICT;
+    case CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT:
+      return SandboxProfilesCompileErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT;
+    case CompilerErrorCodes.RUNTIME_CLIENT_SETUP_INVALID_REF:
+      return SandboxProfilesCompileErrorCodes.RUNTIME_CLIENT_SETUP_INVALID_REF;
+  }
+
+  throw new Error(`Unhandled compiler error code '${code}'.`);
+}
 
 function normalizeConnectionConfig(
   connectionConfig: Record<string, unknown> | null,
@@ -140,15 +172,26 @@ export async function compileProfileVersionRuntimePlan(
     };
   });
 
-  return compileRuntimePlan({
-    organizationId: input.organizationId,
-    sandboxProfileId: input.profileId,
-    version: input.profileVersion,
-    image: input.image,
-    runtimeContext: input.runtimeContext,
-    bindings: compileBindings,
-    registry,
-  });
+  try {
+    return compileRuntimePlan({
+      organizationId: input.organizationId,
+      sandboxProfileId: input.profileId,
+      version: input.profileVersion,
+      image: input.image,
+      runtimeContext: input.runtimeContext,
+      bindings: compileBindings,
+      registry,
+    });
+  } catch (error) {
+    if (error instanceof IntegrationCompilerError) {
+      throw new SandboxProfilesCompileError(
+        mapCompilerErrorCodeToSandboxProfilesCompileErrorCode(error.code),
+        error.message,
+      );
+    }
+
+    throw error;
+  }
 }
 
 export type { CompileProfileVersionRuntimePlanInput };

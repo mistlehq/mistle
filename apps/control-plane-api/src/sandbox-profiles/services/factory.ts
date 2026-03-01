@@ -11,6 +11,8 @@ export type { CreateSandboxProfilesServiceInput, SandboxProfilesService } from "
 export {
   SandboxProfilesBadRequestCodes,
   SandboxProfilesBadRequestError,
+  SandboxProfilesCompileError,
+  SandboxProfilesCompileErrorCodes,
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "./errors.js";
@@ -34,6 +36,7 @@ export function createSandboxProfilesService(
     startProfileInstance: (serviceInput) =>
       startProfileInstance(
         {
+          db: input.db,
           openWorkflow: input.openWorkflow,
         },
         serviceInput,

@@ -9,6 +9,7 @@ import { createSelectSchema } from "drizzle-zod";
 import {
   SandboxProfilesAuthErrorCodes,
   SandboxProfilesBadRequestCodes,
+  SandboxProfilesCompileErrorCodes,
   SandboxProfilesNotFoundCodes,
 } from "./services/errors.js";
 
@@ -72,6 +73,20 @@ const StartSandboxProfileInstanceNotFoundCodeSchema = z.enum([
   SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
   SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
 ]);
+const StartSandboxProfileInstanceBadRequestCodeSchema = z.enum([
+  SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONNECTION_REFERENCE,
+  SandboxProfilesCompileErrorCodes.INVALID_CONNECTION_TARGET_REFERENCE,
+  SandboxProfilesCompileErrorCodes.CONNECTION_MISMATCH,
+  SandboxProfilesCompileErrorCodes.TARGET_DISABLED,
+  SandboxProfilesCompileErrorCodes.CONNECTION_NOT_ACTIVE,
+  SandboxProfilesCompileErrorCodes.KIND_MISMATCH,
+  SandboxProfilesCompileErrorCodes.INVALID_TARGET_CONFIG,
+  SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONFIG,
+  SandboxProfilesCompileErrorCodes.ROUTE_CONFLICT,
+  SandboxProfilesCompileErrorCodes.ARTIFACT_CONFLICT,
+  SandboxProfilesCompileErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+  SandboxProfilesCompileErrorCodes.RUNTIME_CLIENT_SETUP_INVALID_REF,
+]);
 
 export const BadRequestResponseSchema = z
   .object({
@@ -106,6 +121,15 @@ export const StartSandboxProfileInstanceNotFoundResponseSchema = z
     message: z.string().min(1),
   })
   .strict();
+export const StartSandboxProfileInstanceBadRequestResponseSchema = z.union([
+  z
+    .object({
+      code: StartSandboxProfileInstanceBadRequestCodeSchema,
+      message: z.string().min(1),
+    })
+    .strict(),
+  ValidationErrorResponseSchema,
+]);
 
 export const UnauthorizedResponseSchema = z
   .object({
@@ -463,7 +487,7 @@ export const startSandboxProfileInstanceRoute = createRoute({
       description: "Invalid request.",
       content: {
         "application/json": {
-          schema: ValidationErrorResponseSchema,
+          schema: StartSandboxProfileInstanceBadRequestResponseSchema,
         },
       },
     },
