@@ -12,7 +12,7 @@ export async function createDataPlaneWorkerRuntime(
   config: DataPlaneWorkerRuntimeConfig,
 ): Promise<DataPlaneWorkerRuntime> {
   const app = createApp();
-  const resources = await createWorkerRuntimeResources(config.app);
+  const resources = await createWorkerRuntimeResources(config);
   let worker: ReturnType<typeof createRuntimeWorker>;
 
   try {

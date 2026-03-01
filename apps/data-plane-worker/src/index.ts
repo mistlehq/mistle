@@ -14,6 +14,7 @@ if (loadedConfig.global === undefined) {
 const runtime = await createDataPlaneWorkerRuntime({
   app: loadedConfig.app,
   tunnel: loadedConfig.global.tunnel,
+  sandboxProvider: loadedConfig.global.sandbox.provider,
 });
 
 await runtime.start();

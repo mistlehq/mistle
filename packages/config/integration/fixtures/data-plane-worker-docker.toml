@@ -9,6 +9,9 @@ bootstrap_token_secret = "fixture-bootstrap-token-secret"
 token_issuer = "data-plane-worker"
 token_audience = "data-plane-gateway"
 
+[global.sandbox]
+provider = "docker"
+
 [apps.data_plane_worker.server]
 host = "0.0.0.0"
 port = 5305
@@ -25,9 +28,6 @@ concurrency = 3
 [apps.data_plane_worker.tunnel]
 gateway_ws_url = "ws://127.0.0.1:5302/tunnel/sandbox"
 bootstrap_token_ttl_seconds = 120
-
-[apps.data_plane_worker.sandbox]
-provider = "docker"
 
 [apps.data_plane_worker.sandbox.docker]
 socket_path = "/var/run/docker.sock"

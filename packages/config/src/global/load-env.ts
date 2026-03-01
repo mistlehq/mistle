@@ -1,6 +1,7 @@
 import { createEnvLoader, hasEntries } from "../core/load-env.js";
 import {
   type PartialGlobalConfigInput,
+  GlobalSandboxConfigSchema,
   GlobalConfigSchema,
   GlobalTunnelConfigSchema,
 } from "./schema.js";
@@ -35,12 +36,23 @@ const loadTunnelEnv = createEnvLoader<typeof GlobalTunnelConfigSchema>([
   },
 ]);
 
+const loadSandboxEnv = createEnvLoader<typeof GlobalSandboxConfigSchema>([
+  {
+    key: "provider",
+    envVar: "MISTLE_GLOBAL_SANDBOX_PROVIDER",
+  },
+]);
+
 export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigInput {
   const partialGlobal = loadGlobalEnv(env);
   const partialTunnel = loadTunnelEnv(env);
+  const partialSandbox = loadSandboxEnv(env);
 
   if (hasEntries(partialTunnel)) {
     partialGlobal.tunnel = partialTunnel;
+  }
+  if (hasEntries(partialSandbox)) {
+    partialGlobal.sandbox = partialSandbox;
   }
 
   return GlobalConfigSchema.partial().parse(partialGlobal);

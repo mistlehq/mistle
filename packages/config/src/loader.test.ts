@@ -16,6 +16,9 @@ describe("parseConfigRecord", () => {
           tokenIssuer: "data-plane-worker",
           tokenAudience: "data-plane-gateway",
         },
+        sandbox: {
+          provider: "modal",
+        },
       },
       apps: {
         control_plane_api: {
@@ -105,7 +108,6 @@ describe("parseConfigRecord", () => {
             bootstrapTokenTtlSeconds: 120,
           },
           sandbox: {
-            provider: "modal",
             modal: {
               tokenId: "fixture-modal-token-id",
               tokenSecret: "fixture-modal-token-secret",
@@ -142,6 +144,9 @@ describe("parseConfigRecord", () => {
           tokenIssuer: "data-plane-worker",
           tokenAudience: "data-plane-gateway",
         },
+        sandbox: {
+          provider: "docker",
+        },
       },
       apps: {
         control_plane_api: {
@@ -231,7 +236,6 @@ describe("parseConfigRecord", () => {
             bootstrapTokenTtlSeconds: 120,
           },
           sandbox: {
-            provider: "docker",
             docker: {
               socketPath: "/var/run/docker.sock",
               snapshotRepository: "localhost:5001/mistle/snapshots",
