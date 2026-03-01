@@ -88,6 +88,53 @@ function createOpenAiDefinition(): IntegrationDefinition<
   };
 }
 
+function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
+  typeof OpenAiTargetConfigSchema,
+  typeof OpenAiBindingConfigSchema
+> {
+  return {
+    familyId: "openai",
+    variantId: "openai-default",
+    kind: "agent",
+    displayName: "OpenAI",
+    logoKey: "openai",
+    targetConfigSchema: OpenAiTargetConfigSchema,
+    bindingConfigSchema: OpenAiBindingConfigSchema,
+    supportedAuthSchemes: ["api-key"],
+    triggerEventTypes: [],
+    userConfigSlots: [],
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [
+        {
+          artifactKey: "codex-cli",
+          name: "Codex CLI",
+          lifecycle: {
+            install: ({ refs }) => [
+              refs.githubReleases.installLatestBinary({
+                repository: "openai/codex",
+                assets: {
+                  x86_64: {
+                    fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
+                    binaryPath: "codex-x86_64-unknown-linux-musl",
+                  },
+                  aarch64: {
+                    fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
+                    binaryPath: "codex-aarch64-unknown-linux-musl",
+                  },
+                },
+                installPath: "/usr/local/bin/codex",
+                timeoutMs: 120_000,
+              }),
+            ],
+          },
+        },
+      ],
+      runtimeClientSetups: [],
+    }),
+  };
+}
+
 describe("compileRuntimePlan", () => {
   it("compiles bindings into a deterministic runtime plan", () => {
     const registry = new IntegrationRegistry();
@@ -161,6 +208,68 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.runtimeClientSetups[0]?.env.OPENAI_BASE_URL).toBe(
       "http://127.0.0.1:8090/egress/routes/route_bind_openai_agent",
     );
+  });
+
+  it("supports github release binary install refs in artifact lifecycle hooks", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createGithubReleaseArtifactDefinition());
+
+    const runtimePlan = compileRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 12,
+      image: {
+        source: "default-base",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      },
+      runtimeContext: {
+        sandboxProvider: "docker",
+        sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
+      },
+      registry,
+      bindings: [
+        {
+          targetKey: "openai_default",
+          target: {
+            familyId: "openai",
+            variantId: "openai-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://api.openai.com",
+            },
+          },
+          connection: {
+            id: "conn_openai_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_openai_agent",
+            kind: "agent",
+            connectionId: "conn_openai_org_123",
+            config: {
+              defaultModel: "gpt-5.3-codex",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(runtimePlan.artifacts).toHaveLength(1);
+    expect(runtimePlan.artifacts[0]?.lifecycle.install).toHaveLength(1);
+    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[0]).toBe("sh");
+    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[1]).toBe("-euc");
+    expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.timeoutMs).toBe(120_000);
+
+    const installScript = runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[2];
+    expect(typeof installScript).toBe("string");
+    expect(installScript).toContain(
+      'curl -fsSL "https://github.com/$repo/releases/latest/download/$asset_name"',
+    );
+    expect(installScript).toContain("openai/codex");
+    expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
+    expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
+    expect(installScript).toContain("/usr/local/bin/codex");
   });
 
   it("fails when target is disabled", () => {

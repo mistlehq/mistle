@@ -11,6 +11,17 @@ export type OpenAiApiKeyCompileBindingInput = CompileBindingInput<
 
 const CodexCliArtifactKey = "codex-cli";
 const CodexCliInstallPath = "/usr/local/bin/codex";
+const CodexGitHubRepository = "openai/codex";
+const CodexGitHubAssets = {
+  x86_64: {
+    fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
+    binaryPath: "codex-x86_64-unknown-linux-musl",
+  },
+  aarch64: {
+    fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
+    binaryPath: "codex-aarch64-unknown-linux-musl",
+  },
+};
 const ArtifactCommandTimeoutMs = 120_000;
 
 function resolveRoutePathPrefix(baseUrl: string): string {
@@ -29,33 +40,6 @@ function renderCodexConfig(input: { model: string; reasoningEffort: string }): s
     `model = "${input.model}"`,
     `model_reasoning_effort = "${input.reasoningEffort}"`,
     "",
-  ].join("\n");
-}
-
-function renderCodexInstallScript(): string {
-  return [
-    'arch="$(uname -m)"',
-    'case "$arch" in',
-    "  x86_64)",
-    '    archive_name="codex-x86_64-unknown-linux-musl.tar.gz"',
-    '    binary_name="codex-x86_64-unknown-linux-musl"',
-    "    ;;",
-    "  aarch64|arm64)",
-    '    archive_name="codex-aarch64-unknown-linux-musl.tar.gz"',
-    '    binary_name="codex-aarch64-unknown-linux-musl"',
-    "    ;;",
-    "  *)",
-    '    echo "Unsupported architecture: $arch" >&2',
-    "    exit 1",
-    "    ;;",
-    "esac",
-    "",
-    'temp_dir="$(mktemp -d)"',
-    "trap 'rm -rf \"$temp_dir\"' EXIT",
-    "",
-    'curl -fsSL "https://github.com/openai/codex/releases/latest/download/$archive_name" -o "$temp_dir/codex.tar.gz"',
-    'tar -xzf "$temp_dir/codex.tar.gz" -C "$temp_dir"',
-    `install -m 0755 "$temp_dir/$binary_name" "${CodexCliInstallPath}"`,
   ].join("\n");
 }
 
@@ -92,14 +76,18 @@ export function compileOpenAiApiKeyBinding(
         name: "Codex CLI",
         lifecycle: {
           install: ({ refs }) => [
-            refs.command.exec({
-              args: ["sh", "-euc", renderCodexInstallScript()],
+            refs.githubReleases.installLatestBinary({
+              repository: CodexGitHubRepository,
+              assets: CodexGitHubAssets,
+              installPath: CodexCliInstallPath,
               timeoutMs: ArtifactCommandTimeoutMs,
             }),
           ],
           update: ({ refs }) => [
-            refs.command.exec({
-              args: ["sh", "-euc", renderCodexInstallScript()],
+            refs.githubReleases.installLatestBinary({
+              repository: CodexGitHubRepository,
+              assets: CodexGitHubAssets,
+              installPath: CodexCliInstallPath,
               timeoutMs: ArtifactCommandTimeoutMs,
             }),
           ],

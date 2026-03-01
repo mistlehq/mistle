@@ -26,6 +26,13 @@ function createRuntimeArtifactRefs(): RuntimeArtifactRefs {
           ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
         }),
     },
+    githubReleases: {
+      installLatestBinary: (input) =>
+        exec({
+          args: ["github-releases.installLatestBinary", JSON.stringify(input)],
+          ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+        }),
+    },
     compileContext: {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
@@ -119,14 +126,15 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(codexArtifact?.name).toBe("Codex CLI");
     const installCommands = resolveArtifactLifecycleHook(codexArtifact?.lifecycle.install);
     expect(installCommands).toHaveLength(1);
-    expect(installCommands?.[0]?.args[0]).toBe("sh");
-    expect(installCommands?.[0]?.args[1]).toBe("-euc");
-    expect(installCommands?.[0]?.args[2]).toContain(
-      "https://github.com/openai/codex/releases/latest/download",
+    expect(installCommands?.[0]?.args[0]).toBe("github-releases.installLatestBinary");
+    expect(installCommands?.[0]?.args[1]).toContain('"repository":"openai/codex"');
+    expect(installCommands?.[0]?.args[1]).toContain(
+      '"fileName":"codex-x86_64-unknown-linux-musl.tar.gz"',
     );
-    expect(installCommands?.[0]?.args[2]).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
-    expect(installCommands?.[0]?.args[2]).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
-    expect(installCommands?.[0]?.args[2]).toContain("/usr/local/bin/codex");
+    expect(installCommands?.[0]?.args[1]).toContain(
+      '"fileName":"codex-aarch64-unknown-linux-musl.tar.gz"',
+    );
+    expect(installCommands?.[0]?.args[1]).toContain('"installPath":"/usr/local/bin/codex"');
     expect(installCommands?.[0]?.timeoutMs).toBe(120_000);
 
     const updateCommands = resolveArtifactLifecycleHook(codexArtifact?.lifecycle.update);

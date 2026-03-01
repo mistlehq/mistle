@@ -9,6 +9,7 @@ import {
   type CompiledRuntimeArtifactSpec,
   type CompiledRuntimePlan,
   type RuntimeArtifactCommand,
+  type RuntimeArtifactGithubReleaseInstallInput,
   type RuntimeArtifactLifecycleBuilder,
   type RuntimeArtifactRefs,
   type RuntimeArtifactSpec,
@@ -21,6 +22,57 @@ function resolveRouteId(input: { bindingId: string; routeIndex: number }): strin
   }
 
   return `route_${input.bindingId}_${input.routeIndex + 1}`;
+}
+
+function shellEscape(value: string): string {
+  return `'${value.split("'").join("'\"'\"'")}'`;
+}
+
+function renderInstallLatestGithubReleaseBinaryScript(
+  input: RuntimeArtifactGithubReleaseInstallInput,
+): string {
+  const x86AssetFormat = input.assets.x86_64.format ?? "tar.gz";
+  const aarch64AssetFormat = input.assets.aarch64.format ?? "tar.gz";
+
+  return [
+    'arch="$(uname -m)"',
+    "repo=" + shellEscape(input.repository),
+    "install_path=" + shellEscape(input.installPath),
+    'case "$arch" in',
+    "  x86_64)",
+    `    asset_name=${shellEscape(input.assets.x86_64.fileName)}`,
+    `    binary_path=${shellEscape(input.assets.x86_64.binaryPath)}`,
+    `    asset_format=${shellEscape(x86AssetFormat)}`,
+    "    ;;",
+    "  aarch64|arm64)",
+    `    asset_name=${shellEscape(input.assets.aarch64.fileName)}`,
+    `    binary_path=${shellEscape(input.assets.aarch64.binaryPath)}`,
+    `    asset_format=${shellEscape(aarch64AssetFormat)}`,
+    "    ;;",
+    "  *)",
+    '    echo "Unsupported architecture: $arch" >&2',
+    "    exit 1",
+    "    ;;",
+    "esac",
+    "",
+    'temp_dir="$(mktemp -d)"',
+    "trap 'rm -rf \"$temp_dir\"' EXIT",
+    "",
+    'curl -fsSL "https://github.com/$repo/releases/latest/download/$asset_name" -o "$temp_dir/artifact"',
+    'case "$asset_format" in',
+    "  tar.gz)",
+    '    tar -xzf "$temp_dir/artifact" -C "$temp_dir"',
+    '    install -m 0755 "$temp_dir/$binary_path" "$install_path"',
+    "    ;;",
+    "  binary)",
+    '    install -m 0755 "$temp_dir/artifact" "$install_path"',
+    "    ;;",
+    "  *)",
+    '    echo "Unsupported asset format: $asset_format" >&2',
+    "    exit 1",
+    "    ;;",
+    "esac",
+  ].join("\n");
 }
 
 function createRuntimeArtifactRefs(input: {
@@ -58,6 +110,13 @@ function createRuntimeArtifactRefs(input: {
             ...(installInput.force === true ? ["--force"] : []),
             ...installInput.tools,
           ],
+          ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
+        }),
+    },
+    githubReleases: {
+      installLatestBinary: (installInput) =>
+        exec({
+          args: ["sh", "-euc", renderInstallLatestGithubReleaseBinaryScript(installInput)],
           ...(installInput.timeoutMs === undefined ? {} : { timeoutMs: installInput.timeoutMs }),
         }),
     },

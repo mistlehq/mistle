@@ -170,6 +170,22 @@ export type RuntimeArtifactCommand = {
   timeoutMs?: number;
 };
 
+export type RuntimeArtifactGithubReleaseAsset = {
+  fileName: string;
+  binaryPath: string;
+  format?: "tar.gz" | "binary";
+};
+
+export type RuntimeArtifactGithubReleaseInstallInput = {
+  repository: string;
+  assets: {
+    x86_64: RuntimeArtifactGithubReleaseAsset;
+    aarch64: RuntimeArtifactGithubReleaseAsset;
+  };
+  installPath: string;
+  timeoutMs?: number;
+};
+
 export type RuntimeArtifactRefs = {
   command: {
     exec(input: RuntimeArtifactCommand): RuntimeArtifactCommand;
@@ -180,6 +196,9 @@ export type RuntimeArtifactRefs = {
       force?: boolean;
       timeoutMs?: number;
     }): RuntimeArtifactCommand;
+  };
+  githubReleases: {
+    installLatestBinary(input: RuntimeArtifactGithubReleaseInstallInput): RuntimeArtifactCommand;
   };
   compileContext: {
     organizationId: string;
