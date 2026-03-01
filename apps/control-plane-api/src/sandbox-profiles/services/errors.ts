@@ -44,6 +44,24 @@ export class SandboxProfilesBadRequestError extends Error {
   }
 }
 
+export const SandboxProfilesIntegrationBindingsBadRequestCodes = {
+  INVALID_BINDING_REFERENCE: "INVALID_BINDING_REFERENCE",
+  INVALID_BINDING_CONNECTION_REFERENCE: "INVALID_BINDING_CONNECTION_REFERENCE",
+} as const;
+
+export type SandboxProfilesIntegrationBindingsBadRequestCode =
+  (typeof SandboxProfilesIntegrationBindingsBadRequestCodes)[keyof typeof SandboxProfilesIntegrationBindingsBadRequestCodes];
+
+export class SandboxProfilesIntegrationBindingsBadRequestError extends Error {
+  code: SandboxProfilesIntegrationBindingsBadRequestCode;
+
+  constructor(code: SandboxProfilesIntegrationBindingsBadRequestCode, message: string) {
+    super(message);
+    this.name = "SandboxProfilesIntegrationBindingsBadRequestError";
+    this.code = code;
+  }
+}
+
 export const SandboxProfilesCompileErrorCodes = {
   INVALID_BINDING_CONNECTION_REFERENCE: "INVALID_BINDING_CONNECTION_REFERENCE",
   INVALID_CONNECTION_TARGET_REFERENCE: "INVALID_CONNECTION_TARGET_REFERENCE",

@@ -1,0 +1,324 @@
+import {
+  integrationConnections,
+  integrationTargets,
+  IntegrationBindingKinds,
+  sandboxProfiles,
+  sandboxProfileVersionIntegrationBindings,
+  sandboxProfileVersions,
+} from "@mistle/db/control-plane";
+import { describe, expect } from "vitest";
+
+import {
+  SandboxProfilesIntegrationBindingsBadRequestCodes,
+  SandboxProfilesNotFoundCodes,
+} from "../src/sandbox-profiles/services/errors.js";
+import { putProfileVersionIntegrationBindings } from "../src/sandbox-profiles/services/put-profile-version-integration-bindings.js";
+import { it } from "./test-context.js";
+
+describe("sandbox profile version put integration bindings service integration", () => {
+  it("replaces integration bindings for a profile version", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-service@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai_default",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com",
+      },
+    });
+
+    const [connectionA, connectionB] = await fixture.db
+      .insert(integrationConnections)
+      .values([
+        {
+          id: "icn_put_bindings_service_001",
+          organizationId: authenticatedSession.organizationId,
+          targetKey: "openai_default",
+        },
+        {
+          id: "icn_put_bindings_service_002",
+          organizationId: authenticatedSession.organizationId,
+          targetKey: "openai_default",
+        },
+      ])
+      .returning();
+
+    if (connectionA === undefined || connectionB === undefined) {
+      throw new Error("Expected integration connections to be inserted.");
+    }
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_put_bindings_service_001",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "PUT Bindings Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_put_bindings_service_001",
+      version: 2,
+    });
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values([
+      {
+        id: "ibd_put_bindings_existing_001",
+        sandboxProfileId: "sbp_put_bindings_service_001",
+        sandboxProfileVersion: 2,
+        connectionId: connectionA.id,
+        kind: IntegrationBindingKinds.AGENT,
+        config: {
+          runtime: "codex-cli",
+          defaultModel: "gpt-4.1",
+        },
+      },
+      {
+        id: "ibd_put_bindings_existing_002",
+        sandboxProfileId: "sbp_put_bindings_service_001",
+        sandboxProfileVersion: 2,
+        connectionId: connectionA.id,
+        kind: IntegrationBindingKinds.CONNECTOR,
+        config: {
+          connector: "legacy",
+        },
+      },
+    ]);
+
+    const result = await putProfileVersionIntegrationBindings(
+      {
+        db: fixture.db,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_put_bindings_service_001",
+        profileVersion: 2,
+        bindings: [
+          {
+            id: "ibd_put_bindings_existing_001",
+            connectionId: connectionB.id,
+            kind: IntegrationBindingKinds.AGENT,
+            config: {
+              runtime: "codex-cli",
+              defaultModel: "gpt-5",
+            },
+          },
+          {
+            connectionId: connectionA.id,
+            kind: IntegrationBindingKinds.GIT,
+            config: {
+              repositories: ["mistlehq/mistle"],
+            },
+          },
+        ],
+      },
+    );
+
+    expect(result.bindings).toHaveLength(2);
+
+    const updatedBinding = result.bindings.find(
+      (binding) => binding.id === "ibd_put_bindings_existing_001",
+    );
+    expect(updatedBinding).toBeDefined();
+    expect(updatedBinding?.connectionId).toBe(connectionB.id);
+    expect(updatedBinding?.kind).toBe(IntegrationBindingKinds.AGENT);
+    expect(updatedBinding?.config).toEqual({
+      runtime: "codex-cli",
+      defaultModel: "gpt-5",
+    });
+
+    const insertedBinding = result.bindings.find(
+      (binding) => binding.kind === IntegrationBindingKinds.GIT,
+    );
+    expect(insertedBinding).toBeDefined();
+    expect(insertedBinding?.id).not.toBe("");
+
+    const deletedBinding =
+      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+        where: (table, { eq }) => eq(table.id, "ibd_put_bindings_existing_002"),
+      });
+    expect(deletedBinding).toBeUndefined();
+  }, 60_000);
+
+  it("throws not found when sandbox profile is missing", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-missing-profile@example.com",
+    });
+
+    await expect(
+      putProfileVersionIntegrationBindings(
+        {
+          db: fixture.db,
+        },
+        {
+          organizationId: authenticatedSession.organizationId,
+          profileId: "sbp_put_bindings_missing_profile",
+          profileVersion: 1,
+          bindings: [],
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
+    });
+  }, 60_000);
+
+  it("throws not found when sandbox profile version is missing", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-missing-version@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_put_bindings_missing_version_001",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Missing Version",
+      status: "active",
+    });
+
+    await expect(
+      putProfileVersionIntegrationBindings(
+        {
+          db: fixture.db,
+        },
+        {
+          organizationId: authenticatedSession.organizationId,
+          profileId: "sbp_put_bindings_missing_version_001",
+          profileVersion: 3,
+          bindings: [],
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
+    });
+  }, 60_000);
+
+  it("throws bad request when binding references inaccessible connection", async ({ fixture }) => {
+    const firstOrgSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-connection-org-a@example.com",
+    });
+    const secondOrgSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-connection-org-b@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai_default_connection_reference",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com",
+      },
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_put_bindings_connection_reference_001",
+      organizationId: firstOrgSession.organizationId,
+      displayName: "Connection Reference",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_put_bindings_connection_reference_001",
+      version: 1,
+    });
+
+    const [secondOrgConnection] = await fixture.db
+      .insert(integrationConnections)
+      .values({
+        id: "icn_put_bindings_other_org_001",
+        organizationId: secondOrgSession.organizationId,
+        targetKey: "openai_default_connection_reference",
+      })
+      .returning();
+
+    if (secondOrgConnection === undefined) {
+      throw new Error("Expected second-organization connection to be inserted.");
+    }
+
+    await expect(
+      putProfileVersionIntegrationBindings(
+        {
+          db: fixture.db,
+        },
+        {
+          organizationId: firstOrgSession.organizationId,
+          profileId: "sbp_put_bindings_connection_reference_001",
+          profileVersion: 1,
+          bindings: [
+            {
+              connectionId: secondOrgConnection.id,
+              kind: IntegrationBindingKinds.AGENT,
+              config: {
+                runtime: "codex-cli",
+              },
+            },
+          ],
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONNECTION_REFERENCE,
+    });
+  }, 60_000);
+
+  it("throws bad request when request references non-existent binding id", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-invalid-binding-id@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai_default_binding_reference",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com",
+      },
+    });
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_put_bindings_invalid_binding_reference_001",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Invalid Binding Reference",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_put_bindings_invalid_binding_reference_001",
+      version: 1,
+    });
+
+    const [connection] = await fixture.db
+      .insert(integrationConnections)
+      .values({
+        id: "icn_put_bindings_valid_reference_001",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "openai_default_binding_reference",
+      })
+      .returning();
+
+    if (connection === undefined) {
+      throw new Error("Expected connection to be inserted.");
+    }
+
+    await expect(
+      putProfileVersionIntegrationBindings(
+        {
+          db: fixture.db,
+        },
+        {
+          organizationId: authenticatedSession.organizationId,
+          profileId: "sbp_put_bindings_invalid_binding_reference_001",
+          profileVersion: 1,
+          bindings: [
+            {
+              id: "ibd_non_existent",
+              connectionId: connection.id,
+              kind: IntegrationBindingKinds.AGENT,
+              config: {
+                runtime: "codex-cli",
+              },
+            },
+          ],
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_REFERENCE,
+    });
+  }, 60_000);
+});
