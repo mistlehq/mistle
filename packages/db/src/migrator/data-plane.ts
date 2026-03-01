@@ -9,5 +9,8 @@ export const DATA_PLANE_MIGRATIONS_FOLDER_PATH = fileURLToPath(
 );
 
 export async function runDataPlaneMigrations(input: RunDataPlaneMigrationsInput): Promise<void> {
-  await runPostgresMigrations(input);
+  await runPostgresMigrations({
+    ...input,
+    ensureSchemaExists: false,
+  });
 }
