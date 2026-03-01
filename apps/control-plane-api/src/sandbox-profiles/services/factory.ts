@@ -2,6 +2,7 @@ import { compileProfileVersionRuntimePlan } from "./compile-profile-version-runt
 import { createProfile } from "./create-profile.js";
 import { getProfile } from "./get-profile.js";
 import { listProfiles } from "./list-profiles.js";
+import { putProfileVersionIntegrationBindings } from "./put-profile-version-integration-bindings.js";
 import { requestDeleteProfile } from "./request-delete-profile.js";
 import { startProfileInstance } from "./start-profile-instance.js";
 import type { CreateSandboxProfilesServiceInput, SandboxProfilesService } from "./types.js";
@@ -13,6 +14,8 @@ export {
   SandboxProfilesBadRequestError,
   SandboxProfilesCompileError,
   SandboxProfilesCompileErrorCodes,
+  SandboxProfilesIntegrationBindingsBadRequestCodes,
+  SandboxProfilesIntegrationBindingsBadRequestError,
   SandboxProfilesNotFoundCodes,
   SandboxProfilesNotFoundError,
 } from "./errors.js";
@@ -30,6 +33,13 @@ export function createSandboxProfilesService(
         {
           db: input.db,
           openWorkflow: input.openWorkflow,
+        },
+        serviceInput,
+      ),
+    putProfileVersionIntegrationBindings: (serviceInput) =>
+      putProfileVersionIntegrationBindings(
+        {
+          db: input.db,
         },
         serviceInput,
       ),
