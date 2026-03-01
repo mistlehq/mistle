@@ -9,6 +9,21 @@ export type OpenAiApiKeyCompileBindingInput = CompileBindingInput<
   OpenAiApiKeyBindingConfig
 >;
 
+const CodexCliArtifactKey = "codex-cli";
+const CodexCliInstallPath = "/usr/local/bin/codex";
+const CodexGitHubRepository = "openai/codex";
+const CodexGitHubAssets = {
+  x86_64: {
+    fileName: "codex-x86_64-unknown-linux-musl.tar.gz",
+    binaryPath: "codex-x86_64-unknown-linux-musl",
+  },
+  aarch64: {
+    fileName: "codex-aarch64-unknown-linux-musl.tar.gz",
+    binaryPath: "codex-aarch64-unknown-linux-musl",
+  },
+};
+const ArtifactCommandTimeoutMs = 120_000;
+
 function resolveRoutePathPrefix(baseUrl: string): string {
   const parsedUrl = new URL(baseUrl);
   const pathname = parsedUrl.pathname;
@@ -55,7 +70,35 @@ export function compileOpenAiApiKeyBinding(
         },
       },
     ],
-    artifacts: [],
+    artifacts: [
+      {
+        artifactKey: CodexCliArtifactKey,
+        name: "Codex CLI",
+        lifecycle: {
+          install: ({ refs }) => [
+            refs.githubReleases.installLatestBinary({
+              repository: CodexGitHubRepository,
+              assets: CodexGitHubAssets,
+              installPath: CodexCliInstallPath,
+              timeoutMs: ArtifactCommandTimeoutMs,
+            }),
+          ],
+          update: ({ refs }) => [
+            refs.githubReleases.installLatestBinary({
+              repository: CodexGitHubRepository,
+              assets: CodexGitHubAssets,
+              installPath: CodexCliInstallPath,
+              timeoutMs: ArtifactCommandTimeoutMs,
+            }),
+          ],
+          remove: ({ refs }) => [
+            refs.command.exec({
+              args: ["rm", "-f", CodexCliInstallPath],
+            }),
+          ],
+        },
+      },
+    ],
     runtimeClientSetups: [
       {
         clientId: input.binding.config.runtime,

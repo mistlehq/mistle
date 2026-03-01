@@ -87,6 +87,23 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(runtimePlan.sandboxProfileId).toBe("sbp_compile_success");
     expect(runtimePlan.version).toBe(1);
     expect(runtimePlan.egressRoutes).toHaveLength(1);
+    expect(runtimePlan.artifacts).toHaveLength(1);
+    expect(runtimePlan.artifacts[0]).toMatchObject({
+      artifactKey: "codex-cli",
+      name: "Codex CLI",
+      lifecycle: {
+        install: [{ args: ["sh", "-euc"], timeoutMs: 120_000 }],
+        update: [{ args: ["sh", "-euc"], timeoutMs: 120_000 }],
+        remove: [{ args: ["rm", "-f", "/usr/local/bin/codex"] }],
+      },
+    });
+
+    const installScript = runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[2];
+    expect(typeof installScript).toBe("string");
+    expect(installScript).toContain("https://github.com/openai/codex/releases/latest/download");
+    expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
+    expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
+    expect(installScript).toContain("/usr/local/bin/codex");
     expect(runtimePlan.runtimeClientSetups).toEqual([
       {
         clientId: "codex-cli",

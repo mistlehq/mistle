@@ -38,7 +38,20 @@ function createRoute(input: {
 
 function createCompiledBindingResult(input: {
   route: EgressCredentialRoute;
-  artifactInstallPath: string;
+  artifactKey: string;
+  artifactName?: string;
+  artifactInstallCommands?: ReadonlyArray<{
+    args: ReadonlyArray<string>;
+    env?: Record<string, string>;
+    cwd?: string;
+    timeoutMs?: number;
+  }>;
+  artifactUpdateCommands?: ReadonlyArray<{
+    args: ReadonlyArray<string>;
+    env?: Record<string, string>;
+    cwd?: string;
+    timeoutMs?: number;
+  }>;
   runtimeClientSetup?: {
     clientId: string;
     env: Record<string, string | { kind: "egress_url"; routeId: string }>;
@@ -49,11 +62,16 @@ function createCompiledBindingResult(input: {
     egressRoutes: [input.route],
     artifacts: [
       {
-        artifactId: `${input.route.routeId}_artifact`,
-        uri: `https://artifacts.example.com/${input.route.routeId}`,
-        sha256: `${input.route.routeId}_sha256`,
-        installPath: input.artifactInstallPath,
-        executable: true,
+        artifactKey: input.artifactKey,
+        name: input.artifactName ?? `${input.route.routeId} artifact`,
+        lifecycle: {
+          install: input.artifactInstallCommands ?? [
+            { args: ["echo", "install", input.route.routeId] },
+          ],
+          ...(input.artifactUpdateCommands === undefined
+            ? {}
+            : { update: input.artifactUpdateCommands }),
+        },
       },
     ],
     runtimeClientSetups:
@@ -78,7 +96,7 @@ describe("validateCompiledBindingResults", () => {
         hosts: ["api.openai.com"],
         pathPrefixes: ["/v1/responses"],
       }),
-      artifactInstallPath: "/usr/local/bin/codex",
+      artifactKey: "codex-cli",
       runtimeClientSetup: {
         clientId: "codex-cli",
         env: {
@@ -102,7 +120,7 @@ describe("validateCompiledBindingResults", () => {
         hosts: ["api.github.com"],
         pathPrefixes: ["/repos"],
       }),
-      artifactInstallPath: "/usr/local/bin/gh",
+      artifactKey: "gh-cli",
     });
 
     expect(() =>
@@ -120,7 +138,7 @@ describe("validateCompiledBindingResults", () => {
         hosts: ["api.openai.com"],
         pathPrefixes: ["/v1"],
       }),
-      artifactInstallPath: "/tmp/a",
+      artifactKey: "artifact-a",
     });
     const resultB = createCompiledBindingResult({
       route: createRoute({
@@ -129,7 +147,7 @@ describe("validateCompiledBindingResults", () => {
         hosts: ["api.openai.com"],
         pathPrefixes: ["/v1/responses"],
       }),
-      artifactInstallPath: "/tmp/b",
+      artifactKey: "artifact-b",
     });
 
     expect(() =>
@@ -157,7 +175,7 @@ describe("validateCompiledBindingResults", () => {
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
-      artifactInstallPath: "/tmp/a",
+      artifactKey: "artifact-a",
       runtimeClientSetup: {
         clientId: "codex-cli",
         env: {
@@ -172,7 +190,7 @@ describe("validateCompiledBindingResults", () => {
         bindingId: "bind_b",
         hosts: ["api.github.com"],
       }),
-      artifactInstallPath: "/tmp/b",
+      artifactKey: "artifact-b",
       runtimeClientSetup: {
         clientId: "codex-cli",
         env: {
@@ -207,7 +225,7 @@ describe("validateCompiledBindingResults", () => {
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
-      artifactInstallPath: "/tmp/a",
+      artifactKey: "artifact-a",
       runtimeClientSetup: {
         clientId: "codex-cli",
         env: {},
@@ -227,7 +245,7 @@ describe("validateCompiledBindingResults", () => {
         bindingId: "bind_b",
         hosts: ["api.github.com"],
       }),
-      artifactInstallPath: "/tmp/b",
+      artifactKey: "artifact-b",
       runtimeClientSetup: {
         clientId: "codex-cli",
         env: {},
@@ -267,7 +285,7 @@ describe("validateCompiledBindingResults", () => {
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
-      artifactInstallPath: "/tmp/a",
+      artifactKey: "artifact-a",
       runtimeClientSetup: {
         clientId: "codex-cli",
         env: {
@@ -286,7 +304,7 @@ describe("validateCompiledBindingResults", () => {
         bindingId: "bind_b",
         hosts: ["api.github.com"],
       }),
-      artifactInstallPath: "/tmp/b",
+      artifactKey: "artifact-b",
       runtimeClientSetup: {
         clientId: "codex-cli",
         env: {
@@ -304,5 +322,71 @@ describe("validateCompiledBindingResults", () => {
         compiledBindingResults: [resultA, resultB],
       }),
     ).not.toThrow();
+  });
+
+  it("fails on artifact key conflicts with different lifecycle specs", () => {
+    const resultA = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      artifactName: "Codex CLI",
+      artifactInstallCommands: [{ args: ["sh", "-euc", "install-codex-latest"] }],
+    });
+
+    const resultB = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_b",
+        bindingId: "bind_b",
+        hosts: ["api.github.com"],
+      }),
+      artifactKey: "codex-cli",
+      artifactName: "Codex CLI",
+      artifactInstallCommands: [{ args: ["sh", "-euc", "install-codex-v0.100.0"] }],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [resultA, resultB],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+  });
+
+  it("fails when an artifact has no install commands", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      artifactInstallCommands: [],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+  });
+
+  it("fails when an artifact command has empty args", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      artifactInstallCommands: [{ args: [] }],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrowError(IntegrationCompilerError);
   });
 });

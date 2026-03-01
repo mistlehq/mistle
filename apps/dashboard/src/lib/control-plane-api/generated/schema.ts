@@ -1057,16 +1057,34 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": {
-              error: {
-                message: string;
-                name: string;
-              } & {
-                [key: string]: unknown;
-              };
-              /** @enum {boolean} */
-              success: false;
-            };
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_BINDING_CONNECTION_REFERENCE"
+                    | "INVALID_CONNECTION_TARGET_REFERENCE"
+                    | "CONNECTION_MISMATCH"
+                    | "TARGET_DISABLED"
+                    | "CONNECTION_NOT_ACTIVE"
+                    | "KIND_MISMATCH"
+                    | "INVALID_TARGET_CONFIG"
+                    | "INVALID_BINDING_CONFIG"
+                    | "ROUTE_CONFLICT"
+                    | "ARTIFACT_CONFLICT"
+                    | "RUNTIME_CLIENT_SETUP_CONFLICT"
+                    | "RUNTIME_CLIENT_SETUP_INVALID_REF";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
           };
         };
         /** @description Authentication is required. */

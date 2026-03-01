@@ -163,12 +163,77 @@ export type EgressCredentialRoute = {
   };
 };
 
-export type RuntimeArtifactSpec = {
-  artifactId: string;
-  uri: string;
-  sha256: string;
+export type RuntimeArtifactCommand = {
+  args: ReadonlyArray<string>;
+  env?: Record<string, string>;
+  cwd?: string;
+  timeoutMs?: number;
+};
+
+export type RuntimeArtifactGithubReleaseAsset = {
+  fileName: string;
+  binaryPath: string;
+  format?: "tar.gz" | "binary";
+};
+
+export type RuntimeArtifactGithubReleaseInstallInput = {
+  repository: string;
+  assets: {
+    x86_64: RuntimeArtifactGithubReleaseAsset;
+    aarch64: RuntimeArtifactGithubReleaseAsset;
+  };
   installPath: string;
-  executable: boolean;
+  timeoutMs?: number;
+};
+
+export type RuntimeArtifactRefs = {
+  command: {
+    exec(input: RuntimeArtifactCommand): RuntimeArtifactCommand;
+  };
+  mise: {
+    install(input: {
+      tools: ReadonlyArray<string>;
+      force?: boolean;
+      timeoutMs?: number;
+    }): RuntimeArtifactCommand;
+  };
+  githubReleases: {
+    installLatestBinary(input: RuntimeArtifactGithubReleaseInstallInput): RuntimeArtifactCommand;
+  };
+  compileContext: {
+    organizationId: string;
+    sandboxProfileId: string;
+    version: number;
+    targetKey: string;
+    bindingId: string;
+    sandboxProvider: string;
+  };
+};
+
+export type RuntimeArtifactLifecycleBuilder = (input: {
+  refs: RuntimeArtifactRefs;
+}) => ReadonlyArray<RuntimeArtifactCommand>;
+
+type RuntimeArtifactLifecycle<THook> = {
+  install: THook;
+  update?: THook;
+  remove?: THook;
+};
+
+export type RuntimeArtifactSpec = {
+  artifactKey: string;
+  name: string;
+  description?: string;
+  lifecycle: RuntimeArtifactLifecycle<
+    ReadonlyArray<RuntimeArtifactCommand> | RuntimeArtifactLifecycleBuilder
+  >;
+};
+
+export type CompiledRuntimeArtifactSpec = {
+  artifactKey: string;
+  name: string;
+  description?: string;
+  lifecycle: RuntimeArtifactLifecycle<ReadonlyArray<RuntimeArtifactCommand>>;
 };
 
 type RuntimeClientSetupBase<TEnvValue> = {
@@ -192,7 +257,7 @@ export type CompileBindingResult = {
 
 export type CompiledBindingResult = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
-  artifacts: ReadonlyArray<RuntimeArtifactSpec>;
+  artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClientSetups: ReadonlyArray<CompiledRuntimeClientSetup>;
 };
 
@@ -281,7 +346,7 @@ export type CompiledRuntimePlan = {
   version: number;
   image: ResolvedSandboxImage;
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
-  artifacts: ReadonlyArray<RuntimeArtifactSpec>;
+  artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClientSetups: ReadonlyArray<RuntimeClientSetup>;
 };
 

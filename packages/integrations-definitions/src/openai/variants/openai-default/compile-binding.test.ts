@@ -1,6 +1,62 @@
+import type {
+  RuntimeArtifactCommand,
+  RuntimeArtifactLifecycleBuilder,
+  RuntimeArtifactRefs,
+} from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { compileOpenAiApiKeyBinding } from "./compile-binding.js";
+
+function createRuntimeArtifactRefs(): RuntimeArtifactRefs {
+  const exec = (input: RuntimeArtifactCommand): RuntimeArtifactCommand => ({
+    args: [...input.args],
+    ...(input.env === undefined ? {} : { env: input.env }),
+    ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+    ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+  });
+
+  return {
+    command: {
+      exec,
+    },
+    mise: {
+      install: (input) =>
+        exec({
+          args: ["mise", "install", ...(input.force === true ? ["--force"] : []), ...input.tools],
+          ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+        }),
+    },
+    githubReleases: {
+      installLatestBinary: (input) =>
+        exec({
+          args: ["github-releases.installLatestBinary", JSON.stringify(input)],
+          ...(input.timeoutMs === undefined ? {} : { timeoutMs: input.timeoutMs }),
+        }),
+    },
+    compileContext: {
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "openai_default",
+      bindingId: "ibd_123",
+      sandboxProvider: "docker",
+    },
+  };
+}
+
+function resolveArtifactLifecycleHook(
+  hook: ReadonlyArray<RuntimeArtifactCommand> | RuntimeArtifactLifecycleBuilder | undefined,
+): ReadonlyArray<RuntimeArtifactCommand> | undefined {
+  if (hook === undefined) {
+    return undefined;
+  }
+
+  if (typeof hook === "function") {
+    return hook({ refs: createRuntimeArtifactRefs() });
+  }
+
+  return hook;
+}
 
 describe("compileOpenAiApiKeyBinding", () => {
   it("builds expected egress route and codex runtime setup", () => {
@@ -61,6 +117,32 @@ describe("compileOpenAiApiKeyBinding", () => {
           connectionId: "icn_123",
           secretType: "api_key",
         },
+      },
+    ]);
+
+    expect(compiled.artifacts).toHaveLength(1);
+    const codexArtifact = compiled.artifacts[0];
+    expect(codexArtifact?.artifactKey).toBe("codex-cli");
+    expect(codexArtifact?.name).toBe("Codex CLI");
+    const installCommands = resolveArtifactLifecycleHook(codexArtifact?.lifecycle.install);
+    expect(installCommands).toHaveLength(1);
+    expect(installCommands?.[0]?.args[0]).toBe("github-releases.installLatestBinary");
+    expect(installCommands?.[0]?.args[1]).toContain('"repository":"openai/codex"');
+    expect(installCommands?.[0]?.args[1]).toContain(
+      '"fileName":"codex-x86_64-unknown-linux-musl.tar.gz"',
+    );
+    expect(installCommands?.[0]?.args[1]).toContain(
+      '"fileName":"codex-aarch64-unknown-linux-musl.tar.gz"',
+    );
+    expect(installCommands?.[0]?.args[1]).toContain('"installPath":"/usr/local/bin/codex"');
+    expect(installCommands?.[0]?.timeoutMs).toBe(120_000);
+
+    const updateCommands = resolveArtifactLifecycleHook(codexArtifact?.lifecycle.update);
+    expect(updateCommands).toEqual(installCommands);
+
+    expect(resolveArtifactLifecycleHook(codexArtifact?.lifecycle.remove)).toEqual([
+      {
+        args: ["rm", "-f", "/usr/local/bin/codex"],
       },
     ]);
 
