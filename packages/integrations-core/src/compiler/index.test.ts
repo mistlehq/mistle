@@ -55,7 +55,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
           artifactKey: "codex-cli",
           name: "Codex CLI",
           lifecycle: {
-            onSandboxCreate: ({ refs }) => [
+            install: ({ refs }) => [
               refs.mise.install({
                 tools: ["npm:@openai/codex@latest"],
                 timeoutMs: 120_000,
@@ -146,7 +146,7 @@ describe("compileRuntimePlan", () => {
       artifactKey: "codex-cli",
       name: "Codex CLI",
       lifecycle: {
-        onSandboxCreate: [
+        install: [
           {
             args: ["mise", "install", "npm:@openai/codex@latest"],
             timeoutMs: 120_000,

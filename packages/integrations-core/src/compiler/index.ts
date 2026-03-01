@@ -78,7 +78,7 @@ type RuntimeArtifactLifecycleHook =
 
 function resolveLifecycleHook(input: {
   artifactKey: string;
-  hookName: "onSandboxCreate" | "onSandboxResume" | "onSandboxShutdown";
+  hookName: "install" | "update" | "remove";
   hook: RuntimeArtifactLifecycleHook | undefined;
   refs: RuntimeArtifactRefs;
 }): ReadonlyArray<RuntimeArtifactCommand> | undefined {
@@ -120,30 +120,30 @@ function resolveRuntimeArtifacts(input: {
   });
 
   return input.artifacts.map((artifact) => {
-    const onSandboxCreate = resolveLifecycleHook({
+    const install = resolveLifecycleHook({
       artifactKey: artifact.artifactKey,
-      hookName: "onSandboxCreate",
-      hook: artifact.lifecycle.onSandboxCreate,
+      hookName: "install",
+      hook: artifact.lifecycle.install,
       refs,
     });
 
-    if (onSandboxCreate === undefined) {
+    if (install === undefined) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.ARTIFACT_CONFLICT,
-        `Artifact '${artifact.artifactKey}' must define onSandboxCreate commands.`,
+        `Artifact '${artifact.artifactKey}' must define install commands.`,
       );
     }
 
-    const onSandboxResume = resolveLifecycleHook({
+    const update = resolveLifecycleHook({
       artifactKey: artifact.artifactKey,
-      hookName: "onSandboxResume",
-      hook: artifact.lifecycle.onSandboxResume,
+      hookName: "update",
+      hook: artifact.lifecycle.update,
       refs,
     });
-    const onSandboxShutdown = resolveLifecycleHook({
+    const remove = resolveLifecycleHook({
       artifactKey: artifact.artifactKey,
-      hookName: "onSandboxShutdown",
-      hook: artifact.lifecycle.onSandboxShutdown,
+      hookName: "remove",
+      hook: artifact.lifecycle.remove,
       refs,
     });
 
@@ -152,9 +152,9 @@ function resolveRuntimeArtifacts(input: {
       name: artifact.name,
       ...(artifact.description === undefined ? {} : { description: artifact.description }),
       lifecycle: {
-        onSandboxCreate,
-        ...(onSandboxResume === undefined ? {} : { onSandboxResume }),
-        ...(onSandboxShutdown === undefined ? {} : { onSandboxShutdown }),
+        install,
+        ...(update === undefined ? {} : { update }),
+        ...(remove === undefined ? {} : { remove }),
       },
     };
   });

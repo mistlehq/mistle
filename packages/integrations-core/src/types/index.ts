@@ -196,9 +196,9 @@ export type RuntimeArtifactLifecycleBuilder = (input: {
 }) => ReadonlyArray<RuntimeArtifactCommand>;
 
 type RuntimeArtifactLifecycle<THook> = {
-  onSandboxCreate: THook;
-  onSandboxResume?: THook;
-  onSandboxShutdown?: THook;
+  install: THook;
+  update?: THook;
+  remove?: THook;
 };
 
 export type RuntimeArtifactSpec = {

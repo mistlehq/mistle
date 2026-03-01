@@ -76,19 +76,19 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
   const artifactByKey = new Map<string, CompiledRuntimeArtifactSpec>();
 
   for (const artifact of input) {
-    if (artifact.lifecycle.onSandboxCreate.length === 0) {
+    if (artifact.lifecycle.install.length === 0) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.ARTIFACT_CONFLICT,
-        `Artifact '${artifact.artifactKey}' must include at least one onSandboxCreate command.`,
+        `Artifact '${artifact.artifactKey}' must include at least one install command.`,
       );
     }
 
     const lifecycleHooks: ReadonlyArray<
-      ReadonlyArray<CompiledRuntimeArtifactSpec["lifecycle"]["onSandboxCreate"][number]>
+      ReadonlyArray<CompiledRuntimeArtifactSpec["lifecycle"]["install"][number]>
     > = [
-      artifact.lifecycle.onSandboxCreate,
-      artifact.lifecycle.onSandboxResume ?? [],
-      artifact.lifecycle.onSandboxShutdown ?? [],
+      artifact.lifecycle.install,
+      artifact.lifecycle.update ?? [],
+      artifact.lifecycle.remove ?? [],
     ];
 
     for (const hookCommands of lifecycleHooks) {
@@ -131,8 +131,8 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
 }
 
 function artifactCommandsEqual(
-  left: ReadonlyArray<CompiledRuntimeArtifactSpec["lifecycle"]["onSandboxCreate"][number]>,
-  right: ReadonlyArray<CompiledRuntimeArtifactSpec["lifecycle"]["onSandboxCreate"][number]>,
+  left: ReadonlyArray<CompiledRuntimeArtifactSpec["lifecycle"]["install"][number]>,
+  right: ReadonlyArray<CompiledRuntimeArtifactSpec["lifecycle"]["install"][number]>,
 ): boolean {
   if (left.length !== right.length) {
     return false;
@@ -204,15 +204,15 @@ function artifactLifecycleEquals(
   left: CompiledRuntimeArtifactSpec["lifecycle"],
   right: CompiledRuntimeArtifactSpec["lifecycle"],
 ): boolean {
-  const leftResume = left.onSandboxResume ?? [];
-  const rightResume = right.onSandboxResume ?? [];
-  const leftShutdown = left.onSandboxShutdown ?? [];
-  const rightShutdown = right.onSandboxShutdown ?? [];
+  const leftUpdate = left.update ?? [];
+  const rightUpdate = right.update ?? [];
+  const leftRemove = left.remove ?? [];
+  const rightRemove = right.remove ?? [];
 
   return (
-    artifactCommandsEqual(left.onSandboxCreate, right.onSandboxCreate) &&
-    artifactCommandsEqual(leftResume, rightResume) &&
-    artifactCommandsEqual(leftShutdown, rightShutdown)
+    artifactCommandsEqual(left.install, right.install) &&
+    artifactCommandsEqual(leftUpdate, rightUpdate) &&
+    artifactCommandsEqual(leftRemove, rightRemove)
   );
 }
 
