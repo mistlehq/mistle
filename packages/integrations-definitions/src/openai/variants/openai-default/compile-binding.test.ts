@@ -37,7 +37,7 @@ function createRuntimeArtifactRefs(): RuntimeArtifactRefs {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 1,
-      targetKey: "openai_default",
+      targetKey: "openai-default",
       bindingId: "ibd_123",
     },
   };
@@ -63,7 +63,7 @@ describe("compileOpenAiApiKeyBinding", () => {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 1,
-      targetKey: "openai_default",
+      targetKey: "openai-default",
       target: {
         familyId: "openai",
         variantId: "openai-default",
@@ -166,7 +166,7 @@ describe("compileOpenAiApiKeyBinding", () => {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 1,
-      targetKey: "openai_proxy",
+      targetKey: "openai-proxy",
       target: {
         familyId: "openai",
         variantId: "openai-default",

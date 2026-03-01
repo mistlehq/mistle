@@ -25,7 +25,7 @@ describe("sandbox profile version put integration bindings integration", () => {
     });
 
     await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai_default_put_bindings_route",
+      targetKey: "openai-default-put-bindings-route",
       familyId: "openai",
       variantId: "openai-default",
       enabled: true,
@@ -40,12 +40,12 @@ describe("sandbox profile version put integration bindings integration", () => {
         {
           id: "icn_put_bindings_route_001",
           organizationId: authenticatedSession.organizationId,
-          targetKey: "openai_default_put_bindings_route",
+          targetKey: "openai-default-put-bindings-route",
         },
         {
           id: "icn_put_bindings_route_002",
           organizationId: authenticatedSession.organizationId,
-          targetKey: "openai_default_put_bindings_route",
+          targetKey: "openai-default-put-bindings-route",
         },
       ])
       .returning();
@@ -232,7 +232,7 @@ describe("sandbox profile version put integration bindings integration", () => {
     });
 
     await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai_default_put_bindings_route_invalid_binding_id",
+      targetKey: "openai-default-put-bindings-route-invalid-binding-id",
       familyId: "openai",
       variantId: "openai-default",
       enabled: true,
@@ -256,7 +256,7 @@ describe("sandbox profile version put integration bindings integration", () => {
       .values({
         id: "icn_put_bindings_route_invalid_binding_id_001",
         organizationId: authenticatedSession.organizationId,
-        targetKey: "openai_default_put_bindings_route_invalid_binding_id",
+        targetKey: "openai-default-put-bindings-route-invalid-binding-id",
       })
       .returning();
 

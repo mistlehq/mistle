@@ -37,7 +37,7 @@ describe("sandbox profile compile runtime plan integration", () => {
       version: 1,
     });
     await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai_default",
+      targetKey: "openai-default",
       familyId: "openai",
       variantId: "openai-default",
       enabled: true,
@@ -48,7 +48,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     await fixture.db.insert(integrationConnections).values({
       id: "icn_compile_success",
       organizationId: authenticatedSession.organizationId,
-      targetKey: "openai_default",
+      targetKey: "openai-default",
       status: IntegrationConnectionStatuses.ACTIVE,
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({

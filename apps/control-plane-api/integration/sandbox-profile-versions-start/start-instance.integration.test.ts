@@ -126,7 +126,7 @@ describe("sandbox profile version start instance integration", () => {
       version: 1,
     });
     await fixture.controlPlaneDb.insert(integrationTargets).values({
-      targetKey: "openai_default",
+      targetKey: "openai-default",
       familyId: "openai",
       variantId: "openai-default",
       enabled: true,
@@ -137,7 +137,7 @@ describe("sandbox profile version start instance integration", () => {
     await fixture.controlPlaneDb.insert(integrationConnections).values({
       id: "icn_missing_connection",
       organizationId: otherOrganizationSession.organizationId,
-      targetKey: "openai_default",
+      targetKey: "openai-default",
       status: IntegrationConnectionStatuses.ACTIVE,
     });
     await fixture.controlPlaneDb.insert(sandboxProfileVersionIntegrationBindings).values({

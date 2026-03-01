@@ -165,7 +165,7 @@ describe("compileRuntimePlan", () => {
       registry,
       bindings: [
         {
-          targetKey: "openai_default",
+          targetKey: "openai-default",
           target: {
             familyId: "openai",
             variantId: "openai-default",
@@ -233,7 +233,7 @@ describe("compileRuntimePlan", () => {
       registry,
       bindings: [
         {
-          targetKey: "openai_default",
+          targetKey: "openai-default",
           target: {
             familyId: "openai",
             variantId: "openai-default",
@@ -295,7 +295,7 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            targetKey: "openai_default",
+            targetKey: "openai-default",
             target: {
               familyId: "openai",
               variantId: "openai-default",
@@ -333,7 +333,7 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            targetKey: "openai_default",
+            targetKey: "openai-default",
             target: {
               familyId: "openai",
               variantId: "openai-default",
@@ -381,7 +381,7 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            targetKey: "openai_default",
+            targetKey: "openai-default",
             target: {
               familyId: "openai",
               variantId: "openai-default",
@@ -419,7 +419,7 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            targetKey: "openai_default",
+            targetKey: "openai-default",
             target: {
               familyId: "openai",
               variantId: "openai-default",
@@ -467,7 +467,7 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            targetKey: "openai_default",
+            targetKey: "openai-default",
             target: {
               familyId: "openai",
               variantId: "openai-default",
@@ -509,7 +509,7 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            targetKey: "openai_default",
+            targetKey: "openai-default",
             target: {
               familyId: "openai",
               variantId: "openai-default",
@@ -561,7 +561,7 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            targetKey: "openai_default",
+            targetKey: "openai-default",
             target: {
               familyId: "openai",
               variantId: "openai-default",
@@ -603,7 +603,7 @@ describe("compileRuntimePlan", () => {
         registry,
         bindings: [
           {
-            targetKey: "openai_default",
+            targetKey: "openai-default",
             target: {
               familyId: "openai",
               variantId: "openai-default",
@@ -698,7 +698,7 @@ describe("compileRuntimePlan", () => {
       registry,
       bindings: [
         {
-          targetKey: "openai_default",
+          targetKey: "openai-default",
           target: {
             familyId: "openai",
             variantId: "openai-default",
