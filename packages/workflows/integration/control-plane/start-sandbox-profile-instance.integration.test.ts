@@ -31,10 +31,6 @@ describe("start sandbox profile instance workflow integration", () => {
       });
 
       const openWorkflow = createControlPlaneOpenWorkflow({ backend });
-      const resolvedManifest: Record<string, unknown> = {
-        app: "resolved-profile-version",
-        command: ["echo", "hello"],
-      };
       const workflowInput: StartSandboxProfileInstanceWorkflowInput = {
         organizationId: "org_control_plane_start_001",
         sandboxProfileId: "sbp_control_plane_start_001",
@@ -53,13 +49,7 @@ describe("start sandbox profile instance workflow integration", () => {
       };
 
       const workflow = createStartSandboxProfileInstanceWorkflow({
-        resolveSandboxProfileVersion: async () => {
-          return {
-            manifest: resolvedManifest,
-          };
-        },
         startSandboxInstance: async (input) => {
-          expect(input.manifest).toEqual(resolvedManifest);
           expect(input.image).toEqual(workflowInput.image);
 
           return {

@@ -1,5 +1,4 @@
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
-import { StartSandboxInstanceInputSchema } from "@mistle/data-plane-trpc/contracts";
 import { sandboxProfiles } from "@mistle/db/control-plane";
 import { SMTPEmailSender } from "@mistle/emails";
 import {
@@ -30,13 +29,9 @@ type ResolveSandboxProfileVersionInput = {
   sandboxProfileVersion: number;
 };
 
-type ResolvedSandboxStartManifest = {
-  manifest: Record<string, unknown>;
-};
-
-async function resolveSandboxStartManifest(
+async function verifySandboxProfileVersionExists(
   ctx: ResolveSandboxProfileVersionInput,
-): Promise<ResolvedSandboxStartManifest> {
+): Promise<void> {
   const sandboxProfile = await ctx.db.query.sandboxProfiles.findFirst({
     columns: {
       id: true,
@@ -51,7 +46,7 @@ async function resolveSandboxStartManifest(
 
   const sandboxProfileVersion = await ctx.db.query.sandboxProfileVersions.findFirst({
     columns: {
-      manifest: true,
+      sandboxProfileId: true,
     },
     where: (table, { and, eq }) =>
       and(
@@ -63,17 +58,6 @@ async function resolveSandboxStartManifest(
   if (sandboxProfileVersion === undefined) {
     throw new Error("Sandbox profile version was not found.");
   }
-
-  const parsedManifest = StartSandboxInstanceInputSchema.shape.manifest.safeParse(
-    sandboxProfileVersion.manifest,
-  );
-  if (!parsedManifest.success) {
-    throw new Error("Sandbox profile version manifest is invalid.");
-  }
-
-  return {
-    manifest: parsedManifest.data,
-  };
 }
 
 function createWorkflowInputs(ctx: {
@@ -115,14 +99,14 @@ function createWorkflowInputs(ctx: {
       },
     },
     startSandboxProfileInstance: {
-      resolveSandboxProfileVersion: async (input) =>
-        resolveSandboxStartManifest({
+      startSandboxInstance: async (input) => {
+        await verifySandboxProfileVersionExists({
           db: ctx.db,
           organizationId: input.organizationId,
           sandboxProfileId: input.sandboxProfileId,
           sandboxProfileVersion: input.sandboxProfileVersion,
-        }),
-      startSandboxInstance: async (input) => {
+        });
+
         const response = await dataPlaneSandboxInstancesClient.startSandboxInstance(input);
 
         return {

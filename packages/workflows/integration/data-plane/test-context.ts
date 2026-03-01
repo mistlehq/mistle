@@ -27,11 +27,6 @@ export type DataPlaneWorkflowFixture = {
   startedBootstrapTokenJtis: string[];
 };
 
-type JsonValue = string | number | boolean | null | JsonObject | JsonValue[];
-type JsonObject = {
-  [key: string]: JsonValue;
-};
-
 function resolveDockerWorkflowIntegrationEnabled(): boolean {
   if (process.env.MISTLE_SANDBOX_INTEGRATION !== "1") {
     return false;
@@ -61,33 +56,6 @@ function resolveDockerSocketPath(): string {
 
 export const dockerStartSandboxWorkflowIntegrationEnabled =
   resolveDockerWorkflowIntegrationEnabled();
-
-function toJsonValue(value: unknown): JsonValue {
-  if (value === null) {
-    return null;
-  }
-
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return value;
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((item) => toJsonValue(item));
-  }
-
-  if (typeof value === "object") {
-    const objectValue: JsonObject = {};
-    const entries = Object.entries(value);
-
-    for (const [key, entryValue] of entries) {
-      objectValue[key] = toJsonValue(entryValue);
-    }
-
-    return objectValue;
-  }
-
-  throw new Error("Manifest contains a non-JSON-serializable value.");
-}
 
 export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
   fixture: [
@@ -173,7 +141,6 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
               },
               insertSandboxInstance: async (workflowInput) => {
                 const sandboxInstanceId = `sbi_${randomUUID().replaceAll("-", "")}`;
-                const manifest = toJsonValue(workflowInput.manifest);
                 let insertedRows: Array<{ id: string }>;
                 try {
                   insertedRows = await sql<{ id: string }[]>`
@@ -182,7 +149,6 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                       organization_id,
                       sandbox_profile_id,
                       sandbox_profile_version,
-                      manifest,
                       provider,
                       provider_sandbox_id,
                       status,
@@ -195,7 +161,6 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                       ${workflowInput.organizationId},
                       ${workflowInput.sandboxProfileId},
                       ${workflowInput.sandboxProfileVersion},
-                      ${sql.json(manifest)},
                       ${workflowInput.provider},
                       ${workflowInput.providerSandboxId},
                       ${SandboxInstanceStatuses.STARTING},

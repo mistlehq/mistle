@@ -113,9 +113,6 @@ const worker = createControlPlaneWorker({
       },
     },
     startSandboxProfileInstance: {
-      resolveSandboxProfileVersion: async () => {
-        throw new Error("Provide profile-version resolution logic.");
-      },
       startSandboxInstance: async () => {
         throw new Error("Provide data-plane sandbox start logic.");
       },

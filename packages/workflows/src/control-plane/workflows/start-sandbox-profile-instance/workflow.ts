@@ -7,22 +7,14 @@ import {
   type StartSandboxProfileInstanceWorkflowOutput,
 } from "./spec.js";
 
-type ResolvedSandboxProfileVersion = Pick<StartSandboxInstanceWorkflowInput, "manifest">;
-
 export type CreateStartSandboxProfileInstanceWorkflowInput = {
-  resolveSandboxProfileVersion: (input: {
-    organizationId: string;
-    sandboxProfileId: string;
-    sandboxProfileVersion: number;
-  }) => Promise<ResolvedSandboxProfileVersion>;
   startSandboxInstance: (
     input: StartSandboxInstanceWorkflowInput,
   ) => Promise<StartSandboxProfileInstanceWorkflowOutput>;
 };
 
 /**
- * Creates a control-plane workflow that resolves profile version configuration and
- * starts a sandbox instance through the data-plane API.
+ * Creates a control-plane workflow that starts a sandbox instance through the data-plane API.
  */
 export function createStartSandboxProfileInstanceWorkflow(
   ctx: CreateStartSandboxProfileInstanceWorkflowInput,
@@ -33,16 +25,6 @@ export function createStartSandboxProfileInstanceWorkflow(
 > {
   return defineWorkflow(StartSandboxProfileInstanceWorkflowSpec, async (workflowCtx) => {
     const workflowInput = workflowCtx.input;
-    const resolvedProfileVersion = await workflowCtx.step.run(
-      { name: "resolve-sandbox-profile-version" },
-      async () =>
-        ctx.resolveSandboxProfileVersion({
-          organizationId: workflowInput.organizationId,
-          sandboxProfileId: workflowInput.sandboxProfileId,
-          sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-        }),
-    );
-
     const startedSandbox = await workflowCtx.step.run(
       { name: "start-sandbox-instance-in-data-plane" },
       async () =>
@@ -50,7 +32,6 @@ export function createStartSandboxProfileInstanceWorkflow(
           organizationId: workflowInput.organizationId,
           sandboxProfileId: workflowInput.sandboxProfileId,
           sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-          manifest: resolvedProfileVersion.manifest,
           startedBy: workflowInput.startedBy,
           source: workflowInput.source,
           image: workflowInput.image,

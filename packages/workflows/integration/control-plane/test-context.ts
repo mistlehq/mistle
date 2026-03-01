@@ -99,11 +99,6 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
               },
             },
             startSandboxProfileInstance: {
-              resolveSandboxProfileVersion: async () => {
-                throw new Error(
-                  "startSandboxProfileInstance.resolveSandboxProfileVersion is not configured in this fixture.",
-                );
-              },
               startSandboxInstance: async () => {
                 throw new Error(
                   "startSandboxProfileInstance.startSandboxInstance is not configured in this fixture.",

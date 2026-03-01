@@ -27,29 +27,14 @@ function createDockerBaseImageHandle(imageId: string): StartSandboxInstanceWorkf
   };
 }
 
-function normalizePersistedManifest(manifest: unknown): unknown {
-  if (typeof manifest === "string") {
-    return JSON.parse(manifest);
-  }
-
-  return manifest;
-}
-
 describeDockerWorkflowIntegration("start sandbox instance workflow integration", () => {
   it("starts a docker sandbox and persists sandbox instance state", async ({ fixture }) => {
-    const manifest: Record<string, unknown> = {
-      command: ["echo", "hello"],
-      env: {
-        HELLO: "WORLD",
-      },
-    };
     const startedBootstrapTokenJtiCountBefore = fixture.startedBootstrapTokenJtis.length;
 
     const handle = await fixture.openWorkflow.runWorkflow(StartSandboxInstanceWorkflowSpec, {
       organizationId: `org-${randomUUID()}`,
       sandboxProfileId: `sbp-${randomUUID()}`,
       sandboxProfileVersion: 1,
-      manifest,
       startedBy: {
         kind: "user",
         id: `usr-${randomUUID()}`,
@@ -87,7 +72,6 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
         organization_id: string;
         sandbox_profile_id: string;
         sandbox_profile_version: number;
-        manifest: unknown;
         provider: string;
         provider_sandbox_id: string | null;
         status: string;
@@ -102,7 +86,6 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
         organization_id,
         sandbox_profile_id,
         sandbox_profile_version,
-        manifest,
         provider,
         provider_sandbox_id,
         status,
@@ -121,7 +104,6 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
       throw new Error("Expected one persisted sandbox instance row.");
     }
 
-    expect(normalizePersistedManifest(persistedRow.manifest)).toEqual(manifest);
     expect(persistedRow.provider).toBe("docker");
     expect(persistedRow.provider_sandbox_id).toBe(result.providerSandboxId);
     expect(persistedRow.status).toBe("running");
@@ -143,9 +125,6 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
       organizationId,
       sandboxProfileId,
       sandboxProfileVersion: 1,
-      manifest: {
-        mode: "ack-timeout",
-      },
       startedBy: {
         kind: "user",
         id: `usr-${randomUUID()}`,
@@ -217,9 +196,6 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
         organizationId: FORBIDDEN_ORGANIZATION_ID,
         sandboxProfileId: `sbp-${randomUUID()}`,
         sandboxProfileVersion: 1,
-        manifest: {
-          mode: "rollback-check",
-        },
         startedBy: {
           kind: "user",
           id: `usr-${randomUUID()}`,

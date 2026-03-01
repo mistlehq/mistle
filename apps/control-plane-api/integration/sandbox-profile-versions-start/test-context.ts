@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
-import { StartSandboxInstanceInputSchema } from "@mistle/data-plane-trpc/contracts";
 import {
   CONTROL_PLANE_SCHEMA_NAME,
   createControlPlaneDatabase,
@@ -57,9 +56,9 @@ type ResolveSandboxProfileVersionInput = {
   sandboxProfileVersion: number;
 };
 
-async function resolveSandboxProfileVersion(input: ResolveSandboxProfileVersionInput): Promise<{
-  manifest: Record<string, unknown>;
-}> {
+async function verifySandboxProfileVersionExists(
+  input: ResolveSandboxProfileVersionInput,
+): Promise<void> {
   const sandboxProfile = await input.db.query.sandboxProfiles.findFirst({
     columns: {
       id: true,
@@ -74,7 +73,7 @@ async function resolveSandboxProfileVersion(input: ResolveSandboxProfileVersionI
 
   const sandboxProfileVersion = await input.db.query.sandboxProfileVersions.findFirst({
     columns: {
-      manifest: true,
+      sandboxProfileId: true,
     },
     where: (table, { and, eq }) =>
       and(
@@ -86,17 +85,6 @@ async function resolveSandboxProfileVersion(input: ResolveSandboxProfileVersionI
   if (sandboxProfileVersion === undefined) {
     throw new Error("Sandbox profile version was not found.");
   }
-
-  const parsedManifest = StartSandboxInstanceInputSchema.shape.manifest.safeParse(
-    sandboxProfileVersion.manifest,
-  );
-  if (!parsedManifest.success) {
-    throw new Error("Sandbox profile version manifest is invalid.");
-  }
-
-  return {
-    manifest: parsedManifest.data,
-  };
 }
 
 export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
@@ -182,7 +170,6 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
                     organizationId: workflowInput.organizationId,
                     sandboxProfileId: workflowInput.sandboxProfileId,
                     sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-                    manifest: workflowInput.manifest,
                     provider: workflowInput.provider,
                     providerSandboxId: workflowInput.providerSandboxId,
                     status: SandboxInstanceStatuses.STARTING,
@@ -348,14 +335,14 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
               },
             },
             startSandboxProfileInstance: {
-              resolveSandboxProfileVersion: async (input) =>
-                resolveSandboxProfileVersion({
+              startSandboxInstance: async (input) => {
+                await verifySandboxProfileVersionExists({
                   db: controlPlaneWorkflowDb,
                   organizationId: input.organizationId,
                   sandboxProfileId: input.sandboxProfileId,
                   sandboxProfileVersion: input.sandboxProfileVersion,
-                }),
-              startSandboxInstance: async (input) => {
+                });
+
                 const response = await dataPlaneClient.startSandboxInstance(input);
 
                 return {

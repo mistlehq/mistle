@@ -54,7 +54,6 @@ describe("sandbox profiles create integration", () => {
     }
     expect(initialVersion.sandboxProfileId).toBe(body.id);
     expect(initialVersion.version).toBe(1);
-    expect(initialVersion.manifest).toEqual({});
   }, 60_000);
 
   it("creates a sandbox profile with explicit status", async ({ fixture }) => {

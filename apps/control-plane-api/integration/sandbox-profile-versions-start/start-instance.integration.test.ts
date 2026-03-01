@@ -28,9 +28,6 @@ describe("sandbox profile version start instance integration", () => {
     await fixture.controlPlaneDb.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_start_instance_001",
       version: 3,
-      manifest: {
-        command: ["echo", "hello"],
-      },
     });
 
     const response = await fixture.request(
@@ -102,7 +99,6 @@ describe("sandbox profile version start instance integration", () => {
     await fixture.controlPlaneDb.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_start_instance_compile_error",
       version: 1,
-      manifest: {},
     });
     await fixture.controlPlaneDb.insert(sandboxProfileVersionIntegrationBindings).values({
       id: "ibd_start_instance_compile_error",

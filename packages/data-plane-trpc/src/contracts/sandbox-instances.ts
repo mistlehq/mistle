@@ -22,7 +22,6 @@ export const StartSandboxInstanceInputSchema = z
     organizationId: z.string().min(1),
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
-    manifest: z.record(z.string(), z.unknown()),
     startedBy: z
       .object({
         kind: z.enum(DataPlaneSandboxInstanceStarterKinds),

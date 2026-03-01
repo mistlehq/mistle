@@ -25,7 +25,6 @@ export async function createProfile(
       .values({
         sandboxProfileId: createdProfile.id,
         version: INITIAL_SANDBOX_PROFILE_VERSION,
-        manifest: {},
       })
       .returning();
 

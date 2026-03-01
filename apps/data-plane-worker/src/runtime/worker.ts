@@ -149,7 +149,6 @@ function createWorkflowInputs(ctx: {
             organizationId: workflowInput.organizationId,
             sandboxProfileId: workflowInput.sandboxProfileId,
             sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-            manifest: workflowInput.manifest,
             provider: workflowInput.provider,
             providerSandboxId: workflowInput.providerSandboxId,
             status: SandboxInstanceStatuses.STARTING,
