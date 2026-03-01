@@ -342,6 +342,13 @@ function start(): void {
     env: sharedDevEnv,
   });
 
+  console.log("Running data-plane DB migrations...");
+  runOrThrow({
+    command: "pnpm",
+    args: ["--filter", "@mistle/data-plane-api", "db:migrate"],
+    env: sharedDevEnv,
+  });
+
   console.log("Starting public tunnels...");
   runOrThrow({
     command: "docker",
