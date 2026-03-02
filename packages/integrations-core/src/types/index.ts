@@ -143,6 +143,30 @@ export type CompileBindingInput<
   };
 };
 
+export type IntegrationCredentialResolverInput = {
+  organizationId: string;
+  targetKey: string;
+  connectionId: string;
+  secretType: string;
+  purpose?: string;
+};
+
+export type IntegrationCredentialResolverResult = {
+  value: string;
+  expiresAt?: string;
+};
+
+export type IntegrationCredentialResolver = {
+  resolve(
+    input: IntegrationCredentialResolverInput,
+  ): MaybePromise<IntegrationCredentialResolverResult>;
+};
+
+export type IntegrationCredentialResolvers = {
+  default?: IntegrationCredentialResolver;
+  custom?: Record<string, IntegrationCredentialResolver>;
+};
+
 export type IntegrationOAuthCredentialMaterial = {
   purpose: string;
   secretType: string;
@@ -183,6 +207,13 @@ export type IntegrationOAuthHandler<TTargetConfig = Record<string, unknown>> = {
   ): MaybePromise<IntegrationOAuthCompleteResult>;
 };
 
+export type EgressCredentialResolverRef = {
+  connectionId: string;
+  secretType: string;
+  purpose?: string;
+  resolverKey?: string;
+};
+
 export type EgressCredentialRoute = {
   routeId: string;
   bindingId: string;
@@ -198,10 +229,7 @@ export type EgressCredentialRoute = {
     type: "bearer" | "basic" | "header" | "query";
     target: string;
   };
-  credentialResolver: {
-    connectionId: string;
-    secretType: string;
-  };
+  credentialResolver: EgressCredentialResolverRef;
 };
 
 export type RuntimeArtifactCommand = {
@@ -323,6 +351,7 @@ export type IntegrationDefinition<
   targetConfigSchema: TTargetConfigSchema;
   bindingConfigSchema: TBindingConfigSchema;
   supportedAuthSchemes: ReadonlyArray<IntegrationSupportedAuthScheme>;
+  credentialResolvers?: IntegrationCredentialResolvers;
   authHandlers?: {
     oauth?: IntegrationOAuthHandler<ParsedSchemaOutput<TTargetConfigSchema>>;
   };
