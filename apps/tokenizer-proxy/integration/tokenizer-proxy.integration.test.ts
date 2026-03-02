@@ -114,14 +114,6 @@ describe("tokenizer proxy integration", () => {
         controlPlaneApi: {
           baseUrl: controlPlaneServer.baseUrl,
         },
-        credentialResolver: {
-          requestTimeoutMs: 3000,
-        },
-        cache: {
-          maxEntries: 64,
-          defaultTtlSeconds: 60,
-          refreshSkewSeconds: 10,
-        },
       },
       internalAuthServiceToken: "integration-service-token",
     });
@@ -192,14 +184,6 @@ describe("tokenizer proxy integration", () => {
         },
         controlPlaneApi: {
           baseUrl: controlPlaneServer.baseUrl,
-        },
-        credentialResolver: {
-          requestTimeoutMs: 3000,
-        },
-        cache: {
-          maxEntries: 64,
-          defaultTtlSeconds: 60,
-          refreshSkewSeconds: 10,
         },
       },
       internalAuthServiceToken: "integration-service-token",

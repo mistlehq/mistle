@@ -15,3 +15,8 @@ export const EgressRequestHeaders = {
 } as const;
 
 export const CONTROL_PLANE_INTERNAL_AUTH_HEADER = "x-mistle-service-token";
+
+export const CREDENTIAL_RESOLVER_REQUEST_TIMEOUT_MS = 3000;
+export const CREDENTIAL_CACHE_MAX_ENTRIES = 10000;
+export const CREDENTIAL_CACHE_DEFAULT_TTL_SECONDS = 300;
+export const CREDENTIAL_CACHE_REFRESH_SKEW_SECONDS = 30;

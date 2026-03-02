@@ -1,5 +1,11 @@
 import { Hono } from "hono";
 
+import {
+  CREDENTIAL_CACHE_DEFAULT_TTL_SECONDS,
+  CREDENTIAL_CACHE_MAX_ENTRIES,
+  CREDENTIAL_CACHE_REFRESH_SKEW_SECONDS,
+  CREDENTIAL_RESOLVER_REQUEST_TIMEOUT_MS,
+} from "./egress/constants.js";
 import { ControlPlaneCredentialResolverClient } from "./egress/control-plane-client.js";
 import { CredentialCache } from "./egress/credential-cache.js";
 import { createEgressProxyHandler, EGRESS_ROUTE_BASE_PATH } from "./egress/proxy-handler.js";
@@ -13,12 +19,12 @@ export function createApp(
   const controlPlaneCredentialResolverClient = new ControlPlaneCredentialResolverClient({
     baseUrl: config.controlPlaneApi.baseUrl,
     internalAuthServiceToken,
-    requestTimeoutMs: config.credentialResolver.requestTimeoutMs,
+    requestTimeoutMs: CREDENTIAL_RESOLVER_REQUEST_TIMEOUT_MS,
   });
   const credentialCache = new CredentialCache({
-    maxEntries: config.cache.maxEntries,
-    defaultTtlSeconds: config.cache.defaultTtlSeconds,
-    refreshSkewSeconds: config.cache.refreshSkewSeconds,
+    maxEntries: CREDENTIAL_CACHE_MAX_ENTRIES,
+    defaultTtlSeconds: CREDENTIAL_CACHE_DEFAULT_TTL_SECONDS,
+    refreshSkewSeconds: CREDENTIAL_CACHE_REFRESH_SKEW_SECONDS,
     now: () => Date.now(),
   });
   const egressProxyHandler = createEgressProxyHandler({
