@@ -1,5 +1,5 @@
 {
-  "name": "@mistle/tunnel-auth",
+  "name": "@mistle/gateway-connection-auth",
   "private": true,
   "type": "module",
   "exports": {

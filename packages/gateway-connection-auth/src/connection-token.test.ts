@@ -4,42 +4,44 @@ import { SignJWT } from "jose";
 import { describe, expect, it } from "vitest";
 
 import {
-  BootstrapTokenError,
-  BootstrapTokenErrorCode,
-  mintBootstrapToken,
-  verifyBootstrapToken,
-  type BootstrapTokenConfig,
-} from "./bootstrap-token.js";
+  ConnectionTokenError,
+  ConnectionTokenErrorCode,
+  mintConnectionToken,
+  verifyConnectionToken,
+  type ConnectionTokenConfig,
+} from "./connection-token.js";
 
-const defaultConfig: BootstrapTokenConfig = {
-  bootstrapTokenSecret: "integration-bootstrap-token-secret",
-  tokenIssuer: "data-plane-worker",
+const defaultConfig: ConnectionTokenConfig = {
+  connectionTokenSecret: "integration-connection-token-secret",
+  tokenIssuer: "control-plane-api",
   tokenAudience: "data-plane-gateway",
 };
 
-async function expectBootstrapTokenError(promise: Promise<unknown>): Promise<BootstrapTokenError> {
+async function expectConnectionTokenError(
+  promise: Promise<unknown>,
+): Promise<ConnectionTokenError> {
   try {
     await promise;
   } catch (error) {
-    if (error instanceof BootstrapTokenError) {
+    if (error instanceof ConnectionTokenError) {
       return error;
     }
 
     throw error;
   }
 
-  throw new Error("Expected promise to reject with BootstrapTokenError.");
+  throw new Error("Expected promise to reject with ConnectionTokenError.");
 }
 
-describe("@mistle/tunnel-auth bootstrap token", () => {
-  it("mints and verifies bootstrap token with the same config", async () => {
-    const token = await mintBootstrapToken({
+describe("@mistle/gateway-connection-auth connection token", () => {
+  it("mints and verifies connection token with the same config", async () => {
+    const token = await mintConnectionToken({
       config: defaultConfig,
       jti: "jti_roundtrip_001",
       ttlSeconds: 60,
     });
 
-    const verifiedToken = await verifyBootstrapToken({
+    const verifiedToken = await verifyConnectionToken({
       config: defaultConfig,
       token,
     });
@@ -50,37 +52,37 @@ describe("@mistle/tunnel-auth bootstrap token", () => {
   });
 
   it("rejects mint when jti claim is empty", async () => {
-    const error = await expectBootstrapTokenError(
-      mintBootstrapToken({
+    const error = await expectConnectionTokenError(
+      mintConnectionToken({
         config: defaultConfig,
         jti: "   ",
         ttlSeconds: 60,
       }),
     );
 
-    expect(error.code).toBe(BootstrapTokenErrorCode.JTI_REQUIRED);
+    expect(error.code).toBe(ConnectionTokenErrorCode.JTI_REQUIRED);
   });
 
   it("rejects mint when ttlSeconds is invalid", async () => {
-    const error = await expectBootstrapTokenError(
-      mintBootstrapToken({
+    const error = await expectConnectionTokenError(
+      mintConnectionToken({
         config: defaultConfig,
         jti: "jti_invalid_ttl_001",
         ttlSeconds: 0,
       }),
     );
 
-    expect(error.code).toBe(BootstrapTokenErrorCode.INVALID_TTL_SECONDS);
+    expect(error.code).toBe(ConnectionTokenErrorCode.INVALID_TTL_SECONDS);
   });
 
   it("rejects verify when audience does not match", async () => {
-    const token = await mintBootstrapToken({
+    const token = await mintConnectionToken({
       config: defaultConfig,
       jti: "jti_bad_aud_001",
       ttlSeconds: 60,
     });
-    const error = await expectBootstrapTokenError(
-      verifyBootstrapToken({
+    const error = await expectConnectionTokenError(
+      verifyConnectionToken({
         config: {
           ...defaultConfig,
           tokenAudience: "data-plane-gateway-mismatch",
@@ -89,7 +91,7 @@ describe("@mistle/tunnel-auth bootstrap token", () => {
       }),
     );
 
-    expect(error.code).toBe(BootstrapTokenErrorCode.TOKEN_INVALID_AUDIENCE);
+    expect(error.code).toBe(ConnectionTokenErrorCode.TOKEN_INVALID_AUDIENCE);
   });
 
   it("rejects verify when token is expired", async () => {
@@ -100,16 +102,16 @@ describe("@mistle/tunnel-auth bootstrap token", () => {
       .setAudience(defaultConfig.tokenAudience)
       .setIssuedAt(1)
       .setExpirationTime(2)
-      .sign(createSecretKey(new TextEncoder().encode(defaultConfig.bootstrapTokenSecret)));
+      .sign(createSecretKey(new TextEncoder().encode(defaultConfig.connectionTokenSecret)));
 
-    const error = await expectBootstrapTokenError(
-      verifyBootstrapToken({
+    const error = await expectConnectionTokenError(
+      verifyConnectionToken({
         config: defaultConfig,
         token,
       }),
     );
 
-    expect(error.code).toBe(BootstrapTokenErrorCode.TOKEN_EXPIRED);
+    expect(error.code).toBe(ConnectionTokenErrorCode.TOKEN_EXPIRED);
   });
 
   it("rejects verify when jti claim is missing", async () => {
@@ -119,15 +121,15 @@ describe("@mistle/tunnel-auth bootstrap token", () => {
       .setAudience(defaultConfig.tokenAudience)
       .setIssuedAt()
       .setExpirationTime("2m")
-      .sign(createSecretKey(new TextEncoder().encode(defaultConfig.bootstrapTokenSecret)));
+      .sign(createSecretKey(new TextEncoder().encode(defaultConfig.connectionTokenSecret)));
 
-    const error = await expectBootstrapTokenError(
-      verifyBootstrapToken({
+    const error = await expectConnectionTokenError(
+      verifyConnectionToken({
         config: defaultConfig,
         token,
       }),
     );
 
-    expect(error.code).toBe(BootstrapTokenErrorCode.JTI_REQUIRED);
+    expect(error.code).toBe(ConnectionTokenErrorCode.JTI_REQUIRED);
   });
 });

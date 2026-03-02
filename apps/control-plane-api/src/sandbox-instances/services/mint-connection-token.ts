@@ -4,7 +4,7 @@ import {
   DataPlaneSandboxInstanceStatuses,
   type DataPlaneSandboxInstancesClient,
 } from "@mistle/data-plane-trpc";
-import { mintBootstrapToken } from "@mistle/tunnel-auth";
+import { mintConnectionToken as mintGatewayConnectionToken } from "@mistle/gateway-connection-auth";
 
 import {
   SandboxInstancesConflictCodes,
@@ -60,7 +60,7 @@ export async function mintConnectionToken(
     );
   }
 
-  const token = await mintBootstrapToken({
+  const token = await mintGatewayConnectionToken({
     config: input.tokenConfig,
     jti: createTokenJti(sandboxInstance.id),
     ttlSeconds: input.tokenTtlSeconds,

@@ -1,5 +1,5 @@
 import { createNodeWebSocket } from "@hono/node-ws";
-import type { BootstrapTokenConfig } from "@mistle/tunnel-auth";
+import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
 
 import { createApp, stopApp } from "../app.js";
 import { startServer } from "../server.js";

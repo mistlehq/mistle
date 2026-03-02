@@ -1,5 +1,5 @@
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
-import { verifyBootstrapToken } from "@mistle/tunnel-auth";
+import { verifyConnectionToken } from "@mistle/gateway-connection-auth";
 import { describe, expect } from "vitest";
 
 import {
@@ -10,15 +10,15 @@ import {
 } from "../src/sandbox-instances/contracts.js";
 import { it } from "./sandbox-profile-versions-start/test-context.js";
 
-const IntegrationTunnelConfig = {
-  bootstrapTokenSecret: "integration-bootstrap-secret",
+const IntegrationConnectionTokenConfig = {
+  connectionTokenSecret: "integration-bootstrap-secret",
   tokenIssuer: "integration-issuer",
   tokenAudience: "integration-audience",
 } as const;
 const IntegrationGatewayWsUrl = "ws://127.0.0.1:5202/tunnel/sandbox";
 
 describe("sandbox instance connection tokens integration", () => {
-  it("issues a bootstrap token for a running sandbox instance", async ({ fixture }) => {
+  it("issues a connection token for a running sandbox instance", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
       email: "integration-sandbox-instance-connection-token@example.com",
     });
@@ -55,8 +55,8 @@ describe("sandbox instance connection tokens integration", () => {
     expect(`${url.protocol}//${url.host}${url.pathname}`).toBe(IntegrationGatewayWsUrl);
     expect(url.searchParams.get("token")).toBe(body.token);
 
-    const verifiedToken = await verifyBootstrapToken({
-      config: IntegrationTunnelConfig,
+    const verifiedToken = await verifyConnectionToken({
+      config: IntegrationConnectionTokenConfig,
       token: body.token,
     });
     expect(verifiedToken.jti.startsWith(`${sandboxInstanceId}-`)).toBe(true);

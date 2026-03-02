@@ -26,7 +26,7 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
       gatewayWebsocketUrl: config.sandbox.gatewayWsUrl,
       tokenTtlSeconds: SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS,
       tokenConfig: {
-        bootstrapTokenSecret: runtimeConfig.tunnel.bootstrapTokenSecret,
+        connectionTokenSecret: runtimeConfig.tunnel.bootstrapTokenSecret,
         tokenIssuer: runtimeConfig.tunnel.tokenIssuer,
         tokenAudience: runtimeConfig.tunnel.tokenAudience,
       },

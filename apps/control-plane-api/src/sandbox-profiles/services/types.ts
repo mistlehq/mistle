@@ -6,9 +6,9 @@ import type {
   SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
+import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
-import type { BootstrapTokenConfig } from "@mistle/tunnel-auth";
 import type {
   StartSandboxProfileInstanceWorkflowInput,
   createControlPlaneOpenWorkflow,
@@ -26,7 +26,7 @@ export type CreateSandboxProfilesServiceInput = {
     instanceId: string;
     gatewayWebsocketUrl: string;
     tokenTtlSeconds: number;
-    tokenConfig: BootstrapTokenConfig;
+    tokenConfig: ConnectionTokenConfig;
   }) => Promise<{
     instanceId: string;
     url: string;
@@ -73,7 +73,7 @@ export type SandboxProfilesService = {
     connectionToken?: {
       gatewayWebsocketUrl: string;
       tokenTtlSeconds: number;
-      tokenConfig: BootstrapTokenConfig;
+      tokenConfig: ConnectionTokenConfig;
     };
     startedBy: {
       kind: SandboxInstanceStarterKind;

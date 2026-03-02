@@ -5,8 +5,8 @@ import {
   sandboxInstanceRuntimePlans,
   sandboxInstances,
 } from "@mistle/db/data-plane";
+import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import { systemSleeper } from "@mistle/time";
-import { mintBootstrapToken } from "@mistle/tunnel-auth";
 import {
   createDataPlaneWorker,
   type CreateDataPlaneWorkflowDefinitionsInput,

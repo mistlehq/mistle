@@ -4,7 +4,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import { mintBootstrapToken } from "@mistle/tunnel-auth";
+import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import { describe, expect } from "vitest";
 import WebSocket from "ws";
 
