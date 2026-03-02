@@ -43,6 +43,13 @@ const BadRequestCodeSchema = z.enum([
   IntegrationConnectionsBadRequestCodes.INVALID_LIST_CONNECTIONS_INPUT,
   IntegrationConnectionsBadRequestCodes.INVALID_PAGINATION_CURSOR,
   IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
+  IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_START_INPUT,
+  IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_COMPLETE_INPUT,
+  IntegrationConnectionsBadRequestCodes.OAUTH_NOT_SUPPORTED,
+  IntegrationConnectionsBadRequestCodes.OAUTH_HANDLER_NOT_CONFIGURED,
+  IntegrationConnectionsBadRequestCodes.OAUTH_STATE_INVALID,
+  IntegrationConnectionsBadRequestCodes.OAUTH_STATE_EXPIRED,
+  IntegrationConnectionsBadRequestCodes.OAUTH_STATE_ALREADY_USED,
 ]);
 
 export const IntegrationConnectionsBadRequestResponseSchema = z
@@ -101,6 +108,30 @@ export const CreateApiKeyConnectionParamsSchema = z
 export const CreateApiKeyConnectionBodySchema = z
   .object({
     apiKey: z.string().min(1),
+  })
+  .strict();
+
+export const StartOAuthConnectionParamsSchema = z
+  .object({
+    targetKey: z.string().min(1),
+  })
+  .strict();
+
+export const StartOAuthConnectionResponseSchema = z
+  .object({
+    authorizationUrl: z.url(),
+  })
+  .strict();
+
+export const CompleteOAuthConnectionParamsSchema = z
+  .object({
+    targetKey: z.string().min(1),
+  })
+  .strict();
+
+export const CompleteOAuthConnectionBodySchema = z
+  .object({
+    query: z.record(z.string(), z.string()),
   })
   .strict();
 
@@ -173,6 +204,132 @@ export const createApiKeyConnectionRoute = createRoute({
   responses: {
     201: {
       description: "Create an API-key backed integration connection.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ListIntegrationConnectionsBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsUnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsForbiddenResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Integration target was not found.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsNotFoundResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
+export const startOAuthConnectionRoute = createRoute({
+  method: "post",
+  path: "/:targetKey/oauth/start",
+  tags: ["Integrations"],
+  request: {
+    params: StartOAuthConnectionParamsSchema,
+  },
+  responses: {
+    200: {
+      description: "Create an OAuth authorization URL for an integration target.",
+      content: {
+        "application/json": {
+          schema: StartOAuthConnectionResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ListIntegrationConnectionsBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsUnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsForbiddenResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Integration target was not found.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsNotFoundResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
+export const completeOAuthConnectionRoute = createRoute({
+  method: "post",
+  path: "/:targetKey/oauth/complete",
+  tags: ["Integrations"],
+  request: {
+    params: CompleteOAuthConnectionParamsSchema,
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: CompleteOAuthConnectionBodySchema,
+        },
+      },
+    },
+  },
+  responses: {
+    201: {
+      description: "Create an OAuth-backed integration connection from callback query params.",
       content: {
         "application/json": {
           schema: IntegrationConnectionSchema,

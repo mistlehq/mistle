@@ -4,17 +4,21 @@ import { z } from "zod";
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 import { INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH } from "./constants.js";
 import {
+  completeOAuthConnectionRoute,
+  createApiKeyConnectionRoute,
   IntegrationConnectionsBadRequestResponseSchema,
   IntegrationConnectionsNotFoundResponseSchema,
-  createApiKeyConnectionRoute,
   listIntegrationConnectionsRoute,
+  startOAuthConnectionRoute,
 } from "./contracts.js";
+import { completeOAuthConnection } from "./services/complete-oauth-connection.js";
 import { createApiKeyConnection } from "./services/create-api-key-connection.js";
 import {
   IntegrationConnectionsBadRequestError,
   IntegrationConnectionsNotFoundError,
 } from "./services/errors.js";
 import { listIntegrationConnections } from "./services/list-connections.js";
+import { startOAuthConnection } from "./services/start-oauth-connection.js";
 
 export function createIntegrationConnectionsApp(): AppRoutes<
   typeof INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH
@@ -61,7 +65,51 @@ export function createIntegrationConnectionsApp(): AppRoutes<
 
       return ctx.json(createdConnection, 201);
     } catch (error) {
-      return handleCreateApiKeyConnectionError(ctx, error);
+      return handleIntegrationConnectionMutationError(ctx, error);
+    }
+  });
+
+  routes.openapi(startOAuthConnectionRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+
+      const startedOAuthConnection = await startOAuthConnection(ctx.get("db"), {
+        organizationId: session.session.activeOrganizationId,
+        targetKey: params.targetKey,
+      });
+
+      return ctx.json(startedOAuthConnection, 200);
+    } catch (error) {
+      return handleIntegrationConnectionMutationError(ctx, error);
+    }
+  });
+
+  routes.openapi(completeOAuthConnectionRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const body = ctx.req.valid("json");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+
+      const completedConnection = await completeOAuthConnection(
+        ctx.get("db"),
+        ctx.get("config").integrations,
+        {
+          organizationId: session.session.activeOrganizationId,
+          targetKey: params.targetKey,
+          query: body.query,
+        },
+      );
+
+      return ctx.json(completedConnection, 201);
+    } catch (error) {
+      return handleIntegrationConnectionMutationError(ctx, error);
     }
   });
 
@@ -84,7 +132,7 @@ function handleListIntegrationConnectionsError(ctx: AppContext, error: unknown) 
   throw error;
 }
 
-function handleCreateApiKeyConnectionError(ctx: AppContext, error: unknown) {
+function handleIntegrationConnectionMutationError(ctx: AppContext, error: unknown) {
   if (error instanceof IntegrationConnectionsBadRequestError) {
     const responseBody: z.infer<typeof IntegrationConnectionsBadRequestResponseSchema> = {
       code: error.code,
