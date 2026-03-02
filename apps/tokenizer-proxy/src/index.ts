@@ -1,0 +1,64 @@
+import { AppIds, loadConfig } from "@mistle/config";
+
+import { logger } from "./logger.js";
+import { createTokenizerProxyRuntime } from "./runtime/index.js";
+
+const loadedConfig = loadConfig({
+  app: AppIds.TOKENIZER_PROXY,
+  env: process.env,
+});
+if (loadedConfig.global === undefined) {
+  throw new Error("Expected global config to be loaded for tokenizer-proxy.");
+}
+
+const runtime = createTokenizerProxyRuntime({
+  app: loadedConfig.app,
+  internalAuthServiceToken: loadedConfig.global.internalAuth.serviceToken,
+});
+
+await runtime.start();
+
+let shutdownPromise: Promise<void> | undefined;
+
+async function stopRuntimeAndExit(signal: NodeJS.Signals): Promise<void> {
+  try {
+    await runtime.stop();
+    process.exit(0);
+  } catch (error) {
+    logger.error(
+      {
+        err: error,
+        signal,
+      },
+      "Failed to gracefully shutdown tokenizer-proxy",
+    );
+    process.exit(1);
+  }
+}
+
+async function shutdownAndExit(signal: NodeJS.Signals): Promise<void> {
+  if (shutdownPromise !== undefined) {
+    await shutdownPromise;
+    return;
+  }
+
+  shutdownPromise = stopRuntimeAndExit(signal);
+
+  await shutdownPromise;
+}
+
+process.once("SIGINT", () => {
+  void shutdownAndExit("SIGINT");
+});
+
+process.once("SIGTERM", () => {
+  void shutdownAndExit("SIGTERM");
+});
+
+logger.info(
+  {
+    host: loadedConfig.app.server.host,
+    port: loadedConfig.app.server.port,
+  },
+  "tokenizer-proxy listening",
+);

@@ -389,6 +389,25 @@ importers:
 
   apps/sandbox-runtime: {}
 
+  apps/tokenizer-proxy:
+    dependencies:
+      '@hono/node-server':
+        specifier: ^1.19.4
+        version: 1.19.9(hono@4.12.3)
+      '@mistle/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@mistle/logging':
+        specifier: workspace:*
+        version: link:../../packages/logging
+      hono:
+        specifier: ^4.12.3
+        version: 4.12.3
+    devDependencies:
+      '@mistle/test-core':
+        specifier: workspace:*
+        version: link:../../packages/test-core
+
   packages/config:
     dependencies:
       smol-toml:
