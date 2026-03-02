@@ -65,7 +65,7 @@ export function createDataPlaneSandboxInstancesClient(
     },
     getSandboxInstance: async (getInput) => {
       const parsedGetInput = GetSandboxInstanceInputSchema.parse(getInput);
-      const response = await untypedTrpcClient.query("sandboxInstances.get", parsedGetInput);
+      const response = await trpcClient.sandboxInstances.get.query(parsedGetInput);
 
       return GetSandboxInstanceResponseSchema.parse(response);
     },
