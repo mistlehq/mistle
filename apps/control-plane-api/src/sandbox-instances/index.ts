@@ -3,3 +3,14 @@ export {
   SandboxInstanceConnectionTokenSchema,
   createSandboxInstanceConnectionTokenRoute,
 } from "./contracts.js";
+export type {
+  CreateSandboxInstancesServiceInput,
+  SandboxInstancesService,
+} from "./services/factory.js";
+export {
+  SandboxInstancesConflictCodes,
+  SandboxInstancesConflictError,
+  SandboxInstancesNotFoundCodes,
+  SandboxInstancesNotFoundError,
+  createSandboxInstancesService,
+} from "./services/factory.js";

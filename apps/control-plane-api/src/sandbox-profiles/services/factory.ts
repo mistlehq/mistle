@@ -47,6 +47,7 @@ export function createSandboxProfilesService(
       startProfileInstance(
         {
           db: input.db,
+          dataPlaneDb: input.dataPlaneDb,
           openWorkflow: input.openWorkflow,
         },
         serviceInput,

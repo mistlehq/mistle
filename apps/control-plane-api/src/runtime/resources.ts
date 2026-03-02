@@ -1,4 +1,5 @@
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
 import {
   createControlPlaneBackend,
   createControlPlaneOpenWorkflow,
@@ -9,6 +10,7 @@ import type { ControlPlaneApiConfig, ControlPlaneApp } from "../types.js";
 
 export type AppRuntimeResources = {
   db: ControlPlaneDatabase;
+  dataPlaneDb: DataPlaneDatabase;
   dbPool: Pool;
   workflowBackend: Awaited<ReturnType<typeof createControlPlaneBackend>>;
   openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
@@ -48,6 +50,7 @@ export async function createAppResources(
 
   return {
     db,
+    dataPlaneDb: createDataPlaneDatabase(dbPool),
     dbPool,
     workflowBackend,
     openWorkflow: createControlPlaneOpenWorkflow({ backend: workflowBackend }),
