@@ -50,16 +50,23 @@ export const DataPlaneWorkerSandboxDockerConfigSchema = z
   })
   .strict();
 
+const DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema = z.url().refine((value) => {
+  const parsedUrl = new URL(value);
+  return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+}, "sandbox.tokenizerProxyEgressBaseUrl must use http or https.");
+
 export const DataPlaneWorkerSandboxConfigSchema = z.discriminatedUnion("provider", [
   z
     .object({
       provider: z.literal(DataPlaneWorkerSandboxProviders.MODAL),
+      tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema,
       modal: DataPlaneWorkerSandboxModalConfigSchema,
     })
     .strict(),
   z
     .object({
       provider: z.literal(DataPlaneWorkerSandboxProviders.DOCKER),
+      tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema,
       docker: DataPlaneWorkerSandboxDockerConfigSchema,
     })
     .strict(),
@@ -70,6 +77,7 @@ export const PartialDataPlaneWorkerSandboxConfigSchema = z
     provider: z
       .enum([DataPlaneWorkerSandboxProviders.MODAL, DataPlaneWorkerSandboxProviders.DOCKER])
       .optional(),
+    tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema.optional(),
     modal: DataPlaneWorkerSandboxModalConfigSchema.partial().optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.partial().optional(),
   })

@@ -28,6 +28,14 @@ export const ModalStartSandboxRequestSchema = z
     imageId: z.string().trim().min(1, {
       message: "Modal request field `imageId` is required.",
     }),
+    env: z
+      .record(
+        z.string().trim().min(1, {
+          message: "Modal request field `env` keys must be non-empty.",
+        }),
+        z.string(),
+      )
+      .optional(),
   })
   .strict();
 export type ModalStartSandboxRequest = z.output<typeof ModalStartSandboxRequestSchema>;

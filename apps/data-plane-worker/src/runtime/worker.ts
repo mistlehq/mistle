@@ -19,6 +19,8 @@ import type { WorkerRuntimeResources } from "./resources.js";
 import { encodeSandboxStartupInput } from "./sandbox-startup-input.js";
 
 const SandboxTunnelConnectAckPollIntervalMs = 250;
+const SandboxRuntimeTokenizerProxyEgressBaseURLEnv =
+  "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 
 function resolveSandboxTunnelConnectAckTimeoutMs(config: DataPlaneWorkerRuntimeConfig): number {
   const bootstrapTokenTtlSeconds = config.app.tunnel.bootstrapTokenTtlSeconds;
@@ -132,6 +134,10 @@ function createWorkflowInputs(ctx: {
           image: {
             ...workflowInput.image,
             provider: ctx.config.app.sandbox.provider,
+          },
+          env: {
+            [SandboxRuntimeTokenizerProxyEgressBaseURLEnv]:
+              ctx.config.app.sandbox.tokenizerProxyEgressBaseUrl,
           },
         });
 

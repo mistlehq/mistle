@@ -59,8 +59,9 @@ export class ModalApiClient implements ModalClient {
     const image = await this.#runModalClientOperation(ModalClientOperationIds.RESOLVE_IMAGE, () =>
       this.#modalClient.images.fromId(parsedRequest.imageId),
     );
+    const createParams = parsedRequest.env === undefined ? undefined : { env: parsedRequest.env };
     const sandbox = await this.#runModalClientOperation(ModalClientOperationIds.START_SANDBOX, () =>
-      this.#modalClient.sandboxes.create(app, image),
+      this.#modalClient.sandboxes.create(app, image, createParams),
     );
 
     return {

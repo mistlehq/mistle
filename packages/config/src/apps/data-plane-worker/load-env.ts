@@ -100,6 +100,10 @@ const loadSandboxEnv = createEnvLoader<typeof DataPlaneWorkerSandboxConfigSchema
     key: "provider",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_PROVIDER",
   },
+  {
+    key: "tokenizerProxyEgressBaseUrl",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL",
+  },
 ]);
 
 export function loadDataPlaneWorkerFromEnv(

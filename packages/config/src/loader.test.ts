@@ -106,6 +106,7 @@ describe("parseConfigRecord", () => {
           },
           sandbox: {
             provider: "modal",
+            tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
             modal: {
               tokenId: "fixture-modal-token-id",
               tokenSecret: "fixture-modal-token-secret",
@@ -232,6 +233,7 @@ describe("parseConfigRecord", () => {
           },
           sandbox: {
             provider: "docker",
+            tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
             docker: {
               socketPath: "/var/run/docker.sock",
               snapshotRepository: "localhost:5001/mistle/snapshots",
