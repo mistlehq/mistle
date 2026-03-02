@@ -70,7 +70,14 @@ export interface paths {
                   code:
                     | "INVALID_LIST_CONNECTIONS_INPUT"
                     | "INVALID_PAGINATION_CURSOR"
-                    | "INVALID_CREATE_CONNECTION_INPUT";
+                    | "INVALID_CREATE_CONNECTION_INPUT"
+                    | "INVALID_OAUTH_START_INPUT"
+                    | "INVALID_OAUTH_COMPLETE_INPUT"
+                    | "OAUTH_NOT_SUPPORTED"
+                    | "OAUTH_HANDLER_NOT_CONFIGURED"
+                    | "OAUTH_STATE_INVALID"
+                    | "OAUTH_STATE_EXPIRED"
+                    | "OAUTH_STATE_ALREADY_USED";
                   message: string;
                 }
               | {
@@ -191,7 +198,277 @@ export interface paths {
                   code:
                     | "INVALID_LIST_CONNECTIONS_INPUT"
                     | "INVALID_PAGINATION_CURSOR"
-                    | "INVALID_CREATE_CONNECTION_INPUT";
+                    | "INVALID_CREATE_CONNECTION_INPUT"
+                    | "INVALID_OAUTH_START_INPUT"
+                    | "INVALID_OAUTH_COMPLETE_INPUT"
+                    | "OAUTH_NOT_SUPPORTED"
+                    | "OAUTH_HANDLER_NOT_CONFIGURED"
+                    | "OAUTH_STATE_INVALID"
+                    | "OAUTH_STATE_EXPIRED"
+                    | "OAUTH_STATE_ALREADY_USED";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration target was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "TARGET_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integration/connections/:targetKey/oauth/complete": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          targetKey: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            query: {
+              [key: string]: string;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Create an OAuth-backed integration connection from callback query params. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              config?: {
+                [key: string]: unknown;
+              };
+              createdAt: string;
+              externalSubjectId?: string;
+              id: string;
+              /** @enum {string} */
+              status: "active" | "error" | "revoked";
+              targetKey: string;
+              targetSnapshotConfig?: {
+                [key: string]: unknown;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_LIST_CONNECTIONS_INPUT"
+                    | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_CREATE_CONNECTION_INPUT"
+                    | "INVALID_OAUTH_START_INPUT"
+                    | "INVALID_OAUTH_COMPLETE_INPUT"
+                    | "OAUTH_NOT_SUPPORTED"
+                    | "OAUTH_HANDLER_NOT_CONFIGURED"
+                    | "OAUTH_STATE_INVALID"
+                    | "OAUTH_STATE_EXPIRED"
+                    | "OAUTH_STATE_ALREADY_USED";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration target was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "TARGET_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integration/connections/:targetKey/oauth/start": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          targetKey: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Create an OAuth authorization URL for an integration target. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** Format: uri */
+              authorizationUrl: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_LIST_CONNECTIONS_INPUT"
+                    | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_CREATE_CONNECTION_INPUT"
+                    | "INVALID_OAUTH_START_INPUT"
+                    | "INVALID_OAUTH_COMPLETE_INPUT"
+                    | "OAUTH_NOT_SUPPORTED"
+                    | "OAUTH_HANDLER_NOT_CONFIGURED"
+                    | "OAUTH_STATE_INVALID"
+                    | "OAUTH_STATE_EXPIRED"
+                    | "OAUTH_STATE_ALREADY_USED";
                   message: string;
                 }
               | {
@@ -1034,7 +1311,13 @@ export interface paths {
         };
         cookie?: never;
       };
-      requestBody?: never;
+      requestBody?: {
+        content: {
+          "application/json": {
+            issueConnectionToken?: boolean;
+          };
+        };
+      };
       responses: {
         /** @description Start a sandbox instance for the specified sandbox profile version. */
         201: {
@@ -1043,6 +1326,12 @@ export interface paths {
           };
           content: {
             "application/json": {
+              connection?: {
+                expiresAt: string;
+                token: string;
+                /** Format: uri */
+                url: string;
+              };
               providerSandboxId: string;
               sandboxInstanceId: string;
               /** @enum {string} */
