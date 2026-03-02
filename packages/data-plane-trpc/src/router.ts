@@ -1,11 +1,25 @@
-import { initTRPC, type AnyMutationProcedure, type AnyRouter } from "@trpc/server";
+import {
+  initTRPC,
+  type AnyMutationProcedure,
+  type AnyQueryProcedure,
+  type AnyRouter,
+} from "@trpc/server";
 
 import {
+  GetSandboxInstanceInputSchema,
+  GetSandboxInstanceResponseSchema,
+  type GetSandboxInstanceInput,
+  type GetSandboxInstanceResponse,
   StartSandboxInstanceCompletedResponseSchema,
   type StartSandboxInstanceCompletedResponse,
   StartSandboxInstanceInputSchema,
   type StartSandboxInstanceInput,
 } from "./contracts/index.js";
+
+type GetSandboxProcedureSchemas = {
+  inputSchema: typeof GetSandboxInstanceInputSchema;
+  outputSchema: typeof GetSandboxInstanceResponseSchema;
+};
 
 type StartSandboxProcedureSchemas = {
   inputSchema: typeof StartSandboxInstanceInputSchema;
@@ -13,13 +27,22 @@ type StartSandboxProcedureSchemas = {
 };
 
 export function createDataPlaneSandboxInstancesTrpcRouter<
+  TGetProcedure extends AnyQueryProcedure,
   TStartProcedure extends AnyMutationProcedure,
   TSandboxInstancesRouter extends AnyRouter,
 >(input: {
-  createRouter: (routerInput: { start: TStartProcedure }) => TSandboxInstancesRouter;
+  createRouter: (routerInput: {
+    get: TGetProcedure;
+    start: TStartProcedure;
+  }) => TSandboxInstancesRouter;
+  createGetProcedure: (schemas: GetSandboxProcedureSchemas) => TGetProcedure;
   createStartProcedure: (schemas: StartSandboxProcedureSchemas) => TStartProcedure;
 }): TSandboxInstancesRouter {
   return input.createRouter({
+    get: input.createGetProcedure({
+      inputSchema: GetSandboxInstanceInputSchema,
+      outputSchema: GetSandboxInstanceResponseSchema,
+    }),
     start: input.createStartProcedure({
       inputSchema: StartSandboxInstanceInputSchema,
       outputSchema: StartSandboxInstanceCompletedResponseSchema,
@@ -47,8 +70,21 @@ function createTypeOnlyStartSandboxInstanceCompletedResponse(
   throw new Error("Data plane tRPC contract router is type-only and should not execute.");
 }
 
+function createTypeOnlyGetSandboxInstanceResponse(
+  _input: GetSandboxInstanceInput,
+): Promise<GetSandboxInstanceResponse> {
+  throw new Error("Data plane tRPC contract router is type-only and should not execute.");
+}
+
 const sandboxInstancesTrpcRouterContract = createDataPlaneSandboxInstancesTrpcRouter({
   createRouter: t.router,
+  createGetProcedure: (schemas) =>
+    t.procedure
+      .input(schemas.inputSchema)
+      .output(schemas.outputSchema)
+      .query(({ input }) => {
+        return createTypeOnlyGetSandboxInstanceResponse(input);
+      }),
   createStartProcedure: (schemas) =>
     t.procedure
       .input(schemas.inputSchema)

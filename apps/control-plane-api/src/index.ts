@@ -7,10 +7,14 @@ async function startControlPlaneApi(): Promise<void> {
   const loadedConfig = loadConfig({
     app: AppIds.CONTROL_PLANE_API,
     env: process.env,
-    includeGlobal: false,
   });
-  const appConfig = loadedConfig.app;
-  const runtime = await createControlPlaneApiRuntime(appConfig);
+  if (loadedConfig.global === undefined) {
+    throw new Error("Expected global config to be loaded for control-plane-api.");
+  }
+  const runtime = await createControlPlaneApiRuntime({
+    app: loadedConfig.app,
+    internalAuthServiceToken: loadedConfig.global.internalAuth.serviceToken,
+  });
 
   await runtime.start();
 
@@ -53,9 +57,9 @@ async function startControlPlaneApi(): Promise<void> {
 
   logger.info(
     {
-      authBaseUrl: appConfig.auth.baseUrl,
-      host: appConfig.server.host,
-      port: appConfig.server.port,
+      authBaseUrl: loadedConfig.app.auth.baseUrl,
+      host: loadedConfig.app.server.host,
+      port: loadedConfig.app.server.port,
     },
     "control-plane-api listening",
   );

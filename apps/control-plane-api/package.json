@@ -29,6 +29,7 @@
     "@hono/node-server": "^1.19.4",
     "@hono/zod-openapi": "^1.2.2",
     "@mistle/config": "workspace:*",
+    "@mistle/data-plane-trpc": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/emails": "workspace:*",
     "@mistle/http": "workspace:*",
@@ -36,6 +37,7 @@
     "@mistle/integrations-definitions": "workspace:*",
     "@mistle/logging": "workspace:*",
     "@mistle/time": "workspace:*",
+    "@mistle/tunnel-auth": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "better-auth": "1.4.19",
     "drizzle-orm": "^0.45.1",
@@ -46,7 +48,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@mistle/data-plane-trpc": "workspace:*",
     "@mistle/test-core": "workspace:*",
     "@types/pg": "^8.15.6"
   }

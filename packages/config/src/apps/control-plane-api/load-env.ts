@@ -3,6 +3,7 @@ import { asObjectRecord } from "../../core/record.js";
 import {
   type PartialControlPlaneApiConfigInput,
   ControlPlaneApiAuthConfigSchema,
+  ControlPlaneApiDataPlaneApiConfigSchema,
   ControlPlaneApiDatabaseConfigSchema,
   ControlPlaneApiIntegrationsConfigSchema,
   ControlPlaneApiSandboxConfigSchema,
@@ -80,6 +81,13 @@ const loadWorkflowEnv = createEnvLoader<typeof ControlPlaneApiWorkflowConfigSche
   },
 ]);
 
+const loadDataPlaneApiEnv = createEnvLoader<typeof ControlPlaneApiDataPlaneApiConfigSchema>([
+  {
+    key: "baseUrl",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL",
+  },
+]);
+
 const loadSandboxEnv = createEnvLoader<typeof ControlPlaneApiSandboxConfigSchema>([
   {
     key: "defaultBaseImage",
@@ -146,6 +154,11 @@ export function loadControlPlaneApiFromEnv(
   const workflow = loadWorkflowEnv(env);
   if (hasEntries(workflow)) {
     partialConfig.workflow = workflow;
+  }
+
+  const dataPlaneApi = loadDataPlaneApiEnv(env);
+  if (hasEntries(dataPlaneApi)) {
+    partialConfig.dataPlaneApi = dataPlaneApi;
   }
 
   const sandbox = loadSandboxEnv(env);

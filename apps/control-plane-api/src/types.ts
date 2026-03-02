@@ -5,6 +5,7 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { Context, Hono } from "hono";
 
 import type { ControlPlaneAuth } from "./auth/index.js";
+import type { SandboxInstancesService } from "./sandbox-instances/services/factory.js";
 import type { SandboxProfilesService } from "./sandbox-profiles/services/factory.js";
 
 type LoadControlPlaneApiConfigResult = ReturnType<
@@ -12,6 +13,11 @@ type LoadControlPlaneApiConfigResult = ReturnType<
 >;
 
 export type ControlPlaneApiConfig = LoadControlPlaneApiConfigResult["app"];
+export type ControlPlaneApiGlobalConfig = NonNullable<LoadControlPlaneApiConfigResult["global"]>;
+export type ControlPlaneApiRuntimeConfig = {
+  app: ControlPlaneApiConfig;
+  internalAuthServiceToken: ControlPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
+};
 
 export type AppContextBindings = {
   Variables: AppContextVariables;
@@ -24,6 +30,7 @@ export type AppRoutes<BasePath> = {
 
 export type AppServices = {
   auth: ControlPlaneAuth;
+  sandboxInstances: SandboxInstancesService;
   sandboxProfiles: SandboxProfilesService;
 };
 

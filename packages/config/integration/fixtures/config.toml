@@ -29,6 +29,9 @@ otp_allowed_attempts = 3
 database_url = "postgresql://mistle:mistle@127.0.0.1:6432/mistle"
 namespace_id = "fixture"
 
+[apps.control_plane_api.data_plane_api]
+base_url = "http://127.0.0.1:5300"
+
 [apps.control_plane_api.sandbox]
 default_base_image = "127.0.0.1:5001/mistle/sandbox-base:fixture"
 

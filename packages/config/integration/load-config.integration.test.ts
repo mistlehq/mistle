@@ -60,6 +60,9 @@ const controlPlaneApiEnvConfig = {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     namespaceId: "development",
   },
+  dataPlaneApi: {
+    baseUrl: "http://127.0.0.1:5002",
+  },
   sandbox: {
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
   },
@@ -80,6 +83,9 @@ const controlPlaneApiFixtureConfig = {
   workflow: {
     ...controlPlaneApiEnvConfig.workflow,
     namespaceId: "fixture",
+  },
+  dataPlaneApi: {
+    baseUrl: "http://127.0.0.1:5300",
   },
   sandbox: {
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:fixture",

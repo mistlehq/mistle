@@ -13,9 +13,13 @@ export type StartControlPlaneApiTestingRuntimeInput = {
   databaseDirectUrl: string;
   databasePooledUrl: string;
   workflowNamespaceId: string;
+  internalAuthServiceToken?: string;
   server?: {
     host?: string;
     port?: number;
+  };
+  dataPlaneApi?: {
+    baseUrl?: string;
   };
   auth?: {
     baseUrl?: string;
@@ -53,6 +57,9 @@ function createTestingConfig(
     workflow: {
       databaseUrl: input.databasePooledUrl,
       namespaceId: input.workflowNamespaceId,
+    },
+    dataPlaneApi: {
+      baseUrl: input.dataPlaneApi?.baseUrl ?? "http://127.0.0.1:4000",
     },
     sandbox: {
       defaultBaseImage: input.sandbox?.defaultBaseImage ?? "127.0.0.1:5001/mistle/sandbox-base:dev",
@@ -104,7 +111,10 @@ export async function startControlPlaneApiTestingRuntime(
     workflowNamespaceId: input.workflowNamespaceId,
   });
 
-  return createControlPlaneApiRuntime(createTestingConfig(input));
+  return createControlPlaneApiRuntime({
+    app: createTestingConfig(input),
+    internalAuthServiceToken: input.internalAuthServiceToken ?? "integration-service-token",
+  });
 }
 
 export type { ControlPlaneApiRuntime };
