@@ -42,7 +42,6 @@ export type StartControlPlaneApiTestingRuntimeInput = {
   sandbox?: {
     defaultBaseImage?: string;
     gatewayWsUrl?: string;
-    bootstrapTokenTtlSeconds?: number;
   };
   integrations?: {
     activeMasterEncryptionKeyVersion?: number;
@@ -75,7 +74,6 @@ function createTestingConfig(
     sandbox: {
       defaultBaseImage: input.sandbox?.defaultBaseImage ?? "127.0.0.1:5001/mistle/sandbox-base:dev",
       gatewayWsUrl: input.sandbox?.gatewayWsUrl ?? "ws://127.0.0.1:5202/tunnel/sandbox",
-      bootstrapTokenTtlSeconds: input.sandbox?.bootstrapTokenTtlSeconds ?? 120,
     },
     integrations: {
       activeMasterEncryptionKeyVersion: input.integrations?.activeMasterEncryptionKeyVersion ?? 1,

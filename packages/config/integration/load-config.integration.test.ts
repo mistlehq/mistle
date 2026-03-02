@@ -66,7 +66,6 @@ const controlPlaneApiEnvConfig = {
   sandbox: {
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-    bootstrapTokenTtlSeconds: 120,
   },
   integrations: {
     activeMasterEncryptionKeyVersion: 1,
@@ -92,7 +91,6 @@ const controlPlaneApiFixtureConfig = {
   sandbox: {
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:fixture",
     gatewayWsUrl: "ws://127.0.0.1:5302/tunnel/sandbox",
-    bootstrapTokenTtlSeconds: 120,
   },
   integrations: {
     activeMasterEncryptionKeyVersion: 2,
