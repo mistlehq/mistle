@@ -21,6 +21,15 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
   });
   const sandboxInstancesService = createSandboxInstancesService({
     dataPlaneClient,
+    defaultConnectionToken: {
+      gatewayWebsocketUrl: config.sandbox.gatewayWsUrl,
+      tokenTtlSeconds: config.sandbox.bootstrapTokenTtlSeconds,
+      tokenConfig: {
+        bootstrapTokenSecret: runtimeConfig.tunnel.bootstrapTokenSecret,
+        tokenIssuer: runtimeConfig.tunnel.tokenIssuer,
+        tokenAudience: runtimeConfig.tunnel.tokenAudience,
+      },
+    },
   });
   const sandboxProfilesService = createSandboxProfilesService({
     db: resources.db,

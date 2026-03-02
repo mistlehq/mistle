@@ -37,6 +37,8 @@ base_url = "http://data-plane-api:8082"
 
 [apps.control_plane_api.sandbox]
 default_base_image = "registry.example.com/mistle/sandbox-base:prod"
+gateway_ws_url = "wss://gateway.mistle.example/tunnel/sandbox"
+bootstrap_token_ttl_seconds = 120
 
 [apps.control_plane_api.integrations]
 active_master_encryption_key_version = 1

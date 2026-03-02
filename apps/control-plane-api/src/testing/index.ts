@@ -18,6 +18,11 @@ export type StartControlPlaneApiTestingRuntimeInput = {
   databasePooledUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken?: string;
+  tunnel?: {
+    bootstrapTokenSecret?: string;
+    tokenIssuer?: string;
+    tokenAudience?: string;
+  };
   server?: {
     host?: string;
     port?: number;
@@ -36,6 +41,8 @@ export type StartControlPlaneApiTestingRuntimeInput = {
   };
   sandbox?: {
     defaultBaseImage?: string;
+    gatewayWsUrl?: string;
+    bootstrapTokenTtlSeconds?: number;
   };
   integrations?: {
     activeMasterEncryptionKeyVersion?: number;
@@ -67,6 +74,8 @@ function createTestingConfig(
     },
     sandbox: {
       defaultBaseImage: input.sandbox?.defaultBaseImage ?? "127.0.0.1:5001/mistle/sandbox-base:dev",
+      gatewayWsUrl: input.sandbox?.gatewayWsUrl ?? "ws://127.0.0.1:5202/tunnel/sandbox",
+      bootstrapTokenTtlSeconds: input.sandbox?.bootstrapTokenTtlSeconds ?? 120,
     },
     integrations: {
       activeMasterEncryptionKeyVersion: input.integrations?.activeMasterEncryptionKeyVersion ?? 1,
@@ -118,6 +127,11 @@ export async function startControlPlaneApiTestingRuntime(
   const runtimeConfig: ControlPlaneApiRuntimeConfig = {
     app: createTestingConfig(input),
     internalAuthServiceToken: input.internalAuthServiceToken ?? "integration-service-token",
+    tunnel: {
+      bootstrapTokenSecret: input.tunnel?.bootstrapTokenSecret ?? "integration-bootstrap-secret",
+      tokenIssuer: input.tunnel?.tokenIssuer ?? "integration-issuer",
+      tokenAudience: input.tunnel?.tokenAudience ?? "integration-audience",
+    },
   };
 
   return createControlPlaneApiRuntime(runtimeConfig);

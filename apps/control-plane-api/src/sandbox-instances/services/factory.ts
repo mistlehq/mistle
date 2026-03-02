@@ -14,6 +14,13 @@ export function createSandboxInstancesService(
 ): SandboxInstancesService {
   const sandboxInstancesService = {
     mintConnectionToken: (serviceInput) => mintConnectionToken(input.dataPlaneClient, serviceInput),
+    mintConnectionTokenForInstance: (serviceInput) =>
+      mintConnectionToken(input.dataPlaneClient, {
+        ...serviceInput,
+        gatewayWebsocketUrl: input.defaultConnectionToken.gatewayWebsocketUrl,
+        tokenTtlSeconds: input.defaultConnectionToken.tokenTtlSeconds,
+        tokenConfig: input.defaultConnectionToken.tokenConfig,
+      }),
   } satisfies SandboxInstancesService;
 
   return sandboxInstancesService;

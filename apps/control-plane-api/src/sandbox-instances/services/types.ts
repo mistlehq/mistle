@@ -3,6 +3,11 @@ import type { BootstrapTokenConfig } from "@mistle/tunnel-auth";
 
 export type CreateSandboxInstancesServiceInput = {
   dataPlaneClient: DataPlaneSandboxInstancesClient;
+  defaultConnectionToken: {
+    gatewayWebsocketUrl: string;
+    tokenTtlSeconds: number;
+    tokenConfig: BootstrapTokenConfig;
+  };
 };
 
 export type MintSandboxInstanceConnectionTokenInput = {
@@ -24,4 +29,8 @@ export type SandboxInstancesService = {
   mintConnectionToken: (
     input: MintSandboxInstanceConnectionTokenInput,
   ) => Promise<SandboxInstanceConnectionToken>;
+  mintConnectionTokenForInstance: (input: {
+    organizationId: string;
+    instanceId: string;
+  }) => Promise<SandboxInstanceConnectionToken>;
 };

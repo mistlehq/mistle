@@ -105,6 +105,16 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE",
   },
   {
+    configPath: ["apps", "control_plane_api", "sandbox", "gatewayWsUrl"],
+    tomlPath: ["apps", "control_plane_api", "sandbox", "gateway_ws_url"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_GATEWAY_WS_URL",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "sandbox", "bootstrapTokenTtlSeconds"],
+    tomlPath: ["apps", "control_plane_api", "sandbox", "bootstrap_token_ttl_seconds"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_BOOTSTRAP_TOKEN_TTL_SECONDS",
+  },
+  {
     configPath: ["apps", "control_plane_api", "integrations", "activeMasterEncryptionKeyVersion"],
     tomlPath: ["apps", "control_plane_api", "integrations", "active_master_encryption_key_version"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION",

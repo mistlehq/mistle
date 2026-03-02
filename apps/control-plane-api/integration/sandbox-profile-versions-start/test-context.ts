@@ -387,6 +387,8 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
           },
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+            bootstrapTokenTtlSeconds: 120,
           },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
@@ -407,6 +409,11 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
         const controlPlaneRuntime = await createControlPlaneApiRuntime({
           app: controlPlaneConfig,
           internalAuthServiceToken,
+          tunnel: {
+            bootstrapTokenSecret: "integration-bootstrap-secret",
+            tokenIssuer: "integration-issuer",
+            tokenAudience: "integration-audience",
+          },
         });
         cleanupTasks.unshift(async () => {
           await controlPlaneRuntime.stop();
