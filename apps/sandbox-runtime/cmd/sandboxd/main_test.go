@@ -30,6 +30,9 @@ func TestRunWithInput(t *testing.T) {
 				if key == config.ListenAddrEnv {
 					return ":8090", true
 				}
+				if key == config.TokenizerProxyEgressBaseURLEnv {
+					return "http://127.0.0.1:5004/tokenizer-proxy/egress", true
+				}
 				return "", false
 			},
 		})

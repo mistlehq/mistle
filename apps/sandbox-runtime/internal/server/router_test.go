@@ -1,6 +1,7 @@
 package server
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -49,6 +50,39 @@ func TestNewRouter(t *testing.T) {
 		}
 		if recorder.Body.String() != `{"ok":false}` {
 			t.Fatalf("expected body {\"ok\":false}, got %s", recorder.Body.String())
+		}
+	})
+
+	t.Run("delegates egress route requests to egress handler", func(t *testing.T) {
+		egressHandler := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if request.Method != http.MethodPost {
+				t.Fatalf("expected forwarded request method POST, got %s", request.Method)
+			}
+			if request.URL.Path != "/egress/routes/route_openai/v1/responses" {
+				t.Fatalf("unexpected forwarded path: %s", request.URL.Path)
+			}
+
+			writer.WriteHeader(http.StatusCreated)
+			_, _ = io.WriteString(writer, `{"ok":true}`)
+		})
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(
+			http.MethodPost,
+			"/egress/routes/route_openai/v1/responses",
+			nil,
+		)
+
+		NewRouter(RouterInput{
+			BootstrapTokenLoaded: true,
+			EgressHandler:        egressHandler,
+		}).ServeHTTP(recorder, request)
+
+		if recorder.Code != http.StatusCreated {
+			t.Fatalf("expected status 201, got %d", recorder.Code)
+		}
+		if recorder.Body.String() != `{"ok":true}` {
+			t.Fatalf("expected body {\"ok\":true}, got %s", recorder.Body.String())
 		}
 	})
 }

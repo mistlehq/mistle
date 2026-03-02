@@ -11,6 +11,7 @@ This directory contains container image definitions used by `@mistle/sandbox-run
 - The base image builds and runs `sandboxd` from `apps/sandbox-runtime`.
 - `sandboxd` now expects startup JSON on stdin with `bootstrapToken`, `tunnelGatewayWsUrl`, and `runtimePlan`.
 - `sandboxd` keeps the bootstrap token in memory and establishes a websocket tunnel to data-plane-gateway.
+- `sandboxd` exposes `/egress/routes/{routeId}` and forwards to tokenizer proxy egress.
 - Build this image with repository root as context:
   - `docker build -f apps/sandbox-runtime/images/base/Dockerfile .`
 - A root `.dockerignore` is used to keep build context small.
