@@ -14,6 +14,7 @@ import postgres from "postgres";
 import { it as vitestIt } from "vitest";
 
 import {
+  DataPlaneWorkerWorkflowIds,
   createDataPlaneBackend,
   createDataPlaneOpenWorkflow,
   createDataPlaneWorker,
@@ -117,162 +118,171 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
         const worker: Worker = createDataPlaneWorker({
           openWorkflow,
           maxConcurrentWorkflows: 1,
-          deps: {
-            startSandbox: async (workflowInput) => {
-              const startedSandbox = await dockerSandboxAdapter.start({
-                image: {
-                  ...workflowInput.image,
-                  provider: SandboxProvider.DOCKER,
+          enabledWorkflows: [DataPlaneWorkerWorkflowIds.START_SANDBOX_INSTANCE],
+          services: {
+            startSandboxInstance: {
+              sandboxLifecycle: {
+                startSandbox: async (workflowInput) => {
+                  const startedSandbox = await dockerSandboxAdapter.start({
+                    image: {
+                      ...workflowInput.image,
+                      provider: SandboxProvider.DOCKER,
+                    },
+                  });
+                  const bootstrapTokenJti = randomUUID();
+
+                  startedSandboxIds.push(startedSandbox.sandboxId);
+                  startedBootstrapTokenJtis.push(bootstrapTokenJti);
+
+                  return {
+                    provider: startedSandbox.provider,
+                    providerSandboxId: startedSandbox.sandboxId,
+                    bootstrapTokenJti,
+                  };
                 },
-              });
-              const bootstrapTokenJti = randomUUID();
+                stopSandbox: async (workflowInput) => {
+                  await dockerSandboxAdapter.stop({
+                    sandboxId: workflowInput.providerSandboxId,
+                  });
+                },
+              },
+              sandboxInstances: {
+                createSandboxInstance: async (workflowInput) => {
+                  const sandboxInstanceId = `sbi_${randomUUID().replaceAll("-", "")}`;
+                  let insertedRows: Array<{ id: string }>;
+                  try {
+                    insertedRows = await sql<{ id: string }[]>`
+                      insert into data_plane.sandbox_instances (
+                        id,
+                        organization_id,
+                        sandbox_profile_id,
+                        sandbox_profile_version,
+                        provider,
+                        provider_sandbox_id,
+                        status,
+                        started_by_kind,
+                        started_by_id,
+                        source
+                      )
+                      values (
+                        ${sandboxInstanceId},
+                        ${workflowInput.organizationId},
+                        ${workflowInput.sandboxProfileId},
+                        ${workflowInput.sandboxProfileVersion},
+                        ${workflowInput.provider},
+                        ${workflowInput.providerSandboxId},
+                        ${SandboxInstanceStatuses.STARTING},
+                        ${workflowInput.startedBy.kind},
+                        ${workflowInput.startedBy.id},
+                        ${workflowInput.source}
+                      )
+                      returning id
+                    `;
 
-              startedSandboxIds.push(startedSandbox.sandboxId);
-              startedBootstrapTokenJtis.push(bootstrapTokenJti);
+                    await sql`
+                      insert into data_plane.sandbox_instance_runtime_plans (
+                        id,
+                        sandbox_instance_id,
+                        revision,
+                        compiled_runtime_plan,
+                        compiled_from_profile_id,
+                        compiled_from_profile_version
+                      )
+                      values (
+                        ${`srp_${randomUUID().replaceAll("-", "")}`},
+                        ${sandboxInstanceId},
+                        ${1},
+                        ${sql.json(workflowInput.runtimePlan)},
+                        ${workflowInput.sandboxProfileId},
+                        ${workflowInput.sandboxProfileVersion}
+                      )
+                    `;
+                  } catch (error) {
+                    const rawErrorMessage =
+                      error instanceof Error
+                        ? `${error.name}: ${error.message}`
+                        : `unknown error: ${String(error)}`;
+                    throw new Error(
+                      `Failed to insert sandbox instance row in integration fixture. ${rawErrorMessage}`,
+                    );
+                  }
 
-              return {
-                provider: startedSandbox.provider,
-                providerSandboxId: startedSandbox.sandboxId,
-                bootstrapTokenJti,
-              };
-            },
-            stopSandbox: async (workflowInput) => {
-              await dockerSandboxAdapter.stop({
-                sandboxId: workflowInput.providerSandboxId,
-              });
-            },
-            insertSandboxInstance: async (workflowInput) => {
-              const sandboxInstanceId = `sbi_${randomUUID().replaceAll("-", "")}`;
-              let insertedRows: Array<{ id: string }>;
-              try {
-                insertedRows = await sql<{ id: string }[]>`
-                  insert into data_plane.sandbox_instances (
-                    id,
-                    organization_id,
-                    sandbox_profile_id,
-                    sandbox_profile_version,
-                    provider,
-                    provider_sandbox_id,
-                    status,
-                    started_by_kind,
-                    started_by_id,
-                    source
-                  )
-                  values (
-                    ${sandboxInstanceId},
-                    ${workflowInput.organizationId},
-                    ${workflowInput.sandboxProfileId},
-                    ${workflowInput.sandboxProfileVersion},
-                    ${workflowInput.provider},
-                    ${workflowInput.providerSandboxId},
-                    ${SandboxInstanceStatuses.STARTING},
-                    ${workflowInput.startedBy.kind},
-                    ${workflowInput.startedBy.id},
-                    ${workflowInput.source}
-                  )
-                  returning id
-                `;
+                  const insertedRow = insertedRows[0];
+                  if (insertedRow === undefined) {
+                    throw new Error(
+                      "Failed to insert sandbox instance row in integration fixture.",
+                    );
+                  }
 
-                await sql`
-                  insert into data_plane.sandbox_instance_runtime_plans (
-                    id,
-                    sandbox_instance_id,
-                    revision,
-                    compiled_runtime_plan,
-                    compiled_from_profile_id,
-                    compiled_from_profile_version
-                  )
-                  values (
-                    ${`srp_${randomUUID().replaceAll("-", "")}`},
-                    ${sandboxInstanceId},
-                    ${1},
-                    ${sql.json(workflowInput.runtimePlan)},
-                    ${workflowInput.sandboxProfileId},
-                    ${workflowInput.sandboxProfileVersion}
-                  )
-                `;
-              } catch (error) {
-                const rawErrorMessage =
-                  error instanceof Error
-                    ? `${error.name}: ${error.message}`
-                    : `unknown error: ${String(error)}`;
-                throw new Error(
-                  `Failed to insert sandbox instance row in integration fixture. ${rawErrorMessage}`,
-                );
-              }
+                  return {
+                    sandboxInstanceId: insertedRow.id,
+                  };
+                },
+                markSandboxInstanceRunning: async (workflowInput) => {
+                  const updatedRows = await sql<{ id: string }[]>`
+                    update data_plane.sandbox_instances
+                    set
+                      status = ${SandboxInstanceStatuses.RUNNING},
+                      started_at = now(),
+                      failed_at = null,
+                      failure_code = null,
+                      failure_message = null,
+                      updated_at = now()
+                    where
+                      id = ${workflowInput.sandboxInstanceId}
+                      and status = ${SandboxInstanceStatuses.STARTING}
+                    returning id
+                  `;
+                  if (updatedRows[0] === undefined) {
+                    throw new Error(
+                      "Failed to transition sandbox instance status from starting to running in integration fixture.",
+                    );
+                  }
+                },
+                markSandboxInstanceFailed: async (workflowInput) => {
+                  const updatedRows = await sql<{ id: string }[]>`
+                    update data_plane.sandbox_instances
+                    set
+                      status = ${SandboxInstanceStatuses.FAILED},
+                      failed_at = now(),
+                      failure_code = ${workflowInput.failureCode},
+                      failure_message = ${workflowInput.failureMessage},
+                      updated_at = now()
+                    where
+                      id = ${workflowInput.sandboxInstanceId}
+                      and status = ${SandboxInstanceStatuses.STARTING}
+                    returning id
+                  `;
+                  if (updatedRows[0] === undefined) {
+                    throw new Error(
+                      "Failed to transition sandbox instance status from starting to failed in integration fixture.",
+                    );
+                  }
+                },
+              },
+              tunnelConnectAcks: {
+                waitForSandboxTunnelConnectAck: async (workflowInput) => {
+                  const waitDeadlineMs = Date.now() + TunnelConnectAckWaitTimeoutMs;
 
-              const insertedRow = insertedRows[0];
-              if (insertedRow === undefined) {
-                throw new Error("Failed to insert sandbox instance row in integration fixture.");
-              }
+                  while (true) {
+                    const ackRows = await sql<{ bootstrap_token_jti: string }[]>`
+                      select bootstrap_token_jti
+                      from data_plane.sandbox_tunnel_connect_acks
+                      where bootstrap_token_jti = ${workflowInput.bootstrapTokenJti}
+                    `;
+                    if (ackRows[0] !== undefined) {
+                      return true;
+                    }
 
-              return {
-                sandboxInstanceId: insertedRow.id,
-              };
-            },
-            waitForSandboxTunnelConnectAck: async (workflowInput) => {
-              const waitDeadlineMs = Date.now() + TunnelConnectAckWaitTimeoutMs;
+                    const remainingMs = waitDeadlineMs - Date.now();
+                    if (remainingMs <= 0) {
+                      return false;
+                    }
 
-              while (true) {
-                const ackRows = await sql<{ bootstrap_token_jti: string }[]>`
-                  select bootstrap_token_jti
-                  from data_plane.sandbox_tunnel_connect_acks
-                  where bootstrap_token_jti = ${workflowInput.bootstrapTokenJti}
-                `;
-                if (ackRows[0] !== undefined) {
-                  return true;
-                }
-
-                const remainingMs = waitDeadlineMs - Date.now();
-                if (remainingMs <= 0) {
-                  return false;
-                }
-
-                await sql`select pg_sleep(${Math.min(remainingMs, TunnelConnectAckPollIntervalMs) / 1000})`;
-              }
-            },
-            updateSandboxInstanceStatus: async (workflowInput) => {
-              if (workflowInput.status === "running") {
-                const updatedRows = await sql<{ id: string }[]>`
-                  update data_plane.sandbox_instances
-                  set
-                    status = ${SandboxInstanceStatuses.RUNNING},
-                    started_at = now(),
-                    failed_at = null,
-                    failure_code = null,
-                    failure_message = null,
-                    updated_at = now()
-                  where
-                    id = ${workflowInput.sandboxInstanceId}
-                    and status = ${SandboxInstanceStatuses.STARTING}
-                  returning id
-                `;
-                if (updatedRows[0] === undefined) {
-                  throw new Error(
-                    "Failed to transition sandbox instance status from starting to running in integration fixture.",
-                  );
-                }
-                return;
-              }
-
-              const updatedRows = await sql<{ id: string }[]>`
-                update data_plane.sandbox_instances
-                set
-                  status = ${SandboxInstanceStatuses.FAILED},
-                  failed_at = now(),
-                  failure_code = ${workflowInput.failureCode},
-                  failure_message = ${workflowInput.failureMessage},
-                  updated_at = now()
-                where
-                  id = ${workflowInput.sandboxInstanceId}
-                  and status = ${SandboxInstanceStatuses.STARTING}
-                returning id
-              `;
-              if (updatedRows[0] === undefined) {
-                throw new Error(
-                  "Failed to transition sandbox instance status from starting to failed in integration fixture.",
-                );
-              }
+                    await sql`select pg_sleep(${Math.min(remainingMs, TunnelConnectAckPollIntervalMs) / 1000})`;
+                  }
+                },
+              },
             },
           },
         });

@@ -1,7 +1,10 @@
 import type { EmailSender } from "@mistle/emails";
 import type { OpenWorkflow, Worker } from "openworkflow";
 
-import { createControlPlaneWorkflowDefinitions } from "./workflows/index.js";
+import { createRequestDeleteSandboxProfileWorkflow } from "./workflows/request-delete-sandbox-profile/index.js";
+import { createSendOrganizationInvitationWorkflow } from "./workflows/send-organization-invitation/index.js";
+import { createSendVerificationOTPWorkflow } from "./workflows/send-verification-otp/index.js";
+import { createStartSandboxProfileInstanceWorkflow } from "./workflows/start-sandbox-profile-instance/index.js";
 import type {
   StartSandboxProfileInstanceWorkflowInput,
   StartSandboxProfileInstanceWorkflowOutput,
@@ -15,50 +18,94 @@ export type ControlPlaneWorkerEmailDelivery = {
   };
 };
 
-export type ControlPlaneWorkerDependencies = {
-  emailDelivery: ControlPlaneWorkerEmailDelivery;
-  deleteSandboxProfile: (input: { organizationId: string; profileId: string }) => Promise<void>;
-  startSandboxProfileInstance: (
-    input: StartSandboxProfileInstanceWorkflowInput,
-  ) => Promise<StartSandboxProfileInstanceWorkflowOutput>;
+export type ControlPlaneWorkerServices = {
+  emailDelivery?: ControlPlaneWorkerEmailDelivery;
+  sandboxProfiles?: {
+    deleteSandboxProfile: (input: { organizationId: string; profileId: string }) => Promise<void>;
+  };
+  sandboxInstances?: {
+    startSandboxProfileInstance: (
+      input: StartSandboxProfileInstanceWorkflowInput,
+    ) => Promise<StartSandboxProfileInstanceWorkflowOutput>;
+  };
 };
+
+export const ControlPlaneWorkerWorkflowIds = {
+  SEND_ORGANIZATION_INVITATION: "sendOrganizationInvitation",
+  SEND_VERIFICATION_OTP: "sendVerificationOTP",
+  REQUEST_DELETE_SANDBOX_PROFILE: "requestDeleteSandboxProfile",
+  START_SANDBOX_PROFILE_INSTANCE: "startSandboxProfileInstance",
+} as const;
+
+export type ControlPlaneWorkerWorkflowId =
+  (typeof ControlPlaneWorkerWorkflowIds)[keyof typeof ControlPlaneWorkerWorkflowIds];
 
 export type CreateControlPlaneWorkerInput = {
   openWorkflow: OpenWorkflow;
   maxConcurrentWorkflows: number;
-  deps: ControlPlaneWorkerDependencies;
+  enabledWorkflows: ReadonlyArray<ControlPlaneWorkerWorkflowId>;
+  services: ControlPlaneWorkerServices;
 };
 
+function assertNever(value: never): never {
+  throw new Error(`Unsupported control-plane workflow id: ${String(value)}`);
+}
+
 /**
- * Creates a control-plane OpenWorkflow worker and registers all workflows.
+ * Creates a control-plane OpenWorkflow worker and registers enabled workflows.
  */
 export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): Worker {
-  const workflows = createControlPlaneWorkflowDefinitions({
-    sendOrganizationInvitation: input.deps.emailDelivery,
-    sendVerificationOTP: input.deps.emailDelivery,
-    requestDeleteSandboxProfile: {
-      deleteSandboxProfile: input.deps.deleteSandboxProfile,
-    },
-    startSandboxProfileInstance: {
-      startSandboxInstance: input.deps.startSandboxProfileInstance,
-    },
-  });
-  input.openWorkflow.implementWorkflow(
-    workflows.sendOrganizationInvitation.spec,
-    workflows.sendOrganizationInvitation.fn,
-  );
-  input.openWorkflow.implementWorkflow(
-    workflows.sendVerificationOTP.spec,
-    workflows.sendVerificationOTP.fn,
-  );
-  input.openWorkflow.implementWorkflow(
-    workflows.requestDeleteSandboxProfile.spec,
-    workflows.requestDeleteSandboxProfile.fn,
-  );
-  input.openWorkflow.implementWorkflow(
-    workflows.startSandboxProfileInstance.spec,
-    workflows.startSandboxProfileInstance.fn,
-  );
+  for (const workflowId of input.enabledWorkflows) {
+    if (workflowId === ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION) {
+      if (input.services.emailDelivery === undefined) {
+        throw new Error(
+          "Control-plane email delivery service is required for sendOrganizationInvitation workflow.",
+        );
+      }
+      const workflow = createSendOrganizationInvitationWorkflow(input.services.emailDelivery);
+      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
+      continue;
+    }
+
+    if (workflowId === ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP) {
+      if (input.services.emailDelivery === undefined) {
+        throw new Error(
+          "Control-plane email delivery service is required for sendVerificationOTP workflow.",
+        );
+      }
+      const workflow = createSendVerificationOTPWorkflow(input.services.emailDelivery);
+      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
+      continue;
+    }
+
+    if (workflowId === ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE) {
+      if (input.services.sandboxProfiles === undefined) {
+        throw new Error(
+          "Control-plane sandbox profiles service is required for requestDeleteSandboxProfile workflow.",
+        );
+      }
+      const workflow = createRequestDeleteSandboxProfileWorkflow({
+        deleteSandboxProfile: input.services.sandboxProfiles.deleteSandboxProfile,
+      });
+      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
+      continue;
+    }
+
+    if (workflowId === ControlPlaneWorkerWorkflowIds.START_SANDBOX_PROFILE_INSTANCE) {
+      if (input.services.sandboxInstances === undefined) {
+        throw new Error(
+          "Control-plane sandbox instances service is required for startSandboxProfileInstance workflow.",
+        );
+      }
+      const workflow = createStartSandboxProfileInstanceWorkflow({
+        startSandboxInstance: input.services.sandboxInstances.startSandboxProfileInstance,
+      });
+      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
+      continue;
+    }
+
+    return assertNever(workflowId);
+  }
 
   return input.openWorkflow.newWorker({
     concurrency: input.maxConcurrentWorkflows,

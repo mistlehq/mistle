@@ -6,5 +6,5 @@ export {
 } from "./spec.js";
 export {
   createStartSandboxInstanceWorkflow,
-  type CreateStartSandboxInstanceWorkflowInput,
+  type StartSandboxInstanceWorkflowServices,
 } from "./workflow.js";

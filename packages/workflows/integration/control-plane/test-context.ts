@@ -12,6 +12,7 @@ import postgres from "postgres";
 import { it as vitestIt } from "vitest";
 
 import {
+  ControlPlaneWorkerWorkflowIds,
   createControlPlaneBackend,
   createControlPlaneOpenWorkflow,
   createControlPlaneWorker,
@@ -75,7 +76,12 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
         const worker: Worker = createControlPlaneWorker({
           openWorkflow,
           maxConcurrentWorkflows: 1,
-          deps: {
+          enabledWorkflows: [
+            ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
+            ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
+            ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE,
+          ],
+          services: {
             emailDelivery: {
               emailSender,
               from: {
@@ -83,14 +89,13 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
                 name: "Mistle",
               },
             },
-            deleteSandboxProfile: async (input) => {
-              await sql`
-                delete from control_plane.sandbox_profiles
-                where id = ${input.profileId} and organization_id = ${input.organizationId}
-              `;
-            },
-            startSandboxProfileInstance: async () => {
-              throw new Error("startSandboxProfileInstance is not configured in this fixture.");
+            sandboxProfiles: {
+              deleteSandboxProfile: async (input) => {
+                await sql`
+                  delete from control_plane.sandbox_profiles
+                  where id = ${input.profileId} and organization_id = ${input.organizationId}
+                `;
+              },
             },
           },
         });

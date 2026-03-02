@@ -2,8 +2,9 @@ import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/c
 import { sandboxProfiles } from "@mistle/db/control-plane";
 import { SMTPEmailSender } from "@mistle/emails";
 import {
+  ControlPlaneWorkerWorkflowIds,
   createControlPlaneWorker,
-  type ControlPlaneWorkerDependencies,
+  type StartSandboxProfileInstanceWorkflowInput,
 } from "@mistle/workflows/control-plane";
 import { and, eq } from "drizzle-orm";
 
@@ -22,90 +23,58 @@ function createEmailSender(config: ControlPlaneWorkerConfig): SMTPEmailSender {
   });
 }
 
-type ResolveSandboxProfileVersionInput = {
-  db: WorkerRuntimeResources["db"];
+async function verifySandboxProfileVersionExists(input: {
   organizationId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;
-};
-
-async function verifySandboxProfileVersionExists(
-  ctx: ResolveSandboxProfileVersionInput,
-): Promise<void> {
-  const sandboxProfile = await ctx.db.query.sandboxProfiles.findFirst({
+  resources: Pick<WorkerRuntimeResources, "db">;
+}): Promise<void> {
+  const sandboxProfile = await input.resources.db.query.sandboxProfiles.findFirst({
     columns: {
       id: true,
     },
-    where: (table, { and, eq }) =>
-      and(eq(table.id, ctx.sandboxProfileId), eq(table.organizationId, ctx.organizationId)),
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.id, input.sandboxProfileId),
+        whereEq(table.organizationId, input.organizationId),
+      ),
   });
-
   if (sandboxProfile === undefined) {
     throw new Error("Sandbox profile was not found.");
   }
 
-  const sandboxProfileVersion = await ctx.db.query.sandboxProfileVersions.findFirst({
+  const sandboxProfileVersion = await input.resources.db.query.sandboxProfileVersions.findFirst({
     columns: {
       sandboxProfileId: true,
     },
-    where: (table, { and, eq }) =>
-      and(
-        eq(table.sandboxProfileId, ctx.sandboxProfileId),
-        eq(table.version, ctx.sandboxProfileVersion),
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.sandboxProfileId, input.sandboxProfileId),
+        whereEq(table.version, input.sandboxProfileVersion),
       ),
   });
-
   if (sandboxProfileVersion === undefined) {
     throw new Error("Sandbox profile version was not found.");
   }
 }
 
-function createWorkerDependencies(ctx: {
-  config: ControlPlaneWorkerConfig;
-  internalAuthServiceToken: string;
-  db: WorkerRuntimeResources["db"];
-  emailSender: SMTPEmailSender;
-}): ControlPlaneWorkerDependencies {
-  const dataPlaneSandboxInstancesClient = createDataPlaneSandboxInstancesClient({
-    baseUrl: ctx.config.dataPlaneApi.baseUrl,
-    serviceToken: ctx.internalAuthServiceToken,
+async function startSandboxProfileInstance(input: {
+  resources: Pick<WorkerRuntimeResources, "db">;
+  dataPlaneSandboxInstancesClient: ReturnType<typeof createDataPlaneSandboxInstancesClient>;
+  workflowInput: StartSandboxProfileInstanceWorkflowInput;
+}): Promise<{
+  workflowRunId: string;
+  sandboxInstanceId: string;
+  providerSandboxId: string;
+}> {
+  await verifySandboxProfileVersionExists({
+    resources: input.resources,
+    organizationId: input.workflowInput.organizationId,
+    sandboxProfileId: input.workflowInput.sandboxProfileId,
+    sandboxProfileVersion: input.workflowInput.sandboxProfileVersion,
   });
 
-  return {
-    emailDelivery: {
-      emailSender: ctx.emailSender,
-      from: {
-        email: ctx.config.email.fromAddress,
-        name: ctx.config.email.fromName,
-      },
-    },
-    deleteSandboxProfile: async (input) => {
-      await ctx.db
-        .delete(sandboxProfiles)
-        .where(
-          and(
-            eq(sandboxProfiles.id, input.profileId),
-            eq(sandboxProfiles.organizationId, input.organizationId),
-          ),
-        );
-    },
-    startSandboxProfileInstance: async (input) => {
-      await verifySandboxProfileVersionExists({
-        db: ctx.db,
-        organizationId: input.organizationId,
-        sandboxProfileId: input.sandboxProfileId,
-        sandboxProfileVersion: input.sandboxProfileVersion,
-      });
-
-      const response = await dataPlaneSandboxInstancesClient.startSandboxInstance(input);
-
-      return {
-        workflowRunId: response.workflowRunId,
-        sandboxInstanceId: response.sandboxInstanceId,
-        providerSandboxId: response.providerSandboxId,
-      };
-    },
-  };
+  return input.dataPlaneSandboxInstancesClient.startSandboxInstance(input.workflowInput);
 }
 
 export function createRuntimeWorker(ctx: {
@@ -114,15 +83,49 @@ export function createRuntimeWorker(ctx: {
   resources: Pick<WorkerRuntimeResources, "db" | "openWorkflow">;
 }): ReturnType<typeof createControlPlaneWorker> {
   const emailSender = createEmailSender(ctx.config);
+  const dataPlaneSandboxInstancesClient = createDataPlaneSandboxInstancesClient({
+    baseUrl: ctx.config.dataPlaneApi.baseUrl,
+    serviceToken: ctx.internalAuthServiceToken,
+  });
 
   return createControlPlaneWorker({
     openWorkflow: ctx.resources.openWorkflow,
     maxConcurrentWorkflows: ctx.config.workflow.concurrency,
-    deps: createWorkerDependencies({
-      config: ctx.config,
-      internalAuthServiceToken: ctx.internalAuthServiceToken,
-      db: ctx.resources.db,
-      emailSender,
-    }),
+    enabledWorkflows: [
+      ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
+      ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
+      ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE,
+      ControlPlaneWorkerWorkflowIds.START_SANDBOX_PROFILE_INSTANCE,
+    ],
+    services: {
+      emailDelivery: {
+        emailSender,
+        from: {
+          email: ctx.config.email.fromAddress,
+          name: ctx.config.email.fromName,
+        },
+      },
+      sandboxProfiles: {
+        deleteSandboxProfile: async (input) => {
+          await ctx.resources.db
+            .delete(sandboxProfiles)
+            .where(
+              and(
+                eq(sandboxProfiles.id, input.profileId),
+                eq(sandboxProfiles.organizationId, input.organizationId),
+              ),
+            );
+        },
+      },
+      sandboxInstances: {
+        startSandboxProfileInstance: async (workflowInput) => {
+          return startSandboxProfileInstance({
+            resources: ctx.resources,
+            dataPlaneSandboxInstancesClient,
+            workflowInput,
+          });
+        },
+      },
+    },
   });
 }

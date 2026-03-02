@@ -17,6 +17,7 @@ import {
   type PostgresWithPgBouncerService,
 } from "@mistle/test-core";
 import {
+  ControlPlaneWorkerWorkflowIds,
   createControlPlaneBackend,
   createControlPlaneOpenWorkflow,
   createControlPlaneWorker,
@@ -32,7 +33,6 @@ import { createAuthenticatedSession } from "./helpers/auth-session.js";
 
 export type ControlPlaneApiIntegrationFixture = {
   config: ControlPlaneApiConfig;
-  internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   mailpitService: MailpitService;
   databaseStack: PostgresWithPgBouncerService;
@@ -92,7 +92,12 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
         const workflowWorker = createControlPlaneWorker({
           openWorkflow,
           maxConcurrentWorkflows: 1,
-          deps: {
+          enabledWorkflows: [
+            ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
+            ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
+            ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE,
+          ],
+          services: {
             emailDelivery: {
               emailSender,
               from: {
@@ -100,18 +105,17 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
                 name: "Mistle",
               },
             },
-            deleteSandboxProfile: async (input) => {
-              await workflowDb
-                .delete(sandboxProfiles)
-                .where(
-                  and(
-                    eq(sandboxProfiles.id, input.profileId),
-                    eq(sandboxProfiles.organizationId, input.organizationId),
-                  ),
-                );
-            },
-            startSandboxProfileInstance: async () => {
-              throw new Error("startSandboxProfileInstance is not configured in this fixture.");
+            sandboxProfiles: {
+              deleteSandboxProfile: async (input) => {
+                await workflowDb
+                  .delete(sandboxProfiles)
+                  .where(
+                    and(
+                      eq(sandboxProfiles.id, input.profileId),
+                      eq(sandboxProfiles.organizationId, input.organizationId),
+                    ),
+                  );
+              },
             },
           },
         });
@@ -137,7 +141,6 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
           },
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
-            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
@@ -155,16 +158,10 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
             otpAllowedAttempts: 3,
           },
         };
-        const internalAuthServiceToken = "integration-service-token";
 
         const runtime = await createControlPlaneApiRuntime({
           app: config,
-          internalAuthServiceToken,
-          connectionToken: {
-            secret: "integration-connection-secret",
-            issuer: "integration-issuer",
-            audience: "integration-audience",
-          },
+          internalAuthServiceToken: "integration-service-token",
         });
         cleanupTasks.unshift(async () => {
           await runtime.stop();
@@ -172,7 +169,6 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
 
         await use({
           config,
-          internalAuthServiceToken,
           db: runtime.db,
           mailpitService,
           databaseStack,

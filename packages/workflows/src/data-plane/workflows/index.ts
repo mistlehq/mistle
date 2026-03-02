@@ -1,7 +1,7 @@
 import {
   createStartSandboxInstanceWorkflow,
   StartSandboxInstanceWorkflowSpec,
-  type CreateStartSandboxInstanceWorkflowInput,
+  type StartSandboxInstanceWorkflowServices,
 } from "./start-sandbox-instance/index.js";
 
 /**
@@ -14,7 +14,7 @@ export type DataPlaneWorkflowDefinitions = {
 };
 
 export type CreateDataPlaneWorkflowDefinitionsInput = {
-  startSandboxInstance: CreateStartSandboxInstanceWorkflowInput;
+  startSandboxInstance: StartSandboxInstanceWorkflowServices;
 };
 
 export function createDataPlaneWorkflowDefinitions(

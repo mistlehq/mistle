@@ -8,12 +8,17 @@ Reference catalog of data-plane workflows in `@mistle/workflows`.
 | ---------------------- | ---------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | Start Sandbox Instance | `StartSandboxInstanceWorkflowSpec` | `data-plane.sandbox-instances.start` | `{ organizationId: string; sandboxProfileId: string; sandboxProfileVersion: number; startedBy: { kind: "user"; id: string }; source: "dashboard"; image: { imageId: string; kind: "base" \| "snapshot"; createdAt: string } }` | `{ sandboxInstanceId: string; providerSandboxId: string }` | Starts a provider sandbox, persists the data-plane `sandbox_instances` row, and rolls back provider sandbox creation when persistence fails. |
 
-## Worker Dependencies
+## Worker Services
 
 `createDataPlaneWorker(...)` currently requires:
 
-- `deps.startSandbox`
-- `deps.stopSandbox`
-- `deps.insertSandboxInstance`
-- `deps.waitForSandboxTunnelConnectAck`
-- `deps.updateSandboxInstanceStatus`
+- `enabledWorkflows` with workflow ids from `DataPlaneWorkerWorkflowIds`
+- `services.startSandboxInstance.sandboxLifecycle`
+  - `startSandbox`
+  - `stopSandbox`
+- `services.startSandboxInstance.sandboxInstances`
+  - `createSandboxInstance`
+  - `markSandboxInstanceRunning`
+  - `markSandboxInstanceFailed`
+- `services.startSandboxInstance.tunnelConnectAcks`
+  - `waitForSandboxTunnelConnectAck`
