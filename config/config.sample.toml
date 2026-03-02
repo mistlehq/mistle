@@ -32,6 +32,9 @@ otp_allowed_attempts = 3
 database_url = "postgresql://mistle:replace-with-password@db:6432/mistle"
 namespace_id = "production"
 
+[apps.control_plane_api.data_plane_api]
+base_url = "http://data-plane-api:8082"
+
 [apps.control_plane_api.sandbox]
 default_base_image = "registry.example.com/mistle/sandbox-base:prod"
 

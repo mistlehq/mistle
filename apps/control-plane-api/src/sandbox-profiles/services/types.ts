@@ -5,11 +5,7 @@ import type {
   SandboxProfileStatus,
   SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
-import type {
-  DataPlaneDatabase,
-  SandboxInstanceSource,
-  SandboxInstanceStarterKind,
-} from "@mistle/db/data-plane";
+import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
 import type { BootstrapTokenConfig } from "@mistle/tunnel-auth";
@@ -24,8 +20,19 @@ export type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenW
 
 export type CreateSandboxProfilesServiceInput = {
   db: ControlPlaneDatabase;
-  dataPlaneDb: DataPlaneDatabase;
   openWorkflow: ControlPlaneOpenWorkflow;
+  mintSandboxInstanceConnectionToken?: (input: {
+    organizationId: string;
+    instanceId: string;
+    gatewayWebsocketUrl: string;
+    tokenTtlSeconds: number;
+    tokenConfig: BootstrapTokenConfig;
+  }) => Promise<{
+    instanceId: string;
+    url: string;
+    token: string;
+    expiresAt: string;
+  }>;
 };
 
 export type SandboxProfilesService = {

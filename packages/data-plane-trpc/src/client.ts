@@ -3,8 +3,12 @@ import type { AnyRouter } from "@trpc/server";
 
 import { DATA_PLANE_INTERNAL_AUTH_HEADER, DATA_PLANE_TRPC_PATH } from "./constants.js";
 import {
+  GetSandboxInstanceInputSchema,
+  GetSandboxInstanceResponseSchema,
   StartSandboxInstanceCompletedResponseSchema,
   StartSandboxInstanceInputSchema,
+  type GetSandboxInstanceInput,
+  type GetSandboxInstanceResponse,
   type StartSandboxInstanceCompletedResponse,
   type StartSandboxInstanceInput,
 } from "./contracts/index.js";
@@ -30,6 +34,7 @@ export type DataPlaneSandboxInstancesClient = {
   startSandboxInstance: (
     input: StartSandboxInstanceInput,
   ) => Promise<StartSandboxInstanceCompletedResponse>;
+  getSandboxInstance: (input: GetSandboxInstanceInput) => Promise<GetSandboxInstanceResponse>;
 };
 
 export type CreateDataPlaneSandboxInstancesClientInput = {
@@ -57,6 +62,12 @@ export function createDataPlaneSandboxInstancesClient(
       const response = await trpcClient.sandboxInstances.start.mutate(parsedStartInput);
 
       return StartSandboxInstanceCompletedResponseSchema.parse(response);
+    },
+    getSandboxInstance: async (getInput) => {
+      const parsedGetInput = GetSandboxInstanceInputSchema.parse(getInput);
+      const response = await untypedTrpcClient.query("sandboxInstances.get", parsedGetInput);
+
+      return GetSandboxInstanceResponseSchema.parse(response);
     },
   };
 }

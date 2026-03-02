@@ -13,6 +13,11 @@ type LoadControlPlaneApiConfigResult = ReturnType<
 >;
 
 export type ControlPlaneApiConfig = LoadControlPlaneApiConfigResult["app"];
+export type ControlPlaneApiGlobalConfig = NonNullable<LoadControlPlaneApiConfigResult["global"]>;
+export type ControlPlaneApiRuntimeConfig = {
+  app: ControlPlaneApiConfig;
+  internalAuthServiceToken: ControlPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
+};
 
 export type AppContextBindings = {
   Variables: AppContextVariables;

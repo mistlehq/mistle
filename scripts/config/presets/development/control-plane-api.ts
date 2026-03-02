@@ -39,6 +39,9 @@ export const controlPlaneApiDevelopmentPreset = {
           database_url: "postgresql://mistle:mistle@127.0.0.1:6432/mistle_dev",
           namespace_id: "development",
         },
+        data_plane_api: {
+          base_url: "http://127.0.0.1:5300",
+        },
         sandbox: {
           default_base_image: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },

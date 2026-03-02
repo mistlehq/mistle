@@ -1,3 +1,4 @@
+import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import {
   SandboxInstanceSources,
   SandboxInstanceStarterKinds,
@@ -11,11 +12,18 @@ import {
   MigrationTracking,
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
-import { startPostgresWithPgBouncer, type PostgresWithPgBouncerService } from "@mistle/test-core";
+import {
+  reserveAvailablePort,
+  startPostgresWithPgBouncer,
+  type PostgresWithPgBouncerService,
+} from "@mistle/test-core";
 import { verifyBootstrapToken } from "@mistle/tunnel-auth";
+import { createDataPlaneBackend } from "@mistle/workflows/data-plane";
 import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
+import { createDataPlaneApiRuntime } from "../../data-plane-api/src/runtime/index.js";
+import type { DataPlaneApiConfig } from "../../data-plane-api/src/types.js";
 import {
   SandboxInstancesConflictCodes,
   SandboxInstancesConflictError,
@@ -31,11 +39,15 @@ const TokenConfig = {
 } as const;
 
 const GatewayWebsocketUrl = "wss://gateway.example.test/tunnel/client";
+const InternalAuthServiceToken = "integration-service-token";
+const WorkflowNamespaceId = "integration";
 
 describe("sandbox instances service mintConnectionToken", () => {
   let databaseStack: PostgresWithPgBouncerService;
   let dataPlaneDbPool: Pool;
   let dataPlaneDb: DataPlaneDatabase;
+  let dataPlaneRuntime: Awaited<ReturnType<typeof createDataPlaneApiRuntime>> | undefined;
+  let dataPlaneBaseUrl: string;
 
   beforeAll(async () => {
     databaseStack = await startPostgresWithPgBouncer({
@@ -54,6 +66,35 @@ describe("sandbox instances service mintConnectionToken", () => {
       connectionString: databaseStack.pooledUrl,
     });
     dataPlaneDb = createDataPlaneDatabase(dataPlaneDbPool);
+
+    const dataPlaneMigrationBackend = await createDataPlaneBackend({
+      url: databaseStack.directUrl,
+      namespaceId: WorkflowNamespaceId,
+      runMigrations: true,
+    });
+    await dataPlaneMigrationBackend.stop();
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const dataPlaneConfig: DataPlaneApiConfig = {
+      server: {
+        host,
+        port,
+      },
+      database: {
+        url: databaseStack.pooledUrl,
+      },
+      workflow: {
+        databaseUrl: databaseStack.pooledUrl,
+        namespaceId: WorkflowNamespaceId,
+      },
+    };
+    dataPlaneBaseUrl = `http://${host}:${String(port)}`;
+    dataPlaneRuntime = await createDataPlaneApiRuntime({
+      app: dataPlaneConfig,
+      internalAuthServiceToken: InternalAuthServiceToken,
+    });
+    await dataPlaneRuntime.start();
   });
 
   beforeEach(async () => {
@@ -61,7 +102,11 @@ describe("sandbox instances service mintConnectionToken", () => {
   });
 
   afterAll(async () => {
-    await Promise.all([dataPlaneDbPool.end(), databaseStack.stop()]);
+    await Promise.all([
+      dataPlaneRuntime?.stop() ?? Promise.resolve(),
+      dataPlaneDbPool.end(),
+      databaseStack.stop(),
+    ]);
   });
 
   it("mints a connection token for a running sandbox instance", async () => {
@@ -83,7 +128,10 @@ describe("sandbox instances service mintConnectionToken", () => {
     });
 
     const sandboxInstancesService = createSandboxInstancesService({
-      dataPlaneDb,
+      dataPlaneClient: createDataPlaneSandboxInstancesClient({
+        baseUrl: dataPlaneBaseUrl,
+        serviceToken: InternalAuthServiceToken,
+      }),
     });
 
     const tokenResponse = await sandboxInstancesService.mintConnectionToken({
@@ -113,7 +161,10 @@ describe("sandbox instances service mintConnectionToken", () => {
 
   it("throws not found when the sandbox instance does not exist", async () => {
     const sandboxInstancesService = createSandboxInstancesService({
-      dataPlaneDb,
+      dataPlaneClient: createDataPlaneSandboxInstancesClient({
+        baseUrl: dataPlaneBaseUrl,
+        serviceToken: InternalAuthServiceToken,
+      }),
     });
 
     await expect(
@@ -148,7 +199,10 @@ describe("sandbox instances service mintConnectionToken", () => {
     });
 
     const sandboxInstancesService = createSandboxInstancesService({
-      dataPlaneDb,
+      dataPlaneClient: createDataPlaneSandboxInstancesClient({
+        baseUrl: dataPlaneBaseUrl,
+        serviceToken: InternalAuthServiceToken,
+      }),
     });
 
     await expect(

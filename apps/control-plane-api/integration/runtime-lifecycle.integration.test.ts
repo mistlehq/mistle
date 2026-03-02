@@ -6,17 +6,20 @@ import { createControlPlaneApiRuntime } from "../src/runtime/index.js";
 import { createRuntimeConfigWithPort } from "./config.js";
 import { it } from "./test-context.js";
 
+const IntegrationServiceToken = "integration-service-token";
+
 describe("runtime lifecycle integration", () => {
   it("enforces start/stop runtime lifecycle semantics", async ({ fixture }) => {
     const host = "127.0.0.1";
     const port = await reserveAvailablePort({ host });
-    const runtime = await createControlPlaneApiRuntime(
-      createRuntimeConfigWithPort({
+    const runtime = await createControlPlaneApiRuntime({
+      app: createRuntimeConfigWithPort({
         config: fixture.config,
         host,
         port,
       }),
-    );
+      internalAuthServiceToken: IntegrationServiceToken,
+    });
 
     try {
       await runtime.start();
@@ -42,13 +45,14 @@ describe("runtime lifecycle integration", () => {
   }) => {
     const host = "127.0.0.1";
     const port = await reserveAvailablePort({ host });
-    const runtime = await createControlPlaneApiRuntime(
-      createRuntimeConfigWithPort({
+    const runtime = await createControlPlaneApiRuntime({
+      app: createRuntimeConfigWithPort({
         config: fixture.config,
         host,
         port,
       }),
-    );
+      internalAuthServiceToken: IntegrationServiceToken,
+    });
     const healthURL = `http://${host}:${String(port)}/__healthz`;
 
     await runtime.start();
@@ -67,7 +71,10 @@ describe("runtime lifecycle integration", () => {
   }, 60_000);
 
   it("releases app resources after stopApp", async ({ fixture }) => {
-    const app = await createApp(fixture.config);
+    const app = await createApp({
+      app: fixture.config,
+      internalAuthServiceToken: IntegrationServiceToken,
+    });
     expect(getAppDatabase(app)).toBeDefined();
 
     await stopApp(app);
