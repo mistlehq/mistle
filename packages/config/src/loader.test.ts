@@ -11,15 +11,17 @@ describe("parseConfigRecord", () => {
         internalAuth: {
           serviceToken: "test-service-token",
         },
-        tunnel: {
-          bootstrapTokenSecret: "test-bootstrap-token-secret",
-          tokenIssuer: "data-plane-worker",
-          tokenAudience: "data-plane-gateway",
-        },
-        connectionTokens: {
-          secret: "test-connection-token-secret",
-          issuer: "control-plane-api",
-          audience: "data-plane-gateway",
+        sandbox: {
+          connect: {
+            tokenSecret: "test-connection-token-secret",
+            tokenIssuer: "control-plane-api",
+            tokenAudience: "data-plane-gateway",
+          },
+          bootstrap: {
+            tokenSecret: "test-bootstrap-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "data-plane-gateway",
+          },
         },
       },
       apps: {
@@ -156,15 +158,17 @@ describe("parseConfigRecord", () => {
         internalAuth: {
           serviceToken: "test-service-token",
         },
-        tunnel: {
-          bootstrapTokenSecret: "test-bootstrap-token-secret",
-          tokenIssuer: "data-plane-worker",
-          tokenAudience: "data-plane-gateway",
-        },
-        connectionTokens: {
-          secret: "test-connection-token-secret",
-          issuer: "control-plane-api",
-          audience: "data-plane-gateway",
+        sandbox: {
+          connect: {
+            tokenSecret: "test-connection-token-secret",
+            tokenIssuer: "control-plane-api",
+            tokenAudience: "data-plane-gateway",
+          },
+          bootstrap: {
+            tokenSecret: "test-bootstrap-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "data-plane-gateway",
+          },
         },
       },
       apps: {

@@ -1,9 +1,8 @@
 import { createEnvLoader, hasEntries } from "../core/load-env.js";
 import {
-  GlobalConnectionTokensConfigSchema,
+  GlobalSandboxTokenConfigSchema,
   type PartialGlobalConfigInput,
   GlobalConfigSchema,
-  GlobalTunnelConfigSchema,
 } from "./schema.js";
 
 const loadGlobalEnv = createEnvLoader<typeof GlobalConfigSchema>([
@@ -21,46 +20,54 @@ const loadGlobalEnv = createEnvLoader<typeof GlobalConfigSchema>([
   },
 ]);
 
-const loadTunnelEnv = createEnvLoader<typeof GlobalTunnelConfigSchema>([
+const loadSandboxBootstrapTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConfigSchema>([
   {
-    key: "bootstrapTokenSecret",
-    envVar: "MISTLE_GLOBAL_TUNNEL_BOOTSTRAP_TOKEN_SECRET",
+    key: "tokenSecret",
+    envVar: "MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET",
   },
   {
     key: "tokenIssuer",
-    envVar: "MISTLE_GLOBAL_TUNNEL_TOKEN_ISSUER",
+    envVar: "MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER",
   },
   {
     key: "tokenAudience",
-    envVar: "MISTLE_GLOBAL_TUNNEL_TOKEN_AUDIENCE",
+    envVar: "MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE",
   },
 ]);
 
-const loadConnectionTokensEnv = createEnvLoader<typeof GlobalConnectionTokensConfigSchema>([
+const loadSandboxConnectTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConfigSchema>([
   {
-    key: "secret",
-    envVar: "MISTLE_GLOBAL_CONNECTION_TOKENS_SECRET",
+    key: "tokenSecret",
+    envVar: "MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET",
   },
   {
-    key: "issuer",
-    envVar: "MISTLE_GLOBAL_CONNECTION_TOKENS_ISSUER",
+    key: "tokenIssuer",
+    envVar: "MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER",
   },
   {
-    key: "audience",
-    envVar: "MISTLE_GLOBAL_CONNECTION_TOKENS_AUDIENCE",
+    key: "tokenAudience",
+    envVar: "MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE",
   },
 ]);
 
 export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigInput {
   const partialGlobal = loadGlobalEnv(env);
-  const partialTunnel = loadTunnelEnv(env);
-  const partialConnectionTokens = loadConnectionTokensEnv(env);
+  const partialSandboxBootstrapToken = loadSandboxBootstrapTokenEnv(env);
+  const partialSandboxConnectToken = loadSandboxConnectTokenEnv(env);
 
-  if (hasEntries(partialTunnel)) {
-    partialGlobal.tunnel = partialTunnel;
-  }
-  if (hasEntries(partialConnectionTokens)) {
-    partialGlobal.connectionTokens = partialConnectionTokens;
+  if (hasEntries(partialSandboxBootstrapToken) || hasEntries(partialSandboxConnectToken)) {
+    partialGlobal.sandbox = {
+      ...(hasEntries(partialSandboxBootstrapToken)
+        ? {
+            bootstrap: partialSandboxBootstrapToken,
+          }
+        : {}),
+      ...(hasEntries(partialSandboxConnectToken)
+        ? {
+            connect: partialSandboxConnectToken,
+          }
+        : {}),
+    };
   }
 
   return GlobalConfigSchema.partial().parse(partialGlobal);

@@ -10,7 +10,7 @@ export type DataPlaneWorkerConfig = LoadDataPlaneWorkerConfigResult["app"];
 export type DataPlaneWorkerGlobalConfig = NonNullable<LoadDataPlaneWorkerConfigResult["global"]>;
 export type DataPlaneWorkerRuntimeConfig = {
   app: DataPlaneWorkerConfig;
-  tunnel: DataPlaneWorkerGlobalConfig["tunnel"];
+  sandbox: DataPlaneWorkerGlobalConfig["sandbox"];
 };
 
 export type AppContextBindings = {

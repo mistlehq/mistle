@@ -6,13 +6,15 @@ export const globalDevelopmentPreset = {
   defaults: {
     global: {
       env: "development",
-      tunnel: {
-        token_issuer: "data-plane-worker",
-        token_audience: "data-plane-gateway",
-      },
-      connection_tokens: {
-        issuer: "control-plane-api",
-        audience: "data-plane-gateway",
+      sandbox: {
+        connect: {
+          token_issuer: "control-plane-api",
+          token_audience: "data-plane-gateway",
+        },
+        bootstrap: {
+          token_issuer: "data-plane-worker",
+          token_audience: "data-plane-gateway",
+        },
       },
     },
   },
@@ -23,12 +25,12 @@ export const globalDevelopmentPreset = {
       generate: () => randomBytes(32).toString("base64url"),
     },
     {
-      path: ["global", "tunnel", "bootstrap_token_secret"],
+      path: ["global", "sandbox", "connect", "token_secret"],
       when: "always",
       generate: () => randomBytes(32).toString("base64url"),
     },
     {
-      path: ["global", "connection_tokens", "secret"],
+      path: ["global", "sandbox", "bootstrap", "token_secret"],
       when: "always",
       generate: () => randomBytes(32).toString("base64url"),
     },

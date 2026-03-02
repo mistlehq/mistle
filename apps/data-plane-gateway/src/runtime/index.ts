@@ -20,9 +20,9 @@ export function createDataPlaneGatewayRuntime(
     app,
     upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
     bootstrapTokenConfig: {
-      bootstrapTokenSecret: config.tunnel.bootstrapTokenSecret,
-      tokenIssuer: config.tunnel.tokenIssuer,
-      tokenAudience: config.tunnel.tokenAudience,
+      bootstrapTokenSecret: config.sandbox.bootstrap.tokenSecret,
+      tokenIssuer: config.sandbox.bootstrap.tokenIssuer,
+      tokenAudience: config.sandbox.bootstrap.tokenAudience,
     } satisfies BootstrapTokenConfig,
   });
 

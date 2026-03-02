@@ -16,9 +16,9 @@ type LoadControlPlaneApiConfigResult = ReturnType<
 export type ControlPlaneApiConfig = LoadControlPlaneApiConfigResult["app"];
 export type ControlPlaneApiGlobalConfig = NonNullable<LoadControlPlaneApiConfigResult["global"]>;
 export type ControlPlaneApiConnectionTokenConfig = {
-  secret: ControlPlaneApiGlobalConfig["connectionTokens"]["secret"];
-  issuer: ControlPlaneApiGlobalConfig["connectionTokens"]["issuer"];
-  audience: ControlPlaneApiGlobalConfig["connectionTokens"]["audience"];
+  secret: ControlPlaneApiGlobalConfig["sandbox"]["connect"]["tokenSecret"];
+  issuer: ControlPlaneApiGlobalConfig["sandbox"]["connect"]["tokenIssuer"];
+  audience: ControlPlaneApiGlobalConfig["sandbox"]["connect"]["tokenAudience"];
 };
 export type ControlPlaneApiRuntimeConfig = {
   app: ControlPlaneApiConfig;

@@ -7,15 +7,15 @@ env = "production"
 [global.internal_auth]
 service_token = "replace-with-internal-service-token"
 
-[global.tunnel]
-bootstrap_token_secret = "replace-with-bootstrap-token-secret"
-token_issuer = "data-plane-worker"
+[global.sandbox.connect]
+token_secret = "replace-with-connect-token-secret"
+token_issuer = "control-plane-api"
 token_audience = "data-plane-gateway"
 
-[global.connection_tokens]
-secret = "replace-with-connection-token-secret"
-issuer = "control-plane-api"
-audience = "data-plane-gateway"
+[global.sandbox.bootstrap]
+token_secret = "replace-with-bootstrap-token-secret"
+token_issuer = "data-plane-worker"
+token_audience = "data-plane-gateway"
 
 [apps.control_plane_api.server]
 host = "0.0.0.0"

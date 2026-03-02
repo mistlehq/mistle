@@ -103,9 +103,9 @@ describe("sandbox tunnel connect endpoint integration", () => {
       const jti = randomUUID();
       const token = await mintBootstrapToken({
         config: {
-          bootstrapTokenSecret: fixture.config.tunnel.bootstrapTokenSecret,
-          tokenIssuer: fixture.config.tunnel.tokenIssuer,
-          tokenAudience: fixture.config.tunnel.tokenAudience,
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
         },
         jti,
         ttlSeconds: 120,
@@ -131,9 +131,9 @@ describe("sandbox tunnel connect endpoint integration", () => {
       const jti = randomUUID();
       const token = await mintBootstrapToken({
         config: {
-          bootstrapTokenSecret: fixture.config.tunnel.bootstrapTokenSecret,
-          tokenIssuer: fixture.config.tunnel.tokenIssuer,
-          tokenAudience: fixture.config.tunnel.tokenAudience,
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
         },
         jti,
         ttlSeconds: 120,

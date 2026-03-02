@@ -11,27 +11,29 @@ const dataPlaneWorkerDockerConfigFixturePath = fileURLToPath(
   new URL("./fixtures/data-plane-worker-docker.toml", import.meta.url),
 );
 const serviceToken = "fixture-service-token";
-const bootstrapTokenSecret = "fixture-bootstrap-token-secret";
-const tokenIssuer = "data-plane-worker";
-const tokenAudience = "data-plane-gateway";
-const connectionTokenSecret = "fixture-connection-token-secret";
-const connectionTokenIssuer = "control-plane-api";
-const connectionTokenAudience = "data-plane-gateway";
+const sandboxConnectTokenSecret = "fixture-connection-token-secret";
+const sandboxConnectTokenIssuer = "control-plane-api";
+const sandboxConnectTokenAudience = "data-plane-gateway";
+const sandboxBootstrapTokenSecret = "fixture-bootstrap-token-secret";
+const sandboxBootstrapTokenIssuer = "data-plane-worker";
+const sandboxBootstrapTokenAudience = "data-plane-gateway";
 
 const globalDevelopmentConfig = {
   env: "development",
   internalAuth: {
     serviceToken,
   },
-  tunnel: {
-    bootstrapTokenSecret,
-    tokenIssuer,
-    tokenAudience,
-  },
-  connectionTokens: {
-    secret: connectionTokenSecret,
-    issuer: connectionTokenIssuer,
-    audience: connectionTokenAudience,
+  sandbox: {
+    connect: {
+      tokenSecret: sandboxConnectTokenSecret,
+      tokenIssuer: sandboxConnectTokenIssuer,
+      tokenAudience: sandboxConnectTokenAudience,
+    },
+    bootstrap: {
+      tokenSecret: sandboxBootstrapTokenSecret,
+      tokenIssuer: sandboxBootstrapTokenIssuer,
+      tokenAudience: sandboxBootstrapTokenAudience,
+    },
   },
 } as const;
 
@@ -40,15 +42,17 @@ const globalProductionConfig = {
   internalAuth: {
     serviceToken,
   },
-  tunnel: {
-    bootstrapTokenSecret,
-    tokenIssuer,
-    tokenAudience,
-  },
-  connectionTokens: {
-    secret: connectionTokenSecret,
-    issuer: connectionTokenIssuer,
-    audience: connectionTokenAudience,
+  sandbox: {
+    connect: {
+      tokenSecret: sandboxConnectTokenSecret,
+      tokenIssuer: sandboxConnectTokenIssuer,
+      tokenAudience: sandboxConnectTokenAudience,
+    },
+    bootstrap: {
+      tokenSecret: sandboxBootstrapTokenSecret,
+      tokenIssuer: sandboxBootstrapTokenIssuer,
+      tokenAudience: sandboxBootstrapTokenAudience,
+    },
   },
 } as const;
 
