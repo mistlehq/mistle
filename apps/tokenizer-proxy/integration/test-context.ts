@@ -25,14 +25,6 @@ export const it = vitestIt.extend<{ fixture: TokenizerProxyIntegrationFixture }>
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5100",
           },
-          credentialResolver: {
-            requestTimeoutMs: 3000,
-          },
-          cache: {
-            maxEntries: 128,
-            defaultTtlSeconds: 300,
-            refreshSkewSeconds: 30,
-          },
         },
         internalAuthServiceToken: "integration-service-token",
       };
