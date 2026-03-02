@@ -1,16 +1,25 @@
-import {
-  SandboxInstanceSources,
-  SandboxInstanceStarterKinds,
-  SandboxInstanceStatuses,
+import type {
+  SandboxInstanceSource,
+  SandboxInstanceStarterKind,
+  SandboxInstanceStatus,
 } from "@mistle/db/data-plane";
 import { SandboxImageKind } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflows/data-plane";
 import { z } from "zod";
 
 export const DataPlaneSandboxImageKinds = SandboxImageKind;
-export const DataPlaneSandboxInstanceStarterKinds = SandboxInstanceStarterKinds;
-export const DataPlaneSandboxInstanceSources = SandboxInstanceSources;
-export const DataPlaneSandboxInstanceStatuses = SandboxInstanceStatuses;
+export const DataPlaneSandboxInstanceStarterKinds = {
+  USER: "user",
+} as const;
+export const DataPlaneSandboxInstanceSources = {
+  DASHBOARD: "dashboard",
+} as const;
+export const DataPlaneSandboxInstanceStatuses = {
+  STARTING: "starting",
+  RUNNING: "running",
+  STOPPED: "stopped",
+  FAILED: "failed",
+} as const;
 
 export const StartSandboxInstanceImageSchema = z
   .object({
@@ -198,3 +207,33 @@ type ContractMatchesWorkflowInput =
 
 const contractMatchesWorkflowInput: ContractMatchesWorkflowInput = true;
 void contractMatchesWorkflowInput;
+
+type ContractStarterKind =
+  (typeof DataPlaneSandboxInstanceStarterKinds)[keyof typeof DataPlaneSandboxInstanceStarterKinds];
+type ContractStarterKindMatchesDb = ContractStarterKind extends SandboxInstanceStarterKind
+  ? SandboxInstanceStarterKind extends ContractStarterKind
+    ? true
+    : never
+  : never;
+const contractStarterKindMatchesDb: ContractStarterKindMatchesDb = true;
+void contractStarterKindMatchesDb;
+
+type ContractSource =
+  (typeof DataPlaneSandboxInstanceSources)[keyof typeof DataPlaneSandboxInstanceSources];
+type ContractSourceMatchesDb = ContractSource extends SandboxInstanceSource
+  ? SandboxInstanceSource extends ContractSource
+    ? true
+    : never
+  : never;
+const contractSourceMatchesDb: ContractSourceMatchesDb = true;
+void contractSourceMatchesDb;
+
+type ContractStatus =
+  (typeof DataPlaneSandboxInstanceStatuses)[keyof typeof DataPlaneSandboxInstanceStatuses];
+type ContractStatusMatchesDb = ContractStatus extends SandboxInstanceStatus
+  ? SandboxInstanceStatus extends ContractStatus
+    ? true
+    : never
+  : never;
+const contractStatusMatchesDb: ContractStatusMatchesDb = true;
+void contractStatusMatchesDb;
