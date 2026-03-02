@@ -7,7 +7,11 @@ import {
 import { createControlPlaneBackend } from "@mistle/workflows/control-plane";
 
 import { createControlPlaneApiRuntime } from "../runtime/index.js";
-import type { ControlPlaneApiConfig, ControlPlaneApiRuntime } from "../types.js";
+import type {
+  ControlPlaneApiConfig,
+  ControlPlaneApiRuntime,
+  ControlPlaneApiRuntimeConfig,
+} from "../types.js";
 
 export type StartControlPlaneApiTestingRuntimeInput = {
   databaseDirectUrl: string;
@@ -111,10 +115,12 @@ export async function startControlPlaneApiTestingRuntime(
     workflowNamespaceId: input.workflowNamespaceId,
   });
 
-  return createControlPlaneApiRuntime({
+  const runtimeConfig: ControlPlaneApiRuntimeConfig = {
     app: createTestingConfig(input),
     internalAuthServiceToken: input.internalAuthServiceToken ?? "integration-service-token",
-  });
+  };
+
+  return createControlPlaneApiRuntime(runtimeConfig);
 }
 
 export type { ControlPlaneApiRuntime };

@@ -1,8 +1,10 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 
 import { createAuthApp } from "../auth/app.js";
 import { createIntegrationConnectionsApp } from "../integration-connections/index.js";
 import { createIntegrationTargetsApp } from "../integration-targets/index.js";
+import { createInternalIntegrationCredentialsApp } from "../internal-integration-credentials/index.js";
 import { createAppContextMiddleware } from "../middleware/app-context.js";
 import { createCorsMiddleware } from "../middleware/cors.js";
 import { withAuthSession } from "../middleware/with-auth-session.js";
@@ -14,7 +16,9 @@ import type { AppServices, ControlPlaneApiConfig, ControlPlaneApp } from "../typ
 type RegisterAppRoutesInput = {
   app: ControlPlaneApp;
   config: ControlPlaneApiConfig;
+  internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
+  integrationRegistry: IntegrationRegistry;
   services: AppServices;
 };
 
@@ -26,7 +30,9 @@ export function registerAppRoutes(input: RegisterAppRoutesInput): void {
     "*",
     createAppContextMiddleware({
       config,
+      internalAuthServiceToken: input.internalAuthServiceToken,
       db,
+      integrationRegistry: input.integrationRegistry,
       services,
     }),
   );
@@ -42,6 +48,7 @@ export function registerAppRoutes(input: RegisterAppRoutesInput): void {
 
 export function registerApiRouteModules(app: ControlPlaneApp): void {
   const authApp = createAuthApp();
+  const internalIntegrationCredentialsApp = createInternalIntegrationCredentialsApp();
   const integrationConnectionsApp = withAuthSession(createIntegrationConnectionsApp());
   const integrationTargetsApp = withAuthSession(createIntegrationTargetsApp());
   const organizationMembershipCapabilitiesApp = withAuthSession(
@@ -49,6 +56,7 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
   );
   const sandboxProfilesApp = withAuthSession(createSandboxProfilesApp());
   app.route(authApp.basePath, authApp.routes);
+  app.route(internalIntegrationCredentialsApp.basePath, internalIntegrationCredentialsApp.routes);
   app.route(integrationConnectionsApp.basePath, integrationConnectionsApp.routes);
   app.route(integrationTargetsApp.basePath, integrationTargetsApp.routes);
   app.route(

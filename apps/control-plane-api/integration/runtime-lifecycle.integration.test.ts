@@ -6,8 +6,6 @@ import { createControlPlaneApiRuntime } from "../src/runtime/index.js";
 import { createRuntimeConfigWithPort } from "./config.js";
 import { it } from "./test-context.js";
 
-const IntegrationServiceToken = "integration-service-token";
-
 describe("runtime lifecycle integration", () => {
   it("enforces start/stop runtime lifecycle semantics", async ({ fixture }) => {
     const host = "127.0.0.1";
@@ -18,7 +16,7 @@ describe("runtime lifecycle integration", () => {
         host,
         port,
       }),
-      internalAuthServiceToken: IntegrationServiceToken,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
     });
 
     try {
@@ -51,7 +49,7 @@ describe("runtime lifecycle integration", () => {
         host,
         port,
       }),
-      internalAuthServiceToken: IntegrationServiceToken,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
     });
     const healthURL = `http://${host}:${String(port)}/__healthz`;
 
@@ -73,7 +71,7 @@ describe("runtime lifecycle integration", () => {
   it("releases app resources after stopApp", async ({ fixture }) => {
     const app = await createApp({
       app: fixture.config,
-      internalAuthServiceToken: IntegrationServiceToken,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
     });
     expect(getAppDatabase(app)).toBeDefined();
 
