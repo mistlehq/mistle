@@ -247,6 +247,142 @@ func TestApply(t *testing.T) {
 		}
 	})
 
+	t.Run("runs artifact removals before update commands for snapshot sources", func(t *testing.T) {
+		tempDirectory := t.TempDir()
+		removalTargetPath := filepath.Join(tempDirectory, "stale-artifact.txt")
+		updateMarkerPath := filepath.Join(tempDirectory, "update-marker.txt")
+		if err := os.WriteFile(removalTargetPath, []byte("stale"), 0o600); err != nil {
+			t.Fatalf("expected stale artifact file setup to succeed, got %v", err)
+		}
+
+		err := Apply(ApplyInput{
+			RuntimePlan: startup.RuntimePlan{
+				Image: startup.ResolvedSandboxImage{
+					Source:     "snapshot",
+					ImageRef:   "mistle/sandbox-snapshot@sha256:test",
+					InstanceID: "sbi_test_123",
+				},
+				ArtifactRemovals: []startup.RuntimeArtifactRemovalSpec{
+					{
+						ArtifactKey: "artifact_old",
+						Commands: []startup.RuntimeArtifactCommand{
+							{
+								Args: []string{
+									"sh",
+									"-euc",
+									`rm -f "$REMOVE_PATH"`,
+								},
+								Env: map[string]string{
+									"REMOVE_PATH": removalTargetPath,
+								},
+							},
+						},
+					},
+				},
+				Artifacts: []startup.RuntimeArtifactSpec{
+					{
+						ArtifactKey: "artifact_cli",
+						Name:        "Artifact CLI",
+						Lifecycle: startup.RuntimeArtifactLifecycle{
+							Install: []startup.RuntimeArtifactCommand{
+								{
+									Args: []string{"sh", "-euc", "exit 91"},
+								},
+							},
+							Update: []startup.RuntimeArtifactCommand{
+								{
+									Args: []string{
+										"sh",
+										"-euc",
+										`test ! -f "$REMOVE_PATH"; printf '%s' "$UPDATE_CONTENT" > "$UPDATE_PATH"`,
+									},
+									Env: map[string]string{
+										"REMOVE_PATH":    removalTargetPath,
+										"UPDATE_PATH":    updateMarkerPath,
+										"UPDATE_CONTENT": "artifact-update",
+									},
+								},
+							},
+						},
+					},
+				},
+				RuntimeClientSetups: []startup.RuntimeClientSetup{},
+			},
+		})
+		if err != nil {
+			t.Fatalf("expected snapshot artifact removals and updates to succeed, got %v", err)
+		}
+
+		if _, err := os.Stat(removalTargetPath); !os.IsNotExist(err) {
+			t.Fatalf("expected stale artifact file to be removed, got stat err=%v", err)
+		}
+
+		updateMarkerBytes, err := os.ReadFile(updateMarkerPath)
+		if err != nil {
+			t.Fatalf("expected update marker file to exist, got %v", err)
+		}
+		if string(updateMarkerBytes) != "artifact-update" {
+			t.Fatalf("unexpected update marker content: %s", string(updateMarkerBytes))
+		}
+	})
+
+	t.Run("skips artifact removals for base sources", func(t *testing.T) {
+		err := Apply(ApplyInput{
+			RuntimePlan: startup.RuntimePlan{
+				Image: startup.ResolvedSandboxImage{
+					Source:   "base",
+					ImageRef: "mistle/sandbox-base:dev",
+				},
+				ArtifactRemovals: []startup.RuntimeArtifactRemovalSpec{
+					{
+						ArtifactKey: "artifact_old",
+						Commands: []startup.RuntimeArtifactCommand{
+							{
+								Args: []string{"sh", "-euc", "exit 66"},
+							},
+						},
+					},
+				},
+				RuntimeClientSetups: []startup.RuntimeClientSetup{},
+			},
+		})
+		if err != nil {
+			t.Fatalf("expected artifact removals to be skipped for base source, got %v", err)
+		}
+	})
+
+	t.Run("returns explicit error when an artifact removal command fails", func(t *testing.T) {
+		err := Apply(ApplyInput{
+			RuntimePlan: startup.RuntimePlan{
+				Image: startup.ResolvedSandboxImage{
+					Source:     "snapshot",
+					ImageRef:   "mistle/sandbox-snapshot@sha256:test",
+					InstanceID: "sbi_test_123",
+				},
+				ArtifactRemovals: []startup.RuntimeArtifactRemovalSpec{
+					{
+						ArtifactKey: "artifact_old",
+						Commands: []startup.RuntimeArtifactCommand{
+							{
+								Args: []string{"sh", "-euc", "exit 9"},
+							},
+						},
+					},
+				},
+				RuntimeClientSetups: []startup.RuntimeClientSetup{},
+			},
+		})
+		if err == nil {
+			t.Fatal("expected artifact removal command failure")
+		}
+		if !strings.Contains(err.Error(), "runtime plan artifactRemovals[0] commands[0] failed") {
+			t.Fatalf("expected artifact removal location in error, got %v", err)
+		}
+		if !strings.Contains(err.Error(), "artifactKey=artifact_old") {
+			t.Fatalf("expected artifact key in removal error, got %v", err)
+		}
+	})
+
 	t.Run("returns explicit error when an artifact command fails", func(t *testing.T) {
 		err := Apply(ApplyInput{
 			RuntimePlan: startup.RuntimePlan{
