@@ -69,6 +69,23 @@ function createTrpcClient(
 }
 
 describe("tRPC internal service auth integration", () => {
+  it("allows requests with valid service token", async ({ fixture }) => {
+    const client = createTrpcClient(fixture.baseUrl, fixture.internalAuthServiceToken);
+
+    const response = await client.sandboxInstances.start.mutate(
+      createStartSandboxInput({
+        organizationId: "org_dp_api_integration_auth_valid",
+        sandboxProfileId: "sbp_dp_api_integration_auth_valid",
+        sandboxProfileVersion: 1,
+        userId: "usr_dp_api_integration_auth_valid",
+        imageId: "im_dp_api_integration_auth_valid",
+      }),
+    );
+
+    expect(response.status).toBe("completed");
+    expect(response.workflowRunId).not.toBe("");
+  }, 60_000);
+
   it("rejects requests missing service token", async ({ fixture }) => {
     const client = createTRPCClient<DataPlaneTrpcRouter>({
       links: [
