@@ -73,7 +73,7 @@ describe("sandbox profile compile runtime plan integration", () => {
         profileId: "sbp_compile_success",
         profileVersion: 1,
         image: {
-          source: "default-base",
+          source: "base",
           imageRef: "mistle/sandbox-base:dev",
         },
         runtimeContext: {
@@ -139,7 +139,7 @@ model_reasoning_effort = "medium"
           profileId: "sbp_compile_missing_profile",
           profileVersion: 1,
           image: {
-            source: "default-base",
+            source: "base",
             imageRef: "mistle/sandbox-base:dev",
           },
           runtimeContext: {
@@ -179,7 +179,7 @@ model_reasoning_effort = "medium"
           profileId: "sbp_compile_missing_version",
           profileVersion: 9,
           image: {
-            source: "default-base",
+            source: "base",
             imageRef: "mistle/sandbox-base:dev",
           },
           runtimeContext: {
@@ -235,7 +235,7 @@ model_reasoning_effort = "medium"
           profileId: "sbp_compile_missing_connection",
           profileVersion: 1,
           image: {
-            source: "default-base",
+            source: "base",
             imageRef: "mistle/sandbox-base:dev",
           },
           runtimeContext: {
@@ -299,7 +299,7 @@ model_reasoning_effort = "medium"
           profileId: "sbp_compile_missing_target",
           profileVersion: 1,
           image: {
-            source: "default-base",
+            source: "base",
             imageRef: "mistle/sandbox-base:dev",
           },
           runtimeContext: {

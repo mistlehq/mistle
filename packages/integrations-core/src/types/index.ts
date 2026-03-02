@@ -314,18 +314,18 @@ export type TriggerRule = {
 
 export type ResolvedSandboxImage =
   | {
-      source: "instance-latest-snapshot";
+      source: "snapshot";
       imageRef: string;
       instanceId: string;
     }
   | {
-      source: "profile-version-base";
+      source: "profile-base";
       imageRef: string;
       sandboxProfileId: string;
       version: number;
     }
   | {
-      source: "default-base";
+      source: "base";
       imageRef: string;
     };
 

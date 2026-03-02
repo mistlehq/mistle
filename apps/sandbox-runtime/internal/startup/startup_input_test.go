@@ -10,7 +10,7 @@ const validRuntimePlanJSON = `{
 	"sandboxProfileId": "sbp_123",
 	"version": 1,
 	"image": {
-		"source": "default-base",
+		"source": "base",
 		"imageRef": "mistle/sandbox-base:dev"
 	},
 	"egressRoutes": [],
@@ -46,9 +46,9 @@ func TestReadStartupInput(t *testing.T) {
 				startupInput.RuntimePlan.SandboxProfileID,
 			)
 		}
-		if startupInput.RuntimePlan.Image.Source != "default-base" {
+		if startupInput.RuntimePlan.Image.Source != "base" {
 			t.Fatalf(
-				"expected runtime plan image source default-base, got %q",
+				"expected runtime plan image source base, got %q",
 				startupInput.RuntimePlan.Image.Source,
 			)
 		}
@@ -190,7 +190,7 @@ func TestReadStartupInput(t *testing.T) {
 					"sandboxProfileId": "sbp_123",
 					"version": 1,
 					"image": {
-						"source": "default-base",
+						"source": "base",
 						"imageRef": "mistle/sandbox-base:dev"
 					},
 					"egressRoutes": [],
@@ -218,7 +218,7 @@ func TestReadStartupInput(t *testing.T) {
 					"sandboxProfileId": "sbp_123",
 					"version": 1,
 					"image": {
-						"source": "default-base",
+						"source": "base",
 						"imageRef": "mistle/sandbox-base:dev"
 					}
 				}

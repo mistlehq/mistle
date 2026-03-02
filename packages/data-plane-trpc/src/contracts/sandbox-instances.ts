@@ -18,14 +18,14 @@ export const StartSandboxInstanceImageSchema = z
 const CompiledRuntimePlanImageSchema = z.union([
   z
     .object({
-      source: z.literal("instance-latest-snapshot"),
+      source: z.literal("snapshot"),
       imageRef: z.string().min(1),
       instanceId: z.string().min(1),
     })
     .strict(),
   z
     .object({
-      source: z.literal("profile-version-base"),
+      source: z.literal("profile-base"),
       imageRef: z.string().min(1),
       sandboxProfileId: z.string().min(1),
       version: z.number().int().min(1),
@@ -33,7 +33,7 @@ const CompiledRuntimePlanImageSchema = z.union([
     .strict(),
   z
     .object({
-      source: z.literal("default-base"),
+      source: z.literal("base"),
       imageRef: z.string().min(1),
     })
     .strict(),

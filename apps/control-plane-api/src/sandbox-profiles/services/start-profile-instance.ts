@@ -58,7 +58,7 @@ export async function startProfileInstance(
       profileId: serviceInput.profileId,
       profileVersion: serviceInput.profileVersion,
       image: {
-        source: "default-base",
+        source: "base",
         imageRef: serviceInput.image.imageId,
       },
       runtimeContext: {

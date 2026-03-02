@@ -34,7 +34,7 @@ function createRuntimePlan(input: {
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     image: {
-      source: "default-base",
+      source: "base",
       imageRef: "registry:3",
     },
     egressRoutes: [],

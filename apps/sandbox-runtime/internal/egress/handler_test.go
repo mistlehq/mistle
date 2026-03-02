@@ -23,7 +23,7 @@ func buildRuntimePlanForHandlerTests() startup.RuntimePlan {
 		SandboxProfileID: "sbp_handler_test",
 		Version:          3,
 		Image: startup.ResolvedSandboxImage{
-			Source:   "default-base",
+			Source:   "base",
 			ImageRef: "mistle/sandbox-base:dev",
 		},
 		EgressRoutes: []startup.EgressCredentialRoute{
