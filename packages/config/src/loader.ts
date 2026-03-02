@@ -8,6 +8,7 @@ import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/inde
 import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
 import { dataPlaneGatewayConfigModule } from "./apps/data-plane-gateway/index.js";
 import { dataPlaneWorkerConfigModule } from "./apps/data-plane-worker/index.js";
+import { tokenizerProxyConfigModule } from "./apps/tokenizer-proxy/index.js";
 import { mergeConfigRoots } from "./core/merge.js";
 import { type ConfigModule } from "./core/module.js";
 import { asObjectRecord, getValueAtPath } from "./core/record.js";
@@ -107,6 +108,10 @@ function parseAppConfig(
   appId: typeof AppIds.DATA_PLANE_WORKER,
   root: Record<string, unknown>,
 ): AppConfigModuleValue<typeof AppIds.DATA_PLANE_WORKER>;
+function parseAppConfig(
+  appId: typeof AppIds.TOKENIZER_PROXY,
+  root: Record<string, unknown>,
+): AppConfigModuleValue<typeof AppIds.TOKENIZER_PROXY>;
 function parseAppConfig<TApp extends AppConfigModuleKey>(
   appId: TApp,
   root: Record<string, unknown>,
@@ -133,6 +138,10 @@ function parseAppConfig(
 
   if (appId === AppIds.DATA_PLANE_WORKER) {
     return parseModuleValue(dataPlaneWorkerConfigModule, root);
+  }
+
+  if (appId === AppIds.TOKENIZER_PROXY) {
+    return parseModuleValue(tokenizerProxyConfigModule, root);
   }
 
   throw new Error("Unsupported app id.");

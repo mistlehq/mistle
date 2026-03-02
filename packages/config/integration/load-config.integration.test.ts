@@ -252,6 +252,43 @@ const dataPlaneWorkerDockerFixtureConfig = {
   },
 } as const;
 
+const tokenizerProxyEnvConfig = {
+  server: {
+    host: "127.0.0.1",
+    port: 5005,
+  },
+  controlPlaneApi: {
+    baseUrl: "http://127.0.0.1:5000",
+  },
+  credentialResolver: {
+    requestTimeoutMs: 3000,
+  },
+  cache: {
+    maxEntries: 4096,
+    defaultTtlSeconds: 300,
+    refreshSkewSeconds: 30,
+  },
+} as const;
+
+const tokenizerProxyFixtureConfig = {
+  ...tokenizerProxyEnvConfig,
+  server: {
+    host: "0.0.0.0",
+    port: 5305,
+  },
+  controlPlaneApi: {
+    baseUrl: "http://127.0.0.1:5100",
+  },
+  credentialResolver: {
+    requestTimeoutMs: 3500,
+  },
+  cache: {
+    maxEntries: 8192,
+    defaultTtlSeconds: 300,
+    refreshSkewSeconds: 30,
+  },
+} as const;
+
 describe("loadConfig integrations", () => {
   it("loads control-plane-api purely from a config file fixture", () => {
     const config = loadConfig({
@@ -622,6 +659,73 @@ describe("loadConfig integrations", () => {
 
     expect(config).toEqual({
       app: dataPlaneWorkerFixtureConfig,
+    });
+  });
+
+  it("loads tokenizer-proxy purely from a config file fixture", () => {
+    const config = loadConfig({
+      app: AppIds.TOKENIZER_PROXY,
+      configPath: configFixturePath,
+    });
+
+    expect(config).toEqual({
+      global: globalDevelopmentConfig,
+      app: tokenizerProxyFixtureConfig,
+    });
+  });
+
+  it("loads tokenizer-proxy purely from env", () => {
+    const config = loadConfig({
+      app: AppIds.TOKENIZER_PROXY,
+      env: createIntegrationEnv({
+        NODE_ENV: "production",
+        MISTLE_APPS_TOKENIZER_PROXY_HOST: "localhost",
+        MISTLE_APPS_TOKENIZER_PROXY_PORT: "5306",
+      }),
+    });
+
+    expect(config).toEqual({
+      global: globalProductionConfig,
+      app: {
+        ...tokenizerProxyEnvConfig,
+        server: {
+          host: "localhost",
+          port: 5306,
+        },
+      },
+    });
+  });
+
+  it("loads tokenizer-proxy from both config file and env, with env precedence", () => {
+    const config = loadConfig({
+      app: AppIds.TOKENIZER_PROXY,
+      configPath: configFixturePath,
+      env: {
+        MISTLE_APPS_TOKENIZER_PROXY_CACHE_MAX_ENTRIES: "9000",
+      },
+    });
+
+    expect(config).toEqual({
+      global: globalDevelopmentConfig,
+      app: {
+        ...tokenizerProxyFixtureConfig,
+        cache: {
+          ...tokenizerProxyFixtureConfig.cache,
+          maxEntries: 9000,
+        },
+      },
+    });
+  });
+
+  it("returns only tokenizer-proxy app config when includeGlobal is false", () => {
+    const config = loadConfig({
+      app: AppIds.TOKENIZER_PROXY,
+      includeGlobal: false,
+      configPath: configFixturePath,
+    });
+
+    expect(config).toEqual({
+      app: tokenizerProxyFixtureConfig,
     });
   });
 });

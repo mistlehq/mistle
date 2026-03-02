@@ -5,6 +5,7 @@ import { dataPlaneApiDevelopmentPreset } from "./data-plane-api.ts";
 import { dataPlaneGatewayDevelopmentPreset } from "./data-plane-gateway.ts";
 import { dataPlaneWorkerDevelopmentPreset } from "./data-plane-worker.ts";
 import { globalDevelopmentPreset } from "./global.ts";
+import { tokenizerProxyDevelopmentPreset } from "./tokenizer-proxy.ts";
 import type { DevelopmentPresetModule } from "./types.ts";
 
 export const developmentPresetModules: readonly DevelopmentPresetModule[] = [
@@ -14,5 +15,6 @@ export const developmentPresetModules: readonly DevelopmentPresetModule[] = [
   dataPlaneApiDevelopmentPreset,
   dataPlaneGatewayDevelopmentPreset,
   dataPlaneWorkerDevelopmentPreset,
+  tokenizerProxyDevelopmentPreset,
   dashboardDevelopmentPreset,
 ];

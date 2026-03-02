@@ -104,3 +104,18 @@ token_id = "fixture-modal-token-id"
 token_secret = "fixture-modal-token-secret"
 app_name = "mistle-sandbox"
 environment_name = "development"
+
+[apps.tokenizer_proxy.server]
+host = "0.0.0.0"
+port = 5305
+
+[apps.tokenizer_proxy.control_plane_api]
+base_url = "http://127.0.0.1:5100"
+
+[apps.tokenizer_proxy.credential_resolver]
+request_timeout_ms = 3500
+
+[apps.tokenizer_proxy.cache]
+max_entries = 8192
+default_ttl_seconds = 300
+refresh_skew_seconds = 30

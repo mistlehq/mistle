@@ -5,6 +5,7 @@ import { ControlPlaneWorkerConfigSchema } from "./apps/control-plane-worker/sche
 import { DataPlaneApiConfigSchema } from "./apps/data-plane-api/schema.js";
 import { DataPlaneGatewayConfigSchema } from "./apps/data-plane-gateway/schema.js";
 import { DataPlaneWorkerConfigSchema } from "./apps/data-plane-worker/schema.js";
+import { TokenizerProxyConfigSchema } from "./apps/tokenizer-proxy/schema.js";
 import { GlobalConfigSchema } from "./global/schema.js";
 
 export const ConfigSchema = z
@@ -17,6 +18,7 @@ export const ConfigSchema = z
         data_plane_api: DataPlaneApiConfigSchema,
         data_plane_gateway: DataPlaneGatewayConfigSchema,
         data_plane_worker: DataPlaneWorkerConfigSchema,
+        tokenizer_proxy: TokenizerProxyConfigSchema,
       })
       .strict(),
   })
