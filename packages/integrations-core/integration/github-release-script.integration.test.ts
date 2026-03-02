@@ -85,7 +85,7 @@ describe("renderInstallLatestGithubReleaseBinaryScript integration", () => {
       sandboxProfileId: "sbp_123",
       version: 1,
       image: {
-        source: "default-base",
+        source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
       },
       runtimeContext: {

@@ -11,18 +11,18 @@ const RuntimePlanSchema = z.object({
   version: z.number().int(),
   image: z.discriminatedUnion("source", [
     z.object({
-      source: z.literal("instance-latest-snapshot"),
+      source: z.literal("snapshot"),
       imageRef: z.string().min(1),
       instanceId: z.string().min(1),
     }),
     z.object({
-      source: z.literal("profile-version-base"),
+      source: z.literal("profile-base"),
       imageRef: z.string().min(1),
       sandboxProfileId: z.string().min(1),
       version: z.number().int(),
     }),
     z.object({
-      source: z.literal("default-base"),
+      source: z.literal("base"),
       imageRef: z.string().min(1),
     }),
   ]),
@@ -113,7 +113,7 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
     sandboxProfileId: "sbp_runtime_plan_001",
     version: 1,
     image: {
-      source: "default-base",
+      source: "base",
       imageRef: "registry:3",
     },
     egressRoutes: [],

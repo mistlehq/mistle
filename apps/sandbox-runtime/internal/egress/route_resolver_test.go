@@ -12,7 +12,7 @@ func buildRuntimePlanForResolverTests() startup.RuntimePlan {
 		SandboxProfileID: "sbp_test",
 		Version:          1,
 		Image: startup.ResolvedSandboxImage{
-			Source:   "default-base",
+			Source:   "base",
 			ImageRef: "mistle/sandbox-base:dev",
 		},
 		EgressRoutes: []startup.EgressCredentialRoute{

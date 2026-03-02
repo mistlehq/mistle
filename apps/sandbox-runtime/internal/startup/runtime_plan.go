@@ -6,9 +6,9 @@ import (
 )
 
 const (
-	resolvedSandboxImageSourceInstanceLatestSnapshot = "instance-latest-snapshot"
-	resolvedSandboxImageSourceProfileVersionBase     = "profile-version-base"
-	resolvedSandboxImageSourceDefaultBase            = "default-base"
+	resolvedSandboxImageSourceSnapshot    = "snapshot"
+	resolvedSandboxImageSourceProfileBase = "profile-base"
+	resolvedSandboxImageSourceBase        = "base"
 )
 
 var allowedAuthInjectionTypes = map[string]struct{}{
@@ -155,18 +155,18 @@ func validateResolvedSandboxImage(image ResolvedSandboxImage) error {
 	}
 
 	switch image.Source {
-	case resolvedSandboxImageSourceInstanceLatestSnapshot:
+	case resolvedSandboxImageSourceSnapshot:
 		if strings.TrimSpace(image.InstanceID) == "" {
 			return fmt.Errorf("runtime plan image instanceId is required for source '%s'", image.Source)
 		}
-	case resolvedSandboxImageSourceProfileVersionBase:
+	case resolvedSandboxImageSourceProfileBase:
 		if strings.TrimSpace(image.SandboxProfileID) == "" {
 			return fmt.Errorf("runtime plan image sandboxProfileId is required for source '%s'", image.Source)
 		}
 		if image.Version < 1 {
 			return fmt.Errorf("runtime plan image version must be at least 1 for source '%s'", image.Source)
 		}
-	case resolvedSandboxImageSourceDefaultBase:
+	case resolvedSandboxImageSourceBase:
 		return nil
 	default:
 		return fmt.Errorf("runtime plan image source '%s' is not supported", image.Source)
