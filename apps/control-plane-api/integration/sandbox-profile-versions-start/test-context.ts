@@ -153,87 +153,62 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
         const dataPlaneDb = createDataPlaneDatabase(dataPlaneDbPool);
         const dataPlaneWorkflowWorker = createDataPlaneWorker({
           openWorkflow: dataPlaneOpenWorkflow,
-          concurrency: 1,
-          workflowInputs: {
-            startSandboxInstance: {
-              startSandbox: async () => {
-                return {
-                  provider: "docker",
-                  providerSandboxId: `integration-${randomUUID()}`,
-                  bootstrapTokenJti: randomUUID(),
-                };
-              },
-              stopSandbox: async () => {},
-              insertSandboxInstance: async (workflowInput) => {
-                return dataPlaneDb.transaction(async (tx) => {
-                  const insertedRows = await tx
-                    .insert(sandboxInstances)
-                    .values({
-                      organizationId: workflowInput.organizationId,
-                      sandboxProfileId: workflowInput.sandboxProfileId,
-                      sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-                      provider: workflowInput.provider,
-                      providerSandboxId: workflowInput.providerSandboxId,
-                      status: SandboxInstanceStatuses.STARTING,
-                      startedByKind: workflowInput.startedBy.kind,
-                      startedById: workflowInput.startedBy.id,
-                      source: workflowInput.source,
-                    })
-                    .returning({
-                      id: sandboxInstances.id,
-                    });
-                  const insertedSandboxInstance = insertedRows[0];
-
-                  if (insertedSandboxInstance === undefined) {
-                    throw new Error("Expected sandbox instance insert to return one row.");
-                  }
-
-                  await tx.insert(sandboxInstanceRuntimePlans).values({
-                    sandboxInstanceId: insertedSandboxInstance.id,
-                    revision: 1,
-                    compiledRuntimePlan: workflowInput.runtimePlan,
-                    compiledFromProfileId: workflowInput.sandboxProfileId,
-                    compiledFromProfileVersion: workflowInput.sandboxProfileVersion,
+          maxConcurrentWorkflows: 1,
+          deps: {
+            startSandbox: async () => {
+              return {
+                provider: "docker",
+                providerSandboxId: `integration-${randomUUID()}`,
+                bootstrapTokenJti: randomUUID(),
+              };
+            },
+            stopSandbox: async () => {},
+            insertSandboxInstance: async (workflowInput) => {
+              return dataPlaneDb.transaction(async (tx) => {
+                const insertedRows = await tx
+                  .insert(sandboxInstances)
+                  .values({
+                    organizationId: workflowInput.organizationId,
+                    sandboxProfileId: workflowInput.sandboxProfileId,
+                    sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+                    provider: workflowInput.provider,
+                    providerSandboxId: workflowInput.providerSandboxId,
+                    status: SandboxInstanceStatuses.STARTING,
+                    startedByKind: workflowInput.startedBy.kind,
+                    startedById: workflowInput.startedBy.id,
+                    source: workflowInput.source,
+                  })
+                  .returning({
+                    id: sandboxInstances.id,
                   });
+                const insertedSandboxInstance = insertedRows[0];
 
-                  return {
-                    sandboxInstanceId: insertedSandboxInstance.id,
-                  };
-                });
-              },
-              waitForSandboxTunnelConnectAck: async () => {
-                return true;
-              },
-              updateSandboxInstanceStatus: async (workflowInput) => {
-                if (workflowInput.status === "running") {
-                  const updatedRows = await dataPlaneDb
-                    .update(sandboxInstances)
-                    .set({
-                      status: SandboxInstanceStatuses.RUNNING,
-                    })
-                    .where(
-                      and(
-                        eq(sandboxInstances.id, workflowInput.sandboxInstanceId),
-                        eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
-                      ),
-                    )
-                    .returning({
-                      id: sandboxInstances.id,
-                    });
-                  if (updatedRows[0] === undefined) {
-                    throw new Error(
-                      "Expected sandbox instance status transition from starting to running.",
-                    );
-                  }
-                  return;
+                if (insertedSandboxInstance === undefined) {
+                  throw new Error("Expected sandbox instance insert to return one row.");
                 }
 
+                await tx.insert(sandboxInstanceRuntimePlans).values({
+                  sandboxInstanceId: insertedSandboxInstance.id,
+                  revision: 1,
+                  compiledRuntimePlan: workflowInput.runtimePlan,
+                  compiledFromProfileId: workflowInput.sandboxProfileId,
+                  compiledFromProfileVersion: workflowInput.sandboxProfileVersion,
+                });
+
+                return {
+                  sandboxInstanceId: insertedSandboxInstance.id,
+                };
+              });
+            },
+            waitForSandboxTunnelConnectAck: async () => {
+              return true;
+            },
+            updateSandboxInstanceStatus: async (workflowInput) => {
+              if (workflowInput.status === "running") {
                 const updatedRows = await dataPlaneDb
                   .update(sandboxInstances)
                   .set({
-                    status: SandboxInstanceStatuses.FAILED,
-                    failureCode: workflowInput.failureCode,
-                    failureMessage: workflowInput.failureMessage,
+                    status: SandboxInstanceStatuses.RUNNING,
                   })
                   .where(
                     and(
@@ -246,10 +221,33 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
                   });
                 if (updatedRows[0] === undefined) {
                   throw new Error(
-                    "Expected sandbox instance status transition from starting to failed.",
+                    "Expected sandbox instance status transition from starting to running.",
                   );
                 }
-              },
+                return;
+              }
+
+              const updatedRows = await dataPlaneDb
+                .update(sandboxInstances)
+                .set({
+                  status: SandboxInstanceStatuses.FAILED,
+                  failureCode: workflowInput.failureCode,
+                  failureMessage: workflowInput.failureMessage,
+                })
+                .where(
+                  and(
+                    eq(sandboxInstances.id, workflowInput.sandboxInstanceId),
+                    eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+                  ),
+                )
+                .returning({
+                  id: sandboxInstances.id,
+                });
+              if (updatedRows[0] === undefined) {
+                throw new Error(
+                  "Expected sandbox instance status transition from starting to failed.",
+                );
+              }
             },
           },
         });
@@ -317,51 +315,40 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
         });
         const controlPlaneWorkflowWorker = createControlPlaneWorker({
           openWorkflow: controlPlaneOpenWorkflow,
-          concurrency: 1,
-          workflowInputs: {
-            sendOrganizationInvitation: {
+          maxConcurrentWorkflows: 1,
+          deps: {
+            emailDelivery: {
               emailSender,
               from: {
                 email: "no-reply@mistle.dev",
                 name: "Mistle",
               },
             },
-            sendVerificationOTP: {
-              emailSender,
-              from: {
-                email: "no-reply@mistle.dev",
-                name: "Mistle",
-              },
+            deleteSandboxProfile: async (input) => {
+              await controlPlaneWorkflowDb
+                .delete(sandboxProfiles)
+                .where(
+                  and(
+                    eq(sandboxProfiles.id, input.profileId),
+                    eq(sandboxProfiles.organizationId, input.organizationId),
+                  ),
+                );
             },
-            requestDeleteSandboxProfile: {
-              deleteSandboxProfile: async (input) => {
-                await controlPlaneWorkflowDb
-                  .delete(sandboxProfiles)
-                  .where(
-                    and(
-                      eq(sandboxProfiles.id, input.profileId),
-                      eq(sandboxProfiles.organizationId, input.organizationId),
-                    ),
-                  );
-              },
-            },
-            startSandboxProfileInstance: {
-              startSandboxInstance: async (input) => {
-                await verifySandboxProfileVersionExists({
-                  db: controlPlaneWorkflowDb,
-                  organizationId: input.organizationId,
-                  sandboxProfileId: input.sandboxProfileId,
-                  sandboxProfileVersion: input.sandboxProfileVersion,
-                });
+            startSandboxProfileInstance: async (input) => {
+              await verifySandboxProfileVersionExists({
+                db: controlPlaneWorkflowDb,
+                organizationId: input.organizationId,
+                sandboxProfileId: input.sandboxProfileId,
+                sandboxProfileVersion: input.sandboxProfileVersion,
+              });
 
-                const response = await dataPlaneClient.startSandboxInstance(input);
+              const response = await dataPlaneClient.startSandboxInstance(input);
 
-                return {
-                  workflowRunId: response.workflowRunId,
-                  sandboxInstanceId: response.sandboxInstanceId,
-                  providerSandboxId: response.providerSandboxId,
-                };
-              },
+              return {
+                workflowRunId: response.workflowRunId,
+                sandboxInstanceId: response.sandboxInstanceId,
+                providerSandboxId: response.providerSandboxId,
+              };
             },
           },
         });

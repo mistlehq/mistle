@@ -1,5 +1,6 @@
 export {
   StartSandboxProfileInstanceWorkflowSpec,
+  type StartSandboxProfileInstanceWorkflowImageInput,
   type StartSandboxProfileInstanceWorkflowInput,
   type StartSandboxProfileInstanceWorkflowOutput,
 } from "./spec.js";

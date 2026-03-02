@@ -27,7 +27,6 @@ Root export is also available:
 | `createControlPlaneBackend`                 | `function`      | Creates a Postgres backend configured to the control-plane schema.                                    |
 | `createControlPlaneOpenWorkflow`            | `function`      | Creates an OpenWorkflow client for producers and workers.                                             |
 | `createControlPlaneWorker`                  | `function`      | Registers control-plane workflows and returns a worker instance.                                      |
-| `createControlPlaneWorkflowDefinitions`     | `function`      | Builds control-plane workflow implementations from explicit dependencies.                             |
 | `SendOrganizationInvitationWorkflowSpec`    | `workflow spec` | Spec for invitation email delivery workflow (`control-plane.auth.send-organization-invitation`).      |
 | `SendVerificationOTPWorkflowSpec`           | `workflow spec` | Spec for OTP email delivery workflow (`control-plane.auth.send-verification-otp`).                    |
 | `RequestDeleteSandboxProfileWorkflowSpec`   | `workflow spec` | Spec for sandbox profile deletion workflow (`control-plane.sandbox-profiles.request-delete-profile`). |
@@ -37,14 +36,13 @@ Root export is also available:
 
 ### `@mistle/workflows/data-plane`
 
-| Export                               | Type            | Purpose                                                                              |
-| ------------------------------------ | --------------- | ------------------------------------------------------------------------------------ |
-| `DataPlaneOpenWorkflow.SCHEMA`       | `string`        | Dedicated OpenWorkflow schema name (`data_plane_openworkflow`).                      |
-| `createDataPlaneBackend`             | `function`      | Creates a Postgres backend configured to the data-plane schema.                      |
-| `createDataPlaneOpenWorkflow`        | `function`      | Creates an OpenWorkflow client for producers and workers.                            |
-| `createDataPlaneWorker`              | `function`      | Registers data-plane workflows and returns a worker instance.                        |
-| `createDataPlaneWorkflowDefinitions` | `function`      | Builds data-plane workflow implementations.                                          |
-| `StartSandboxInstanceWorkflowSpec`   | `workflow spec` | Spec for data-plane sandbox instance startup (`data-plane.sandbox-instances.start`). |
+| Export                             | Type            | Purpose                                                                              |
+| ---------------------------------- | --------------- | ------------------------------------------------------------------------------------ |
+| `DataPlaneOpenWorkflow.SCHEMA`     | `string`        | Dedicated OpenWorkflow schema name (`data_plane_openworkflow`).                      |
+| `createDataPlaneBackend`           | `function`      | Creates a Postgres backend configured to the data-plane schema.                      |
+| `createDataPlaneOpenWorkflow`      | `function`      | Creates an OpenWorkflow client for producers and workers.                            |
+| `createDataPlaneWorker`            | `function`      | Registers data-plane workflows and returns a worker instance.                        |
+| `StartSandboxInstanceWorkflowSpec` | `workflow spec` | Spec for data-plane sandbox instance startup (`data-plane.sandbox-instances.start`). |
 
 ## Example Usage
 
@@ -84,38 +82,27 @@ const emailSender = SMTPEmailSender.fromTransportOptions({
 
 const worker = createControlPlaneWorker({
   openWorkflow: ow,
-  concurrency: 4,
-  workflowInputs: {
-    sendOrganizationInvitation: {
+  maxConcurrentWorkflows: 4,
+  deps: {
+    emailDelivery: {
       emailSender,
       from: {
         email: "noreply@example.com",
         name: "Mistle",
       },
     },
-    sendVerificationOTP: {
-      emailSender,
-      from: {
-        email: "noreply@example.com",
-        name: "Mistle",
-      },
+    deleteSandboxProfile: async (input) => {
+      await db
+        .delete(sandboxProfiles)
+        .where(
+          and(
+            eq(sandboxProfiles.id, input.profileId),
+            eq(sandboxProfiles.organizationId, input.organizationId),
+          ),
+        );
     },
-    requestDeleteSandboxProfile: {
-      deleteSandboxProfile: async (input) => {
-        await db
-          .delete(sandboxProfiles)
-          .where(
-            and(
-              eq(sandboxProfiles.id, input.profileId),
-              eq(sandboxProfiles.organizationId, input.organizationId),
-            ),
-          );
-      },
-    },
-    startSandboxProfileInstance: {
-      startSandboxInstance: async () => {
-        throw new Error("Provide data-plane sandbox start logic.");
-      },
+    startSandboxProfileInstance: async () => {
+      throw new Error("Provide data-plane sandbox start logic.");
     },
   },
 });
@@ -175,13 +162,17 @@ const ow = createDataPlaneOpenWorkflow({ backend });
 
 const worker = createDataPlaneWorker({
   openWorkflow: ow,
-  concurrency: 4,
-  workflowInputs: {
-    startSandboxInstance: {
-      startSandbox: async () => ({ provider: "modal", providerSandboxId: "sb_123" }),
-      stopSandbox: async () => {},
-      insertSandboxInstance: async () => ({ sandboxInstanceId: "sbi_123" }),
-    },
+  maxConcurrentWorkflows: 4,
+  deps: {
+    startSandbox: async () => ({
+      provider: "modal",
+      providerSandboxId: "sb_123",
+      bootstrapTokenJti: "jti_123",
+    }),
+    stopSandbox: async () => {},
+    insertSandboxInstance: async () => ({ sandboxInstanceId: "sbi_123" }),
+    waitForSandboxTunnelConnectAck: async () => true,
+    updateSandboxInstanceStatus: async () => {},
   },
 });
 
@@ -193,22 +184,33 @@ await worker.start();
 1. Create a workflow module under the target plane directory, for example `src/control-plane/workflows/send-verification-otp/`.
 2. Define the workflow spec in `spec.ts` and implementation in `workflow.ts`.
 3. Export it through `src/control-plane/workflows/index.ts` or `src/data-plane/workflows/index.ts`.
-4. Add workflow dependency inputs to the plane definitions builder so workers can inject runtime dependencies explicitly.
+4. Add worker dependency ports to the plane worker factory so runtime wiring stays in one place.
 5. Export the workflow spec from the plane entrypoint (`src/control-plane/index.ts` or `src/data-plane/index.ts`) if producers in apps need to schedule it.
 6. Use the plane client in producers and call `runWorkflow(workflowSpec, input)`.
 
-Example registry wiring:
+Example worker wiring:
 
 ```ts
-// src/control-plane/workflows/index.ts
-import { createRequestDeleteSandboxProfileWorkflow } from "./request-delete-sandbox-profile/index.js";
-import { createSendVerificationOTPWorkflow } from "./send-verification-otp/index.js";
+// src/control-plane/worker.ts
+import { createRequestDeleteSandboxProfileWorkflow } from "./workflows/request-delete-sandbox-profile/index.js";
+import { createSendVerificationOTPWorkflow } from "./workflows/send-verification-otp/index.js";
 
-export function createControlPlaneWorkflowDefinitions(input) {
-  return [
-    createSendVerificationOTPWorkflow(input.sendVerificationOTP),
-    createRequestDeleteSandboxProfileWorkflow(input.requestDeleteSandboxProfile),
-  ];
+export function createControlPlaneWorker(input) {
+  const sendVerificationOtpWorkflow = createSendVerificationOTPWorkflow(input.deps.emailDelivery);
+  const requestDeleteSandboxProfileWorkflow = createRequestDeleteSandboxProfileWorkflow({
+    deleteSandboxProfile: input.deps.deleteSandboxProfile,
+  });
+  input.openWorkflow.implementWorkflow(
+    sendVerificationOtpWorkflow.spec,
+    sendVerificationOtpWorkflow.fn,
+  );
+  input.openWorkflow.implementWorkflow(
+    requestDeleteSandboxProfileWorkflow.spec,
+    requestDeleteSandboxProfileWorkflow.fn,
+  );
+  return input.openWorkflow.newWorker({
+    concurrency: input.maxConcurrentWorkflows,
+  });
 }
 ```
 

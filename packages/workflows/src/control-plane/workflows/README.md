@@ -11,15 +11,13 @@ Reference catalog of control-plane workflows in `@mistle/workflows`.
 | Request Delete Sandbox Profile | `RequestDeleteSandboxProfileWorkflowSpec` | `control-plane.sandbox-profiles.request-delete-profile`  | `{ organizationId: string; profileId: string }`                                                                                                                                                             | `{ profileId: string }`                                                           | Deletes a sandbox profile in background worker context.                                                                |
 | Start Sandbox Profile Instance | `StartSandboxProfileInstanceWorkflowSpec` | `control-plane.sandbox-instances.start-profile-instance` | `{ organizationId: string; sandboxProfileId: string; sandboxProfileVersion: number; startedBy: { kind: string; id: string }; source: string; image: { imageId: string; kind: string; createdAt: string } }` | `{ workflowRunId: string; sandboxInstanceId: string; providerSandboxId: string }` | Validates profile/profile-version existence and starts a sandbox via data-plane API using caller-resolved image input. |
 
-## Registration Dependencies
+## Worker Dependencies
 
-`createControlPlaneWorkflowDefinitions(...)` currently requires:
+`createControlPlaneWorker(...)` currently requires:
 
-- `sendOrganizationInvitation.emailSender`
-- `sendOrganizationInvitation.from`
-- `sendVerificationOTP.emailSender`
-- `sendVerificationOTP.from`
-- `requestDeleteSandboxProfile.deleteSandboxProfile`
-- `startSandboxProfileInstance.startSandboxInstance`
+- `deps.emailDelivery.emailSender`
+- `deps.emailDelivery.from`
+- `deps.deleteSandboxProfile`
+- `deps.startSandboxProfileInstance`
 
 When adding a new workflow, update this file with the new workflow contract and runtime dependencies.

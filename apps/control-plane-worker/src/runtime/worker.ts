@@ -3,7 +3,7 @@ import { sandboxProfiles } from "@mistle/db/control-plane";
 import { SMTPEmailSender } from "@mistle/emails";
 import {
   createControlPlaneWorker,
-  type CreateControlPlaneWorkflowDefinitionsInput,
+  type ControlPlaneWorkerDependencies,
 } from "@mistle/workflows/control-plane";
 import { and, eq } from "drizzle-orm";
 
@@ -60,61 +60,50 @@ async function verifySandboxProfileVersionExists(
   }
 }
 
-function createWorkflowInputs(ctx: {
+function createWorkerDependencies(ctx: {
   config: ControlPlaneWorkerConfig;
   internalAuthServiceToken: string;
   db: WorkerRuntimeResources["db"];
   emailSender: SMTPEmailSender;
-}): CreateControlPlaneWorkflowDefinitionsInput {
+}): ControlPlaneWorkerDependencies {
   const dataPlaneSandboxInstancesClient = createDataPlaneSandboxInstancesClient({
     baseUrl: ctx.config.dataPlaneApi.baseUrl,
     serviceToken: ctx.internalAuthServiceToken,
   });
 
   return {
-    sendOrganizationInvitation: {
+    emailDelivery: {
       emailSender: ctx.emailSender,
       from: {
         email: ctx.config.email.fromAddress,
         name: ctx.config.email.fromName,
       },
     },
-    sendVerificationOTP: {
-      emailSender: ctx.emailSender,
-      from: {
-        email: ctx.config.email.fromAddress,
-        name: ctx.config.email.fromName,
-      },
+    deleteSandboxProfile: async (input) => {
+      await ctx.db
+        .delete(sandboxProfiles)
+        .where(
+          and(
+            eq(sandboxProfiles.id, input.profileId),
+            eq(sandboxProfiles.organizationId, input.organizationId),
+          ),
+        );
     },
-    requestDeleteSandboxProfile: {
-      deleteSandboxProfile: async (input) => {
-        await ctx.db
-          .delete(sandboxProfiles)
-          .where(
-            and(
-              eq(sandboxProfiles.id, input.profileId),
-              eq(sandboxProfiles.organizationId, input.organizationId),
-            ),
-          );
-      },
-    },
-    startSandboxProfileInstance: {
-      startSandboxInstance: async (input) => {
-        await verifySandboxProfileVersionExists({
-          db: ctx.db,
-          organizationId: input.organizationId,
-          sandboxProfileId: input.sandboxProfileId,
-          sandboxProfileVersion: input.sandboxProfileVersion,
-        });
+    startSandboxProfileInstance: async (input) => {
+      await verifySandboxProfileVersionExists({
+        db: ctx.db,
+        organizationId: input.organizationId,
+        sandboxProfileId: input.sandboxProfileId,
+        sandboxProfileVersion: input.sandboxProfileVersion,
+      });
 
-        const response = await dataPlaneSandboxInstancesClient.startSandboxInstance(input);
+      const response = await dataPlaneSandboxInstancesClient.startSandboxInstance(input);
 
-        return {
-          workflowRunId: response.workflowRunId,
-          sandboxInstanceId: response.sandboxInstanceId,
-          providerSandboxId: response.providerSandboxId,
-        };
-      },
+      return {
+        workflowRunId: response.workflowRunId,
+        sandboxInstanceId: response.sandboxInstanceId,
+        providerSandboxId: response.providerSandboxId,
+      };
     },
   };
 }
@@ -128,8 +117,8 @@ export function createRuntimeWorker(ctx: {
 
   return createControlPlaneWorker({
     openWorkflow: ctx.resources.openWorkflow,
-    concurrency: ctx.config.workflow.concurrency,
-    workflowInputs: createWorkflowInputs({
+    maxConcurrentWorkflows: ctx.config.workflow.concurrency,
+    deps: createWorkerDependencies({
       config: ctx.config,
       internalAuthServiceToken: ctx.internalAuthServiceToken,
       db: ctx.resources.db,

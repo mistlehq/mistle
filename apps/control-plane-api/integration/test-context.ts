@@ -91,40 +91,27 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
 
         const workflowWorker = createControlPlaneWorker({
           openWorkflow,
-          concurrency: 1,
-          workflowInputs: {
-            sendOrganizationInvitation: {
+          maxConcurrentWorkflows: 1,
+          deps: {
+            emailDelivery: {
               emailSender,
               from: {
                 email: "no-reply@mistle.dev",
                 name: "Mistle",
               },
             },
-            sendVerificationOTP: {
-              emailSender,
-              from: {
-                email: "no-reply@mistle.dev",
-                name: "Mistle",
-              },
-            },
-            requestDeleteSandboxProfile: {
-              deleteSandboxProfile: async (input) => {
-                await workflowDb
-                  .delete(sandboxProfiles)
-                  .where(
-                    and(
-                      eq(sandboxProfiles.id, input.profileId),
-                      eq(sandboxProfiles.organizationId, input.organizationId),
-                    ),
-                  );
-              },
-            },
-            startSandboxProfileInstance: {
-              startSandboxInstance: async () => {
-                throw new Error(
-                  "startSandboxProfileInstance.startSandboxInstance is not configured in this fixture.",
+            deleteSandboxProfile: async (input) => {
+              await workflowDb
+                .delete(sandboxProfiles)
+                .where(
+                  and(
+                    eq(sandboxProfiles.id, input.profileId),
+                    eq(sandboxProfiles.organizationId, input.organizationId),
+                  ),
                 );
-              },
+            },
+            startSandboxProfileInstance: async () => {
+              throw new Error("startSandboxProfileInstance is not configured in this fixture.");
             },
           },
         });

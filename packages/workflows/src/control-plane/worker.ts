@@ -1,37 +1,66 @@
+import type { EmailSender } from "@mistle/emails";
 import type { OpenWorkflow, Worker } from "openworkflow";
 
-import {
-  createControlPlaneWorkflowDefinitions,
-  type CreateControlPlaneWorkflowDefinitionsInput,
-} from "./workflows/index.js";
+import { createControlPlaneWorkflowDefinitions } from "./workflows/index.js";
+import type {
+  StartSandboxProfileInstanceWorkflowInput,
+  StartSandboxProfileInstanceWorkflowOutput,
+} from "./workflows/start-sandbox-profile-instance/index.js";
+
+export type ControlPlaneWorkerEmailDelivery = {
+  emailSender: EmailSender;
+  from: {
+    email: string;
+    name: string;
+  };
+};
+
+export type ControlPlaneWorkerDependencies = {
+  emailDelivery: ControlPlaneWorkerEmailDelivery;
+  deleteSandboxProfile: (input: { organizationId: string; profileId: string }) => Promise<void>;
+  startSandboxProfileInstance: (
+    input: StartSandboxProfileInstanceWorkflowInput,
+  ) => Promise<StartSandboxProfileInstanceWorkflowOutput>;
+};
 
 export type CreateControlPlaneWorkerInput = {
   openWorkflow: OpenWorkflow;
-  concurrency: number;
-  workflowInputs: CreateControlPlaneWorkflowDefinitionsInput;
+  maxConcurrentWorkflows: number;
+  deps: ControlPlaneWorkerDependencies;
 };
 
 /**
  * Creates a control-plane OpenWorkflow worker and registers all workflows.
  */
-export function createControlPlaneWorker(ctx: CreateControlPlaneWorkerInput): Worker {
-  const workflows = createControlPlaneWorkflowDefinitions(ctx.workflowInputs);
-  ctx.openWorkflow.implementWorkflow(
+export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): Worker {
+  const workflows = createControlPlaneWorkflowDefinitions({
+    sendOrganizationInvitation: input.deps.emailDelivery,
+    sendVerificationOTP: input.deps.emailDelivery,
+    requestDeleteSandboxProfile: {
+      deleteSandboxProfile: input.deps.deleteSandboxProfile,
+    },
+    startSandboxProfileInstance: {
+      startSandboxInstance: input.deps.startSandboxProfileInstance,
+    },
+  });
+  input.openWorkflow.implementWorkflow(
     workflows.sendOrganizationInvitation.spec,
     workflows.sendOrganizationInvitation.fn,
   );
-  ctx.openWorkflow.implementWorkflow(
+  input.openWorkflow.implementWorkflow(
     workflows.sendVerificationOTP.spec,
     workflows.sendVerificationOTP.fn,
   );
-  ctx.openWorkflow.implementWorkflow(
+  input.openWorkflow.implementWorkflow(
     workflows.requestDeleteSandboxProfile.spec,
     workflows.requestDeleteSandboxProfile.fn,
   );
-  ctx.openWorkflow.implementWorkflow(
+  input.openWorkflow.implementWorkflow(
     workflows.startSandboxProfileInstance.spec,
     workflows.startSandboxProfileInstance.fn,
   );
 
-  return ctx.openWorkflow.newWorker({ concurrency: ctx.concurrency });
+  return input.openWorkflow.newWorker({
+    concurrency: input.maxConcurrentWorkflows,
+  });
 }

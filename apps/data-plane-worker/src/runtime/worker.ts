@@ -9,7 +9,7 @@ import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import { systemSleeper } from "@mistle/time";
 import {
   createDataPlaneWorker,
-  type CreateDataPlaneWorkflowDefinitionsInput,
+  type DataPlaneWorkerDependencies,
   type StartSandboxInstanceWorkflowInput,
 } from "@mistle/workflows/data-plane";
 import { and, eq, sql } from "drizzle-orm";
@@ -121,125 +121,97 @@ async function writeSandboxStartupInput(input: {
   }
 }
 
-function createWorkflowInputs(ctx: {
+function createWorkerDependencies(ctx: {
   config: DataPlaneWorkerRuntimeConfig;
   resources: Pick<WorkerRuntimeResources, "db" | "sandboxAdapter">;
-}): CreateDataPlaneWorkflowDefinitionsInput {
+}): DataPlaneWorkerDependencies {
   const sandboxTunnelConnectAckTimeoutMs = resolveSandboxTunnelConnectAckTimeoutMs(ctx.config);
 
   return {
-    startSandboxInstance: {
-      startSandbox: async (workflowInput) => {
-        const startedSandbox = await ctx.resources.sandboxAdapter.start({
-          image: {
-            ...workflowInput.image,
-            provider: ctx.config.app.sandbox.provider,
-          },
-          env: {
-            [SandboxRuntimeTokenizerProxyEgressBaseURLEnv]:
-              ctx.config.app.sandbox.tokenizerProxyEgressBaseUrl,
-          },
-        });
+    startSandbox: async (workflowInput) => {
+      const startedSandbox = await ctx.resources.sandboxAdapter.start({
+        image: {
+          ...workflowInput.image,
+          provider: ctx.config.app.sandbox.provider,
+        },
+        env: {
+          [SandboxRuntimeTokenizerProxyEgressBaseURLEnv]:
+            ctx.config.app.sandbox.tokenizerProxyEgressBaseUrl,
+        },
+      });
 
-        const bootstrapTokenJti = await writeSandboxStartupInput({
-          config: ctx.config,
-          resources: ctx.resources,
-          runtimePlan: workflowInput.runtimePlan,
-          sandbox: startedSandbox,
+      const bootstrapTokenJti = await writeSandboxStartupInput({
+        config: ctx.config,
+        resources: ctx.resources,
+        runtimePlan: workflowInput.runtimePlan,
+        sandbox: startedSandbox,
+      });
+
+      return {
+        provider: startedSandbox.provider,
+        providerSandboxId: startedSandbox.sandboxId,
+        bootstrapTokenJti,
+      };
+    },
+    stopSandbox: async (workflowInput) => {
+      await ctx.resources.sandboxAdapter.stop({
+        sandboxId: workflowInput.providerSandboxId,
+      });
+    },
+    insertSandboxInstance: async (workflowInput) => {
+      return ctx.resources.db.transaction(async (tx) => {
+        const insertedRows = await tx
+          .insert(sandboxInstances)
+          .values({
+            organizationId: workflowInput.organizationId,
+            sandboxProfileId: workflowInput.sandboxProfileId,
+            sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+            provider: workflowInput.provider,
+            providerSandboxId: workflowInput.providerSandboxId,
+            status: SandboxInstanceStatuses.STARTING,
+            startedByKind: workflowInput.startedBy.kind,
+            startedById: workflowInput.startedBy.id,
+            source: workflowInput.source,
+          })
+          .returning({
+            id: sandboxInstances.id,
+          });
+
+        const sandboxInstance = insertedRows[0];
+        if (sandboxInstance === undefined) {
+          throw new Error("Failed to insert sandbox instance row.");
+        }
+
+        await tx.insert(sandboxInstanceRuntimePlans).values({
+          sandboxInstanceId: sandboxInstance.id,
+          revision: 1,
+          compiledRuntimePlan: workflowInput.runtimePlan,
+          compiledFromProfileId: workflowInput.sandboxProfileId,
+          compiledFromProfileVersion: workflowInput.sandboxProfileVersion,
         });
 
         return {
-          provider: startedSandbox.provider,
-          providerSandboxId: startedSandbox.sandboxId,
-          bootstrapTokenJti,
+          sandboxInstanceId: sandboxInstance.id,
         };
-      },
-      stopSandbox: async (workflowInput) => {
-        await ctx.resources.sandboxAdapter.stop({
-          sandboxId: workflowInput.providerSandboxId,
-        });
-      },
-      insertSandboxInstance: async (workflowInput) => {
-        return ctx.resources.db.transaction(async (tx) => {
-          const insertedRows = await tx
-            .insert(sandboxInstances)
-            .values({
-              organizationId: workflowInput.organizationId,
-              sandboxProfileId: workflowInput.sandboxProfileId,
-              sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-              provider: workflowInput.provider,
-              providerSandboxId: workflowInput.providerSandboxId,
-              status: SandboxInstanceStatuses.STARTING,
-              startedByKind: workflowInput.startedBy.kind,
-              startedById: workflowInput.startedBy.id,
-              source: workflowInput.source,
-            })
-            .returning({
-              id: sandboxInstances.id,
-            });
-
-          const sandboxInstance = insertedRows[0];
-          if (sandboxInstance === undefined) {
-            throw new Error("Failed to insert sandbox instance row.");
-          }
-
-          await tx.insert(sandboxInstanceRuntimePlans).values({
-            sandboxInstanceId: sandboxInstance.id,
-            revision: 1,
-            compiledRuntimePlan: workflowInput.runtimePlan,
-            compiledFromProfileId: workflowInput.sandboxProfileId,
-            compiledFromProfileVersion: workflowInput.sandboxProfileVersion,
-          });
-
-          return {
-            sandboxInstanceId: sandboxInstance.id,
-          };
-        });
-      },
-      waitForSandboxTunnelConnectAck: async (workflowInput) => {
-        return waitForSandboxTunnelConnectAck({
-          resources: ctx.resources,
-          bootstrapTokenJti: workflowInput.bootstrapTokenJti,
-          timeoutMs: sandboxTunnelConnectAckTimeoutMs,
-        });
-      },
-      updateSandboxInstanceStatus: async (workflowInput) => {
-        if (workflowInput.status === "running") {
-          const updatedRows = await ctx.resources.db
-            .update(sandboxInstances)
-            .set({
-              status: SandboxInstanceStatuses.RUNNING,
-              startedAt: sql`now()`,
-              failedAt: null,
-              failureCode: null,
-              failureMessage: null,
-              updatedAt: sql`now()`,
-            })
-            .where(
-              and(
-                eq(sandboxInstances.id, workflowInput.sandboxInstanceId),
-                eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
-              ),
-            )
-            .returning({
-              id: sandboxInstances.id,
-            });
-
-          if (updatedRows[0] === undefined) {
-            throw new Error(
-              "Failed to transition sandbox instance status from starting to running.",
-            );
-          }
-          return;
-        }
-
+      });
+    },
+    waitForSandboxTunnelConnectAck: async (workflowInput) => {
+      return waitForSandboxTunnelConnectAck({
+        resources: ctx.resources,
+        bootstrapTokenJti: workflowInput.bootstrapTokenJti,
+        timeoutMs: sandboxTunnelConnectAckTimeoutMs,
+      });
+    },
+    updateSandboxInstanceStatus: async (workflowInput) => {
+      if (workflowInput.status === "running") {
         const updatedRows = await ctx.resources.db
           .update(sandboxInstances)
           .set({
-            status: SandboxInstanceStatuses.FAILED,
-            failedAt: sql`now()`,
-            failureCode: workflowInput.failureCode,
-            failureMessage: workflowInput.failureMessage,
+            status: SandboxInstanceStatuses.RUNNING,
+            startedAt: sql`now()`,
+            failedAt: null,
+            failureCode: null,
+            failureMessage: null,
             updatedAt: sql`now()`,
           })
           .where(
@@ -253,9 +225,33 @@ function createWorkflowInputs(ctx: {
           });
 
         if (updatedRows[0] === undefined) {
-          throw new Error("Failed to transition sandbox instance status from starting to failed.");
+          throw new Error("Failed to transition sandbox instance status from starting to running.");
         }
-      },
+        return;
+      }
+
+      const updatedRows = await ctx.resources.db
+        .update(sandboxInstances)
+        .set({
+          status: SandboxInstanceStatuses.FAILED,
+          failedAt: sql`now()`,
+          failureCode: workflowInput.failureCode,
+          failureMessage: workflowInput.failureMessage,
+          updatedAt: sql`now()`,
+        })
+        .where(
+          and(
+            eq(sandboxInstances.id, workflowInput.sandboxInstanceId),
+            eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
+          ),
+        )
+        .returning({
+          id: sandboxInstances.id,
+        });
+
+      if (updatedRows[0] === undefined) {
+        throw new Error("Failed to transition sandbox instance status from starting to failed.");
+      }
     },
   };
 }
@@ -266,8 +262,8 @@ export function createRuntimeWorker(ctx: {
 }): ReturnType<typeof createDataPlaneWorker> {
   return createDataPlaneWorker({
     openWorkflow: ctx.resources.openWorkflow,
-    concurrency: ctx.config.app.workflow.concurrency,
-    workflowInputs: createWorkflowInputs({
+    maxConcurrentWorkflows: ctx.config.app.workflow.concurrency,
+    deps: createWorkerDependencies({
       config: ctx.config,
       resources: ctx.resources,
     }),

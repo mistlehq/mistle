@@ -87,116 +87,114 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
         });
         const workflowWorker = createDataPlaneWorker({
           openWorkflow,
-          concurrency: 1,
-          workflowInputs: {
-            startSandboxInstance: {
-              startSandbox: async () => {
-                return {
-                  provider: "docker",
-                  providerSandboxId: `integration-${randomUUID()}`,
-                  bootstrapTokenJti: randomUUID(),
-                };
-              },
-              stopSandbox: async () => {},
-              insertSandboxInstance: async (workflowInput) => {
-                return db.transaction(async (tx) => {
-                  const insertedRows = await tx
-                    .insert(sandboxInstances)
-                    .values({
-                      organizationId: workflowInput.organizationId,
-                      sandboxProfileId: workflowInput.sandboxProfileId,
-                      sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-                      provider: workflowInput.provider,
-                      providerSandboxId: workflowInput.providerSandboxId,
-                      status: SandboxInstanceStatuses.STARTING,
-                      startedByKind: workflowInput.startedBy.kind,
-                      startedById: workflowInput.startedBy.id,
-                      source: workflowInput.source,
-                    })
-                    .returning({
-                      id: sandboxInstances.id,
-                    });
-
-                  const insertedSandboxInstance = insertedRows[0];
-                  if (insertedSandboxInstance === undefined) {
-                    throw new Error("Expected sandbox instance insert to return one row.");
-                  }
-
-                  await tx.insert(sandboxInstanceRuntimePlans).values({
-                    sandboxInstanceId: insertedSandboxInstance.id,
-                    revision: 1,
-                    compiledRuntimePlan: workflowInput.runtimePlan,
-                    compiledFromProfileId: workflowInput.sandboxProfileId,
-                    compiledFromProfileVersion: workflowInput.sandboxProfileVersion,
+          maxConcurrentWorkflows: 1,
+          deps: {
+            startSandbox: async () => {
+              return {
+                provider: "docker",
+                providerSandboxId: `integration-${randomUUID()}`,
+                bootstrapTokenJti: randomUUID(),
+              };
+            },
+            stopSandbox: async () => {},
+            insertSandboxInstance: async (workflowInput) => {
+              return db.transaction(async (tx) => {
+                const insertedRows = await tx
+                  .insert(sandboxInstances)
+                  .values({
+                    organizationId: workflowInput.organizationId,
+                    sandboxProfileId: workflowInput.sandboxProfileId,
+                    sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+                    provider: workflowInput.provider,
+                    providerSandboxId: workflowInput.providerSandboxId,
+                    status: SandboxInstanceStatuses.STARTING,
+                    startedByKind: workflowInput.startedBy.kind,
+                    startedById: workflowInput.startedBy.id,
+                    source: workflowInput.source,
+                  })
+                  .returning({
+                    id: sandboxInstances.id,
                   });
 
-                  return {
-                    sandboxInstanceId: insertedSandboxInstance.id,
-                  };
-                });
-              },
-              waitForSandboxTunnelConnectAck: async () => {
-                return true;
-              },
-              updateSandboxInstanceStatus: async (workflowInput) => {
-                if (workflowInput.status === "running") {
-                  const updateResult = await dbPool.query<{ id: string }>(
-                    `
-                      update data_plane.sandbox_instances
-                      set
-                        status = $1,
-                        started_at = now(),
-                        failed_at = null,
-                        failure_code = null,
-                        failure_message = null,
-                        updated_at = now()
-                      where
-                        id = $2
-                        and status = $3
-                      returning id
-                    `,
-                    [
-                      SandboxInstanceStatuses.RUNNING,
-                      workflowInput.sandboxInstanceId,
-                      SandboxInstanceStatuses.STARTING,
-                    ],
-                  );
-                  if (updateResult.rows[0] === undefined) {
-                    throw new Error(
-                      "Expected sandbox instance status transition from starting to running.",
-                    );
-                  }
-                  return;
+                const insertedSandboxInstance = insertedRows[0];
+                if (insertedSandboxInstance === undefined) {
+                  throw new Error("Expected sandbox instance insert to return one row.");
                 }
 
+                await tx.insert(sandboxInstanceRuntimePlans).values({
+                  sandboxInstanceId: insertedSandboxInstance.id,
+                  revision: 1,
+                  compiledRuntimePlan: workflowInput.runtimePlan,
+                  compiledFromProfileId: workflowInput.sandboxProfileId,
+                  compiledFromProfileVersion: workflowInput.sandboxProfileVersion,
+                });
+
+                return {
+                  sandboxInstanceId: insertedSandboxInstance.id,
+                };
+              });
+            },
+            waitForSandboxTunnelConnectAck: async () => {
+              return true;
+            },
+            updateSandboxInstanceStatus: async (workflowInput) => {
+              if (workflowInput.status === "running") {
                 const updateResult = await dbPool.query<{ id: string }>(
                   `
                     update data_plane.sandbox_instances
                     set
                       status = $1,
-                      failed_at = now(),
-                      failure_code = $2,
-                      failure_message = $3,
+                      started_at = now(),
+                      failed_at = null,
+                      failure_code = null,
+                      failure_message = null,
                       updated_at = now()
                     where
-                      id = $4
-                      and status = $5
+                      id = $2
+                      and status = $3
                     returning id
                   `,
                   [
-                    SandboxInstanceStatuses.FAILED,
-                    workflowInput.failureCode,
-                    workflowInput.failureMessage,
+                    SandboxInstanceStatuses.RUNNING,
                     workflowInput.sandboxInstanceId,
                     SandboxInstanceStatuses.STARTING,
                   ],
                 );
                 if (updateResult.rows[0] === undefined) {
                   throw new Error(
-                    "Expected sandbox instance status transition from starting to failed.",
+                    "Expected sandbox instance status transition from starting to running.",
                   );
                 }
-              },
+                return;
+              }
+
+              const updateResult = await dbPool.query<{ id: string }>(
+                `
+                  update data_plane.sandbox_instances
+                  set
+                    status = $1,
+                    failed_at = now(),
+                    failure_code = $2,
+                    failure_message = $3,
+                    updated_at = now()
+                  where
+                    id = $4
+                    and status = $5
+                  returning id
+                `,
+                [
+                  SandboxInstanceStatuses.FAILED,
+                  workflowInput.failureCode,
+                  workflowInput.failureMessage,
+                  workflowInput.sandboxInstanceId,
+                  SandboxInstanceStatuses.STARTING,
+                ],
+              );
+              if (updateResult.rows[0] === undefined) {
+                throw new Error(
+                  "Expected sandbox instance status transition from starting to failed.",
+                );
+              }
             },
           },
         });
