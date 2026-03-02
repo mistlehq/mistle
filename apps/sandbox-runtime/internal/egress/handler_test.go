@@ -43,6 +43,8 @@ func buildRuntimePlanForHandlerTests() startup.RuntimePlan {
 				CredentialResolver: startup.EgressCredentialResolver{
 					ConnectionID: "icn_openai",
 					SecretType:   "api_key",
+					Purpose:      "api_key",
+					ResolverKey:  "default",
 				},
 			},
 		},
@@ -133,6 +135,12 @@ func TestHandlerServeHTTP(t *testing.T) {
 		}
 		if captured.Headers.Get(HeaderEgressCredentialSecretType) != "api_key" {
 			t.Fatalf("expected %s header", HeaderEgressCredentialSecretType)
+		}
+		if captured.Headers.Get(HeaderEgressCredentialPurpose) != "api_key" {
+			t.Fatalf("expected %s header", HeaderEgressCredentialPurpose)
+		}
+		if captured.Headers.Get(HeaderEgressCredentialResolverKey) != "default" {
+			t.Fatalf("expected %s header", HeaderEgressCredentialResolverKey)
 		}
 		if captured.Headers.Get(HeaderSandboxProfileID) != "sbp_handler_test" {
 			t.Fatalf("expected %s header", HeaderSandboxProfileID)
