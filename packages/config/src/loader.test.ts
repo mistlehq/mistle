@@ -132,14 +132,6 @@ describe("parseConfigRecord", () => {
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5100",
           },
-          credentialResolver: {
-            requestTimeoutMs: 3000,
-          },
-          cache: {
-            maxEntries: 2048,
-            defaultTtlSeconds: 300,
-            refreshSkewSeconds: 30,
-          },
         },
       },
     };
@@ -273,14 +265,6 @@ describe("parseConfigRecord", () => {
           },
           controlPlaneApi: {
             baseUrl: "http://127.0.0.1:5100",
-          },
-          credentialResolver: {
-            requestTimeoutMs: 3000,
-          },
-          cache: {
-            maxEntries: 2048,
-            defaultTtlSeconds: 300,
-            refreshSkewSeconds: 30,
           },
         },
       },

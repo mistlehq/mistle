@@ -18,26 +18,10 @@ export const TokenizerProxyControlPlaneApiConfigSchema = z
   })
   .strict();
 
-export const TokenizerProxyCredentialResolverConfigSchema = z
-  .object({
-    requestTimeoutMs: z.number().int().min(1),
-  })
-  .strict();
-
-export const TokenizerProxyCacheConfigSchema = z
-  .object({
-    maxEntries: z.number().int().min(1),
-    defaultTtlSeconds: z.number().int().min(1),
-    refreshSkewSeconds: z.number().int().min(0),
-  })
-  .strict();
-
 export const TokenizerProxyConfigSchema = z
   .object({
     server: TokenizerProxyServerConfigSchema,
     controlPlaneApi: TokenizerProxyControlPlaneApiConfigSchema,
-    credentialResolver: TokenizerProxyCredentialResolverConfigSchema,
-    cache: TokenizerProxyCacheConfigSchema,
   })
   .strict();
 
@@ -45,8 +29,6 @@ export const PartialTokenizerProxyConfigSchema = z
   .object({
     server: TokenizerProxyServerConfigSchema.partial().optional(),
     controlPlaneApi: TokenizerProxyControlPlaneApiConfigSchema.partial().optional(),
-    credentialResolver: TokenizerProxyCredentialResolverConfigSchema.partial().optional(),
-    cache: TokenizerProxyCacheConfigSchema.partial().optional(),
   })
   .strict();
 

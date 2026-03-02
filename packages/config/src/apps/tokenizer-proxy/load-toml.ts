@@ -11,8 +11,6 @@ export function loadTokenizerProxyFromToml(
   const tokenizerProxy = asObjectRecord(apps.tokenizer_proxy);
   const server = asObjectRecord(tokenizerProxy.server);
   const controlPlaneApi = asObjectRecord(tokenizerProxy.control_plane_api);
-  const credentialResolver = asObjectRecord(tokenizerProxy.credential_resolver);
-  const cache = asObjectRecord(tokenizerProxy.cache);
 
   return PartialTokenizerProxyConfigSchema.parse({
     server: {
@@ -21,14 +19,6 @@ export function loadTokenizerProxyFromToml(
     },
     controlPlaneApi: {
       baseUrl: controlPlaneApi.base_url,
-    },
-    credentialResolver: {
-      requestTimeoutMs: credentialResolver.request_timeout_ms,
-    },
-    cache: {
-      maxEntries: cache.max_entries,
-      defaultTtlSeconds: cache.default_ttl_seconds,
-      refreshSkewSeconds: cache.refresh_skew_seconds,
     },
   });
 }

@@ -320,24 +320,4 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     tomlPath: ["apps", "tokenizer_proxy", "control_plane_api", "base_url"],
     envVar: "MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL",
   },
-  {
-    configPath: ["apps", "tokenizer_proxy", "credentialResolver", "requestTimeoutMs"],
-    tomlPath: ["apps", "tokenizer_proxy", "credential_resolver", "request_timeout_ms"],
-    envVar: "MISTLE_APPS_TOKENIZER_PROXY_CREDENTIAL_RESOLVER_REQUEST_TIMEOUT_MS",
-  },
-  {
-    configPath: ["apps", "tokenizer_proxy", "cache", "maxEntries"],
-    tomlPath: ["apps", "tokenizer_proxy", "cache", "max_entries"],
-    envVar: "MISTLE_APPS_TOKENIZER_PROXY_CACHE_MAX_ENTRIES",
-  },
-  {
-    configPath: ["apps", "tokenizer_proxy", "cache", "defaultTtlSeconds"],
-    tomlPath: ["apps", "tokenizer_proxy", "cache", "default_ttl_seconds"],
-    envVar: "MISTLE_APPS_TOKENIZER_PROXY_CACHE_DEFAULT_TTL_SECONDS",
-  },
-  {
-    configPath: ["apps", "tokenizer_proxy", "cache", "refreshSkewSeconds"],
-    tomlPath: ["apps", "tokenizer_proxy", "cache", "refresh_skew_seconds"],
-    envVar: "MISTLE_APPS_TOKENIZER_PROXY_CACHE_REFRESH_SKEW_SECONDS",
-  },
 ];

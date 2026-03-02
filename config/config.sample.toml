@@ -121,13 +121,5 @@ port = 8085
 [apps.tokenizer_proxy.control_plane_api]
 base_url = "http://control-plane-api:8080"
 
-[apps.tokenizer_proxy.credential_resolver]
-request_timeout_ms = 3000
-
-[apps.tokenizer_proxy.cache]
-max_entries = 10000
-default_ttl_seconds = 300
-refresh_skew_seconds = 30
-
 [apps.dashboard]
 control_plane_api_origin = "https://api.mistle.example"

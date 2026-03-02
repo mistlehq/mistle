@@ -260,14 +260,6 @@ const tokenizerProxyEnvConfig = {
   controlPlaneApi: {
     baseUrl: "http://127.0.0.1:5000",
   },
-  credentialResolver: {
-    requestTimeoutMs: 3000,
-  },
-  cache: {
-    maxEntries: 4096,
-    defaultTtlSeconds: 300,
-    refreshSkewSeconds: 30,
-  },
 } as const;
 
 const tokenizerProxyFixtureConfig = {
@@ -278,14 +270,6 @@ const tokenizerProxyFixtureConfig = {
   },
   controlPlaneApi: {
     baseUrl: "http://127.0.0.1:5100",
-  },
-  credentialResolver: {
-    requestTimeoutMs: 3500,
-  },
-  cache: {
-    maxEntries: 8192,
-    defaultTtlSeconds: 300,
-    refreshSkewSeconds: 30,
   },
 } as const;
 
@@ -701,7 +685,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.TOKENIZER_PROXY,
       configPath: configFixturePath,
       env: {
-        MISTLE_APPS_TOKENIZER_PROXY_CACHE_MAX_ENTRIES: "9000",
+        MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL: "https://control-plane.local",
       },
     });
 
@@ -709,9 +693,8 @@ describe("loadConfig integrations", () => {
       global: globalDevelopmentConfig,
       app: {
         ...tokenizerProxyFixtureConfig,
-        cache: {
-          ...tokenizerProxyFixtureConfig.cache,
-          maxEntries: 9000,
+        controlPlaneApi: {
+          baseUrl: "https://control-plane.local",
         },
       },
     });
