@@ -15,6 +15,22 @@ describe("GitHubEnterpriseServerTargetConfigSchema", () => {
     });
   });
 
+  it("parses optional github app metadata", () => {
+    const parsed = GitHubEnterpriseServerTargetConfigSchema.parse({
+      api_base_url: "https://ghe.example.com/api/v3",
+      web_base_url: "https://ghe.example.com",
+      app_id: "9999",
+      client_id: "Iv1.enterprise",
+    });
+
+    expect(parsed).toEqual({
+      apiBaseUrl: "https://ghe.example.com/api/v3",
+      webBaseUrl: "https://ghe.example.com/",
+      appId: "9999",
+      clientId: "Iv1.enterprise",
+    });
+  });
+
   it("fails for invalid URL fields", () => {
     expect(() =>
       GitHubEnterpriseServerTargetConfigSchema.parse({

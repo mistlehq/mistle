@@ -1,8 +1,8 @@
 import {
-  compileGitHubApiKeyBinding,
+  compileGitHubBinding,
   type GitHubCompileBindingInput,
 } from "../../shared/compile-binding.js";
 
 export type GitHubCloudCompileBindingInput = GitHubCompileBindingInput;
 
-export const compileGitHubCloudBinding = compileGitHubApiKeyBinding;
+export const compileGitHubCloudBinding = compileGitHubBinding;
