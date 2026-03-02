@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "@mistle/test-core": "workspace:*",
-    "@trpc/client": "^11.10.0",
+    "@trpc/client": "^11.11.0",
     "@types/pg": "^8.18.0"
   }
 }
