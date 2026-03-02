@@ -43,6 +43,7 @@ describe("assembleCompiledRuntimePlan", () => {
               name: "GitHub CLI",
               lifecycle: {
                 install: [{ args: ["mise", "install", "gh@latest"] }],
+                remove: [{ args: ["rm", "-f", "/usr/local/bin/gh"] }],
               },
             },
           ],
@@ -89,6 +90,7 @@ describe("assembleCompiledRuntimePlan", () => {
               name: "Codex CLI",
               lifecycle: {
                 install: [{ args: ["sh", "-euc", "install-codex-latest"] }],
+                remove: [{ args: ["rm", "-f", "/usr/local/bin/codex"] }],
               },
             },
           ],
@@ -115,6 +117,7 @@ describe("assembleCompiledRuntimePlan", () => {
 
     expect(plan.egressRoutes[0]?.routeId).toBe("route_a");
     expect(plan.artifacts.map((artifact) => artifact.artifactKey)).toEqual(["codex-cli", "gh-cli"]);
+    expect(plan.artifactRemovals).toEqual([]);
 
     const mergedSetup = plan.runtimeClientSetups[0];
     expect(mergedSetup?.clientId).toBe("codex-cli");
@@ -401,5 +404,67 @@ describe("assembleCompiledRuntimePlan", () => {
         expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_INVALID_REF);
       }
     }
+  });
+
+  it("includes artifact removals from previous compiled bindings when artifact key is absent in current plan", () => {
+    const plan = assembleCompiledRuntimePlan({
+      sandboxProfileId: "sbp_123",
+      version: 4,
+      image: {
+        source: "snapshot",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-snapshots@sha256:test",
+        instanceId: "sbi_123",
+      },
+      runtimeContext: {
+        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
+      },
+      compiledBindingResults: [
+        {
+          egressRoutes: [],
+          artifacts: [
+            {
+              artifactKey: "codex-cli",
+              name: "Codex CLI",
+              lifecycle: {
+                install: [{ args: ["echo", "install-codex"] }],
+                remove: [{ args: ["rm", "-f", "/usr/local/bin/codex"] }],
+              },
+            },
+          ],
+          runtimeClientSetups: [],
+        },
+      ],
+      previousCompiledBindingResults: [
+        {
+          egressRoutes: [],
+          artifacts: [
+            {
+              artifactKey: "codex-cli",
+              name: "Codex CLI",
+              lifecycle: {
+                install: [{ args: ["echo", "install-codex"] }],
+                remove: [{ args: ["rm", "-f", "/usr/local/bin/codex"] }],
+              },
+            },
+            {
+              artifactKey: "gh-cli",
+              name: "GitHub CLI",
+              lifecycle: {
+                install: [{ args: ["echo", "install-gh"] }],
+                remove: [{ args: ["rm", "-f", "/usr/local/bin/gh"] }],
+              },
+            },
+          ],
+          runtimeClientSetups: [],
+        },
+      ],
+    });
+
+    expect(plan.artifactRemovals).toEqual([
+      {
+        artifactKey: "gh-cli",
+        commands: [{ args: ["rm", "-f", "/usr/local/bin/gh"] }],
+      },
+    ]);
   });
 });

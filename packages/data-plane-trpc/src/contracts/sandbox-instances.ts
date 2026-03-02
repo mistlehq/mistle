@@ -88,9 +88,16 @@ const CompiledRuntimeArtifactSpecSchema = z
       .object({
         install: z.array(RuntimeArtifactCommandSchema),
         update: z.array(RuntimeArtifactCommandSchema).optional(),
-        remove: z.array(RuntimeArtifactCommandSchema).optional(),
+        remove: z.array(RuntimeArtifactCommandSchema),
       })
       .strict(),
+  })
+  .strict();
+
+const CompiledRuntimeArtifactRemovalSpecSchema = z
+  .object({
+    artifactKey: z.string().min(1),
+    commands: z.array(RuntimeArtifactCommandSchema),
   })
   .strict();
 
@@ -119,6 +126,7 @@ const CompiledRuntimePlanSchema = z
     image: CompiledRuntimePlanImageSchema,
     egressRoutes: z.array(EgressCredentialRouteSchema),
     artifacts: z.array(CompiledRuntimeArtifactSpecSchema),
+    artifactRemovals: z.array(CompiledRuntimeArtifactRemovalSpecSchema),
     runtimeClientSetups: z.array(RuntimeClientSetupSchema),
   })
   .strict();

@@ -24,6 +24,7 @@ type RuntimePlan struct {
 	Image               ResolvedSandboxImage    `json:"image"`
 	EgressRoutes        []EgressCredentialRoute `json:"egressRoutes"`
 	Artifacts           []RuntimeArtifactSpec   `json:"artifacts"`
+	ArtifactRemovals    []RuntimeArtifactRemovalSpec `json:"artifactRemovals"`
 	RuntimeClientSetups []RuntimeClientSetup    `json:"runtimeClientSetups"`
 }
 
@@ -77,6 +78,11 @@ type RuntimeArtifactLifecycle struct {
 	Remove  []RuntimeArtifactCommand `json:"remove"`
 }
 
+type RuntimeArtifactRemovalSpec struct {
+	ArtifactKey string                   `json:"artifactKey"`
+	Commands    []RuntimeArtifactCommand `json:"commands"`
+}
+
 type RuntimeArtifactCommand struct {
 	Args      []string          `json:"args"`
 	Env       map[string]string `json:"env"`
@@ -111,6 +117,9 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 	if runtimePlan.Artifacts == nil {
 		return fmt.Errorf("runtime plan artifacts is required")
 	}
+	if runtimePlan.ArtifactRemovals == nil {
+		return fmt.Errorf("runtime plan artifactRemovals is required")
+	}
 	if runtimePlan.RuntimeClientSetups == nil {
 		return fmt.Errorf("runtime plan runtimeClientSetups is required")
 	}
@@ -133,6 +142,11 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 
 	for artifactIndex, artifact := range runtimePlan.Artifacts {
 		if err := validateArtifact(artifact, artifactIndex); err != nil {
+			return err
+		}
+	}
+	for removalIndex, removal := range runtimePlan.ArtifactRemovals {
+		if err := validateArtifactRemoval(removal, removalIndex); err != nil {
 			return err
 		}
 	}
@@ -237,8 +251,14 @@ func validateArtifact(artifact RuntimeArtifactSpec, artifactIndex int) error {
 	if artifact.Lifecycle.Install == nil {
 		return fmt.Errorf("runtime plan artifacts[%d] lifecycle.install is required", artifactIndex)
 	}
+	if artifact.Lifecycle.Remove == nil {
+		return fmt.Errorf("runtime plan artifacts[%d] lifecycle.remove is required", artifactIndex)
+	}
 	if len(artifact.Lifecycle.Install) == 0 {
 		return fmt.Errorf("runtime plan artifacts[%d] lifecycle.install must not be empty", artifactIndex)
+	}
+	if len(artifact.Lifecycle.Remove) == 0 {
+		return fmt.Errorf("runtime plan artifacts[%d] lifecycle.remove must not be empty", artifactIndex)
 	}
 
 	for installIndex, command := range artifact.Lifecycle.Install {
@@ -253,6 +273,28 @@ func validateArtifact(artifact RuntimeArtifactSpec, artifactIndex int) error {
 	}
 	for removeIndex, command := range artifact.Lifecycle.Remove {
 		if err := validateArtifactCommand(command, fmt.Sprintf("runtime plan artifacts[%d] lifecycle.remove[%d]", artifactIndex, removeIndex)); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateArtifactRemoval(removal RuntimeArtifactRemovalSpec, removalIndex int) error {
+	if strings.TrimSpace(removal.ArtifactKey) == "" {
+		return fmt.Errorf("runtime plan artifactRemovals[%d] artifactKey is required", removalIndex)
+	}
+	if removal.Commands == nil {
+		return fmt.Errorf("runtime plan artifactRemovals[%d] commands is required", removalIndex)
+	}
+	if len(removal.Commands) == 0 {
+		return fmt.Errorf("runtime plan artifactRemovals[%d] commands must not be empty", removalIndex)
+	}
+	for commandIndex, command := range removal.Commands {
+		if err := validateArtifactCommand(
+			command,
+			fmt.Sprintf("runtime plan artifactRemovals[%d] commands[%d]", removalIndex, commandIndex),
+		); err != nil {
 			return err
 		}
 	}

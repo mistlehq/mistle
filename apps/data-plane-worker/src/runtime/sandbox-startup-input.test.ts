@@ -62,27 +62,36 @@ const RuntimePlanSchema = z.object({
             timeoutMs: z.number().int().optional(),
           }),
         ),
-        update: z
-          .array(
-            z.object({
-              args: z.array(z.string()),
-              env: z.record(z.string(), z.string()).optional(),
-              cwd: z.string().optional(),
-              timeoutMs: z.number().int().optional(),
-            }),
-          )
-          .optional(),
-        remove: z
-          .array(
-            z.object({
-              args: z.array(z.string()),
-              env: z.record(z.string(), z.string()).optional(),
-              cwd: z.string().optional(),
-              timeoutMs: z.number().int().optional(),
-            }),
-          )
-          .optional(),
+        update: z.array(
+          z.object({
+            args: z.array(z.string()),
+            env: z.record(z.string(), z.string()).optional(),
+            cwd: z.string().optional(),
+            timeoutMs: z.number().int().optional(),
+          }),
+        ),
+        remove: z.array(
+          z.object({
+            args: z.array(z.string()),
+            env: z.record(z.string(), z.string()).optional(),
+            cwd: z.string().optional(),
+            timeoutMs: z.number().int().optional(),
+          }),
+        ),
       }),
+    }),
+  ),
+  artifactRemovals: z.array(
+    z.object({
+      artifactKey: z.string().min(1),
+      commands: z.array(
+        z.object({
+          args: z.array(z.string()),
+          env: z.record(z.string(), z.string()).optional(),
+          cwd: z.string().optional(),
+          timeoutMs: z.number().int().optional(),
+        }),
+      ),
     }),
   ),
   runtimeClientSetups: z.array(
@@ -118,6 +127,7 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
     },
     egressRoutes: [],
     artifacts: [],
+    artifactRemovals: [],
     runtimeClientSetups: [],
   };
 }

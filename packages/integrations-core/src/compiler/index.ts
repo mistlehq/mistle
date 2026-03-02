@@ -5,6 +5,7 @@ import { assembleCompiledRuntimePlan } from "../runtime-plan/index.js";
 import {
   egressUrlRef,
   IntegrationConnectionStatuses,
+  type CompileRuntimePlanBindingInput,
   type CompileBindingResult,
   type CompileRuntimePlanInput,
   type CompiledBindingResult,
@@ -199,6 +200,12 @@ function resolveRuntimeArtifacts(input: {
       hook: artifact.lifecycle.remove,
       refs,
     });
+    if (remove === undefined) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.ARTIFACT_CONFLICT,
+        `Artifact '${artifact.artifactKey}' must define remove commands.`,
+      );
+    }
 
     return {
       artifactKey: artifact.artifactKey,
@@ -207,13 +214,25 @@ function resolveRuntimeArtifacts(input: {
       lifecycle: {
         install,
         ...(update === undefined ? {} : { update }),
-        ...(remove === undefined ? {} : { remove }),
+        remove,
       },
     };
   });
 }
 
-export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRuntimePlan {
+type CompileBindingsInput = {
+  organizationId: string;
+  sandboxProfileId: string;
+  version: number;
+  runtimeContext: {
+    sandboxdEgressBaseUrl: string;
+  };
+  registry: CompileRuntimePlanInput["registry"];
+  bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
+  enforceRuntimeEligibility: boolean;
+};
+
+function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBindingResult> {
   const compiledBindingResults: CompiledBindingResult[] = [];
 
   for (const bindingInput of input.bindings) {
@@ -224,14 +243,17 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
       );
     }
 
-    if (!bindingInput.target.enabled) {
+    if (input.enforceRuntimeEligibility && !bindingInput.target.enabled) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.TARGET_DISABLED,
         `Target '${bindingInput.targetKey}' is disabled.`,
       );
     }
 
-    if (bindingInput.connection.status !== IntegrationConnectionStatuses.ACTIVE) {
+    if (
+      input.enforceRuntimeEligibility &&
+      bindingInput.connection.status !== IntegrationConnectionStatuses.ACTIVE
+    ) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.CONNECTION_NOT_ACTIVE,
         `Connection '${bindingInput.connection.id}' is not active.`,
@@ -316,9 +338,36 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
     compiledBindingResults.push(compiledBindingResult);
   }
 
+  return compiledBindingResults;
+}
+
+export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRuntimePlan {
+  const compiledBindingResults = compileBindings({
+    organizationId: input.organizationId,
+    sandboxProfileId: input.sandboxProfileId,
+    version: input.version,
+    runtimeContext: input.runtimeContext,
+    registry: input.registry,
+    bindings: input.bindings,
+    enforceRuntimeEligibility: true,
+  });
+
   validateCompiledBindingResults({
     compiledBindingResults,
   });
+
+  const previousCompiledBindingResults =
+    input.previousBindings === undefined
+      ? []
+      : compileBindings({
+          organizationId: input.organizationId,
+          sandboxProfileId: input.sandboxProfileId,
+          version: input.version - 1,
+          runtimeContext: input.runtimeContext,
+          registry: input.registry,
+          bindings: input.previousBindings,
+          enforceRuntimeEligibility: false,
+        });
 
   return assembleCompiledRuntimePlan({
     sandboxProfileId: input.sandboxProfileId,
@@ -326,5 +375,6 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
     image: input.image,
     runtimeContext: input.runtimeContext,
     compiledBindingResults,
+    previousCompiledBindingResults,
   });
 }
