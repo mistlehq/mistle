@@ -7,6 +7,7 @@ import { organizations } from "./organizations.js";
 
 export const IntegrationCredentialSecretKinds = {
   API_KEY: "api_key",
+  OAUTH_ACCESS_TOKEN: "oauth_access_token",
 } as const;
 
 export type IntegrationCredentialSecretKind =
