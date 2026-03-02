@@ -127,6 +127,15 @@ describe("parseConfigRecord", () => {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
           },
         },
+        tokenizer_proxy: {
+          server: {
+            host: "127.0.0.1",
+            port: 5205,
+          },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
+          },
+        },
       },
     };
     const config = parseConfigRecord(configRecord);
@@ -253,6 +262,15 @@ describe("parseConfigRecord", () => {
           },
           database: {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+          },
+        },
+        tokenizer_proxy: {
+          server: {
+            host: "127.0.0.1",
+            port: 5205,
+          },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
           },
         },
       },

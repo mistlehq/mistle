@@ -117,5 +117,12 @@ environment_name = "production"
 # socket_path = "/var/run/docker.sock"
 # snapshot_repository = "registry.example.com/mistle/snapshots"
 
+[apps.tokenizer_proxy.server]
+host = "0.0.0.0"
+port = 8085
+
+[apps.tokenizer_proxy.control_plane_api]
+base_url = "http://control-plane-api:8080"
+
 [apps.dashboard]
 control_plane_api_origin = "https://api.mistle.example"

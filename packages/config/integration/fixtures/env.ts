@@ -65,6 +65,9 @@ const baseIntegrationEnv: NodeJS.ProcessEnv = {
   MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET: "fixture-modal-token-secret",
   MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_APP_NAME: "mistle-sandbox",
   MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME: "development",
+  MISTLE_APPS_TOKENIZER_PROXY_HOST: "127.0.0.1",
+  MISTLE_APPS_TOKENIZER_PROXY_PORT: "5005",
+  MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5000",
 };
 
 export function createIntegrationEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {

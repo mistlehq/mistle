@@ -96,7 +96,7 @@ const dotenvContent = convertTomlContentToDotenvContent('[global]\nenv = "produc
 
 Scope:
 
-- Conversion covers keys managed by `@mistle/config` modules (`global`, `apps.control_plane_api`, `apps.control_plane_worker`, `apps.data_plane_api`, `apps.data_plane_gateway`, `apps.data_plane_worker`).
+- Conversion covers keys managed by `@mistle/config` modules (`global`, `apps.control_plane_api`, `apps.control_plane_worker`, `apps.data_plane_api`, `apps.data_plane_gateway`, `apps.data_plane_worker`, `apps.tokenizer_proxy`).
 - Unknown keys are ignored.
 
 ## Merge Rules
@@ -113,6 +113,7 @@ Scope:
 - [Data Plane API module](./src/apps/data-plane-api/README.md)
 - [Data Plane Gateway module](./src/apps/data-plane-gateway/README.md)
 - [Data Plane Worker module](./src/apps/data-plane-worker/README.md)
+- [Tokenizer Proxy module](./src/apps/tokenizer-proxy/README.md)
 
 ## Adding And Managing Config
 
