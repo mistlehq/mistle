@@ -1,25 +1,36 @@
 import { Hono } from "hono";
 
+import {
+  CREDENTIAL_CACHE_DEFAULT_TTL_SECONDS,
+  CREDENTIAL_CACHE_MAX_ENTRIES,
+  CREDENTIAL_CACHE_REFRESH_SKEW_SECONDS,
+  CREDENTIAL_RESOLVER_REQUEST_TIMEOUT_MS,
+} from "./egress/constants.js";
+import { ControlPlaneCredentialResolverClient } from "./egress/control-plane-client.js";
+import { CredentialCache } from "./egress/credential-cache.js";
+import { createEgressProxyHandler, EGRESS_ROUTE_BASE_PATH } from "./egress/proxy-handler.js";
 import type { AppContextBindings, TokenizerProxyApp, TokenizerProxyConfig } from "./types.js";
-
-const EgressRoutePath = "/tokenizer-proxy/egress/routes/:routeId/*";
-
-type CreateNotImplementedResponseInput = {
-  message: string;
-};
-
-function createNotImplementedResponse(input: CreateNotImplementedResponseInput) {
-  return {
-    code: "NOT_IMPLEMENTED",
-    message: input.message,
-  } as const;
-}
 
 export function createApp(
   config: TokenizerProxyConfig,
   internalAuthServiceToken: string,
 ): TokenizerProxyApp {
   const app = new Hono<AppContextBindings>();
+  const controlPlaneCredentialResolverClient = new ControlPlaneCredentialResolverClient({
+    baseUrl: config.controlPlaneApi.baseUrl,
+    internalAuthServiceToken,
+    requestTimeoutMs: CREDENTIAL_RESOLVER_REQUEST_TIMEOUT_MS,
+  });
+  const credentialCache = new CredentialCache({
+    maxEntries: CREDENTIAL_CACHE_MAX_ENTRIES,
+    defaultTtlSeconds: CREDENTIAL_CACHE_DEFAULT_TTL_SECONDS,
+    refreshSkewSeconds: CREDENTIAL_CACHE_REFRESH_SKEW_SECONDS,
+    now: () => Date.now(),
+  });
+  const egressProxyHandler = createEgressProxyHandler({
+    controlPlaneCredentialResolverClient,
+    credentialCache,
+  });
 
   app.use("*", async (ctx, next) => {
     ctx.set("config", config);
@@ -31,16 +42,7 @@ export function createApp(
     return ctx.json({ ok: true });
   });
 
-  app.all(EgressRoutePath, (ctx) => {
-    const routeId = ctx.req.param("routeId");
-
-    return ctx.json(
-      createNotImplementedResponse({
-        message: `Tokenizer proxy egress route '${routeId}' is not implemented.`,
-      }),
-      501,
-    );
-  });
+  app.all(EGRESS_ROUTE_BASE_PATH, egressProxyHandler);
 
   return app;
 }
