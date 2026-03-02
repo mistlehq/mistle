@@ -37,6 +37,22 @@ func Apply(input ApplyInput) error {
 		return err
 	}
 
+	if input.RuntimePlan.Image.Source == runtimeImageSourceSnapshot {
+		for removalIndex, removal := range input.RuntimePlan.ArtifactRemovals {
+			for commandIndex, command := range removal.Commands {
+				if err := runRuntimeArtifactCommand(command); err != nil {
+					return fmt.Errorf(
+						"runtime plan artifactRemovals[%d] commands[%d] failed (artifactKey=%s): %w",
+						removalIndex,
+						commandIndex,
+						removal.ArtifactKey,
+						err,
+					)
+				}
+			}
+		}
+	}
+
 	for artifactIndex, artifact := range input.RuntimePlan.Artifacts {
 		commands := selectArtifactLifecycleCommands(artifact, commandSet)
 		for commandIndex, command := range commands {
