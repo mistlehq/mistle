@@ -215,7 +215,7 @@ export type RuntimeArtifactLifecycleBuilder = (input: {
 type RuntimeArtifactLifecycle<THook> = {
   install: THook;
   update?: THook;
-  remove?: THook;
+  remove: THook;
 };
 
 export type RuntimeArtifactSpec = {
@@ -232,6 +232,11 @@ export type CompiledRuntimeArtifactSpec = {
   name: string;
   description?: string;
   lifecycle: RuntimeArtifactLifecycle<ReadonlyArray<RuntimeArtifactCommand>>;
+};
+
+export type CompiledRuntimeArtifactRemovalSpec = {
+  artifactKey: string;
+  commands: ReadonlyArray<RuntimeArtifactCommand>;
 };
 
 type RuntimeClientSetupBase<TEnvValue> = {
@@ -335,6 +340,7 @@ export type CompiledRuntimePlan = {
   image: ResolvedSandboxImage;
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
+  artifactRemovals: ReadonlyArray<CompiledRuntimeArtifactRemovalSpec>;
   runtimeClientSetups: ReadonlyArray<RuntimeClientSetup>;
 };
 
@@ -367,5 +373,6 @@ export type CompileRuntimePlanInput = {
     sandboxdEgressBaseUrl: string;
   };
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
+  previousBindings?: ReadonlyArray<CompileRuntimePlanBindingInput>;
   registry: IntegrationDefinitionResolver;
 };

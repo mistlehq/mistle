@@ -53,6 +53,7 @@ function createGithubBinaryInstallDefinition(): IntegrationDefinition<
                 timeoutMs: 120_000,
               }),
             ],
+            remove: [{ args: ["rm", "-f", InstallPath] }],
           },
         },
       ],
@@ -125,6 +126,7 @@ describe("renderInstallLatestGithubReleaseBinaryScript integration", () => {
     if (typeof script !== "string") {
       throw new Error("Expected generated github release install script.");
     }
+    expect(runtimePlan.artifactRemovals).toEqual([]);
 
     let container: StartedTestContainer | undefined;
 

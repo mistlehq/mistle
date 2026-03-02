@@ -82,14 +82,16 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
         `Artifact '${artifact.artifactKey}' must include at least one install command.`,
       );
     }
+    if (artifact.lifecycle.remove.length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.ARTIFACT_CONFLICT,
+        `Artifact '${artifact.artifactKey}' must include at least one remove command.`,
+      );
+    }
 
     const lifecycleHooks: ReadonlyArray<
       ReadonlyArray<CompiledRuntimeArtifactSpec["lifecycle"]["install"][number]>
-    > = [
-      artifact.lifecycle.install,
-      artifact.lifecycle.update ?? [],
-      artifact.lifecycle.remove ?? [],
-    ];
+    > = [artifact.lifecycle.install, artifact.lifecycle.update ?? [], artifact.lifecycle.remove];
 
     for (const hookCommands of lifecycleHooks) {
       for (const command of hookCommands) {
@@ -206,13 +208,11 @@ function artifactLifecycleEquals(
 ): boolean {
   const leftUpdate = left.update ?? [];
   const rightUpdate = right.update ?? [];
-  const leftRemove = left.remove ?? [];
-  const rightRemove = right.remove ?? [];
 
   return (
     artifactCommandsEqual(left.install, right.install) &&
     artifactCommandsEqual(leftUpdate, rightUpdate) &&
-    artifactCommandsEqual(leftRemove, rightRemove)
+    artifactCommandsEqual(left.remove, right.remove)
   );
 }
 

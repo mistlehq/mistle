@@ -52,6 +52,12 @@ function createCompiledBindingResult(input: {
     cwd?: string;
     timeoutMs?: number;
   }>;
+  artifactRemoveCommands?: ReadonlyArray<{
+    args: ReadonlyArray<string>;
+    env?: Record<string, string>;
+    cwd?: string;
+    timeoutMs?: number;
+  }>;
   runtimeClientSetup?: {
     clientId: string;
     env: Record<string, string | { kind: "egress_url"; routeId: string }>;
@@ -71,6 +77,9 @@ function createCompiledBindingResult(input: {
           ...(input.artifactUpdateCommands === undefined
             ? {}
             : { update: input.artifactUpdateCommands }),
+          remove: input.artifactRemoveCommands ?? [
+            { args: ["echo", "remove", input.route.routeId] },
+          ],
         },
       },
     ],
@@ -363,6 +372,24 @@ describe("validateCompiledBindingResults", () => {
       }),
       artifactKey: "codex-cli",
       artifactInstallCommands: [],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+  });
+
+  it("fails when an artifact has no remove commands", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      artifactRemoveCommands: [],
     });
 
     expect(() =>

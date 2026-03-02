@@ -67,40 +67,14 @@ function normalizeConnectionConfig(
   return connectionConfig;
 }
 
-export async function compileProfileVersionRuntimePlan(
+async function resolveCompileBindingsForVersion(
   { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
-  input: CompileProfileVersionRuntimePlanInput,
-): Promise<CompiledRuntimePlan> {
-  const sandboxProfile = await db.query.sandboxProfiles.findFirst({
-    columns: {
-      id: true,
-    },
-    where: (table, { and, eq }) =>
-      and(eq(table.id, input.profileId), eq(table.organizationId, input.organizationId)),
-  });
-
-  if (sandboxProfile === undefined) {
-    throw new SandboxProfilesNotFoundError(
-      SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
-      "Sandbox profile was not found.",
-    );
-  }
-
-  const sandboxProfileVersion = await db.query.sandboxProfileVersions.findFirst({
-    columns: {
-      sandboxProfileId: true,
-    },
-    where: (table, { and, eq }) =>
-      and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
-  });
-
-  if (sandboxProfileVersion === undefined) {
-    throw new SandboxProfilesNotFoundError(
-      SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
-      "Sandbox profile version was not found.",
-    );
-  }
-
+  input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+  },
+) {
   const integrationBindings = await db.query.sandboxProfileVersionIntegrationBindings.findMany({
     where: (table, { and, eq }) =>
       and(
@@ -129,7 +103,7 @@ export async function compileProfileVersionRuntimePlan(
         });
   const targetsByKey = new Map(targets.map((target) => [target.targetKey, target]));
 
-  const compileBindings = integrationBindings.map((binding) => {
+  return integrationBindings.map((binding) => {
     const connection = connectionsById.get(binding.connectionId);
     if (connection === undefined) {
       throw new SandboxProfilesCompileError(
@@ -170,6 +144,75 @@ export async function compileProfileVersionRuntimePlan(
       },
     };
   });
+}
+
+export async function compileProfileVersionRuntimePlan(
+  { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
+  input: CompileProfileVersionRuntimePlanInput,
+): Promise<CompiledRuntimePlan> {
+  const sandboxProfile = await db.query.sandboxProfiles.findFirst({
+    columns: {
+      id: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.id, input.profileId), eq(table.organizationId, input.organizationId)),
+  });
+
+  if (sandboxProfile === undefined) {
+    throw new SandboxProfilesNotFoundError(
+      SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
+      "Sandbox profile was not found.",
+    );
+  }
+
+  const sandboxProfileVersion = await db.query.sandboxProfileVersions.findFirst({
+    columns: {
+      sandboxProfileId: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.sandboxProfileId, input.profileId), eq(table.version, input.profileVersion)),
+  });
+
+  if (sandboxProfileVersion === undefined) {
+    throw new SandboxProfilesNotFoundError(
+      SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
+      "Sandbox profile version was not found.",
+    );
+  }
+
+  const compileBindings = await resolveCompileBindingsForVersion(
+    {
+      db,
+    },
+    {
+      organizationId: input.organizationId,
+      profileId: input.profileId,
+      profileVersion: input.profileVersion,
+    },
+  );
+
+  const previousSandboxProfileVersion = await db.query.sandboxProfileVersions.findFirst({
+    columns: {
+      version: true,
+    },
+    where: (table, { and, eq, lt }) =>
+      and(eq(table.sandboxProfileId, input.profileId), lt(table.version, input.profileVersion)),
+    orderBy: (table, { desc }) => [desc(table.version)],
+  });
+
+  const previousCompileBindings =
+    previousSandboxProfileVersion === undefined
+      ? []
+      : await resolveCompileBindingsForVersion(
+          {
+            db,
+          },
+          {
+            organizationId: input.organizationId,
+            profileId: input.profileId,
+            profileVersion: previousSandboxProfileVersion.version,
+          },
+        );
 
   try {
     return compileRuntimePlan({
@@ -179,6 +222,9 @@ export async function compileProfileVersionRuntimePlan(
       image: input.image,
       runtimeContext: input.runtimeContext,
       bindings: compileBindings,
+      ...(previousCompileBindings.length === 0
+        ? {}
+        : { previousBindings: previousCompileBindings }),
       registry,
     });
   } catch (error) {
