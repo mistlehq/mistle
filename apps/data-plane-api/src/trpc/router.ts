@@ -1,7 +1,10 @@
-import { createDataPlaneTrpcRouter } from "./base.js";
+import { createDataPlaneTrpcRouter as createDataPlaneTrpcContractRouter } from "@mistle/data-plane-trpc/router";
+
+import { createDataPlaneTrpcRouter as createDataPlaneTrpcAppRouter } from "./base.js";
 import { sandboxInstancesTrpcRouter } from "./routers/sandbox-instances.js";
 
-export const dataPlaneTrpcRouter = createDataPlaneTrpcRouter({
+export const dataPlaneTrpcRouter = createDataPlaneTrpcContractRouter({
+  createRouter: createDataPlaneTrpcAppRouter,
   sandboxInstances: sandboxInstancesTrpcRouter,
 });
 

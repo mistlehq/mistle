@@ -1,8 +1,5 @@
-import {
-  StartSandboxInstanceCompletedResponseSchema,
-  type StartSandboxInstanceInput,
-  StartSandboxInstanceInputSchema,
-} from "@mistle/data-plane-trpc/contracts";
+import { type StartSandboxInstanceInput } from "@mistle/data-plane-trpc/contracts";
+import { createDataPlaneSandboxInstancesTrpcRouter } from "@mistle/data-plane-trpc/router";
 import { StartSandboxInstanceWorkflowSpec } from "@mistle/workflows/data-plane";
 
 import { createDataPlaneTrpcRouter } from "../base.js";
@@ -25,27 +22,29 @@ function createStartSandboxIdempotencyKey(input: StartSandboxInstanceInput): str
   });
 }
 
-export const sandboxInstancesTrpcRouter = createDataPlaneTrpcRouter({
-  start: dataPlaneTrpcProcedure
-    .input(StartSandboxInstanceInputSchema)
-    .output(StartSandboxInstanceCompletedResponseSchema)
-    .mutation(async ({ ctx, input }) => {
-      const workflowRunHandle = await ctx.resources.openWorkflow.runWorkflow(
-        StartSandboxInstanceWorkflowSpec,
-        input,
-        {
-          idempotencyKey: createStartSandboxIdempotencyKey(input),
-        },
-      );
-      const workflowResult = await workflowRunHandle.result({
-        timeoutMs: START_SANDBOX_WAIT_TIMEOUT_MS,
-      });
+export const sandboxInstancesTrpcRouter = createDataPlaneSandboxInstancesTrpcRouter({
+  createRouter: createDataPlaneTrpcRouter,
+  createStartProcedure: (schemas) =>
+    dataPlaneTrpcProcedure
+      .input(schemas.inputSchema)
+      .output(schemas.outputSchema)
+      .mutation(async ({ ctx, input }) => {
+        const workflowRunHandle = await ctx.resources.openWorkflow.runWorkflow(
+          StartSandboxInstanceWorkflowSpec,
+          input,
+          {
+            idempotencyKey: createStartSandboxIdempotencyKey(input),
+          },
+        );
+        const workflowResult = await workflowRunHandle.result({
+          timeoutMs: START_SANDBOX_WAIT_TIMEOUT_MS,
+        });
 
-      return {
-        status: "completed",
-        sandboxInstanceId: workflowResult.sandboxInstanceId,
-        providerSandboxId: workflowResult.providerSandboxId,
-        workflowRunId: workflowRunHandle.workflowRun.id,
-      };
-    }),
+        return {
+          status: "completed",
+          sandboxInstanceId: workflowResult.sandboxInstanceId,
+          providerSandboxId: workflowResult.providerSandboxId,
+          workflowRunId: workflowRunHandle.workflowRun.id,
+        };
+      }),
 });

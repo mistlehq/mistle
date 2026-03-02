@@ -1,9 +1,4 @@
-import {
-  createTRPCClient,
-  createTRPCUntypedClient,
-  httpBatchLink,
-  type TRPCLink,
-} from "@trpc/client";
+import { createTRPCClient, httpBatchLink, type TRPCLink } from "@trpc/client";
 import type { AnyRouter } from "@trpc/server";
 
 import { DATA_PLANE_INTERNAL_AUTH_HEADER, DATA_PLANE_TRPC_PATH } from "./constants.js";
@@ -13,6 +8,7 @@ import {
   type StartSandboxInstanceCompletedResponse,
   type StartSandboxInstanceInput,
 } from "./contracts/index.js";
+import type { DataPlaneTrpcRouter } from "./router.js";
 
 export interface DataPlaneTrpcClientOptions<TRouter extends AnyRouter> {
   links: TRPCLink<TRouter>[];
@@ -44,7 +40,7 @@ export type CreateDataPlaneSandboxInstancesClientInput = {
 export function createDataPlaneSandboxInstancesClient(
   input: CreateDataPlaneSandboxInstancesClientInput,
 ): DataPlaneSandboxInstancesClient {
-  const untypedTrpcClient = createTRPCUntypedClient<AnyRouter>({
+  const trpcClient = createTRPCClient<DataPlaneTrpcRouter>({
     links: [
       httpBatchLink({
         url: createDataPlaneTrpcUrl(input.baseUrl),
@@ -58,7 +54,7 @@ export function createDataPlaneSandboxInstancesClient(
   return {
     startSandboxInstance: async (startInput) => {
       const parsedStartInput = StartSandboxInstanceInputSchema.parse(startInput);
-      const response = await untypedTrpcClient.mutation("sandboxInstances.start", parsedStartInput);
+      const response = await trpcClient.sandboxInstances.start.mutate(parsedStartInput);
 
       return StartSandboxInstanceCompletedResponseSchema.parse(response);
     },
