@@ -55,23 +55,20 @@ async function resolvePersistedCredential(
   input: ResolvePersistedCredentialInput,
 ): Promise<ResolvedIntegrationCredential> {
   const credentialPurpose = input.purpose;
-  const linkedCredentials =
-    credentialPurpose === undefined
-      ? await input.db.query.integrationConnectionCredentials.findMany({
-          columns: {
-            credentialId: true,
-            purpose: true,
-          },
-          where: (table, { eq }) => eq(table.connectionId, input.connectionId),
-        })
-      : await input.db.query.integrationConnectionCredentials.findMany({
-          columns: {
-            credentialId: true,
-            purpose: true,
-          },
-          where: (table, { and, eq }) =>
-            and(eq(table.connectionId, input.connectionId), eq(table.purpose, credentialPurpose)),
-        });
+  const linkedCredentials = await input.db.query.integrationConnectionCredentials.findMany({
+    columns: {
+      credentialId: true,
+      purpose: true,
+    },
+    where: (table, { and, eq }) => {
+      const connectionFilter = eq(table.connectionId, input.connectionId);
+      if (credentialPurpose === undefined) {
+        return connectionFilter;
+      }
+
+      return and(connectionFilter, eq(table.purpose, credentialPurpose));
+    },
+  });
 
   if (linkedCredentials.length === 0) {
     throw new InternalIntegrationCredentialsError(
