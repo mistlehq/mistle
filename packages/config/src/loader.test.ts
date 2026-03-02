@@ -11,10 +11,17 @@ describe("parseConfigRecord", () => {
         internalAuth: {
           serviceToken: "test-service-token",
         },
-        tunnel: {
-          bootstrapTokenSecret: "test-bootstrap-token-secret",
-          tokenIssuer: "data-plane-worker",
-          tokenAudience: "data-plane-gateway",
+        sandbox: {
+          connect: {
+            tokenSecret: "test-connection-token-secret",
+            tokenIssuer: "control-plane-api",
+            tokenAudience: "data-plane-gateway",
+          },
+          bootstrap: {
+            tokenSecret: "test-bootstrap-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "data-plane-gateway",
+          },
         },
       },
       apps: {
@@ -44,6 +51,7 @@ describe("parseConfigRecord", () => {
           },
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
@@ -150,10 +158,17 @@ describe("parseConfigRecord", () => {
         internalAuth: {
           serviceToken: "test-service-token",
         },
-        tunnel: {
-          bootstrapTokenSecret: "test-bootstrap-token-secret",
-          tokenIssuer: "data-plane-worker",
-          tokenAudience: "data-plane-gateway",
+        sandbox: {
+          connect: {
+            tokenSecret: "test-connection-token-secret",
+            tokenIssuer: "control-plane-api",
+            tokenAudience: "data-plane-gateway",
+          },
+          bootstrap: {
+            tokenSecret: "test-bootstrap-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "data-plane-gateway",
+          },
         },
       },
       apps: {
@@ -183,6 +198,7 @@ describe("parseConfigRecord", () => {
           },
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,

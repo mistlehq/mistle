@@ -4,8 +4,13 @@ env = "development"
 [global.internal_auth]
 service_token = "fixture-service-token"
 
-[global.tunnel]
-bootstrap_token_secret = "fixture-bootstrap-token-secret"
+[global.sandbox.connect]
+token_secret = "fixture-connection-token-secret"
+token_issuer = "control-plane-api"
+token_audience = "data-plane-gateway"
+
+[global.sandbox.bootstrap]
+token_secret = "fixture-bootstrap-token-secret"
 token_issuer = "data-plane-worker"
 token_audience = "data-plane-gateway"
 

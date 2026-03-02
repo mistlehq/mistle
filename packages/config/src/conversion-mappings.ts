@@ -19,19 +19,34 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN",
   },
   {
-    configPath: ["global", "tunnel", "bootstrapTokenSecret"],
-    tomlPath: ["global", "tunnel", "bootstrap_token_secret"],
-    envVar: "MISTLE_GLOBAL_TUNNEL_BOOTSTRAP_TOKEN_SECRET",
+    configPath: ["global", "sandbox", "connect", "tokenSecret"],
+    tomlPath: ["global", "sandbox", "connect", "token_secret"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET",
   },
   {
-    configPath: ["global", "tunnel", "tokenIssuer"],
-    tomlPath: ["global", "tunnel", "token_issuer"],
-    envVar: "MISTLE_GLOBAL_TUNNEL_TOKEN_ISSUER",
+    configPath: ["global", "sandbox", "connect", "tokenIssuer"],
+    tomlPath: ["global", "sandbox", "connect", "token_issuer"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER",
   },
   {
-    configPath: ["global", "tunnel", "tokenAudience"],
-    tomlPath: ["global", "tunnel", "token_audience"],
-    envVar: "MISTLE_GLOBAL_TUNNEL_TOKEN_AUDIENCE",
+    configPath: ["global", "sandbox", "connect", "tokenAudience"],
+    tomlPath: ["global", "sandbox", "connect", "token_audience"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE",
+  },
+  {
+    configPath: ["global", "sandbox", "bootstrap", "tokenSecret"],
+    tomlPath: ["global", "sandbox", "bootstrap", "token_secret"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET",
+  },
+  {
+    configPath: ["global", "sandbox", "bootstrap", "tokenIssuer"],
+    tomlPath: ["global", "sandbox", "bootstrap", "token_issuer"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER",
+  },
+  {
+    configPath: ["global", "sandbox", "bootstrap", "tokenAudience"],
+    tomlPath: ["global", "sandbox", "bootstrap", "token_audience"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE",
   },
   {
     configPath: ["apps", "control_plane_api", "server", "host"],
@@ -103,6 +118,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     configPath: ["apps", "control_plane_api", "sandbox", "defaultBaseImage"],
     tomlPath: ["apps", "control_plane_api", "sandbox", "default_base_image"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE",
+  },
+  {
+    configPath: ["apps", "control_plane_api", "sandbox", "gatewayWsUrl"],
+    tomlPath: ["apps", "control_plane_api", "sandbox", "gateway_ws_url"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_GATEWAY_WS_URL",
   },
   {
     configPath: ["apps", "control_plane_api", "integrations", "activeMasterEncryptionKeyVersion"],

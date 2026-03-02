@@ -3,7 +3,7 @@ import {
   BootstrapTokenError,
   type BootstrapTokenConfig,
   verifyBootstrapToken,
-} from "@mistle/tunnel-auth";
+} from "@mistle/gateway-tunnel-auth";
 
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";

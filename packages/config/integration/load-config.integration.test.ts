@@ -11,19 +11,29 @@ const dataPlaneWorkerDockerConfigFixturePath = fileURLToPath(
   new URL("./fixtures/data-plane-worker-docker.toml", import.meta.url),
 );
 const serviceToken = "fixture-service-token";
-const bootstrapTokenSecret = "fixture-bootstrap-token-secret";
-const tokenIssuer = "data-plane-worker";
-const tokenAudience = "data-plane-gateway";
+const sandboxConnectTokenSecret = "fixture-connection-token-secret";
+const sandboxConnectTokenIssuer = "control-plane-api";
+const sandboxConnectTokenAudience = "data-plane-gateway";
+const sandboxBootstrapTokenSecret = "fixture-bootstrap-token-secret";
+const sandboxBootstrapTokenIssuer = "data-plane-worker";
+const sandboxBootstrapTokenAudience = "data-plane-gateway";
 
 const globalDevelopmentConfig = {
   env: "development",
   internalAuth: {
     serviceToken,
   },
-  tunnel: {
-    bootstrapTokenSecret,
-    tokenIssuer,
-    tokenAudience,
+  sandbox: {
+    connect: {
+      tokenSecret: sandboxConnectTokenSecret,
+      tokenIssuer: sandboxConnectTokenIssuer,
+      tokenAudience: sandboxConnectTokenAudience,
+    },
+    bootstrap: {
+      tokenSecret: sandboxBootstrapTokenSecret,
+      tokenIssuer: sandboxBootstrapTokenIssuer,
+      tokenAudience: sandboxBootstrapTokenAudience,
+    },
   },
 } as const;
 
@@ -32,10 +42,17 @@ const globalProductionConfig = {
   internalAuth: {
     serviceToken,
   },
-  tunnel: {
-    bootstrapTokenSecret,
-    tokenIssuer,
-    tokenAudience,
+  sandbox: {
+    connect: {
+      tokenSecret: sandboxConnectTokenSecret,
+      tokenIssuer: sandboxConnectTokenIssuer,
+      tokenAudience: sandboxConnectTokenAudience,
+    },
+    bootstrap: {
+      tokenSecret: sandboxBootstrapTokenSecret,
+      tokenIssuer: sandboxBootstrapTokenIssuer,
+      tokenAudience: sandboxBootstrapTokenAudience,
+    },
   },
 } as const;
 
@@ -65,6 +82,7 @@ const controlPlaneApiEnvConfig = {
   },
   sandbox: {
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+    gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
   },
   integrations: {
     activeMasterEncryptionKeyVersion: 1,
@@ -89,6 +107,7 @@ const controlPlaneApiFixtureConfig = {
   },
   sandbox: {
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:fixture",
+    gatewayWsUrl: "ws://127.0.0.1:5302/tunnel/sandbox",
   },
   integrations: {
     activeMasterEncryptionKeyVersion: 2,

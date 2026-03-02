@@ -5,8 +5,8 @@ import {
   sandboxInstanceRuntimePlans,
   sandboxInstances,
 } from "@mistle/db/data-plane";
+import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import { systemSleeper } from "@mistle/time";
-import { mintBootstrapToken } from "@mistle/tunnel-auth";
 import {
   createDataPlaneWorker,
   type CreateDataPlaneWorkflowDefinitionsInput,
@@ -79,9 +79,9 @@ async function writeSandboxStartupInput(input: {
   const bootstrapTokenJti = randomUUID();
   const bootstrapToken = await mintBootstrapToken({
     config: {
-      bootstrapTokenSecret: input.config.tunnel.bootstrapTokenSecret,
-      tokenIssuer: input.config.tunnel.tokenIssuer,
-      tokenAudience: input.config.tunnel.tokenAudience,
+      bootstrapTokenSecret: input.config.sandbox.bootstrap.tokenSecret,
+      tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
+      tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
     },
     jti: bootstrapTokenJti,
     ttlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,

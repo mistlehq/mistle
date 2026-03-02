@@ -4,8 +4,13 @@ env = "development"
 [global.internal_auth]
 service_token = "fixture-service-token"
 
-[global.tunnel]
-bootstrap_token_secret = "fixture-bootstrap-token-secret"
+[global.sandbox.connect]
+token_secret = "fixture-connection-token-secret"
+token_issuer = "control-plane-api"
+token_audience = "data-plane-gateway"
+
+[global.sandbox.bootstrap]
+token_secret = "fixture-bootstrap-token-secret"
 token_issuer = "data-plane-worker"
 token_audience = "data-plane-gateway"
 
@@ -34,6 +39,7 @@ base_url = "http://127.0.0.1:5300"
 
 [apps.control_plane_api.sandbox]
 default_base_image = "127.0.0.1:5001/mistle/sandbox-base:fixture"
+gateway_ws_url = "ws://127.0.0.1:5302/tunnel/sandbox"
 
 [apps.control_plane_api.integrations]
 active_master_encryption_key_version = 2

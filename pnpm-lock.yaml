@@ -98,6 +98,9 @@ importers:
       '@mistle/emails':
         specifier: workspace:*
         version: link:../../packages/emails
+      '@mistle/gateway-connection-auth':
+        specifier: workspace:*
+        version: link:../../packages/gateway-connection-auth
       '@mistle/http':
         specifier: workspace:*
         version: link:../../packages/http
@@ -113,9 +116,6 @@ importers:
       '@mistle/time':
         specifier: workspace:*
         version: link:../../packages/time
-      '@mistle/tunnel-auth':
-        specifier: workspace:*
-        version: link:../../packages/tunnel-auth
       '@mistle/workflows':
         specifier: workspace:*
         version: link:../../packages/workflows
@@ -318,12 +318,12 @@ importers:
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@mistle/gateway-tunnel-auth':
+        specifier: workspace:*
+        version: link:../../packages/gateway-tunnel-auth
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
-      '@mistle/tunnel-auth':
-        specifier: workspace:*
-        version: link:../../packages/tunnel-auth
       hono:
         specifier: ^4.12.3
         version: 4.12.3
@@ -355,6 +355,9 @@ importers:
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@mistle/gateway-tunnel-auth':
+        specifier: workspace:*
+        version: link:../../packages/gateway-tunnel-auth
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
@@ -364,9 +367,6 @@ importers:
       '@mistle/time':
         specifier: workspace:*
         version: link:../../packages/time
-      '@mistle/tunnel-auth':
-        specifier: workspace:*
-        version: link:../../packages/tunnel-auth
       '@mistle/workflows':
         specifier: workspace:*
         version: link:../../packages/workflows
@@ -485,6 +485,18 @@ importers:
         specifier: ^7.0.11
         version: 7.0.11
 
+  packages/gateway-connection-auth:
+    dependencies:
+      jose:
+        specifier: ^6.1.3
+        version: 6.1.3
+
+  packages/gateway-tunnel-auth:
+    dependencies:
+      jose:
+        specifier: ^6.1.3
+        version: 6.1.3
+
   packages/http:
     dependencies:
       zod:
@@ -569,12 +581,6 @@ importers:
         version: link:../test-core
 
   packages/time: {}
-
-  packages/tunnel-auth:
-    dependencies:
-      jose:
-        specifier: ^6.1.3
-        version: 6.1.3
 
   packages/ui:
     dependencies:

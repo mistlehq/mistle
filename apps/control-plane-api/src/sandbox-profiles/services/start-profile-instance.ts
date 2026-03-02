@@ -1,5 +1,5 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
-import type { BootstrapTokenConfig } from "@mistle/tunnel-auth";
+import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { StartSandboxProfileInstanceWorkflowInput } from "@mistle/workflows/control-plane";
 import { StartSandboxProfileInstanceWorkflowSpec } from "@mistle/workflows/control-plane";
 
@@ -17,7 +17,7 @@ type StartProfileInstanceInput = {
   connectionToken?: {
     gatewayWebsocketUrl: string;
     tokenTtlSeconds: number;
-    tokenConfig: BootstrapTokenConfig;
+    tokenConfig: ConnectionTokenConfig;
   };
   startedBy: {
     kind: SandboxInstanceStarterKind;

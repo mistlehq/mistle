@@ -2,6 +2,7 @@ import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/c
 
 import { createControlPlaneAuth } from "./auth/index.js";
 import type { AppRuntimeResources } from "./runtime/resources.js";
+import { SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS } from "./sandbox-instances/constants.js";
 import { createSandboxInstancesService } from "./sandbox-instances/index.js";
 import { createSandboxProfilesService } from "./sandbox-profiles/index.js";
 import type { AppServices, ControlPlaneApiRuntimeConfig } from "./types.js";
@@ -21,6 +22,15 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
   });
   const sandboxInstancesService = createSandboxInstancesService({
     dataPlaneClient,
+    defaultConnectionToken: {
+      gatewayWebsocketUrl: config.sandbox.gatewayWsUrl,
+      tokenTtlSeconds: SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS,
+      tokenConfig: {
+        connectionTokenSecret: runtimeConfig.connectionToken.secret,
+        tokenIssuer: runtimeConfig.connectionToken.issuer,
+        tokenAudience: runtimeConfig.connectionToken.audience,
+      },
+    },
   });
   const sandboxProfilesService = createSandboxProfilesService({
     db: resources.db,

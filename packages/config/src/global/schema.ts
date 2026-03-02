@@ -1,10 +1,17 @@
 import { z } from "zod";
 
-export const GlobalTunnelConfigSchema = z
+export const GlobalSandboxTokenConfigSchema = z
   .object({
-    bootstrapTokenSecret: z.string().trim().min(1),
+    tokenSecret: z.string().trim().min(1),
     tokenIssuer: z.string().trim().min(1),
     tokenAudience: z.string().trim().min(1),
+  })
+  .strict();
+
+export const GlobalSandboxConfigSchema = z
+  .object({
+    connect: GlobalSandboxTokenConfigSchema,
+    bootstrap: GlobalSandboxTokenConfigSchema,
   })
   .strict();
 
@@ -16,7 +23,7 @@ export const GlobalConfigSchema = z
         serviceToken: z.string().trim().min(1),
       })
       .strict(),
-    tunnel: GlobalTunnelConfigSchema,
+    sandbox: GlobalSandboxConfigSchema,
   })
   .strict();
 

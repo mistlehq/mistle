@@ -72,10 +72,17 @@ export const it = vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture 
               url: databaseStack.pooledUrl,
             },
           },
-          tunnel: {
-            bootstrapTokenSecret: IntegrationBootstrapTokenSecret,
-            tokenIssuer: IntegrationTokenIssuer,
-            tokenAudience: IntegrationTokenAudience,
+          sandbox: {
+            connect: {
+              tokenSecret: "integration-connect-token-secret",
+              tokenIssuer: "integration-control-plane-api",
+              tokenAudience: IntegrationTokenAudience,
+            },
+            bootstrap: {
+              tokenSecret: IntegrationBootstrapTokenSecret,
+              tokenIssuer: IntegrationTokenIssuer,
+              tokenAudience: IntegrationTokenAudience,
+            },
           },
         };
 

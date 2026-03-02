@@ -4,7 +4,9 @@ import { type PartialGlobalConfigInput, GlobalConfigSchema } from "./schema.js";
 export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGlobalConfigInput {
   const global = asObjectRecord(tomlRoot.global);
   const internalAuth = asObjectRecord(global.internal_auth);
-  const tunnel = asObjectRecord(global.tunnel);
+  const sandbox = asObjectRecord(global.sandbox);
+  const sandboxBootstrap = asObjectRecord(sandbox.bootstrap);
+  const sandboxConnect = asObjectRecord(sandbox.connect);
 
   return GlobalConfigSchema.partial().parse({
     env: global.env,
@@ -15,12 +17,20 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
           },
         }
       : {}),
-    ...(typeof tunnel.bootstrap_token_secret === "string"
+    ...(typeof sandboxBootstrap.token_secret === "string" ||
+    typeof sandboxConnect.token_secret === "string"
       ? {
-          tunnel: {
-            bootstrapTokenSecret: tunnel.bootstrap_token_secret,
-            tokenIssuer: tunnel.token_issuer,
-            tokenAudience: tunnel.token_audience,
+          sandbox: {
+            bootstrap: {
+              tokenSecret: sandboxBootstrap.token_secret,
+              tokenIssuer: sandboxBootstrap.token_issuer,
+              tokenAudience: sandboxBootstrap.token_audience,
+            },
+            connect: {
+              tokenSecret: sandboxConnect.token_secret,
+              tokenIssuer: sandboxConnect.token_issuer,
+              tokenAudience: sandboxConnect.token_audience,
+            },
           },
         }
       : {}),

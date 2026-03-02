@@ -93,6 +93,10 @@ const loadSandboxEnv = createEnvLoader<typeof ControlPlaneApiSandboxConfigSchema
     key: "defaultBaseImage",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE",
   },
+  {
+    key: "gatewayWsUrl",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_GATEWAY_WS_URL",
+  },
 ]);
 
 const loadIntegrationsEnv = createEnvLoader<typeof ControlPlaneApiIntegrationsConfigSchema>([

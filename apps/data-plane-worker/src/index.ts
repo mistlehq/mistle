@@ -8,12 +8,12 @@ const loadedConfig = loadConfig({
   env: process.env,
 });
 if (loadedConfig.global === undefined) {
-  throw new Error("Expected global tunnel config to be loaded for data-plane-worker.");
+  throw new Error("Expected global sandbox config to be loaded for data-plane-worker.");
 }
 
 const runtime = await createDataPlaneWorkerRuntime({
   app: loadedConfig.app,
-  tunnel: loadedConfig.global.tunnel,
+  sandbox: loadedConfig.global.sandbox,
 });
 
 await runtime.start();

@@ -14,9 +14,12 @@ describe("convertEnvToTomlRecord", () => {
     const tomlRecord = convertEnvToTomlRecord({
       IGNORED_VALUE: "ignored",
       NODE_ENV: "test",
-      MISTLE_GLOBAL_TUNNEL_BOOTSTRAP_TOKEN_SECRET: "fixture-bootstrap-secret",
-      MISTLE_GLOBAL_TUNNEL_TOKEN_ISSUER: "data-plane-worker",
-      MISTLE_GLOBAL_TUNNEL_TOKEN_AUDIENCE: "data-plane-gateway",
+      MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: "fixture-bootstrap-secret",
+      MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: "data-plane-worker",
+      MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE: "data-plane-gateway",
+      MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: "fixture-connection-secret",
+      MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER: "control-plane-api",
+      MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE: "data-plane-gateway",
       MISTLE_APPS_CONTROL_PLANE_API_HOST: "127.0.0.1",
       MISTLE_APPS_CONTROL_PLANE_API_PORT: "5000",
       MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
@@ -38,10 +41,17 @@ describe("convertEnvToTomlRecord", () => {
     expect(tomlRecord).toEqual({
       global: {
         env: "development",
-        tunnel: {
-          bootstrap_token_secret: "fixture-bootstrap-secret",
-          token_issuer: "data-plane-worker",
-          token_audience: "data-plane-gateway",
+        sandbox: {
+          bootstrap: {
+            token_secret: "fixture-bootstrap-secret",
+            token_issuer: "data-plane-worker",
+            token_audience: "data-plane-gateway",
+          },
+          connect: {
+            token_secret: "fixture-connection-secret",
+            token_issuer: "control-plane-api",
+            token_audience: "data-plane-gateway",
+          },
         },
       },
       apps: {
@@ -94,10 +104,17 @@ describe("convertTomlToEnvRecord", () => {
     const envRecord = convertTomlToEnvRecord({
       global: {
         env: "production",
-        tunnel: {
-          bootstrap_token_secret: "prod-bootstrap-secret",
-          token_issuer: "data-plane-worker",
-          token_audience: "data-plane-gateway",
+        sandbox: {
+          bootstrap: {
+            token_secret: "prod-bootstrap-secret",
+            token_issuer: "data-plane-worker",
+            token_audience: "data-plane-gateway",
+          },
+          connect: {
+            token_secret: "prod-connection-secret",
+            token_issuer: "control-plane-api",
+            token_audience: "data-plane-gateway",
+          },
         },
       },
       apps: {
@@ -137,9 +154,12 @@ describe("convertTomlToEnvRecord", () => {
 
     expect(envRecord).toEqual({
       NODE_ENV: "production",
-      MISTLE_GLOBAL_TUNNEL_BOOTSTRAP_TOKEN_SECRET: "prod-bootstrap-secret",
-      MISTLE_GLOBAL_TUNNEL_TOKEN_ISSUER: "data-plane-worker",
-      MISTLE_GLOBAL_TUNNEL_TOKEN_AUDIENCE: "data-plane-gateway",
+      MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: "prod-bootstrap-secret",
+      MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: "data-plane-worker",
+      MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE: "data-plane-gateway",
+      MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: "prod-connection-secret",
+      MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER: "control-plane-api",
+      MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE: "data-plane-gateway",
       MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE:
         "registry.example.com/mistle/sandbox-base:prod",
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "https://a.example,https://b.example",

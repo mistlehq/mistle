@@ -7,8 +7,13 @@ env = "production"
 [global.internal_auth]
 service_token = "replace-with-internal-service-token"
 
-[global.tunnel]
-bootstrap_token_secret = "replace-with-bootstrap-token-secret"
+[global.sandbox.connect]
+token_secret = "replace-with-connect-token-secret"
+token_issuer = "control-plane-api"
+token_audience = "data-plane-gateway"
+
+[global.sandbox.bootstrap]
+token_secret = "replace-with-bootstrap-token-secret"
 token_issuer = "data-plane-worker"
 token_audience = "data-plane-gateway"
 
@@ -37,6 +42,7 @@ base_url = "http://data-plane-api:8082"
 
 [apps.control_plane_api.sandbox]
 default_base_image = "registry.example.com/mistle/sandbox-base:prod"
+gateway_ws_url = "wss://gateway.mistle.example/tunnel/sandbox"
 
 [apps.control_plane_api.integrations]
 active_master_encryption_key_version = 1

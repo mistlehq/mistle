@@ -1,18 +1,22 @@
-import {
-  SandboxInstanceSources,
-  SandboxInstanceStarterKinds,
-  SandboxInstanceStatuses,
-} from "@mistle/db/data-plane";
 import { SandboxImageKind } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflows/data-plane";
 import { z } from "zod";
 
-export const DataPlaneSandboxImageKinds = SandboxImageKind;
-export const DataPlaneSandboxInstanceStarterKinds = SandboxInstanceStarterKinds;
-export const DataPlaneSandboxInstanceSources = SandboxInstanceSources;
-export const DataPlaneSandboxInstanceStatuses = SandboxInstanceStatuses;
+const DataPlaneSandboxImageKinds = SandboxImageKind;
+const DataPlaneSandboxInstanceStarterKinds = {
+  USER: "user",
+} as const;
+const DataPlaneSandboxInstanceSources = {
+  DASHBOARD: "dashboard",
+} as const;
+export const DataPlaneSandboxInstanceStatuses = {
+  STARTING: "starting",
+  RUNNING: "running",
+  STOPPED: "stopped",
+  FAILED: "failed",
+} as const;
 
-export const StartSandboxInstanceImageSchema = z
+const StartSandboxInstanceImageSchema = z
   .object({
     imageId: z.string().min(1),
     kind: z.enum(DataPlaneSandboxImageKinds),
@@ -192,9 +196,3 @@ export type StartSandboxInstanceCompletedResponse = z.infer<
 >;
 export type GetSandboxInstanceInput = z.infer<typeof GetSandboxInstanceInputSchema>;
 export type GetSandboxInstanceResponse = z.infer<typeof GetSandboxInstanceResponseSchema>;
-
-type ContractMatchesWorkflowInput =
-  StartSandboxInstanceInput extends StartSandboxInstanceWorkflowInput ? true : never;
-
-const contractMatchesWorkflowInput: ContractMatchesWorkflowInput = true;
-void contractMatchesWorkflowInput;

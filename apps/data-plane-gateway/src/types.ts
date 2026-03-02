@@ -11,7 +11,7 @@ export type DataPlaneGatewayConfig = LoadDataPlaneGatewayConfigResult["app"];
 export type DataPlaneGatewayGlobalConfig = NonNullable<LoadDataPlaneGatewayConfigResult["global"]>;
 export type DataPlaneGatewayRuntimeConfig = {
   app: DataPlaneGatewayConfig;
-  tunnel: DataPlaneGatewayGlobalConfig["tunnel"];
+  sandbox: DataPlaneGatewayGlobalConfig["sandbox"];
 };
 
 export type AppContextBindings = {

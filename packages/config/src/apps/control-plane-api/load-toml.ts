@@ -44,6 +44,7 @@ export function loadControlPlaneApiFromToml(
     },
     sandbox: {
       defaultBaseImage: sandbox.default_base_image,
+      gatewayWsUrl: sandbox.gateway_ws_url,
     },
   };
 
