@@ -154,25 +154,7 @@ describe("tokenizer proxy integration", () => {
   }, 60_000);
 
   it("returns 502 when control-plane credential resolution fails", async () => {
-    const controlPlaneServer = await startHttpServer((request, response) => {
-      if (
-        request.method !== "POST" ||
-        request.url !== "/internal/integration-credentials/resolve"
-      ) {
-        response.statusCode = 404;
-        response.end("not_found");
-        return;
-      }
-
-      response.setHeader("content-type", "application/json");
-      response.statusCode = 404;
-      response.end(
-        JSON.stringify({
-          code: "CREDENTIAL_NOT_FOUND",
-          message: "No active integration credential was found for this secret type.",
-        }),
-      );
-    });
+    const controlPlaneEchoService = await startHttpEcho();
 
     const host = "127.0.0.1";
     const port = await reserveAvailablePort({ host });
@@ -183,7 +165,7 @@ describe("tokenizer proxy integration", () => {
           port,
         },
         controlPlaneApi: {
-          baseUrl: controlPlaneServer.baseUrl,
+          baseUrl: controlPlaneEchoService.baseUrl,
         },
       },
       internalAuthServiceToken: "integration-service-token",
@@ -212,7 +194,7 @@ describe("tokenizer proxy integration", () => {
         message: "Failed to resolve integration credential.",
       });
     } finally {
-      await Promise.all([runtime.stop(), controlPlaneServer.close()]);
+      await Promise.all([runtime.stop(), controlPlaneEchoService.stop()]);
     }
   });
 });
