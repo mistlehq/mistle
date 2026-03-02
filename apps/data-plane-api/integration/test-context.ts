@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import {
   SandboxInstanceStatuses,
   createDataPlaneDatabase,
+  sandboxInstanceRuntimePlans,
+  sandboxInstances,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
 import {
@@ -102,63 +104,41 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
               },
               sandboxInstances: {
                 createSandboxInstance: async (workflowInput) => {
-                  const insertedRows = await dbPool.query<{ id: string }>(
-                    `
-                      insert into data_plane.sandbox_instances (
-                        organization_id,
-                        sandbox_profile_id,
-                        sandbox_profile_version,
-                        provider,
-                        provider_sandbox_id,
-                        status,
-                        started_by_kind,
-                        started_by_id,
-                        source
-                      )
-                      values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-                      returning id
-                    `,
-                    [
-                      workflowInput.organizationId,
-                      workflowInput.sandboxProfileId,
-                      workflowInput.sandboxProfileVersion,
-                      workflowInput.provider,
-                      workflowInput.providerSandboxId,
-                      SandboxInstanceStatuses.STARTING,
-                      workflowInput.startedBy.kind,
-                      workflowInput.startedBy.id,
-                      workflowInput.source,
-                    ],
-                  );
+                  return db.transaction(async (tx) => {
+                    const insertedRows = await tx
+                      .insert(sandboxInstances)
+                      .values({
+                        organizationId: workflowInput.organizationId,
+                        sandboxProfileId: workflowInput.sandboxProfileId,
+                        sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+                        provider: workflowInput.provider,
+                        providerSandboxId: workflowInput.providerSandboxId,
+                        status: SandboxInstanceStatuses.STARTING,
+                        startedByKind: workflowInput.startedBy.kind,
+                        startedById: workflowInput.startedBy.id,
+                        source: workflowInput.source,
+                      })
+                      .returning({
+                        id: sandboxInstances.id,
+                      });
 
-                  const sandboxInstance = insertedRows.rows[0];
-                  if (sandboxInstance === undefined) {
-                    throw new Error("Failed to insert sandbox instance row.");
-                  }
+                    const insertedSandboxInstance = insertedRows[0];
+                    if (insertedSandboxInstance === undefined) {
+                      throw new Error("Expected sandbox instance insert to return one row.");
+                    }
 
-                  await dbPool.query(
-                    `
-                      insert into data_plane.sandbox_instance_runtime_plans (
-                        sandbox_instance_id,
-                        revision,
-                        compiled_runtime_plan,
-                        compiled_from_profile_id,
-                        compiled_from_profile_version
-                      )
-                      values ($1, $2, $3::jsonb, $4, $5)
-                    `,
-                    [
-                      sandboxInstance.id,
-                      1,
-                      JSON.stringify(workflowInput.runtimePlan),
-                      workflowInput.sandboxProfileId,
-                      workflowInput.sandboxProfileVersion,
-                    ],
-                  );
+                    await tx.insert(sandboxInstanceRuntimePlans).values({
+                      sandboxInstanceId: insertedSandboxInstance.id,
+                      revision: 1,
+                      compiledRuntimePlan: workflowInput.runtimePlan,
+                      compiledFromProfileId: workflowInput.sandboxProfileId,
+                      compiledFromProfileVersion: workflowInput.sandboxProfileVersion,
+                    });
 
-                  return {
-                    sandboxInstanceId: sandboxInstance.id,
-                  };
+                    return {
+                      sandboxInstanceId: insertedSandboxInstance.id,
+                    };
+                  });
                 },
                 markSandboxInstanceRunning: async (workflowInput) => {
                   const updatedRows = await dbPool.query<{ id: string }>(
