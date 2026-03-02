@@ -48,7 +48,7 @@
       "idx": 6,
       "version": "7",
       "when": 1772289380120,
-      "tag": "0006_add-profile-version-bindings-and-trigger-rules",
+      "tag": "0006_add-profile-version-bindings",
       "breakpoints": true
     },
     {
