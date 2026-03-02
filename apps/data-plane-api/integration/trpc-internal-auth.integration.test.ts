@@ -1,9 +1,9 @@
 import { DATA_PLANE_INTERNAL_AUTH_HEADER } from "@mistle/data-plane-trpc/constants";
 import type { StartSandboxInstanceInput } from "@mistle/data-plane-trpc/contracts";
+import type { DataPlaneTrpcRouter } from "@mistle/data-plane-trpc/router";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { describe, expect } from "vitest";
 
-import type { DataPlaneTrpcRouter } from "../src/trpc/router.js";
 import { it } from "./test-context.js";
 
 function createRuntimePlan(input: {

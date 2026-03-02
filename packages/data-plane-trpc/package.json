@@ -33,6 +33,12 @@
       "import": "./src/contracts/*.ts",
       "default": "./src/contracts/*.ts"
     },
+    "./router": {
+      "types": "./src/router.ts",
+      "node": "./dist/router.js",
+      "import": "./src/router.ts",
+      "default": "./src/router.ts"
+    },
     "./*.js": {
       "types": "./src/*.ts",
       "node": "./dist/*.js",
