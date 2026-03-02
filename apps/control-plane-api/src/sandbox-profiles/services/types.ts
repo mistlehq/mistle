@@ -33,6 +33,11 @@ export type CreateSandboxProfilesServiceInput = {
     token: string;
     expiresAt: string;
   }>;
+  defaultConnectionToken?: {
+    gatewayWebsocketUrl: string;
+    tokenTtlSeconds: number;
+    tokenConfig: BootstrapTokenConfig;
+  };
 };
 
 export type SandboxProfilesService = {

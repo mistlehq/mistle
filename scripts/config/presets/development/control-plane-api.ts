@@ -44,6 +44,8 @@ export const controlPlaneApiDevelopmentPreset = {
         },
         sandbox: {
           default_base_image: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          gateway_ws_url: "ws://127.0.0.1:5302/tunnel/sandbox",
+          bootstrap_token_ttl_seconds: 120,
         },
         integrations: {
           active_master_encryption_key_version: 1,

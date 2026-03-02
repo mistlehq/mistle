@@ -7,6 +7,11 @@ import { createRuntimeConfigWithPort } from "./config.js";
 import { it } from "./test-context.js";
 
 const IntegrationServiceToken = "integration-service-token";
+const IntegrationTunnelConfig = {
+  bootstrapTokenSecret: "integration-bootstrap-secret",
+  tokenIssuer: "integration-issuer",
+  tokenAudience: "integration-audience",
+} as const;
 
 describe("runtime lifecycle integration", () => {
   it("enforces start/stop runtime lifecycle semantics", async ({ fixture }) => {
@@ -19,6 +24,7 @@ describe("runtime lifecycle integration", () => {
         port,
       }),
       internalAuthServiceToken: IntegrationServiceToken,
+      tunnel: IntegrationTunnelConfig,
     });
 
     try {
@@ -52,6 +58,7 @@ describe("runtime lifecycle integration", () => {
         port,
       }),
       internalAuthServiceToken: IntegrationServiceToken,
+      tunnel: IntegrationTunnelConfig,
     });
     const healthURL = `http://${host}:${String(port)}/__healthz`;
 
@@ -74,6 +81,7 @@ describe("runtime lifecycle integration", () => {
     const app = await createApp({
       app: fixture.config,
       internalAuthServiceToken: IntegrationServiceToken,
+      tunnel: IntegrationTunnelConfig,
     });
     expect(getAppDatabase(app)).toBeDefined();
 

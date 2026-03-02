@@ -26,6 +26,15 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
     db: resources.db,
     openWorkflow: resources.openWorkflow,
     mintSandboxInstanceConnectionToken: sandboxInstancesService.mintConnectionToken,
+    defaultConnectionToken: {
+      gatewayWebsocketUrl: config.sandbox.gatewayWsUrl,
+      tokenTtlSeconds: config.sandbox.bootstrapTokenTtlSeconds,
+      tokenConfig: {
+        bootstrapTokenSecret: runtimeConfig.tunnel.bootstrapTokenSecret,
+        tokenIssuer: runtimeConfig.tunnel.tokenIssuer,
+        tokenAudience: runtimeConfig.tunnel.tokenAudience,
+      },
+    },
   });
 
   return {

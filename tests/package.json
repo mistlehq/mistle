@@ -7,5 +7,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:system": "vitest -c vitest.system.config.ts --run --passWithNoTests",
     "test:e2e": "playwright test --config playwright.config.ts --pass-with-no-tests"
+  },
+  "dependencies": {
+    "@mistle/test-environments": "workspace:*",
+    "@mistle/tunnel-auth": "workspace:*"
   }
 }

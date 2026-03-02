@@ -41,6 +41,8 @@ export const ControlPlaneApiDataPlaneApiConfigSchema = z
 export const ControlPlaneApiSandboxConfigSchema = z
   .object({
     defaultBaseImage: z.string().min(1),
+    gatewayWsUrl: z.string().min(1),
+    bootstrapTokenTtlSeconds: z.number().int().min(1),
   })
   .strict();
 

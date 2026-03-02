@@ -1,6 +1,7 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
+    "jsx": "react-jsx",
     "types": ["node", "vitest/globals", "@playwright/test"]
   },
   "include": ["**/*.ts", "vitest.system.config.ts", "playwright.config.ts"]

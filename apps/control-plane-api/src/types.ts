@@ -17,6 +17,7 @@ export type ControlPlaneApiGlobalConfig = NonNullable<LoadControlPlaneApiConfigR
 export type ControlPlaneApiRuntimeConfig = {
   app: ControlPlaneApiConfig;
   internalAuthServiceToken: ControlPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
+  tunnel: ControlPlaneApiGlobalConfig["tunnel"];
 };
 
 export type AppContextBindings = {

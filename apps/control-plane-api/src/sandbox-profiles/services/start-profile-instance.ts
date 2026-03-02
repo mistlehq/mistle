@@ -62,9 +62,10 @@ export async function startProfileInstance(
     db,
     openWorkflow,
     mintSandboxInstanceConnectionToken,
+    defaultConnectionToken,
   }: Pick<
     CreateSandboxProfilesServiceInput,
-    "db" | "openWorkflow" | "mintSandboxInstanceConnectionToken"
+    "db" | "openWorkflow" | "mintSandboxInstanceConnectionToken" | "defaultConnectionToken"
   >,
   serviceInput: StartProfileInstanceInput,
 ): Promise<StartProfileInstanceOutput> {
@@ -117,7 +118,8 @@ export async function startProfileInstance(
     };
   }
 
-  if (serviceInput.connectionToken === undefined) {
+  const connectionTokenConfig = serviceInput.connectionToken ?? defaultConnectionToken;
+  if (connectionTokenConfig === undefined) {
     throw new Error(
       "Connection token configuration is required when issueConnectionToken is enabled.",
     );
@@ -129,9 +131,9 @@ export async function startProfileInstance(
   const connectionToken = await mintSandboxInstanceConnectionToken({
     organizationId: serviceInput.organizationId,
     instanceId: workflowResult.sandboxInstanceId,
-    gatewayWebsocketUrl: serviceInput.connectionToken.gatewayWebsocketUrl,
-    tokenTtlSeconds: serviceInput.connectionToken.tokenTtlSeconds,
-    tokenConfig: serviceInput.connectionToken.tokenConfig,
+    gatewayWebsocketUrl: connectionTokenConfig.gatewayWebsocketUrl,
+    tokenTtlSeconds: connectionTokenConfig.tokenTtlSeconds,
+    tokenConfig: connectionTokenConfig.tokenConfig,
   });
 
   return {

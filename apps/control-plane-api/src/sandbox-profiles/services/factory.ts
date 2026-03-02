@@ -23,17 +23,20 @@ export {
 export function createSandboxProfilesService(
   input: CreateSandboxProfilesServiceInput,
 ): SandboxProfilesService {
-  const startProfileInstanceDependencies =
-    input.mintSandboxInstanceConnectionToken === undefined
-      ? {
-          db: input.db,
-          openWorkflow: input.openWorkflow,
-        }
+  const startProfileInstanceDependencies = {
+    db: input.db,
+    openWorkflow: input.openWorkflow,
+    ...(input.mintSandboxInstanceConnectionToken === undefined
+      ? {}
       : {
-          db: input.db,
-          openWorkflow: input.openWorkflow,
           mintSandboxInstanceConnectionToken: input.mintSandboxInstanceConnectionToken,
-        };
+        }),
+    ...(input.defaultConnectionToken === undefined
+      ? {}
+      : {
+          defaultConnectionToken: input.defaultConnectionToken,
+        }),
+  };
 
   const sandboxProfilesService = {
     listProfiles: (serviceInput) => listProfiles({ db: input.db }, serviceInput),

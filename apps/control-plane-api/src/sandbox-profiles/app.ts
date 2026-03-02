@@ -166,6 +166,7 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
   routes.openapi(startSandboxProfileInstanceRoute, async (ctx) => {
     try {
       const params = ctx.req.valid("param");
+      const body = ctx.req.valid("json");
       const session = ctx.get("session");
       if (session === null) {
         throw new Error("Expected authenticated session to be available.");
@@ -177,6 +178,11 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
           organizationId: session.session.activeOrganizationId,
           profileId: params.profileId,
           profileVersion: params.version,
+          ...(body.issueConnectionToken === undefined
+            ? {}
+            : {
+                issueConnectionToken: body.issueConnectionToken,
+              }),
           startedBy: {
             kind: "user",
             id: session.user.id,

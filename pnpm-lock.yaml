@@ -686,7 +686,14 @@ importers:
         specifier: workspace:*
         version: link:../test-core
 
-  tests: {}
+  tests:
+    dependencies:
+      '@mistle/test-environments':
+        specifier: workspace:*
+        version: link:../packages/test-environments
+      '@mistle/tunnel-auth':
+        specifier: workspace:*
+        version: link:../packages/tunnel-auth
 
 packages:
 
