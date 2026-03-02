@@ -1,11 +1,15 @@
 import { createApp, getAppDatabase, stopApp } from "../app.js";
 import { startServer } from "../server.js";
-import type { ControlPlaneApiConfig, ControlPlaneApiRuntime, StartedServer } from "../types.js";
+import type {
+  ControlPlaneApiRuntime,
+  ControlPlaneApiRuntimeConfig,
+  StartedServer,
+} from "../types.js";
 
 export async function createControlPlaneApiRuntime(
-  config: ControlPlaneApiConfig,
+  runtimeConfig: ControlPlaneApiRuntimeConfig,
 ): Promise<ControlPlaneApiRuntime> {
-  const app = await createApp(config);
+  const app = await createApp(runtimeConfig);
   const db = getAppDatabase(app);
   let startedServer: StartedServer | undefined;
   let stopPromise: Promise<void> | undefined;
@@ -35,8 +39,8 @@ export async function createControlPlaneApiRuntime(
 
       startedServer = startServer({
         app,
-        host: config.server.host,
-        port: config.server.port,
+        host: runtimeConfig.app.server.host,
+        port: runtimeConfig.app.server.port,
       });
     },
     stop: async () => {

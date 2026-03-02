@@ -89,6 +89,9 @@ importers:
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@mistle/data-plane-trpc':
+        specifier: workspace:*
+        version: link:../../packages/data-plane-trpc
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -138,9 +141,6 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
-      '@mistle/data-plane-trpc':
-        specifier: workspace:*
-        version: link:../../packages/data-plane-trpc
       '@mistle/test-core':
         specifier: workspace:*
         version: link:../../packages/test-core

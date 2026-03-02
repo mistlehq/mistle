@@ -8,19 +8,21 @@ import {
 } from "./runtime/resources.js";
 import { registerAppRoutes } from "./runtime/routes.js";
 import { createAppServices } from "./service.js";
-import type { AppContextBindings, ControlPlaneApiConfig, ControlPlaneApp } from "./types.js";
+import type { AppContextBindings, ControlPlaneApiRuntimeConfig, ControlPlaneApp } from "./types.js";
 
-export async function createApp(config: ControlPlaneApiConfig): Promise<ControlPlaneApp> {
+export async function createApp(
+  runtimeConfig: ControlPlaneApiRuntimeConfig,
+): Promise<ControlPlaneApp> {
   const app = new OpenAPIHono<AppContextBindings>();
-  const resources = await createAppResources(config);
+  const resources = await createAppResources(runtimeConfig.app);
   const services = createAppServices({
-    config,
+    runtimeConfig,
     resources,
   });
 
   registerAppRoutes({
     app,
-    config,
+    config: runtimeConfig.app,
     db: resources.db,
     services,
   });

@@ -1,8 +1,8 @@
-import type { DataPlaneDatabase } from "@mistle/db/data-plane";
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import type { BootstrapTokenConfig } from "@mistle/tunnel-auth";
 
 export type CreateSandboxInstancesServiceInput = {
-  dataPlaneDb: DataPlaneDatabase;
+  dataPlaneClient: DataPlaneSandboxInstancesClient;
 };
 
 export type MintSandboxInstanceConnectionTokenInput = {

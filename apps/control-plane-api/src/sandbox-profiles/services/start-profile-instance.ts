@@ -3,7 +3,6 @@ import type { BootstrapTokenConfig } from "@mistle/tunnel-auth";
 import type { StartSandboxProfileInstanceWorkflowInput } from "@mistle/workflows/control-plane";
 import { StartSandboxProfileInstanceWorkflowSpec } from "@mistle/workflows/control-plane";
 
-import { mintConnectionToken } from "../../sandbox-instances/services/mint-connection-token.js";
 import { compileProfileVersionRuntimePlan } from "./compile-profile-version-runtime-plan.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
@@ -61,9 +60,12 @@ function createIdempotencyKey(input: {
 export async function startProfileInstance(
   {
     db,
-    dataPlaneDb,
     openWorkflow,
-  }: Pick<CreateSandboxProfilesServiceInput, "db" | "dataPlaneDb" | "openWorkflow">,
+    mintSandboxInstanceConnectionToken,
+  }: Pick<
+    CreateSandboxProfilesServiceInput,
+    "db" | "openWorkflow" | "mintSandboxInstanceConnectionToken"
+  >,
   serviceInput: StartProfileInstanceInput,
 ): Promise<StartProfileInstanceOutput> {
   const runtimePlan = await compileProfileVersionRuntimePlan(
@@ -120,8 +122,11 @@ export async function startProfileInstance(
       "Connection token configuration is required when issueConnectionToken is enabled.",
     );
   }
+  if (mintSandboxInstanceConnectionToken === undefined) {
+    throw new Error("Sandbox instance connection token minting is not configured.");
+  }
 
-  const connectionToken = await mintConnectionToken(dataPlaneDb, {
+  const connectionToken = await mintSandboxInstanceConnectionToken({
     organizationId: serviceInput.organizationId,
     instanceId: workflowResult.sandboxInstanceId,
     gatewayWebsocketUrl: serviceInput.connectionToken.gatewayWebsocketUrl,

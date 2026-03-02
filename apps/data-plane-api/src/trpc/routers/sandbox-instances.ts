@@ -1,4 +1,6 @@
 import {
+  GetSandboxInstanceInputSchema,
+  GetSandboxInstanceResponseSchema,
   StartSandboxInstanceCompletedResponseSchema,
   type StartSandboxInstanceInput,
   StartSandboxInstanceInputSchema,
@@ -26,6 +28,28 @@ function createStartSandboxIdempotencyKey(input: StartSandboxInstanceInput): str
 }
 
 export const sandboxInstancesTrpcRouter = createDataPlaneTrpcRouter({
+  get: dataPlaneTrpcProcedure
+    .input(GetSandboxInstanceInputSchema)
+    .output(GetSandboxInstanceResponseSchema)
+    .query(async ({ ctx, input }) => {
+      const sandboxInstance = await ctx.resources.db.query.sandboxInstances.findFirst({
+        columns: {
+          id: true,
+          status: true,
+        },
+        where: (table, { and, eq }) =>
+          and(eq(table.id, input.instanceId), eq(table.organizationId, input.organizationId)),
+      });
+
+      if (sandboxInstance === undefined) {
+        return null;
+      }
+
+      return {
+        id: sandboxInstance.id,
+        status: sandboxInstance.status,
+      };
+    }),
   start: dataPlaneTrpcProcedure
     .input(StartSandboxInstanceInputSchema)
     .output(StartSandboxInstanceCompletedResponseSchema)

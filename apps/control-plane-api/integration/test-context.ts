@@ -144,6 +144,9 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
             databaseUrl: databaseStack.pooledUrl,
             namespaceId: workflowNamespaceId,
           },
+          dataPlaneApi: {
+            baseUrl: "http://127.0.0.1:4000",
+          },
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           },
@@ -164,7 +167,10 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
           },
         };
 
-        const runtime = await createControlPlaneApiRuntime(config);
+        const runtime = await createControlPlaneApiRuntime({
+          app: config,
+          internalAuthServiceToken: "integration-service-token",
+        });
         cleanupTasks.unshift(async () => {
           await runtime.stop();
         });

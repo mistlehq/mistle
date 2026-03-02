@@ -382,6 +382,9 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
             databaseUrl: controlPlaneDatabaseStack.pooledUrl,
             namespaceId: workflowNamespaceId,
           },
+          dataPlaneApi: {
+            baseUrl: `http://${dataPlaneHost}:${String(dataPlanePort)}`,
+          },
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           },
@@ -401,7 +404,10 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
             otpAllowedAttempts: 3,
           },
         };
-        const controlPlaneRuntime = await createControlPlaneApiRuntime(controlPlaneConfig);
+        const controlPlaneRuntime = await createControlPlaneApiRuntime({
+          app: controlPlaneConfig,
+          internalAuthServiceToken,
+        });
         cleanupTasks.unshift(async () => {
           await controlPlaneRuntime.stop();
         });

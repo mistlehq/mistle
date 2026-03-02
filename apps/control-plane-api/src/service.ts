@@ -1,16 +1,32 @@
+import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
+
 import { createControlPlaneAuth } from "./auth/index.js";
 import type { AppRuntimeResources } from "./runtime/resources.js";
 import { createSandboxInstancesService } from "./sandbox-instances/index.js";
 import { createSandboxProfilesService } from "./sandbox-profiles/index.js";
-import type { AppServices, ControlPlaneApiConfig } from "./types.js";
+import type { AppServices, ControlPlaneApiRuntimeConfig } from "./types.js";
 
 type CreateAppServicesInput = {
-  config: ControlPlaneApiConfig;
-  resources: Pick<AppRuntimeResources, "db" | "dataPlaneDb" | "openWorkflow">;
+  runtimeConfig: ControlPlaneApiRuntimeConfig;
+  resources: Pick<AppRuntimeResources, "db" | "openWorkflow">;
 };
 
 export function createAppServices(input: CreateAppServicesInput): AppServices {
-  const { config, resources } = input;
+  const { runtimeConfig, resources } = input;
+  const { app: config } = runtimeConfig;
+
+  const dataPlaneClient = createDataPlaneSandboxInstancesClient({
+    baseUrl: config.dataPlaneApi.baseUrl,
+    serviceToken: runtimeConfig.internalAuthServiceToken,
+  });
+  const sandboxInstancesService = createSandboxInstancesService({
+    dataPlaneClient,
+  });
+  const sandboxProfilesService = createSandboxProfilesService({
+    db: resources.db,
+    openWorkflow: resources.openWorkflow,
+    mintSandboxInstanceConnectionToken: sandboxInstancesService.mintConnectionToken,
+  });
 
   return {
     auth: createControlPlaneAuth({
@@ -28,13 +44,7 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
       db: resources.db,
       openWorkflow: resources.openWorkflow,
     }),
-    sandboxProfiles: createSandboxProfilesService({
-      db: resources.db,
-      dataPlaneDb: resources.dataPlaneDb,
-      openWorkflow: resources.openWorkflow,
-    }),
-    sandboxInstances: createSandboxInstancesService({
-      dataPlaneDb: resources.dataPlaneDb,
-    }),
+    sandboxProfiles: sandboxProfilesService,
+    sandboxInstances: sandboxInstancesService,
   };
 }

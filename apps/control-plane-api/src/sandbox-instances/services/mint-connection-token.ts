@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import { SandboxInstanceStatuses, type DataPlaneDatabase } from "@mistle/db/data-plane";
+import {
+  DataPlaneSandboxInstanceStatuses,
+  type DataPlaneSandboxInstancesClient,
+} from "@mistle/data-plane-trpc";
 import { mintBootstrapToken } from "@mistle/tunnel-auth";
 
 import {
@@ -35,26 +38,22 @@ function createTokenJti(instanceId: string): string {
 }
 
 export async function mintConnectionToken(
-  db: DataPlaneDatabase,
+  dataPlaneClient: DataPlaneSandboxInstancesClient,
   input: MintSandboxInstanceConnectionTokenInput,
 ): Promise<SandboxInstanceConnectionToken> {
-  const sandboxInstance = await db.query.sandboxInstances.findFirst({
-    columns: {
-      id: true,
-      status: true,
-    },
-    where: (table, { and, eq }) =>
-      and(eq(table.id, input.instanceId), eq(table.organizationId, input.organizationId)),
+  const sandboxInstance = await dataPlaneClient.getSandboxInstance({
+    organizationId: input.organizationId,
+    instanceId: input.instanceId,
   });
 
-  if (sandboxInstance === undefined) {
+  if (sandboxInstance === null) {
     throw new SandboxInstancesNotFoundError(
       SandboxInstancesNotFoundCodes.INSTANCE_NOT_FOUND,
       `Sandbox instance '${input.instanceId}' was not found.`,
     );
   }
 
-  if (sandboxInstance.status !== SandboxInstanceStatuses.RUNNING) {
+  if (sandboxInstance.status !== DataPlaneSandboxInstanceStatuses.RUNNING) {
     throw new SandboxInstancesConflictError(
       SandboxInstancesConflictCodes.INSTANCE_NOT_RUNNING,
       `Sandbox instance '${sandboxInstance.id}' is not running.`,
