@@ -33,6 +33,7 @@ import { createAuthenticatedSession } from "./helpers/auth-session.js";
 
 export type ControlPlaneApiIntegrationFixture = {
   config: ControlPlaneApiConfig;
+  internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   mailpitService: MailpitService;
   databaseStack: PostgresWithPgBouncerService;
@@ -123,6 +124,7 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
         cleanupTasks.unshift(async () => {
           await workflowWorker.stop();
         });
+        const internalAuthServiceToken = "integration-service-token";
 
         const config: ControlPlaneApiConfig = {
           server: {
@@ -141,6 +143,7 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
           },
           sandbox: {
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
@@ -161,7 +164,12 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
 
         const runtime = await createControlPlaneApiRuntime({
           app: config,
-          internalAuthServiceToken: "integration-service-token",
+          internalAuthServiceToken,
+          connectionToken: {
+            secret: "integration-connection-secret",
+            issuer: "integration-issuer",
+            audience: "integration-audience",
+          },
         });
         cleanupTasks.unshift(async () => {
           await runtime.stop();
@@ -169,6 +177,7 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
 
         await use({
           config,
+          internalAuthServiceToken,
           db: runtime.db,
           mailpitService,
           databaseStack,

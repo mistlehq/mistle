@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import type { SandboxAdapter, SandboxHandle } from "@mistle/sandbox";
-import { mintBootstrapToken } from "@mistle/tunnel-auth";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflows/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
@@ -16,9 +16,9 @@ export async function writeSandboxStartupInput(input: {
   const bootstrapTokenJti = randomUUID();
   const bootstrapToken = await mintBootstrapToken({
     config: {
-      bootstrapTokenSecret: input.config.tunnel.bootstrapTokenSecret,
-      tokenIssuer: input.config.tunnel.tokenIssuer,
-      tokenAudience: input.config.tunnel.tokenAudience,
+      bootstrapTokenSecret: input.config.sandbox.bootstrap.tokenSecret,
+      tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
+      tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
     },
     jti: bootstrapTokenJti,
     ttlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
