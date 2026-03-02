@@ -913,6 +913,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "secrets": {
+          "name": "secrets",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "display_name_override": {
           "name": "display_name_override",
           "type": "text",
