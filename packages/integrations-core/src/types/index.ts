@@ -108,6 +108,8 @@ export type IntegrationUserConfigSlot =
   | IntegrationFileUserConfigSlot
   | IntegrationEnvUserConfigSlot;
 
+type MaybePromise<TValue> = TValue | Promise<TValue>;
+
 export type EgressUrlRef = {
   kind: "egress_url";
   routeId: string;
@@ -139,6 +141,46 @@ export type CompileBindingInput<
   runtimeContext: {
     sandboxdEgressBaseUrl: string;
   };
+};
+
+export type IntegrationOAuthCredentialMaterial = {
+  purpose: string;
+  secretType: string;
+  plaintext: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type IntegrationOAuthStartInput<TTargetConfig = Record<string, unknown>> = {
+  organizationId: string;
+  targetKey: string;
+  target: Omit<IntegrationTarget, "config"> & { config: TTargetConfig };
+  state: string;
+};
+
+export type IntegrationOAuthStartResult = {
+  authorizationUrl: string;
+};
+
+export type IntegrationOAuthCompleteInput<TTargetConfig = Record<string, unknown>> = {
+  organizationId: string;
+  targetKey: string;
+  target: Omit<IntegrationTarget, "config"> & { config: TTargetConfig };
+  query: URLSearchParams;
+};
+
+export type IntegrationOAuthCompleteResult = {
+  externalSubjectId?: string;
+  connectionConfig: Record<string, unknown>;
+  credentialMaterials: ReadonlyArray<IntegrationOAuthCredentialMaterial>;
+};
+
+export type IntegrationOAuthHandler<TTargetConfig = Record<string, unknown>> = {
+  start(
+    input: IntegrationOAuthStartInput<TTargetConfig>,
+  ): MaybePromise<IntegrationOAuthStartResult>;
+  complete(
+    input: IntegrationOAuthCompleteInput<TTargetConfig>,
+  ): MaybePromise<IntegrationOAuthCompleteResult>;
 };
 
 export type EgressCredentialRoute = {
@@ -281,6 +323,9 @@ export type IntegrationDefinition<
   targetConfigSchema: TTargetConfigSchema;
   bindingConfigSchema: TBindingConfigSchema;
   supportedAuthSchemes: ReadonlyArray<IntegrationSupportedAuthScheme>;
+  authHandlers?: {
+    oauth?: IntegrationOAuthHandler<ParsedSchemaOutput<TTargetConfigSchema>>;
+  };
   triggerEventTypes: ReadonlyArray<string>;
   userConfigSlots: ReadonlyArray<IntegrationUserConfigSlot>;
   compileBinding(

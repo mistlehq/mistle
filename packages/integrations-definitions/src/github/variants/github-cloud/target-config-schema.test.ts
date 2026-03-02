@@ -20,6 +20,7 @@ describe("GitHubCloudTargetConfigSchema", () => {
       api_base_url: "https://api.github.com",
       web_base_url: "https://github.com",
       app_id: 12345,
+      app_slug: "mistle-app",
       client_id: "Iv1.abc123",
     });
 
@@ -27,6 +28,7 @@ describe("GitHubCloudTargetConfigSchema", () => {
       apiBaseUrl: "https://api.github.com/",
       webBaseUrl: "https://github.com/",
       appId: "12345",
+      appSlug: "mistle-app",
       clientId: "Iv1.abc123",
     });
   });
