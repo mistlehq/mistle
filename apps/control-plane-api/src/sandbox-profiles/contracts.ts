@@ -105,6 +105,12 @@ export const SandboxProfileVersionParamsSchema = z
   })
   .strict();
 
+export const StartSandboxProfileInstanceBodySchema = z
+  .object({
+    issueConnectionToken: z.boolean().optional(),
+  })
+  .strict();
+
 const BadRequestCodeSchema = z.enum([
   SandboxProfilesBadRequestCodes.INVALID_LIST_PROFILES_INPUT,
   SandboxProfilesBadRequestCodes.INVALID_PAGINATION_CURSOR,
@@ -207,12 +213,20 @@ export const SandboxProfileDeletionAcceptedResponseSchema = z
     profileId: z.string().min(1),
   })
   .strict();
+export const SandboxInstanceConnectionSchema = z
+  .object({
+    url: z.url(),
+    token: z.string().min(1),
+    expiresAt: z.string().min(1),
+  })
+  .strict();
 export const StartSandboxProfileInstanceResponseSchema = z
   .object({
     status: z.literal("completed"),
     workflowRunId: z.string().min(1),
     sandboxInstanceId: z.string().min(1),
     providerSandboxId: z.string().min(1),
+    connection: SandboxInstanceConnectionSchema.optional(),
   })
   .strict();
 
@@ -596,6 +610,14 @@ export const startSandboxProfileInstanceRoute = createRoute({
   tags: ["Sandbox Profiles"],
   request: {
     params: SandboxProfileVersionParamsSchema,
+    body: {
+      required: false,
+      content: {
+        "application/json": {
+          schema: StartSandboxProfileInstanceBodySchema,
+        },
+      },
+    },
   },
   responses: {
     201: {

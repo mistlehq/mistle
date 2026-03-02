@@ -2121,6 +2121,22 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "issueConnectionToken": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "responses": {
           "201": {
             "description": "Start a sandbox instance for the specified sandbox profile version.",
@@ -2144,6 +2160,25 @@
                     "providerSandboxId": {
                       "type": "string",
                       "minLength": 1
+                    },
+                    "connection": {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "token": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "expiresAt": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["url", "token", "expiresAt"],
+                      "additionalProperties": false
                     }
                   },
                   "required": ["status", "workflowRunId", "sandboxInstanceId", "providerSandboxId"],
