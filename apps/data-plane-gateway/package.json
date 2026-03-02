@@ -26,7 +26,7 @@
   },
   "devDependencies": {
     "@mistle/test-core": "workspace:*",
-    "@types/pg": "^8.15.6",
+    "@types/pg": "^8.18.0",
     "@types/ws": "^8.18.1",
     "ws": "^8.18.3"
   }
