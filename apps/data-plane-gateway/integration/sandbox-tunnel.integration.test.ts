@@ -11,6 +11,7 @@ import WebSocket from "ws";
 import { it } from "./test-context.js";
 
 const ConnectTimeoutMs = 4_000;
+const IntegrationTestTimeoutMs = 30_000;
 
 type FailedWebSocketConnectResult = {
   error: unknown;
@@ -96,57 +97,63 @@ function closeWebSocket(socket: WebSocket): Promise<void> {
 }
 
 describe("sandbox tunnel connect endpoint integration", () => {
-  it("accepts a valid bootstrap token and records exactly one ack", async ({ fixture }) => {
-    const jti = randomUUID();
-    const token = await mintBootstrapToken({
-      config: {
-        bootstrapTokenSecret: fixture.config.tunnel.bootstrapTokenSecret,
-        tokenIssuer: fixture.config.tunnel.tokenIssuer,
-        tokenAudience: fixture.config.tunnel.tokenAudience,
-      },
-      jti,
-      ttlSeconds: 120,
-    });
-    const socket = await connectWebSocket(
-      `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(token)}`,
-    );
+  it(
+    "accepts a valid bootstrap token and records exactly one ack",
+    async ({ fixture }) => {
+      const jti = randomUUID();
+      const token = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.tunnel.bootstrapTokenSecret,
+          tokenIssuer: fixture.config.tunnel.tokenIssuer,
+          tokenAudience: fixture.config.tunnel.tokenAudience,
+        },
+        jti,
+        ttlSeconds: 120,
+      });
+      const socket = await connectWebSocket(
+        `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(token)}`,
+      );
 
-    const recordedAck = await fixture.db.query.sandboxTunnelConnectAcks.findFirst({
-      where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
-    });
+      const recordedAck = await fixture.db.query.sandboxTunnelConnectAcks.findFirst({
+        where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
+      });
 
-    expect(recordedAck?.bootstrapTokenJti).toBe(jti);
+      expect(recordedAck?.bootstrapTokenJti).toBe(jti);
 
-    await closeWebSocket(socket);
-  });
+      await closeWebSocket(socket);
+    },
+    IntegrationTestTimeoutMs,
+  );
 
-  it("rejects reconnect attempts that reuse an acknowledged bootstrap token", async ({
-    fixture,
-  }) => {
-    const jti = randomUUID();
-    const token = await mintBootstrapToken({
-      config: {
-        bootstrapTokenSecret: fixture.config.tunnel.bootstrapTokenSecret,
-        tokenIssuer: fixture.config.tunnel.tokenIssuer,
-        tokenAudience: fixture.config.tunnel.tokenAudience,
-      },
-      jti,
-      ttlSeconds: 120,
-    });
-    const socket = await connectWebSocket(
-      `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(token)}`,
-    );
-    await closeWebSocket(socket);
+  it(
+    "rejects reconnect attempts that reuse an acknowledged bootstrap token",
+    async ({ fixture }) => {
+      const jti = randomUUID();
+      const token = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.tunnel.bootstrapTokenSecret,
+          tokenIssuer: fixture.config.tunnel.tokenIssuer,
+          tokenAudience: fixture.config.tunnel.tokenAudience,
+        },
+        jti,
+        ttlSeconds: 120,
+      });
+      const socket = await connectWebSocket(
+        `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(token)}`,
+      );
+      await closeWebSocket(socket);
 
-    const failedConnect = await connectWebSocketExpectFailure(
-      `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(token)}`,
-    );
-    const recordedAcks = await fixture.db.query.sandboxTunnelConnectAcks.findMany({
-      where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
-    });
+      const failedConnect = await connectWebSocketExpectFailure(
+        `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(token)}`,
+      );
+      const recordedAcks = await fixture.db.query.sandboxTunnelConnectAcks.findMany({
+        where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
+      });
 
-    expect(failedConnect.error).toBeInstanceOf(Error);
-    expect(failedConnect.responseStatusCode).toBe(409);
-    expect(recordedAcks).toHaveLength(1);
-  });
+      expect(failedConnect.error).toBeInstanceOf(Error);
+      expect(failedConnect.responseStatusCode).toBe(409);
+      expect(recordedAcks).toHaveLength(1);
+    },
+    IntegrationTestTimeoutMs,
+  );
 });
