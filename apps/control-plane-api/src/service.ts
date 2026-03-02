@@ -1,11 +1,12 @@
 import { createControlPlaneAuth } from "./auth/index.js";
 import type { AppRuntimeResources } from "./runtime/resources.js";
+import { createSandboxInstancesService } from "./sandbox-instances/index.js";
 import { createSandboxProfilesService } from "./sandbox-profiles/index.js";
 import type { AppServices, ControlPlaneApiConfig } from "./types.js";
 
 type CreateAppServicesInput = {
   config: ControlPlaneApiConfig;
-  resources: Pick<AppRuntimeResources, "db" | "openWorkflow">;
+  resources: Pick<AppRuntimeResources, "db" | "dataPlaneDb" | "openWorkflow">;
 };
 
 export function createAppServices(input: CreateAppServicesInput): AppServices {
@@ -29,7 +30,11 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
     }),
     sandboxProfiles: createSandboxProfilesService({
       db: resources.db,
+      dataPlaneDb: resources.dataPlaneDb,
       openWorkflow: resources.openWorkflow,
+    }),
+    sandboxInstances: createSandboxInstancesService({
+      dataPlaneDb: resources.dataPlaneDb,
     }),
   };
 }

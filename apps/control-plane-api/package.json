@@ -36,6 +36,7 @@
     "@mistle/integrations-definitions": "workspace:*",
     "@mistle/logging": "workspace:*",
     "@mistle/time": "workspace:*",
+    "@mistle/tunnel-auth": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "better-auth": "1.4.19",
     "drizzle-orm": "^0.45.1",

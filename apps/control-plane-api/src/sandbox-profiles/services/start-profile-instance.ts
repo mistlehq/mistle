@@ -1,7 +1,9 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
+import type { BootstrapTokenConfig } from "@mistle/tunnel-auth";
 import type { StartSandboxProfileInstanceWorkflowInput } from "@mistle/workflows/control-plane";
 import { StartSandboxProfileInstanceWorkflowSpec } from "@mistle/workflows/control-plane";
 
+import { mintConnectionToken } from "../../sandbox-instances/services/mint-connection-token.js";
 import { compileProfileVersionRuntimePlan } from "./compile-profile-version-runtime-plan.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
@@ -12,6 +14,12 @@ type StartProfileInstanceInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
+  issueConnectionToken?: boolean;
+  connectionToken?: {
+    gatewayWebsocketUrl: string;
+    tokenTtlSeconds: number;
+    tokenConfig: BootstrapTokenConfig;
+  };
   startedBy: {
     kind: SandboxInstanceStarterKind;
     id: string;
@@ -25,6 +33,11 @@ type StartProfileInstanceOutput = {
   workflowRunId: string;
   sandboxInstanceId: string;
   providerSandboxId: string;
+  connection?: {
+    url: string;
+    token: string;
+    expiresAt: string;
+  };
 };
 
 function createIdempotencyKey(input: {
@@ -46,7 +59,11 @@ function createIdempotencyKey(input: {
 }
 
 export async function startProfileInstance(
-  { db, openWorkflow }: Pick<CreateSandboxProfilesServiceInput, "db" | "openWorkflow">,
+  {
+    db,
+    dataPlaneDb,
+    openWorkflow,
+  }: Pick<CreateSandboxProfilesServiceInput, "db" | "dataPlaneDb" | "openWorkflow">,
   serviceInput: StartProfileInstanceInput,
 ): Promise<StartProfileInstanceOutput> {
   const runtimePlan = await compileProfileVersionRuntimePlan(
@@ -89,10 +106,38 @@ export async function startProfileInstance(
     timeoutMs: START_SANDBOX_PROFILE_INSTANCE_WAIT_TIMEOUT_MS,
   });
 
+  if (serviceInput.issueConnectionToken !== true) {
+    return {
+      status: "completed",
+      workflowRunId: workflowResult.workflowRunId,
+      sandboxInstanceId: workflowResult.sandboxInstanceId,
+      providerSandboxId: workflowResult.providerSandboxId,
+    };
+  }
+
+  if (serviceInput.connectionToken === undefined) {
+    throw new Error(
+      "Connection token configuration is required when issueConnectionToken is enabled.",
+    );
+  }
+
+  const connectionToken = await mintConnectionToken(dataPlaneDb, {
+    organizationId: serviceInput.organizationId,
+    instanceId: workflowResult.sandboxInstanceId,
+    gatewayWebsocketUrl: serviceInput.connectionToken.gatewayWebsocketUrl,
+    tokenTtlSeconds: serviceInput.connectionToken.tokenTtlSeconds,
+    tokenConfig: serviceInput.connectionToken.tokenConfig,
+  });
+
   return {
     status: "completed",
     workflowRunId: workflowResult.workflowRunId,
     sandboxInstanceId: workflowResult.sandboxInstanceId,
     providerSandboxId: workflowResult.providerSandboxId,
+    connection: {
+      url: connectionToken.url,
+      token: connectionToken.token,
+      expiresAt: connectionToken.expiresAt,
+    },
   };
 }
