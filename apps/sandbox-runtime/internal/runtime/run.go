@@ -10,6 +10,7 @@ import (
 
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/config"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/egress"
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/runtimeplan"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/server"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/tunnel"
@@ -39,6 +40,10 @@ func Run(input RunInput) error {
 	})
 	if err != nil {
 		return err
+	}
+
+	if err := runtimeplan.Apply(runtimeplan.ApplyInput{RuntimePlan: startupInput.RuntimePlan}); err != nil {
+		return fmt.Errorf("failed to apply runtime plan: %w", err)
 	}
 
 	listenAddr, err := parseListenAddr(cfg.ListenAddr)
