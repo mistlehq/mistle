@@ -8,6 +8,14 @@ export const GlobalTunnelConfigSchema = z
   })
   .strict();
 
+export const GlobalConnectionTokensConfigSchema = z
+  .object({
+    secret: z.string().trim().min(1),
+    issuer: z.string().trim().min(1),
+    audience: z.string().trim().min(1),
+  })
+  .strict();
+
 export const GlobalConfigSchema = z
   .object({
     env: z.enum(["development", "production"]),
@@ -17,6 +25,7 @@ export const GlobalConfigSchema = z
       })
       .strict(),
     tunnel: GlobalTunnelConfigSchema,
+    connectionTokens: GlobalConnectionTokensConfigSchema,
   })
   .strict();
 

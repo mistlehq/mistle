@@ -14,6 +14,9 @@ const serviceToken = "fixture-service-token";
 const bootstrapTokenSecret = "fixture-bootstrap-token-secret";
 const tokenIssuer = "data-plane-worker";
 const tokenAudience = "data-plane-gateway";
+const connectionTokenSecret = "fixture-connection-token-secret";
+const connectionTokenIssuer = "control-plane-api";
+const connectionTokenAudience = "data-plane-gateway";
 
 const globalDevelopmentConfig = {
   env: "development",
@@ -24,6 +27,11 @@ const globalDevelopmentConfig = {
     bootstrapTokenSecret,
     tokenIssuer,
     tokenAudience,
+  },
+  connectionTokens: {
+    secret: connectionTokenSecret,
+    issuer: connectionTokenIssuer,
+    audience: connectionTokenAudience,
   },
 } as const;
 
@@ -36,6 +44,11 @@ const globalProductionConfig = {
     bootstrapTokenSecret,
     tokenIssuer,
     tokenAudience,
+  },
+  connectionTokens: {
+    secret: connectionTokenSecret,
+    issuer: connectionTokenIssuer,
+    audience: connectionTokenAudience,
   },
 } as const;
 

@@ -408,10 +408,10 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
         const controlPlaneRuntime = await createControlPlaneApiRuntime({
           app: controlPlaneConfig,
           internalAuthServiceToken,
-          tunnel: {
-            bootstrapTokenSecret: "integration-bootstrap-secret",
-            tokenIssuer: "integration-issuer",
-            tokenAudience: "integration-audience",
+          connectionToken: {
+            secret: "integration-connection-secret",
+            issuer: "integration-issuer",
+            audience: "integration-audience",
           },
         });
         cleanupTasks.unshift(async () => {

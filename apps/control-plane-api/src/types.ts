@@ -15,10 +15,15 @@ type LoadControlPlaneApiConfigResult = ReturnType<
 
 export type ControlPlaneApiConfig = LoadControlPlaneApiConfigResult["app"];
 export type ControlPlaneApiGlobalConfig = NonNullable<LoadControlPlaneApiConfigResult["global"]>;
+export type ControlPlaneApiConnectionTokenConfig = {
+  secret: ControlPlaneApiGlobalConfig["connectionTokens"]["secret"];
+  issuer: ControlPlaneApiGlobalConfig["connectionTokens"]["issuer"];
+  audience: ControlPlaneApiGlobalConfig["connectionTokens"]["audience"];
+};
 export type ControlPlaneApiRuntimeConfig = {
   app: ControlPlaneApiConfig;
   internalAuthServiceToken: ControlPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
-  tunnel: ControlPlaneApiGlobalConfig["tunnel"];
+  connectionToken: ControlPlaneApiConnectionTokenConfig;
 };
 
 export type AppContextBindings = {

@@ -6,10 +6,10 @@ import { createControlPlaneApiRuntime } from "../src/runtime/index.js";
 import { createRuntimeConfigWithPort } from "./config.js";
 import { it } from "./test-context.js";
 
-const IntegrationTunnelConfig = {
-  bootstrapTokenSecret: "integration-bootstrap-secret",
-  tokenIssuer: "integration-issuer",
-  tokenAudience: "integration-audience",
+const IntegrationConnectionTokenConfig = {
+  secret: "integration-connection-secret",
+  issuer: "integration-issuer",
+  audience: "integration-audience",
 } as const;
 describe("runtime lifecycle integration", () => {
   it("enforces start/stop runtime lifecycle semantics", async ({ fixture }) => {
@@ -22,7 +22,7 @@ describe("runtime lifecycle integration", () => {
         port,
       }),
       internalAuthServiceToken: fixture.internalAuthServiceToken,
-      tunnel: IntegrationTunnelConfig,
+      connectionToken: IntegrationConnectionTokenConfig,
     });
 
     try {
@@ -56,7 +56,7 @@ describe("runtime lifecycle integration", () => {
         port,
       }),
       internalAuthServiceToken: fixture.internalAuthServiceToken,
-      tunnel: IntegrationTunnelConfig,
+      connectionToken: IntegrationConnectionTokenConfig,
     });
     const healthURL = `http://${host}:${String(port)}/__healthz`;
 
@@ -79,7 +79,7 @@ describe("runtime lifecycle integration", () => {
     const app = await createApp({
       app: fixture.config,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
-      tunnel: IntegrationTunnelConfig,
+      connectionToken: IntegrationConnectionTokenConfig,
     });
     expect(getAppDatabase(app)).toBeDefined();
 

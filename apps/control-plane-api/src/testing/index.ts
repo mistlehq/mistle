@@ -18,10 +18,10 @@ export type StartControlPlaneApiTestingRuntimeInput = {
   databasePooledUrl: string;
   workflowNamespaceId: string;
   internalAuthServiceToken?: string;
-  tunnel?: {
-    bootstrapTokenSecret?: string;
-    tokenIssuer?: string;
-    tokenAudience?: string;
+  connectionToken?: {
+    secret?: string;
+    issuer?: string;
+    audience?: string;
   };
   server?: {
     host?: string;
@@ -125,10 +125,10 @@ export async function startControlPlaneApiTestingRuntime(
   const runtimeConfig: ControlPlaneApiRuntimeConfig = {
     app: createTestingConfig(input),
     internalAuthServiceToken: input.internalAuthServiceToken ?? "integration-service-token",
-    tunnel: {
-      bootstrapTokenSecret: input.tunnel?.bootstrapTokenSecret ?? "integration-bootstrap-secret",
-      tokenIssuer: input.tunnel?.tokenIssuer ?? "integration-issuer",
-      tokenAudience: input.tunnel?.tokenAudience ?? "integration-audience",
+    connectionToken: {
+      secret: input.connectionToken?.secret ?? "integration-connection-secret",
+      issuer: input.connectionToken?.issuer ?? "integration-issuer",
+      audience: input.connectionToken?.audience ?? "integration-audience",
     },
   };
 

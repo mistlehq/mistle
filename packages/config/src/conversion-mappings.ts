@@ -34,6 +34,21 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_GLOBAL_TUNNEL_TOKEN_AUDIENCE",
   },
   {
+    configPath: ["global", "connectionTokens", "secret"],
+    tomlPath: ["global", "connection_tokens", "secret"],
+    envVar: "MISTLE_GLOBAL_CONNECTION_TOKENS_SECRET",
+  },
+  {
+    configPath: ["global", "connectionTokens", "issuer"],
+    tomlPath: ["global", "connection_tokens", "issuer"],
+    envVar: "MISTLE_GLOBAL_CONNECTION_TOKENS_ISSUER",
+  },
+  {
+    configPath: ["global", "connectionTokens", "audience"],
+    tomlPath: ["global", "connection_tokens", "audience"],
+    envVar: "MISTLE_GLOBAL_CONNECTION_TOKENS_AUDIENCE",
+  },
+  {
     configPath: ["apps", "control_plane_api", "server", "host"],
     tomlPath: ["apps", "control_plane_api", "server", "host"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_HOST",

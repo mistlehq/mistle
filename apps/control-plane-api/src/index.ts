@@ -14,7 +14,7 @@ async function startControlPlaneApi(): Promise<void> {
   const runtime = await createControlPlaneApiRuntime({
     app: loadedConfig.app,
     internalAuthServiceToken: loadedConfig.global.internalAuth.serviceToken,
-    tunnel: loadedConfig.global.tunnel,
+    connectionToken: loadedConfig.global.connectionTokens,
   });
 
   await runtime.start();

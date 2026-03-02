@@ -16,6 +16,11 @@ describe("parseConfigRecord", () => {
           tokenIssuer: "data-plane-worker",
           tokenAudience: "data-plane-gateway",
         },
+        connectionTokens: {
+          secret: "test-connection-token-secret",
+          issuer: "control-plane-api",
+          audience: "data-plane-gateway",
+        },
       },
       apps: {
         control_plane_api: {
@@ -155,6 +160,11 @@ describe("parseConfigRecord", () => {
           bootstrapTokenSecret: "test-bootstrap-token-secret",
           tokenIssuer: "data-plane-worker",
           tokenAudience: "data-plane-gateway",
+        },
+        connectionTokens: {
+          secret: "test-connection-token-secret",
+          issuer: "control-plane-api",
+          audience: "data-plane-gateway",
         },
       },
       apps: {

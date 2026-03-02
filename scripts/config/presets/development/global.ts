@@ -10,6 +10,10 @@ export const globalDevelopmentPreset = {
         token_issuer: "data-plane-worker",
         token_audience: "data-plane-gateway",
       },
+      connection_tokens: {
+        issuer: "control-plane-api",
+        audience: "data-plane-gateway",
+      },
     },
   },
   generators: [
@@ -20,6 +24,11 @@ export const globalDevelopmentPreset = {
     },
     {
       path: ["global", "tunnel", "bootstrap_token_secret"],
+      when: "always",
+      generate: () => randomBytes(32).toString("base64url"),
+    },
+    {
+      path: ["global", "connection_tokens", "secret"],
       when: "always",
       generate: () => randomBytes(32).toString("base64url"),
     },
