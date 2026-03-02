@@ -1,5 +1,6 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
+import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
 import { GitHubEnterpriseServerSupportedAuthSchemes } from "./auth.js";
 import {
   GitHubEnterpriseServerBindingConfigSchema,
@@ -27,6 +28,9 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   targetConfigSchema: GitHubEnterpriseServerTargetConfigSchema,
   bindingConfigSchema: GitHubEnterpriseServerBindingConfigSchema,
   supportedAuthSchemes: GitHubEnterpriseServerSupportedAuthSchemes,
+  authHandlers: {
+    oauth: GitHubAppOAuthHandler,
+  },
   triggerEventTypes: GitHubEnterpriseServerTriggerEventTypes,
   userConfigSlots: [],
   compileBinding: compileGitHubEnterpriseServerBinding,

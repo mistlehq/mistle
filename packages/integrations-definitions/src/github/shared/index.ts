@@ -11,3 +11,4 @@ export { GitHubTriggerEventTypes } from "./webhook.js";
 export { GitHubBindingConfigSchema, type GitHubBindingConfig } from "./binding-config-schema.js";
 export { GitHubTargetConfigSchema, type GitHubTargetConfig } from "./target-config-schema.js";
 export { compileGitHubBinding, type GitHubCompileBindingInput } from "./compile-binding.js";
+export { GitHubAppOAuthHandler } from "./oauth-handler.js";

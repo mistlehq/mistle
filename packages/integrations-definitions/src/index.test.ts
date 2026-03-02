@@ -32,6 +32,7 @@ describe("integrations-definitions index", () => {
       displayName: "GitHub",
       supportedAuthSchemes: ["api-key", "oauth"],
     });
+    expect(githubCloudDefinition?.authHandlers?.oauth).toBeDefined();
     expect(githubEnterpriseServerDefinition).toMatchObject({
       familyId: "github",
       variantId: "github-enterprise-server",
@@ -39,6 +40,7 @@ describe("integrations-definitions index", () => {
       displayName: "GitHub Enterprise Server",
       supportedAuthSchemes: ["api-key", "oauth"],
     });
+    expect(githubEnterpriseServerDefinition?.authHandlers?.oauth).toBeDefined();
   });
 
   it("lists registered definitions", () => {

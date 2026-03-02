@@ -20,6 +20,7 @@ describe("GitHubEnterpriseServerTargetConfigSchema", () => {
       api_base_url: "https://ghe.example.com/api/v3",
       web_base_url: "https://ghe.example.com",
       app_id: "9999",
+      app_slug: "mistle-enterprise-app",
       client_id: "Iv1.enterprise",
     });
 
@@ -27,6 +28,7 @@ describe("GitHubEnterpriseServerTargetConfigSchema", () => {
       apiBaseUrl: "https://ghe.example.com/api/v3",
       webBaseUrl: "https://ghe.example.com/",
       appId: "9999",
+      appSlug: "mistle-enterprise-app",
       clientId: "Iv1.enterprise",
     });
   });
