@@ -170,4 +170,42 @@ describe("integration registry", () => {
       }),
     ).toThrowError(IntegrationDefinitionRegistryError);
   });
+
+  it("registers definitions with custom credential resolver contracts", () => {
+    const registry = new IntegrationRegistry();
+
+    registry.register({
+      familyId: "github",
+      variantId: "github-cloud",
+      kind: "git",
+      displayName: "GitHub",
+      logoKey: "github",
+      targetConfigSchema: ConfigSchema,
+      bindingConfigSchema: ConfigSchema,
+      supportedAuthSchemes: ["oauth", "api-key"],
+      credentialResolvers: {
+        custom: {
+          github_installation_token: {
+            resolve: async (input) => ({
+              value: `${input.connectionId}:${input.secretType}`,
+            }),
+          },
+        },
+      },
+      triggerEventTypes: [],
+      userConfigSlots: [],
+      compileBinding: () => ({
+        egressRoutes: [],
+        artifacts: [],
+        runtimeClientSetups: [],
+      }),
+    });
+
+    const definition = registry.getDefinition({
+      familyId: "github",
+      variantId: "github-cloud",
+    });
+
+    expect(definition?.credentialResolvers?.custom?.github_installation_token).toBeDefined();
+  });
 });
