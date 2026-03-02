@@ -100,6 +100,7 @@ bootstrap_token_ttl_seconds = 120
 
 [apps.data_plane_worker.sandbox]
 provider = "modal"
+tokenizer_proxy_egress_base_url = "https://api.mistle.example/tokenizer-proxy/egress"
 
 [apps.data_plane_worker.sandbox.modal]
 token_id = "replace-with-modal-token-id"

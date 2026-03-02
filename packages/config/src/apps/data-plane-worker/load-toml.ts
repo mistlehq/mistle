@@ -21,6 +21,7 @@ export function loadDataPlaneWorkerFromToml(
 
   const sandboxConfig: Record<string, unknown> = {
     provider: sandbox.provider,
+    tokenizerProxyEgressBaseUrl: sandbox.tokenizer_proxy_egress_base_url,
   };
 
   if (sandbox.provider === DataPlaneWorkerSandboxProviders.MODAL && hasEntries(sandboxModal)) {

@@ -97,6 +97,7 @@ bootstrap_token_ttl_seconds = 120
 
 [apps.data_plane_worker.sandbox]
 provider = "modal"
+tokenizer_proxy_egress_base_url = "http://127.0.0.1:5004/tokenizer-proxy/egress"
 
 [apps.data_plane_worker.sandbox.modal]
 token_id = "fixture-modal-token-id"

@@ -23,7 +23,10 @@ export class ModalSandboxAdapter implements SandboxAdapter {
       throw new SandboxConfigurationError("Modal adapter received a non-Modal image handle.");
     }
 
-    const response = await this.#client.startSandbox({ imageId: request.image.imageId });
+    const response = await this.#client.startSandbox({
+      imageId: request.image.imageId,
+      ...(request.env === undefined ? {} : { env: request.env }),
+    });
     const sandboxId = response.sandboxId;
 
     return {

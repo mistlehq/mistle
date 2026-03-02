@@ -26,6 +26,7 @@ export interface SandboxHandle {
 
 export interface SandboxStartRequest {
   readonly image: SandboxImageHandle;
+  readonly env?: Readonly<Record<string, string>>;
 }
 
 export interface SandboxSnapshotRequest {

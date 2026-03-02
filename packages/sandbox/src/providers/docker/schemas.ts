@@ -18,6 +18,14 @@ export const DockerStartSandboxRequestSchema = z
     imageRef: z.string().trim().min(1, {
       message: "Docker request field `imageRef` is required.",
     }),
+    env: z
+      .record(
+        z.string().trim().min(1, {
+          message: "Docker request field `env` keys must be non-empty.",
+        }),
+        z.string(),
+      )
+      .optional(),
   })
   .strict();
 export type DockerStartSandboxRequest = z.output<typeof DockerStartSandboxRequestSchema>;

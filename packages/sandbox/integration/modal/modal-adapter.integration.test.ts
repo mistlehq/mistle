@@ -11,6 +11,13 @@ const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const SNAPSHOT_MARKER_FILE_PATH = "/tmp/mistle-snapshot-marker.txt";
 const STDIN_MARKER_FILE_PATH = "/tmp/mistle-stdin-marker.txt";
+const INJECTED_ENV_KEY = "MISTLE_SANDBOX_INJECTED_ENV";
+
+type SandboxCommandResult = {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+};
 
 function formatUnknownError(error: unknown): string {
   if (error instanceof Error) {
@@ -52,6 +59,24 @@ async function readSandboxFile(sandbox: ModalSandbox, path: string): Promise<str
   } finally {
     await file.close();
   }
+}
+
+async function runSandboxCommand(input: {
+  sandbox: ModalSandbox;
+  command: string[];
+}): Promise<SandboxCommandResult> {
+  const process = await input.sandbox.exec(input.command, { mode: "text" });
+  const [exitCode, stdout, stderr] = await Promise.all([
+    process.wait(),
+    process.stdout.readText(),
+    process.stderr.readText(),
+  ]);
+
+  return {
+    exitCode,
+    stdout,
+    stderr,
+  };
 }
 
 describeModalAdapterIntegration("modal adapter integration", () => {
@@ -156,6 +181,33 @@ describeModalAdapterIntegration("modal adapter integration", () => {
       const startedSandbox = await fixture.modalClient.sandboxes.fromId(sandbox.sandboxId);
       const markerFromSandbox = await readSandboxFile(startedSandbox, STDIN_MARKER_FILE_PATH);
       expect(markerFromSandbox).toBe(stdinMarker);
+    } finally {
+      if (sandboxId !== undefined) {
+        await fixture.adapter.stop({ sandboxId });
+      }
+    }
+  }, 300_000);
+
+  it("injects start env into sandbox process", async ({ fixture }) => {
+    const injectedEnvValue = `mistle-modal-env-${randomUUID()}`;
+    let sandboxId: string | undefined;
+
+    try {
+      const sandbox = await fixture.adapter.start({
+        image: fixture.baseImage,
+        env: {
+          [INJECTED_ENV_KEY]: injectedEnvValue,
+        },
+      });
+      sandboxId = sandbox.sandboxId;
+
+      const startedSandbox = await fixture.modalClient.sandboxes.fromId(sandbox.sandboxId);
+      const commandResult = await runSandboxCommand({
+        sandbox: startedSandbox,
+        command: ["sh", "-lc", `printenv ${INJECTED_ENV_KEY}`],
+      });
+      expect(commandResult.exitCode).toBe(0);
+      expect(commandResult.stdout.trimEnd()).toBe(injectedEnvValue);
     } finally {
       if (sandboxId !== undefined) {
         await fixture.adapter.stop({ sandboxId });

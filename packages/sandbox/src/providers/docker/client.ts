@@ -126,6 +126,19 @@ function resolveRepositoryDigest(
   return repoDigests.find((repoDigest) => repoDigest.startsWith(`${repository}@`));
 }
 
+function toDockerEnv(env: Record<string, string> | undefined): string[] | undefined {
+  if (env === undefined) {
+    return undefined;
+  }
+
+  const entries = Object.entries(env);
+  if (entries.length === 0) {
+    return undefined;
+  }
+
+  return entries.map(([key, value]) => `${key}=${value}`);
+}
+
 export class DockerApiClient implements DockerClient {
   readonly #config: DockerSandboxConfig;
   readonly #docker: Docker;
@@ -149,6 +162,7 @@ export class DockerApiClient implements DockerClient {
       AttachStdin: true,
       AttachStdout: true,
       AttachStderr: true,
+      ...(parsedRequest.env === undefined ? {} : { Env: toDockerEnv(parsedRequest.env) }),
       Labels: {
         "mistle.sandbox.provider": "docker",
       },
