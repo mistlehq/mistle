@@ -22,7 +22,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   variantId: "github-enterprise-server",
   kind: IntegrationKinds.GIT,
   displayName: "GitHub Enterprise Server",
-  description: "GitHub Enterprise Server PAT-based integration scaffold for git/runtime routing.",
+  description: "GitHub Enterprise Server integration scaffold for PAT and GitHub App auth modes.",
   logoKey: "github",
   targetConfigSchema: GitHubEnterpriseServerTargetConfigSchema,
   bindingConfigSchema: GitHubEnterpriseServerBindingConfigSchema,

@@ -30,12 +30,14 @@ describe("integrations-definitions index", () => {
       variantId: "github-cloud",
       kind: "git",
       displayName: "GitHub",
+      supportedAuthSchemes: ["api-key", "oauth"],
     });
     expect(githubEnterpriseServerDefinition).toMatchObject({
       familyId: "github",
       variantId: "github-enterprise-server",
       kind: "git",
       displayName: "GitHub Enterprise Server",
+      supportedAuthSchemes: ["api-key", "oauth"],
     });
   });
 

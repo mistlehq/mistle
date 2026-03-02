@@ -15,6 +15,22 @@ describe("GitHubCloudTargetConfigSchema", () => {
     });
   });
 
+  it("parses optional github app metadata", () => {
+    const parsed = GitHubCloudTargetConfigSchema.parse({
+      api_base_url: "https://api.github.com",
+      web_base_url: "https://github.com",
+      app_id: 12345,
+      client_id: "Iv1.abc123",
+    });
+
+    expect(parsed).toEqual({
+      apiBaseUrl: "https://api.github.com/",
+      webBaseUrl: "https://github.com/",
+      appId: "12345",
+      clientId: "Iv1.abc123",
+    });
+  });
+
   it("fails for invalid URL fields", () => {
     expect(() =>
       GitHubCloudTargetConfigSchema.parse({
