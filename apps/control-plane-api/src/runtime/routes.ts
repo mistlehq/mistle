@@ -1,4 +1,5 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 
 import { createAuthApp } from "../auth/app.js";
 import { createIntegrationConnectionsApp } from "../integration-connections/index.js";
@@ -17,6 +18,7 @@ type RegisterAppRoutesInput = {
   config: ControlPlaneApiConfig;
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
+  integrationRegistry: IntegrationRegistry;
   services: AppServices;
 };
 
@@ -30,6 +32,7 @@ export function registerAppRoutes(input: RegisterAppRoutesInput): void {
       config,
       internalAuthServiceToken: input.internalAuthServiceToken,
       db,
+      integrationRegistry: input.integrationRegistry,
       services,
     }),
   );

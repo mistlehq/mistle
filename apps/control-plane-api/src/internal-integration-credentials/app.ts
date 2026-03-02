@@ -50,6 +50,7 @@ export function createInternalIntegrationCredentialsApp(): AppRoutes<
     try {
       const resolvedCredential = await resolveIntegrationCredential(
         ctx.get("db"),
+        ctx.get("integrationRegistry"),
         ctx.get("config").integrations,
         parsedInput.data,
       );

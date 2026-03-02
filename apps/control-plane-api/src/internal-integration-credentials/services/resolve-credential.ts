@@ -3,7 +3,6 @@ import {
   IntegrationCredentialSecretKinds,
   type IntegrationCredentialSecretKind,
 } from "@mistle/db/control-plane";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 
 import {
   decryptCredentialUtf8,
@@ -15,8 +14,6 @@ import {
   InternalIntegrationCredentialsError,
   InternalIntegrationCredentialsErrorCodes,
 } from "./errors.js";
-
-const integrationRegistry = createIntegrationRegistry();
 
 export type ResolveIntegrationCredentialInput = {
   connectionId: string;
@@ -175,6 +172,7 @@ async function resolvePersistedCredential(
 
 export async function resolveIntegrationCredential(
   db: AppContext["var"]["db"],
+  integrationRegistry: AppContext["var"]["integrationRegistry"],
   integrationsConfig: AppContext["var"]["config"]["integrations"],
   input: ResolveIntegrationCredentialInput,
 ): Promise<ResolvedIntegrationCredential> {

@@ -25,6 +25,7 @@ export async function createApp(
     config: runtimeConfig.app,
     internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
     db: resources.db,
+    integrationRegistry: resources.integrationRegistry,
     services,
   });
   setAppResources(app, resources);
