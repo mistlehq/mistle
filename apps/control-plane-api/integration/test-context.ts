@@ -32,6 +32,7 @@ import { createAuthenticatedSession } from "./helpers/auth-session.js";
 
 export type ControlPlaneApiIntegrationFixture = {
   config: ControlPlaneApiConfig;
+  internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   mailpitService: MailpitService;
   databaseStack: PostgresWithPgBouncerService;
@@ -166,10 +167,11 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
             otpAllowedAttempts: 3,
           },
         };
+        const internalAuthServiceToken = "integration-service-token";
 
         const runtime = await createControlPlaneApiRuntime({
           app: config,
-          internalAuthServiceToken: "integration-service-token",
+          internalAuthServiceToken,
         });
         cleanupTasks.unshift(async () => {
           await runtime.stop();
@@ -177,6 +179,7 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
 
         await use({
           config,
+          internalAuthServiceToken,
           db: runtime.db,
           mailpitService,
           databaseStack,

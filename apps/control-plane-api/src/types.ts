@@ -47,6 +47,7 @@ export type AppSession = {
 
 export type AppContextVariables = {
   config: ControlPlaneApiConfig;
+  internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   services: AppServices;
   session: AppSession | null;

@@ -9,6 +9,7 @@ export function createAppContextMiddleware(
 ): MiddlewareHandler<AppContextBindings> {
   return async (ctx, next) => {
     ctx.set("config", appContext.config);
+    ctx.set("internalAuthServiceToken", appContext.internalAuthServiceToken);
     ctx.set("db", appContext.db);
     ctx.set("services", appContext.services);
     ctx.set("session", null);
