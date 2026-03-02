@@ -8,6 +8,7 @@ import { dockerAdapterIntegrationEnabled, it } from "./test-context.js";
 
 const describeDockerAdapterIntegration = dockerAdapterIntegrationEnabled ? describe : describe.skip;
 const SNAPSHOT_MARKER_FILE_PATH = "/tmp/mistle-snapshot-marker.txt";
+const INJECTED_ENV_KEY = "MISTLE_SANDBOX_INJECTED_ENV";
 
 type ContainerCommandResult = {
   exitCode: number;
@@ -237,6 +238,34 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
         path: "/tmp/mistle-startup-token",
       });
       expect(tokenFromSandbox).toBe(startupToken);
+    } finally {
+      if (sandboxId !== undefined) {
+        await fixture.adapter.stop({ sandboxId });
+      }
+    }
+  }, 300_000);
+
+  it("injects start env into sandbox process", async ({ fixture }) => {
+    const injectedEnvValue = `mistle-docker-env-${randomUUID()}`;
+    let sandboxId: string | undefined;
+
+    try {
+      const sandbox = await fixture.adapter.start({
+        image: fixture.baseImage,
+        env: {
+          [INJECTED_ENV_KEY]: injectedEnvValue,
+        },
+      });
+      sandboxId = sandbox.sandboxId;
+
+      const result = await runContainerCommand({
+        dockerClient: fixture.dockerClient,
+        sandboxId: sandbox.sandboxId,
+        command: ["sh", "-lc", `printenv ${INJECTED_ENV_KEY}`],
+      });
+
+      expect(result.exitCode).toBe(0);
+      expect(result.output.trimEnd()).toBe(injectedEnvValue);
     } finally {
       if (sandboxId !== undefined) {
         await fixture.adapter.stop({ sandboxId });
