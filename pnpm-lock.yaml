@@ -545,9 +545,28 @@ importers:
       '@mistle/control-plane-worker':
         specifier: workspace:*
         version: link:../../apps/control-plane-worker
+      '@mistle/data-plane-api':
+        specifier: workspace:*
+        version: link:../../apps/data-plane-api
+      '@mistle/db':
+        specifier: workspace:*
+        version: link:../db
       '@mistle/test-core':
         specifier: workspace:*
         version: link:../test-core
+      '@mistle/workflows':
+        specifier: workspace:*
+        version: link:../workflows
+      drizzle-orm:
+        specifier: ^0.45.1
+        version: 0.45.1(@types/pg@8.16.0)(kysely@0.28.11)(pg@8.19.0)(postgres@3.4.8)
+      pg:
+        specifier: ^8.19.0
+        version: 8.19.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.15.6
+        version: 8.16.0
 
   packages/time: {}
 
