@@ -57,7 +57,7 @@
   },
   "devDependencies": {
     "@mistle/test-core": "workspace:*",
-    "@types/pg": "^8.15.6",
+    "@types/pg": "^8.18.0",
     "drizzle-kit": "^0.31.9",
     "squawk-cli": "^2.41.0"
   }
