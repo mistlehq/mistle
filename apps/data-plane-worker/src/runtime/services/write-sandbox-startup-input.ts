@@ -5,7 +5,7 @@ import type { SandboxAdapter, SandboxHandle } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflows/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
-import { encodeSandboxStartupInput } from "../sandbox-startup-input.js";
+import { encodeSandboxStartupInput } from "./sandbox-startup-input.js";
 
 export async function writeSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
