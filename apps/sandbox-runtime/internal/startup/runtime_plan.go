@@ -19,13 +19,13 @@ var allowedAuthInjectionTypes = map[string]struct{}{
 }
 
 type RuntimePlan struct {
-	SandboxProfileID    string                  `json:"sandboxProfileId"`
-	Version             int                     `json:"version"`
-	Image               ResolvedSandboxImage    `json:"image"`
-	EgressRoutes        []EgressCredentialRoute `json:"egressRoutes"`
-	Artifacts           []RuntimeArtifactSpec   `json:"artifacts"`
+	SandboxProfileID    string                       `json:"sandboxProfileId"`
+	Version             int                          `json:"version"`
+	Image               ResolvedSandboxImage         `json:"image"`
+	EgressRoutes        []EgressCredentialRoute      `json:"egressRoutes"`
+	Artifacts           []RuntimeArtifactSpec        `json:"artifacts"`
 	ArtifactRemovals    []RuntimeArtifactRemovalSpec `json:"artifactRemovals"`
-	RuntimeClientSetups []RuntimeClientSetup    `json:"runtimeClientSetups"`
+	RuntimeClientSetups []RuntimeClientSetup         `json:"runtimeClientSetups"`
 }
 
 type ResolvedSandboxImage struct {
@@ -63,6 +63,8 @@ type EgressAuthInjection struct {
 type EgressCredentialResolver struct {
 	ConnectionID string `json:"connectionId"`
 	SecretType   string `json:"secretType"`
+	Purpose      string `json:"purpose"`
+	ResolverKey  string `json:"resolverKey"`
 }
 
 type RuntimeArtifactSpec struct {

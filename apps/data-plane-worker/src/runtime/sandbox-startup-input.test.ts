@@ -45,6 +45,8 @@ const RuntimePlanSchema = z.object({
       credentialResolver: z.object({
         connectionId: z.string().min(1),
         secretType: z.string().min(1),
+        purpose: z.string().min(1).optional(),
+        resolverKey: z.string().min(1).optional(),
       }),
     }),
   ),
@@ -125,7 +127,30 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
       source: "base",
       imageRef: "registry:3",
     },
-    egressRoutes: [],
+    egressRoutes: [
+      {
+        routeId: "route_1",
+        bindingId: "binding_1",
+        match: {
+          hosts: ["api.github.com"],
+          pathPrefixes: ["/repos"],
+          methods: ["GET"],
+        },
+        upstream: {
+          baseUrl: "https://api.github.com",
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: {
+          connectionId: "icn_123",
+          secretType: "oauth_access_token",
+          purpose: "github_app_installation_token",
+          resolverKey: "github_installation_token",
+        },
+      },
+    ],
     artifacts: [],
     artifactRemovals: [],
     runtimeClientSetups: [],

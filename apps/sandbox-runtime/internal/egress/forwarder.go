@@ -10,15 +10,17 @@ import (
 )
 
 const (
-	HeaderEgressRouteID              = "X-Mistle-Egress-Route-Id"
-	HeaderEgressBindingID            = "X-Mistle-Egress-Binding-Id"
-	HeaderEgressUpstreamBaseURL      = "X-Mistle-Egress-Upstream-Base-Url"
-	HeaderEgressAuthInjectionType    = "X-Mistle-Egress-Auth-Injection-Type"
-	HeaderEgressAuthInjectionTarget  = "X-Mistle-Egress-Auth-Injection-Target"
-	HeaderEgressConnectionID         = "X-Mistle-Egress-Connection-Id"
-	HeaderEgressCredentialSecretType = "X-Mistle-Egress-Credential-Secret-Type"
-	HeaderSandboxProfileID           = "X-Mistle-Sandbox-Profile-Id"
-	HeaderSandboxProfileVersion      = "X-Mistle-Sandbox-Profile-Version"
+	HeaderEgressRouteID               = "X-Mistle-Egress-Route-Id"
+	HeaderEgressBindingID             = "X-Mistle-Egress-Binding-Id"
+	HeaderEgressUpstreamBaseURL       = "X-Mistle-Egress-Upstream-Base-Url"
+	HeaderEgressAuthInjectionType     = "X-Mistle-Egress-Auth-Injection-Type"
+	HeaderEgressAuthInjectionTarget   = "X-Mistle-Egress-Auth-Injection-Target"
+	HeaderEgressConnectionID          = "X-Mistle-Egress-Connection-Id"
+	HeaderEgressCredentialSecretType  = "X-Mistle-Egress-Credential-Secret-Type"
+	HeaderEgressCredentialPurpose     = "X-Mistle-Egress-Credential-Purpose"
+	HeaderEgressCredentialResolverKey = "X-Mistle-Egress-Credential-Resolver-Key"
+	HeaderSandboxProfileID            = "X-Mistle-Sandbox-Profile-Id"
+	HeaderSandboxProfileVersion       = "X-Mistle-Sandbox-Profile-Version"
 )
 
 type Forwarder struct {
@@ -138,6 +140,18 @@ func (forwarder Forwarder) buildForwardRequest(input struct {
 	forwardRequest.Header.Set(HeaderEgressAuthInjectionTarget, input.route.AuthInjection.Target)
 	forwardRequest.Header.Set(HeaderEgressConnectionID, input.route.CredentialResolver.ConnectionID)
 	forwardRequest.Header.Set(HeaderEgressCredentialSecretType, input.route.CredentialResolver.SecretType)
+	if strings.TrimSpace(input.route.CredentialResolver.Purpose) != "" {
+		forwardRequest.Header.Set(
+			HeaderEgressCredentialPurpose,
+			input.route.CredentialResolver.Purpose,
+		)
+	}
+	if strings.TrimSpace(input.route.CredentialResolver.ResolverKey) != "" {
+		forwardRequest.Header.Set(
+			HeaderEgressCredentialResolverKey,
+			input.route.CredentialResolver.ResolverKey,
+		)
+	}
 	forwardRequest.Header.Set(HeaderSandboxProfileID, forwarder.runtimePlan.SandboxProfileID)
 	forwardRequest.Header.Set(
 		HeaderSandboxProfileVersion,

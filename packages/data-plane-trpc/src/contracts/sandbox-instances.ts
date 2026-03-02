@@ -65,6 +65,8 @@ const EgressCredentialRouteSchema = z
       .object({
         connectionId: z.string().min(1),
         secretType: z.string().min(1),
+        purpose: z.string().min(1).optional(),
+        resolverKey: z.string().min(1).optional(),
       })
       .strict(),
   })
