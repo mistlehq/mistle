@@ -294,13 +294,9 @@ export async function startSystemEnvironment(
       databaseDirectUrl: controlPlaneDatabaseStack.directUrl,
       databasePooledUrl: controlPlaneDatabaseStack.pooledUrl,
       workflowNamespaceId,
-      internalAuthServiceToken,
       server: {
         host: DefaultHost,
         port: controlPlanePort,
-      },
-      dataPlaneApi: {
-        baseUrl: dataPlaneBaseUrl,
       },
     });
     await controlPlaneApiRuntime.start();
