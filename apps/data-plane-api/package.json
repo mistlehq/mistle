@@ -2,6 +2,14 @@
   "name": "@mistle/data-plane-api",
   "private": true,
   "type": "module",
+  "exports": {
+    "./testing": {
+      "types": "./src/testing/index.ts",
+      "node": "./src/testing/index.ts",
+      "import": "./src/testing/index.ts",
+      "default": "./src/testing/index.ts"
+    }
+  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "db:migrate": "tsx src/scripts/run-data-plane-migrations.ts",

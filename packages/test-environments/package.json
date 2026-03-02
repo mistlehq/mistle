@@ -22,6 +22,14 @@
   "dependencies": {
     "@mistle/control-plane-api": "workspace:*",
     "@mistle/control-plane-worker": "workspace:*",
-    "@mistle/test-core": "workspace:*"
+    "@mistle/data-plane-api": "workspace:*",
+    "@mistle/db": "workspace:*",
+    "@mistle/test-core": "workspace:*",
+    "@mistle/workflows": "workspace:*",
+    "drizzle-orm": "^0.45.1",
+    "pg": "^8.19.0"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.6"
   }
 }
