@@ -17,6 +17,10 @@ func TestApply(t *testing.T) {
 
 		err := Apply(ApplyInput{
 			RuntimePlan: startup.RuntimePlan{
+				Image: startup.ResolvedSandboxImage{
+					Source:   "base",
+					ImageRef: "mistle/sandbox-base:dev",
+				},
 				RuntimeClientSetups: []startup.RuntimeClientSetup{
 					{
 						ClientID: "client_codex",
@@ -91,6 +95,10 @@ func TestApply(t *testing.T) {
 
 		err := Apply(ApplyInput{
 			RuntimePlan: startup.RuntimePlan{
+				Image: startup.ResolvedSandboxImage{
+					Source:   "base",
+					ImageRef: "mistle/sandbox-base:dev",
+				},
 				RuntimeClientSetups: []startup.RuntimeClientSetup{
 					{
 						ClientID: "client_failure",
@@ -112,6 +120,196 @@ func TestApply(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "failed to create parent directory") {
 			t.Fatalf("expected parent directory failure in error, got %v", err)
+		}
+	})
+
+	t.Run("runs install commands for base sources before applying runtime files", func(t *testing.T) {
+		tempDirectory := t.TempDir()
+		artifactMarkerPath := filepath.Join(tempDirectory, "artifact-marker.txt")
+		sharedPath := filepath.Join(tempDirectory, "shared.txt")
+
+		err := Apply(ApplyInput{
+			RuntimePlan: startup.RuntimePlan{
+				Image: startup.ResolvedSandboxImage{
+					Source:   "base",
+					ImageRef: "mistle/sandbox-base:dev",
+				},
+				Artifacts: []startup.RuntimeArtifactSpec{
+					{
+						ArtifactKey: "artifact_cli",
+						Name:        "Artifact CLI",
+						Lifecycle: startup.RuntimeArtifactLifecycle{
+							Install: []startup.RuntimeArtifactCommand{
+								{
+									Args: []string{
+										"sh",
+										"-euc",
+										`printf '%s' "$MARKER_CONTENT" > "$MARKER_PATH"; printf '%s' "$SHARED_CONTENT" > "$SHARED_PATH"`,
+									},
+									Env: map[string]string{
+										"MARKER_PATH":    artifactMarkerPath,
+										"MARKER_CONTENT": "artifact-install",
+										"SHARED_PATH":    sharedPath,
+										"SHARED_CONTENT": "artifact-content",
+									},
+								},
+							},
+						},
+					},
+				},
+				RuntimeClientSetups: []startup.RuntimeClientSetup{
+					{
+						ClientID: "client_codex",
+						Env:      map[string]string{},
+						Files: []startup.RuntimeFileSpec{
+							{
+								FileID:  "file_shared",
+								Path:    sharedPath,
+								Mode:    0o600,
+								Content: "runtime-file-content",
+							},
+						},
+					},
+				},
+			},
+		})
+		if err != nil {
+			t.Fatalf("expected runtime plan apply to succeed, got %v", err)
+		}
+
+		artifactMarkerBytes, err := os.ReadFile(artifactMarkerPath)
+		if err != nil {
+			t.Fatalf("expected artifact marker file to exist, got %v", err)
+		}
+		if string(artifactMarkerBytes) != "artifact-install" {
+			t.Fatalf("unexpected artifact marker content: %s", string(artifactMarkerBytes))
+		}
+
+		sharedBytes, err := os.ReadFile(sharedPath)
+		if err != nil {
+			t.Fatalf("expected shared file to exist, got %v", err)
+		}
+		if string(sharedBytes) != "runtime-file-content" {
+			t.Fatalf("expected runtime file to overwrite shared path, got %s", string(sharedBytes))
+		}
+	})
+
+	t.Run("runs update commands for snapshot sources and skips install commands", func(t *testing.T) {
+		tempDirectory := t.TempDir()
+		updateMarkerPath := filepath.Join(tempDirectory, "update-marker.txt")
+
+		err := Apply(ApplyInput{
+			RuntimePlan: startup.RuntimePlan{
+				Image: startup.ResolvedSandboxImage{
+					Source:     "snapshot",
+					ImageRef:   "mistle/sandbox-snapshot@sha256:test",
+					InstanceID: "sbi_test_123",
+				},
+				Artifacts: []startup.RuntimeArtifactSpec{
+					{
+						ArtifactKey: "artifact_cli",
+						Name:        "Artifact CLI",
+						Lifecycle: startup.RuntimeArtifactLifecycle{
+							Install: []startup.RuntimeArtifactCommand{
+								{
+									Args: []string{"sh", "-euc", "exit 91"},
+								},
+							},
+							Update: []startup.RuntimeArtifactCommand{
+								{
+									Args: []string{
+										"sh",
+										"-euc",
+										`printf '%s' "$UPDATE_CONTENT" > "$UPDATE_PATH"`,
+									},
+									Env: map[string]string{
+										"UPDATE_PATH":    updateMarkerPath,
+										"UPDATE_CONTENT": "artifact-update",
+									},
+								},
+							},
+						},
+					},
+				},
+				RuntimeClientSetups: []startup.RuntimeClientSetup{},
+			},
+		})
+		if err != nil {
+			t.Fatalf("expected snapshot artifact update command to succeed, got %v", err)
+		}
+
+		updateMarkerBytes, err := os.ReadFile(updateMarkerPath)
+		if err != nil {
+			t.Fatalf("expected update marker file to exist, got %v", err)
+		}
+		if string(updateMarkerBytes) != "artifact-update" {
+			t.Fatalf("unexpected update marker content: %s", string(updateMarkerBytes))
+		}
+	})
+
+	t.Run("returns explicit error when an artifact command fails", func(t *testing.T) {
+		err := Apply(ApplyInput{
+			RuntimePlan: startup.RuntimePlan{
+				Image: startup.ResolvedSandboxImage{
+					Source:   "base",
+					ImageRef: "mistle/sandbox-base:dev",
+				},
+				Artifacts: []startup.RuntimeArtifactSpec{
+					{
+						ArtifactKey: "artifact_cli",
+						Name:        "Artifact CLI",
+						Lifecycle: startup.RuntimeArtifactLifecycle{
+							Install: []startup.RuntimeArtifactCommand{
+								{
+									Args: []string{"sh", "-euc", "exit 7"},
+								},
+							},
+						},
+					},
+				},
+				RuntimeClientSetups: []startup.RuntimeClientSetup{},
+			},
+		})
+		if err == nil {
+			t.Fatal("expected artifact command failure")
+		}
+		if !strings.Contains(err.Error(), "runtime plan artifacts[0] lifecycle.install[0] failed") {
+			t.Fatalf("expected artifact lifecycle location in error, got %v", err)
+		}
+		if !strings.Contains(err.Error(), "artifactKey=artifact_cli") {
+			t.Fatalf("expected artifact key in error, got %v", err)
+		}
+	})
+
+	t.Run("returns explicit error when an artifact command times out", func(t *testing.T) {
+		err := Apply(ApplyInput{
+			RuntimePlan: startup.RuntimePlan{
+				Image: startup.ResolvedSandboxImage{
+					Source:   "base",
+					ImageRef: "mistle/sandbox-base:dev",
+				},
+				Artifacts: []startup.RuntimeArtifactSpec{
+					{
+						ArtifactKey: "artifact_cli",
+						Name:        "Artifact CLI",
+						Lifecycle: startup.RuntimeArtifactLifecycle{
+							Install: []startup.RuntimeArtifactCommand{
+								{
+									Args:      []string{"sh", "-euc", "sleep 1"},
+									TimeoutMs: 10,
+								},
+							},
+						},
+					},
+				},
+				RuntimeClientSetups: []startup.RuntimeClientSetup{},
+			},
+		})
+		if err == nil {
+			t.Fatal("expected artifact command timeout failure")
+		}
+		if !strings.Contains(err.Error(), "artifact command timed out after 10ms") {
+			t.Fatalf("expected timeout details in error, got %v", err)
 		}
 	})
 }
