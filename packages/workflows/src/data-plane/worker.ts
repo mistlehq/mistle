@@ -1,25 +1,52 @@
 import type { OpenWorkflow, Worker } from "openworkflow";
 
 import {
-  createDataPlaneWorkflowDefinitions,
-  type CreateDataPlaneWorkflowDefinitionsInput,
-} from "./workflows/index.js";
+  createStartSandboxInstanceWorkflow,
+  type StartSandboxInstanceWorkflowServices,
+} from "./workflows/start-sandbox-instance/index.js";
+
+export const DataPlaneWorkerWorkflowIds = {
+  START_SANDBOX_INSTANCE: "startSandboxInstance",
+} as const;
+
+export type DataPlaneWorkerWorkflowId =
+  (typeof DataPlaneWorkerWorkflowIds)[keyof typeof DataPlaneWorkerWorkflowIds];
+
+export type DataPlaneWorkerServices = {
+  startSandboxInstance: StartSandboxInstanceWorkflowServices;
+};
 
 export type CreateDataPlaneWorkerInput = {
   openWorkflow: OpenWorkflow;
-  concurrency: number;
-  workflowInputs: CreateDataPlaneWorkflowDefinitionsInput;
+  maxConcurrentWorkflows: number;
+  enabledWorkflows: ReadonlyArray<DataPlaneWorkerWorkflowId>;
+  services: DataPlaneWorkerServices;
 };
 
+function assertNever(value: never): never {
+  throw new Error(`Unsupported data-plane workflow id: ${String(value)}`);
+}
+
 /**
- * Creates a data-plane OpenWorkflow worker and registers all workflows.
+ * Creates a data-plane OpenWorkflow worker and registers enabled workflows.
  */
 export function createDataPlaneWorker(input: CreateDataPlaneWorkerInput): Worker {
-  const workflows = createDataPlaneWorkflowDefinitions(input.workflowInputs);
-  input.openWorkflow.implementWorkflow(
-    workflows.startSandboxInstance.spec,
-    workflows.startSandboxInstance.fn,
-  );
+  for (const workflowId of input.enabledWorkflows) {
+    if (workflowId === DataPlaneWorkerWorkflowIds.START_SANDBOX_INSTANCE) {
+      const startSandboxInstanceWorkflow = createStartSandboxInstanceWorkflow(
+        input.services.startSandboxInstance,
+      );
+      input.openWorkflow.implementWorkflow(
+        startSandboxInstanceWorkflow.spec,
+        startSandboxInstanceWorkflow.fn,
+      );
+      continue;
+    }
 
-  return input.openWorkflow.newWorker({ concurrency: input.concurrency });
+    return assertNever(workflowId);
+  }
+
+  return input.openWorkflow.newWorker({
+    concurrency: input.maxConcurrentWorkflows,
+  });
 }

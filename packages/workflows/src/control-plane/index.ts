@@ -1,8 +1,7 @@
 export { createControlPlaneBackend } from "./backend.js";
 export { createControlPlaneOpenWorkflow } from "./client.js";
-export { createControlPlaneWorker } from "./worker.js";
+export { ControlPlaneWorkerWorkflowIds, createControlPlaneWorker } from "./worker.js";
 export {
-  createControlPlaneWorkflowDefinitions,
   RequestDeleteSandboxProfileWorkflowSpec,
   StartSandboxProfileInstanceWorkflowSpec,
   SendOrganizationInvitationWorkflowSpec,
@@ -15,6 +14,7 @@ export {
 export {
   createStartSandboxProfileInstanceWorkflow,
   type CreateStartSandboxProfileInstanceWorkflowInput,
+  type StartSandboxProfileInstanceWorkflowImageInput,
   type StartSandboxProfileInstanceWorkflowInput,
   type StartSandboxProfileInstanceWorkflowOutput,
 } from "./workflows/start-sandbox-profile-instance/index.js";
@@ -32,12 +32,12 @@ export {
 export { ControlPlaneOpenWorkflow } from "./constants.js";
 export type { CreateControlPlaneBackendInput } from "./backend.js";
 export type { CreateControlPlaneOpenWorkflowInput } from "./client.js";
-export type { CreateControlPlaneWorkerInput } from "./worker.js";
 export type {
-  ControlPlaneWorkflowDefinition,
-  ControlPlaneWorkflowDefinitions,
-  CreateControlPlaneWorkflowDefinitionsInput,
-} from "./workflows/index.js";
+  ControlPlaneWorkerEmailDelivery,
+  ControlPlaneWorkerServices,
+  ControlPlaneWorkerWorkflowId,
+  CreateControlPlaneWorkerInput,
+} from "./worker.js";
 export type { CreateSendVerificationOTPWorkflowInput } from "./workflows/send-verification-otp/index.js";
 export type {
   RequestDeleteSandboxProfileWorkflowInput,

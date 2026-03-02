@@ -17,6 +17,7 @@ import {
   type PostgresWithPgBouncerService,
 } from "@mistle/test-core";
 import {
+  ControlPlaneWorkerWorkflowIds,
   createControlPlaneBackend,
   createControlPlaneOpenWorkflow,
   createControlPlaneWorker,
@@ -91,23 +92,21 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
 
         const workflowWorker = createControlPlaneWorker({
           openWorkflow,
-          concurrency: 1,
-          workflowInputs: {
-            sendOrganizationInvitation: {
+          maxConcurrentWorkflows: 1,
+          enabledWorkflows: [
+            ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
+            ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
+            ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE,
+          ],
+          services: {
+            emailDelivery: {
               emailSender,
               from: {
                 email: "no-reply@mistle.dev",
                 name: "Mistle",
               },
             },
-            sendVerificationOTP: {
-              emailSender,
-              from: {
-                email: "no-reply@mistle.dev",
-                name: "Mistle",
-              },
-            },
-            requestDeleteSandboxProfile: {
+            sandboxProfiles: {
               deleteSandboxProfile: async (input) => {
                 await workflowDb
                   .delete(sandboxProfiles)
@@ -119,19 +118,13 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
                   );
               },
             },
-            startSandboxProfileInstance: {
-              startSandboxInstance: async () => {
-                throw new Error(
-                  "startSandboxProfileInstance.startSandboxInstance is not configured in this fixture.",
-                );
-              },
-            },
           },
         });
         await workflowWorker.start();
         cleanupTasks.unshift(async () => {
           await workflowWorker.stop();
         });
+        const internalAuthServiceToken = "integration-service-token";
 
         const config: ControlPlaneApiConfig = {
           server: {
@@ -168,7 +161,6 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
             otpAllowedAttempts: 3,
           },
         };
-        const internalAuthServiceToken = "integration-service-token";
 
         const runtime = await createControlPlaneApiRuntime({
           app: config,

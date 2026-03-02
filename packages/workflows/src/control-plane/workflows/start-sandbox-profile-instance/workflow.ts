@@ -1,6 +1,5 @@
 import { defineWorkflow, type Workflow } from "openworkflow";
 
-import type { StartSandboxInstanceWorkflowInput } from "../../../data-plane/workflows/start-sandbox-instance/spec.js";
 import {
   StartSandboxProfileInstanceWorkflowSpec,
   type StartSandboxProfileInstanceWorkflowInput,
@@ -9,7 +8,7 @@ import {
 
 export type CreateStartSandboxProfileInstanceWorkflowInput = {
   startSandboxInstance: (
-    input: StartSandboxInstanceWorkflowInput,
+    input: StartSandboxProfileInstanceWorkflowInput,
   ) => Promise<StartSandboxProfileInstanceWorkflowOutput>;
 };
 
@@ -27,16 +26,7 @@ export function createStartSandboxProfileInstanceWorkflow(
     const workflowInput = workflowCtx.input;
     const startedSandbox = await workflowCtx.step.run(
       { name: "start-sandbox-instance-in-data-plane" },
-      async () =>
-        ctx.startSandboxInstance({
-          organizationId: workflowInput.organizationId,
-          sandboxProfileId: workflowInput.sandboxProfileId,
-          sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-          runtimePlan: workflowInput.runtimePlan,
-          startedBy: workflowInput.startedBy,
-          source: workflowInput.source,
-          image: workflowInput.image,
-        }),
+      async () => ctx.startSandboxInstance(workflowInput),
     );
 
     return startedSandbox;
