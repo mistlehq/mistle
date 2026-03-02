@@ -42,7 +42,7 @@
     "@mistle/emails": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/sandbox": "workspace:*",
-    "openworkflow": "^0.7.3",
+    "openworkflow": "^0.8.0",
     "postgres": "^3.4.8"
   },
   "devDependencies": {
