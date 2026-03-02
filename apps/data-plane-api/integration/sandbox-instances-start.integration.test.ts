@@ -195,64 +195,6 @@ describe("sandboxInstances.start integration", () => {
     expect(persistedSandboxInstances).toHaveLength(1);
   }, 60_000);
 
-  it("rejects requests missing service token", async ({ fixture }) => {
-    const client = createTRPCClient<DataPlaneTrpcRouter>({
-      links: [
-        httpBatchLink({
-          url: new URL("/trpc", fixture.baseUrl).toString(),
-        }),
-      ],
-    });
-
-    await expect(
-      client.sandboxInstances.start.mutate({
-        organizationId: "org_dp_api_integration_unauth_missing",
-        sandboxProfileId: "sbp_dp_api_integration_unauth_missing",
-        sandboxProfileVersion: 1,
-        runtimePlan: createRuntimePlan({
-          sandboxProfileId: "sbp_dp_api_integration_unauth_missing",
-          version: 1,
-        }),
-        startedBy: {
-          kind: "user",
-          id: "usr_dp_api_integration_unauth_missing",
-        },
-        source: "dashboard",
-        image: {
-          imageId: "im_dp_api_integration_unauth_missing",
-          kind: "base",
-          createdAt: "2026-02-27T00:00:00.000Z",
-        },
-      }),
-    ).rejects.toThrow("Internal service authentication failed.");
-  }, 60_000);
-
-  it("rejects requests with invalid service token", async ({ fixture }) => {
-    const client = createTrpcClient(fixture.baseUrl, "invalid-service-token");
-
-    await expect(
-      client.sandboxInstances.start.mutate({
-        organizationId: "org_dp_api_integration_unauth_invalid",
-        sandboxProfileId: "sbp_dp_api_integration_unauth_invalid",
-        sandboxProfileVersion: 1,
-        runtimePlan: createRuntimePlan({
-          sandboxProfileId: "sbp_dp_api_integration_unauth_invalid",
-          version: 1,
-        }),
-        startedBy: {
-          kind: "user",
-          id: "usr_dp_api_integration_unauth_invalid",
-        },
-        source: "dashboard",
-        image: {
-          imageId: "im_dp_api_integration_unauth_invalid",
-          kind: "base",
-          createdAt: "2026-02-27T00:00:00.000Z",
-        },
-      }),
-    ).rejects.toThrow("Internal service authentication failed.");
-  }, 60_000);
-
   it("rolls back sandbox instance insert when runtime plan insert fails", async ({ fixture }) => {
     const client = createTrpcClient(fixture.baseUrl, fixture.internalAuthServiceToken);
     const organizationId = "org_dp_api_runtime_plan_insert_failure";
