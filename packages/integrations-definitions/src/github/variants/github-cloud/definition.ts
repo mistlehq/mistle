@@ -1,4 +1,5 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
+import { z } from "zod";
 
 import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
 import { GitHubCloudSupportedAuthSchemes } from "./auth.js";
@@ -15,8 +16,11 @@ import { GitHubCloudTriggerEventTypes } from "./webhook.js";
 
 type GitHubCloudIntegrationDefinition = IntegrationDefinition<
   { parse: (input: unknown) => GitHubCloudTargetConfig },
+  { parse: (input: unknown) => Record<string, never> },
   { parse: (input: unknown) => GitHubCloudBindingConfig }
 >;
+
+const GitHubCloudTargetSecretSchema = z.object({}).strict();
 
 export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
   familyId: "github",
@@ -26,6 +30,7 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
   description: "GitHub Cloud integration scaffold for PAT and GitHub App auth modes.",
   logoKey: "github",
   targetConfigSchema: GitHubCloudTargetConfigSchema,
+  targetSecretSchema: GitHubCloudTargetSecretSchema,
   bindingConfigSchema: GitHubCloudBindingConfigSchema,
   supportedAuthSchemes: GitHubCloudSupportedAuthSchemes,
   authHandlers: {

@@ -7,6 +7,7 @@ import { IntegrationRegistry } from "../src/registry/index.js";
 import type { IntegrationDefinition } from "../src/types/index.js";
 
 const EmptyTargetConfigSchema = z.object({});
+const EmptyTargetSecretsSchema = z.object({});
 const EmptyBindingConfigSchema = z.object({});
 
 const TestContainerImage = "alpine:3.22";
@@ -14,6 +15,7 @@ const InstallPath = "/tmp/jq";
 
 function createGithubBinaryInstallDefinition(): IntegrationDefinition<
   typeof EmptyTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
   typeof EmptyBindingConfigSchema
 > {
   return {
@@ -23,6 +25,7 @@ function createGithubBinaryInstallDefinition(): IntegrationDefinition<
     displayName: "Test",
     logoKey: "test",
     targetConfigSchema: EmptyTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: EmptyBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
     triggerEventTypes: [],
@@ -102,6 +105,7 @@ describe("renderInstallLatestGithubReleaseBinaryScript integration", () => {
             variantId: "github-releases-install-binary",
             enabled: true,
             config: {},
+            secrets: {},
           },
           connection: {
             id: "conn_123",

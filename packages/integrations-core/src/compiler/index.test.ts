@@ -10,12 +10,15 @@ const OpenAiTargetConfigSchema = z.object({
   apiBaseUrl: z.url(),
 });
 
+const EmptyTargetSecretsSchema = z.object({});
+
 const OpenAiBindingConfigSchema = z.object({
   defaultModel: z.string().min(1),
 });
 
 function createOpenAiDefinition(): IntegrationDefinition<
   typeof OpenAiTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
   typeof OpenAiBindingConfigSchema
 > {
   return {
@@ -25,6 +28,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
     displayName: "OpenAI",
     logoKey: "openai",
     targetConfigSchema: OpenAiTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
     triggerEventTypes: [],
@@ -126,6 +130,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
 
 function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
   typeof OpenAiTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
   typeof OpenAiBindingConfigSchema
 > {
   return {
@@ -135,6 +140,7 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
     displayName: "OpenAI",
     logoKey: "openai",
     targetConfigSchema: OpenAiTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
     triggerEventTypes: [],
@@ -179,6 +185,7 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
 
 function createOpenAiNoArtifactDefinition(): IntegrationDefinition<
   typeof OpenAiTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
   typeof OpenAiBindingConfigSchema
 > {
   return {
@@ -188,6 +195,7 @@ function createOpenAiNoArtifactDefinition(): IntegrationDefinition<
     displayName: "OpenAI (No Artifacts)",
     logoKey: "openai",
     targetConfigSchema: OpenAiTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
     triggerEventTypes: [],
@@ -228,6 +236,7 @@ describe("compileRuntimePlan", () => {
             config: {
               apiBaseUrl: "https://api.openai.com",
             },
+            secrets: {},
           },
           connection: {
             id: "conn_openai_org_123",
@@ -317,6 +326,7 @@ describe("compileRuntimePlan", () => {
             config: {
               apiBaseUrl: "https://api.openai.com",
             },
+            secrets: {},
           },
           connection: {
             id: "conn_openai_org_123",
@@ -377,6 +387,7 @@ describe("compileRuntimePlan", () => {
               variantId: "openai-default",
               enabled: false,
               config: {},
+              secrets: {},
             },
             connection: {
               id: "conn_openai_org_123",
@@ -415,6 +426,7 @@ describe("compileRuntimePlan", () => {
               variantId: "openai-default",
               enabled: false,
               config: {},
+              secrets: {},
             },
             connection: {
               id: "conn_openai_org_123",
@@ -466,6 +478,7 @@ describe("compileRuntimePlan", () => {
             config: {
               apiBaseUrl: "https://api.openai.com",
             },
+            secrets: {},
           },
           connection: {
             id: "conn_openai_org_123",
@@ -492,6 +505,7 @@ describe("compileRuntimePlan", () => {
             config: {
               apiBaseUrl: "https://api.openai.com",
             },
+            secrets: {},
           },
           connection: {
             id: "conn_openai_org_123",
@@ -544,6 +558,7 @@ describe("compileRuntimePlan", () => {
               variantId: "openai-default",
               enabled: true,
               config: {},
+              secrets: {},
             },
             connection: {
               id: "conn_openai_org_999",
@@ -582,6 +597,7 @@ describe("compileRuntimePlan", () => {
               variantId: "openai-default",
               enabled: true,
               config: {},
+              secrets: {},
             },
             connection: {
               id: "conn_openai_org_999",
@@ -632,6 +648,7 @@ describe("compileRuntimePlan", () => {
               config: {
                 apiBaseUrl: "not-a-url",
               },
+              secrets: {},
             },
             connection: {
               id: "conn_openai_org_123",
@@ -674,6 +691,7 @@ describe("compileRuntimePlan", () => {
               config: {
                 apiBaseUrl: "not-a-url",
               },
+              secrets: {},
             },
             connection: {
               id: "conn_openai_org_123",
@@ -695,6 +713,130 @@ describe("compileRuntimePlan", () => {
       expect(error).toBeInstanceOf(IntegrationCompilerError);
       if (error instanceof IntegrationCompilerError) {
         expect(error.code).toBe(CompilerErrorCodes.INVALID_TARGET_CONFIG);
+      }
+    }
+  });
+
+  it("fails when target secrets do not satisfy schema", () => {
+    const targetSecretSchema = z.object({
+      webhookSecret: z.string().min(1),
+    });
+
+    const definition: IntegrationDefinition<
+      typeof OpenAiTargetConfigSchema,
+      typeof targetSecretSchema,
+      typeof OpenAiBindingConfigSchema
+    > = {
+      familyId: "openai",
+      variantId: "openai-default",
+      kind: "agent",
+      displayName: "OpenAI",
+      logoKey: "openai",
+      targetConfigSchema: OpenAiTargetConfigSchema,
+      targetSecretSchema,
+      bindingConfigSchema: OpenAiBindingConfigSchema,
+      supportedAuthSchemes: ["api-key"],
+      triggerEventTypes: [],
+      userConfigSlots: [],
+      compileBinding: () => ({
+        egressRoutes: [],
+        artifacts: [],
+        runtimeClientSetups: [],
+        runtimeClientProcesses: [],
+      }),
+    };
+
+    const registry = new IntegrationRegistry();
+    registry.register(definition);
+
+    expect(() =>
+      compileRuntimePlan({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        runtimeContext: {
+          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
+        },
+        registry,
+        bindings: [
+          {
+            targetKey: "openai-default",
+            target: {
+              familyId: "openai",
+              variantId: "openai-default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://api.openai.com",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_openai_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_openai_agent",
+              kind: "agent",
+              connectionId: "conn_openai_org_123",
+              config: {
+                defaultModel: "gpt-5.3-codex",
+              },
+            },
+          },
+        ],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+
+    try {
+      compileRuntimePlan({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        runtimeContext: {
+          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
+        },
+        registry,
+        bindings: [
+          {
+            targetKey: "openai-default",
+            target: {
+              familyId: "openai",
+              variantId: "openai-default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://api.openai.com",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_openai_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_openai_agent",
+              kind: "agent",
+              connectionId: "conn_openai_org_123",
+              config: {
+                defaultModel: "gpt-5.3-codex",
+              },
+            },
+          },
+        ],
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(IntegrationCompilerError);
+      if (error instanceof IntegrationCompilerError) {
+        expect(error.code).toBe(CompilerErrorCodes.INVALID_TARGET_SECRETS);
       }
     }
   });
@@ -726,6 +868,7 @@ describe("compileRuntimePlan", () => {
               config: {
                 apiBaseUrl: "https://api.openai.com",
               },
+              secrets: {},
             },
             connection: {
               id: "conn_openai_org_123",
@@ -768,6 +911,7 @@ describe("compileRuntimePlan", () => {
               config: {
                 apiBaseUrl: "https://api.openai.com",
               },
+              secrets: {},
             },
             connection: {
               id: "conn_openai_org_123",
@@ -809,35 +953,39 @@ describe("compileRuntimePlan", () => {
         normalizedModel: config.defaultModel.trim().toLowerCase(),
       }));
 
-    const definition: IntegrationDefinition<typeof targetConfigSchema, typeof bindingConfigSchema> =
-      {
-        familyId: "openai",
-        variantId: "openai-default",
-        kind: "agent",
-        displayName: "OpenAI",
-        logoKey: "openai",
-        targetConfigSchema,
-        bindingConfigSchema,
-        supportedAuthSchemes: ["api-key"],
-        triggerEventTypes: [],
-        userConfigSlots: [],
-        compileBinding: (input) => ({
-          egressRoutes: [],
-          artifacts: [],
-          runtimeClientSetups: [
-            {
-              clientId: "typed-config",
-              env: {
-                API_HOST: input.target.config.apiHost,
-                MODEL: input.binding.config.normalizedModel,
-                ROUTE_ID: input.refs.egressUrl.routeId,
-              },
-              files: [],
+    const definition: IntegrationDefinition<
+      typeof targetConfigSchema,
+      typeof EmptyTargetSecretsSchema,
+      typeof bindingConfigSchema
+    > = {
+      familyId: "openai",
+      variantId: "openai-default",
+      kind: "agent",
+      displayName: "OpenAI",
+      logoKey: "openai",
+      targetConfigSchema,
+      targetSecretSchema: EmptyTargetSecretsSchema,
+      bindingConfigSchema,
+      supportedAuthSchemes: ["api-key"],
+      triggerEventTypes: [],
+      userConfigSlots: [],
+      compileBinding: (input) => ({
+        egressRoutes: [],
+        artifacts: [],
+        runtimeClientSetups: [
+          {
+            clientId: "typed-config",
+            env: {
+              API_HOST: input.target.config.apiHost,
+              MODEL: input.binding.config.normalizedModel,
+              ROUTE_ID: input.refs.egressUrl.routeId,
             },
-          ],
-          runtimeClientProcesses: [],
-        }),
-      };
+            files: [],
+          },
+        ],
+        runtimeClientProcesses: [],
+      }),
+    };
 
     const registry = new IntegrationRegistry();
     registry.register(definition);
@@ -864,6 +1012,7 @@ describe("compileRuntimePlan", () => {
             config: {
               apiBaseUrl: "https://api.openai.com/v1",
             },
+            secrets: {},
           },
           connection: {
             id: "conn_openai_org_123",

@@ -13,6 +13,7 @@ describe("compileGitHubCloudBinding", () => {
         familyId: "github",
         variantId: "github-cloud",
         enabled: true,
+        secrets: {},
         config: {
           apiBaseUrl: "https://api.github.com",
           webBaseUrl: "https://github.com",
@@ -80,6 +81,7 @@ describe("compileGitHubCloudBinding", () => {
         familyId: "github",
         variantId: "github-cloud",
         enabled: true,
+        secrets: {},
         config: {
           apiBaseUrl: "https://proxy.example.com/github/api/v3",
           webBaseUrl: "https://proxy.example.com/github",
@@ -127,6 +129,7 @@ describe("compileGitHubCloudBinding", () => {
         familyId: "github",
         variantId: "github-cloud",
         enabled: true,
+        secrets: {},
         config: {
           apiBaseUrl: "https://api.github.com",
           webBaseUrl: "https://github.com",
@@ -173,6 +176,7 @@ describe("compileGitHubCloudBinding", () => {
           familyId: "github",
           variantId: "github-cloud",
           enabled: true,
+          secrets: {},
           config: {
             apiBaseUrl: "https://api.github.com",
             webBaseUrl: "https://github.com",

@@ -76,7 +76,7 @@ export async function completeOAuthConnection(
   integrationsConfig: AppContext["var"]["config"]["integrations"],
   input: CompleteOAuthConnectionInput,
 ): Promise<CompletedConnection> {
-  const resolved = await resolveOauthHandlerTargetOrThrow(db, {
+  const resolved = await resolveOauthHandlerTargetOrThrow(db, integrationsConfig, {
     targetKey: input.targetKey,
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_COMPLETE_INPUT,
   });

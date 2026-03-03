@@ -35,6 +35,7 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
   const sandboxProfilesService = createSandboxProfilesService({
     db: resources.db,
     openWorkflow: resources.openWorkflow,
+    integrationsConfig: config.integrations,
     mintSandboxInstanceConnectionToken: sandboxInstancesService.mintConnectionToken,
   });
 

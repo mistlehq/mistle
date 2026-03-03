@@ -128,6 +128,7 @@ const StartSandboxProfileInstanceBadRequestCodeSchema = z.enum([
   SandboxProfilesCompileErrorCodes.CONNECTION_NOT_ACTIVE,
   SandboxProfilesCompileErrorCodes.KIND_MISMATCH,
   SandboxProfilesCompileErrorCodes.INVALID_TARGET_CONFIG,
+  SandboxProfilesCompileErrorCodes.INVALID_TARGET_SECRETS,
   SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONFIG,
   SandboxProfilesCompileErrorCodes.ROUTE_CONFLICT,
   SandboxProfilesCompileErrorCodes.ARTIFACT_CONFLICT,

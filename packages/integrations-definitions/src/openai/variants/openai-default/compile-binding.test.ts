@@ -68,6 +68,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         familyId: "openai",
         variantId: "openai-default",
         enabled: true,
+        secrets: {},
         config: {
           apiBaseUrl: "https://api.openai.com/v1",
         },
@@ -172,6 +173,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         familyId: "openai",
         variantId: "openai-default",
         enabled: true,
+        secrets: {},
         config: {
           apiBaseUrl: "https://proxy.example.com/openai-v2",
         },

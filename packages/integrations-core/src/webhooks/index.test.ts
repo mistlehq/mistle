@@ -94,6 +94,7 @@ describe("webhook helpers", () => {
         variantId: "github-cloud",
         enabled: true,
         config: {},
+        secrets: {},
       },
       headers: {
         "x-event": "issue_comment",
@@ -125,6 +126,7 @@ describe("webhook helpers", () => {
           variantId: "github-cloud",
           enabled: true,
           config: {},
+          secrets: {},
         },
         headers: {},
         rawBody: new Uint8Array(),
@@ -148,6 +150,7 @@ describe("webhook helpers", () => {
           variantId: "github-cloud",
           enabled: true,
           config: {},
+          secrets: {},
         },
         headers: {},
         rawBody: new Uint8Array(),

@@ -13,6 +13,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         familyId: "github",
         variantId: "github-enterprise-server",
         enabled: true,
+        secrets: {},
         config: {
           apiBaseUrl: "https://ghe.example.com/api/v3",
           webBaseUrl: "https://ghe.example.com",
@@ -80,6 +81,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         familyId: "github",
         variantId: "github-enterprise-server",
         enabled: true,
+        secrets: {},
         config: {
           apiBaseUrl: "https://ghe.example.com/api/v3",
           webBaseUrl: "https://ghe.example.com",
@@ -127,6 +129,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         familyId: "github",
         variantId: "github-enterprise-server",
         enabled: true,
+        secrets: {},
         config: {
           apiBaseUrl: "https://ghe.example.com/api/v3",
           webBaseUrl: "https://ghe.example.com",
@@ -173,6 +176,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
           familyId: "github",
           variantId: "github-enterprise-server",
           enabled: true,
+          secrets: {},
           config: {
             apiBaseUrl: "https://ghe.example.com/api/v3",
             webBaseUrl: "https://ghe.example.com",

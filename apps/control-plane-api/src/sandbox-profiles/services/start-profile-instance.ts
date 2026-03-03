@@ -61,16 +61,18 @@ export async function startProfileInstance(
   {
     db,
     openWorkflow,
+    integrationsConfig,
     mintSandboxInstanceConnectionToken,
   }: Pick<
     CreateSandboxProfilesServiceInput,
-    "db" | "openWorkflow" | "mintSandboxInstanceConnectionToken"
+    "db" | "openWorkflow" | "integrationsConfig" | "mintSandboxInstanceConnectionToken"
   >,
   serviceInput: StartProfileInstanceInput,
 ): Promise<StartProfileInstanceOutput> {
   const runtimePlan = await compileProfileVersionRuntimePlan(
     {
       db,
+      integrationsConfig,
     },
     {
       organizationId: serviceInput.organizationId,

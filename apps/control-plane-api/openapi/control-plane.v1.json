@@ -2832,6 +2832,7 @@
                             "CONNECTION_NOT_ACTIVE",
                             "KIND_MISMATCH",
                             "INVALID_TARGET_CONFIG",
+                            "INVALID_TARGET_SECRETS",
                             "INVALID_BINDING_CONFIG",
                             "ROUTE_CONFLICT",
                             "ARTIFACT_CONFLICT",

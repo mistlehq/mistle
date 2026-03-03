@@ -77,10 +77,14 @@ export function createIntegrationConnectionsApp(): AppRoutes<
         throw new Error("Expected authenticated session to be available.");
       }
 
-      const startedOAuthConnection = await startOAuthConnection(ctx.get("db"), {
-        organizationId: session.session.activeOrganizationId,
-        targetKey: params.targetKey,
-      });
+      const startedOAuthConnection = await startOAuthConnection(
+        ctx.get("db"),
+        ctx.get("config").integrations,
+        {
+          organizationId: session.session.activeOrganizationId,
+          targetKey: params.targetKey,
+        },
+      );
 
       return ctx.json(startedOAuthConnection, 200);
     } catch (error) {

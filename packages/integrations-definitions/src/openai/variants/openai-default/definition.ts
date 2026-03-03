@@ -17,6 +17,7 @@ import { OpenAiApiKeyTriggerEventTypes } from "./webhook.js";
 
 type OpenAiApiKeyIntegrationDefinition = IntegrationDefinition<
   { parse: (input: unknown) => OpenAiApiKeyTargetConfig },
+  { parse: (input: unknown) => Record<string, never> },
   { parse: (input: unknown) => OpenAiApiKeyBindingConfig }
 >;
 
@@ -27,6 +28,7 @@ const OpenAiUserReasoningEffortSchema = z.enum([
   OpenAiReasoningEfforts.MEDIUM,
   OpenAiReasoningEfforts.HIGH,
 ]);
+const OpenAiApiKeyTargetSecretSchema = z.object({}).strict();
 
 export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   familyId: "openai",
@@ -36,6 +38,7 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   description: "OpenAI API key based integration for Codex runtime sessions.",
   logoKey: "openai",
   targetConfigSchema: OpenAiApiKeyTargetConfigSchema,
+  targetSecretSchema: OpenAiApiKeyTargetSecretSchema,
   bindingConfigSchema: OpenAiApiKeyBindingConfigSchema,
   supportedAuthSchemes: OpenAiApiKeySupportedAuthSchemes,
   triggerEventTypes: OpenAiApiKeyTriggerEventTypes,
