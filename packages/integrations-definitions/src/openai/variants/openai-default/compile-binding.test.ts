@@ -145,8 +145,8 @@ describe("compileOpenAiApiKeyBinding", () => {
       },
     ]);
 
-    expect(compiled.runtimeClientSetups).toHaveLength(1);
-    expect(compiled.runtimeClientSetups[0]?.env).toEqual({
+    expect(compiled.runtimeClients).toHaveLength(1);
+    expect(compiled.runtimeClients[0]?.setup.env).toEqual({
       OPENAI_BASE_URL: {
         kind: "egress_url",
         routeId: "route_ibd_123",
@@ -154,16 +154,15 @@ describe("compileOpenAiApiKeyBinding", () => {
       OPENAI_MODEL: "gpt-5.3-codex",
       OPENAI_REASONING_EFFORT: "medium",
     });
-    expect(compiled.runtimeClientSetups[0]?.files[0]?.fileId).toBe("codex_config");
-    expect(compiled.runtimeClientSetups[0]?.files[0]?.path).toBe("/workspace/.codex/config.toml");
-    expect(compiled.runtimeClientSetups[0]?.files[0]?.content).not.toContain("base_url =");
-    expect(compiled.runtimeClientSetups[0]?.files[0]?.content).not.toContain(
+    expect(compiled.runtimeClients[0]?.setup.files[0]?.fileId).toBe("codex_config");
+    expect(compiled.runtimeClients[0]?.setup.files[0]?.path).toBe("/workspace/.codex/config.toml");
+    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).not.toContain("base_url =");
+    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).not.toContain(
       "[model_providers.openai]",
     );
-    expect(compiled.runtimeClientProcesses).toEqual([
+    expect(compiled.runtimeClients[0]?.processes).toEqual([
       {
         processKey: "codex-app-server",
-        clientId: "codex-cli",
         command: {
           args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
         },
@@ -177,6 +176,17 @@ describe("compileOpenAiApiKeyBinding", () => {
           timeoutMs: 10_000,
           gracePeriodMs: 2_000,
         },
+      },
+    ]);
+    expect(compiled.runtimeClients[0]?.endpoints).toEqual([
+      {
+        endpointKey: "app-server",
+        processKey: "codex-app-server",
+        transport: {
+          type: "ws",
+          url: "ws://127.0.0.1:4500",
+        },
+        connectionMode: "dedicated",
       },
     ]);
   });
@@ -223,11 +233,11 @@ describe("compileOpenAiApiKeyBinding", () => {
 
     expect(compiled.egressRoutes[0]?.match.hosts).toEqual(["proxy.example.com"]);
     expect(compiled.egressRoutes[0]?.match.pathPrefixes).toEqual(["/openai-v2"]);
-    expect(compiled.runtimeClientSetups[0]?.env.OPENAI_BASE_URL).toEqual({
+    expect(compiled.runtimeClients[0]?.setup.env.OPENAI_BASE_URL).toEqual({
       kind: "egress_url",
       routeId: "route_ibd_123",
     });
-    expect(compiled.runtimeClientProcesses).toHaveLength(1);
-    expect(compiled.runtimeClientProcesses[0]?.processKey).toBe("codex-app-server");
+    expect(compiled.runtimeClients[0]?.processes).toHaveLength(1);
+    expect(compiled.runtimeClients[0]?.processes[0]?.processKey).toBe("codex-app-server");
   });
 });

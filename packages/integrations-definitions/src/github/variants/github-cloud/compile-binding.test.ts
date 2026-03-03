@@ -67,8 +67,7 @@ describe("compileGitHubCloudBinding", () => {
     ]);
 
     expect(compiled.artifacts).toEqual([]);
-    expect(compiled.runtimeClientSetups).toEqual([]);
-    expect(compiled.runtimeClientProcesses).toEqual([]);
+    expect(compiled.runtimeClients).toEqual([]);
   });
 
   it("preserves custom API base path for enterprise-style proxies", () => {

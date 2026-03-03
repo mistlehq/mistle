@@ -104,44 +104,56 @@ export function compileOpenAiApiKeyBinding(
         },
       },
     ],
-    runtimeClientSetups: [
+    runtimeClients: [
       {
         clientId: input.binding.config.runtime,
-        env: {
-          OPENAI_BASE_URL: input.refs.egressUrl,
-          OPENAI_MODEL: input.binding.config.defaultModel,
-          OPENAI_REASONING_EFFORT: input.binding.config.reasoningEffort,
+        setup: {
+          env: {
+            OPENAI_BASE_URL: input.refs.egressUrl,
+            OPENAI_MODEL: input.binding.config.defaultModel,
+            OPENAI_REASONING_EFFORT: input.binding.config.reasoningEffort,
+          },
+          files: [
+            {
+              fileId: "codex_config",
+              path: "/workspace/.codex/config.toml",
+              mode: 384,
+              content: renderCodexConfig({
+                model: input.binding.config.defaultModel,
+                reasoningEffort: input.binding.config.reasoningEffort,
+              }),
+            },
+          ],
         },
-        files: [
+        processes: [
           {
-            fileId: "codex_config",
-            path: "/workspace/.codex/config.toml",
-            mode: 384,
-            content: renderCodexConfig({
-              model: input.binding.config.defaultModel,
-              reasoningEffort: input.binding.config.reasoningEffort,
-            }),
+            processKey: CodexAppServerProcessKey,
+            command: {
+              args: [CodexCliInstallPath, "app-server", "--listen", CodexAppServerListenUrl],
+            },
+            readiness: {
+              type: "ws",
+              url: CodexAppServerListenUrl,
+              timeoutMs: RuntimeClientProcessReadinessTimeoutMs,
+            },
+            stop: {
+              signal: "sigterm",
+              timeoutMs: RuntimeClientProcessStopTimeoutMs,
+              gracePeriodMs: RuntimeClientProcessStopGracePeriodMs,
+            },
           },
         ],
-      },
-    ],
-    runtimeClientProcesses: [
-      {
-        processKey: CodexAppServerProcessKey,
-        clientId: input.binding.config.runtime,
-        command: {
-          args: [CodexCliInstallPath, "app-server", "--listen", CodexAppServerListenUrl],
-        },
-        readiness: {
-          type: "ws",
-          url: CodexAppServerListenUrl,
-          timeoutMs: RuntimeClientProcessReadinessTimeoutMs,
-        },
-        stop: {
-          signal: "sigterm",
-          timeoutMs: RuntimeClientProcessStopTimeoutMs,
-          gracePeriodMs: RuntimeClientProcessStopGracePeriodMs,
-        },
+        endpoints: [
+          {
+            endpointKey: "app-server",
+            processKey: CodexAppServerProcessKey,
+            transport: {
+              type: "ws",
+              url: CodexAppServerListenUrl,
+            },
+            connectionMode: "dedicated",
+          },
+        ],
       },
     ],
   };

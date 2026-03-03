@@ -114,7 +114,6 @@ const CompiledRuntimeArtifactRemovalSpecSchema = z
 
 const RuntimeClientSetupSchema = z
   .object({
-    clientId: z.string().min(1),
     env: z.record(z.string(), z.string()),
     files: z.array(
       z
@@ -175,10 +174,39 @@ const RuntimeClientProcessStopPolicySchema = z
 const RuntimeClientProcessSchema = z
   .object({
     processKey: z.string().min(1),
-    clientId: z.string().min(1),
     command: RuntimeArtifactCommandSchema,
     readiness: RuntimeClientProcessReadinessSchema,
     stop: RuntimeClientProcessStopPolicySchema,
+  })
+  .strict();
+
+const RuntimeClientEndpointTransportSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("ws"),
+      url: z.url().refine((value) => {
+        const parsedURL = new URL(value);
+        return parsedURL.protocol === "ws:" || parsedURL.protocol === "wss:";
+      }, "URL must use ws or wss scheme"),
+    })
+    .strict(),
+]);
+
+const RuntimeClientEndpointSchema = z
+  .object({
+    endpointKey: z.string().min(1),
+    processKey: z.string().min(1).optional(),
+    transport: RuntimeClientEndpointTransportSchema,
+    connectionMode: z.enum(["dedicated", "shared"]),
+  })
+  .strict();
+
+const RuntimeClientSchema = z
+  .object({
+    clientId: z.string().min(1),
+    setup: RuntimeClientSetupSchema,
+    processes: z.array(RuntimeClientProcessSchema),
+    endpoints: z.array(RuntimeClientEndpointSchema),
   })
   .strict();
 
@@ -190,8 +218,7 @@ const CompiledRuntimePlanSchema = z
     egressRoutes: z.array(EgressCredentialRouteSchema),
     artifacts: z.array(CompiledRuntimeArtifactSpecSchema),
     artifactRemovals: z.array(CompiledRuntimeArtifactRemovalSpecSchema),
-    runtimeClientSetups: z.array(RuntimeClientSetupSchema),
-    runtimeClientProcesses: z.array(RuntimeClientProcessSchema),
+    runtimeClients: z.array(RuntimeClientSchema),
   })
   .strict();
 

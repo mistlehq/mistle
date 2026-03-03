@@ -48,8 +48,8 @@ func buildRuntimePlanForHandlerTests() startup.RuntimePlan {
 				},
 			},
 		},
-		Artifacts:           []startup.RuntimeArtifactSpec{},
-		RuntimeClientSetups: []startup.RuntimeClientSetup{},
+		Artifacts:      []startup.RuntimeArtifactSpec{},
+		RuntimeClients: []startup.RuntimeClient{},
 	}
 }
 

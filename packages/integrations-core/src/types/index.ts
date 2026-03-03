@@ -463,7 +463,6 @@ export type CompiledRuntimeArtifactRemovalSpec = {
 };
 
 type RuntimeClientSetupBase<TEnvValue> = {
-  clientId: string;
   env: Record<string, TEnvValue>;
   files: ReadonlyArray<{ fileId: string; path: string; mode: number; content: string }>;
   launchArgs?: ReadonlyArray<string>;
@@ -503,27 +502,47 @@ export type RuntimeClientProcessStopPolicy = {
 
 export type RuntimeClientProcessSpec = {
   processKey: string;
-  clientId: string;
   command: RuntimeArtifactCommand;
   readiness: RuntimeClientProcessReadiness;
   stop: RuntimeClientProcessStopPolicy;
 };
+
+export type RuntimeClientEndpointTransport = {
+  type: "ws";
+  url: string;
+};
+
+export type RuntimeClientEndpointSpec = {
+  endpointKey: string;
+  transport: RuntimeClientEndpointTransport;
+  processKey?: string;
+  connectionMode: "dedicated" | "shared";
+};
+
+type RuntimeClientBase<TEnvValue> = {
+  clientId: string;
+  setup: RuntimeClientSetupBase<TEnvValue>;
+  processes: ReadonlyArray<RuntimeClientProcessSpec>;
+  endpoints: ReadonlyArray<RuntimeClientEndpointSpec>;
+};
+
+export type CompiledRuntimeClient = RuntimeClientBase<string | EgressUrlRef>;
+
+export type RuntimeClient = RuntimeClientBase<string>;
 
 export type CompileBindingEgressRoute = Omit<EgressCredentialRoute, "routeId" | "bindingId">;
 
 export type CompileBindingResult = {
   egressRoutes: ReadonlyArray<CompileBindingEgressRoute>;
   artifacts: ReadonlyArray<RuntimeArtifactSpec>;
-  runtimeClientSetups: ReadonlyArray<CompiledRuntimeClientSetup>;
-  runtimeClientProcesses: ReadonlyArray<RuntimeClientProcessSpec>;
+  runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
   agentCapabilities?: ReadonlyArray<AgentCapability>;
 };
 
 export type CompiledBindingResult = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
-  runtimeClientSetups: ReadonlyArray<CompiledRuntimeClientSetup>;
-  runtimeClientProcesses: ReadonlyArray<RuntimeClientProcessSpec>;
+  runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
   agentCapabilities?: ReadonlyArray<IntegrationBindingAgentCapability>;
 };
 
@@ -627,8 +646,7 @@ export type CompiledRuntimePlan = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   artifactRemovals: ReadonlyArray<CompiledRuntimeArtifactRemovalSpec>;
-  runtimeClientSetups: ReadonlyArray<RuntimeClientSetup>;
-  runtimeClientProcesses: ReadonlyArray<RuntimeClientProcessSpec>;
+  runtimeClients: ReadonlyArray<RuntimeClient>;
 };
 
 export type IntegrationDefinitionLocator = {

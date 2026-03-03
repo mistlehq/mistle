@@ -30,8 +30,7 @@ describe("integration registry", () => {
       compileBinding: () => ({
         egressRoutes: [],
         artifacts: [],
-        runtimeClientSetups: [],
-        runtimeClientProcesses: [],
+        runtimeClients: [],
       }),
     });
 
@@ -60,8 +59,7 @@ describe("integration registry", () => {
       compileBinding: () => ({
         egressRoutes: [],
         artifacts: [],
-        runtimeClientSetups: [],
-        runtimeClientProcesses: [],
+        runtimeClients: [],
       }),
     };
 
@@ -98,8 +96,7 @@ describe("integration registry", () => {
         compileBinding: () => ({
           egressRoutes: [],
           artifacts: [],
-          runtimeClientSetups: [],
-          runtimeClientProcesses: [],
+          runtimeClients: [],
         }),
       },
       {
@@ -117,8 +114,7 @@ describe("integration registry", () => {
         compileBinding: () => ({
           egressRoutes: [],
           artifacts: [],
-          runtimeClientSetups: [],
-          runtimeClientProcesses: [],
+          runtimeClients: [],
         }),
       },
     ]);
@@ -175,8 +171,7 @@ describe("integration registry", () => {
         compileBinding: () => ({
           egressRoutes: [],
           artifacts: [],
-          runtimeClientSetups: [],
-          runtimeClientProcesses: [],
+          runtimeClients: [],
         }),
       }),
     ).toThrowError(IntegrationDefinitionRegistryError);
@@ -217,8 +212,7 @@ describe("integration registry", () => {
         compileBinding: () => ({
           egressRoutes: [],
           artifacts: [],
-          runtimeClientSetups: [],
-          runtimeClientProcesses: [],
+          runtimeClients: [],
         }),
       }),
     ).toThrowError(IntegrationDefinitionRegistryError);
@@ -251,8 +245,7 @@ describe("integration registry", () => {
       compileBinding: () => ({
         egressRoutes: [],
         artifacts: [],
-        runtimeClientSetups: [],
-        runtimeClientProcesses: [],
+        runtimeClients: [],
       }),
     });
 

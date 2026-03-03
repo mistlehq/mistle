@@ -4,7 +4,7 @@ import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js
 import { assembleCompiledRuntimePlan } from "./index.js";
 
 describe("assembleCompiledRuntimePlan", () => {
-  it("merges runtime client setup fragments and produces deterministic ordering", () => {
+  it("merges runtime client fragments and produces deterministic ordering", () => {
     const plan = assembleCompiledRuntimePlan({
       sandboxProfileId: "sbp_123",
       version: 7,
@@ -47,36 +47,48 @@ describe("assembleCompiledRuntimePlan", () => {
               },
             },
           ],
-          runtimeClientSetups: [
+          runtimeClients: [
             {
               clientId: "codex-cli",
-              env: {
-                OPENAI_BASE_URL: {
-                  kind: "egress_url",
-                  routeId: "route_a",
+              setup: {
+                env: {
+                  OPENAI_BASE_URL: {
+                    kind: "egress_url",
+                    routeId: "route_a",
+                  },
                 },
+                files: [],
+                launchArgs: ["--sandbox", "workspace-write"],
               },
-              files: [],
-              launchArgs: ["--sandbox", "workspace-write"],
-            },
-          ],
-          runtimeClientProcesses: [
-            {
-              processKey: "process_b",
-              clientId: "codex-cli",
-              command: {
-                args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4746"],
-              },
-              readiness: {
-                type: "tcp",
-                host: "127.0.0.1",
-                port: 4746,
-                timeoutMs: 5_000,
-              },
-              stop: {
-                signal: "sigterm",
-                timeoutMs: 10_000,
-              },
+              processes: [
+                {
+                  processKey: "process_b",
+                  command: {
+                    args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4746"],
+                  },
+                  readiness: {
+                    type: "tcp",
+                    host: "127.0.0.1",
+                    port: 4746,
+                    timeoutMs: 5_000,
+                  },
+                  stop: {
+                    signal: "sigterm",
+                    timeoutMs: 10_000,
+                  },
+                },
+              ],
+              endpoints: [
+                {
+                  endpointKey: "app-server-b",
+                  processKey: "process_b",
+                  transport: {
+                    type: "ws",
+                    url: "ws://127.0.0.1:4746",
+                  },
+                  connectionMode: "dedicated",
+                },
+              ],
             },
           ],
         },
@@ -113,41 +125,53 @@ describe("assembleCompiledRuntimePlan", () => {
               },
             },
           ],
-          runtimeClientSetups: [
+          runtimeClients: [
             {
               clientId: "codex-cli",
-              env: {
-                OPENAI_ORG: "org_abc",
+              setup: {
+                env: {
+                  OPENAI_ORG: "org_abc",
+                },
+                files: [
+                  {
+                    fileId: "codex_config",
+                    path: "/workspace/.codex/config.toml",
+                    mode: 384,
+                    content: 'model = "gpt-5.3-codex"',
+                  },
+                ],
+                launchArgs: ["--model", "gpt-5.3-codex"],
               },
-              files: [
+              processes: [
                 {
-                  fileId: "codex_config",
-                  path: "/workspace/.codex/config.toml",
-                  mode: 384,
-                  content: 'model = "gpt-5.3-codex"',
+                  processKey: "process_a",
+                  command: {
+                    args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
+                  },
+                  readiness: {
+                    type: "tcp",
+                    host: "127.0.0.1",
+                    port: 4747,
+                    timeoutMs: 5_000,
+                  },
+                  stop: {
+                    signal: "sigterm",
+                    timeoutMs: 10_000,
+                    gracePeriodMs: 2_000,
+                  },
                 },
               ],
-              launchArgs: ["--model", "gpt-5.3-codex"],
-            },
-          ],
-          runtimeClientProcesses: [
-            {
-              processKey: "process_a",
-              clientId: "codex-cli",
-              command: {
-                args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
-              },
-              readiness: {
-                type: "tcp",
-                host: "127.0.0.1",
-                port: 4747,
-                timeoutMs: 5_000,
-              },
-              stop: {
-                signal: "sigterm",
-                timeoutMs: 10_000,
-                gracePeriodMs: 2_000,
-              },
+              endpoints: [
+                {
+                  endpointKey: "app-server-a",
+                  processKey: "process_a",
+                  transport: {
+                    type: "ws",
+                    url: "ws://127.0.0.1:4747",
+                  },
+                  connectionMode: "dedicated",
+                },
+              ],
             },
           ],
         },
@@ -158,21 +182,25 @@ describe("assembleCompiledRuntimePlan", () => {
     expect(plan.artifacts.map((artifact) => artifact.artifactKey)).toEqual(["codex-cli", "gh-cli"]);
     expect(plan.artifactRemovals).toEqual([]);
 
-    const mergedSetup = plan.runtimeClientSetups[0];
-    expect(mergedSetup?.clientId).toBe("codex-cli");
-    expect(mergedSetup?.env).toEqual({
+    const runtimeClient = plan.runtimeClients[0];
+    expect(runtimeClient?.clientId).toBe("codex-cli");
+    expect(runtimeClient?.setup.env).toEqual({
       OPENAI_BASE_URL: "http://sandboxd.internal/egress/routes/route_a",
       OPENAI_ORG: "org_abc",
     });
-    expect(mergedSetup?.launchArgs).toEqual([
+    expect(runtimeClient?.setup.launchArgs).toEqual([
       "--sandbox",
       "workspace-write",
       "--model",
       "gpt-5.3-codex",
     ]);
-    expect(plan.runtimeClientProcesses.map((process) => process.processKey)).toEqual([
+    expect(runtimeClient?.processes.map((process) => process.processKey)).toEqual([
       "process_a",
       "process_b",
+    ]);
+    expect(runtimeClient?.endpoints.map((endpoint) => endpoint.endpointKey)).toEqual([
+      "app-server-a",
+      "app-server-b",
     ]);
   });
 
@@ -192,30 +220,36 @@ describe("assembleCompiledRuntimePlan", () => {
           {
             egressRoutes: [],
             artifacts: [],
-            runtimeClientSetups: [
+            runtimeClients: [
               {
                 clientId: "codex-cli",
-                env: {
-                  OPENAI_BASE_URL: "https://api.openai.com",
+                setup: {
+                  env: {
+                    OPENAI_BASE_URL: "https://api.openai.com",
+                  },
+                  files: [],
                 },
-                files: [],
+                processes: [],
+                endpoints: [],
               },
             ],
-            runtimeClientProcesses: [],
           },
           {
             egressRoutes: [],
             artifacts: [],
-            runtimeClientSetups: [
+            runtimeClients: [
               {
                 clientId: "codex-cli",
-                env: {
-                  OPENAI_BASE_URL: "https://example.invalid/openai-v2",
+                setup: {
+                  env: {
+                    OPENAI_BASE_URL: "https://example.invalid/openai-v2",
+                  },
+                  files: [],
                 },
-                files: [],
+                processes: [],
+                endpoints: [],
               },
             ],
-            runtimeClientProcesses: [],
           },
         ],
       }),
@@ -236,30 +270,36 @@ describe("assembleCompiledRuntimePlan", () => {
           {
             egressRoutes: [],
             artifacts: [],
-            runtimeClientSetups: [
+            runtimeClients: [
               {
                 clientId: "codex-cli",
-                env: {
-                  OPENAI_BASE_URL: "https://api.openai.com",
+                setup: {
+                  env: {
+                    OPENAI_BASE_URL: "https://api.openai.com",
+                  },
+                  files: [],
                 },
-                files: [],
+                processes: [],
+                endpoints: [],
               },
             ],
-            runtimeClientProcesses: [],
           },
           {
             egressRoutes: [],
             artifacts: [],
-            runtimeClientSetups: [
+            runtimeClients: [
               {
                 clientId: "codex-cli",
-                env: {
-                  OPENAI_BASE_URL: "https://example.invalid/openai-v2",
+                setup: {
+                  env: {
+                    OPENAI_BASE_URL: "https://example.invalid/openai-v2",
+                  },
+                  files: [],
                 },
-                files: [],
+                processes: [],
+                endpoints: [],
               },
             ],
-            runtimeClientProcesses: [],
           },
         ],
       });
@@ -287,40 +327,46 @@ describe("assembleCompiledRuntimePlan", () => {
           {
             egressRoutes: [],
             artifacts: [],
-            runtimeClientSetups: [
+            runtimeClients: [
               {
                 clientId: "codex-cli",
-                env: {},
-                files: [
-                  {
-                    fileId: "codex_config",
-                    path: "/workspace/.codex/config.toml",
-                    mode: 384,
-                    content: 'model = "gpt-5.3-codex"',
-                  },
-                ],
+                setup: {
+                  env: {},
+                  files: [
+                    {
+                      fileId: "codex_config",
+                      path: "/workspace/.codex/config.toml",
+                      mode: 384,
+                      content: 'model = "gpt-5.3-codex"',
+                    },
+                  ],
+                },
+                processes: [],
+                endpoints: [],
               },
             ],
-            runtimeClientProcesses: [],
           },
           {
             egressRoutes: [],
             artifacts: [],
-            runtimeClientSetups: [
+            runtimeClients: [
               {
                 clientId: "codex-cli",
-                env: {},
-                files: [
-                  {
-                    fileId: "codex_config",
-                    path: "/workspace/.codex/override.toml",
-                    mode: 384,
-                    content: 'model = "gpt-5.3-codex"',
-                  },
-                ],
+                setup: {
+                  env: {},
+                  files: [
+                    {
+                      fileId: "codex_config",
+                      path: "/workspace/.codex/override.toml",
+                      mode: 384,
+                      content: 'model = "gpt-5.3-codex"',
+                    },
+                  ],
+                },
+                processes: [],
+                endpoints: [],
               },
             ],
-            runtimeClientProcesses: [],
           },
         ],
       }),
@@ -341,40 +387,46 @@ describe("assembleCompiledRuntimePlan", () => {
           {
             egressRoutes: [],
             artifacts: [],
-            runtimeClientSetups: [
+            runtimeClients: [
               {
                 clientId: "codex-cli",
-                env: {},
-                files: [
-                  {
-                    fileId: "codex_config",
-                    path: "/workspace/.codex/config.toml",
-                    mode: 384,
-                    content: 'model = "gpt-5.3-codex"',
-                  },
-                ],
+                setup: {
+                  env: {},
+                  files: [
+                    {
+                      fileId: "codex_config",
+                      path: "/workspace/.codex/config.toml",
+                      mode: 384,
+                      content: 'model = "gpt-5.3-codex"',
+                    },
+                  ],
+                },
+                processes: [],
+                endpoints: [],
               },
             ],
-            runtimeClientProcesses: [],
           },
           {
             egressRoutes: [],
             artifacts: [],
-            runtimeClientSetups: [
+            runtimeClients: [
               {
                 clientId: "codex-cli",
-                env: {},
-                files: [
-                  {
-                    fileId: "codex_config",
-                    path: "/workspace/.codex/override.toml",
-                    mode: 384,
-                    content: 'model = "gpt-5.3-codex"',
-                  },
-                ],
+                setup: {
+                  env: {},
+                  files: [
+                    {
+                      fileId: "codex_config",
+                      path: "/workspace/.codex/override.toml",
+                      mode: 384,
+                      content: 'model = "gpt-5.3-codex"',
+                    },
+                  ],
+                },
+                processes: [],
+                endpoints: [],
               },
             ],
-            runtimeClientProcesses: [],
           },
         ],
       });
@@ -402,19 +454,22 @@ describe("assembleCompiledRuntimePlan", () => {
           {
             egressRoutes: [],
             artifacts: [],
-            runtimeClientSetups: [
+            runtimeClients: [
               {
                 clientId: "codex-cli",
-                env: {
-                  OPENAI_BASE_URL: {
-                    kind: "egress_url",
-                    routeId: "route_missing",
+                setup: {
+                  env: {
+                    OPENAI_BASE_URL: {
+                      kind: "egress_url",
+                      routeId: "route_missing",
+                    },
                   },
+                  files: [],
                 },
-                files: [],
+                processes: [],
+                endpoints: [],
               },
             ],
-            runtimeClientProcesses: [],
           },
         ],
       }),
@@ -435,19 +490,22 @@ describe("assembleCompiledRuntimePlan", () => {
           {
             egressRoutes: [],
             artifacts: [],
-            runtimeClientSetups: [
+            runtimeClients: [
               {
                 clientId: "codex-cli",
-                env: {
-                  OPENAI_BASE_URL: {
-                    kind: "egress_url",
-                    routeId: "route_missing",
+                setup: {
+                  env: {
+                    OPENAI_BASE_URL: {
+                      kind: "egress_url",
+                      routeId: "route_missing",
+                    },
                   },
+                  files: [],
                 },
-                files: [],
+                processes: [],
+                endpoints: [],
               },
             ],
-            runtimeClientProcesses: [],
           },
         ],
       });
@@ -484,8 +542,7 @@ describe("assembleCompiledRuntimePlan", () => {
               },
             },
           ],
-          runtimeClientSetups: [],
-          runtimeClientProcesses: [],
+          runtimeClients: [],
         },
       ],
       previousCompiledBindingResults: [
@@ -509,8 +566,7 @@ describe("assembleCompiledRuntimePlan", () => {
               },
             },
           ],
-          runtimeClientSetups: [],
-          runtimeClientProcesses: [],
+          runtimeClients: [],
         },
       ],
     });

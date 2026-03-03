@@ -96,61 +96,76 @@ const RuntimePlanSchema = z.object({
       ),
     }),
   ),
-  runtimeClientSetups: z.array(
+  runtimeClients: z.array(
     z.object({
       clientId: z.string().min(1),
-      env: z.record(z.string(), z.string()),
-      files: z.array(
+      setup: z.object({
+        env: z.record(z.string(), z.string()),
+        files: z.array(
+          z.object({
+            fileId: z.string().min(1),
+            path: z.string().min(1),
+            mode: z.number().int(),
+            content: z.string(),
+          }),
+        ),
+        launchArgs: z.array(z.string()).optional(),
+      }),
+      processes: z.array(
         z.object({
-          fileId: z.string().min(1),
-          path: z.string().min(1),
-          mode: z.number().int(),
-          content: z.string(),
+          processKey: z.string().min(1),
+          command: z.object({
+            args: z.array(z.string()),
+            env: z.record(z.string(), z.string()).optional(),
+            cwd: z.string().optional(),
+            timeoutMs: z.number().int().optional(),
+          }),
+          readiness: z.discriminatedUnion("type", [
+            z.object({
+              type: z.literal("none"),
+            }),
+            z.object({
+              type: z.literal("tcp"),
+              host: z.string().min(1),
+              port: z.number().int().min(1).max(65_535),
+              timeoutMs: z.number().int().positive(),
+            }),
+            z.object({
+              type: z.literal("http"),
+              url: z.url(),
+              expectedStatus: z.number().int().min(100).max(599),
+              timeoutMs: z.number().int().positive(),
+            }),
+            z.object({
+              type: z.literal("ws"),
+              url: z.url().refine((value) => {
+                const parsedURL = new URL(value);
+                return parsedURL.protocol === "ws:" || parsedURL.protocol === "wss:";
+              }, "URL must use ws or wss scheme"),
+              timeoutMs: z.number().int().positive(),
+            }),
+          ]),
+          stop: z.object({
+            signal: z.enum(["sigterm", "sigkill"]),
+            timeoutMs: z.number().int().positive(),
+            gracePeriodMs: z.number().int().min(0).optional(),
+          }),
         }),
       ),
-      launchArgs: z.array(z.string()).optional(),
-    }),
-  ),
-  runtimeClientProcesses: z.array(
-    z.object({
-      processKey: z.string().min(1),
-      clientId: z.string().min(1),
-      command: z.object({
-        args: z.array(z.string()),
-        env: z.record(z.string(), z.string()).optional(),
-        cwd: z.string().optional(),
-        timeoutMs: z.number().int().optional(),
-      }),
-      readiness: z.discriminatedUnion("type", [
+      endpoints: z.array(
         z.object({
-          type: z.literal("none"),
+          endpointKey: z.string().min(1),
+          processKey: z.string().min(1).optional(),
+          transport: z.object({
+            type: z.literal("ws"),
+            url: z.url().refine((value) => {
+              const parsedURL = new URL(value);
+              return parsedURL.protocol === "ws:" || parsedURL.protocol === "wss:";
+            }, "URL must use ws or wss scheme"),
+          }),
+          connectionMode: z.enum(["dedicated", "shared"]),
         }),
-        z.object({
-          type: z.literal("tcp"),
-          host: z.string().min(1),
-          port: z.number().int().min(1).max(65_535),
-          timeoutMs: z.number().int().positive(),
-        }),
-        z.object({
-          type: z.literal("http"),
-          url: z.url(),
-          expectedStatus: z.number().int().min(100).max(599),
-          timeoutMs: z.number().int().positive(),
-        }),
-        z.object({
-          type: z.literal("ws"),
-          url: z.url().refine((value) => {
-            const parsedURL = new URL(value);
-            return parsedURL.protocol === "ws:" || parsedURL.protocol === "wss:";
-          }, "URL must use ws or wss scheme"),
-          timeoutMs: z.number().int().positive(),
-        }),
-      ]),
-      stop: z.object({
-        signal: z.enum(["sigterm", "sigkill"]),
-        timeoutMs: z.number().int().positive(),
-        gracePeriodMs: z.number().int().min(0).optional(),
-      }),
+      ),
     }),
   ),
 });
@@ -195,8 +210,7 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
     ],
     artifacts: [],
     artifactRemovals: [],
-    runtimeClientSetups: [],
-    runtimeClientProcesses: [],
+    runtimeClients: [],
   };
 }
 
