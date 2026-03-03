@@ -8,14 +8,17 @@ import {
 
 import {
   encryptCredentialUtf8,
+  encryptIntegrationConnectionSecrets,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../integration-credentials/crypto.js";
 import type { AppContext } from "../../types.js";
 import {
+  IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
   IntegrationConnectionsNotFoundError,
 } from "./errors.js";
+import { resolveConnectionUserSecretsOrThrow } from "./resolve-user-secrets.js";
 
 const API_KEY_CREDENTIAL_PURPOSE = "api_key";
 
@@ -23,6 +26,7 @@ export type CreateApiKeyConnectionInput = {
   organizationId: string;
   targetKey: string;
   apiKey: string;
+  connectionSecrets: Record<string, string>;
 };
 
 type CreatedConnection = {
@@ -66,6 +70,27 @@ export async function createApiKeyConnection(
     masterKeyVersion: organizationCredentialKey.masterKeyVersion,
     masterEncryptionKeys: integrationsConfig.masterEncryptionKeys,
   });
+
+  const parsedConnectionSecrets = resolveConnectionUserSecretsOrThrow({
+    familyId: target.familyId,
+    variantId: target.variantId,
+    targetKey: input.targetKey,
+    rawSecrets: input.connectionSecrets,
+    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
+  });
+
+  const encryptedConnectionSecrets =
+    Object.keys(parsedConnectionSecrets).length === 0
+      ? null
+      : encryptIntegrationConnectionSecrets({
+          secrets: parsedConnectionSecrets,
+          masterKeyVersion: integrationsConfig.activeMasterEncryptionKeyVersion,
+          masterEncryptionKeyMaterial: resolveMasterEncryptionKeyMaterial({
+            masterKeyVersion: integrationsConfig.activeMasterEncryptionKeyVersion,
+            masterEncryptionKeys: integrationsConfig.masterEncryptionKeys,
+          }),
+        });
+
   const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
     wrappedCiphertext: organizationCredentialKey.ciphertext,
     masterEncryptionKeyMaterial,
@@ -84,6 +109,7 @@ export async function createApiKeyConnection(
           organizationId: input.organizationId,
           targetKey: input.targetKey,
           status: IntegrationConnectionStatuses.ACTIVE,
+          ...(encryptedConnectionSecrets === null ? {} : { secrets: encryptedConnectionSecrets }),
           targetSnapshotConfig: target.config,
         })
         .returning();

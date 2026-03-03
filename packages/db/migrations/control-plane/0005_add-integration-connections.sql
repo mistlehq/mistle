@@ -13,6 +13,7 @@ CREATE TABLE "control_plane"."integration_connections" (
 	"status" text DEFAULT 'active' NOT NULL,
 	"external_subject_id" text,
 	"config" jsonb,
+	"secrets" jsonb,
 	"target_snapshot_config" jsonb,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL

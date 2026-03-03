@@ -13,6 +13,10 @@ import {
   IntegrationConnectionsBadRequestResponseSchema,
   StartOAuthConnectionResponseSchema,
 } from "../src/integration-connections/contracts.js";
+import {
+  decryptIntegrationConnectionSecrets,
+  resolveMasterEncryptionKeyMaterial,
+} from "../src/integration-credentials/crypto.js";
 import { it } from "./test-context.js";
 
 describe("integration connections oauth integration", () => {
@@ -111,6 +115,9 @@ describe("integration connections oauth integration", () => {
         installation_id: "12345",
         setup_action: "install",
       },
+      secrets: {
+        webhook_secret: "whsec_oauth_flow",
+      },
     });
 
     const completeResponse = await fixture.request(
@@ -154,6 +161,18 @@ describe("integration connections oauth integration", () => {
       web_base_url: "https://github.com",
       app_slug: "mistle-github-app",
     });
+    expect(persistedConnection.secrets).not.toBeNull();
+    if (persistedConnection.secrets === null) {
+      throw new Error("Expected encrypted connection secrets.");
+    }
+
+    const decryptedConnectionSecrets = decryptStoredConnectionSecrets({
+      encryptedSecrets: persistedConnection.secrets,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    expect(decryptedConnectionSecrets).toEqual({
+      webhook_secret: "whsec_oauth_flow",
+    });
 
     const oauthSession = await fixture.db.query.integrationOauthSessions.findFirst({
       where: (table, { and, eq }) =>
@@ -177,6 +196,69 @@ describe("integration connections oauth integration", () => {
       .from(integrationConnectionCredentials)
       .where(eq(integrationConnectionCredentials.connectionId, completeBody.id));
     expect(linkedCredentials).toHaveLength(0);
+  }, 60_000);
+
+  it("returns 400 when oauth completion secrets include unsupported keys", async ({ fixture }) => {
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "github-cloud",
+      familyId: "github",
+      variantId: "github-cloud",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+        app_slug: "mistle-github-app",
+      },
+    });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-oauth-complete-unsupported-secret@example.com",
+    });
+
+    const startResponse = await fixture.request(
+      "/v1/integration/connections/github-cloud/oauth/start",
+      {
+        method: "POST",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
+      },
+    );
+    expect(startResponse.status).toBe(200);
+    const startBody = StartOAuthConnectionResponseSchema.parse(await startResponse.json());
+    const startUrl = new URL(startBody.authorizationUrl);
+    const state = startUrl.searchParams.get("state");
+    if (state === null || state.length === 0) {
+      throw new Error("Expected oauth state in authorization URL.");
+    }
+
+    const response = await fixture.request(
+      "/v1/integration/connections/github-cloud/oauth/complete",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          query: {
+            state,
+            installation_id: "12345",
+            setup_action: "install",
+          },
+          secrets: {
+            unknown_secret: "not-allowed",
+          },
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("INVALID_OAUTH_COMPLETE_INPUT");
+    expect(responseBody.message).toContain("unsupported key 'unknown_secret'");
   }, 60_000);
 
   it("returns 400 when oauth completion state is missing", async ({ fixture }) => {
@@ -397,3 +479,23 @@ describe("integration connections oauth integration", () => {
     expect(responseBody.code).toBe("OAUTH_NOT_SUPPORTED");
   }, 60_000);
 });
+
+function decryptStoredConnectionSecrets(input: {
+  encryptedSecrets: {
+    masterKeyVersion: number;
+    nonce: string;
+    ciphertext: string;
+  };
+  masterEncryptionKeys: Record<string, string>;
+}): Record<string, string> {
+  const masterKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: input.encryptedSecrets.masterKeyVersion,
+    masterEncryptionKeys: input.masterEncryptionKeys,
+  });
+
+  return decryptIntegrationConnectionSecrets({
+    nonce: input.encryptedSecrets.nonce,
+    ciphertext: input.encryptedSecrets.ciphertext,
+    masterEncryptionKeyMaterial: masterKeyMaterial,
+  });
+}

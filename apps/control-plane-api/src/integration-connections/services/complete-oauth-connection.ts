@@ -10,6 +10,7 @@ import { and, eq, isNull } from "drizzle-orm";
 
 import {
   encryptCredentialUtf8,
+  encryptIntegrationConnectionSecrets,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../integration-credentials/crypto.js";
@@ -19,11 +20,13 @@ import {
   IntegrationConnectionsBadRequestError,
 } from "./errors.js";
 import { resolveOauthHandlerTargetOrThrow } from "./resolve-oauth-handler.js";
+import { resolveConnectionUserSecretsOrThrow } from "./resolve-user-secrets.js";
 
 type CompleteOAuthConnectionInput = {
   organizationId: string;
   targetKey: string;
   query: Record<string, string>;
+  connectionSecrets: Record<string, string>;
 };
 
 type CompletedConnection = {
@@ -80,6 +83,24 @@ export async function completeOAuthConnection(
     targetKey: input.targetKey,
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_COMPLETE_INPUT,
   });
+  const parsedConnectionSecrets = resolveConnectionUserSecretsOrThrow({
+    familyId: resolved.target.familyId,
+    variantId: resolved.target.variantId,
+    targetKey: input.targetKey,
+    rawSecrets: input.connectionSecrets,
+    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_COMPLETE_INPUT,
+  });
+  const encryptedConnectionSecrets =
+    Object.keys(parsedConnectionSecrets).length === 0
+      ? null
+      : encryptIntegrationConnectionSecrets({
+          secrets: parsedConnectionSecrets,
+          masterKeyVersion: integrationsConfig.activeMasterEncryptionKeyVersion,
+          masterEncryptionKeyMaterial: resolveMasterEncryptionKeyMaterial({
+            masterKeyVersion: integrationsConfig.activeMasterEncryptionKeyVersion,
+            masterEncryptionKeys: integrationsConfig.masterEncryptionKeys,
+          }),
+        });
 
   const queryParams = createOAuthQueryParams(input.query);
   const state = resolveOAuthStateOrThrow(queryParams);
@@ -157,6 +178,7 @@ export async function completeOAuthConnection(
         organizationId: input.organizationId,
         targetKey: input.targetKey,
         status: IntegrationConnectionStatuses.ACTIVE,
+        ...(encryptedConnectionSecrets === null ? {} : { secrets: encryptedConnectionSecrets }),
         ...(completedOAuthConnection.externalSubjectId === undefined
           ? {}
           : { externalSubjectId: completedOAuthConnection.externalSubjectId }),
