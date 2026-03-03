@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
-import type { CompiledBindingResult, EgressCredentialRoute } from "../types/index.js";
+import type {
+  CompiledBindingResult,
+  EgressCredentialRoute,
+  RuntimeClientProcessSpec,
+} from "../types/index.js";
 import { validateCompiledBindingResults } from "./index.js";
 
 function createRoute(input: {
@@ -63,6 +67,7 @@ function createCompiledBindingResult(input: {
     env: Record<string, string | { kind: "egress_url"; routeId: string }>;
     files: Array<{ fileId: string; path: string; mode: number; content: string }>;
   };
+  runtimeClientProcesses?: ReadonlyArray<RuntimeClientProcessSpec>;
 }): CompiledBindingResult {
   return {
     egressRoutes: [input.route],
@@ -93,6 +98,7 @@ function createCompiledBindingResult(input: {
               files: input.runtimeClientSetup.files,
             },
           ],
+    runtimeClientProcesses: input.runtimeClientProcesses ?? [],
   };
 }
 
@@ -331,6 +337,101 @@ describe("validateCompiledBindingResults", () => {
         compiledBindingResults: [resultA, resultB],
       }),
     ).not.toThrow();
+  });
+
+  it("fails on runtime client process key conflicts", () => {
+    const processA: RuntimeClientProcessSpec = {
+      processKey: "codex-app-server",
+      clientId: "codex-cli",
+      command: {
+        args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4746"],
+      },
+      readiness: {
+        type: "tcp",
+        host: "127.0.0.1",
+        port: 4746,
+        timeoutMs: 5_000,
+      },
+      stop: {
+        signal: "sigterm",
+        timeoutMs: 10_000,
+      },
+    };
+    const processB: RuntimeClientProcessSpec = {
+      processKey: "codex-app-server",
+      clientId: "codex-cli",
+      command: {
+        args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
+      },
+      readiness: {
+        type: "none",
+      },
+      stop: {
+        signal: "sigterm",
+        timeoutMs: 10_000,
+      },
+    };
+
+    const resultA = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "artifact-a",
+      runtimeClientProcesses: [processA],
+    });
+    const resultB = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_b",
+        bindingId: "bind_b",
+        hosts: ["api.github.com"],
+      }),
+      artifactKey: "artifact-b",
+      runtimeClientProcesses: [processB],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [resultA, resultB],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+  });
+
+  it("fails when runtime client process readiness is invalid", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "artifact-a",
+      runtimeClientProcesses: [
+        {
+          processKey: "codex-app-server",
+          clientId: "codex-cli",
+          command: {
+            args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
+          },
+          readiness: {
+            type: "tcp",
+            host: "127.0.0.1",
+            port: 0,
+            timeoutMs: 5_000,
+          },
+          stop: {
+            signal: "sigterm",
+            timeoutMs: 10_000,
+          },
+        },
+      ],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrowError(IntegrationCompilerError);
   });
 
   it("fails on artifact key conflicts with different lifecycle specs", () => {

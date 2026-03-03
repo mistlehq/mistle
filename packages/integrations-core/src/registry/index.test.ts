@@ -29,6 +29,7 @@ describe("integration registry", () => {
         egressRoutes: [],
         artifacts: [],
         runtimeClientSetups: [],
+        runtimeClientProcesses: [],
       }),
     });
 
@@ -57,6 +58,7 @@ describe("integration registry", () => {
         egressRoutes: [],
         artifacts: [],
         runtimeClientSetups: [],
+        runtimeClientProcesses: [],
       }),
     };
 
@@ -93,6 +95,7 @@ describe("integration registry", () => {
           egressRoutes: [],
           artifacts: [],
           runtimeClientSetups: [],
+          runtimeClientProcesses: [],
         }),
       },
       {
@@ -110,6 +113,7 @@ describe("integration registry", () => {
           egressRoutes: [],
           artifacts: [],
           runtimeClientSetups: [],
+          runtimeClientProcesses: [],
         }),
       },
     ]);
@@ -166,6 +170,7 @@ describe("integration registry", () => {
           egressRoutes: [],
           artifacts: [],
           runtimeClientSetups: [],
+          runtimeClientProcesses: [],
         }),
       }),
     ).toThrowError(IntegrationDefinitionRegistryError);
@@ -198,6 +203,7 @@ describe("integration registry", () => {
         egressRoutes: [],
         artifacts: [],
         runtimeClientSetups: [],
+        runtimeClientProcesses: [],
       }),
     });
 

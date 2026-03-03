@@ -64,5 +64,6 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
     ],
     artifacts: [],
     runtimeClientSetups: [],
+    runtimeClientProcesses: [],
   };
 }

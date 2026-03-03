@@ -120,5 +120,6 @@ export function compileOpenAiApiKeyBinding(
         ],
       },
     ],
+    runtimeClientProcesses: [],
   };
 }

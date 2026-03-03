@@ -60,6 +60,25 @@ describe("assembleCompiledRuntimePlan", () => {
               launchArgs: ["--sandbox", "workspace-write"],
             },
           ],
+          runtimeClientProcesses: [
+            {
+              processKey: "process_b",
+              clientId: "codex-cli",
+              command: {
+                args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4746"],
+              },
+              readiness: {
+                type: "tcp",
+                host: "127.0.0.1",
+                port: 4746,
+                timeoutMs: 5_000,
+              },
+              stop: {
+                signal: "sigterm",
+                timeoutMs: 10_000,
+              },
+            },
+          ],
         },
         {
           egressRoutes: [
@@ -111,6 +130,26 @@ describe("assembleCompiledRuntimePlan", () => {
               launchArgs: ["--model", "gpt-5.3-codex"],
             },
           ],
+          runtimeClientProcesses: [
+            {
+              processKey: "process_a",
+              clientId: "codex-cli",
+              command: {
+                args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
+              },
+              readiness: {
+                type: "tcp",
+                host: "127.0.0.1",
+                port: 4747,
+                timeoutMs: 5_000,
+              },
+              stop: {
+                signal: "sigterm",
+                timeoutMs: 10_000,
+                gracePeriodMs: 2_000,
+              },
+            },
+          ],
         },
       ],
     });
@@ -130,6 +169,10 @@ describe("assembleCompiledRuntimePlan", () => {
       "workspace-write",
       "--model",
       "gpt-5.3-codex",
+    ]);
+    expect(plan.runtimeClientProcesses.map((process) => process.processKey)).toEqual([
+      "process_a",
+      "process_b",
     ]);
   });
 
@@ -158,6 +201,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 files: [],
               },
             ],
+            runtimeClientProcesses: [],
           },
           {
             egressRoutes: [],
@@ -171,6 +215,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 files: [],
               },
             ],
+            runtimeClientProcesses: [],
           },
         ],
       }),
@@ -200,6 +245,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 files: [],
               },
             ],
+            runtimeClientProcesses: [],
           },
           {
             egressRoutes: [],
@@ -213,6 +259,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 files: [],
               },
             ],
+            runtimeClientProcesses: [],
           },
         ],
       });
@@ -254,6 +301,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 ],
               },
             ],
+            runtimeClientProcesses: [],
           },
           {
             egressRoutes: [],
@@ -272,6 +320,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 ],
               },
             ],
+            runtimeClientProcesses: [],
           },
         ],
       }),
@@ -306,6 +355,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 ],
               },
             ],
+            runtimeClientProcesses: [],
           },
           {
             egressRoutes: [],
@@ -324,6 +374,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 ],
               },
             ],
+            runtimeClientProcesses: [],
           },
         ],
       });
@@ -363,6 +414,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 files: [],
               },
             ],
+            runtimeClientProcesses: [],
           },
         ],
       }),
@@ -395,6 +447,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 files: [],
               },
             ],
+            runtimeClientProcesses: [],
           },
         ],
       });
@@ -432,6 +485,7 @@ describe("assembleCompiledRuntimePlan", () => {
             },
           ],
           runtimeClientSetups: [],
+          runtimeClientProcesses: [],
         },
       ],
       previousCompiledBindingResults: [
@@ -456,6 +510,7 @@ describe("assembleCompiledRuntimePlan", () => {
             },
           ],
           runtimeClientSetups: [],
+          runtimeClientProcesses: [],
         },
       ],
     });

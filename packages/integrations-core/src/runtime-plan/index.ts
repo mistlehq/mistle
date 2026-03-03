@@ -5,6 +5,7 @@ import type {
   CompiledRuntimeArtifactSpec,
   CompiledRuntimeArtifactRemovalSpec,
   CompiledRuntimeClientSetup,
+  RuntimeClientProcessSpec,
   CompiledRuntimePlan,
   EgressUrlRef,
   RuntimeClientSetup,
@@ -43,6 +44,18 @@ function flattenRuntimeClientSetups(
   }
 
   return runtimeClientSetups;
+}
+
+function flattenRuntimeClientProcesses(
+  input: ReadonlyArray<CompiledBindingResult>,
+): ReadonlyArray<RuntimeClientProcessSpec> {
+  const runtimeClientProcesses: RuntimeClientProcessSpec[] = [];
+
+  for (const compiledBindingResult of input) {
+    runtimeClientProcesses.push(...compiledBindingResult.runtimeClientProcesses);
+  }
+
+  return runtimeClientProcesses;
 }
 
 function createEgressRouteBaseUrl(input: { egressBaseUrl: string; routeId: string }): string {
@@ -239,6 +252,12 @@ function sortArtifacts(
   return [...input].sort((left, right) => left.artifactKey.localeCompare(right.artifactKey));
 }
 
+function sortRuntimeClientProcesses(
+  input: ReadonlyArray<RuntimeClientProcessSpec>,
+): ReadonlyArray<RuntimeClientProcessSpec> {
+  return [...input].sort((left, right) => left.processKey.localeCompare(right.processKey));
+}
+
 function computeArtifactRemovals(input: {
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   previousCompiledBindingResults: ReadonlyArray<CompiledBindingResult> | undefined;
@@ -287,6 +306,9 @@ export function assembleCompiledRuntimePlan(
       egressBaseUrl: input.runtimeContext.sandboxdEgressBaseUrl,
     }),
   );
+  const runtimeClientProcesses = sortRuntimeClientProcesses(
+    flattenRuntimeClientProcesses(input.compiledBindingResults),
+  );
 
   return {
     sandboxProfileId: input.sandboxProfileId,
@@ -296,5 +318,6 @@ export function assembleCompiledRuntimePlan(
     artifacts,
     artifactRemovals,
     runtimeClientSetups,
+    runtimeClientProcesses,
   };
 }

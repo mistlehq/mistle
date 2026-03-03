@@ -382,18 +382,51 @@ export type CompiledRuntimeClientSetup = RuntimeClientSetupBase<string | EgressU
 
 export type RuntimeClientSetup = RuntimeClientSetupBase<string>;
 
+export type RuntimeClientProcessReadiness =
+  | {
+      type: "none";
+    }
+  | {
+      type: "tcp";
+      host: string;
+      port: number;
+      timeoutMs: number;
+    }
+  | {
+      type: "http";
+      url: string;
+      expectedStatus: number;
+      timeoutMs: number;
+    };
+
+export type RuntimeClientProcessStopPolicy = {
+  signal: "sigterm" | "sigkill";
+  timeoutMs: number;
+  gracePeriodMs?: number;
+};
+
+export type RuntimeClientProcessSpec = {
+  processKey: string;
+  clientId: string;
+  command: RuntimeArtifactCommand;
+  readiness: RuntimeClientProcessReadiness;
+  stop: RuntimeClientProcessStopPolicy;
+};
+
 export type CompileBindingEgressRoute = Omit<EgressCredentialRoute, "routeId" | "bindingId">;
 
 export type CompileBindingResult = {
   egressRoutes: ReadonlyArray<CompileBindingEgressRoute>;
   artifacts: ReadonlyArray<RuntimeArtifactSpec>;
   runtimeClientSetups: ReadonlyArray<CompiledRuntimeClientSetup>;
+  runtimeClientProcesses: ReadonlyArray<RuntimeClientProcessSpec>;
 };
 
 export type CompiledBindingResult = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClientSetups: ReadonlyArray<CompiledRuntimeClientSetup>;
+  runtimeClientProcesses: ReadonlyArray<RuntimeClientProcessSpec>;
 };
 
 export type IntegrationDefinition<
@@ -479,6 +512,7 @@ export type CompiledRuntimePlan = {
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   artifactRemovals: ReadonlyArray<CompiledRuntimeArtifactRemovalSpec>;
   runtimeClientSetups: ReadonlyArray<RuntimeClientSetup>;
+  runtimeClientProcesses: ReadonlyArray<RuntimeClientProcessSpec>;
 };
 
 export type IntegrationDefinitionLocator = {

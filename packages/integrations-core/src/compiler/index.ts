@@ -333,6 +333,7 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         bindingId: bindingInput.binding.id,
       }),
       runtimeClientSetups: compileBindingResult.runtimeClientSetups,
+      runtimeClientProcesses: compileBindingResult.runtimeClientProcesses,
     };
 
     compiledBindingResults.push(compiledBindingResult);
