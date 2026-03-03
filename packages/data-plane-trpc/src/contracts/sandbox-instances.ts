@@ -152,6 +152,16 @@ const RuntimeClientProcessReadinessSchema = z.discriminatedUnion("type", [
       timeoutMs: z.number().int().positive(),
     })
     .strict(),
+  z
+    .object({
+      type: z.literal("ws"),
+      url: z.url().refine((value) => {
+        const parsedURL = new URL(value);
+        return parsedURL.protocol === "ws:" || parsedURL.protocol === "wss:";
+      }, "URL must use ws or wss scheme"),
+      timeoutMs: z.number().int().positive(),
+    })
+    .strict(),
 ]);
 
 const RuntimeClientProcessStopPolicySchema = z

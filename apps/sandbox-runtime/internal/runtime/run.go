@@ -21,7 +21,7 @@ type RunInput struct {
 	Stdin     io.Reader
 }
 
-func Run(input RunInput) error {
+func Run(input RunInput) (runErr error) {
 	if input.LookupEnv == nil {
 		return fmt.Errorf("lookup env function is required")
 	}
@@ -45,6 +45,17 @@ func Run(input RunInput) error {
 	if err := runtimeplan.Apply(runtimeplan.ApplyInput{RuntimePlan: startupInput.RuntimePlan}); err != nil {
 		return fmt.Errorf("failed to apply runtime plan: %w", err)
 	}
+
+	processManager, err := startRuntimeClientProcesses(startupInput.RuntimePlan.RuntimeClientProcesses)
+	if err != nil {
+		return fmt.Errorf("failed to start runtime client processes: %w", err)
+	}
+	defer func() {
+		stopErr := processManager.Stop()
+		if stopErr != nil && runErr == nil {
+			runErr = fmt.Errorf("failed to stop runtime client processes: %w", stopErr)
+		}
+	}()
 
 	listenAddr, err := parseListenAddr(cfg.ListenAddr)
 	if err != nil {
@@ -104,5 +115,12 @@ func Run(input RunInput) error {
 		}
 
 		return nil
+	case processExit := <-processManager.UnexpectedExit():
+		cancelTunnel()
+		_ = httpServer.Close()
+		if processExit.Err != nil {
+			return fmt.Errorf("runtime client process '%s' exited unexpectedly: %w", processExit.ProcessKey, processExit.Err)
+		}
+		return fmt.Errorf("runtime client process '%s' exited unexpectedly", processExit.ProcessKey)
 	}
 }

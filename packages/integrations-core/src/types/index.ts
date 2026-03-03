@@ -393,6 +393,11 @@ export type RuntimeClientProcessReadiness =
       timeoutMs: number;
     }
   | {
+      type: "ws";
+      url: string;
+      timeoutMs: number;
+    }
+  | {
       type: "http";
       url: string;
       expectedStatus: number;

@@ -342,6 +342,10 @@ function runtimeClientProcessReadinessEquals(
     );
   }
 
+  if (left.type === "ws" && right.type === "ws") {
+    return left.url === right.url && left.timeoutMs === right.timeoutMs;
+  }
+
   if (left.type === "http" && right.type === "http") {
     return (
       left.url === right.url &&
@@ -467,6 +471,33 @@ function validateRuntimeClientProcesses(input: ReadonlyArray<RuntimeClientProces
         throw new IntegrationCompilerError(
           CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
           `Runtime client process '${runtimeClientProcess.processKey}' http readiness timeoutMs must be greater than zero.`,
+        );
+      }
+    }
+
+    if (runtimeClientProcess.readiness.type === "ws") {
+      let parsedURL: URL;
+      try {
+        parsedURL = new URL(runtimeClientProcess.readiness.url);
+      } catch (error) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+          `Runtime client process '${runtimeClientProcess.processKey}' ws readiness url must be a valid URL.`,
+          { cause: error },
+        );
+      }
+
+      if (parsedURL.protocol !== "ws:" && parsedURL.protocol !== "wss:") {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+          `Runtime client process '${runtimeClientProcess.processKey}' ws readiness url must use ws or wss scheme.`,
+        );
+      }
+
+      if (runtimeClientProcess.readiness.timeoutMs <= 0) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+          `Runtime client process '${runtimeClientProcess.processKey}' ws readiness timeoutMs must be greater than zero.`,
         );
       }
     }
