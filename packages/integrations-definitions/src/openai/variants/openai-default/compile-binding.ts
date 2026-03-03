@@ -1,6 +1,6 @@
 import type { CompileBindingInput, CompileBindingResult } from "@mistle/integrations-core";
 
-import { OpenAiApiKeyCredentialSecretTypes } from "./auth.js";
+import { resolveOpenAiCredentialSecretType } from "./auth.js";
 import type { OpenAiApiKeyBindingConfig } from "./binding-config-schema.js";
 import type { OpenAiApiKeyTargetConfig } from "./target-config-schema.js";
 
@@ -53,6 +53,7 @@ export function compileOpenAiApiKeyBinding(
 ): CompileBindingResult {
   const routeHost = new URL(input.target.config.apiBaseUrl).host;
   const routePathPrefix = resolveRoutePathPrefix(input.target.config.apiBaseUrl);
+  const credentialSecretType = resolveOpenAiCredentialSecretType(input.connection.config);
 
   return {
     egressRoutes: [
@@ -71,7 +72,7 @@ export function compileOpenAiApiKeyBinding(
         },
         credentialResolver: {
           connectionId: input.connection.id,
-          secretType: OpenAiApiKeyCredentialSecretTypes.API_KEY,
+          secretType: credentialSecretType,
         },
       },
     ],

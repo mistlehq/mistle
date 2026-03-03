@@ -5,6 +5,7 @@ import {
   integrationCredentials,
   IntegrationCredentialSecretKinds,
 } from "@mistle/db/control-plane";
+import { IntegrationSupportedAuthSchemes } from "@mistle/integrations-core";
 
 import {
   encryptCredentialUtf8,
@@ -109,6 +110,9 @@ export async function createApiKeyConnection(
           organizationId: input.organizationId,
           targetKey: input.targetKey,
           status: IntegrationConnectionStatuses.ACTIVE,
+          config: {
+            auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
+          },
           ...(encryptedConnectionSecrets === null ? {} : { secrets: encryptedConnectionSecrets }),
           targetSnapshotConfig: target.config,
         })
