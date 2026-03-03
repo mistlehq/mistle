@@ -37,6 +37,17 @@ function validateRoutes(input: ReadonlyArray<EgressCredentialRoute>): void {
   const routeIdToRoute = new Map<string, EgressCredentialRoute>();
 
   for (const route of input) {
+    if (route.match.pathPrefixes !== undefined) {
+      for (const [pathPrefixIndex, pathPrefix] of route.match.pathPrefixes.entries()) {
+        if (pathPrefix.trim().length === 0) {
+          throw new IntegrationCompilerError(
+            CompilerErrorCodes.ROUTE_CONFLICT,
+            `Egress route '${route.routeId}' contains an empty path prefix at index ${pathPrefixIndex}.`,
+          );
+        }
+      }
+    }
+
     const existingRoute = routeIdToRoute.get(route.routeId);
     if (existingRoute !== undefined) {
       throw new IntegrationCompilerError(

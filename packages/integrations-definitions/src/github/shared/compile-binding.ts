@@ -1,4 +1,9 @@
-import type { CompileBindingInput, CompileBindingResult } from "@mistle/integrations-core";
+import {
+  joinRoutePathPrefixes,
+  resolveRoutePathPrefixFromBaseUrl,
+  type CompileBindingInput,
+  type CompileBindingResult,
+} from "@mistle/integrations-core";
 
 import { resolveGitHubCredentialSecretType } from "./auth.js";
 import type { GitHubBindingConfig } from "./binding-config-schema.js";
@@ -10,36 +15,13 @@ export type GitHubCompileBindingInput = CompileBindingInput<
   GitHubBindingConfig
 >;
 
-function resolveApiPathPrefix(baseUrl: string): string {
-  const pathname = new URL(baseUrl).pathname;
-
-  if (pathname === "/") {
-    return "";
-  }
-
-  if (pathname.endsWith("/")) {
-    return pathname.slice(0, -1);
-  }
-
-  return pathname;
-}
-
-function createRepositoryPathPrefix(input: { apiPathPrefix: string; repository: string }): string {
-  return `${input.apiPathPrefix}/repos/${input.repository}`;
-}
-
 export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileBindingResult {
   const routeHost = new URL(input.target.config.apiBaseUrl).host;
-  const apiPathPrefix = resolveApiPathPrefix(input.target.config.apiBaseUrl);
+  const apiPathPrefix = resolveRoutePathPrefixFromBaseUrl(input.target.config.apiBaseUrl);
   const credentialSecretType = resolveGitHubCredentialSecretType(input.connection.config);
   const repositoryPathPrefixes = [...new Set(input.binding.config.repositories)]
     .sort((left, right) => left.localeCompare(right))
-    .map((repository) =>
-      createRepositoryPathPrefix({
-        apiPathPrefix,
-        repository,
-      }),
-    );
+    .map((repository) => joinRoutePathPrefixes(apiPathPrefix, `/repos/${repository}`));
 
   return {
     egressRoutes: [

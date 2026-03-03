@@ -192,6 +192,35 @@ describe("validateCompiledBindingResults", () => {
     }
   });
 
+  it("fails when a route contains an empty path prefix", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+        pathPrefixes: [""],
+      }),
+      artifactKey: "artifact-a",
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+
+    try {
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(IntegrationCompilerError);
+      if (error instanceof IntegrationCompilerError) {
+        expect(error.code).toBe(CompilerErrorCodes.ROUTE_CONFLICT);
+      }
+    }
+  });
+
   it("fails on runtime client env conflicts", () => {
     const resultA = createCompiledBindingResult({
       route: createRoute({

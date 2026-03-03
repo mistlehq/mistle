@@ -248,6 +248,51 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(compiled.runtimeClients[0]?.processes[0]?.processKey).toBe("codex-app-server");
   });
 
+  it("uses '/' as the route path prefix for root API base urls", () => {
+    const compiled = compileOpenAiApiKeyBinding({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "openai-default",
+      target: {
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        secrets: {},
+        config: {
+          apiBaseUrl: "https://api.openai.com",
+        },
+      },
+      connection: {
+        id: "icn_123",
+        status: "active",
+        config: {
+          auth_scheme: OpenAiApiKeyAuthScheme,
+        },
+      },
+      binding: {
+        id: "ibd_123",
+        kind: "agent",
+        config: {
+          runtime: "codex-cli",
+          defaultModel: "gpt-5.3-codex",
+          reasoningEffort: "medium",
+        },
+      },
+      refs: {
+        egressUrl: {
+          kind: "egress_url",
+          routeId: "route_ibd_123",
+        },
+      },
+      runtimeContext: {
+        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
+      },
+    });
+
+    expect(compiled.egressRoutes[0]?.match.pathPrefixes).toEqual(["/"]);
+  });
+
   it("fails fast when connection auth_scheme is missing", () => {
     expect(() =>
       compileOpenAiApiKeyBinding({

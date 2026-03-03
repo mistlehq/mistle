@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import type { EgressCredentialRoute } from "../types/index.js";
 import {
+  joinRoutePathPrefixes,
   matchesRoute,
   orderRoutesForMatching,
+  resolveRoutePathPrefixFromBaseUrl,
   resolveRouteForRequest,
   routesOverlap,
 } from "./index.js";
@@ -46,6 +48,25 @@ function createRoute(input: {
 }
 
 describe("egress route matching", () => {
+  it("resolves root URLs to '/' path prefix", () => {
+    expect(resolveRoutePathPrefixFromBaseUrl("https://api.openai.com")).toBe("/");
+    expect(resolveRoutePathPrefixFromBaseUrl("https://api.openai.com/")).toBe("/");
+  });
+
+  it("resolves non-root URLs by trimming only trailing slash", () => {
+    expect(resolveRoutePathPrefixFromBaseUrl("https://proxy.example.com/openai-v2/")).toBe(
+      "/openai-v2",
+    );
+    expect(resolveRoutePathPrefixFromBaseUrl("https://proxy.example.com/openai-v2")).toBe(
+      "/openai-v2",
+    );
+  });
+
+  it("joins route path prefixes without introducing double slashes", () => {
+    expect(joinRoutePathPrefixes("/", "/repos/acme/repo")).toBe("/repos/acme/repo");
+    expect(joinRoutePathPrefixes("/api/v3", "/repos/acme/repo")).toBe("/api/v3/repos/acme/repo");
+  });
+
   it("matches by host, path prefix, and method", () => {
     const route = createRoute({
       routeId: "route_a",
