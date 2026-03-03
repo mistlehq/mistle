@@ -4,11 +4,18 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
 
-import { startIntegrationEnvironment } from "@mistle/test-environments";
+import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import {
+  startControlPlaneApi,
+  startControlPlaneWorker,
+  startMailpit,
+  startPostgresWithPgBouncer,
+} from "@mistle/test-harness";
+import { Pool } from "pg";
+import { Network } from "testcontainers";
 import { it as vitestIt } from "vitest";
-
-type DashboardIntegrationEnvironment = Awaited<ReturnType<typeof startIntegrationEnvironment>>;
 
 export type AuthenticatedSession = {
   cookie: string;
@@ -17,12 +24,19 @@ export type AuthenticatedSession = {
 };
 
 export type DashboardMembersInvitationsFixture = {
-  db: DashboardIntegrationEnvironment["apiRuntime"]["db"];
+  db: ControlPlaneDatabase;
   request: (path: string, init?: RequestInit) => Promise<Response>;
   authSession: (input?: { email?: string }) => Promise<AuthenticatedSession>;
 };
 
 const AUTH_OTP_LENGTH = 6;
+const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../../..", import.meta.url));
+const CONFIG_PATH_IN_CONTAINER = "/workspace/config/config.development.toml";
+const APP_STARTUP_TIMEOUT_MS = 120_000;
+const PGBOUNCER_NETWORK_ALIAS = "pgbouncer";
+const PGBOUNCER_PORT_IN_NETWORK = 5432;
+const MAILPIT_NETWORK_ALIAS = "mailpit";
+const MAILPIT_SMTP_PORT_IN_NETWORK = 1025;
 
 function extractOTPCode(text: string): string | undefined {
   const pattern = new RegExp(`\\b(\\d{${String(AUTH_OTP_LENGTH)}})\\b`);
@@ -53,40 +67,119 @@ function generateIntegrationAuthEmail(): string {
   return `integration-auth-${randomUUID()}@example.com`;
 }
 
+function createDatabaseUrl(input: {
+  username: string;
+  password: string;
+  host: string;
+  port: number;
+  databaseName: string;
+}): string {
+  return `postgresql://${encodeURIComponent(input.username)}:${encodeURIComponent(input.password)}@${input.host}:${String(input.port)}/${input.databaseName}`;
+}
+
+function createRequestFn(baseUrl: string): (path: string, init?: RequestInit) => Promise<Response> {
+  return async (path, init) => {
+    const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+    return fetch(`${baseUrl}${normalizedPath}`, init);
+  };
+}
+
 export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture }>({
   fixture: [
     async ({}, use) => {
-      const environment = await startIntegrationEnvironment({
-        capabilities: ["members-invite-email"],
-      });
-
+      const cleanupTasks: Array<() => Promise<void>> = [];
       try {
-        const mailpitService = environment.mailpitService;
-        if (mailpitService === null) {
-          throw new Error(
-            "Expected mailpit service to be started for members-invite-email capability.",
-          );
-        }
+        const workflowNamespaceId = `integration_${randomUUID().replaceAll("-", "_")}`;
+        const network = await new Network().start();
+        cleanupTasks.unshift(async () => {
+          await network.stop();
+        });
+
+        const databaseStack = await startPostgresWithPgBouncer({
+          databaseName: `mistle_dashboard_integration_${randomUUID().replaceAll("-", "_")}`,
+          network,
+          pgbouncerNetworkAlias: PGBOUNCER_NETWORK_ALIAS,
+        });
+        cleanupTasks.unshift(async () => {
+          await databaseStack.stop();
+        });
+
+        const mailpitService = await startMailpit({
+          network,
+          networkAlias: MAILPIT_NETWORK_ALIAS,
+        });
+        cleanupTasks.unshift(async () => {
+          await mailpitService.stop();
+        });
+
+        const pooledDatabaseUrlInNetwork = createDatabaseUrl({
+          username: databaseStack.postgres.username,
+          password: databaseStack.postgres.password,
+          host: PGBOUNCER_NETWORK_ALIAS,
+          port: PGBOUNCER_PORT_IN_NETWORK,
+          databaseName: databaseStack.postgres.databaseName,
+        });
+
+        const apiService = await startControlPlaneApi({
+          buildContextHostPath: PROJECT_ROOT_HOST_PATH,
+          configPathInContainer: CONFIG_PATH_IN_CONTAINER,
+          startupTimeoutMs: APP_STARTUP_TIMEOUT_MS,
+          network,
+          environment: {
+            MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL: pooledDatabaseUrlInNetwork,
+            MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: pooledDatabaseUrlInNetwork,
+            MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: workflowNamespaceId,
+          },
+        });
+        cleanupTasks.unshift(async () => {
+          await apiService.stop();
+        });
+
+        const workerService = await startControlPlaneWorker({
+          buildContextHostPath: PROJECT_ROOT_HOST_PATH,
+          configPathInContainer: CONFIG_PATH_IN_CONTAINER,
+          startupTimeoutMs: APP_STARTUP_TIMEOUT_MS,
+          network,
+          environment: {
+            MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL: pooledDatabaseUrlInNetwork,
+            MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: workflowNamespaceId,
+            MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_HOST: MAILPIT_NETWORK_ALIAS,
+            MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT: String(MAILPIT_SMTP_PORT_IN_NETWORK),
+            MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE: "false",
+            MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_USERNAME: "",
+            MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PASSWORD: "",
+          },
+        });
+        cleanupTasks.unshift(async () => {
+          await workerService.stop();
+        });
+
+        const databasePool = new Pool({
+          connectionString: databaseStack.pooledUrl,
+        });
+        cleanupTasks.unshift(async () => {
+          await databasePool.end();
+        });
+
+        const db = createControlPlaneDatabase(databasePool);
+        const request = createRequestFn(apiService.hostBaseUrl);
 
         await use({
-          db: environment.apiRuntime.db,
-          request: environment.request,
+          db,
+          request,
           authSession: async (input) => {
             const email = input?.email ?? generateIntegrationAuthEmail();
 
-            const sendResponse = await environment.request(
-              "/v1/auth/email-otp/send-verification-otp",
-              {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json",
-                },
-                body: JSON.stringify({
-                  email,
-                  type: "sign-in",
-                }),
+            const sendResponse = await request("/v1/auth/email-otp/send-verification-otp", {
+              method: "POST",
+              headers: {
+                "content-type": "application/json",
               },
-            );
+              body: JSON.stringify({
+                email,
+                type: "sign-in",
+              }),
+            });
             if (sendResponse.status !== 200) {
               throw new Error(
                 `Expected OTP send response status 200, got ${String(sendResponse.status)}.`,
@@ -106,7 +199,7 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
               throw new Error("OTP was not found in Mailpit message text.");
             }
 
-            const signInResponse = await environment.request("/v1/auth/sign-in/email-otp", {
+            const signInResponse = await request("/v1/auth/sign-in/email-otp", {
               method: "POST",
               headers: {
                 "content-type": "application/json",
@@ -127,7 +220,7 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
               throw new Error("Expected sign-in response to include set-cookie.");
             }
 
-            const user = await environment.apiRuntime.db.query.users.findFirst({
+            const user = await db.query.users.findFirst({
               columns: {
                 id: true,
               },
@@ -137,7 +230,7 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
               throw new Error("Expected user to be created after OTP sign-in.");
             }
 
-            const session = await environment.apiRuntime.db.query.sessions.findFirst({
+            const session = await db.query.sessions.findFirst({
               columns: {
                 activeOrganizationId: true,
               },
@@ -156,20 +249,17 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
                 : null;
 
             if (activeOrganizationId === null) {
-              const createOrganizationResponse = await environment.request(
-                "/v1/auth/organization/create",
-                {
-                  method: "POST",
-                  headers: {
-                    "content-type": "application/json",
-                    cookie: requestCookie,
-                  },
-                  body: JSON.stringify({
-                    name: "Integration Organization",
-                    slug: `integration-${randomUUID()}`,
-                  }),
+              const createOrganizationResponse = await request("/v1/auth/organization/create", {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  cookie: requestCookie,
                 },
-              );
+                body: JSON.stringify({
+                  name: "Integration Organization",
+                  slug: `integration-${randomUUID()}`,
+                }),
+              });
               if (createOrganizationResponse.status !== 200) {
                 throw new Error(
                   `Expected organization create response status 200, got ${String(createOrganizationResponse.status)}.`,
@@ -195,7 +285,9 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
           },
         });
       } finally {
-        await environment.stop();
+        for (const cleanupTask of cleanupTasks) {
+          await cleanupTask();
+        }
       }
     },
     {

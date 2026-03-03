@@ -56,7 +56,7 @@
     "typeid-js": "^1.2.0"
   },
   "devDependencies": {
-    "@mistle/test-core": "workspace:*",
+    "@mistle/test-harness": "workspace:*",
     "@types/pg": "^8.18.0",
     "drizzle-kit": "^0.31.9",
     "squawk-cli": "^2.41.0"

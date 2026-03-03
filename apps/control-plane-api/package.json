@@ -2,14 +2,6 @@
   "name": "@mistle/control-plane-api",
   "private": true,
   "type": "module",
-  "exports": {
-    "./testing": {
-      "types": "./src/testing/index.ts",
-      "node": "./src/testing/index.ts",
-      "import": "./src/testing/index.ts",
-      "default": "./src/testing/index.ts"
-    }
-  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "db:migrate": "tsx src/scripts/run-control-plane-migrations.ts",
@@ -48,7 +40,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@mistle/test-core": "workspace:*",
+    "@mistle/test-harness": "workspace:*",
     "@types/pg": "^8.18.0"
   }
 }

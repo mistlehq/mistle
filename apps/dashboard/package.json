@@ -33,7 +33,7 @@
     "react-router": "~7.13.0"
   },
   "devDependencies": {
-    "@mistle/test-environments": "workspace:*",
+    "@mistle/test-harness": "workspace:*",
     "@tailwindcss/vite": "^4.1.14",
     "@testing-library/react": "^16.3.0",
     "@vitejs/plugin-react": "^5.1.4",

@@ -2,14 +2,6 @@
   "name": "@mistle/control-plane-worker",
   "private": true,
   "type": "module",
-  "exports": {
-    "./testing": {
-      "types": "./src/testing/index.ts",
-      "node": "./src/testing/index.ts",
-      "import": "./src/testing/index.ts",
-      "default": "./src/testing/index.ts"
-    }
-  },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
@@ -35,7 +27,7 @@
     "pg": "^8.19.0"
   },
   "devDependencies": {
-    "@mistle/test-core": "workspace:*",
+    "@mistle/test-harness": "workspace:*",
     "@types/pg": "^8.18.0"
   }
 }

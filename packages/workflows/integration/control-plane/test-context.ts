@@ -5,7 +5,11 @@ import {
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
 import { SMTPEmailSender } from "@mistle/emails";
-import { startMailpit, startPostgresWithPgBouncer, type MailpitService } from "@mistle/test-core";
+import {
+  startMailpit,
+  startPostgresWithPgBouncer,
+  type MailpitService,
+} from "@mistle/test-harness";
 import type { Worker } from "openworkflow";
 import type { BackendPostgres } from "openworkflow/postgres";
 import postgres from "postgres";

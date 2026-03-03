@@ -7,7 +7,7 @@ import {
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
 import { SandboxProvider, createSandboxAdapter, type SandboxAdapter } from "@mistle/sandbox";
-import { startPostgresWithPgBouncer } from "@mistle/test-core";
+import { startPostgresWithPgBouncer } from "@mistle/test-harness";
 import type { Worker } from "openworkflow";
 import type { BackendPostgres } from "openworkflow/postgres";
 import postgres from "postgres";

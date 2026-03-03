@@ -1,4 +1,7 @@
-import { startPostgresWithPgBouncer, type PostgresWithPgBouncerService } from "@mistle/test-core";
+import {
+  startPostgresWithPgBouncer,
+  type PostgresWithPgBouncerService,
+} from "@mistle/test-harness";
 import { it as vitestIt } from "vitest";
 
 import type { ControlPlaneWorkerConfig } from "../src/types.js";

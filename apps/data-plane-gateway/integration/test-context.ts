@@ -12,7 +12,7 @@ import {
   reserveAvailablePort,
   startPostgresWithPgBouncer,
   type PostgresWithPgBouncerService,
-} from "@mistle/test-core";
+} from "@mistle/test-harness";
 import { Pool } from "pg";
 import { it as vitestIt } from "vitest";
 

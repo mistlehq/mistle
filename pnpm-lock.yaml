@@ -141,9 +141,9 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
-      '@mistle/test-core':
+      '@mistle/test-harness':
         specifier: workspace:*
-        version: link:../../packages/test-core
+        version: link:../../packages/test-harness
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
@@ -181,9 +181,9 @@ importers:
         specifier: ^8.19.0
         version: 8.19.0
     devDependencies:
-      '@mistle/test-core':
+      '@mistle/test-harness':
         specifier: workspace:*
-        version: link:../../packages/test-core
+        version: link:../../packages/test-harness
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
@@ -233,9 +233,9 @@ importers:
         specifier: ~7.13.0
         version: 7.13.1(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
     devDependencies:
-      '@mistle/test-environments':
+      '@mistle/test-harness':
         specifier: workspace:*
-        version: link:../../packages/test-environments
+        version: link:../../packages/test-harness
       '@tailwindcss/vite':
         specifier: ^4.1.14
         version: 4.2.1(vite@7.3.1(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
@@ -294,9 +294,9 @@ importers:
         specifier: ^8.19.0
         version: 8.19.0
     devDependencies:
-      '@mistle/test-core':
+      '@mistle/test-harness':
         specifier: workspace:*
-        version: link:../../packages/test-core
+        version: link:../../packages/test-harness
       '@trpc/client':
         specifier: ^11.11.0
         version: 11.11.0(@trpc/server@11.10.0(typescript@5.9.3))(typescript@5.9.3)
@@ -331,9 +331,9 @@ importers:
         specifier: ^8.19.0
         version: 8.19.0
     devDependencies:
-      '@mistle/test-core':
+      '@mistle/test-harness':
         specifier: workspace:*
-        version: link:../../packages/test-core
+        version: link:../../packages/test-harness
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
@@ -404,9 +404,9 @@ importers:
         specifier: ^4.12.3
         version: 4.12.3
     devDependencies:
-      '@mistle/test-core':
+      '@mistle/test-harness':
         specifier: workspace:*
-        version: link:../../packages/test-core
+        version: link:../../packages/test-harness
 
   packages/config:
     dependencies:
@@ -450,9 +450,9 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0
     devDependencies:
-      '@mistle/test-core':
+      '@mistle/test-harness':
         specifier: workspace:*
-        version: link:../test-core
+        version: link:../test-harness
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
@@ -478,9 +478,9 @@ importers:
         specifier: ^19.2.0
         version: 19.2.4(react@19.2.4)
     devDependencies:
-      '@mistle/test-core':
+      '@mistle/test-harness':
         specifier: workspace:*
-        version: link:../test-core
+        version: link:../test-harness
       '@types/nodemailer':
         specifier: ^7.0.11
         version: 7.0.11
@@ -553,7 +553,7 @@ importers:
         specifier: ^11.7.2
         version: 11.12.0
 
-  packages/test-core:
+  packages/test-harness:
     dependencies:
       '@mistle/time':
         specifier: workspace:*
@@ -567,18 +567,6 @@ importers:
       testcontainers:
         specifier: ^11.7.2
         version: 11.12.0
-
-  packages/test-environments:
-    dependencies:
-      '@mistle/control-plane-api':
-        specifier: workspace:*
-        version: link:../../apps/control-plane-api
-      '@mistle/control-plane-worker':
-        specifier: workspace:*
-        version: link:../../apps/control-plane-worker
-      '@mistle/test-core':
-        specifier: workspace:*
-        version: link:../test-core
 
   packages/time: {}
 
@@ -688,9 +676,9 @@ importers:
       '@mistle/db':
         specifier: workspace:*
         version: link:../db
-      '@mistle/test-core':
+      '@mistle/test-harness':
         specifier: workspace:*
-        version: link:../test-core
+        version: link:../test-harness
 
   tests: {}
 
@@ -9085,14 +9073,6 @@ snapshots:
     optionalDependencies:
       vite: 7.3.1(@types/node@24.10.15)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  '@vitest/mocker@4.0.18(vite@7.3.1(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))':
-    dependencies:
-      '@vitest/spy': 4.0.18
-      estree-walker: 3.0.3
-      magic-string: 0.30.21
-    optionalDependencies:
-      vite: 7.3.1(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
-
   '@vitest/pretty-format@4.0.18':
     dependencies:
       tinyrainbow: 3.0.3
@@ -12581,7 +12561,7 @@ snapshots:
   vitest@4.0.18(@types/node@25.3.3)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2):
     dependencies:
       '@vitest/expect': 4.0.18
-      '@vitest/mocker': 4.0.18(vite@7.3.1(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
+      '@vitest/mocker': 4.0.18(vite@7.3.1(@types/node@24.10.15)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
       '@vitest/pretty-format': 4.0.18
       '@vitest/runner': 4.0.18
       '@vitest/snapshot': 4.0.18

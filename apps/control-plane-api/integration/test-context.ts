@@ -15,7 +15,7 @@ import {
   startPostgresWithPgBouncer,
   type MailpitService,
   type PostgresWithPgBouncerService,
-} from "@mistle/test-core";
+} from "@mistle/test-harness";
 import {
   ControlPlaneWorkerWorkflowIds,
   createControlPlaneBackend,

@@ -2,7 +2,7 @@
  * This suite uses an extended integration `it` fixture imported from test context.
  */
 
-import { reserveAvailablePort, startHttpEcho } from "@mistle/test-core";
+import { reserveAvailablePort, startHttpEcho } from "@mistle/test-harness";
 import { describe, expect } from "vitest";
 
 import { EgressRequestHeaders } from "../src/egress/constants.js";
