@@ -67,8 +67,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
     ]);
 
     expect(compiled.artifacts).toEqual([]);
-    expect(compiled.runtimeClientSetups).toEqual([]);
-    expect(compiled.runtimeClientProcesses).toEqual([]);
+    expect(compiled.runtimeClients).toEqual([]);
   });
 
   it("deduplicates and sorts repositories for deterministic route matching", () => {

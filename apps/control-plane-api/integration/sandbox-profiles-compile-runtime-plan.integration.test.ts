@@ -109,22 +109,53 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("/usr/local/bin/codex");
-    expect(runtimePlan.runtimeClientSetups).toEqual([
+    expect(runtimePlan.runtimeClients).toEqual([
       {
         clientId: "codex-cli",
-        env: {
-          OPENAI_BASE_URL: "http://sandboxd.internal/egress/routes/route_ibd_compile_success",
-          OPENAI_MODEL: "gpt-5.3-codex",
-          OPENAI_REASONING_EFFORT: "medium",
-        },
-        files: [
-          {
-            fileId: "codex_config",
-            path: "/workspace/.codex/config.toml",
-            mode: 384,
-            content: `model = "gpt-5.3-codex"
+        setup: {
+          env: {
+            OPENAI_BASE_URL: "http://sandboxd.internal/egress/routes/route_ibd_compile_success",
+            OPENAI_MODEL: "gpt-5.3-codex",
+            OPENAI_REASONING_EFFORT: "medium",
+          },
+          files: [
+            {
+              fileId: "codex_config",
+              path: "/workspace/.codex/config.toml",
+              mode: 384,
+              content: `model = "gpt-5.3-codex"
 model_reasoning_effort = "medium"
 `,
+            },
+          ],
+        },
+        processes: [
+          {
+            processKey: "codex-app-server",
+            command: {
+              args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
+            },
+            readiness: {
+              type: "ws",
+              url: "ws://127.0.0.1:4500",
+              timeoutMs: 5_000,
+            },
+            stop: {
+              signal: "sigterm",
+              timeoutMs: 10_000,
+              gracePeriodMs: 2_000,
+            },
+          },
+        ],
+        endpoints: [
+          {
+            endpointKey: "app-server",
+            processKey: "codex-app-server",
+            transport: {
+              type: "ws",
+              url: "ws://127.0.0.1:4500",
+            },
+            connectionMode: "dedicated",
           },
         ],
       },

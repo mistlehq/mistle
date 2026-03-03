@@ -69,14 +69,14 @@ func Apply(input ApplyInput) error {
 		}
 	}
 
-	for setupIndex, setup := range input.RuntimePlan.RuntimeClientSetups {
-		for fileIndex, file := range setup.Files {
+	for clientIndex, runtimeClient := range input.RuntimePlan.RuntimeClients {
+		for fileIndex, file := range runtimeClient.Setup.Files {
 			if err := applyRuntimeFile(file); err != nil {
 				return fmt.Errorf(
-					"runtime plan runtimeClientSetups[%d] files[%d] failed (clientId=%s fileId=%s path=%s): %w",
-					setupIndex,
+					"runtime plan runtimeClients[%d].setup.files[%d] failed (clientId=%s fileId=%s path=%s): %w",
+					clientIndex,
 					fileIndex,
-					setup.ClientID,
+					runtimeClient.ClientID,
 					file.FileID,
 					file.Path,
 					err,

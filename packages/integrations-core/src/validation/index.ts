@@ -3,35 +3,33 @@ import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js
 import type {
   CompiledRuntimeArtifactSpec,
   CompiledBindingResult,
+  CompiledRuntimeClient,
   EgressCredentialRoute,
-  CompiledRuntimeClientSetup,
   EgressUrlRef,
+  RuntimeArtifactCommand,
+  RuntimeClientEndpointSpec,
   RuntimeClientProcessSpec,
 } from "../types/index.js";
 
 function flattenCompiledBindingResults(input: ReadonlyArray<CompiledBindingResult>): {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
-  runtimeClientSetups: ReadonlyArray<CompiledRuntimeClientSetup>;
-  runtimeClientProcesses: ReadonlyArray<RuntimeClientProcessSpec>;
+  runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
 } {
   const egressRoutes: EgressCredentialRoute[] = [];
   const artifacts: CompiledRuntimeArtifactSpec[] = [];
-  const runtimeClientSetups: CompiledRuntimeClientSetup[] = [];
-  const runtimeClientProcesses: RuntimeClientProcessSpec[] = [];
+  const runtimeClients: CompiledRuntimeClient[] = [];
 
   for (const compiledBindingResult of input) {
     egressRoutes.push(...compiledBindingResult.egressRoutes);
     artifacts.push(...compiledBindingResult.artifacts);
-    runtimeClientSetups.push(...compiledBindingResult.runtimeClientSetups);
-    runtimeClientProcesses.push(...compiledBindingResult.runtimeClientProcesses);
+    runtimeClients.push(...compiledBindingResult.runtimeClients);
   }
 
   return {
     egressRoutes,
     artifacts,
-    runtimeClientSetups,
-    runtimeClientProcesses,
+    runtimeClients,
   };
 }
 
@@ -229,92 +227,9 @@ function runtimeClientSetupValueEquals(left: string | EgressUrlRef, right: strin
   return left.kind === right.kind && left.routeId === right.routeId;
 }
 
-function validateRuntimeClientSetups(input: ReadonlyArray<CompiledRuntimeClientSetup>): void {
-  const clientEnvByClientId = new Map<string, Map<string, string | EgressUrlRef>>();
-  const clientFilesByPathByClientId = new Map<
-    string,
-    Map<string, { fileId: string; mode: number; content: string }>
-  >();
-  const clientFilesByIdByClientId = new Map<
-    string,
-    Map<string, { path: string; mode: number; content: string }>
-  >();
-
-  for (const runtimeClientSetup of input) {
-    let envByKey = clientEnvByClientId.get(runtimeClientSetup.clientId);
-    if (envByKey === undefined) {
-      envByKey = new Map();
-      clientEnvByClientId.set(runtimeClientSetup.clientId, envByKey);
-    }
-
-    for (const [envKey, envValue] of Object.entries(runtimeClientSetup.env)) {
-      const existingValue = envByKey.get(envKey);
-      if (existingValue !== undefined && !runtimeClientSetupValueEquals(existingValue, envValue)) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-          `Runtime client env conflict for client '${runtimeClientSetup.clientId}' and key '${envKey}'.`,
-        );
-      }
-
-      envByKey.set(envKey, envValue);
-    }
-
-    let filesByPath = clientFilesByPathByClientId.get(runtimeClientSetup.clientId);
-    if (filesByPath === undefined) {
-      filesByPath = new Map();
-      clientFilesByPathByClientId.set(runtimeClientSetup.clientId, filesByPath);
-    }
-
-    let filesById = clientFilesByIdByClientId.get(runtimeClientSetup.clientId);
-    if (filesById === undefined) {
-      filesById = new Map();
-      clientFilesByIdByClientId.set(runtimeClientSetup.clientId, filesById);
-    }
-
-    for (const file of runtimeClientSetup.files) {
-      const existingFileByPath = filesByPath.get(file.path);
-      if (
-        existingFileByPath !== undefined &&
-        (existingFileByPath.fileId !== file.fileId ||
-          existingFileByPath.mode !== file.mode ||
-          existingFileByPath.content !== file.content)
-      ) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-          `Runtime client file conflict for client '${runtimeClientSetup.clientId}' and path '${file.path}'.`,
-        );
-      }
-
-      const existingFileById = filesById.get(file.fileId);
-      if (
-        existingFileById !== undefined &&
-        (existingFileById.path !== file.path ||
-          existingFileById.mode !== file.mode ||
-          existingFileById.content !== file.content)
-      ) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-          `Runtime client file conflict for client '${runtimeClientSetup.clientId}' and fileId '${file.fileId}'.`,
-        );
-      }
-
-      filesByPath.set(file.path, {
-        fileId: file.fileId,
-        mode: file.mode,
-        content: file.content,
-      });
-      filesById.set(file.fileId, {
-        path: file.path,
-        mode: file.mode,
-        content: file.content,
-      });
-    }
-  }
-}
-
 function runtimeArtifactCommandEquals(
-  left: RuntimeClientProcessSpec["command"],
-  right: RuntimeClientProcessSpec["command"],
+  left: RuntimeArtifactCommand,
+  right: RuntimeArtifactCommand,
 ): boolean {
   return (
     stringArrayEquals(left.args, right.args) &&
@@ -373,163 +288,368 @@ function runtimeClientProcessSpecEquals(
   right: RuntimeClientProcessSpec,
 ): boolean {
   return (
-    left.clientId === right.clientId &&
     runtimeArtifactCommandEquals(left.command, right.command) &&
     runtimeClientProcessReadinessEquals(left.readiness, right.readiness) &&
     runtimeClientProcessStopPolicyEquals(left.stop, right.stop)
   );
 }
 
-function validateRuntimeClientProcesses(input: ReadonlyArray<RuntimeClientProcessSpec>): void {
-  const processByKey = new Map<string, RuntimeClientProcessSpec>();
+function runtimeClientEndpointSpecEquals(
+  left: RuntimeClientEndpointSpec,
+  right: RuntimeClientEndpointSpec,
+): boolean {
+  if (
+    left.connectionMode !== right.connectionMode ||
+    left.processKey !== right.processKey ||
+    left.transport.type !== right.transport.type
+  ) {
+    return false;
+  }
 
-  for (const runtimeClientProcess of input) {
-    if (runtimeClientProcess.processKey.trim().length === 0) {
+  if (left.transport.type === "ws" && right.transport.type === "ws") {
+    return left.transport.url === right.transport.url;
+  }
+
+  return false;
+}
+
+function validateRuntimeClientProcess(input: {
+  runtimeClientProcess: RuntimeClientProcessSpec;
+  clientId: string;
+}): void {
+  const runtimeClientProcess = input.runtimeClientProcess;
+
+  if (runtimeClientProcess.processKey.trim().length === 0) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      `Runtime client process for client '${input.clientId}' must define a non-empty processKey.`,
+    );
+  }
+
+  const commandArgs = runtimeClientProcess.command.args;
+  if (commandArgs.length === 0) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' must define at least one command arg.`,
+    );
+  }
+  const commandName = commandArgs[0];
+  if (commandName === undefined || commandName.trim().length === 0) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' has an empty command name.`,
+    );
+  }
+
+  const commandTimeoutMs = runtimeClientProcess.command.timeoutMs;
+  if (commandTimeoutMs !== undefined && commandTimeoutMs <= 0) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' command timeoutMs must be greater than zero when provided.`,
+    );
+  }
+
+  if (runtimeClientProcess.readiness.type === "tcp") {
+    if (runtimeClientProcess.readiness.host.trim().length === 0) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-        "Runtime client process must define a non-empty processKey.",
+        `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' tcp readiness host must be non-empty.`,
       );
     }
-    if (runtimeClientProcess.clientId.trim().length === 0) {
+    if (
+      !Number.isInteger(runtimeClientProcess.readiness.port) ||
+      runtimeClientProcess.readiness.port < 1 ||
+      runtimeClientProcess.readiness.port > 65_535
+    ) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-        `Runtime client process '${runtimeClientProcess.processKey}' must define a non-empty clientId.`,
+        `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' tcp readiness port must be an integer between 1 and 65535.`,
       );
     }
-
-    const commandArgs = runtimeClientProcess.command.args;
-    if (commandArgs.length === 0) {
+    if (runtimeClientProcess.readiness.timeoutMs <= 0) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-        `Runtime client process '${runtimeClientProcess.processKey}' must define at least one command arg.`,
+        `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' tcp readiness timeoutMs must be greater than zero.`,
       );
     }
-    const commandName = commandArgs[0];
-    if (commandName === undefined || commandName.trim().length === 0) {
+  }
+
+  if (runtimeClientProcess.readiness.type === "http") {
+    try {
+      new URL(runtimeClientProcess.readiness.url);
+    } catch (error) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-        `Runtime client process '${runtimeClientProcess.processKey}' has an empty command name.`,
-      );
-    }
-
-    const commandTimeoutMs = runtimeClientProcess.command.timeoutMs;
-    if (commandTimeoutMs !== undefined && commandTimeoutMs <= 0) {
-      throw new IntegrationCompilerError(
-        CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-        `Runtime client process '${runtimeClientProcess.processKey}' command timeoutMs must be greater than zero when provided.`,
-      );
-    }
-
-    if (runtimeClientProcess.readiness.type === "tcp") {
-      if (runtimeClientProcess.readiness.host.trim().length === 0) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-          `Runtime client process '${runtimeClientProcess.processKey}' tcp readiness host must be non-empty.`,
-        );
-      }
-      if (
-        !Number.isInteger(runtimeClientProcess.readiness.port) ||
-        runtimeClientProcess.readiness.port < 1 ||
-        runtimeClientProcess.readiness.port > 65_535
-      ) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-          `Runtime client process '${runtimeClientProcess.processKey}' tcp readiness port must be an integer between 1 and 65535.`,
-        );
-      }
-      if (runtimeClientProcess.readiness.timeoutMs <= 0) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-          `Runtime client process '${runtimeClientProcess.processKey}' tcp readiness timeoutMs must be greater than zero.`,
-        );
-      }
-    }
-
-    if (runtimeClientProcess.readiness.type === "http") {
-      try {
-        new URL(runtimeClientProcess.readiness.url);
-      } catch (error) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-          `Runtime client process '${runtimeClientProcess.processKey}' http readiness url must be a valid URL.`,
-          { cause: error },
-        );
-      }
-
-      if (
-        !Number.isInteger(runtimeClientProcess.readiness.expectedStatus) ||
-        runtimeClientProcess.readiness.expectedStatus < 100 ||
-        runtimeClientProcess.readiness.expectedStatus > 599
-      ) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-          `Runtime client process '${runtimeClientProcess.processKey}' http readiness expectedStatus must be an integer between 100 and 599.`,
-        );
-      }
-
-      if (runtimeClientProcess.readiness.timeoutMs <= 0) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-          `Runtime client process '${runtimeClientProcess.processKey}' http readiness timeoutMs must be greater than zero.`,
-        );
-      }
-    }
-
-    if (runtimeClientProcess.readiness.type === "ws") {
-      let parsedURL: URL;
-      try {
-        parsedURL = new URL(runtimeClientProcess.readiness.url);
-      } catch (error) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-          `Runtime client process '${runtimeClientProcess.processKey}' ws readiness url must be a valid URL.`,
-          { cause: error },
-        );
-      }
-
-      if (parsedURL.protocol !== "ws:" && parsedURL.protocol !== "wss:") {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-          `Runtime client process '${runtimeClientProcess.processKey}' ws readiness url must use ws or wss scheme.`,
-        );
-      }
-
-      if (runtimeClientProcess.readiness.timeoutMs <= 0) {
-        throw new IntegrationCompilerError(
-          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-          `Runtime client process '${runtimeClientProcess.processKey}' ws readiness timeoutMs must be greater than zero.`,
-        );
-      }
-    }
-
-    if (runtimeClientProcess.stop.timeoutMs <= 0) {
-      throw new IntegrationCompilerError(
-        CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-        `Runtime client process '${runtimeClientProcess.processKey}' stop timeoutMs must be greater than zero.`,
+        `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' http readiness url must be a valid URL.`,
+        { cause: error },
       );
     }
 
     if (
-      runtimeClientProcess.stop.gracePeriodMs !== undefined &&
-      runtimeClientProcess.stop.gracePeriodMs < 0
+      !Number.isInteger(runtimeClientProcess.readiness.expectedStatus) ||
+      runtimeClientProcess.readiness.expectedStatus < 100 ||
+      runtimeClientProcess.readiness.expectedStatus > 599
     ) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-        `Runtime client process '${runtimeClientProcess.processKey}' stop gracePeriodMs must be greater than or equal to zero when provided.`,
+        `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' http readiness expectedStatus must be an integer between 100 and 599.`,
       );
     }
 
-    const existingProcess = processByKey.get(runtimeClientProcess.processKey);
-    if (existingProcess === undefined) {
-      processByKey.set(runtimeClientProcess.processKey, runtimeClientProcess);
-      continue;
-    }
-
-    if (!runtimeClientProcessSpecEquals(existingProcess, runtimeClientProcess)) {
+    if (runtimeClientProcess.readiness.timeoutMs <= 0) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-        `Runtime client process key conflict for '${runtimeClientProcess.processKey}'.`,
+        `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' http readiness timeoutMs must be greater than zero.`,
       );
+    }
+  }
+
+  if (runtimeClientProcess.readiness.type === "ws") {
+    let parsedURL: URL;
+    try {
+      parsedURL = new URL(runtimeClientProcess.readiness.url);
+    } catch (error) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+        `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' ws readiness url must be a valid URL.`,
+        { cause: error },
+      );
+    }
+
+    if (parsedURL.protocol !== "ws:" && parsedURL.protocol !== "wss:") {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+        `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' ws readiness url must use ws or wss scheme.`,
+      );
+    }
+
+    if (runtimeClientProcess.readiness.timeoutMs <= 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+        `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' ws readiness timeoutMs must be greater than zero.`,
+      );
+    }
+  }
+
+  if (runtimeClientProcess.stop.timeoutMs <= 0) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' stop timeoutMs must be greater than zero.`,
+    );
+  }
+
+  if (
+    runtimeClientProcess.stop.gracePeriodMs !== undefined &&
+    runtimeClientProcess.stop.gracePeriodMs < 0
+  ) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      `Runtime client process '${runtimeClientProcess.processKey}' for client '${input.clientId}' stop gracePeriodMs must be greater than or equal to zero when provided.`,
+    );
+  }
+}
+
+function validateRuntimeClientEndpoint(input: {
+  runtimeClientEndpoint: RuntimeClientEndpointSpec;
+  clientId: string;
+}): void {
+  const runtimeClientEndpoint = input.runtimeClientEndpoint;
+
+  if (runtimeClientEndpoint.endpointKey.trim().length === 0) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      `Runtime client endpoint for client '${input.clientId}' must define a non-empty endpointKey.`,
+    );
+  }
+
+  if (
+    runtimeClientEndpoint.processKey !== undefined &&
+    runtimeClientEndpoint.processKey.trim().length === 0
+  ) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+      `Runtime client endpoint '${runtimeClientEndpoint.endpointKey}' for client '${input.clientId}' must define a non-empty processKey when provided.`,
+    );
+  }
+
+  if (runtimeClientEndpoint.transport.type === "ws") {
+    let parsedURL: URL;
+    try {
+      parsedURL = new URL(runtimeClientEndpoint.transport.url);
+    } catch (error) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+        `Runtime client endpoint '${runtimeClientEndpoint.endpointKey}' for client '${input.clientId}' ws transport url must be a valid URL.`,
+        { cause: error },
+      );
+    }
+
+    if (parsedURL.protocol !== "ws:" && parsedURL.protocol !== "wss:") {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+        `Runtime client endpoint '${runtimeClientEndpoint.endpointKey}' for client '${input.clientId}' ws transport url must use ws or wss scheme.`,
+      );
+    }
+  }
+}
+
+function validateRuntimeClients(input: ReadonlyArray<CompiledRuntimeClient>): void {
+  const clientEnvByClientId = new Map<string, Map<string, string | EgressUrlRef>>();
+  const clientFilesByPathByClientId = new Map<
+    string,
+    Map<string, { fileId: string; mode: number; content: string }>
+  >();
+  const clientFilesByIdByClientId = new Map<
+    string,
+    Map<string, { path: string; mode: number; content: string }>
+  >();
+  const clientProcessesByKey = new Map<string, Map<string, RuntimeClientProcessSpec>>();
+  const clientEndpointsByKey = new Map<string, Map<string, RuntimeClientEndpointSpec>>();
+
+  for (const runtimeClient of input) {
+    if (runtimeClient.clientId.trim().length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+        "Runtime client must define a non-empty clientId.",
+      );
+    }
+
+    let envByKey = clientEnvByClientId.get(runtimeClient.clientId);
+    if (envByKey === undefined) {
+      envByKey = new Map();
+      clientEnvByClientId.set(runtimeClient.clientId, envByKey);
+    }
+
+    for (const [envKey, envValue] of Object.entries(runtimeClient.setup.env)) {
+      const existingValue = envByKey.get(envKey);
+      if (existingValue !== undefined && !runtimeClientSetupValueEquals(existingValue, envValue)) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+          `Runtime client env conflict for client '${runtimeClient.clientId}' and key '${envKey}'.`,
+        );
+      }
+
+      envByKey.set(envKey, envValue);
+    }
+
+    let filesByPath = clientFilesByPathByClientId.get(runtimeClient.clientId);
+    if (filesByPath === undefined) {
+      filesByPath = new Map();
+      clientFilesByPathByClientId.set(runtimeClient.clientId, filesByPath);
+    }
+
+    let filesById = clientFilesByIdByClientId.get(runtimeClient.clientId);
+    if (filesById === undefined) {
+      filesById = new Map();
+      clientFilesByIdByClientId.set(runtimeClient.clientId, filesById);
+    }
+
+    for (const file of runtimeClient.setup.files) {
+      const existingFileByPath = filesByPath.get(file.path);
+      if (
+        existingFileByPath !== undefined &&
+        (existingFileByPath.fileId !== file.fileId ||
+          existingFileByPath.mode !== file.mode ||
+          existingFileByPath.content !== file.content)
+      ) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+          `Runtime client file conflict for client '${runtimeClient.clientId}' and path '${file.path}'.`,
+        );
+      }
+
+      const existingFileById = filesById.get(file.fileId);
+      if (
+        existingFileById !== undefined &&
+        (existingFileById.path !== file.path ||
+          existingFileById.mode !== file.mode ||
+          existingFileById.content !== file.content)
+      ) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+          `Runtime client file conflict for client '${runtimeClient.clientId}' and fileId '${file.fileId}'.`,
+        );
+      }
+
+      filesByPath.set(file.path, {
+        fileId: file.fileId,
+        mode: file.mode,
+        content: file.content,
+      });
+      filesById.set(file.fileId, {
+        path: file.path,
+        mode: file.mode,
+        content: file.content,
+      });
+    }
+
+    let processesByKey = clientProcessesByKey.get(runtimeClient.clientId);
+    if (processesByKey === undefined) {
+      processesByKey = new Map();
+      clientProcessesByKey.set(runtimeClient.clientId, processesByKey);
+    }
+
+    for (const runtimeClientProcess of runtimeClient.processes) {
+      validateRuntimeClientProcess({
+        runtimeClientProcess,
+        clientId: runtimeClient.clientId,
+      });
+
+      const existingProcess = processesByKey.get(runtimeClientProcess.processKey);
+      if (existingProcess === undefined) {
+        processesByKey.set(runtimeClientProcess.processKey, runtimeClientProcess);
+        continue;
+      }
+
+      if (!runtimeClientProcessSpecEquals(existingProcess, runtimeClientProcess)) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+          `Runtime client process key conflict for client '${runtimeClient.clientId}' and process '${runtimeClientProcess.processKey}'.`,
+        );
+      }
+    }
+
+    let endpointsByKey = clientEndpointsByKey.get(runtimeClient.clientId);
+    if (endpointsByKey === undefined) {
+      endpointsByKey = new Map();
+      clientEndpointsByKey.set(runtimeClient.clientId, endpointsByKey);
+    }
+
+    for (const runtimeClientEndpoint of runtimeClient.endpoints) {
+      validateRuntimeClientEndpoint({
+        runtimeClientEndpoint,
+        clientId: runtimeClient.clientId,
+      });
+
+      const existingEndpoint = endpointsByKey.get(runtimeClientEndpoint.endpointKey);
+      if (existingEndpoint === undefined) {
+        endpointsByKey.set(runtimeClientEndpoint.endpointKey, runtimeClientEndpoint);
+        continue;
+      }
+
+      if (!runtimeClientEndpointSpecEquals(existingEndpoint, runtimeClientEndpoint)) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+          `Runtime client endpoint key conflict for client '${runtimeClient.clientId}' and endpoint '${runtimeClientEndpoint.endpointKey}'.`,
+        );
+      }
+    }
+  }
+
+  for (const [clientId, endpointsByKey] of clientEndpointsByKey.entries()) {
+    const processesByKey = clientProcessesByKey.get(clientId) ?? new Map();
+
+    for (const runtimeClientEndpoint of endpointsByKey.values()) {
+      if (runtimeClientEndpoint.processKey === undefined) {
+        continue;
+      }
+
+      if (!processesByKey.has(runtimeClientEndpoint.processKey)) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+          `Runtime client endpoint '${runtimeClientEndpoint.endpointKey}' references missing process '${runtimeClientEndpoint.processKey}' for client '${clientId}'.`,
+        );
+      }
     }
   }
 }
@@ -541,6 +661,5 @@ export function validateCompiledBindingResults(input: {
 
   validateRoutes(flattenedResults.egressRoutes);
   validateArtifacts(flattenedResults.artifacts);
-  validateRuntimeClientSetups(flattenedResults.runtimeClientSetups);
-  validateRuntimeClientProcesses(flattenedResults.runtimeClientProcesses);
+  validateRuntimeClients(flattenedResults.runtimeClients);
 }

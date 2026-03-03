@@ -46,7 +46,7 @@ func Run(input RunInput) (runErr error) {
 		return fmt.Errorf("failed to apply runtime plan: %w", err)
 	}
 
-	processManager, err := startRuntimeClientProcesses(startupInput.RuntimePlan.RuntimeClientProcesses)
+	processManager, err := startRuntimeClientProcesses(flattenRuntimeClientProcesses(startupInput.RuntimePlan.RuntimeClients))
 	if err != nil {
 		return fmt.Errorf("failed to start runtime client processes: %w", err)
 	}
@@ -123,4 +123,13 @@ func Run(input RunInput) (runErr error) {
 		}
 		return fmt.Errorf("runtime client process '%s' exited unexpectedly", processExit.ProcessKey)
 	}
+}
+
+func flattenRuntimeClientProcesses(runtimeClients []startup.RuntimeClient) []startup.RuntimeClientProcessSpec {
+	processes := make([]startup.RuntimeClientProcessSpec, 0)
+	for _, runtimeClient := range runtimeClients {
+		processes = append(processes, runtimeClient.Processes...)
+	}
+
+	return processes
 }

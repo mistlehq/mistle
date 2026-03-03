@@ -34,7 +34,6 @@ func TestStartRuntimeClientProcesses(t *testing.T) {
 		processes := []startup.RuntimeClientProcessSpec{
 			{
 				ProcessKey: "process_codex",
-				ClientID:   "client_codex",
 				Command: helperProcessCommand(
 					"tcp-listen",
 					map[string]string{
@@ -69,7 +68,6 @@ func TestStartRuntimeClientProcesses(t *testing.T) {
 		processes := []startup.RuntimeClientProcessSpec{
 			{
 				ProcessKey: "process_exit_early",
-				ClientID:   "client_codex",
 				Command:    helperProcessCommand("exit-immediately", map[string]string{}),
 				Readiness: startup.RuntimeClientProcessReadiness{
 					Type:      "tcp",
@@ -105,7 +103,6 @@ func TestStartRuntimeClientProcesses(t *testing.T) {
 		processes := []startup.RuntimeClientProcessSpec{
 			{
 				ProcessKey: "process_codex_ws",
-				ClientID:   "client_codex",
 				Command: helperProcessCommand(
 					"ws-listen",
 					map[string]string{
@@ -139,7 +136,6 @@ func TestStartRuntimeClientProcesses(t *testing.T) {
 		processes := []startup.RuntimeClientProcessSpec{
 			{
 				ProcessKey: "process_exit_later",
-				ClientID:   "client_codex",
 				Command: helperProcessCommand(
 					"exit-after-delay",
 					map[string]string{
@@ -181,7 +177,6 @@ func TestStartRuntimeClientProcesses(t *testing.T) {
 		processes := []startup.RuntimeClientProcessSpec{
 			{
 				ProcessKey: "process_ignore_sigterm",
-				ClientID:   "client_codex",
 				Command:    helperProcessCommand("ignore-sigterm", map[string]string{}),
 				Readiness: startup.RuntimeClientProcessReadiness{
 					Type: "none",

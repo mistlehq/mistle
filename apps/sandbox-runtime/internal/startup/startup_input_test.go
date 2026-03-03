@@ -16,8 +16,7 @@ const validRuntimePlanJSON = `{
 	"egressRoutes": [],
 	"artifacts": [],
 	"artifactRemovals": [],
-	"runtimeClientSetups": [],
-	"runtimeClientProcesses": []
+	"runtimeClients": []
 }`
 
 const validStartupInputJSON = `{
@@ -198,8 +197,7 @@ func TestReadStartupInput(t *testing.T) {
 					"egressRoutes": [],
 					"artifacts": [],
 					"artifactRemovals": [],
-					"runtimeClientSetups": [],
-	"runtimeClientProcesses": [],
+					"runtimeClients": [],
 					"extra": "bad"
 				}
 			}`),

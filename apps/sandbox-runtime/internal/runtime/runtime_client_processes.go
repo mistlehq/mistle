@@ -54,7 +54,7 @@ func startRuntimeClientProcesses(
 		if err != nil {
 			_ = manager.Stop()
 			return nil, fmt.Errorf(
-				"runtime plan runtimeClientProcesses[%d] failed to start (processKey=%s): %w",
+				"runtime client process[%d] failed to start (processKey=%s): %w",
 				processIndex,
 				processSpec.ProcessKey,
 				err,
@@ -67,7 +67,7 @@ func startRuntimeClientProcesses(
 		if err := waitForRuntimeClientProcessReadiness(runningProcess, processSpec.Readiness); err != nil {
 			_ = manager.Stop()
 			return nil, fmt.Errorf(
-				"runtime plan runtimeClientProcesses[%d] readiness check failed (processKey=%s): %w",
+				"runtime client process[%d] readiness check failed (processKey=%s): %w",
 				processIndex,
 				processSpec.ProcessKey,
 				err,

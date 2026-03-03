@@ -20,8 +20,7 @@ function createRuntimePlan(input: {
     egressRoutes: [],
     artifacts: [],
     artifactRemovals: [],
-    runtimeClientSetups: [],
-    runtimeClientProcesses: [],
+    runtimeClients: [],
   };
 }
 

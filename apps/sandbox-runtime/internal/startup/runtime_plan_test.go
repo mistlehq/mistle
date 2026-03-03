@@ -14,6 +14,7 @@ func TestValidateRuntimeClientProcessReadiness(t *testing.T) {
 				TimeoutMs: 5000,
 			},
 			0,
+			0,
 		)
 		if err != nil {
 			t.Fatalf("expected ws readiness validation to succeed, got %v", err)
@@ -27,6 +28,7 @@ func TestValidateRuntimeClientProcessReadiness(t *testing.T) {
 				URL:       "http://127.0.0.1:4500",
 				TimeoutMs: 5000,
 			},
+			0,
 			0,
 		)
 		if err == nil {

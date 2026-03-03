@@ -4,6 +4,7 @@ import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js
 import type {
   CompiledBindingResult,
   EgressCredentialRoute,
+  RuntimeClientEndpointSpec,
   RuntimeClientProcessSpec,
 } from "../types/index.js";
 import { validateCompiledBindingResults } from "./index.js";
@@ -68,7 +69,13 @@ function createCompiledBindingResult(input: {
     files: Array<{ fileId: string; path: string; mode: number; content: string }>;
   };
   runtimeClientProcesses?: ReadonlyArray<RuntimeClientProcessSpec>;
+  runtimeClientEndpoints?: ReadonlyArray<RuntimeClientEndpointSpec>;
 }): CompiledBindingResult {
+  const hasRuntimeClient =
+    input.runtimeClientSetup !== undefined ||
+    (input.runtimeClientProcesses !== undefined && input.runtimeClientProcesses.length > 0) ||
+    (input.runtimeClientEndpoints !== undefined && input.runtimeClientEndpoints.length > 0);
+
   return {
     egressRoutes: [input.route],
     artifacts: [
@@ -88,17 +95,19 @@ function createCompiledBindingResult(input: {
         },
       },
     ],
-    runtimeClientSetups:
-      input.runtimeClientSetup === undefined
-        ? []
-        : [
-            {
-              clientId: input.runtimeClientSetup.clientId,
-              env: input.runtimeClientSetup.env,
-              files: input.runtimeClientSetup.files,
+    runtimeClients: !hasRuntimeClient
+      ? []
+      : [
+          {
+            clientId: input.runtimeClientSetup?.clientId ?? "codex-cli",
+            setup: {
+              env: input.runtimeClientSetup?.env ?? {},
+              files: input.runtimeClientSetup?.files ?? [],
             },
-          ],
-    runtimeClientProcesses: input.runtimeClientProcesses ?? [],
+            processes: input.runtimeClientProcesses ?? [],
+            endpoints: input.runtimeClientEndpoints ?? [],
+          },
+        ],
   };
 }
 
@@ -342,7 +351,6 @@ describe("validateCompiledBindingResults", () => {
   it("fails on runtime client process key conflicts", () => {
     const processA: RuntimeClientProcessSpec = {
       processKey: "codex-app-server",
-      clientId: "codex-cli",
       command: {
         args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
       },
@@ -359,7 +367,6 @@ describe("validateCompiledBindingResults", () => {
     };
     const processB: RuntimeClientProcessSpec = {
       processKey: "codex-app-server",
-      clientId: "codex-cli",
       command: {
         args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
       },
@@ -409,7 +416,6 @@ describe("validateCompiledBindingResults", () => {
       runtimeClientProcesses: [
         {
           processKey: "codex-app-server",
-          clientId: "codex-cli",
           command: {
             args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
           },
@@ -445,7 +451,6 @@ describe("validateCompiledBindingResults", () => {
       runtimeClientProcesses: [
         {
           processKey: "codex-app-server",
-          clientId: "codex-cli",
           command: {
             args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
           },
@@ -480,7 +485,6 @@ describe("validateCompiledBindingResults", () => {
       runtimeClientProcesses: [
         {
           processKey: "codex-app-server",
-          clientId: "codex-cli",
           command: {
             args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
           },
@@ -493,6 +497,61 @@ describe("validateCompiledBindingResults", () => {
             signal: "sigterm",
             timeoutMs: 10_000,
           },
+        },
+      ],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+  });
+
+  it("fails when runtime client endpoint references missing process", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "artifact-a",
+      runtimeClientEndpoints: [
+        {
+          endpointKey: "app-server",
+          processKey: "codex-app-server",
+          transport: {
+            type: "ws",
+            url: "ws://127.0.0.1:4500",
+          },
+          connectionMode: "dedicated",
+        },
+      ],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+  });
+
+  it("fails when runtime client endpoint ws url uses unsupported url scheme", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "artifact-a",
+      runtimeClientEndpoints: [
+        {
+          endpointKey: "app-server",
+          transport: {
+            type: "ws",
+            url: "http://127.0.0.1:4500",
+          },
+          connectionMode: "dedicated",
         },
       ],
     });

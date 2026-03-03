@@ -20,14 +20,13 @@ var allowedAuthInjectionTypes = map[string]struct{}{
 }
 
 type RuntimePlan struct {
-	SandboxProfileID       string                       `json:"sandboxProfileId"`
-	Version                int                          `json:"version"`
-	Image                  ResolvedSandboxImage         `json:"image"`
-	EgressRoutes           []EgressCredentialRoute      `json:"egressRoutes"`
-	Artifacts              []RuntimeArtifactSpec        `json:"artifacts"`
-	ArtifactRemovals       []RuntimeArtifactRemovalSpec `json:"artifactRemovals"`
-	RuntimeClientSetups    []RuntimeClientSetup         `json:"runtimeClientSetups"`
-	RuntimeClientProcesses []RuntimeClientProcessSpec   `json:"runtimeClientProcesses"`
+	SandboxProfileID string                       `json:"sandboxProfileId"`
+	Version          int                          `json:"version"`
+	Image            ResolvedSandboxImage         `json:"image"`
+	EgressRoutes     []EgressCredentialRoute      `json:"egressRoutes"`
+	Artifacts        []RuntimeArtifactSpec        `json:"artifacts"`
+	ArtifactRemovals []RuntimeArtifactRemovalSpec `json:"artifactRemovals"`
+	RuntimeClients   []RuntimeClient              `json:"runtimeClients"`
 }
 
 type ResolvedSandboxImage struct {
@@ -94,8 +93,14 @@ type RuntimeArtifactCommand struct {
 	TimeoutMs int               `json:"timeoutMs"`
 }
 
+type RuntimeClient struct {
+	ClientID  string                      `json:"clientId"`
+	Setup     RuntimeClientSetup          `json:"setup"`
+	Processes []RuntimeClientProcessSpec  `json:"processes"`
+	Endpoints []RuntimeClientEndpointSpec `json:"endpoints"`
+}
+
 type RuntimeClientSetup struct {
-	ClientID   string            `json:"clientId"`
 	Env        map[string]string `json:"env"`
 	Files      []RuntimeFileSpec `json:"files"`
 	LaunchArgs []string          `json:"launchArgs"`
@@ -103,10 +108,21 @@ type RuntimeClientSetup struct {
 
 type RuntimeClientProcessSpec struct {
 	ProcessKey string                         `json:"processKey"`
-	ClientID   string                         `json:"clientId"`
 	Command    RuntimeArtifactCommand         `json:"command"`
 	Readiness  RuntimeClientProcessReadiness  `json:"readiness"`
 	Stop       RuntimeClientProcessStopPolicy `json:"stop"`
+}
+
+type RuntimeClientEndpointSpec struct {
+	EndpointKey    string                         `json:"endpointKey"`
+	ProcessKey     string                         `json:"processKey"`
+	Transport      RuntimeClientEndpointTransport `json:"transport"`
+	ConnectionMode string                         `json:"connectionMode"`
+}
+
+type RuntimeClientEndpointTransport struct {
+	Type string `json:"type"`
+	URL  string `json:"url"`
 }
 
 type RuntimeClientProcessReadiness struct {
@@ -147,11 +163,8 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 	if runtimePlan.ArtifactRemovals == nil {
 		return fmt.Errorf("runtime plan artifactRemovals is required")
 	}
-	if runtimePlan.RuntimeClientSetups == nil {
-		return fmt.Errorf("runtime plan runtimeClientSetups is required")
-	}
-	if runtimePlan.RuntimeClientProcesses == nil {
-		return fmt.Errorf("runtime plan runtimeClientProcesses is required")
+	if runtimePlan.RuntimeClients == nil {
+		return fmt.Errorf("runtime plan runtimeClients is required")
 	}
 
 	if err := validateResolvedSandboxImage(runtimePlan.Image); err != nil {
@@ -181,13 +194,8 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 		}
 	}
 
-	for setupIndex, setup := range runtimePlan.RuntimeClientSetups {
-		if err := validateRuntimeClientSetup(setup, setupIndex); err != nil {
-			return err
-		}
-	}
-	for processIndex, process := range runtimePlan.RuntimeClientProcesses {
-		if err := validateRuntimeClientProcess(process, processIndex); err != nil {
+	for clientIndex, runtimeClient := range runtimePlan.RuntimeClients {
+		if err := validateRuntimeClient(runtimeClient, clientIndex); err != nil {
 			return err
 		}
 	}
@@ -361,59 +369,116 @@ func validateArtifactCommand(command RuntimeArtifactCommand, location string) er
 	return nil
 }
 
-func validateRuntimeClientSetup(setup RuntimeClientSetup, setupIndex int) error {
-	if strings.TrimSpace(setup.ClientID) == "" {
-		return fmt.Errorf("runtime plan runtimeClientSetups[%d] clientId is required", setupIndex)
+func validateRuntimeClient(runtimeClient RuntimeClient, clientIndex int) error {
+	if strings.TrimSpace(runtimeClient.ClientID) == "" {
+		return fmt.Errorf("runtime plan runtimeClients[%d].clientId is required", clientIndex)
 	}
+	if runtimeClient.Processes == nil {
+		return fmt.Errorf("runtime plan runtimeClients[%d].processes is required", clientIndex)
+	}
+	if runtimeClient.Endpoints == nil {
+		return fmt.Errorf("runtime plan runtimeClients[%d].endpoints is required", clientIndex)
+	}
+
+	if err := validateRuntimeClientSetup(runtimeClient.Setup, clientIndex); err != nil {
+		return err
+	}
+
+	processesByKey := make(map[string]struct{}, len(runtimeClient.Processes))
+	for processIndex, process := range runtimeClient.Processes {
+		if err := validateRuntimeClientProcess(process, clientIndex, processIndex); err != nil {
+			return err
+		}
+
+		if _, exists := processesByKey[process.ProcessKey]; exists {
+			return fmt.Errorf(
+				"runtime plan runtimeClients[%d].processes[%d].processKey '%s' is duplicated",
+				clientIndex,
+				processIndex,
+				process.ProcessKey,
+			)
+		}
+		processesByKey[process.ProcessKey] = struct{}{}
+	}
+
+	endpointsByKey := make(map[string]struct{}, len(runtimeClient.Endpoints))
+	for endpointIndex, endpoint := range runtimeClient.Endpoints {
+		if err := validateRuntimeClientEndpoint(endpoint, clientIndex, endpointIndex); err != nil {
+			return err
+		}
+
+		if _, exists := endpointsByKey[endpoint.EndpointKey]; exists {
+			return fmt.Errorf(
+				"runtime plan runtimeClients[%d].endpoints[%d].endpointKey '%s' is duplicated",
+				clientIndex,
+				endpointIndex,
+				endpoint.EndpointKey,
+			)
+		}
+		endpointsByKey[endpoint.EndpointKey] = struct{}{}
+
+		if strings.TrimSpace(endpoint.ProcessKey) != "" {
+			if _, exists := processesByKey[endpoint.ProcessKey]; !exists {
+				return fmt.Errorf(
+					"runtime plan runtimeClients[%d].endpoints[%d].processKey '%s' does not reference a declared process",
+					clientIndex,
+					endpointIndex,
+					endpoint.ProcessKey,
+				)
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateRuntimeClientSetup(setup RuntimeClientSetup, clientIndex int) error {
 	if setup.Env == nil {
-		return fmt.Errorf("runtime plan runtimeClientSetups[%d] env is required", setupIndex)
+		return fmt.Errorf("runtime plan runtimeClients[%d].setup.env is required", clientIndex)
 	}
 	if setup.Files == nil {
-		return fmt.Errorf("runtime plan runtimeClientSetups[%d] files is required", setupIndex)
+		return fmt.Errorf("runtime plan runtimeClients[%d].setup.files is required", clientIndex)
 	}
 
 	for envKey := range setup.Env {
 		if strings.TrimSpace(envKey) == "" {
-			return fmt.Errorf("runtime plan runtimeClientSetups[%d] env keys must be non-empty", setupIndex)
+			return fmt.Errorf("runtime plan runtimeClients[%d].setup.env keys must be non-empty", clientIndex)
 		}
 	}
 	for fileIndex, file := range setup.Files {
 		if strings.TrimSpace(file.FileID) == "" {
-			return fmt.Errorf("runtime plan runtimeClientSetups[%d] files[%d].fileId is required", setupIndex, fileIndex)
+			return fmt.Errorf("runtime plan runtimeClients[%d].setup.files[%d].fileId is required", clientIndex, fileIndex)
 		}
 		if strings.TrimSpace(file.Path) == "" {
-			return fmt.Errorf("runtime plan runtimeClientSetups[%d] files[%d].path is required", setupIndex, fileIndex)
+			return fmt.Errorf("runtime plan runtimeClients[%d].setup.files[%d].path is required", clientIndex, fileIndex)
 		}
 		if file.Mode < 0 {
-			return fmt.Errorf("runtime plan runtimeClientSetups[%d] files[%d].mode must be greater than or equal to 0", setupIndex, fileIndex)
+			return fmt.Errorf("runtime plan runtimeClients[%d].setup.files[%d].mode must be greater than or equal to 0", clientIndex, fileIndex)
 		}
 	}
 
 	return nil
 }
 
-func validateRuntimeClientProcess(process RuntimeClientProcessSpec, processIndex int) error {
+func validateRuntimeClientProcess(process RuntimeClientProcessSpec, clientIndex int, processIndex int) error {
 	if strings.TrimSpace(process.ProcessKey) == "" {
-		return fmt.Errorf("runtime plan runtimeClientProcesses[%d].processKey is required", processIndex)
+		return fmt.Errorf("runtime plan runtimeClients[%d].processes[%d].processKey is required", clientIndex, processIndex)
 	}
-	if strings.TrimSpace(process.ClientID) == "" {
-		return fmt.Errorf("runtime plan runtimeClientProcesses[%d].clientId is required", processIndex)
-	}
-	if err := validateArtifactCommand(process.Command, fmt.Sprintf("runtime plan runtimeClientProcesses[%d].command", processIndex)); err != nil {
+	if err := validateArtifactCommand(process.Command, fmt.Sprintf("runtime plan runtimeClients[%d].processes[%d].command", clientIndex, processIndex)); err != nil {
 		return err
 	}
-	if err := validateRuntimeClientProcessReadiness(process.Readiness, processIndex); err != nil {
+	if err := validateRuntimeClientProcessReadiness(process.Readiness, clientIndex, processIndex); err != nil {
 		return err
 	}
-	if err := validateRuntimeClientProcessStopPolicy(process.Stop, processIndex); err != nil {
+	if err := validateRuntimeClientProcessStopPolicy(process.Stop, clientIndex, processIndex); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func validateRuntimeClientProcessReadiness(readiness RuntimeClientProcessReadiness, processIndex int) error {
-	location := fmt.Sprintf("runtime plan runtimeClientProcesses[%d].readiness", processIndex)
+func validateRuntimeClientProcessReadiness(readiness RuntimeClientProcessReadiness, clientIndex int, processIndex int) error {
+	location := fmt.Sprintf("runtime plan runtimeClients[%d].processes[%d].readiness", clientIndex, processIndex)
 
 	switch readiness.Type {
 	case "none":
@@ -464,8 +529,8 @@ func validateRuntimeClientProcessReadiness(readiness RuntimeClientProcessReadine
 	}
 }
 
-func validateRuntimeClientProcessStopPolicy(stop RuntimeClientProcessStopPolicy, processIndex int) error {
-	location := fmt.Sprintf("runtime plan runtimeClientProcesses[%d].stop", processIndex)
+func validateRuntimeClientProcessStopPolicy(stop RuntimeClientProcessStopPolicy, clientIndex int, processIndex int) error {
+	location := fmt.Sprintf("runtime plan runtimeClients[%d].processes[%d].stop", clientIndex, processIndex)
 
 	if stop.Signal != "sigterm" && stop.Signal != "sigkill" {
 		return fmt.Errorf("%s.signal '%s' is not supported", location, stop.Signal)
@@ -475,6 +540,38 @@ func validateRuntimeClientProcessStopPolicy(stop RuntimeClientProcessStopPolicy,
 	}
 	if stop.GracePeriodMs < 0 {
 		return fmt.Errorf("%s.gracePeriodMs must be greater than or equal to zero", location)
+	}
+
+	return nil
+}
+
+func validateRuntimeClientEndpoint(endpoint RuntimeClientEndpointSpec, clientIndex int, endpointIndex int) error {
+	location := fmt.Sprintf("runtime plan runtimeClients[%d].endpoints[%d]", clientIndex, endpointIndex)
+
+	if strings.TrimSpace(endpoint.EndpointKey) == "" {
+		return fmt.Errorf("%s.endpointKey is required", location)
+	}
+
+	switch endpoint.ConnectionMode {
+	case "dedicated", "shared":
+	default:
+		return fmt.Errorf("%s.connectionMode '%s' is not supported", location, endpoint.ConnectionMode)
+	}
+
+	switch endpoint.Transport.Type {
+	case "ws":
+		if strings.TrimSpace(endpoint.Transport.URL) == "" {
+			return fmt.Errorf("%s.transport.url is required", location)
+		}
+		parsedURL, err := url.ParseRequestURI(endpoint.Transport.URL)
+		if err != nil || strings.TrimSpace(parsedURL.Scheme) == "" || strings.TrimSpace(parsedURL.Host) == "" {
+			return fmt.Errorf("%s.transport.url must be a valid absolute URL", location)
+		}
+		if parsedURL.Scheme != "ws" && parsedURL.Scheme != "wss" {
+			return fmt.Errorf("%s.transport.url must use ws or wss scheme", location)
+		}
+	default:
+		return fmt.Errorf("%s.transport.type '%s' is not supported", location, endpoint.Transport.Type)
 	}
 
 	return nil

@@ -21,30 +21,38 @@ func TestApply(t *testing.T) {
 					Source:   "base",
 					ImageRef: "mistle/sandbox-base:dev",
 				},
-				RuntimeClientSetups: []startup.RuntimeClientSetup{
+				RuntimeClients: []startup.RuntimeClient{
 					{
 						ClientID: "client_codex",
-						Env:      map[string]string{},
-						Files: []startup.RuntimeFileSpec{
-							{
-								FileID:  "file_codex_config",
-								Path:    firstFilePath,
-								Mode:    0o600,
-								Content: "api_base_url = \"http://127.0.0.1:8090/egress/routes/route_openai\"",
+						Setup: startup.RuntimeClientSetup{
+							Env: map[string]string{},
+							Files: []startup.RuntimeFileSpec{
+								{
+									FileID:  "file_codex_config",
+									Path:    firstFilePath,
+									Mode:    0o600,
+									Content: "api_base_url = \"http://127.0.0.1:8090/egress/routes/route_openai\"",
+								},
 							},
 						},
+						Processes: []startup.RuntimeClientProcessSpec{},
+						Endpoints: []startup.RuntimeClientEndpointSpec{},
 					},
 					{
 						ClientID: "client_github",
-						Env:      map[string]string{},
-						Files: []startup.RuntimeFileSpec{
-							{
-								FileID:  "file_github_config",
-								Path:    secondFilePath,
-								Mode:    0o644,
-								Content: "{\"base_url\":\"https://api.github.com\"}",
+						Setup: startup.RuntimeClientSetup{
+							Env: map[string]string{},
+							Files: []startup.RuntimeFileSpec{
+								{
+									FileID:  "file_github_config",
+									Path:    secondFilePath,
+									Mode:    0o644,
+									Content: "{\"base_url\":\"https://api.github.com\"}",
+								},
 							},
 						},
+						Processes: []startup.RuntimeClientProcessSpec{},
+						Endpoints: []startup.RuntimeClientEndpointSpec{},
 					},
 				},
 			},
@@ -99,18 +107,22 @@ func TestApply(t *testing.T) {
 					Source:   "base",
 					ImageRef: "mistle/sandbox-base:dev",
 				},
-				RuntimeClientSetups: []startup.RuntimeClientSetup{
+				RuntimeClients: []startup.RuntimeClient{
 					{
 						ClientID: "client_failure",
-						Env:      map[string]string{},
-						Files: []startup.RuntimeFileSpec{
-							{
-								FileID:  "file_failure",
-								Path:    filepath.Join(blockingPath, "config.toml"),
-								Mode:    0o600,
-								Content: "value = \"x\"",
+						Setup: startup.RuntimeClientSetup{
+							Env: map[string]string{},
+							Files: []startup.RuntimeFileSpec{
+								{
+									FileID:  "file_failure",
+									Path:    filepath.Join(blockingPath, "config.toml"),
+									Mode:    0o600,
+									Content: "value = \"x\"",
+								},
 							},
 						},
+						Processes: []startup.RuntimeClientProcessSpec{},
+						Endpoints: []startup.RuntimeClientEndpointSpec{},
 					},
 				},
 			},
@@ -157,18 +169,22 @@ func TestApply(t *testing.T) {
 						},
 					},
 				},
-				RuntimeClientSetups: []startup.RuntimeClientSetup{
+				RuntimeClients: []startup.RuntimeClient{
 					{
 						ClientID: "client_codex",
-						Env:      map[string]string{},
-						Files: []startup.RuntimeFileSpec{
-							{
-								FileID:  "file_shared",
-								Path:    sharedPath,
-								Mode:    0o600,
-								Content: "runtime-file-content",
+						Setup: startup.RuntimeClientSetup{
+							Env: map[string]string{},
+							Files: []startup.RuntimeFileSpec{
+								{
+									FileID:  "file_shared",
+									Path:    sharedPath,
+									Mode:    0o600,
+									Content: "runtime-file-content",
+								},
 							},
 						},
+						Processes: []startup.RuntimeClientProcessSpec{},
+						Endpoints: []startup.RuntimeClientEndpointSpec{},
 					},
 				},
 			},
@@ -231,7 +247,7 @@ func TestApply(t *testing.T) {
 						},
 					},
 				},
-				RuntimeClientSetups: []startup.RuntimeClientSetup{},
+				RuntimeClients: []startup.RuntimeClient{},
 			},
 		})
 		if err != nil {
@@ -306,7 +322,7 @@ func TestApply(t *testing.T) {
 						},
 					},
 				},
-				RuntimeClientSetups: []startup.RuntimeClientSetup{},
+				RuntimeClients: []startup.RuntimeClient{},
 			},
 		})
 		if err != nil {
@@ -343,7 +359,7 @@ func TestApply(t *testing.T) {
 						},
 					},
 				},
-				RuntimeClientSetups: []startup.RuntimeClientSetup{},
+				RuntimeClients: []startup.RuntimeClient{},
 			},
 		})
 		if err != nil {
@@ -369,7 +385,7 @@ func TestApply(t *testing.T) {
 						},
 					},
 				},
-				RuntimeClientSetups: []startup.RuntimeClientSetup{},
+				RuntimeClients: []startup.RuntimeClient{},
 			},
 		})
 		if err == nil {
@@ -403,7 +419,7 @@ func TestApply(t *testing.T) {
 						},
 					},
 				},
-				RuntimeClientSetups: []startup.RuntimeClientSetup{},
+				RuntimeClients: []startup.RuntimeClient{},
 			},
 		})
 		if err == nil {
@@ -438,7 +454,7 @@ func TestApply(t *testing.T) {
 						},
 					},
 				},
-				RuntimeClientSetups: []startup.RuntimeClientSetup{},
+				RuntimeClients: []startup.RuntimeClient{},
 			},
 		})
 		if err == nil {

@@ -60,8 +60,7 @@ function createGithubBinaryInstallDefinition(): IntegrationDefinition<
           },
         },
       ],
-      runtimeClientSetups: [],
-      runtimeClientProcesses: [],
+      runtimeClients: [],
     }),
   };
 }

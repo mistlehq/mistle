@@ -87,41 +87,53 @@ function createOpenAiDefinition(): IntegrationDefinition<
           },
         },
       ],
-      runtimeClientSetups: [
+      runtimeClients: [
         {
           clientId: "codex-cli",
-          env: {
-            OPENAI_BASE_URL: input.refs.egressUrl,
-            OPENAI_MODEL: input.binding.config.defaultModel,
+          setup: {
+            env: {
+              OPENAI_BASE_URL: input.refs.egressUrl,
+              OPENAI_MODEL: input.binding.config.defaultModel,
+            },
+            files: [
+              {
+                fileId: "codex_config",
+                path: "/workspace/.codex/config.toml",
+                mode: 384,
+                content: 'model = "gpt-5.3-codex"',
+              },
+            ],
           },
-          files: [
+          processes: [
             {
-              fileId: "codex_config",
-              path: "/workspace/.codex/config.toml",
-              mode: 384,
-              content: 'model = "gpt-5.3-codex"',
+              processKey: "codex-app-server",
+              command: {
+                args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
+              },
+              readiness: {
+                type: "tcp",
+                host: "127.0.0.1",
+                port: 4747,
+                timeoutMs: 5_000,
+              },
+              stop: {
+                signal: "sigterm",
+                timeoutMs: 10_000,
+                gracePeriodMs: 2_000,
+              },
             },
           ],
-        },
-      ],
-      runtimeClientProcesses: [
-        {
-          processKey: "codex-app-server",
-          clientId: "codex-cli",
-          command: {
-            args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
-          },
-          readiness: {
-            type: "tcp",
-            host: "127.0.0.1",
-            port: 4747,
-            timeoutMs: 5_000,
-          },
-          stop: {
-            signal: "sigterm",
-            timeoutMs: 10_000,
-            gracePeriodMs: 2_000,
-          },
+          endpoints: [
+            {
+              endpointKey: "app-server",
+              processKey: "codex-app-server",
+              transport: {
+                type: "ws",
+                url: "ws://127.0.0.1:4747",
+              },
+              connectionMode: "dedicated",
+            },
+          ],
         },
       ],
     }),
@@ -177,8 +189,7 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
           },
         },
       ],
-      runtimeClientSetups: [],
-      runtimeClientProcesses: [],
+      runtimeClients: [],
     }),
   };
 }
@@ -203,8 +214,7 @@ function createOpenAiNoArtifactDefinition(): IntegrationDefinition<
     compileBinding: () => ({
       egressRoutes: [],
       artifacts: [],
-      runtimeClientSetups: [],
-      runtimeClientProcesses: [],
+      runtimeClients: [],
     }),
   };
 }
@@ -273,14 +283,13 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.artifacts[0]?.lifecycle.install[1]).toEqual({
       args: ["echo", "binding:bind_openai_agent"],
     });
-    expect(runtimePlan.runtimeClientSetups).toHaveLength(1);
-    expect(runtimePlan.runtimeClientSetups[0]?.env.OPENAI_BASE_URL).toBe(
+    expect(runtimePlan.runtimeClients).toHaveLength(1);
+    expect(runtimePlan.runtimeClients[0]?.setup.env.OPENAI_BASE_URL).toBe(
       "http://127.0.0.1:8090/egress/routes/route_bind_openai_agent",
     );
-    expect(runtimePlan.runtimeClientProcesses).toEqual([
+    expect(runtimePlan.runtimeClients[0]?.processes).toEqual([
       {
         processKey: "codex-app-server",
-        clientId: "codex-cli",
         command: {
           args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
         },
@@ -741,8 +750,7 @@ describe("compileRuntimePlan", () => {
       compileBinding: () => ({
         egressRoutes: [],
         artifacts: [],
-        runtimeClientSetups: [],
-        runtimeClientProcesses: [],
+        runtimeClients: [],
       }),
     };
 
@@ -972,18 +980,21 @@ describe("compileRuntimePlan", () => {
       compileBinding: (input) => ({
         egressRoutes: [],
         artifacts: [],
-        runtimeClientSetups: [
+        runtimeClients: [
           {
             clientId: "typed-config",
-            env: {
-              API_HOST: input.target.config.apiHost,
-              MODEL: input.binding.config.normalizedModel,
-              ROUTE_ID: input.refs.egressUrl.routeId,
+            setup: {
+              env: {
+                API_HOST: input.target.config.apiHost,
+                MODEL: input.binding.config.normalizedModel,
+                ROUTE_ID: input.refs.egressUrl.routeId,
+              },
+              files: [],
             },
-            files: [],
+            processes: [],
+            endpoints: [],
           },
         ],
-        runtimeClientProcesses: [],
       }),
     };
 
@@ -1031,15 +1042,19 @@ describe("compileRuntimePlan", () => {
       ],
     });
 
-    expect(runtimePlan.runtimeClientSetups).toEqual([
+    expect(runtimePlan.runtimeClients).toEqual([
       {
         clientId: "typed-config",
-        env: {
-          API_HOST: "api.openai.com",
-          MODEL: "gpt-5.3-codex",
-          ROUTE_ID: "route_bind_openai_agent",
+        setup: {
+          env: {
+            API_HOST: "api.openai.com",
+            MODEL: "gpt-5.3-codex",
+            ROUTE_ID: "route_bind_openai_agent",
+          },
+          files: [],
         },
-        files: [],
+        processes: [],
+        endpoints: [],
       },
     ]);
   });
