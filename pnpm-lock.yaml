@@ -487,8 +487,8 @@ importers:
         specifier: ^0.31.9
         version: 0.31.9
       squawk-cli:
-        specifier: ^2.41.0
-        version: 2.41.0
+        specifier: ^2.43.0
+        version: 2.43.0
 
   packages/emails:
     dependencies:
@@ -6272,8 +6272,8 @@ packages:
     resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
     engines: {node: '>= 10.x'}
 
-  squawk-cli@2.41.0:
-    resolution: {integrity: sha512-5Io9K8v0jmO95KocT/tQktm9B6o6FSrcdq0phWIXNoInah7jdKZmhVUExXfWfssMOLUvGFTLjlQeTQgn1Eur/g==}
+  squawk-cli@2.43.0:
+    resolution: {integrity: sha512-8OZgiG0is6dYMKisrYW0MC7MN5nYyqerDZBVCWUIMp0o3QbcjkIUbKPYjJ9tMW5Jwp2RkDxZCWE8aQ4eV8aJ4g==}
     hasBin: true
 
   ssh-remote-port-forward@1.0.4:
@@ -12115,7 +12115,7 @@ snapshots:
 
   split2@4.2.0: {}
 
-  squawk-cli@2.41.0:
+  squawk-cli@2.43.0:
     dependencies:
       node-fetch: 2.6.7
     transitivePeerDependencies:
