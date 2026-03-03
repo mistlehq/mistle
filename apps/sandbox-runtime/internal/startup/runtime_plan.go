@@ -444,6 +444,21 @@ func validateRuntimeClientProcessReadiness(readiness RuntimeClientProcessReadine
 			return fmt.Errorf("%s.timeoutMs must be greater than zero", location)
 		}
 		return nil
+	case "ws":
+		if strings.TrimSpace(readiness.URL) == "" {
+			return fmt.Errorf("%s.url is required", location)
+		}
+		parsedURL, err := url.ParseRequestURI(readiness.URL)
+		if err != nil || strings.TrimSpace(parsedURL.Scheme) == "" || strings.TrimSpace(parsedURL.Host) == "" {
+			return fmt.Errorf("%s.url must be a valid absolute URL", location)
+		}
+		if parsedURL.Scheme != "ws" && parsedURL.Scheme != "wss" {
+			return fmt.Errorf("%s.url must use ws or wss scheme", location)
+		}
+		if readiness.TimeoutMs <= 0 {
+			return fmt.Errorf("%s.timeoutMs must be greater than zero", location)
+		}
+		return nil
 	default:
 		return fmt.Errorf("%s.type '%s' is not supported", location, readiness.Type)
 	}

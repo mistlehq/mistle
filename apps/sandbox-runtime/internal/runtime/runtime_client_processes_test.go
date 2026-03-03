@@ -1,8 +1,10 @@
 package runtime
 
 import (
+	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -11,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
 )
 
@@ -18,6 +21,7 @@ const (
 	runtimeClientProcessHelperEnabledEnv = "SANDBOX_RUNTIME_PROCESS_HELPER_ENABLED"
 	runtimeClientProcessHelperModeEnv    = "SANDBOX_RUNTIME_PROCESS_HELPER_MODE"
 	runtimeClientProcessHelperPortEnv    = "SANDBOX_RUNTIME_PROCESS_HELPER_PORT"
+	runtimeClientProcessHelperPathEnv    = "SANDBOX_RUNTIME_PROCESS_HELPER_PATH"
 	runtimeClientProcessHelperDelayMsEnv = "SANDBOX_RUNTIME_PROCESS_HELPER_DELAY_MS"
 )
 
@@ -90,6 +94,46 @@ func TestStartRuntimeClientProcesses(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "process exited before readiness") {
 			t.Fatalf("expected process exit-before-readiness error, got %v", err)
+		}
+	})
+
+	t.Run("starts process and waits for ws readiness", func(t *testing.T) {
+		freePort, err := reserveTCPPort()
+		if err != nil {
+			t.Fatalf("expected free port reservation to succeed, got %v", err)
+		}
+
+		processes := []startup.RuntimeClientProcessSpec{
+			{
+				ProcessKey: "process_codex_ws",
+				ClientID:   "client_codex",
+				Command: helperProcessCommand(
+					"ws-listen",
+					map[string]string{
+						runtimeClientProcessHelperPortEnv: strconv.Itoa(freePort),
+						runtimeClientProcessHelperPathEnv: "/mcp",
+					},
+				),
+				Readiness: startup.RuntimeClientProcessReadiness{
+					Type:      "ws",
+					URL:       fmt.Sprintf("ws://127.0.0.1:%d/mcp", freePort),
+					TimeoutMs: 2000,
+				},
+				Stop: startup.RuntimeClientProcessStopPolicy{
+					Signal:        "sigterm",
+					TimeoutMs:     2000,
+					GracePeriodMs: 100,
+				},
+			},
+		}
+
+		manager, err := startRuntimeClientProcesses(processes)
+		if err != nil {
+			t.Fatalf("expected runtime client process startup to succeed, got %v", err)
+		}
+
+		if err := manager.Stop(); err != nil {
+			t.Fatalf("expected runtime client process stop to succeed, got %v", err)
 		}
 	})
 
@@ -189,6 +233,45 @@ func TestRuntimeClientProcessHelper(t *testing.T) {
 				return
 			}
 			_ = connection.Close()
+		}
+	case "ws-listen":
+		port := os.Getenv(runtimeClientProcessHelperPortEnv)
+		if strings.TrimSpace(port) == "" {
+			_, _ = fmt.Fprintln(os.Stderr, "missing helper websocket listen port")
+			os.Exit(2)
+		}
+		path := strings.TrimSpace(os.Getenv(runtimeClientProcessHelperPathEnv))
+		if path == "" {
+			path = "/"
+		}
+		if !strings.HasPrefix(path, "/") {
+			path = "/" + path
+		}
+
+		listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", port))
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "failed to listen on helper websocket port: %v\n", err)
+			os.Exit(2)
+		}
+		defer listener.Close()
+
+		mux := http.NewServeMux()
+		mux.HandleFunc(path, func(writer http.ResponseWriter, request *http.Request) {
+			connection, err := websocket.Accept(writer, request, nil)
+			if err != nil {
+				return
+			}
+			defer connection.CloseNow()
+
+			_ = connection.Close(websocket.StatusNormalClosure, "ready")
+		})
+
+		httpServer := &http.Server{
+			Handler: mux,
+		}
+		if err := httpServer.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			_, _ = fmt.Fprintf(os.Stderr, "helper websocket server failed: %v\n", err)
+			os.Exit(2)
 		}
 	case "exit-immediately":
 		os.Exit(17)

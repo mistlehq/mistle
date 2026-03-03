@@ -137,6 +137,14 @@ const RuntimePlanSchema = z.object({
           expectedStatus: z.number().int().min(100).max(599),
           timeoutMs: z.number().int().positive(),
         }),
+        z.object({
+          type: z.literal("ws"),
+          url: z.url().refine((value) => {
+            const parsedURL = new URL(value);
+            return parsedURL.protocol === "ws:" || parsedURL.protocol === "wss:";
+          }, "URL must use ws or wss scheme"),
+          timeoutMs: z.number().int().positive(),
+        }),
       ]),
       stop: z.object({
         signal: z.enum(["sigterm", "sigkill"]),

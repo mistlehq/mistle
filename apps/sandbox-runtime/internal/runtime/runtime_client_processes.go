@@ -1,6 +1,7 @@
 package runtime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/coder/websocket"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
 )
 
@@ -235,6 +237,8 @@ func waitForRuntimeClientProcessReadiness(
 		return waitForRuntimeClientProcessTCPReadiness(process, readiness)
 	case "http":
 		return waitForRuntimeClientProcessHTTPReadiness(process, readiness)
+	case "ws":
+		return waitForRuntimeClientProcessWSReadiness(process, readiness)
 	default:
 		return fmt.Errorf("unsupported readiness type '%s'", readiness.Type)
 	}
@@ -278,6 +282,30 @@ func waitForRuntimeClientProcessHTTPReadiness(
 				response.StatusCode,
 				readiness.ExpectedStatus,
 			)
+		}
+
+		return nil
+	}
+
+	return waitForRuntimeClientProcessCheck(process, readiness.TimeoutMs, check)
+}
+
+func waitForRuntimeClientProcessWSReadiness(
+	process *runtimeClientProcess,
+	readiness startup.RuntimeClientProcessReadiness,
+) error {
+	check := func() error {
+		dialContext, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+		defer cancel()
+
+		connection, _, err := websocket.Dial(dialContext, readiness.URL, nil)
+		if err != nil {
+			return err
+		}
+		defer connection.CloseNow()
+
+		if err := connection.Close(websocket.StatusNormalClosure, "readiness probe complete"); err != nil {
+			return err
 		}
 
 		return nil
