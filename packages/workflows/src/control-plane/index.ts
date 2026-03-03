@@ -2,11 +2,17 @@ export { createControlPlaneBackend } from "./backend.js";
 export { createControlPlaneOpenWorkflow } from "./client.js";
 export { ControlPlaneWorkerWorkflowIds, createControlPlaneWorker } from "./worker.js";
 export {
+  HandleIntegrationWebhookEventWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
   StartSandboxProfileInstanceWorkflowSpec,
   SendOrganizationInvitationWorkflowSpec,
   SendVerificationOTPWorkflowSpec,
 } from "./workflows/index.js";
+export {
+  createHandleIntegrationWebhookEventWorkflow,
+  type HandleIntegrationWebhookEventWorkflowInput,
+  type HandleIntegrationWebhookEventWorkflowOutput,
+} from "./workflows/handle-integration-webhook-event/index.js";
 export {
   createRequestDeleteSandboxProfileWorkflow,
   type CreateRequestDeleteSandboxProfileWorkflowInput,

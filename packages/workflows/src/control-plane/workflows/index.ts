@@ -1,4 +1,10 @@
 import {
+  createHandleIntegrationWebhookEventWorkflow,
+  HandleIntegrationWebhookEventWorkflowSpec,
+  type HandleIntegrationWebhookEventWorkflowInput,
+  type HandleIntegrationWebhookEventWorkflowOutput,
+} from "./handle-integration-webhook-event/index.js";
+import {
   createRequestDeleteSandboxProfileWorkflow,
   RequestDeleteSandboxProfileWorkflowSpec,
   type CreateRequestDeleteSandboxProfileWorkflowInput,
@@ -23,12 +29,14 @@ import {
  * Control-plane workflow implementations.
  */
 export type ControlPlaneWorkflowDefinition =
+  | ReturnType<typeof createHandleIntegrationWebhookEventWorkflow>
   | ReturnType<typeof createSendOrganizationInvitationWorkflow>
   | ReturnType<typeof createSendVerificationOTPWorkflow>
   | ReturnType<typeof createRequestDeleteSandboxProfileWorkflow>
   | ReturnType<typeof createStartSandboxProfileInstanceWorkflow>;
 
 export type ControlPlaneWorkflowDefinitions = {
+  handleIntegrationWebhookEvent: ReturnType<typeof createHandleIntegrationWebhookEventWorkflow>;
   sendOrganizationInvitation: ReturnType<typeof createSendOrganizationInvitationWorkflow>;
   sendVerificationOTP: ReturnType<typeof createSendVerificationOTPWorkflow>;
   requestDeleteSandboxProfile: ReturnType<typeof createRequestDeleteSandboxProfileWorkflow>;
@@ -46,6 +54,7 @@ export function createControlPlaneWorkflowDefinitions(
   ctx: CreateControlPlaneWorkflowDefinitionsInput,
 ): ControlPlaneWorkflowDefinitions {
   return {
+    handleIntegrationWebhookEvent: createHandleIntegrationWebhookEventWorkflow(),
     sendOrganizationInvitation: createSendOrganizationInvitationWorkflow(
       ctx.sendOrganizationInvitation,
     ),
@@ -59,6 +68,11 @@ export function createControlPlaneWorkflowDefinitions(
   };
 }
 
+export { HandleIntegrationWebhookEventWorkflowSpec };
+export type {
+  HandleIntegrationWebhookEventWorkflowInput,
+  HandleIntegrationWebhookEventWorkflowOutput,
+};
 export { SendOrganizationInvitationWorkflowSpec };
 export { SendVerificationOTPWorkflowSpec };
 export { RequestDeleteSandboxProfileWorkflowSpec };
