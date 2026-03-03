@@ -87,3 +87,28 @@ export class IntegrationCompilerError extends IntegrationsCoreError {
     this.name = "IntegrationCompilerError";
   }
 }
+
+export type WebhookErrorCode =
+  | "WEBHOOK_HANDLER_NOT_CONFIGURED"
+  | "WEBHOOK_VERIFY_FAILED"
+  | "WEBHOOK_UNSUPPORTED_EVENT_TYPE"
+  | "WEBHOOK_TARGET_KEY_MISMATCH";
+
+export const WebhookErrorCodes: {
+  WEBHOOK_HANDLER_NOT_CONFIGURED: WebhookErrorCode;
+  WEBHOOK_VERIFY_FAILED: WebhookErrorCode;
+  WEBHOOK_UNSUPPORTED_EVENT_TYPE: WebhookErrorCode;
+  WEBHOOK_TARGET_KEY_MISMATCH: WebhookErrorCode;
+} = {
+  WEBHOOK_HANDLER_NOT_CONFIGURED: "WEBHOOK_HANDLER_NOT_CONFIGURED",
+  WEBHOOK_VERIFY_FAILED: "WEBHOOK_VERIFY_FAILED",
+  WEBHOOK_UNSUPPORTED_EVENT_TYPE: "WEBHOOK_UNSUPPORTED_EVENT_TYPE",
+  WEBHOOK_TARGET_KEY_MISMATCH: "WEBHOOK_TARGET_KEY_MISMATCH",
+};
+
+export class IntegrationWebhookError extends IntegrationsCoreError {
+  constructor(code: WebhookErrorCode, message: string, options?: ErrorOptions) {
+    super(code, message, options);
+    this.name = "IntegrationWebhookError";
+  }
+}
