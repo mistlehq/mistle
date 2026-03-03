@@ -11,6 +11,7 @@ import { runCleanupTasks, startPostgresWithPgBouncer } from "@mistle/test-harnes
 import type { Worker } from "openworkflow";
 import type { BackendPostgres } from "openworkflow/postgres";
 import postgres from "postgres";
+import { typeid } from "typeid-js";
 import { it as vitestIt } from "vitest";
 
 import {
@@ -135,7 +136,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                     },
                   });
                   const bootstrapTokenJti = randomUUID();
-                  const sandboxInstanceId = `sbi_${randomUUID().replaceAll("-", "")}`;
+                  const sandboxInstanceId = typeid("sbi").toString();
 
                   startedSandboxIds.push(startedSandbox.sandboxId);
                   startedBootstrapTokenJtis.push(bootstrapTokenJti);

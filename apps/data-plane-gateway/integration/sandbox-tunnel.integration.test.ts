@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
+import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 
 import { it } from "./test-context.js";
@@ -29,7 +30,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
           tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
         },
         jti,
-        sandboxInstanceId: `sbi_${randomUUID().replaceAll("-", "")}`,
+        sandboxInstanceId: typeid("sbi").toString(),
         ttlSeconds: 120,
       });
       const socket = await connectWebSocket(
@@ -58,7 +59,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
           tokenAudience: fixture.config.sandbox.connect.tokenAudience,
         },
         jti,
-        sandboxInstanceId: `sbi_${randomUUID().replaceAll("-", "")}`,
+        sandboxInstanceId: typeid("sbi").toString(),
         ttlSeconds: 120,
       });
       const socket = await connectWebSocket(
@@ -86,7 +87,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
           tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
         },
         jti: randomUUID(),
-        sandboxInstanceId: `sbi_${randomUUID().replaceAll("-", "")}`,
+        sandboxInstanceId: typeid("sbi").toString(),
         ttlSeconds: 120,
       });
       const connectionToken = await mintConnectionToken({
@@ -96,7 +97,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
           tokenAudience: fixture.config.sandbox.connect.tokenAudience,
         },
         jti: randomUUID(),
-        sandboxInstanceId: `sbi_${randomUUID().replaceAll("-", "")}`,
+        sandboxInstanceId: typeid("sbi").toString(),
         ttlSeconds: 120,
       });
 
@@ -121,7 +122,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
           tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
         },
         jti,
-        sandboxInstanceId: `sbi_${randomUUID().replaceAll("-", "")}`,
+        sandboxInstanceId: typeid("sbi").toString(),
         ttlSeconds: 120,
       });
       const socket = await connectWebSocket(
@@ -154,7 +155,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
           tokenAudience: fixture.config.sandbox.connect.tokenAudience,
         },
         jti,
-        sandboxInstanceId: `sbi_${randomUUID().replaceAll("-", "")}`,
+        sandboxInstanceId: typeid("sbi").toString(),
         ttlSeconds: 120,
       });
       const socket = await connectWebSocket(

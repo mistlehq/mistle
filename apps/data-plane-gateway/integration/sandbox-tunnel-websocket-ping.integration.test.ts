@@ -6,6 +6,7 @@ import { randomUUID } from "node:crypto";
 
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
+import { typeid } from "typeid-js";
 import { describe } from "vitest";
 import WebSocket from "ws";
 
@@ -40,7 +41,7 @@ describe("sandbox tunnel websocket ping integration", () => {
           tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
         },
         jti: randomUUID(),
-        sandboxInstanceId: `sbi_${randomUUID().replaceAll("-", "")}`,
+        sandboxInstanceId: typeid("sbi").toString(),
         ttlSeconds: 120,
       });
       const connectionToken = await mintConnectionToken({
@@ -50,7 +51,7 @@ describe("sandbox tunnel websocket ping integration", () => {
           tokenAudience: fixture.config.sandbox.connect.tokenAudience,
         },
         jti: randomUUID(),
-        sandboxInstanceId: `sbi_${randomUUID().replaceAll("-", "")}`,
+        sandboxInstanceId: typeid("sbi").toString(),
         ttlSeconds: 120,
       });
 

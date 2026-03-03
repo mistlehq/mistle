@@ -318,6 +318,9 @@ importers:
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
+      typeid-js:
+        specifier: ^1.2.0
+        version: 1.2.0
 
   apps/data-plane-gateway:
     dependencies:
@@ -358,6 +361,9 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
+      typeid-js:
+        specifier: ^1.2.0
+        version: 1.2.0
       ws:
         specifier: ^8.18.3
         version: 8.19.0
@@ -710,6 +716,9 @@ importers:
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../test-harness
+      typeid-js:
+        specifier: ^1.2.0
+        version: 1.2.0
 
   tests: {}
 

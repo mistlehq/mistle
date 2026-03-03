@@ -47,6 +47,7 @@
   },
   "devDependencies": {
     "@mistle/db": "workspace:*",
-    "@mistle/test-harness": "workspace:*"
+    "@mistle/test-harness": "workspace:*",
+    "typeid-js": "^1.2.0"
   }
 }
