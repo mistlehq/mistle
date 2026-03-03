@@ -159,6 +159,9 @@ export interface paths {
         content: {
           "application/json": {
             apiKey: string;
+            secrets?: {
+              [key: string]: string;
+            };
           };
         };
       };
@@ -298,6 +301,9 @@ export interface paths {
         content: {
           "application/json": {
             query: {
+              [key: string]: string;
+            };
+            secrets?: {
               [key: string]: string;
             };
           };
@@ -1491,6 +1497,7 @@ export interface paths {
                     | "CONNECTION_NOT_ACTIVE"
                     | "KIND_MISMATCH"
                     | "INVALID_TARGET_CONFIG"
+                    | "INVALID_TARGET_SECRETS"
                     | "INVALID_BINDING_CONFIG"
                     | "ROUTE_CONFLICT"
                     | "ARTIFACT_CONFLICT"
