@@ -1,6 +1,7 @@
 import { createNodeWebSocket } from "@hono/node-ws";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
+import { typeid } from "typeid-js";
 
 import { createApp, stopApp } from "../app.js";
 import { startServer } from "../server.js";
@@ -16,6 +17,7 @@ export function createDataPlaneGatewayRuntime(
 ): DataPlaneGatewayRuntime {
   const app = createApp(config.app);
   const nodeWebSocket = createNodeWebSocket({ app });
+  const nodeId = typeid("dpg").toString();
 
   registerSandboxTunnelRoute({
     app,
@@ -30,6 +32,7 @@ export function createDataPlaneGatewayRuntime(
       tokenIssuer: config.sandbox.connect.tokenIssuer,
       tokenAudience: config.sandbox.connect.tokenAudience,
     } satisfies ConnectionTokenConfig,
+    nodeId,
   });
 
   let startedServer: StartedServer | undefined;

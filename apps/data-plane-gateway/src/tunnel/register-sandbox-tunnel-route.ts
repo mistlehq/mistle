@@ -9,12 +9,17 @@ import {
   type BootstrapTokenConfig,
   verifyBootstrapToken,
 } from "@mistle/gateway-tunnel-auth";
-import type { WSContext, WSMessageReceive } from "hono/ws";
-import type { WebSocket } from "ws";
+import type { WSMessageReceive } from "hono/ws";
 
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { insertSandboxTunnelConnectAck } from "./connect-ack.js";
+import { InMemoryTunnelFrameTransportAdapter } from "./frame-transport/adapters/in-memory-frame-transport-adapter.js";
+import { TunnelFrameTransport } from "./frame-transport/index.js";
+import { InMemoryTunnelPeerRegistryAdapter } from "./peer-registry/adapters/in-memory-peer-registry-adapter.js";
+import { TunnelPeerRegistry } from "./peer-registry/index.js";
+import { TunnelRelayCoordinator } from "./relay-coordinator.js";
+import type { TunnelPeerLocation, TunnelPeerSide } from "./types.js";
 
 const SandboxTunnelRoutePath = "/tunnel/sandbox/:instanceId";
 
@@ -23,13 +28,10 @@ type RegisterSandboxTunnelRouteInput = {
   upgradeWebSocket: NodeWebSocket["upgradeWebSocket"];
   bootstrapTokenConfig: BootstrapTokenConfig;
   connectionTokenConfig: ConnectionTokenConfig;
+  nodeId: string;
 };
 
 type TokenKind = "bootstrap" | "connection";
-type TunnelPeerSockets = {
-  bootstrap: WSContext<WebSocket> | undefined;
-  connection: WSContext<WebSocket> | undefined;
-};
 type RequestedToken =
   | {
       kind: "missing";
@@ -44,12 +46,8 @@ type RequestedToken =
 
 const CloseCodes: {
   INTERNAL_ERROR: number;
-  REPLACED: number;
-  PEER_DISCONNECTED: number;
 } = {
   INTERNAL_ERROR: 1011,
-  REPLACED: 1012,
-  PEER_DISCONNECTED: 1012,
 };
 
 function toNormalizedTokenValue(token: string | null): string | undefined {
@@ -113,61 +111,6 @@ async function verifyRequestedToken(input: {
   };
 }
 
-function getOppositeTokenKind(tokenKind: TokenKind): TokenKind {
-  return tokenKind === "bootstrap" ? "connection" : "bootstrap";
-}
-
-function getSocketForTokenKind(
-  sockets: TunnelPeerSockets,
-  tokenKind: TokenKind,
-): WSContext<WebSocket> | undefined {
-  return tokenKind === "bootstrap" ? sockets.bootstrap : sockets.connection;
-}
-
-function setSocketForTokenKind(
-  sockets: TunnelPeerSockets,
-  tokenKind: TokenKind,
-  socket: WSContext<WebSocket> | undefined,
-): void {
-  if (tokenKind === "bootstrap") {
-    sockets.bootstrap = socket;
-    return;
-  }
-  sockets.connection = socket;
-}
-
-function getOrCreateTunnelPeerSockets(
-  tunnelPeersByInstanceId: Map<string, TunnelPeerSockets>,
-  instanceId: string,
-): TunnelPeerSockets {
-  const existing = tunnelPeersByInstanceId.get(instanceId);
-  if (existing !== undefined) {
-    return existing;
-  }
-
-  const created: TunnelPeerSockets = {
-    bootstrap: undefined,
-    connection: undefined,
-  };
-  tunnelPeersByInstanceId.set(instanceId, created);
-  return created;
-}
-
-function closeSocketIfOpen(
-  socket: WSContext<WebSocket> | undefined,
-  closeCode: number,
-  closeReason: string,
-): void {
-  if (socket === undefined) {
-    return;
-  }
-  if (socket.readyState !== 1) {
-    return;
-  }
-
-  socket.close(closeCode, closeReason);
-}
-
 function toForwardPayload(data: WSMessageReceive): string | ArrayBuffer | undefined {
   if (typeof data === "string") {
     return data;
@@ -179,8 +122,16 @@ function toForwardPayload(data: WSMessageReceive): string | ArrayBuffer | undefi
   return undefined;
 }
 
+function toSourcePeerSide(tokenKind: TokenKind): TunnelPeerSide {
+  return tokenKind;
+}
+
 export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInput): void {
-  const tunnelPeersByInstanceId = new Map<string, TunnelPeerSockets>();
+  const peerRegistryAdapter = new InMemoryTunnelPeerRegistryAdapter();
+  const peerRegistry = new TunnelPeerRegistry(peerRegistryAdapter);
+  const frameTransportAdapter = new InMemoryTunnelFrameTransportAdapter(input.nodeId);
+  const frameTransport = new TunnelFrameTransport(frameTransportAdapter);
+  const relayCoordinator = new TunnelRelayCoordinator(input.nodeId, peerRegistry, frameTransport);
 
   input.app.get(
     SandboxTunnelRoutePath,
@@ -275,88 +226,63 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
         if (requestedToken.kind !== "bootstrap" && requestedToken.kind !== "connection") {
           throw new Error("Expected validated sandbox tunnel websocket request token.");
         }
-        const tokenKind: TokenKind = requestedToken.kind;
-        const peerTokenKind = getOppositeTokenKind(tokenKind);
+
+        const sourcePeerSide = toSourcePeerSide(requestedToken.kind);
+        let peerLocation: TunnelPeerLocation | undefined;
 
         return {
           onOpen: (_event, ws) => {
-            const tunnelPeers = getOrCreateTunnelPeerSockets(tunnelPeersByInstanceId, instanceId);
-            const existingSocket = getSocketForTokenKind(tunnelPeers, tokenKind);
-            if (existingSocket !== undefined && existingSocket !== ws) {
-              closeSocketIfOpen(
-                existingSocket,
-                CloseCodes.REPLACED,
-                "Replaced by newer sandbox tunnel connection.",
-              );
-            }
-            setSocketForTokenKind(tunnelPeers, tokenKind, ws);
+            peerLocation = relayCoordinator.attachPeer({
+              instanceId,
+              side: sourcePeerSide,
+              socket: ws,
+            });
           },
           onMessage: (event, ws) => {
-            const tunnelPeers = tunnelPeersByInstanceId.get(instanceId);
-            if (tunnelPeers === undefined) {
-              closeSocketIfOpen(
-                ws,
+            if (peerLocation === undefined) {
+              ws.close(
                 CloseCodes.INTERNAL_ERROR,
-                "Sandbox tunnel state was missing for websocket connection.",
+                "Sandbox tunnel peer location was not initialized for websocket connection.",
               );
               return;
             }
 
-            const peerSocket = getSocketForTokenKind(tunnelPeers, peerTokenKind);
-            if (peerSocket === undefined || peerSocket.readyState !== 1) {
+            if (!relayCoordinator.isCurrentPeer(peerLocation)) {
               return;
             }
 
             const payload = toForwardPayload(event.data);
             if (payload === undefined) {
-              closeSocketIfOpen(
-                ws,
-                CloseCodes.INTERNAL_ERROR,
-                "Unsupported websocket message type.",
-              );
+              ws.close(CloseCodes.INTERNAL_ERROR, "Unsupported websocket message type.");
               return;
             }
 
-            try {
-              peerSocket.send(payload);
-            } catch (error) {
-              logger.error(
-                {
-                  err: error,
-                  instanceId,
-                  sourceTokenKind: tokenKind,
-                },
-                "Failed forwarding sandbox tunnel websocket message to peer",
-              );
-              closeSocketIfOpen(
-                ws,
-                CloseCodes.INTERNAL_ERROR,
-                "Failed forwarding websocket message to tunnel peer.",
-              );
-            }
+            void relayCoordinator
+              .forwardPeerMessage({
+                instanceId,
+                fromSide: sourcePeerSide,
+                payload,
+              })
+              .catch((error: unknown) => {
+                logger.error(
+                  {
+                    err: error,
+                    instanceId,
+                    sourceTokenKind: requestedToken.kind,
+                  },
+                  "Failed forwarding sandbox tunnel websocket message to peer",
+                );
+                ws.close(
+                  CloseCodes.INTERNAL_ERROR,
+                  "Failed forwarding websocket message to tunnel peer.",
+                );
+              });
           },
-          onClose: (_event, ws) => {
-            const tunnelPeers = tunnelPeersByInstanceId.get(instanceId);
-            if (tunnelPeers === undefined) {
+          onClose: () => {
+            if (peerLocation === undefined) {
               return;
             }
-
-            const currentSocket = getSocketForTokenKind(tunnelPeers, tokenKind);
-            if (currentSocket === undefined || currentSocket !== ws) {
-              return;
-            }
-
-            const peerSocket = getSocketForTokenKind(tunnelPeers, peerTokenKind);
-            setSocketForTokenKind(tunnelPeers, tokenKind, undefined);
-            closeSocketIfOpen(
-              peerSocket,
-              CloseCodes.PEER_DISCONNECTED,
-              "Sandbox tunnel peer disconnected.",
-            );
-
-            if (tunnelPeers.bootstrap === undefined && tunnelPeers.connection === undefined) {
-              tunnelPeersByInstanceId.delete(instanceId);
-            }
+            relayCoordinator.detachPeer(peerLocation);
           },
         };
       },

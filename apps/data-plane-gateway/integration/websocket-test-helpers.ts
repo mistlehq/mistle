@@ -84,6 +84,36 @@ export function closeWebSocket(socket: WebSocket): Promise<void> {
   });
 }
 
+export type WebSocketCloseEvent = {
+  code: number;
+  reason: string;
+};
+
+export function waitForWebSocketClose(socket: WebSocket): Promise<WebSocketCloseEvent> {
+  return new Promise((resolve, reject) => {
+    const onClose = (code: number, reason: Buffer): void => {
+      cleanup();
+      resolve({
+        code,
+        reason: reason.toString("utf8"),
+      });
+    };
+
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+
+    const cleanup = (): void => {
+      socket.off("close", onClose);
+      socket.off("error", onError);
+    };
+
+    socket.once("close", onClose);
+    socket.once("error", onError);
+  });
+}
+
 function toBuffer(data: RawData): Buffer {
   if (Buffer.isBuffer(data)) {
     return data;
