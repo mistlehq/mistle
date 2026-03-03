@@ -100,6 +100,26 @@ function createOpenAiDefinition(): IntegrationDefinition<
           ],
         },
       ],
+      runtimeClientProcesses: [
+        {
+          processKey: "codex-app-server",
+          clientId: "codex-cli",
+          command: {
+            args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
+          },
+          readiness: {
+            type: "tcp",
+            host: "127.0.0.1",
+            port: 4747,
+            timeoutMs: 5_000,
+          },
+          stop: {
+            signal: "sigterm",
+            timeoutMs: 10_000,
+            gracePeriodMs: 2_000,
+          },
+        },
+      ],
     }),
   };
 }
@@ -152,6 +172,7 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
         },
       ],
       runtimeClientSetups: [],
+      runtimeClientProcesses: [],
     }),
   };
 }
@@ -175,6 +196,7 @@ function createOpenAiNoArtifactDefinition(): IntegrationDefinition<
       egressRoutes: [],
       artifacts: [],
       runtimeClientSetups: [],
+      runtimeClientProcesses: [],
     }),
   };
 }
@@ -246,6 +268,26 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.runtimeClientSetups[0]?.env.OPENAI_BASE_URL).toBe(
       "http://127.0.0.1:8090/egress/routes/route_bind_openai_agent",
     );
+    expect(runtimePlan.runtimeClientProcesses).toEqual([
+      {
+        processKey: "codex-app-server",
+        clientId: "codex-cli",
+        command: {
+          args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
+        },
+        readiness: {
+          type: "tcp",
+          host: "127.0.0.1",
+          port: 4747,
+          timeoutMs: 5_000,
+        },
+        stop: {
+          signal: "sigterm",
+          timeoutMs: 10_000,
+          gracePeriodMs: 2_000,
+        },
+      },
+    ]);
     expect(runtimePlan.artifactRemovals).toEqual([]);
   });
 
@@ -793,6 +835,7 @@ describe("compileRuntimePlan", () => {
               files: [],
             },
           ],
+          runtimeClientProcesses: [],
         }),
       };
 

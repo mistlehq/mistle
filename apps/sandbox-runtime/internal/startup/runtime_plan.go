@@ -2,6 +2,7 @@ package startup
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 )
 
@@ -19,13 +20,14 @@ var allowedAuthInjectionTypes = map[string]struct{}{
 }
 
 type RuntimePlan struct {
-	SandboxProfileID    string                       `json:"sandboxProfileId"`
-	Version             int                          `json:"version"`
-	Image               ResolvedSandboxImage         `json:"image"`
-	EgressRoutes        []EgressCredentialRoute      `json:"egressRoutes"`
-	Artifacts           []RuntimeArtifactSpec        `json:"artifacts"`
-	ArtifactRemovals    []RuntimeArtifactRemovalSpec `json:"artifactRemovals"`
-	RuntimeClientSetups []RuntimeClientSetup         `json:"runtimeClientSetups"`
+	SandboxProfileID       string                       `json:"sandboxProfileId"`
+	Version                int                          `json:"version"`
+	Image                  ResolvedSandboxImage         `json:"image"`
+	EgressRoutes           []EgressCredentialRoute      `json:"egressRoutes"`
+	Artifacts              []RuntimeArtifactSpec        `json:"artifacts"`
+	ArtifactRemovals       []RuntimeArtifactRemovalSpec `json:"artifactRemovals"`
+	RuntimeClientSetups    []RuntimeClientSetup         `json:"runtimeClientSetups"`
+	RuntimeClientProcesses []RuntimeClientProcessSpec   `json:"runtimeClientProcesses"`
 }
 
 type ResolvedSandboxImage struct {
@@ -99,6 +101,29 @@ type RuntimeClientSetup struct {
 	LaunchArgs []string          `json:"launchArgs"`
 }
 
+type RuntimeClientProcessSpec struct {
+	ProcessKey string                         `json:"processKey"`
+	ClientID   string                         `json:"clientId"`
+	Command    RuntimeArtifactCommand         `json:"command"`
+	Readiness  RuntimeClientProcessReadiness  `json:"readiness"`
+	Stop       RuntimeClientProcessStopPolicy `json:"stop"`
+}
+
+type RuntimeClientProcessReadiness struct {
+	Type           string `json:"type"`
+	Host           string `json:"host"`
+	Port           int    `json:"port"`
+	TimeoutMs      int    `json:"timeoutMs"`
+	URL            string `json:"url"`
+	ExpectedStatus int    `json:"expectedStatus"`
+}
+
+type RuntimeClientProcessStopPolicy struct {
+	Signal        string `json:"signal"`
+	TimeoutMs     int    `json:"timeoutMs"`
+	GracePeriodMs int    `json:"gracePeriodMs"`
+}
+
 type RuntimeFileSpec struct {
 	FileID  string `json:"fileId"`
 	Path    string `json:"path"`
@@ -124,6 +149,9 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 	}
 	if runtimePlan.RuntimeClientSetups == nil {
 		return fmt.Errorf("runtime plan runtimeClientSetups is required")
+	}
+	if runtimePlan.RuntimeClientProcesses == nil {
+		return fmt.Errorf("runtime plan runtimeClientProcesses is required")
 	}
 
 	if err := validateResolvedSandboxImage(runtimePlan.Image); err != nil {
@@ -155,6 +183,11 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 
 	for setupIndex, setup := range runtimePlan.RuntimeClientSetups {
 		if err := validateRuntimeClientSetup(setup, setupIndex); err != nil {
+			return err
+		}
+	}
+	for processIndex, process := range runtimePlan.RuntimeClientProcesses {
+		if err := validateRuntimeClientProcess(process, processIndex); err != nil {
 			return err
 		}
 	}
@@ -354,6 +387,79 @@ func validateRuntimeClientSetup(setup RuntimeClientSetup, setupIndex int) error 
 		if file.Mode < 0 {
 			return fmt.Errorf("runtime plan runtimeClientSetups[%d] files[%d].mode must be greater than or equal to 0", setupIndex, fileIndex)
 		}
+	}
+
+	return nil
+}
+
+func validateRuntimeClientProcess(process RuntimeClientProcessSpec, processIndex int) error {
+	if strings.TrimSpace(process.ProcessKey) == "" {
+		return fmt.Errorf("runtime plan runtimeClientProcesses[%d].processKey is required", processIndex)
+	}
+	if strings.TrimSpace(process.ClientID) == "" {
+		return fmt.Errorf("runtime plan runtimeClientProcesses[%d].clientId is required", processIndex)
+	}
+	if err := validateArtifactCommand(process.Command, fmt.Sprintf("runtime plan runtimeClientProcesses[%d].command", processIndex)); err != nil {
+		return err
+	}
+	if err := validateRuntimeClientProcessReadiness(process.Readiness, processIndex); err != nil {
+		return err
+	}
+	if err := validateRuntimeClientProcessStopPolicy(process.Stop, processIndex); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func validateRuntimeClientProcessReadiness(readiness RuntimeClientProcessReadiness, processIndex int) error {
+	location := fmt.Sprintf("runtime plan runtimeClientProcesses[%d].readiness", processIndex)
+
+	switch readiness.Type {
+	case "none":
+		return nil
+	case "tcp":
+		if strings.TrimSpace(readiness.Host) == "" {
+			return fmt.Errorf("%s.host is required", location)
+		}
+		if readiness.Port < 1 || readiness.Port > 65535 {
+			return fmt.Errorf("%s.port must be between 1 and 65535", location)
+		}
+		if readiness.TimeoutMs <= 0 {
+			return fmt.Errorf("%s.timeoutMs must be greater than zero", location)
+		}
+		return nil
+	case "http":
+		if strings.TrimSpace(readiness.URL) == "" {
+			return fmt.Errorf("%s.url is required", location)
+		}
+		parsedURL, err := url.ParseRequestURI(readiness.URL)
+		if err != nil || strings.TrimSpace(parsedURL.Scheme) == "" || strings.TrimSpace(parsedURL.Host) == "" {
+			return fmt.Errorf("%s.url must be a valid absolute URL", location)
+		}
+		if readiness.ExpectedStatus < 100 || readiness.ExpectedStatus > 599 {
+			return fmt.Errorf("%s.expectedStatus must be between 100 and 599", location)
+		}
+		if readiness.TimeoutMs <= 0 {
+			return fmt.Errorf("%s.timeoutMs must be greater than zero", location)
+		}
+		return nil
+	default:
+		return fmt.Errorf("%s.type '%s' is not supported", location, readiness.Type)
+	}
+}
+
+func validateRuntimeClientProcessStopPolicy(stop RuntimeClientProcessStopPolicy, processIndex int) error {
+	location := fmt.Sprintf("runtime plan runtimeClientProcesses[%d].stop", processIndex)
+
+	if stop.Signal != "sigterm" && stop.Signal != "sigkill" {
+		return fmt.Errorf("%s.signal '%s' is not supported", location, stop.Signal)
+	}
+	if stop.TimeoutMs <= 0 {
+		return fmt.Errorf("%s.timeoutMs must be greater than zero", location)
+	}
+	if stop.GracePeriodMs < 0 {
+		return fmt.Errorf("%s.gracePeriodMs must be greater than or equal to zero", location)
 	}
 
 	return nil

@@ -30,7 +30,7 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("fails when runtime plan apply fails", func(t *testing.T) {
-		startupInputJSON := `{"bootstrapToken":"test-token","tunnelGatewayWsUrl":"ws://127.0.0.1:5003/tunnel/sandbox","runtimePlan":{"sandboxProfileId":"sbp_test","version":1,"image":{"source":"base","imageRef":"mistle/sandbox-base:dev"},"egressRoutes":[],"artifacts":[],"artifactRemovals":[],"runtimeClientSetups":[{"clientId":"client_test","env":{},"files":[{"fileId":"file_test","path":"/tmp","mode":420,"content":"invalid-target"}]}]}}`
+		startupInputJSON := `{"bootstrapToken":"test-token","tunnelGatewayWsUrl":"ws://127.0.0.1:5003/tunnel/sandbox","runtimePlan":{"sandboxProfileId":"sbp_test","version":1,"image":{"source":"base","imageRef":"mistle/sandbox-base:dev"},"egressRoutes":[],"artifacts":[],"artifactRemovals":[],"runtimeClientSetups":[{"clientId":"client_test","env":{},"files":[{"fileId":"file_test","path":"/tmp","mode":420,"content":"invalid-target"}]}],"runtimeClientProcesses":[]}}`
 
 		err := Run(RunInput{
 			LookupEnv: func(key string) (string, bool) {

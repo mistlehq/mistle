@@ -21,6 +21,7 @@ function createRuntimePlan(input: {
     artifacts: [],
     artifactRemovals: [],
     runtimeClientSetups: [],
+    runtimeClientProcesses: [],
   };
 }
 

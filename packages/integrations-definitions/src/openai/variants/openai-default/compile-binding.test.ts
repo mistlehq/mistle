@@ -159,6 +159,7 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(compiled.runtimeClientSetups[0]?.files[0]?.content).not.toContain(
       "[model_providers.openai]",
     );
+    expect(compiled.runtimeClientProcesses).toEqual([]);
   });
 
   it("uses target base-url host and path for custom upstreams", () => {

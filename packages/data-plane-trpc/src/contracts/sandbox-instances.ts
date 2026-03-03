@@ -130,6 +130,48 @@ const RuntimeClientSetupSchema = z
   })
   .strict();
 
+const RuntimeClientProcessReadinessSchema = z.discriminatedUnion("type", [
+  z
+    .object({
+      type: z.literal("none"),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("tcp"),
+      host: z.string().min(1),
+      port: z.number().int().min(1).max(65_535),
+      timeoutMs: z.number().int().positive(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("http"),
+      url: z.url(),
+      expectedStatus: z.number().int().min(100).max(599),
+      timeoutMs: z.number().int().positive(),
+    })
+    .strict(),
+]);
+
+const RuntimeClientProcessStopPolicySchema = z
+  .object({
+    signal: z.enum(["sigterm", "sigkill"]),
+    timeoutMs: z.number().int().positive(),
+    gracePeriodMs: z.number().int().min(0).optional(),
+  })
+  .strict();
+
+const RuntimeClientProcessSchema = z
+  .object({
+    processKey: z.string().min(1),
+    clientId: z.string().min(1),
+    command: RuntimeArtifactCommandSchema,
+    readiness: RuntimeClientProcessReadinessSchema,
+    stop: RuntimeClientProcessStopPolicySchema,
+  })
+  .strict();
+
 const CompiledRuntimePlanSchema = z
   .object({
     sandboxProfileId: z.string().min(1),
@@ -139,6 +181,7 @@ const CompiledRuntimePlanSchema = z
     artifacts: z.array(CompiledRuntimeArtifactSpecSchema),
     artifactRemovals: z.array(CompiledRuntimeArtifactRemovalSpecSchema),
     runtimeClientSetups: z.array(RuntimeClientSetupSchema),
+    runtimeClientProcesses: z.array(RuntimeClientProcessSchema),
   })
   .strict();
 
