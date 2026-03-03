@@ -4,6 +4,7 @@ import {
   type IntegrationTarget,
   type IntegrationCredentialSecretKind,
 } from "@mistle/db/control-plane";
+import { z } from "zod";
 
 import {
   decryptCredentialUtf8,
@@ -53,19 +54,19 @@ type ResolverContextTarget = {
   secrets: Record<string, string>;
 };
 
-function isRecord(input: unknown): input is Record<string, unknown> {
-  return typeof input === "object" && input !== null && !Array.isArray(input);
-}
+const UnknownRecordSchema = z.record(z.string(), z.unknown());
+const StringRecordSchema = z.record(z.string(), z.string());
 
 function resolveConnectionConfigOrThrow(input: {
   connectionId: string;
   config: unknown;
 }): Record<string, unknown> {
-  if (!isRecord(input.config)) {
+  const parsedConfig = UnknownRecordSchema.safeParse(input.config);
+  if (!parsedConfig.success) {
     throw new Error(`Integration connection '${input.connectionId}' has invalid config.`);
   }
 
-  return input.config;
+  return parsedConfig.data;
 }
 
 function resolveResolverContextConnection(input: {
@@ -102,8 +103,9 @@ function resolveResolverContextTarget(input: {
   };
   integrationsConfig: AppContext["var"]["config"]["integrations"];
 }): ResolverContextTarget {
-  const parsedTargetConfig = input.definition.targetConfigSchema.parse(input.target.config);
-  if (!isRecord(parsedTargetConfig)) {
+  const parsedTargetConfigOutput = input.definition.targetConfigSchema.parse(input.target.config);
+  const parsedTargetConfig = UnknownRecordSchema.safeParse(parsedTargetConfigOutput);
+  if (!parsedTargetConfig.success) {
     throw new Error(
       `Integration target '${input.target.targetKey}' has invalid parsed target config.`,
     );
@@ -116,28 +118,21 @@ function resolveResolverContextTarget(input: {
       secrets: input.target.secrets,
     },
   });
-  const parsedTargetSecrets = input.definition.targetSecretSchema.parse(decryptedTargetSecrets);
-  if (!isRecord(parsedTargetSecrets)) {
+  const parsedTargetSecretsOutput =
+    input.definition.targetSecretSchema.parse(decryptedTargetSecrets);
+  const parsedTargetSecrets = StringRecordSchema.safeParse(parsedTargetSecretsOutput);
+  if (!parsedTargetSecrets.success) {
     throw new Error(
       `Integration target '${input.target.targetKey}' has invalid parsed target secrets.`,
     );
-  }
-
-  const normalizedTargetSecrets: Record<string, string> = {};
-  for (const [key, value] of Object.entries(parsedTargetSecrets)) {
-    if (typeof value !== "string") {
-      throw new Error(`Integration target '${input.target.targetKey}' secrets must be strings.`);
-    }
-
-    normalizedTargetSecrets[key] = value;
   }
 
   return {
     familyId: input.target.familyId,
     variantId: input.target.variantId,
     enabled: input.target.enabled,
-    config: parsedTargetConfig,
-    secrets: normalizedTargetSecrets,
+    config: parsedTargetConfig.data,
+    secrets: parsedTargetSecrets.data,
   };
 }
 
