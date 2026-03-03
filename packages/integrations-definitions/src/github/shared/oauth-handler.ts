@@ -4,6 +4,7 @@ import {
 } from "@mistle/integrations-core";
 
 import type { GitHubTargetConfig } from "./target-config-schema.js";
+import type { GitHubTargetSecrets } from "./target-secret-schema.js";
 
 function resolveGitHubAppSlug(targetConfig: GitHubTargetConfig): string {
   if (targetConfig.appSlug === undefined || targetConfig.appSlug.length === 0) {
@@ -33,7 +34,10 @@ function resolveInstallationId(query: URLSearchParams): string {
   return installationId;
 }
 
-export const GitHubAppOAuthHandler: IntegrationOAuthHandler<GitHubTargetConfig> = {
+export const GitHubAppOAuthHandler: IntegrationOAuthHandler<
+  GitHubTargetConfig,
+  GitHubTargetSecrets
+> = {
   start(input) {
     const appSlug = resolveGitHubAppSlug(input.target.config);
 
