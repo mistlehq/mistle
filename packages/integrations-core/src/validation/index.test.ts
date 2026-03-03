@@ -447,11 +447,11 @@ describe("validateCompiledBindingResults", () => {
           processKey: "codex-app-server",
           clientId: "codex-cli",
           command: {
-            args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747/mcp"],
+            args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
           },
           readiness: {
             type: "ws",
-            url: "ws://127.0.0.1:4747/mcp",
+            url: "ws://127.0.0.1:4747",
             timeoutMs: 5_000,
           },
           stop: {
@@ -482,11 +482,11 @@ describe("validateCompiledBindingResults", () => {
           processKey: "codex-app-server",
           clientId: "codex-cli",
           command: {
-            args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747/mcp"],
+            args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
           },
           readiness: {
             type: "ws",
-            url: "http://127.0.0.1:4747/mcp",
+            url: "http://127.0.0.1:4747",
             timeoutMs: 5_000,
           },
           stop: {

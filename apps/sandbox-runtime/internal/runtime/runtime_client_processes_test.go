@@ -21,7 +21,6 @@ const (
 	runtimeClientProcessHelperEnabledEnv = "SANDBOX_RUNTIME_PROCESS_HELPER_ENABLED"
 	runtimeClientProcessHelperModeEnv    = "SANDBOX_RUNTIME_PROCESS_HELPER_MODE"
 	runtimeClientProcessHelperPortEnv    = "SANDBOX_RUNTIME_PROCESS_HELPER_PORT"
-	runtimeClientProcessHelperPathEnv    = "SANDBOX_RUNTIME_PROCESS_HELPER_PATH"
 	runtimeClientProcessHelperDelayMsEnv = "SANDBOX_RUNTIME_PROCESS_HELPER_DELAY_MS"
 )
 
@@ -111,12 +110,11 @@ func TestStartRuntimeClientProcesses(t *testing.T) {
 					"ws-listen",
 					map[string]string{
 						runtimeClientProcessHelperPortEnv: strconv.Itoa(freePort),
-						runtimeClientProcessHelperPathEnv: "/mcp",
 					},
 				),
 				Readiness: startup.RuntimeClientProcessReadiness{
 					Type:      "ws",
-					URL:       fmt.Sprintf("ws://127.0.0.1:%d/mcp", freePort),
+					URL:       fmt.Sprintf("ws://127.0.0.1:%d", freePort),
 					TimeoutMs: 2000,
 				},
 				Stop: startup.RuntimeClientProcessStopPolicy{
@@ -240,14 +238,6 @@ func TestRuntimeClientProcessHelper(t *testing.T) {
 			_, _ = fmt.Fprintln(os.Stderr, "missing helper websocket listen port")
 			os.Exit(2)
 		}
-		path := strings.TrimSpace(os.Getenv(runtimeClientProcessHelperPathEnv))
-		if path == "" {
-			path = "/"
-		}
-		if !strings.HasPrefix(path, "/") {
-			path = "/" + path
-		}
-
 		listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", port))
 		if err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "failed to listen on helper websocket port: %v\n", err)
@@ -256,7 +246,7 @@ func TestRuntimeClientProcessHelper(t *testing.T) {
 		defer listener.Close()
 
 		mux := http.NewServeMux()
-		mux.HandleFunc(path, func(writer http.ResponseWriter, request *http.Request) {
+		mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 			connection, err := websocket.Accept(writer, request, nil)
 			if err != nil {
 				return
