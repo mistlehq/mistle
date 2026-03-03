@@ -6,6 +6,47 @@ export type EgressRequest = {
   method: string;
 };
 
+function normalizeRoutePathPrefix(pathPrefix: string): string {
+  const normalizedPathPrefix = pathPrefix.trim();
+
+  if (normalizedPathPrefix.length === 0) {
+    throw new Error("Route path prefix must be non-empty.");
+  }
+
+  if (!normalizedPathPrefix.startsWith("/")) {
+    throw new Error("Route path prefix must start with '/'.");
+  }
+
+  if (normalizedPathPrefix === "/") {
+    return "/";
+  }
+
+  if (normalizedPathPrefix.endsWith("/")) {
+    return normalizedPathPrefix.slice(0, -1);
+  }
+
+  return normalizedPathPrefix;
+}
+
+export function resolveRoutePathPrefixFromBaseUrl(baseUrl: string): string {
+  return normalizeRoutePathPrefix(new URL(baseUrl).pathname);
+}
+
+export function joinRoutePathPrefixes(basePathPrefix: string, pathPrefix: string): string {
+  const normalizedBasePathPrefix = normalizeRoutePathPrefix(basePathPrefix);
+  const normalizedPathPrefix = normalizeRoutePathPrefix(pathPrefix);
+
+  if (normalizedBasePathPrefix === "/") {
+    return normalizedPathPrefix;
+  }
+
+  if (normalizedPathPrefix === "/") {
+    return normalizedBasePathPrefix;
+  }
+
+  return `${normalizedBasePathPrefix}${normalizedPathPrefix}`;
+}
+
 function normalizeHost(host: string): string {
   const normalized = host.trim().toLowerCase();
 

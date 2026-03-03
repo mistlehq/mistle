@@ -118,6 +118,51 @@ describe("compileGitHubCloudBinding", () => {
     ]);
   });
 
+  it("keeps repository path prefixes valid when api base url is root with trailing slash", () => {
+    const compiled = compileGitHubCloudBinding({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "github_cloud",
+      target: {
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        secrets: {},
+        config: {
+          apiBaseUrl: "https://api.github.com/",
+          webBaseUrl: "https://github.com",
+        },
+      },
+      connection: {
+        id: "icn_123",
+        status: "active",
+        config: {
+          auth_scheme: "api-key",
+        },
+      },
+      binding: {
+        id: "ibd_123",
+        kind: "git",
+        config: {
+          repositories: ["acme/repo"],
+          includeGhCli: false,
+        },
+      },
+      refs: {
+        egressUrl: {
+          kind: "egress_url",
+          routeId: "route_ibd_123",
+        },
+      },
+      runtimeContext: {
+        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
+      },
+    });
+
+    expect(compiled.egressRoutes[0]?.match.pathPrefixes).toEqual(["/repos/acme/repo"]);
+  });
+
   it("uses oauth access token secret type for github app-style oauth connections", () => {
     const compiled = compileGitHubCloudBinding({
       organizationId: "org_123",
