@@ -570,7 +570,9 @@ export interface paths {
                 config: {
                   [key: string]: unknown;
                 };
+                description: string;
                 descriptionOverride?: string;
+                displayName: string;
                 displayNameOverride?: string;
                 enabled: boolean;
                 familyId: string;

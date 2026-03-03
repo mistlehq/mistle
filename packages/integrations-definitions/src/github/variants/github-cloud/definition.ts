@@ -29,7 +29,7 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
   variantId: "github-cloud",
   kind: IntegrationKinds.GIT,
   displayName: "GitHub",
-  description: "GitHub Cloud integration scaffold for PAT and GitHub App auth modes.",
+  description: "Enable webhooks, repository access, GitHub CLI in sandbox.",
   logoKey: "github",
   targetConfigSchema: GitHubCloudTargetConfigSchema,
   targetSecretSchema: GitHubTargetSecretSchema,

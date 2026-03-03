@@ -21,6 +21,7 @@ describe("integration targets discovery integration", () => {
           base_url: "https://github.com",
           app_id: "123456",
         },
+        displayNameOverride: "GitHub Cloud",
         descriptionOverride: "GitHub Cloud target",
       },
       {
@@ -31,6 +32,8 @@ describe("integration targets discovery integration", () => {
         config: {
           base_url: "https://api.linear.app",
         },
+        displayNameOverride: "Linear Cloud",
+        descriptionOverride: "Linear Cloud target",
       },
       {
         targetKey: "openai-default",
@@ -40,7 +43,6 @@ describe("integration targets discovery integration", () => {
         config: {
           api_base_url: "https://api.openai.com",
         },
-        displayNameOverride: "OpenAI API",
       },
       {
         targetKey: "zzz_disabled_target",
@@ -77,6 +79,9 @@ describe("integration targets discovery integration", () => {
           base_url: "https://github.com",
           app_id: "123456",
         },
+        displayName: "GitHub Cloud",
+        description: "GitHub Cloud target",
+        displayNameOverride: "GitHub Cloud",
         descriptionOverride: "GitHub Cloud target",
       },
       {
@@ -87,6 +92,10 @@ describe("integration targets discovery integration", () => {
         config: {
           base_url: "https://api.linear.app",
         },
+        displayName: "Linear Cloud",
+        description: "Linear Cloud target",
+        displayNameOverride: "Linear Cloud",
+        descriptionOverride: "Linear Cloud target",
       },
     ]);
     expect(firstPage.previousPage).toBeNull();
@@ -117,7 +126,9 @@ describe("integration targets discovery integration", () => {
         config: {
           api_base_url: "https://api.openai.com",
         },
-        displayNameOverride: "OpenAI API",
+        displayName: "OpenAI",
+        description:
+          "Enable OpenAI model access with API key or ChatGPT subscription authentication.",
       },
     ]);
     expect(secondPage.nextPage).toBeNull();

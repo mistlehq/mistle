@@ -10,45 +10,6 @@ export type IntegrationCardViewModel = {
   connections: readonly IntegrationConnection[];
 };
 
-function toTitleCaseWord(value: string): string {
-  const [head = "", ...tail] = value;
-  return `${head.toUpperCase()}${tail.join("")}`;
-}
-
-function normalizeNameSegment(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, " ")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-export function resolveIntegrationDisplayName(target: IntegrationTarget): string {
-  if (target.displayNameOverride !== undefined) {
-    return target.displayNameOverride;
-  }
-
-  const normalizedFamily = normalizeNameSegment(target.familyId);
-  if (normalizedFamily === "openai") {
-    return "OpenAI";
-  }
-  if (normalizedFamily === "github") {
-    return "GitHub";
-  }
-
-  return normalizedFamily.split(" ").map(toTitleCaseWord).join(" ");
-}
-
-export function resolveIntegrationDescription(target: IntegrationTarget): string {
-  if (target.descriptionOverride !== undefined) {
-    return target.descriptionOverride;
-  }
-
-  return `${target.familyId}/${target.variantId}`;
-}
-
 export function deriveIntegrationStatus(
   connections: readonly IntegrationConnection[],
 ): IntegrationCardStatus {
@@ -87,8 +48,8 @@ export function buildIntegrationCards(input: {
 
     return {
       target,
-      displayName: resolveIntegrationDisplayName(target),
-      description: resolveIntegrationDescription(target),
+      displayName: target.displayName,
+      description: target.description,
       status: deriveIntegrationStatus(targetConnections),
       connections: targetConnections,
     };

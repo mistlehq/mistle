@@ -35,7 +35,7 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   variantId: "openai-default",
   kind: IntegrationKinds.AGENT,
   displayName: "OpenAI",
-  description: "OpenAI API key based integration for Codex runtime sessions.",
+  description: "Enable OpenAI model access with API key or ChatGPT subscription authentication.",
   logoKey: "openai",
   targetConfigSchema: OpenAiApiKeyTargetConfigSchema,
   targetSecretSchema: OpenAiApiKeyTargetSecretSchema,

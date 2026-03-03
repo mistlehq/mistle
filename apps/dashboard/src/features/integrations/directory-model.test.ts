@@ -1,17 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  buildIntegrationCards,
-  deriveIntegrationStatus,
-  resolveIntegrationDisplayName,
-} from "./directory-model.js";
+import { buildIntegrationCards, deriveIntegrationStatus } from "./directory-model.js";
 import type { IntegrationConnection, IntegrationTarget } from "./integrations-service.js";
 
 function createTarget(input: {
   targetKey: string;
   familyId: string;
   variantId: string;
+  displayName: string;
+  description: string;
   displayNameOverride?: string;
+  descriptionOverride?: string;
 }): IntegrationTarget {
   return {
     targetKey: input.targetKey,
@@ -19,9 +18,14 @@ function createTarget(input: {
     variantId: input.variantId,
     enabled: true,
     config: {},
+    displayName: input.displayName,
+    description: input.description,
     ...(input.displayNameOverride === undefined
       ? {}
       : { displayNameOverride: input.displayNameOverride }),
+    ...(input.descriptionOverride === undefined
+      ? {}
+      : { descriptionOverride: input.descriptionOverride }),
   };
 }
 
@@ -40,29 +44,6 @@ function createConnection(input: {
 }
 
 describe("integrations directory model", () => {
-  it("resolves display names with known family normalization and explicit overrides", () => {
-    expect(
-      resolveIntegrationDisplayName(
-        createTarget({
-          targetKey: "github-cloud",
-          familyId: "github",
-          variantId: "github-cloud",
-        }),
-      ),
-    ).toBe("GitHub");
-
-    expect(
-      resolveIntegrationDisplayName(
-        createTarget({
-          targetKey: "custom-v2",
-          familyId: "custom_provider",
-          variantId: "custom-v2",
-          displayNameOverride: "Custom Integration",
-        }),
-      ),
-    ).toBe("Custom Integration");
-  });
-
   it("derives connection status with active > error > not connected priority", () => {
     expect(
       deriveIntegrationStatus([
@@ -88,6 +69,8 @@ describe("integrations directory model", () => {
             targetKey: "openai-default",
             familyId: "openai",
             variantId: "openai-default",
+            displayName: "OpenAI",
+            description: "OpenAI description",
           }),
         ],
         connections: [
