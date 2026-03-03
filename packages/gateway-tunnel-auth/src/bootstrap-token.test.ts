@@ -36,6 +36,7 @@ describe("@mistle/gateway-tunnel-auth bootstrap token", () => {
     const token = await mintBootstrapToken({
       config: defaultConfig,
       jti: "jti_roundtrip_001",
+      sandboxInstanceId: "sbi_roundtrip_001",
       ttlSeconds: 60,
     });
 
@@ -46,6 +47,7 @@ describe("@mistle/gateway-tunnel-auth bootstrap token", () => {
 
     expect(verifiedToken).toEqual({
       jti: "jti_roundtrip_001",
+      sandboxInstanceId: "sbi_roundtrip_001",
     });
   });
 
@@ -54,6 +56,7 @@ describe("@mistle/gateway-tunnel-auth bootstrap token", () => {
       mintBootstrapToken({
         config: defaultConfig,
         jti: "   ",
+        sandboxInstanceId: "sbi_missing_jti_001",
         ttlSeconds: 60,
       }),
     );
@@ -61,11 +64,25 @@ describe("@mistle/gateway-tunnel-auth bootstrap token", () => {
     expect(error.code).toBe(BootstrapTokenErrorCode.JTI_REQUIRED);
   });
 
+  it("rejects mint when sandboxInstanceId claim is empty", async () => {
+    const error = await expectBootstrapTokenError(
+      mintBootstrapToken({
+        config: defaultConfig,
+        jti: "jti_missing_sandbox_instance_001",
+        sandboxInstanceId: "   ",
+        ttlSeconds: 60,
+      }),
+    );
+
+    expect(error.code).toBe(BootstrapTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED);
+  });
+
   it("rejects mint when ttlSeconds is invalid", async () => {
     const error = await expectBootstrapTokenError(
       mintBootstrapToken({
         config: defaultConfig,
         jti: "jti_invalid_ttl_001",
+        sandboxInstanceId: "sbi_invalid_ttl_001",
         ttlSeconds: 0,
       }),
     );
@@ -77,6 +94,7 @@ describe("@mistle/gateway-tunnel-auth bootstrap token", () => {
     const token = await mintBootstrapToken({
       config: defaultConfig,
       jti: "jti_bad_aud_001",
+      sandboxInstanceId: "sbi_bad_aud_001",
       ttlSeconds: 60,
     });
     const error = await expectBootstrapTokenError(
@@ -129,5 +147,25 @@ describe("@mistle/gateway-tunnel-auth bootstrap token", () => {
     );
 
     expect(error.code).toBe(BootstrapTokenErrorCode.JTI_REQUIRED);
+  });
+
+  it("rejects verify when sandboxInstanceId claim is missing", async () => {
+    const token = await new SignJWT({})
+      .setProtectedHeader({ alg: "HS256" })
+      .setJti("jti_missing_sandbox_instance_002")
+      .setIssuer(defaultConfig.tokenIssuer)
+      .setAudience(defaultConfig.tokenAudience)
+      .setIssuedAt()
+      .setExpirationTime("2m")
+      .sign(createSecretKey(new TextEncoder().encode(defaultConfig.bootstrapTokenSecret)));
+
+    const error = await expectBootstrapTokenError(
+      verifyBootstrapToken({
+        config: defaultConfig,
+        token,
+      }),
+    );
+
+    expect(error.code).toBe(BootstrapTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED);
   });
 });

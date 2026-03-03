@@ -29,6 +29,7 @@
     "@mistle/test-harness": "workspace:*",
     "@types/pg": "^8.18.0",
     "@types/ws": "^8.18.1",
+    "typeid-js": "^1.2.0",
     "ws": "^8.18.3"
   }
 }

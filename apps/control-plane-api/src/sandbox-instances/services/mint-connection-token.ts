@@ -63,6 +63,7 @@ export async function mintConnectionToken(
   const token = await mintGatewayConnectionToken({
     config: input.tokenConfig,
     jti: createTokenJti(sandboxInstance.id),
+    sandboxInstanceId: sandboxInstance.id,
     ttlSeconds: input.tokenTtlSeconds,
   });
 

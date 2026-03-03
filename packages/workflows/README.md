@@ -164,6 +164,7 @@ const worker = createDataPlaneWorker({
     startSandboxInstance: {
       sandboxLifecycle: {
         startSandbox: async () => ({
+          sandboxInstanceId: "sbi_123",
           provider: "modal",
           providerSandboxId: "sb_123",
           bootstrapTokenJti: "jti_123",

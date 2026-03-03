@@ -10,6 +10,7 @@ import { encodeSandboxStartupInput } from "./sandbox-startup-input.js";
 export async function writeSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
   sandboxAdapter: SandboxAdapter;
+  sandboxInstanceId: string;
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   sandbox: SandboxHandle;
 }): Promise<string> {
@@ -21,6 +22,7 @@ export async function writeSandboxStartupInput(input: {
       tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
     },
     jti: bootstrapTokenJti,
+    sandboxInstanceId: input.sandboxInstanceId,
     ttlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
   });
 

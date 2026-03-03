@@ -17,6 +17,7 @@ export async function insertSandboxInstance(
     const insertedRows = await tx
       .insert(sandboxInstances)
       .values({
+        id: input.sandboxInstanceId,
         organizationId: input.organizationId,
         sandboxProfileId: input.sandboxProfileId,
         sandboxProfileVersion: input.sandboxProfileVersion,

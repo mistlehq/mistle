@@ -19,6 +19,7 @@ export type StartSandboxInstanceWorkflowServices = {
       image: StartSandboxInstanceWorkflowInput["image"];
       runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
     }) => Promise<{
+      sandboxInstanceId: string;
       provider: SandboxProvider;
       providerSandboxId: string;
       bootstrapTokenJti: string;
@@ -27,6 +28,7 @@ export type StartSandboxInstanceWorkflowServices = {
   };
   sandboxInstances: {
     createSandboxInstance: (input: {
+      sandboxInstanceId: string;
       organizationId: string;
       sandboxProfileId: string;
       sandboxProfileVersion: number;
@@ -129,7 +131,8 @@ export function createStartSandboxInstanceWorkflow(
       };
       try {
         persistedSandboxInstance = await step.run({ name: "insert-sandbox-instance" }, async () => {
-          return services.sandboxInstances.createSandboxInstance({
+          const persisted = await services.sandboxInstances.createSandboxInstance({
+            sandboxInstanceId: startedSandbox.sandboxInstanceId,
             organizationId: workflowInput.organizationId,
             sandboxProfileId: workflowInput.sandboxProfileId,
             sandboxProfileVersion: workflowInput.sandboxProfileVersion,
@@ -139,6 +142,14 @@ export function createStartSandboxInstanceWorkflow(
             startedBy: workflowInput.startedBy,
             source: workflowInput.source,
           });
+
+          if (persisted.sandboxInstanceId !== startedSandbox.sandboxInstanceId) {
+            throw new Error(
+              "Sandbox instance persistence returned an unexpected sandboxInstanceId.",
+            );
+          }
+
+          return persisted;
         });
       } catch (error) {
         await step.run({ name: "rollback-stop-sandbox" }, async () => {

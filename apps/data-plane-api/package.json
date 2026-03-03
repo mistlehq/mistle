@@ -30,6 +30,7 @@
     "@mistle/test-harness": "workspace:*",
     "@mistle/time": "workspace:*",
     "@trpc/client": "^11.11.0",
-    "@types/pg": "^8.18.0"
+    "@types/pg": "^8.18.0",
+    "typeid-js": "^1.2.0"
   }
 }

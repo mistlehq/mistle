@@ -13,11 +13,13 @@ export type BootstrapTokenConfig = {
 
 export type VerifiedBootstrapToken = {
   jti: string;
+  sandboxInstanceId: string;
 };
 
 export const BootstrapTokenErrorCode = {
   TOKEN_REQUIRED: "TOKEN_REQUIRED",
   JTI_REQUIRED: "JTI_REQUIRED",
+  SANDBOX_INSTANCE_ID_REQUIRED: "SANDBOX_INSTANCE_ID_REQUIRED",
   INVALID_TTL_SECONDS: "INVALID_TTL_SECONDS",
   TOKEN_EXPIRED: "TOKEN_EXPIRED",
   TOKEN_INVALID_ISSUER: "TOKEN_INVALID_ISSUER",
@@ -76,6 +78,7 @@ function mapClaimValidationErrorCode(
 export async function mintBootstrapToken(input: {
   config: BootstrapTokenConfig;
   jti: string;
+  sandboxInstanceId: string;
   ttlSeconds: number;
 }): Promise<string> {
   const normalizedJti = toNonEmptyString(input.jti);
@@ -83,6 +86,13 @@ export async function mintBootstrapToken(input: {
     throw new BootstrapTokenError({
       code: BootstrapTokenErrorCode.JTI_REQUIRED,
       message: "Bootstrap token jti claim is required.",
+    });
+  }
+  const normalizedSandboxInstanceId = toNonEmptyString(input.sandboxInstanceId);
+  if (normalizedSandboxInstanceId === undefined) {
+    throw new BootstrapTokenError({
+      code: BootstrapTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED,
+      message: "Bootstrap token sandboxInstanceId claim is required.",
     });
   }
 
@@ -96,7 +106,9 @@ export async function mintBootstrapToken(input: {
   const nowEpochSeconds = Math.floor(Date.now() / 1000);
 
   try {
-    return await new SignJWT({})
+    return await new SignJWT({
+      sandboxInstanceId: normalizedSandboxInstanceId,
+    })
       .setProtectedHeader({ alg: "HS256" })
       .setJti(normalizedJti)
       .setIssuer(input.config.tokenIssuer)
@@ -126,6 +138,7 @@ export async function verifyBootstrapToken(input: {
   }
 
   let payloadJti: string | undefined;
+  let payloadSandboxInstanceId: string | undefined;
   try {
     const verificationResult = await jwtVerify(
       normalizedToken,
@@ -137,6 +150,9 @@ export async function verifyBootstrapToken(input: {
       },
     );
     payloadJti = verificationResult.payload.jti;
+    if (typeof verificationResult.payload.sandboxInstanceId === "string") {
+      payloadSandboxInstanceId = verificationResult.payload.sandboxInstanceId;
+    }
   } catch (error) {
     if (error instanceof JoseErrors.JWTExpired) {
       throw new BootstrapTokenError({
@@ -176,8 +192,16 @@ export async function verifyBootstrapToken(input: {
       message: "Bootstrap token jti claim is required.",
     });
   }
+  const normalizedSandboxInstanceId = toNonEmptyString(payloadSandboxInstanceId);
+  if (normalizedSandboxInstanceId === undefined) {
+    throw new BootstrapTokenError({
+      code: BootstrapTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED,
+      message: "Bootstrap token sandboxInstanceId claim is required.",
+    });
+  }
 
   return {
     jti: normalizedJti,
+    sandboxInstanceId: normalizedSandboxInstanceId,
   };
 }
