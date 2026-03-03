@@ -36,6 +36,7 @@ function createGitHubCloudTargetConfig(input?: { webhookSecret?: string }) {
     familyId: "github",
     variantId: "github-cloud",
     enabled: true,
+    secrets: {},
     config: {
       apiBaseUrl: "https://api.github.com/",
       webBaseUrl: "https://github.com/",
