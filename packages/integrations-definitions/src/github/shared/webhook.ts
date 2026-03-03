@@ -8,9 +8,6 @@ import type { GitHubTargetConfig } from "./target-config-schema.js";
 import type { GitHubTargetSecrets } from "./target-secret-schema.js";
 import type { GitHubUserSecrets } from "./user-secret-slots.js";
 
-const GitHubIssueCommentCreatedEventType = "github.issue_comment.created";
-const GitHubPullRequestCommentCreatedEventType = "github.pull_request_comment.created";
-
 const GitHubWebhookEventHeaderName = "x-github-event";
 const GitHubWebhookDeliveryHeaderName = "x-github-delivery";
 const GitHubWebhookSignatureHeaderName = "x-hub-signature-256";
@@ -126,11 +123,11 @@ function resolveEventType(input: { providerEventType: string; action: string }):
   const action = sanitizeEventSegment(input.action);
 
   if (providerEventType === "issue_comment" && action === "created") {
-    return GitHubIssueCommentCreatedEventType;
+    return "github.issue_comment.created";
   }
 
   if (providerEventType === "pull_request_review_comment" && action === "created") {
-    return GitHubPullRequestCommentCreatedEventType;
+    return "github.pull_request_comment.created";
   }
 
   return `github.${providerEventType}.${action}`;
