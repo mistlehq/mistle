@@ -27,13 +27,13 @@ describe("settings model", () => {
     expect(resolveSettingsBackDestination("/settings/organization/members")).toBe("/");
   });
 
-  it("includes organization providers in the settings nav groups", () => {
+  it("includes organization integrations in the settings nav groups", () => {
     const organizationGroup = SETTINGS_NAV_GROUPS.find((group) => group.label === "Organization");
     expect(organizationGroup).toBeDefined();
     expect(organizationGroup?.items.map((item) => item.to)).toEqual([
       "/settings/organization/general",
       "/settings/organization/members",
-      "/settings/organization/providers",
+      "/settings/organization/integrations",
     ]);
     for (const item of organizationGroup?.items ?? []) {
       expect(typeof item.icon).toBe("function");

@@ -7,6 +7,7 @@ import {
 } from "@mistle/workflows/control-plane";
 import { Pool } from "pg";
 
+import { seedDefaultIntegrationTargets } from "../integration-targets/services/seed-default-targets.js";
 import type { ControlPlaneApiConfig, ControlPlaneApp } from "../types.js";
 
 export type AppRuntimeResources = {
@@ -39,6 +40,7 @@ export async function createAppResources(
   let workflowBackend: Awaited<ReturnType<typeof createControlPlaneBackend>>;
 
   try {
+    await seedDefaultIntegrationTargets(db, config.integrations.targetCatalog);
     workflowBackend = await createControlPlaneBackend({
       url: config.workflow.databaseUrl,
       namespaceId: config.workflow.namespaceId,

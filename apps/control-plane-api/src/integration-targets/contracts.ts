@@ -13,6 +13,8 @@ export const IntegrationTargetSchema = z
     variantId: z.string().min(1),
     enabled: z.boolean(),
     config: z.record(z.string(), z.unknown()),
+    displayName: z.string().min(1),
+    description: z.string().min(1),
     displayNameOverride: z.string().min(1).optional(),
     descriptionOverride: z.string().min(1).optional(),
   })

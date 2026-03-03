@@ -10,12 +10,12 @@ import {
 import { AuthScreen } from "./features/auth/auth-screen.js";
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
 import { HomePage } from "./features/pages/home-page.js";
+import { IntegrationsCallbackResultPage } from "./features/pages/integrations-callback-result-page.js";
 import { InvitationAcceptPage } from "./features/pages/invitation-accept-page.js";
 import { OrganizationGeneralSettingsPage } from "./features/pages/organization-general-settings-page.js";
+import { OrganizationIntegrationsSettingsPage } from "./features/pages/organization-integrations-settings-page.js";
 import { OrganizationMembersSettingsPage } from "./features/pages/organization-members-settings-page.js";
-import { OrganizationProvidersSettingsPage } from "./features/pages/organization-providers-settings-page.js";
 import { ProfileSettingsPage } from "./features/pages/profile-settings-page.js";
-import { ProvidersCallbackResultPage } from "./features/pages/providers-callback-result-page.js";
 import { SandboxProfileEditorPage } from "./features/pages/sandbox-profile-editor-page.js";
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
 import { SessionsPage } from "./features/pages/sessions-page.js";
@@ -91,8 +91,8 @@ export const APP_ROUTES = createRoutesFromElements(
           personal: <ProfileSettingsPage />,
           organizationGeneral: <OrganizationGeneralSettingsPage />,
           organizationMembers: <OrganizationMembersSettingsPage />,
-          organizationProviders: <OrganizationProvidersSettingsPage />,
-          organizationProviderCallbackResult: <ProvidersCallbackResultPage />,
+          organizationIntegrations: <OrganizationIntegrationsSettingsPage />,
+          organizationIntegrationCallbackResult: <IntegrationsCallbackResultPage />,
         })}
       </Route>
     </Route>

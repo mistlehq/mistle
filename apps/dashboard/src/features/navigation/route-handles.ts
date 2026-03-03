@@ -11,8 +11,8 @@ function toTitleCaseWord(value: string): string {
   return `${head.toUpperCase()}${tail.join("")}`;
 }
 
-function normalizeProviderBreadcrumbLabel(providerId: string): string {
-  const normalizedId = providerId
+function normalizeIntegrationBreadcrumbLabel(targetKey: string): string {
+  const normalizedId = targetKey
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9_-]+/g, " ")
@@ -21,7 +21,7 @@ function normalizeProviderBreadcrumbLabel(providerId: string): string {
     .trim();
 
   if (normalizedId.length === 0) {
-    return "Provider";
+    return "Integration";
   }
 
   if (normalizedId === "github") {
@@ -35,13 +35,13 @@ function normalizeProviderBreadcrumbLabel(providerId: string): string {
   return normalizedId.split(" ").map(toTitleCaseWord).join(" ");
 }
 
-function resolveProviderCallbackBreadcrumb(input: RouteTextResolverInput): string {
-  const providerId = input.params["providerId"];
-  if (providerId === undefined || providerId.trim().length === 0) {
+function resolveIntegrationCallbackBreadcrumb(input: RouteTextResolverInput): string {
+  const targetKey = input.params["targetKey"];
+  if (targetKey === undefined || targetKey.trim().length === 0) {
     return "Callback result";
   }
 
-  return `${normalizeProviderBreadcrumbLabel(providerId)} callback`;
+  return `${normalizeIntegrationBreadcrumbLabel(targetKey)} callback`;
 }
 
 function resolveSandboxProfileDetailBreadcrumb(input: RouteTextResolverInput): string {
@@ -126,15 +126,15 @@ export const ROUTE_HANDLES = {
     title: "Members",
     description: "",
   },
-  settingsOrganizationProviders: {
-    breadcrumb: "Providers",
-    title: "Providers",
+  settingsOrganizationIntegrations: {
+    breadcrumb: "Integrations",
+    title: "Integrations",
     description: "",
   },
-  settingsOrganizationProviderCallbackResult: {
-    breadcrumb: resolveProviderCallbackBreadcrumb,
-    title: "Provider callback result",
-    description: "Review provider connection callback outcome.",
+  settingsOrganizationIntegrationCallbackResult: {
+    breadcrumb: resolveIntegrationCallbackBreadcrumb,
+    title: "Integration callback result",
+    description: "Review integration connection callback outcome.",
   },
 } as const satisfies Record<string, AppRouteHandle>;
 
@@ -142,8 +142,8 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
   "settingsPersonal",
   "settingsOrganizationGeneral",
   "settingsOrganizationMembers",
-  "settingsOrganizationProviders",
-  "settingsOrganizationProviderCallbackResult",
+  "settingsOrganizationIntegrations",
+  "settingsOrganizationIntegrationCallbackResult",
 ] as const;
 
 export const SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT: {
@@ -152,7 +152,7 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT: {
   settingsPersonal: ROUTE_HANDLES.settingsPersonal,
   settingsOrganizationGeneral: ROUTE_HANDLES.settingsOrganizationGeneral,
   settingsOrganizationMembers: ROUTE_HANDLES.settingsOrganizationMembers,
-  settingsOrganizationProviders: ROUTE_HANDLES.settingsOrganizationProviders,
-  settingsOrganizationProviderCallbackResult:
-    ROUTE_HANDLES.settingsOrganizationProviderCallbackResult,
+  settingsOrganizationIntegrations: ROUTE_HANDLES.settingsOrganizationIntegrations,
+  settingsOrganizationIntegrationCallbackResult:
+    ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult,
 };

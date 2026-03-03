@@ -10,6 +10,7 @@ import {
   paginateKeyset,
   parseKeysetPageSize,
 } from "@mistle/http/pagination";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -39,11 +40,58 @@ type IntegrationTargetListItem = {
   variantId: string;
   enabled: boolean;
   config: Record<string, unknown>;
+  displayName: string;
+  description: string;
   displayNameOverride?: string;
   descriptionOverride?: string;
 };
 
 type IntegrationTargetsCursor = z.infer<typeof CursorSchema>;
+
+const IntegrationRegistry = createIntegrationRegistry();
+
+function resolveTargetMetadata(input: {
+  familyId: string;
+  variantId: string;
+  displayNameOverride: string | null;
+  descriptionOverride: string | null;
+}): { displayName: string; description: string } {
+  const definition = IntegrationRegistry.getDefinition({
+    familyId: input.familyId,
+    variantId: input.variantId,
+  });
+
+  if (definition === undefined) {
+    if (input.displayNameOverride !== null && input.descriptionOverride !== null) {
+      return {
+        displayName: input.displayNameOverride,
+        description: input.descriptionOverride,
+      };
+    }
+
+    throw new Error(
+      `Integration definition '${input.familyId}::${input.variantId}' was not found and target metadata overrides are incomplete.`,
+    );
+  }
+
+  if (definition.description === undefined || definition.description.trim().length === 0) {
+    if (input.descriptionOverride !== null) {
+      return {
+        displayName: input.displayNameOverride ?? definition.displayName,
+        description: input.descriptionOverride,
+      };
+    }
+
+    throw new Error(
+      `Integration definition '${input.familyId}::${input.variantId}' must provide a non-empty description.`,
+    );
+  }
+
+  return {
+    displayName: input.displayNameOverride ?? definition.displayName,
+    description: input.descriptionOverride ?? definition.description,
+  };
+}
 
 export async function listIntegrationTargets(
   db: AppContext["var"]["db"],
@@ -128,19 +176,30 @@ export async function listIntegrationTargets(
 
     return {
       ...result,
-      items: result.items.map((target) => ({
-        targetKey: target.targetKey,
-        familyId: target.familyId,
-        variantId: target.variantId,
-        enabled: target.enabled,
-        config: target.config,
-        ...(target.displayNameOverride === null
-          ? {}
-          : { displayNameOverride: target.displayNameOverride }),
-        ...(target.descriptionOverride === null
-          ? {}
-          : { descriptionOverride: target.descriptionOverride }),
-      })),
+      items: result.items.map((target) => {
+        const resolvedMetadata = resolveTargetMetadata({
+          familyId: target.familyId,
+          variantId: target.variantId,
+          displayNameOverride: target.displayNameOverride,
+          descriptionOverride: target.descriptionOverride,
+        });
+
+        return {
+          targetKey: target.targetKey,
+          familyId: target.familyId,
+          variantId: target.variantId,
+          enabled: target.enabled,
+          config: target.config,
+          displayName: resolvedMetadata.displayName,
+          description: resolvedMetadata.description,
+          ...(target.displayNameOverride === null
+            ? {}
+            : { displayNameOverride: target.displayNameOverride }),
+          ...(target.descriptionOverride === null
+            ? {}
+            : { descriptionOverride: target.descriptionOverride }),
+        };
+      }),
     };
   } catch (error) {
     if (

@@ -135,6 +135,15 @@ const loadIntegrationsEnv = createEnvLoader<typeof ControlPlaneApiIntegrationsCo
   },
 ]);
 
+function readOptionalEnv(env: NodeJS.ProcessEnv, envVar: string): string | undefined {
+  const value = env[envVar];
+  return value === undefined ? undefined : value;
+}
+
+function hasDefinedValues(record: Record<string, string | undefined>): boolean {
+  return Object.values(record).some((value) => value !== undefined);
+}
+
 export function loadControlPlaneApiFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialControlPlaneApiConfigInput {
@@ -171,8 +180,63 @@ export function loadControlPlaneApiFromEnv(
   }
 
   const integrations = loadIntegrationsEnv(env);
+  const githubTargetCatalog = {
+    appSlug: readOptionalEnv(env, "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_APP_SLUG"),
+    appId: readOptionalEnv(env, "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_APP_ID"),
+    clientId: readOptionalEnv(env, "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_CLIENT_ID"),
+    apiBaseUrl: readOptionalEnv(
+      env,
+      "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_API_BASE_URL",
+    ),
+    webBaseUrl: readOptionalEnv(
+      env,
+      "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_WEB_BASE_URL",
+    ),
+  };
+  const openAiTargetCatalog = {
+    apiBaseUrl: readOptionalEnv(
+      env,
+      "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_OPENAI_API_BASE_URL",
+    ),
+  };
+  const githubEnterpriseTargetCatalog = {
+    appSlug: readOptionalEnv(
+      env,
+      "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_APP_SLUG",
+    ),
+    appId: readOptionalEnv(
+      env,
+      "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_APP_ID",
+    ),
+    clientId: readOptionalEnv(
+      env,
+      "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_CLIENT_ID",
+    ),
+    apiBaseUrl: readOptionalEnv(
+      env,
+      "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_API_BASE_URL",
+    ),
+    webBaseUrl: readOptionalEnv(
+      env,
+      "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_WEB_BASE_URL",
+    ),
+  };
+  const targetCatalog = {
+    ...(hasDefinedValues(githubTargetCatalog) ? { github: githubTargetCatalog } : {}),
+    ...(hasDefinedValues(githubEnterpriseTargetCatalog)
+      ? { githubEnterprise: githubEnterpriseTargetCatalog }
+      : {}),
+    ...(hasDefinedValues(openAiTargetCatalog) ? { openai: openAiTargetCatalog } : {}),
+  };
   if (hasEntries(integrations)) {
-    partialConfig.integrations = integrations;
+    partialConfig.integrations = {
+      ...integrations,
+      ...(hasEntries(targetCatalog) ? { targetCatalog } : {}),
+    };
+  } else if (hasEntries(targetCatalog)) {
+    partialConfig.integrations = {
+      targetCatalog,
+    };
   }
 
   return PartialControlPlaneApiConfigSchema.parse(partialConfig);
