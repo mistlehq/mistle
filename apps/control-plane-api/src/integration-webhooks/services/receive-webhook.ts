@@ -31,6 +31,7 @@ export type ReceiveIntegrationWebhookInput = {
 
 export type ReceivedIntegrationWebhook = {
   duplicate: boolean;
+  webhookEventId?: string;
 };
 
 async function resolveConnectionSecretsOrThrow(input: {
@@ -178,5 +179,6 @@ export async function receiveIntegrationWebhook(
 
   return {
     duplicate: insertedRows.length === 0,
+    ...(insertedRows[0] === undefined ? {} : { webhookEventId: insertedRows[0].id }),
   };
 }

@@ -1,4 +1,5 @@
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
+import { HandleIntegrationWebhookEventWorkflowSpec } from "@mistle/workflows/control-plane";
 
 import { createControlPlaneAuth } from "./auth/index.js";
 import type { AppRuntimeResources } from "./runtime/resources.js";
@@ -55,6 +56,17 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
       db: resources.db,
       openWorkflow: resources.openWorkflow,
     }),
+    integrationWebhooks: {
+      receiveWebhookEvent: async (workflowInput) => {
+        await resources.openWorkflow.runWorkflow(
+          HandleIntegrationWebhookEventWorkflowSpec,
+          workflowInput,
+          {
+            idempotencyKey: workflowInput.webhookEventId,
+          },
+        );
+      },
+    },
     sandboxProfiles: sandboxProfilesService,
     sandboxInstances: sandboxInstancesService,
   };

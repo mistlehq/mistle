@@ -37,6 +37,17 @@ export function createIntegrationWebhooksApp(): AppRoutes<
         },
       );
 
+      if (!receivedWebhook.duplicate) {
+        const webhookEventId = receivedWebhook.webhookEventId;
+        if (webhookEventId === undefined) {
+          throw new Error("Expected webhook event id for a non-duplicate webhook.");
+        }
+
+        await ctx.get("services").integrationWebhooks.receiveWebhookEvent({
+          webhookEventId,
+        });
+      }
+
       const responseBody: z.infer<typeof IngestIntegrationWebhookResponseSchema> = {
         status: receivedWebhook.duplicate ? "duplicate" : "received",
       };

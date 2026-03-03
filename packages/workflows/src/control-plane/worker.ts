@@ -1,6 +1,7 @@
 import type { EmailSender } from "@mistle/emails";
 import type { OpenWorkflow, Worker } from "openworkflow";
 
+import { createHandleIntegrationWebhookEventWorkflow } from "./workflows/handle-integration-webhook-event/index.js";
 import { createRequestDeleteSandboxProfileWorkflow } from "./workflows/request-delete-sandbox-profile/index.js";
 import { createSendOrganizationInvitationWorkflow } from "./workflows/send-organization-invitation/index.js";
 import { createSendVerificationOTPWorkflow } from "./workflows/send-verification-otp/index.js";
@@ -31,6 +32,7 @@ export type ControlPlaneWorkerServices = {
 };
 
 export const ControlPlaneWorkerWorkflowIds = {
+  HANDLE_INTEGRATION_WEBHOOK_EVENT: "handleIntegrationWebhookEvent",
   SEND_ORGANIZATION_INVITATION: "sendOrganizationInvitation",
   SEND_VERIFICATION_OTP: "sendVerificationOTP",
   REQUEST_DELETE_SANDBOX_PROFILE: "requestDeleteSandboxProfile",
@@ -56,6 +58,12 @@ function assertNever(value: never): never {
  */
 export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): Worker {
   for (const workflowId of input.enabledWorkflows) {
+    if (workflowId === ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT) {
+      const workflow = createHandleIntegrationWebhookEventWorkflow();
+      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
+      continue;
+    }
+
     if (workflowId === ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION) {
       if (input.services.emailDelivery === undefined) {
         throw new Error(

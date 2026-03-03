@@ -94,6 +94,7 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
           openWorkflow,
           maxConcurrentWorkflows: 1,
           enabledWorkflows: [
+            ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT,
             ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
             ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
             ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE,
