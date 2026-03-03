@@ -5,6 +5,7 @@ import {
   GitHubTargetSecretSchema,
   type GitHubTargetSecrets,
 } from "../../shared/target-secret-schema.js";
+import { GitHubUserSecretSlots } from "../../shared/user-secret-slots.js";
 import { GitHubEnterpriseServerSupportedAuthSchemes } from "./auth.js";
 import {
   GitHubEnterpriseServerBindingConfigSchema,
@@ -39,5 +40,6 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   },
   triggerEventTypes: GitHubEnterpriseServerTriggerEventTypes,
   userConfigSlots: [],
+  userSecretSlots: GitHubUserSecretSlots,
   compileBinding: compileGitHubEnterpriseServerBinding,
 };

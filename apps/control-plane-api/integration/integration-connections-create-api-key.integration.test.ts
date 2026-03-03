@@ -11,11 +11,13 @@ import { describe, expect } from "vitest";
 import {
   CreateApiKeyConnectionBodySchema,
   IntegrationConnectionSchema,
+  IntegrationConnectionsBadRequestResponseSchema,
   IntegrationConnectionsNotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../src/integration-connections/contracts.js";
 import {
   decryptCredentialUtf8,
+  decryptIntegrationConnectionSecrets,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../src/integration-credentials/crypto.js";
@@ -148,6 +150,104 @@ describe("integration connections create api key integration", () => {
       code: "TARGET_NOT_FOUND",
       message: "Integration target 'missing_target' was not found.",
     });
+  }, 60_000);
+
+  it("stores encrypted connection secrets when provided for a target secret slot", async ({
+    fixture,
+  }) => {
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "github-cloud",
+      familyId: "github",
+      variantId: "github-cloud",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.github.com",
+      },
+    });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-create-api-key-github-secrets@example.com",
+    });
+
+    const response = await fixture.request("/v1/integration/connections/github-cloud/api-key", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        apiKey: "ghp_test_secret",
+        secrets: {
+          webhook_secret: "whsec_123",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(201);
+    const responseBody = IntegrationConnectionSchema.parse(await response.json());
+
+    const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.id, responseBody.id),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+    });
+    expect(persistedConnection).toBeDefined();
+
+    if (persistedConnection === undefined) {
+      throw new Error("Expected persisted integration connection.");
+    }
+
+    expect(persistedConnection.secrets).not.toBeNull();
+    if (persistedConnection.secrets === null) {
+      throw new Error("Expected encrypted connection secrets.");
+    }
+
+    const decryptedConnectionSecrets = decryptStoredConnectionSecrets({
+      encryptedSecrets: persistedConnection.secrets,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    expect(decryptedConnectionSecrets).toEqual({
+      webhook_secret: "whsec_123",
+    });
+  }, 60_000);
+
+  it("returns 400 when request secrets include unsupported keys", async ({ fixture }) => {
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai-default",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com",
+      },
+    });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-create-api-key-unsupported-secret@example.com",
+    });
+
+    const response = await fixture.request("/v1/integration/connections/openai-default/api-key", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        apiKey: "sk-test-secret-value",
+        secrets: {
+          webhook_secret: "unsupported-for-openai",
+        },
+      }),
+    });
+
+    expect(response.status).toBe(400);
+    const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    expect(responseBody.code).toBe("INVALID_CREATE_CONNECTION_INPUT");
+    expect(responseBody.message).toContain("unsupported key 'webhook_secret'");
   }, 60_000);
 
   it("returns 404 when target exists but is disabled", async ({ fixture }) => {
@@ -304,4 +404,24 @@ function decryptStoredApiKey(input: {
   } finally {
     organizationCredentialKey.fill(0);
   }
+}
+
+function decryptStoredConnectionSecrets(input: {
+  encryptedSecrets: {
+    masterKeyVersion: number;
+    nonce: string;
+    ciphertext: string;
+  };
+  masterEncryptionKeys: Record<string, string>;
+}): Record<string, string> {
+  const masterKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion: input.encryptedSecrets.masterKeyVersion,
+    masterEncryptionKeys: input.masterEncryptionKeys,
+  });
+
+  return decryptIntegrationConnectionSecrets({
+    nonce: input.encryptedSecrets.nonce,
+    ciphertext: input.encryptedSecrets.ciphertext,
+    masterEncryptionKeyMaterial: masterKeyMaterial,
+  });
 }

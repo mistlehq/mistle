@@ -32,6 +32,9 @@ describe("integrations-definitions index", () => {
       displayName: "GitHub",
       supportedAuthSchemes: ["api-key", "oauth"],
     });
+    expect(githubCloudDefinition?.userSecretSlots?.map((slot) => slot.key)).toEqual([
+      "webhook_secret",
+    ]);
     expect(githubCloudDefinition?.authHandlers?.oauth).toBeDefined();
     expect(githubEnterpriseServerDefinition).toMatchObject({
       familyId: "github",
@@ -40,6 +43,9 @@ describe("integrations-definitions index", () => {
       displayName: "GitHub Enterprise Server",
       supportedAuthSchemes: ["api-key", "oauth"],
     });
+    expect(githubEnterpriseServerDefinition?.userSecretSlots?.map((slot) => slot.key)).toEqual([
+      "webhook_secret",
+    ]);
     expect(githubEnterpriseServerDefinition?.authHandlers?.oauth).toBeDefined();
   });
 

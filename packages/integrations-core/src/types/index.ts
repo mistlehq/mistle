@@ -117,6 +117,14 @@ export type IntegrationUserConfigSlot =
   | IntegrationFileUserConfigSlot
   | IntegrationEnvUserConfigSlot;
 
+export type IntegrationUserSecretSlot = {
+  key: string;
+  label: string;
+  description?: string;
+  required?: boolean;
+  valueSchema: IntegrationUserConfigSlotValueSchema;
+};
+
 type MaybePromise<TValue> = TValue | Promise<TValue>;
 
 export type EgressUrlRef = {
@@ -498,6 +506,7 @@ export type IntegrationDefinition<
   >;
   triggerEventTypes: ReadonlyArray<string>;
   userConfigSlots: ReadonlyArray<IntegrationUserConfigSlot>;
+  userSecretSlots?: ReadonlyArray<IntegrationUserSecretSlot>;
   compileBinding(
     input: CompileBindingInput<
       ParsedSchemaOutput<TTargetConfigSchema>,
