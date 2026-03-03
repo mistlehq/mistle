@@ -16,7 +16,7 @@ import {
   GitHubCloudTargetConfigSchema,
   type GitHubCloudTargetConfig,
 } from "./target-config-schema.js";
-import { GitHubCloudTriggerEventTypes, GitHubCloudWebhookHandler } from "./webhook.js";
+import { GitHubCloudWebhookHandler } from "./webhook.js";
 
 type GitHubCloudIntegrationDefinition = IntegrationDefinition<
   { parse: (input: unknown) => GitHubCloudTargetConfig },
@@ -39,7 +39,7 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
     oauth: GitHubAppOAuthHandler,
   },
   webhookHandler: GitHubCloudWebhookHandler,
-  triggerEventTypes: GitHubCloudTriggerEventTypes,
+  triggerEventTypes: [],
   userConfigSlots: [],
   userSecretSlots: GitHubUserSecretSlots,
   compileBinding: compileGitHubCloudBinding,

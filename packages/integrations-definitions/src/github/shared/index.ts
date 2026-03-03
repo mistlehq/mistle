@@ -7,7 +7,7 @@ export {
   GitHubSupportedAuthSchemes,
   resolveGitHubCredentialSecretType,
 } from "./auth.js";
-export { GitHubTriggerEventTypes, GitHubWebhookHandler } from "./webhook.js";
+export { GitHubWebhookHandler } from "./webhook.js";
 export { GitHubBindingConfigSchema, type GitHubBindingConfig } from "./binding-config-schema.js";
 export { GitHubTargetConfigSchema, type GitHubTargetConfig } from "./target-config-schema.js";
 export { GitHubTargetSecretSchema, type GitHubTargetSecrets } from "./target-secret-schema.js";

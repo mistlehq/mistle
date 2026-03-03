@@ -361,7 +361,7 @@ export type IntegrationWebhookHandler<
   parse(
     input: IntegrationWebhookParseInput<TTargetConfig, TTargetSecrets>,
   ): MaybePromise<IntegrationWebhookEvent>;
-  supportedEventTypes: ReadonlyArray<string>;
+  supportedEventTypes?: ReadonlyArray<string>;
 };
 
 export type EgressCredentialResolverRef = {

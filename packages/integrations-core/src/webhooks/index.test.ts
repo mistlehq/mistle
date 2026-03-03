@@ -163,6 +163,42 @@ describe("webhook helpers", () => {
     });
   });
 
+  it("does not filter webhook event types when supportedEventTypes is undefined", async () => {
+    const webhookEvent = await verifyAndParseWebhookOrThrow({
+      definition: {
+        familyId: "github",
+        variantId: "github-cloud",
+        webhookHandler: {
+          verify: () => ({ ok: true }),
+          parse: ({ targetKey }) => ({
+            externalEventId: "evt_123",
+            externalDeliveryId: "delivery_123",
+            providerEventType: "pull_request",
+            eventType: "github.pull_request.opened",
+            payload: {},
+            connectionRef: {
+              targetKey,
+              externalSubjectId: "subj_123",
+            },
+          }),
+        },
+      },
+      targetKey: "github_cloud",
+      target: {
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      resolveConnectionSecrets: () => ({}),
+      headers: {},
+      rawBody: new Uint8Array(),
+    });
+
+    expect(webhookEvent.eventType).toBe("github.pull_request.opened");
+  });
+
   it("resolves connection secrets using parsed connectionRef before verification", async () => {
     let resolvedConnectionRef: IntegrationWebhookConnectionRef | undefined;
     let verifyConnectionRef: IntegrationWebhookConnectionRef | undefined;

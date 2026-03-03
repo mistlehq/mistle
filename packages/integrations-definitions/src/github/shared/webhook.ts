@@ -11,11 +11,6 @@ import type { GitHubUserSecrets } from "./user-secret-slots.js";
 const GitHubIssueCommentCreatedEventType = "github.issue_comment.created";
 const GitHubPullRequestCommentCreatedEventType = "github.pull_request_comment.created";
 
-export const GitHubTriggerEventTypes: ReadonlyArray<string> = [
-  GitHubIssueCommentCreatedEventType,
-  GitHubPullRequestCommentCreatedEventType,
-];
-
 const GitHubWebhookEventHeaderName = "x-github-event";
 const GitHubWebhookDeliveryHeaderName = "x-github-delivery";
 const GitHubWebhookSignatureHeaderName = "x-hub-signature-256";
@@ -165,7 +160,6 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
   GitHubTargetSecrets,
   GitHubUserSecrets
 > = {
-  supportedEventTypes: GitHubTriggerEventTypes,
   async verify(input) {
     const webhookSecret = input.connectionSecrets.webhook_secret;
     if (webhookSecret === undefined || webhookSecret.length === 0) {

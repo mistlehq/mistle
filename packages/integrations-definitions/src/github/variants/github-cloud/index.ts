@@ -9,4 +9,4 @@ export {
 } from "./binding-config-schema.js";
 export { compileGitHubCloudBinding } from "./compile-binding.js";
 export { GitHubCloudCredentialSecretTypes, GitHubCloudSupportedAuthSchemes } from "./auth.js";
-export { GitHubCloudTriggerEventTypes, GitHubCloudWebhookHandler } from "./webhook.js";
+export { GitHubCloudWebhookHandler } from "./webhook.js";

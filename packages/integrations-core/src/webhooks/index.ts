@@ -87,8 +87,12 @@ export function getWebhookHandlerOrThrow<
 
 export function assertSupportedWebhookEventTypeOrThrow(input: {
   eventType: string;
-  supportedEventTypes: ReadonlyArray<string>;
+  supportedEventTypes?: ReadonlyArray<string>;
 }): void {
+  if (input.supportedEventTypes === undefined) {
+    return;
+  }
+
   if (input.supportedEventTypes.includes(input.eventType)) {
     return;
   }
@@ -172,10 +176,12 @@ export async function verifyAndParseWebhookOrThrow<
     );
   }
 
-  assertSupportedWebhookEventTypeOrThrow({
-    eventType: webhookEvent.eventType,
-    supportedEventTypes: webhookHandler.supportedEventTypes,
-  });
+  if (webhookHandler.supportedEventTypes !== undefined) {
+    assertSupportedWebhookEventTypeOrThrow({
+      eventType: webhookEvent.eventType,
+      supportedEventTypes: webhookHandler.supportedEventTypes,
+    });
+  }
 
   return webhookEvent;
 }
