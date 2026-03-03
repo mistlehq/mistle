@@ -28,5 +28,9 @@
     "@mistle/integrations-core": "workspace:*",
     "@octokit/webhooks-methods": "^6.0.0",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@octokit/webhooks-examples": "^7.6.1",
+    "@octokit/webhooks-types": "^7.6.1"
   }
 }
