@@ -1,5 +1,6 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
+import { GitHubFamilyId } from "../../shared/constants.js";
 import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
 import {
   GitHubTargetSecretSchema,
@@ -16,7 +17,7 @@ import {
   GitHubEnterpriseServerTargetConfigSchema,
   type GitHubEnterpriseServerTargetConfig,
 } from "./target-config-schema.js";
-import { GitHubEnterpriseServerTriggerEventTypes } from "./webhook.js";
+import { GitHubEnterpriseServerWebhookHandler } from "./webhook.js";
 
 type GitHubEnterpriseServerIntegrationDefinition = IntegrationDefinition<
   { parse: (input: unknown) => GitHubEnterpriseServerTargetConfig },
@@ -25,7 +26,7 @@ type GitHubEnterpriseServerIntegrationDefinition = IntegrationDefinition<
 >;
 
 export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegrationDefinition = {
-  familyId: "github",
+  familyId: GitHubFamilyId,
   variantId: "github-enterprise-server",
   kind: IntegrationKinds.GIT,
   displayName: "GitHub Enterprise Server",
@@ -38,7 +39,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   authHandlers: {
     oauth: GitHubAppOAuthHandler,
   },
-  triggerEventTypes: GitHubEnterpriseServerTriggerEventTypes,
+  webhookHandler: GitHubEnterpriseServerWebhookHandler,
   userConfigSlots: [],
   userSecretSlots: GitHubUserSecretSlots,
   compileBinding: compileGitHubEnterpriseServerBinding,

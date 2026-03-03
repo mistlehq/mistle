@@ -527,9 +527,19 @@ importers:
       '@mistle/integrations-core':
         specifier: workspace:*
         version: link:../integrations-core
+      '@octokit/webhooks-methods':
+        specifier: ^6.0.0
+        version: 6.0.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6
+    devDependencies:
+      '@octokit/webhooks-examples':
+        specifier: ^7.6.1
+        version: 7.6.1
+      '@octokit/webhooks-types':
+        specifier: ^7.6.1
+        version: 7.6.1
 
   packages/logging:
     dependencies:
@@ -1767,6 +1777,16 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@octokit/webhooks-examples@7.6.1':
+    resolution: {integrity: sha512-De6U3XB6O3DtCa7bKgCMzTHdeopqqZ6SNivMYJnK65ierKL1AnNIA0tkRYCRS7lwGT792d+Ps1WbfHlso6MynQ==}
+
+  '@octokit/webhooks-methods@6.0.0':
+    resolution: {integrity: sha512-MFlzzoDJVw/GcbfzVC1RLR36QqkTLUf79vLVO3D+xn7r0QgxnFoLZgtrzxiQErAjFUOdH6fas2KeQJ1yr/qaXQ==}
+    engines: {node: '>= 20'}
+
+  '@octokit/webhooks-types@7.6.1':
+    resolution: {integrity: sha512-S8u2cJzklBC0FgTwWVLaM8tMrDuDMVE4xiTK4EYXM9GntyvrdbSoxqDQa+Fh57CCNApyIpyeqPhhFEmHPfrXgw==}
 
   '@one-ini/wasm@0.1.1':
     resolution: {integrity: sha512-XuySG1E38YScSJoMlqovLru4KTUNSjgVTIjyh7qMX6aNN5HY5Ct5LhRJdxO79JtTzKfzV/bnWpz+zquYrISsvw==}
@@ -7705,6 +7725,14 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
+
+  '@octokit/webhooks-examples@7.6.1':
+    dependencies:
+      '@octokit/webhooks-types': 7.6.1
+
+  '@octokit/webhooks-methods@6.0.0': {}
+
+  '@octokit/webhooks-types@7.6.1': {}
 
   '@one-ini/wasm@0.1.1': {}
 

@@ -1,5 +1,6 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
+import { GitHubFamilyId } from "../../shared/constants.js";
 import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
 import {
   GitHubTargetSecretSchema,
@@ -16,7 +17,7 @@ import {
   GitHubCloudTargetConfigSchema,
   type GitHubCloudTargetConfig,
 } from "./target-config-schema.js";
-import { GitHubCloudTriggerEventTypes } from "./webhook.js";
+import { GitHubCloudWebhookHandler } from "./webhook.js";
 
 type GitHubCloudIntegrationDefinition = IntegrationDefinition<
   { parse: (input: unknown) => GitHubCloudTargetConfig },
@@ -25,7 +26,7 @@ type GitHubCloudIntegrationDefinition = IntegrationDefinition<
 >;
 
 export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
-  familyId: "github",
+  familyId: GitHubFamilyId,
   variantId: "github-cloud",
   kind: IntegrationKinds.GIT,
   displayName: "GitHub",
@@ -38,7 +39,7 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
   authHandlers: {
     oauth: GitHubAppOAuthHandler,
   },
-  triggerEventTypes: GitHubCloudTriggerEventTypes,
+  webhookHandler: GitHubCloudWebhookHandler,
   userConfigSlots: [],
   userSecretSlots: GitHubUserSecretSlots,
   compileBinding: compileGitHubCloudBinding,
