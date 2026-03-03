@@ -5,6 +5,8 @@ import {
   IntegrationConnectionStatuses,
   integrationTargets,
 } from "@mistle/db/control-plane";
+import { ControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
+import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
 import {
@@ -20,6 +22,8 @@ import { it } from "./test-context.js";
 
 const GitHubEventTypeHeader = "issue_comment";
 const InstallationId = "123456";
+const ControlPlaneWorkflowNamespaceId = "integration";
+const HandleIntegrationWebhookEventWorkflowName = "control-plane.integration-webhooks.handle-event";
 
 function createGitHubWebhookPayload(): Record<string, unknown> {
   return {
@@ -45,6 +49,54 @@ function createGitHubWebhookPayload(): Record<string, unknown> {
 function signGitHubWebhookPayload(input: { secret: string; payload: string }): string {
   const digest = createHmac("sha256", input.secret).update(input.payload, "utf8").digest("hex");
   return `sha256=${digest}`;
+}
+
+type PersistedWebhookWorkflowRun = {
+  id: string;
+  workflowName: string;
+  idempotencyKey: string | null;
+};
+
+async function listWebhookWorkflowRuns(input: {
+  databaseUrl: string;
+  webhookEventId: string;
+}): Promise<ReadonlyArray<PersistedWebhookWorkflowRun>> {
+  const dbPool = new Pool({
+    connectionString: input.databaseUrl,
+  });
+
+  try {
+    const workflowRunRows = await dbPool.query<{
+      id: string;
+      workflow_name: string;
+      idempotency_key: string | null;
+    }>(
+      `
+        select
+          wr.id,
+          wr.workflow_name,
+          wr.idempotency_key
+        from ${ControlPlaneOpenWorkflow.SCHEMA}.workflow_runs wr
+        where wr.namespace_id = $1
+          and wr.workflow_name = $2
+          and wr.input ->> 'webhookEventId' = $3
+        order by wr.created_at asc
+      `,
+      [
+        ControlPlaneWorkflowNamespaceId,
+        HandleIntegrationWebhookEventWorkflowName,
+        input.webhookEventId,
+      ],
+    );
+
+    return workflowRunRows.rows.map((workflowRunRow) => ({
+      id: workflowRunRow.id,
+      workflowName: workflowRunRow.workflow_name,
+      idempotencyKey: workflowRunRow.idempotency_key,
+    }));
+  } finally {
+    await dbPool.end();
+  }
 }
 
 describe("integration webhooks ingest integration", () => {
@@ -123,6 +175,18 @@ describe("integration webhooks ingest integration", () => {
     expect(persistedEvent.eventType).toBe("github.issue_comment.created");
     expect(persistedEvent.status).toBe("received");
     expect(persistedEvent.payload).toEqual(payloadObject);
+
+    const workflowRuns = await listWebhookWorkflowRuns({
+      databaseUrl: fixture.databaseStack.directUrl,
+      webhookEventId: persistedEvent.id,
+    });
+    expect(workflowRuns).toHaveLength(1);
+    const [workflowRun] = workflowRuns;
+    if (workflowRun === undefined) {
+      throw new Error("Expected webhook workflow run to be enqueued.");
+    }
+    expect(workflowRun.workflowName).toBe(HandleIntegrationWebhookEventWorkflowName);
+    expect(workflowRun.idempotencyKey).toBe(persistedEvent.id);
   }, 60_000);
 
   it("returns 400 when webhook signature verification fails", async ({ fixture }) => {
@@ -307,5 +371,20 @@ describe("integration webhooks ingest integration", () => {
         and(eq(table.targetKey, targetKey), eq(table.externalEventId, externalDeliveryId)),
     });
     expect(persistedEvents).toHaveLength(1);
+    const [persistedEvent] = persistedEvents;
+    if (persistedEvent === undefined) {
+      throw new Error("Expected persisted webhook event.");
+    }
+
+    const workflowRuns = await listWebhookWorkflowRuns({
+      databaseUrl: fixture.databaseStack.directUrl,
+      webhookEventId: persistedEvent.id,
+    });
+    expect(workflowRuns).toHaveLength(1);
+    const [workflowRun] = workflowRuns;
+    if (workflowRun === undefined) {
+      throw new Error("Expected exactly one webhook workflow run.");
+    }
+    expect(workflowRun.idempotencyKey).toBe(persistedEvent.id);
   }, 60_000);
 });
