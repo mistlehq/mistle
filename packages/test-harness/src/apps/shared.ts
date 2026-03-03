@@ -10,6 +10,8 @@ import {
   type StartedTestContainer,
 } from "testcontainers";
 
+import { runCleanupTasks } from "../cleanup/index.js";
+
 export type WorkspaceAppReadiness =
   | {
       kind: "http";
@@ -176,13 +178,22 @@ async function cleanupResources(input: {
   container: StartedTestContainer | undefined;
   createdNetwork: StartedNetwork | undefined;
 }): Promise<void> {
-  if (input.container !== undefined) {
-    await input.container.stop();
-  }
-
-  if (input.createdNetwork !== undefined) {
-    await input.createdNetwork.stop();
-  }
+  const tasks = [
+    async () => {
+      if (input.container !== undefined) {
+        await input.container.stop();
+      }
+    },
+    async () => {
+      if (input.createdNetwork !== undefined) {
+        await input.createdNetwork.stop();
+      }
+    },
+  ];
+  await runCleanupTasks({
+    tasks,
+    context: "test-harness app resource cleanup",
+  });
 }
 
 async function resolveNetwork(network: StartedNetwork | undefined): Promise<{
@@ -294,9 +305,10 @@ async function resolveDockerTargetImageName(input: {
   const imageName = createDockerTargetImageName(cacheKey);
   await GenericContainer.fromDockerfile(input.buildContextHostPath, input.dockerfileRelativePath)
     .withBuildArgs(toBuildArgsRecord(input.buildArgs))
+    .withBuildkit()
     .withTarget(input.dockerTarget)
     .build(imageName, {
-      deleteOnExit: false,
+      deleteOnExit: true,
     });
 
   DockerTargetImageCache.set(cacheKey, imageName);

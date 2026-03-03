@@ -11,6 +11,7 @@ import {
 } from "@mistle/db/migrator";
 import { SMTPEmailSender } from "@mistle/emails";
 import {
+  runCleanupTasks,
   startMailpit,
   startPostgresWithPgBouncer,
   type MailpitService,
@@ -193,9 +194,10 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
             }),
         });
       } finally {
-        for (const cleanupTask of cleanupTasks) {
-          await cleanupTask();
-        }
+        await runCleanupTasks({
+          tasks: cleanupTasks,
+          context: "control-plane-api integration fixture cleanup",
+        });
       }
     },
     {

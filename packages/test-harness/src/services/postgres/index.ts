@@ -7,6 +7,8 @@ import {
   type StartedTestContainer,
 } from "testcontainers";
 
+import { runCleanupTasks } from "../../cleanup/index.js";
+
 const POSTGRES_IMAGE = "postgres:18-alpine";
 const PGBOUNCER_IMAGE = "edoburu/pgbouncer:v1.25.1-p0";
 const POSTGRES_INTERNAL_PORT = 5432;
@@ -122,15 +124,27 @@ type StackRuntimeResources = {
 };
 
 async function stopInReverseOrder(input: StackRuntimeResources): Promise<void> {
-  if (input.pgbouncerContainer !== undefined) {
-    await input.pgbouncerContainer.stop();
-  }
-  if (input.postgresContainer !== undefined) {
-    await input.postgresContainer.stop();
-  }
-  if (input.createdNetwork !== undefined) {
-    await input.createdNetwork.stop();
-  }
+  const tasks = [
+    async () => {
+      if (input.pgbouncerContainer !== undefined) {
+        await input.pgbouncerContainer.stop();
+      }
+    },
+    async () => {
+      if (input.postgresContainer !== undefined) {
+        await input.postgresContainer.stop();
+      }
+    },
+    async () => {
+      if (input.createdNetwork !== undefined) {
+        await input.createdNetwork.stop();
+      }
+    },
+  ];
+  await runCleanupTasks({
+    tasks,
+    context: "test-harness postgres stack cleanup",
+  });
 }
 
 export async function startPostgresWithPgBouncer(

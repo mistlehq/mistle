@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import {
+  runCleanupTasks,
   startControlPlaneApi,
   startControlPlaneWorker,
   startMailpit,
@@ -285,9 +286,10 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
           },
         });
       } finally {
-        for (const cleanupTask of cleanupTasks) {
-          await cleanupTask();
-        }
+        await runCleanupTasks({
+          tasks: cleanupTasks,
+          context: "dashboard members invitations fixture cleanup",
+        });
       }
     },
     {

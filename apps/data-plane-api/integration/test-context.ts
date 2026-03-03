@@ -14,6 +14,7 @@ import {
 } from "@mistle/db/migrator";
 import {
   reserveAvailablePort,
+  runCleanupTasks,
   startPostgresWithPgBouncer,
   type PostgresWithPgBouncerService,
 } from "@mistle/test-harness";
@@ -244,9 +245,10 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
           dbPool,
         });
       } finally {
-        for (const cleanupTask of cleanupTasks) {
-          await cleanupTask();
-        }
+        await runCleanupTasks({
+          tasks: cleanupTasks,
+          context: "data-plane-api integration fixture cleanup",
+        });
       }
     },
     {

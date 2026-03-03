@@ -24,6 +24,7 @@ import {
 import { SMTPEmailSender } from "@mistle/emails";
 import {
   reserveAvailablePort,
+  runCleanupTasks,
   startMailpit,
   startPostgresWithPgBouncer,
 } from "@mistle/test-harness";
@@ -444,9 +445,10 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
             }),
         });
       } finally {
-        for (const cleanupTask of cleanupTasks) {
-          await cleanupTask();
-        }
+        await runCleanupTasks({
+          tasks: cleanupTasks,
+          context: "control-plane-api sandbox-profile-versions fixture cleanup",
+        });
       }
     },
     {
