@@ -1,4 +1,4 @@
-export { GitHubApiMethods } from "./constants.js";
+export { GitHubApiMethods, GitHubFamilyId } from "./constants.js";
 export {
   GitHubConnectionConfigSchema,
   GitHubCredentialSecretTypes,

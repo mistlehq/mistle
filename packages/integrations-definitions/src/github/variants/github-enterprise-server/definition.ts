@@ -1,5 +1,6 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
+import { GitHubFamilyId } from "../../shared/constants.js";
 import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
 import {
   GitHubTargetSecretSchema,
@@ -25,7 +26,7 @@ type GitHubEnterpriseServerIntegrationDefinition = IntegrationDefinition<
 >;
 
 export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegrationDefinition = {
-  familyId: "github",
+  familyId: GitHubFamilyId,
   variantId: "github-enterprise-server",
   kind: IntegrationKinds.GIT,
   displayName: "GitHub Enterprise Server",

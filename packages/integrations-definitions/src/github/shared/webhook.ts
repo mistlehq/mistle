@@ -4,6 +4,7 @@ import type {
 } from "@mistle/integrations-core";
 import { verify } from "@octokit/webhooks-methods";
 
+import { GitHubFamilyId } from "./constants.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
 import type { GitHubTargetSecrets } from "./target-secret-schema.js";
 import type { GitHubUserSecrets } from "./user-secret-slots.js";
@@ -122,15 +123,7 @@ function resolveEventType(input: { providerEventType: string; action: string }):
   const providerEventType = sanitizeEventSegment(input.providerEventType);
   const action = sanitizeEventSegment(input.action);
 
-  if (providerEventType === "issue_comment" && action === "created") {
-    return "github.issue_comment.created";
-  }
-
-  if (providerEventType === "pull_request_review_comment" && action === "created") {
-    return "github.pull_request_comment.created";
-  }
-
-  return `github.${providerEventType}.${action}`;
+  return `${GitHubFamilyId}.${providerEventType}.${action}`;
 }
 
 async function verifyGitHubSignature(input: {

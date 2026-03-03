@@ -1,5 +1,6 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
+import { GitHubFamilyId } from "../../shared/constants.js";
 import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
 import {
   GitHubTargetSecretSchema,
@@ -25,7 +26,7 @@ type GitHubCloudIntegrationDefinition = IntegrationDefinition<
 >;
 
 export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
-  familyId: "github",
+  familyId: GitHubFamilyId,
   variantId: "github-cloud",
   kind: IntegrationKinds.GIT,
   displayName: "GitHub",

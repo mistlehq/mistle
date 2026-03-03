@@ -245,7 +245,7 @@ describe("GitHubWebhookHandler", () => {
     expect(parsed.payload).toEqual(IssueCommentCreatedPayload);
   });
 
-  it("maps pull_request_review_comment created to pull_request_comment", async () => {
+  it("uses canonical provider event type for pull_request_review_comment", async () => {
     const parsed = await GitHubWebhookHandler.parse({
       targetKey: "github_cloud",
       target: createGitHubCloudTargetConfig(),
@@ -256,7 +256,7 @@ describe("GitHubWebhookHandler", () => {
       rawBody: encodePayload(PullRequestReviewCommentCreatedPayload),
     });
 
-    expect(parsed.eventType).toBe("github.pull_request_comment.created");
+    expect(parsed.eventType).toBe("github.pull_request_review_comment.created");
   });
 
   it("returns derived event type for unsupported official GitHub events", async () => {
