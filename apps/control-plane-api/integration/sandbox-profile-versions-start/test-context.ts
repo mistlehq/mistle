@@ -1,19 +1,8 @@
-import { randomUUID } from "node:crypto";
+import { execFile } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
-import {
-  CONTROL_PLANE_SCHEMA_NAME,
-  createControlPlaneDatabase,
-  sandboxProfiles,
-  type ControlPlaneDatabase,
-} from "@mistle/db/control-plane";
-import {
-  SandboxInstanceStatuses,
-  createDataPlaneDatabase,
-  sandboxInstanceRuntimePlans,
-  sandboxInstances,
-  type DataPlaneDatabase,
-} from "@mistle/db/data-plane";
+import { CONTROL_PLANE_SCHEMA_NAME, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
 import {
   CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
   DATA_PLANE_MIGRATIONS_FOLDER_PATH,
@@ -21,31 +10,19 @@ import {
   runControlPlaneMigrations,
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
-import { SMTPEmailSender } from "@mistle/emails";
 import {
-  reserveAvailablePort,
+  runCleanupTasks,
+  startDataPlaneApi,
+  startDataPlaneGateway,
+  startDataPlaneWorker,
+  startControlPlaneWorker,
+  startDockerNetwork,
   startMailpit,
   startPostgresWithPgBouncer,
 } from "@mistle/test-harness";
-import {
-  ControlPlaneWorkerWorkflowIds,
-  createControlPlaneBackend,
-  createControlPlaneOpenWorkflow,
-  createControlPlaneWorker,
-  type StartSandboxProfileInstanceWorkflowInput,
-} from "@mistle/workflows/control-plane";
-import {
-  DataPlaneWorkerWorkflowIds,
-  createDataPlaneBackend,
-  createDataPlaneOpenWorkflow,
-  createDataPlaneWorker,
-} from "@mistle/workflows/data-plane";
-import { and, eq, sql } from "drizzle-orm";
 import { Pool } from "pg";
 import { it as vitestIt } from "vitest";
 
-import { createDataPlaneApiRuntime } from "../../../data-plane-api/src/runtime/index.js";
-import type { DataPlaneApiConfig } from "../../../data-plane-api/src/types.js";
 import { createControlPlaneApiRuntime } from "../../src/runtime/index.js";
 import type { AuthenticatedSession } from "../helpers/auth-session.js";
 import { createAuthenticatedSession } from "../helpers/auth-session.js";
@@ -57,39 +34,161 @@ export type StartSandboxIntegrationFixture = {
   authSession: (input?: { email?: string }) => Promise<AuthenticatedSession>;
 };
 
-async function verifySandboxProfileVersionExists(input: {
-  db: ControlPlaneDatabase;
-  organizationId: string;
-  sandboxProfileId: string;
-  sandboxProfileVersion: number;
-}): Promise<void> {
-  const sandboxProfile = await input.db.query.sandboxProfiles.findFirst({
-    columns: {
-      id: true,
-    },
-    where: (table, { and: whereAnd, eq: whereEq }) =>
-      whereAnd(
-        whereEq(table.id, input.sandboxProfileId),
-        whereEq(table.organizationId, input.organizationId),
-      ),
+const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../../../../", import.meta.url));
+const CONFIG_PATH_IN_CONTAINER = "/workspace/config/config.development.toml";
+const APP_STARTUP_TIMEOUT_MS = 120_000;
+const CONTROL_PLANE_POSTGRES_NETWORK_ALIAS = "control-plane-postgres";
+const CONTROL_PLANE_POSTGRES_PORT_IN_NETWORK = 5432;
+const CONTROL_PLANE_PGBOUNCER_NETWORK_ALIAS = "control-plane-pgbouncer";
+const DATA_PLANE_POSTGRES_NETWORK_ALIAS = "data-plane-postgres";
+const DATA_PLANE_POSTGRES_PORT_IN_NETWORK = 5432;
+const DATA_PLANE_PGBOUNCER_NETWORK_ALIAS = "data-plane-pgbouncer";
+const MAILPIT_NETWORK_ALIAS = "mailpit";
+const MAILPIT_SMTP_PORT_IN_NETWORK = 1025;
+const SANDBOX_BASE_IMAGE_REF = "mistle/sandbox-base:dev";
+const SANDBOX_BASE_IMAGE_REPOSITORY = "mistle/sandbox-base";
+const LOCAL_REGISTRY_CONTAINER_PORT = "5000/tcp";
+const LOCAL_REGISTRY_HOST = "127.0.0.1";
+
+function runProcess(command: string, args: readonly string[]): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile(command, [...args], (error) => {
+      if (error !== null) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
   });
-  if (sandboxProfile === undefined) {
-    throw new Error("Sandbox profile was not found.");
+}
+
+function runProcessWithOutput(command: string, args: readonly string[]): Promise<string> {
+  return new Promise((resolve, reject) => {
+    execFile(command, [...args], (error, stdout, stderr) => {
+      if (error !== null) {
+        reject(
+          new Error(
+            `Command failed: ${command} ${args.join(" ")}\nstdout: ${stdout}\nstderr: ${stderr}`,
+          ),
+        );
+        return;
+      }
+
+      resolve(stdout);
+    });
+  });
+}
+
+async function ensureSandboxBaseImage(projectRootHostPath: string): Promise<void> {
+  await runProcess("docker", [
+    "build",
+    "--target",
+    "sandbox-base-dev",
+    "-f",
+    `${projectRootHostPath}/apps/sandbox-runtime/images/base/Dockerfile`,
+    "-t",
+    SANDBOX_BASE_IMAGE_REF,
+    projectRootHostPath,
+  ]);
+}
+
+function parseDockerPublishedPort(dockerPortOutput: string): number {
+  const [firstLine = ""] = dockerPortOutput
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  const portMatch = firstLine.match(/:(\d+)$/u);
+  if (portMatch === null) {
+    throw new Error(`Unable to parse local registry port from docker output: ${dockerPortOutput}`);
   }
 
-  const sandboxProfileVersion = await input.db.query.sandboxProfileVersions.findFirst({
-    columns: {
-      sandboxProfileId: true,
-    },
-    where: (table, { and: whereAnd, eq: whereEq }) =>
-      whereAnd(
-        whereEq(table.sandboxProfileId, input.sandboxProfileId),
-        whereEq(table.version, input.sandboxProfileVersion),
-      ),
-  });
-  if (sandboxProfileVersion === undefined) {
-    throw new Error("Sandbox profile version was not found.");
+  const matchedPort = portMatch[1];
+  if (matchedPort === undefined) {
+    throw new Error(`Unable to parse matched port from docker output: ${dockerPortOutput}`);
   }
+
+  const parsedPort = Number.parseInt(matchedPort, 10);
+  if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65_535) {
+    throw new Error(`Parsed an invalid local registry port: ${String(parsedPort)}`);
+  }
+
+  return parsedPort;
+}
+
+async function startLocalRegistry(): Promise<{
+  host: string;
+  port: number;
+  stop: () => Promise<void>;
+}> {
+  const registryContainerId = (
+    await runProcessWithOutput("docker", [
+      "run",
+      "--detach",
+      "--publish",
+      `${LOCAL_REGISTRY_HOST}::5000`,
+      "registry:2",
+    ])
+  ).trim();
+
+  if (registryContainerId.length === 0) {
+    throw new Error("Failed to start local Docker registry container.");
+  }
+
+  const publishedPortOutput = await runProcessWithOutput("docker", [
+    "port",
+    registryContainerId,
+    LOCAL_REGISTRY_CONTAINER_PORT,
+  ]);
+  const registryPort = parseDockerPublishedPort(publishedPortOutput);
+
+  return {
+    host: LOCAL_REGISTRY_HOST,
+    port: registryPort,
+    stop: async () => {
+      await runProcess("docker", ["rm", "--force", registryContainerId]);
+    },
+  };
+}
+
+async function startRegistryAndPublishSandboxBaseImage(projectRootHostPath: string): Promise<{
+  imageRef: string;
+  stopRegistry: () => Promise<void>;
+}> {
+  await ensureSandboxBaseImage(projectRootHostPath);
+
+  const registry = await startLocalRegistry();
+  try {
+    const publishedImageRef = `${registry.host}:${String(registry.port)}/${SANDBOX_BASE_IMAGE_REPOSITORY}:dev`;
+    await runProcess("docker", ["tag", SANDBOX_BASE_IMAGE_REF, publishedImageRef]);
+    await runProcess("docker", ["push", publishedImageRef]);
+
+    return {
+      imageRef: publishedImageRef,
+      stopRegistry: registry.stop,
+    };
+  } catch (error) {
+    await registry.stop();
+    throw error;
+  }
+}
+
+function toWsBaseUrl(httpBaseUrl: string): string {
+  return httpBaseUrl.replace(/^http/u, "ws");
+}
+
+function createDockerHostGatewayWsUrl(port: number): string {
+  return `ws://host.docker.internal:${String(port)}/tunnel/sandbox`;
+}
+
+function createDatabaseUrl(input: {
+  username: string;
+  password: string;
+  host: string;
+  port: number;
+  databaseName: string;
+}): string {
+  return `postgresql://${encodeURIComponent(input.username)}:${encodeURIComponent(input.password)}@${input.host}:${String(input.port)}/${input.databaseName}`;
 }
 
 export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
@@ -101,9 +200,22 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
       try {
         const internalAuthServiceToken = "integration-service-token";
         const workflowNamespaceId = "integration";
+        const publishedSandboxBaseImage =
+          await startRegistryAndPublishSandboxBaseImage(PROJECT_ROOT_HOST_PATH);
+        cleanupTasks.unshift(async () => {
+          await publishedSandboxBaseImage.stopRegistry();
+        });
+
+        const network = await startDockerNetwork();
+        cleanupTasks.unshift(async () => {
+          await network.stop();
+        });
 
         const controlPlaneDatabaseStack = await startPostgresWithPgBouncer({
           databaseName: "mistle_control_plane_start_instance_integration",
+          network,
+          postgresNetworkAlias: CONTROL_PLANE_POSTGRES_NETWORK_ALIAS,
+          pgbouncerNetworkAlias: CONTROL_PLANE_PGBOUNCER_NETWORK_ALIAS,
         });
         cleanupTasks.unshift(async () => {
           await controlPlaneDatabaseStack.stop();
@@ -118,6 +230,9 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
 
         const dataPlaneDatabaseStack = await startPostgresWithPgBouncer({
           databaseName: "mistle_data_plane_start_instance_integration",
+          network,
+          postgresNetworkAlias: DATA_PLANE_POSTGRES_NETWORK_ALIAS,
+          pgbouncerNetworkAlias: DATA_PLANE_PGBOUNCER_NETWORK_ALIAS,
         });
         cleanupTasks.unshift(async () => {
           await dataPlaneDatabaseStack.stop();
@@ -130,24 +245,6 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
           migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
         });
 
-        const dataPlaneMigrationBackend = await createDataPlaneBackend({
-          url: dataPlaneDatabaseStack.directUrl,
-          namespaceId: workflowNamespaceId,
-          runMigrations: true,
-        });
-        await dataPlaneMigrationBackend.stop();
-
-        const dataPlaneWorkflowBackend = await createDataPlaneBackend({
-          url: dataPlaneDatabaseStack.directUrl,
-          namespaceId: workflowNamespaceId,
-          runMigrations: false,
-        });
-        cleanupTasks.unshift(async () => {
-          await dataPlaneWorkflowBackend.stop();
-        });
-        const dataPlaneOpenWorkflow = createDataPlaneOpenWorkflow({
-          backend: dataPlaneWorkflowBackend,
-        });
         const dataPlaneDbPool = new Pool({
           connectionString: dataPlaneDatabaseStack.directUrl,
         });
@@ -155,231 +252,107 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
           await dataPlaneDbPool.end();
         });
         const dataPlaneDb = createDataPlaneDatabase(dataPlaneDbPool);
-        const dataPlaneWorkflowWorker = createDataPlaneWorker({
-          openWorkflow: dataPlaneOpenWorkflow,
-          maxConcurrentWorkflows: 1,
-          enabledWorkflows: [DataPlaneWorkerWorkflowIds.START_SANDBOX_INSTANCE],
-          services: {
-            startSandboxInstance: {
-              sandboxLifecycle: {
-                startSandbox: async () => {
-                  return {
-                    provider: "docker",
-                    providerSandboxId: `integration-${randomUUID()}`,
-                    bootstrapTokenJti: randomUUID(),
-                  };
-                },
-                stopSandbox: async () => {},
-              },
-              sandboxInstances: {
-                createSandboxInstance: async (workflowInput) => {
-                  return dataPlaneDb.transaction(async (tx) => {
-                    const insertedRows = await tx
-                      .insert(sandboxInstances)
-                      .values({
-                        organizationId: workflowInput.organizationId,
-                        sandboxProfileId: workflowInput.sandboxProfileId,
-                        sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-                        provider: workflowInput.provider,
-                        providerSandboxId: workflowInput.providerSandboxId,
-                        status: SandboxInstanceStatuses.STARTING,
-                        startedByKind: workflowInput.startedBy.kind,
-                        startedById: workflowInput.startedBy.id,
-                        source: workflowInput.source,
-                      })
-                      .returning({
-                        id: sandboxInstances.id,
-                      });
 
-                    const sandboxInstance = insertedRows[0];
-                    if (sandboxInstance === undefined) {
-                      throw new Error("Failed to insert sandbox instance row.");
-                    }
+        const directDataPlaneDatabaseUrlInNetwork = createDatabaseUrl({
+          username: dataPlaneDatabaseStack.postgres.username,
+          password: dataPlaneDatabaseStack.postgres.password,
+          host: DATA_PLANE_POSTGRES_NETWORK_ALIAS,
+          port: DATA_PLANE_POSTGRES_PORT_IN_NETWORK,
+          databaseName: dataPlaneDatabaseStack.postgres.databaseName,
+        });
+        const pooledDataPlaneDatabaseUrlInNetwork = createDatabaseUrl({
+          username: dataPlaneDatabaseStack.postgres.username,
+          password: dataPlaneDatabaseStack.postgres.password,
+          host: DATA_PLANE_PGBOUNCER_NETWORK_ALIAS,
+          port: DATA_PLANE_POSTGRES_PORT_IN_NETWORK,
+          databaseName: dataPlaneDatabaseStack.postgres.databaseName,
+        });
 
-                    await tx.insert(sandboxInstanceRuntimePlans).values({
-                      sandboxInstanceId: sandboxInstance.id,
-                      revision: 1,
-                      compiledRuntimePlan: workflowInput.runtimePlan,
-                      compiledFromProfileId: workflowInput.sandboxProfileId,
-                      compiledFromProfileVersion: workflowInput.sandboxProfileVersion,
-                    });
-
-                    return {
-                      sandboxInstanceId: sandboxInstance.id,
-                    };
-                  });
-                },
-                markSandboxInstanceRunning: async (workflowInput) => {
-                  const updatedRows = await dataPlaneDb
-                    .update(sandboxInstances)
-                    .set({
-                      status: SandboxInstanceStatuses.RUNNING,
-                      startedAt: sql`now()`,
-                      failedAt: null,
-                      failureCode: null,
-                      failureMessage: null,
-                      updatedAt: sql`now()`,
-                    })
-                    .where(
-                      and(
-                        eq(sandboxInstances.id, workflowInput.sandboxInstanceId),
-                        eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
-                      ),
-                    )
-                    .returning({
-                      id: sandboxInstances.id,
-                    });
-
-                  if (updatedRows[0] === undefined) {
-                    throw new Error(
-                      "Failed to transition sandbox instance status from starting to running.",
-                    );
-                  }
-                },
-                markSandboxInstanceFailed: async (workflowInput) => {
-                  const updatedRows = await dataPlaneDb
-                    .update(sandboxInstances)
-                    .set({
-                      status: SandboxInstanceStatuses.FAILED,
-                      failedAt: sql`now()`,
-                      failureCode: workflowInput.failureCode,
-                      failureMessage: workflowInput.failureMessage,
-                      updatedAt: sql`now()`,
-                    })
-                    .where(
-                      and(
-                        eq(sandboxInstances.id, workflowInput.sandboxInstanceId),
-                        eq(sandboxInstances.status, SandboxInstanceStatuses.STARTING),
-                      ),
-                    )
-                    .returning({
-                      id: sandboxInstances.id,
-                    });
-
-                  if (updatedRows[0] === undefined) {
-                    throw new Error(
-                      "Failed to transition sandbox instance status from starting to failed.",
-                    );
-                  }
-                },
-              },
-              tunnelConnectAcks: {
-                waitForSandboxTunnelConnectAck: async () => true,
-              },
-            },
+        const dataPlaneApiService = await startDataPlaneApi({
+          buildContextHostPath: PROJECT_ROOT_HOST_PATH,
+          configPathInContainer: CONFIG_PATH_IN_CONTAINER,
+          startupTimeoutMs: APP_STARTUP_TIMEOUT_MS,
+          network,
+          environment: {
+            MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN: internalAuthServiceToken,
+            MISTLE_APPS_DATA_PLANE_API_DATABASE_URL: pooledDataPlaneDatabaseUrlInNetwork,
+            MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL: pooledDataPlaneDatabaseUrlInNetwork,
+            MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID: workflowNamespaceId,
           },
         });
-        await dataPlaneWorkflowWorker.start();
         cleanupTasks.unshift(async () => {
-          await dataPlaneWorkflowWorker.stop();
+          await dataPlaneApiService.stop();
         });
 
-        const dataPlaneHost = "127.0.0.1";
-        const dataPlanePort = await reserveAvailablePort({ host: dataPlaneHost });
-        const dataPlaneConfig: DataPlaneApiConfig = {
-          server: {
-            host: dataPlaneHost,
-            port: dataPlanePort,
+        const dataPlaneGatewayService = await startDataPlaneGateway({
+          buildContextHostPath: PROJECT_ROOT_HOST_PATH,
+          configPathInContainer: CONFIG_PATH_IN_CONTAINER,
+          startupTimeoutMs: APP_STARTUP_TIMEOUT_MS,
+          network,
+          environment: {
+            MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL: pooledDataPlaneDatabaseUrlInNetwork,
           },
-          database: {
-            url: dataPlaneDatabaseStack.pooledUrl,
-          },
-          workflow: {
-            databaseUrl: dataPlaneDatabaseStack.pooledUrl,
-            namespaceId: workflowNamespaceId,
-          },
-        };
-        const dataPlaneRuntime = await createDataPlaneApiRuntime({
-          app: dataPlaneConfig,
-          internalAuthServiceToken,
         });
-        await dataPlaneRuntime.start();
         cleanupTasks.unshift(async () => {
-          await dataPlaneRuntime.stop();
+          await dataPlaneGatewayService.stop();
         });
 
-        const mailpitService = await startMailpit();
+        const dataPlaneWorkerService = await startDataPlaneWorker({
+          buildContextHostPath: PROJECT_ROOT_HOST_PATH,
+          configPathInContainer: CONFIG_PATH_IN_CONTAINER,
+          startupTimeoutMs: APP_STARTUP_TIMEOUT_MS,
+          network,
+          environment: {
+            MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN: internalAuthServiceToken,
+            MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL: directDataPlaneDatabaseUrlInNetwork,
+            MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL:
+              directDataPlaneDatabaseUrlInNetwork,
+            MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: workflowNamespaceId,
+            MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
+            MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_GATEWAY_WS_URL: createDockerHostGatewayWsUrl(
+              dataPlaneGatewayService.mappedPort,
+            ),
+          },
+        });
+        cleanupTasks.unshift(async () => {
+          await dataPlaneWorkerService.stop();
+        });
+
+        const mailpitService = await startMailpit({
+          network,
+          networkAlias: MAILPIT_NETWORK_ALIAS,
+        });
         cleanupTasks.unshift(async () => {
           await mailpitService.stop();
         });
 
-        const controlPlaneWorkflowBackend = await createControlPlaneBackend({
-          url: controlPlaneDatabaseStack.directUrl,
-          namespaceId: workflowNamespaceId,
-          runMigrations: true,
+        const directControlPlaneDatabaseUrlInNetwork = createDatabaseUrl({
+          username: controlPlaneDatabaseStack.postgres.username,
+          password: controlPlaneDatabaseStack.postgres.password,
+          host: CONTROL_PLANE_POSTGRES_NETWORK_ALIAS,
+          port: CONTROL_PLANE_POSTGRES_PORT_IN_NETWORK,
+          databaseName: controlPlaneDatabaseStack.postgres.databaseName,
         });
-        cleanupTasks.unshift(async () => {
-          await controlPlaneWorkflowBackend.stop();
-        });
-        const controlPlaneOpenWorkflow = createControlPlaneOpenWorkflow({
-          backend: controlPlaneWorkflowBackend,
-        });
-        const controlPlaneWorkflowDbPool = new Pool({
-          connectionString: controlPlaneDatabaseStack.pooledUrl,
-        });
-        cleanupTasks.unshift(async () => {
-          await controlPlaneWorkflowDbPool.end();
-        });
-        const controlPlaneWorkflowDb = createControlPlaneDatabase(controlPlaneWorkflowDbPool);
-
-        const dataPlaneClient = createDataPlaneSandboxInstancesClient({
-          baseUrl: `http://${dataPlaneHost}:${String(dataPlanePort)}`,
-          serviceToken: internalAuthServiceToken,
-        });
-        const emailSender = SMTPEmailSender.fromTransportOptions({
-          host: mailpitService.smtpHost,
-          port: mailpitService.smtpPort,
-          secure: false,
-        });
-        const controlPlaneWorkflowWorker = createControlPlaneWorker({
-          openWorkflow: controlPlaneOpenWorkflow,
-          maxConcurrentWorkflows: 1,
-          enabledWorkflows: [
-            ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT,
-            ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
-            ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
-            ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE,
-            ControlPlaneWorkerWorkflowIds.START_SANDBOX_PROFILE_INSTANCE,
-          ],
-          services: {
-            emailDelivery: {
-              emailSender,
-              from: {
-                email: "no-reply@mistle.dev",
-                name: "Mistle",
-              },
-            },
-            sandboxProfiles: {
-              deleteSandboxProfile: async (input) => {
-                await controlPlaneWorkflowDb
-                  .delete(sandboxProfiles)
-                  .where(
-                    and(
-                      eq(sandboxProfiles.id, input.profileId),
-                      eq(sandboxProfiles.organizationId, input.organizationId),
-                    ),
-                  );
-              },
-            },
-            sandboxInstances: {
-              startSandboxProfileInstance: async (
-                workflowInput: StartSandboxProfileInstanceWorkflowInput,
-              ) => {
-                await verifySandboxProfileVersionExists({
-                  db: controlPlaneWorkflowDb,
-                  organizationId: workflowInput.organizationId,
-                  sandboxProfileId: workflowInput.sandboxProfileId,
-                  sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-                });
-
-                return dataPlaneClient.startSandboxInstance(workflowInput);
-              },
-            },
+        const controlPlaneWorkerService = await startControlPlaneWorker({
+          buildContextHostPath: PROJECT_ROOT_HOST_PATH,
+          configPathInContainer: CONFIG_PATH_IN_CONTAINER,
+          startupTimeoutMs: APP_STARTUP_TIMEOUT_MS,
+          network,
+          environment: {
+            MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN: internalAuthServiceToken,
+            MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL:
+              directControlPlaneDatabaseUrlInNetwork,
+            MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: workflowNamespaceId,
+            MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "true",
+            MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_HOST: MAILPIT_NETWORK_ALIAS,
+            MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT: String(MAILPIT_SMTP_PORT_IN_NETWORK),
+            MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE: "false",
+            MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL:
+              dataPlaneApiService.containerBaseUrl,
           },
         });
-        await controlPlaneWorkflowWorker.start();
         cleanupTasks.unshift(async () => {
-          await controlPlaneWorkflowWorker.stop();
+          await controlPlaneWorkerService.stop();
         });
 
         const controlPlaneConfig = {
@@ -395,11 +368,11 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
             namespaceId: workflowNamespaceId,
           },
           dataPlaneApi: {
-            baseUrl: `http://${dataPlaneHost}:${String(dataPlanePort)}`,
+            baseUrl: dataPlaneApiService.hostBaseUrl,
           },
           sandbox: {
-            defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
-            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+            defaultBaseImage: publishedSandboxBaseImage.imageRef,
+            gatewayWsUrl: `${toWsBaseUrl(dataPlaneGatewayService.hostBaseUrl)}/tunnel/sandbox`,
           },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
@@ -444,9 +417,10 @@ export const it = vitestIt.extend<{ fixture: StartSandboxIntegrationFixture }>({
             }),
         });
       } finally {
-        for (const cleanupTask of cleanupTasks) {
-          await cleanupTask();
-        }
+        await runCleanupTasks({
+          tasks: cleanupTasks,
+          context: "control-plane-api sandbox-profile-versions fixture cleanup",
+        });
       }
     },
     {

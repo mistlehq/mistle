@@ -3,6 +3,7 @@ package startup
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -27,15 +28,30 @@ type ReadStartupInputInput struct {
 	MaxBytes int
 }
 
-func decodeJSONStrict(input []byte, output any) error {
-	decoder := json.NewDecoder(bytes.NewReader(input))
+func decodeJSONStrict(reader io.Reader, maxBytes int, output any) error {
+	limitedReader := &io.LimitedReader{
+		R: reader,
+		N: int64(maxBytes) + 1,
+	}
+	decoder := json.NewDecoder(limitedReader)
 	decoder.DisallowUnknownFields()
 
 	if err := decoder.Decode(output); err != nil {
+		if limitedReader.N == 0 {
+			return fmt.Errorf("startup input exceeds max size of %d bytes", maxBytes)
+		}
 		return err
 	}
 
-	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+	if decoder.InputOffset() > int64(maxBytes) {
+		return fmt.Errorf("startup input exceeds max size of %d bytes", maxBytes)
+	}
+
+	bufferedTrailingJSON, err := io.ReadAll(decoder.Buffered())
+	if err != nil {
+		return fmt.Errorf("failed to read trailing startup input bytes: %w", err)
+	}
+	if len(bytes.TrimSpace(bufferedTrailingJSON)) > 0 {
 		return fmt.Errorf("unexpected trailing JSON content")
 	}
 
@@ -50,22 +66,11 @@ func ReadStartupInput(input ReadStartupInputInput) (StartupInput, error) {
 		return StartupInput{}, fmt.Errorf("startup input max bytes must be at least 1")
 	}
 
-	limitedReader := io.LimitReader(input.Reader, int64(input.MaxBytes)+1)
-	startupInputBytes, err := io.ReadAll(limitedReader)
-	if err != nil {
-		return StartupInput{}, fmt.Errorf("failed to read startup input from stdin: %w", err)
-	}
-	if len(startupInputBytes) > input.MaxBytes {
-		return StartupInput{}, fmt.Errorf("startup input exceeds max size of %d bytes", input.MaxBytes)
-	}
-
-	normalizedStartupInput := bytes.TrimSpace(startupInputBytes)
-	if len(normalizedStartupInput) == 0 {
-		return StartupInput{}, fmt.Errorf("startup input from stdin is empty")
-	}
-
 	var startupInputPayload readStartupInputPayload
-	if decodeError := decodeJSONStrict(normalizedStartupInput, &startupInputPayload); decodeError != nil {
+	if decodeError := decodeJSONStrict(input.Reader, input.MaxBytes, &startupInputPayload); decodeError != nil {
+		if errors.Is(decodeError, io.EOF) {
+			return StartupInput{}, fmt.Errorf("startup input from stdin is empty")
+		}
 		return StartupInput{}, fmt.Errorf("startup input from stdin must be valid json: %w", decodeError)
 	}
 

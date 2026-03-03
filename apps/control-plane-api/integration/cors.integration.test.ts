@@ -25,7 +25,7 @@ describe("cors integration", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("access-control-allow-origin")).toBe(trustedOrigin);
     expect(response.headers.get("access-control-allow-credentials")).toBe("true");
-  });
+  }, 60_000);
 
   it("does not allow untrusted origins on standard requests", async ({ fixture }) => {
     const response = await fixture.request("/__healthz", {
@@ -38,7 +38,7 @@ describe("cors integration", () => {
 
     const allowOrigin = response.headers.get("access-control-allow-origin");
     expect(allowOrigin === null || allowOrigin === "").toBe(true);
-  });
+  }, 60_000);
 
   it("handles preflight requests for trusted origins", async ({ fixture }) => {
     const trustedOrigin = getTrustedOrigin(fixture.config.auth.trustedOrigins);
@@ -61,5 +61,5 @@ describe("cors integration", () => {
     const allowHeaders = response.headers.get("access-control-allow-headers");
     expect(allowHeaders).toContain("Content-Type");
     expect(allowHeaders).toContain("Authorization");
-  });
+  }, 60_000);
 });

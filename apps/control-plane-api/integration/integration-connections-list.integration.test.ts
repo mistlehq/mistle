@@ -98,9 +98,14 @@ describe("integration connections list integration", () => {
     const firstPage = ListIntegrationConnectionsResponseSchema.parse(
       await firstPageResponse.json(),
     );
+    const normalizedFirstPageItems = firstPage.items.map((item) => ({
+      ...item,
+      createdAt: new Date(item.createdAt).toISOString(),
+      updatedAt: new Date(item.updatedAt).toISOString(),
+    }));
 
     expect(firstPage.totalResults).toBe(3);
-    expect(firstPage.items).toEqual([
+    expect(normalizedFirstPageItems).toEqual([
       {
         id: "icn_001",
         targetKey: "github_cloud",
@@ -142,9 +147,14 @@ describe("integration connections list integration", () => {
     const secondPage = ListIntegrationConnectionsResponseSchema.parse(
       await secondPageResponse.json(),
     );
+    const normalizedSecondPageItems = secondPage.items.map((item) => ({
+      ...item,
+      createdAt: new Date(item.createdAt).toISOString(),
+      updatedAt: new Date(item.updatedAt).toISOString(),
+    }));
 
     expect(secondPage.totalResults).toBe(3);
-    expect(secondPage.items).toEqual([
+    expect(normalizedSecondPageItems).toEqual([
       {
         id: "icn_003",
         targetKey: "github_cloud",

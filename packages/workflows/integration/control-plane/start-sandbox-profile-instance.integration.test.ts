@@ -1,4 +1,4 @@
-import { startPostgresWithPgBouncer } from "@mistle/test-harness";
+import { runCleanupTasks, startPostgresWithPgBouncer } from "@mistle/test-harness";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -101,9 +101,10 @@ describe("start sandbox profile instance workflow integration", () => {
         providerSandboxId: `${workflowInput.source}-${workflowInput.image.imageId}`,
       });
     } finally {
-      for (const cleanupTask of cleanupTasks) {
-        await cleanupTask();
-      }
+      await runCleanupTasks({
+        tasks: cleanupTasks,
+        context: "start sandbox profile workflow integration cleanup",
+      });
     }
   }, 90_000);
 });

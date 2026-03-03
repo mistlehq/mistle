@@ -4,7 +4,11 @@ import { resolve } from "node:path";
 import { systemClock, systemSleeper } from "@mistle/time";
 import type { StartedNetwork } from "testcontainers";
 
-import { startDockerTargetApp, type StartedWorkspaceApp } from "./shared.js";
+import {
+  startDockerTargetApp,
+  type StartDockerTargetAppInput,
+  type StartedWorkspaceApp,
+} from "./shared.js";
 
 const HOST_HEALTHCHECK_POLL_INTERVAL_MS = 100;
 
@@ -14,6 +18,7 @@ export type StartDockerHttpAppInput = {
   startupTimeoutMs: number;
   cacheBustKey?: string;
   environment: Record<string, string>;
+  bindMounts?: StartDockerTargetAppInput["bindMounts"];
   network?: StartedNetwork;
 };
 
@@ -117,6 +122,11 @@ export async function startDockerHttpApp(
       ? {}
       : {
           network: input.network,
+        }),
+    ...(input.bindMounts === undefined
+      ? {}
+      : {
+          bindMounts: input.bindMounts,
         }),
   });
 
