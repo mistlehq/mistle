@@ -207,6 +207,68 @@ export type IntegrationOAuthHandler<TTargetConfig = Record<string, unknown>> = {
   ): MaybePromise<IntegrationOAuthCompleteResult>;
 };
 
+export type IntegrationWebhookHeaders = Readonly<Record<string, string>>;
+
+export type IntegrationWebhookVerifyFailureCode =
+  | "invalid-signature"
+  | "invalid-headers"
+  | "invalid-body";
+
+export const IntegrationWebhookVerifyFailureCodes: {
+  INVALID_SIGNATURE: IntegrationWebhookVerifyFailureCode;
+  INVALID_HEADERS: IntegrationWebhookVerifyFailureCode;
+  INVALID_BODY: IntegrationWebhookVerifyFailureCode;
+} = {
+  INVALID_SIGNATURE: "invalid-signature",
+  INVALID_HEADERS: "invalid-headers",
+  INVALID_BODY: "invalid-body",
+};
+
+export type IntegrationWebhookVerifyInput<TTargetConfig = Record<string, unknown>> = {
+  targetKey: string;
+  target: Omit<IntegrationTarget, "config"> & { config: TTargetConfig };
+  headers: IntegrationWebhookHeaders;
+  rawBody: Uint8Array;
+};
+
+export type IntegrationWebhookVerifyResult =
+  | { ok: true }
+  | {
+      ok: false;
+      code: IntegrationWebhookVerifyFailureCode;
+      message: string;
+    };
+
+export type IntegrationWebhookConnectionRef = {
+  targetKey: string;
+  externalSubjectId?: string;
+};
+
+export type IntegrationWebhookParseInput<TTargetConfig = Record<string, unknown>> = {
+  targetKey: string;
+  target: Omit<IntegrationTarget, "config"> & { config: TTargetConfig };
+  headers: IntegrationWebhookHeaders;
+  rawBody: Uint8Array;
+};
+
+export type IntegrationWebhookEvent = {
+  externalEventId: string;
+  externalDeliveryId?: string;
+  providerEventType: string;
+  eventType: string;
+  payload: Record<string, unknown>;
+  occurredAt?: string;
+  connectionRef: IntegrationWebhookConnectionRef;
+};
+
+export type IntegrationWebhookHandler<TTargetConfig = Record<string, unknown>> = {
+  verify(
+    input: IntegrationWebhookVerifyInput<TTargetConfig>,
+  ): MaybePromise<IntegrationWebhookVerifyResult>;
+  parse(input: IntegrationWebhookParseInput<TTargetConfig>): MaybePromise<IntegrationWebhookEvent>;
+  supportedEventTypes: ReadonlyArray<string>;
+};
+
 export type EgressCredentialResolverRef = {
   connectionId: string;
   secretType: string;
@@ -355,6 +417,7 @@ export type IntegrationDefinition<
   authHandlers?: {
     oauth?: IntegrationOAuthHandler<ParsedSchemaOutput<TTargetConfigSchema>>;
   };
+  webhookHandler?: IntegrationWebhookHandler<ParsedSchemaOutput<TTargetConfigSchema>>;
   triggerEventTypes: ReadonlyArray<string>;
   userConfigSlots: ReadonlyArray<IntegrationUserConfigSlot>;
   compileBinding(
