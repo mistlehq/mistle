@@ -5,6 +5,7 @@ import {
   IntegrationCredentialSecretKinds,
   integrationTargets,
 } from "@mistle/db/control-plane";
+import { IntegrationSupportedAuthSchemes } from "@mistle/integrations-core";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
@@ -72,6 +73,9 @@ describe("integration connections create api key integration", () => {
 
     expect(responseBody.targetKey).toBe("openai-default");
     expect(responseBody.status).toBe("active");
+    expect(responseBody.config).toEqual({
+      auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
+    });
     expect(responseBody.targetSnapshotConfig).toEqual({
       api_base_url: "https://api.openai.com",
     });
@@ -88,6 +92,9 @@ describe("integration connections create api key integration", () => {
     if (createdConnection === undefined) {
       throw new Error("Expected created integration connection.");
     }
+    expect(createdConnection.config).toEqual({
+      auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
+    });
 
     const createdConnectionCredential =
       await fixture.db.query.integrationConnectionCredentials.findFirst({
@@ -168,15 +175,28 @@ describe("integration connections create api key integration", () => {
   it("stores encrypted connection secrets when provided for a target secret slot", async ({
     fixture,
   }) => {
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "github-cloud",
-      familyId: "github",
-      variantId: "github-cloud",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.github.com",
-      },
-    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "github-cloud",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+        },
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+          },
+        },
+      });
 
     const authenticatedSession = await fixture.authSession({
       email: "integration-connections-create-api-key-github-secrets@example.com",
@@ -198,6 +218,9 @@ describe("integration connections create api key integration", () => {
 
     expect(response.status).toBe(201);
     const responseBody = IntegrationConnectionSchema.parse(await response.json());
+    expect(responseBody.config).toEqual({
+      auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
+    });
 
     const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
       where: (table, { and, eq }) =>
@@ -211,6 +234,9 @@ describe("integration connections create api key integration", () => {
     if (persistedConnection === undefined) {
       throw new Error("Expected persisted integration connection.");
     }
+    expect(persistedConnection.config).toEqual({
+      auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
+    });
 
     expect(persistedConnection.secrets).not.toBeNull();
     if (persistedConnection.secrets === null) {
@@ -227,15 +253,28 @@ describe("integration connections create api key integration", () => {
   }, 60_000);
 
   it("returns 400 when request secrets include unsupported keys", async ({ fixture }) => {
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com",
-      },
-    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "openai-default",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com",
+        },
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com",
+          },
+        },
+      });
 
     const authenticatedSession = await fixture.authSession({
       email: "integration-connections-create-api-key-unsupported-secret@example.com",

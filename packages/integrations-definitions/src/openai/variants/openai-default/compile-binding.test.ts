@@ -1,4 +1,5 @@
 import type {
+  IntegrationSupportedAuthScheme,
   RuntimeArtifactCommand,
   RuntimeArtifactLifecycleBuilder,
   RuntimeArtifactRefs,
@@ -6,6 +7,8 @@ import type {
 import { describe, expect, it } from "vitest";
 
 import { compileOpenAiApiKeyBinding } from "./compile-binding.js";
+
+const OpenAiApiKeyAuthScheme: IntegrationSupportedAuthScheme = "api-key";
 
 function createRuntimeArtifactRefs(): RuntimeArtifactRefs {
   const exec = (input: RuntimeArtifactCommand): RuntimeArtifactCommand => ({
@@ -76,7 +79,9 @@ describe("compileOpenAiApiKeyBinding", () => {
       connection: {
         id: "icn_123",
         status: "active",
-        config: {},
+        config: {
+          auth_scheme: OpenAiApiKeyAuthScheme,
+        },
       },
       binding: {
         id: "ibd_123",
@@ -209,7 +214,9 @@ describe("compileOpenAiApiKeyBinding", () => {
       connection: {
         id: "icn_123",
         status: "active",
-        config: {},
+        config: {
+          auth_scheme: OpenAiApiKeyAuthScheme,
+        },
       },
       binding: {
         id: "ibd_123",
@@ -239,5 +246,48 @@ describe("compileOpenAiApiKeyBinding", () => {
     });
     expect(compiled.runtimeClients[0]?.processes).toHaveLength(1);
     expect(compiled.runtimeClients[0]?.processes[0]?.processKey).toBe("codex-app-server");
+  });
+
+  it("fails fast when connection auth_scheme is missing", () => {
+    expect(() =>
+      compileOpenAiApiKeyBinding({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 1,
+        targetKey: "openai-default",
+        target: {
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          secrets: {},
+          config: {
+            apiBaseUrl: "https://api.openai.com/v1",
+          },
+        },
+        connection: {
+          id: "icn_123",
+          status: "active",
+          config: {},
+        },
+        binding: {
+          id: "ibd_123",
+          kind: "agent",
+          config: {
+            runtime: "codex-cli",
+            defaultModel: "gpt-5.3-codex",
+            reasoningEffort: "medium",
+          },
+        },
+        refs: {
+          egressUrl: {
+            kind: "egress_url",
+            routeId: "route_ibd_123",
+          },
+        },
+        runtimeContext: {
+          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
+        },
+      }),
+    ).toThrowError();
   });
 });
