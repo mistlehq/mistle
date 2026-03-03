@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"syscall"
 
 	"github.com/coder/websocket"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/sessionprotocol"
@@ -156,7 +157,10 @@ func relayPTYSession(ctx context.Context, tunnelConn *websocket.Conn, session *p
 				return fmt.Errorf("failed to write pty output to websocket: %w", err)
 			}
 		case ptyOutputErr := <-ptyOutputErrCh:
-			if ptyOutputErr == nil || errors.Is(ptyOutputErr, io.EOF) || errors.Is(ptyOutputErr, os.ErrClosed) {
+			if ptyOutputErr == nil ||
+				errors.Is(ptyOutputErr, io.EOF) ||
+				errors.Is(ptyOutputErr, os.ErrClosed) ||
+				errors.Is(ptyOutputErr, syscall.EIO) {
 				continue
 			}
 			return fmt.Errorf("failed to read pty output: %w", ptyOutputErr)
