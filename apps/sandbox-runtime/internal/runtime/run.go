@@ -92,6 +92,7 @@ func Run(input RunInput) (runErr error) {
 			Context:        tunnelCtx,
 			GatewayWSURL:   startupInput.TunnelGatewayURL,
 			BootstrapToken: []byte(startupInput.BootstrapToken),
+			RuntimeClients: startupInput.RuntimePlan.RuntimeClients,
 		})
 	}()
 
