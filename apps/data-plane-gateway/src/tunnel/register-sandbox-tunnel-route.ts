@@ -14,7 +14,7 @@ import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { insertSandboxTunnelConnectAck } from "./connect-ack.js";
 
-const SandboxTunnelRoutePath = "/tunnel/sandbox";
+const SandboxTunnelRoutePath = "/tunnel/sandbox/:instanceId";
 
 type RegisterSandboxTunnelRouteInput = {
   app: DataPlaneGatewayApp;
@@ -69,7 +69,7 @@ async function verifyRequestedToken(input: {
   requestedToken: RequestedToken;
   bootstrapTokenConfig: BootstrapTokenConfig;
   connectionTokenConfig: ConnectionTokenConfig;
-}): Promise<{ tokenKind: TokenKind; tokenJti: string }> {
+}): Promise<{ tokenKind: TokenKind; tokenJti: string; tokenSandboxInstanceId: string }> {
   if (input.requestedToken.kind === "missing" || input.requestedToken.kind === "ambiguous") {
     throw new Error("Expected a token-bearing request.");
   }
@@ -82,6 +82,7 @@ async function verifyRequestedToken(input: {
     return {
       tokenKind: "bootstrap",
       tokenJti: verificationResult.jti,
+      tokenSandboxInstanceId: verificationResult.sandboxInstanceId,
     };
   }
 
@@ -92,6 +93,7 @@ async function verifyRequestedToken(input: {
   return {
     tokenKind: "connection",
     tokenJti: verificationResult.jti,
+    tokenSandboxInstanceId: verificationResult.sandboxInstanceId,
   };
 }
 
@@ -101,6 +103,10 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     async (ctx, next) => {
       if (ctx.req.header("upgrade")?.toLowerCase() !== "websocket") {
         return ctx.json({ error: "Sandbox tunnel endpoint requires websocket upgrade." }, 400);
+      }
+      const requestedInstanceId = ctx.req.param("instanceId").trim();
+      if (requestedInstanceId.length === 0) {
+        return ctx.json({ error: "Sandbox instance id path param is required." }, 400);
       }
 
       const requestedToken = readRequestedTokenFromRequestUrl(new URL(ctx.req.url));
@@ -119,6 +125,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
 
       let verifiedTokenJti: string;
       let verifiedTokenKind: TokenKind;
+      let verifiedTokenSandboxInstanceId: string;
       try {
         const verificationResult = await verifyRequestedToken({
           requestedToken,
@@ -127,6 +134,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
         });
         verifiedTokenJti = verificationResult.tokenJti;
         verifiedTokenKind = verificationResult.tokenKind;
+        verifiedTokenSandboxInstanceId = verificationResult.tokenSandboxInstanceId;
       } catch (error) {
         if (error instanceof BootstrapTokenError) {
           return ctx.json({ error: error.message }, 401);
@@ -139,10 +147,18 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
           {
             err: error,
             requestedTokenKind: requestedToken.kind,
+            requestedInstanceId,
           },
           "Unexpected sandbox tunnel token verification failure",
         );
         return ctx.json({ error: "Sandbox tunnel token verification failed." }, 500);
+      }
+
+      if (verifiedTokenSandboxInstanceId !== requestedInstanceId) {
+        return ctx.json(
+          { error: "Sandbox tunnel token sandboxInstanceId claim does not match request path." },
+          401,
+        );
       }
 
       try {

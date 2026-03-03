@@ -62,10 +62,10 @@ describe("sandbox tunnel websocket ping integration", () => {
       try {
         [sandboxSocket, clientSocket] = await Promise.all([
           connectWebSocket(
-            `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
           ),
           connectWebSocket(
-            `${fixture.websocketBaseUrl}/tunnel/sandbox?connect_token=${encodeURIComponent(connectionToken)}`,
+            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
           ),
         ]);
 

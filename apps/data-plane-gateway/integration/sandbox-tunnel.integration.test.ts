@@ -22,6 +22,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
   it(
     "accepts a valid bootstrap token and records exactly one ack",
     async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
       const jti = randomUUID();
       const token = await mintBootstrapToken({
         config: {
@@ -30,11 +31,11 @@ describe("sandbox tunnel connect endpoint integration", () => {
           tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
         },
         jti,
-        sandboxInstanceId: typeid("sbi").toString(),
+        sandboxInstanceId,
         ttlSeconds: 120,
       });
       const socket = await connectWebSocket(
-        `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(token)}`,
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(token)}`,
       );
 
       const recordedAck = await fixture.db.query.sandboxTunnelConnectAcks.findFirst({
@@ -51,6 +52,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
   it(
     "accepts a valid connection token and records exactly one ack",
     async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
       const jti = randomUUID();
       const token = await mintConnectionToken({
         config: {
@@ -59,11 +61,11 @@ describe("sandbox tunnel connect endpoint integration", () => {
           tokenAudience: fixture.config.sandbox.connect.tokenAudience,
         },
         jti,
-        sandboxInstanceId: typeid("sbi").toString(),
+        sandboxInstanceId,
         ttlSeconds: 120,
       });
       const socket = await connectWebSocket(
-        `${fixture.websocketBaseUrl}/tunnel/sandbox?connect_token=${encodeURIComponent(token)}`,
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(token)}`,
       );
 
       const recordedAck = await fixture.db.query.sandboxTunnelConnectAcks.findFirst({
@@ -103,7 +105,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
       });
 
       const failedConnect = await connectWebSocketExpectFailure(
-        `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(bootstrapToken)}&connect_token=${encodeURIComponent(connectionToken)}`,
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}&connect_token=${encodeURIComponent(connectionToken)}`,
       );
 
       expect(failedConnect.error).toBeInstanceOf(Error);
@@ -115,6 +117,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
   it(
     "rejects reconnect attempts that reuse an acknowledged bootstrap token",
     async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
       const jti = randomUUID();
       const token = await mintBootstrapToken({
         config: {
@@ -123,16 +126,16 @@ describe("sandbox tunnel connect endpoint integration", () => {
           tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
         },
         jti,
-        sandboxInstanceId: typeid("sbi").toString(),
+        sandboxInstanceId,
         ttlSeconds: 120,
       });
       const socket = await connectWebSocket(
-        `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(token)}`,
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(token)}`,
       );
       await closeWebSocket(socket);
 
       const failedConnect = await connectWebSocketExpectFailure(
-        `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(token)}`,
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(token)}`,
       );
       const recordedAcks = await fixture.db.query.sandboxTunnelConnectAcks.findMany({
         where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
@@ -148,6 +151,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
   it(
     "rejects reconnect attempts that reuse an acknowledged connection token",
     async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
       const jti = randomUUID();
       const token = await mintConnectionToken({
         config: {
@@ -156,16 +160,16 @@ describe("sandbox tunnel connect endpoint integration", () => {
           tokenAudience: fixture.config.sandbox.connect.tokenAudience,
         },
         jti,
-        sandboxInstanceId: typeid("sbi").toString(),
+        sandboxInstanceId,
         ttlSeconds: 120,
       });
       const socket = await connectWebSocket(
-        `${fixture.websocketBaseUrl}/tunnel/sandbox?connect_token=${encodeURIComponent(token)}`,
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(token)}`,
       );
       await closeWebSocket(socket);
 
       const failedConnect = await connectWebSocketExpectFailure(
-        `${fixture.websocketBaseUrl}/tunnel/sandbox?connect_token=${encodeURIComponent(token)}`,
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(token)}`,
       );
       const recordedAcks = await fixture.db.query.sandboxTunnelConnectAcks.findMany({
         where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
@@ -174,6 +178,32 @@ describe("sandbox tunnel connect endpoint integration", () => {
       expect(failedConnect.error).toBeInstanceOf(Error);
       expect(failedConnect.responseStatusCode).toBe(409);
       expect(recordedAcks).toHaveLength(1);
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "rejects token requests when path instance id does not match token sandboxInstanceId claim",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const otherSandboxInstanceId = typeid("sbi").toString();
+      const token = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      const failedConnect = await connectWebSocketExpectFailure(
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(otherSandboxInstanceId)}?connect_token=${encodeURIComponent(token)}`,
+      );
+
+      expect(failedConnect.error).toBeInstanceOf(Error);
+      expect(failedConnect.responseStatusCode).toBe(401);
     },
     IntegrationTestTimeoutMs,
   );
