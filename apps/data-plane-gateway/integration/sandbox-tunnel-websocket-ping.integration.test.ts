@@ -34,6 +34,7 @@ describe("sandbox tunnel websocket ping integration", () => {
   it(
     "accepts websocket connections for bootstrap and connection tokens and responds to ping on both",
     async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
       const bootstrapToken = await mintBootstrapToken({
         config: {
           bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
@@ -41,7 +42,7 @@ describe("sandbox tunnel websocket ping integration", () => {
           tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
         },
         jti: randomUUID(),
-        sandboxInstanceId: typeid("sbi").toString(),
+        sandboxInstanceId,
         ttlSeconds: 120,
       });
       const connectionToken = await mintConnectionToken({
@@ -51,7 +52,7 @@ describe("sandbox tunnel websocket ping integration", () => {
           tokenAudience: fixture.config.sandbox.connect.tokenAudience,
         },
         jti: randomUUID(),
-        sandboxInstanceId: typeid("sbi").toString(),
+        sandboxInstanceId,
         ttlSeconds: 120,
       });
 
