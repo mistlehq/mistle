@@ -61,7 +61,7 @@ describe("sandbox tunnel websocket ping integration", () => {
             `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
           ),
           connectWebSocket(
-            `${fixture.websocketBaseUrl}/tunnel/sandbox?token=${encodeURIComponent(connectionToken)}`,
+            `${fixture.websocketBaseUrl}/tunnel/sandbox?connect_token=${encodeURIComponent(connectionToken)}`,
           ),
         ]);
 

@@ -47,7 +47,7 @@ function toNormalizedTokenValue(token: string | null): string | undefined {
 
 function readRequestedTokenFromRequestUrl(url: URL): RequestedToken {
   const bootstrapToken = url.searchParams.get("bootstrap_token");
-  const connectionToken = url.searchParams.get("token");
+  const connectionToken = url.searchParams.get("connect_token");
   const normalizedBootstrapToken = toNormalizedTokenValue(bootstrapToken);
   const normalizedConnectionToken = toNormalizedTokenValue(connectionToken);
 
@@ -111,7 +111,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
         return ctx.json(
           {
             error:
-              "Provide exactly one auth token query param: either 'bootstrap_token' or 'token'.",
+              "Provide exactly one auth token query param: either 'bootstrap_token' or 'connect_token'.",
           },
           400,
         );

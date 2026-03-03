@@ -60,7 +60,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
         ttlSeconds: 120,
       });
       const socket = await connectWebSocket(
-        `${fixture.websocketBaseUrl}/tunnel/sandbox?token=${encodeURIComponent(token)}`,
+        `${fixture.websocketBaseUrl}/tunnel/sandbox?connect_token=${encodeURIComponent(token)}`,
       );
 
       const recordedAck = await fixture.db.query.sandboxTunnelConnectAcks.findFirst({
@@ -97,7 +97,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
       });
 
       const failedConnect = await connectWebSocketExpectFailure(
-        `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(bootstrapToken)}&token=${encodeURIComponent(connectionToken)}`,
+        `${fixture.websocketBaseUrl}/tunnel/sandbox?bootstrap_token=${encodeURIComponent(bootstrapToken)}&connect_token=${encodeURIComponent(connectionToken)}`,
       );
 
       expect(failedConnect.error).toBeInstanceOf(Error);
@@ -152,12 +152,12 @@ describe("sandbox tunnel connect endpoint integration", () => {
         ttlSeconds: 120,
       });
       const socket = await connectWebSocket(
-        `${fixture.websocketBaseUrl}/tunnel/sandbox?token=${encodeURIComponent(token)}`,
+        `${fixture.websocketBaseUrl}/tunnel/sandbox?connect_token=${encodeURIComponent(token)}`,
       );
       await closeWebSocket(socket);
 
       const failedConnect = await connectWebSocketExpectFailure(
-        `${fixture.websocketBaseUrl}/tunnel/sandbox?token=${encodeURIComponent(token)}`,
+        `${fixture.websocketBaseUrl}/tunnel/sandbox?connect_token=${encodeURIComponent(token)}`,
       );
       const recordedAcks = await fixture.db.query.sandboxTunnelConnectAcks.findMany({
         where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
