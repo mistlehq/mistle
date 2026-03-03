@@ -67,6 +67,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     const runtimePlan = await compileProfileVersionRuntimePlan(
       {
         db: fixture.db,
+        integrationsConfig: fixture.config.integrations,
       },
       {
         organizationId: authenticatedSession.organizationId,
@@ -86,19 +87,25 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(runtimePlan.version).toBe(1);
     expect(runtimePlan.egressRoutes).toHaveLength(1);
     expect(runtimePlan.artifacts).toHaveLength(1);
-    expect(runtimePlan.artifacts[0]).toMatchObject({
-      artifactKey: "codex-cli",
-      name: "Codex CLI",
-      lifecycle: {
-        install: [{ args: ["sh", "-euc"], timeoutMs: 120_000 }],
-        update: [{ args: ["sh", "-euc"], timeoutMs: 120_000 }],
-        remove: [{ args: ["rm", "-f", "/usr/local/bin/codex"] }],
-      },
-    });
+    expect(runtimePlan.artifacts[0]?.artifactKey).toBe("codex-cli");
+    expect(runtimePlan.artifacts[0]?.name).toBe("Codex CLI");
 
-    const installScript = runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[2];
+    const installCommand = runtimePlan.artifacts[0]?.lifecycle.install[0];
+    expect(installCommand?.args.slice(0, 2)).toEqual(["sh", "-euc"]);
+    expect(installCommand?.timeoutMs).toBe(120_000);
+
+    const updateCommand = runtimePlan.artifacts[0]?.lifecycle.update?.[0];
+    expect(updateCommand?.args.slice(0, 2)).toEqual(["sh", "-euc"]);
+    expect(updateCommand?.timeoutMs).toBe(120_000);
+
+    expect(runtimePlan.artifacts[0]?.lifecycle.remove).toEqual([
+      { args: ["rm", "-f", "/usr/local/bin/codex"] },
+    ]);
+
+    const installScript = installCommand?.args[2];
     expect(typeof installScript).toBe("string");
-    expect(installScript).toContain("https://github.com/openai/codex/releases/latest/download");
+    expect(installScript).toContain("repo=openai/codex");
+    expect(installScript).toContain("releases/latest/download/$asset_name");
     expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("/usr/local/bin/codex");
@@ -133,6 +140,7 @@ model_reasoning_effort = "medium"
       await compileProfileVersionRuntimePlan(
         {
           db: fixture.db,
+          integrationsConfig: fixture.config.integrations,
         },
         {
           organizationId: authenticatedSession.organizationId,
@@ -173,6 +181,7 @@ model_reasoning_effort = "medium"
       await compileProfileVersionRuntimePlan(
         {
           db: fixture.db,
+          integrationsConfig: fixture.config.integrations,
         },
         {
           organizationId: authenticatedSession.organizationId,
@@ -197,9 +206,14 @@ model_reasoning_effort = "medium"
     }
   }, 60_000);
 
-  it("fails when a binding references a missing organization connection", async ({ fixture }) => {
+  it("fails when a binding references a connection from another organization", async ({
+    fixture,
+  }) => {
     const authenticatedSession = await fixture.authSession({
       email: "integration-sandbox-profile-compile-missing-connection@example.com",
+    });
+    const inaccessibleConnectionSession = await fixture.authSession({
+      email: "integration-sandbox-profile-compile-connection-foreign-org@example.com",
     });
 
     await fixture.db.insert(sandboxProfiles).values({
@@ -211,6 +225,21 @@ model_reasoning_effort = "medium"
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_compile_missing_connection",
       version: 1,
+    });
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai-default-missing-connection",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com/v1",
+      },
+    });
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_missing",
+      organizationId: inaccessibleConnectionSession.organizationId,
+      targetKey: "openai-default-missing-connection",
+      status: IntegrationConnectionStatuses.ACTIVE,
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
       id: "ibd_compile_missing_connection",
@@ -229,6 +258,7 @@ model_reasoning_effort = "medium"
       await compileProfileVersionRuntimePlan(
         {
           db: fixture.db,
+          integrationsConfig: fixture.config.integrations,
         },
         {
           organizationId: authenticatedSession.organizationId,
@@ -255,32 +285,46 @@ model_reasoning_effort = "medium"
     }
   }, 60_000);
 
-  it("fails when a connection references a missing target", async ({ fixture }) => {
+  it("fails when a target has invalid encrypted secrets", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profile-compile-missing-target@example.com",
+      email: "integration-sandbox-profile-compile-invalid-target-secrets@example.com",
     });
 
     await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_compile_missing_target",
+      id: "sbp_compile_invalid_target_secrets",
       organizationId: authenticatedSession.organizationId,
-      displayName: "Compile Missing Target Profile",
+      displayName: "Compile Invalid Target Secrets Profile",
       status: "active",
     });
     await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_compile_missing_target",
+      sandboxProfileId: "sbp_compile_invalid_target_secrets",
       version: 1,
     });
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai-default-invalid-target-secrets",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com/v1",
+      },
+      secrets: {
+        masterKeyVersion: 999,
+        nonce: "invalid",
+        ciphertext: "invalid",
+      },
+    });
     await fixture.db.insert(integrationConnections).values({
-      id: "icn_compile_missing_target",
+      id: "icn_compile_invalid_target_secrets",
       organizationId: authenticatedSession.organizationId,
-      targetKey: "missing_target",
+      targetKey: "openai-default-invalid-target-secrets",
       status: IntegrationConnectionStatuses.ACTIVE,
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-      id: "ibd_compile_missing_target",
-      sandboxProfileId: "sbp_compile_missing_target",
+      id: "ibd_compile_invalid_target_secrets",
+      sandboxProfileId: "sbp_compile_invalid_target_secrets",
       sandboxProfileVersion: 1,
-      connectionId: "icn_compile_missing_target",
+      connectionId: "icn_compile_invalid_target_secrets",
       kind: IntegrationBindingKinds.AGENT,
       config: {
         runtime: "codex-cli",
@@ -293,10 +337,11 @@ model_reasoning_effort = "medium"
       await compileProfileVersionRuntimePlan(
         {
           db: fixture.db,
+          integrationsConfig: fixture.config.integrations,
         },
         {
           organizationId: authenticatedSession.organizationId,
-          profileId: "sbp_compile_missing_target",
+          profileId: "sbp_compile_invalid_target_secrets",
           profileVersion: 1,
           image: {
             source: "base",
@@ -312,9 +357,7 @@ model_reasoning_effort = "medium"
       expect(error).toBeInstanceOf(SandboxProfilesCompileError);
 
       if (error instanceof SandboxProfilesCompileError) {
-        expect(error.code).toBe(
-          SandboxProfilesCompileErrorCodes.INVALID_CONNECTION_TARGET_REFERENCE,
-        );
+        expect(error.code).toBe(SandboxProfilesCompileErrorCodes.INVALID_TARGET_SECRETS);
       }
     }
   }, 60_000);

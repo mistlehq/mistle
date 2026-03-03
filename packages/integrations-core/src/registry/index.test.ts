@@ -9,6 +9,7 @@ import type { IntegrationDefinition } from "../types/index.js";
 import { IntegrationRegistry } from "./index.js";
 
 const ConfigSchema = z.record(z.string(), z.unknown());
+const EmptySecretsSchema = z.object({});
 
 describe("integration registry", () => {
   it("registers and resolves definitions by family + variant", () => {
@@ -21,6 +22,7 @@ describe("integration registry", () => {
       displayName: "OpenAI",
       logoKey: "openai",
       targetConfigSchema: ConfigSchema,
+      targetSecretSchema: EmptySecretsSchema,
       bindingConfigSchema: ConfigSchema,
       supportedAuthSchemes: ["api-key"],
       triggerEventTypes: [],
@@ -50,6 +52,7 @@ describe("integration registry", () => {
       displayName: "OpenAI",
       logoKey: "openai",
       targetConfigSchema: ConfigSchema,
+      targetSecretSchema: EmptySecretsSchema,
       bindingConfigSchema: ConfigSchema,
       supportedAuthSchemes: ["api-key"],
       triggerEventTypes: [],
@@ -87,6 +90,7 @@ describe("integration registry", () => {
         displayName: "GitHub",
         logoKey: "github",
         targetConfigSchema: ConfigSchema,
+        targetSecretSchema: EmptySecretsSchema,
         bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["oauth"],
         triggerEventTypes: ["github.issue_comment.created"],
@@ -105,6 +109,7 @@ describe("integration registry", () => {
         displayName: "OpenAI",
         logoKey: "openai",
         targetConfigSchema: ConfigSchema,
+        targetSecretSchema: EmptySecretsSchema,
         bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["api-key"],
         triggerEventTypes: [],
@@ -137,6 +142,7 @@ describe("integration registry", () => {
         displayName: "OpenAI",
         logoKey: "openai",
         targetConfigSchema: ConfigSchema,
+        targetSecretSchema: EmptySecretsSchema,
         bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["api-key"],
         triggerEventTypes: [],
@@ -186,6 +192,7 @@ describe("integration registry", () => {
       displayName: "GitHub",
       logoKey: "github",
       targetConfigSchema: ConfigSchema,
+      targetSecretSchema: EmptySecretsSchema,
       bindingConfigSchema: ConfigSchema,
       supportedAuthSchemes: ["oauth", "api-key"],
       credentialResolvers: {

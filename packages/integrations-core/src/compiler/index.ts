@@ -283,6 +283,17 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
       );
     }
 
+    let parsedTargetSecrets: ReturnType<typeof definition.targetSecretSchema.parse>;
+    try {
+      parsedTargetSecrets = definition.targetSecretSchema.parse(bindingInput.target.secrets);
+    } catch (error) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.INVALID_TARGET_SECRETS,
+        `Target secrets for '${bindingInput.targetKey}' did not satisfy '${definition.familyId}::${definition.variantId}' schema.`,
+        { cause: error },
+      );
+    }
+
     let parsedBindingConfig: ReturnType<typeof definition.bindingConfigSchema.parse>;
     try {
       parsedBindingConfig = definition.bindingConfigSchema.parse(bindingInput.binding.config);
@@ -302,6 +313,7 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
       target: {
         ...bindingInput.target,
         config: parsedTargetConfig,
+        secrets: parsedTargetSecrets,
       },
       connection: bindingInput.connection,
       binding: {

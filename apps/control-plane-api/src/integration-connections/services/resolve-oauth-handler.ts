@@ -6,6 +6,7 @@ import {
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { z } from "zod";
 
+import { resolveIntegrationTargetSecrets } from "../../integration-targets/services/resolve-target-secrets.js";
 import type { AppContext } from "../../types.js";
 import {
   IntegrationConnectionsBadRequestCodes,
@@ -23,8 +24,9 @@ export type ResolvedOauthHandlerTarget = {
     variantId: string;
     enabled: true;
     config: Record<string, unknown>;
+    secrets: Record<string, string>;
   };
-  oauthHandler: IntegrationOAuthHandler<Record<string, unknown>>;
+  oauthHandler: IntegrationOAuthHandler<Record<string, unknown>, Record<string, string>>;
 };
 
 async function resolveEnabledTargetOrThrow(
@@ -47,6 +49,7 @@ async function resolveEnabledTargetOrThrow(
 
 export async function resolveOauthHandlerTargetOrThrow(
   db: AppContext["var"]["db"],
+  integrationsConfig: AppContext["var"]["config"]["integrations"],
   input: {
     targetKey: string;
     invalidInputCode:
@@ -82,19 +85,17 @@ export async function resolveOauthHandlerTargetOrThrow(
     );
   }
 
-  try {
-    const parsedConfig = definition.targetConfigSchema.parse(target.config);
+  const targetSecrets = resolveIntegrationTargetSecrets({
+    integrationsConfig,
+    target: {
+      targetKey: target.targetKey,
+      secrets: target.secrets,
+    },
+  });
 
-    return {
-      target: {
-        targetKey: target.targetKey,
-        familyId: target.familyId,
-        variantId: target.variantId,
-        enabled: true,
-        config: parsedConfig,
-      },
-      oauthHandler,
-    };
+  let parsedConfig: Record<string, unknown>;
+  try {
+    parsedConfig = definition.targetConfigSchema.parse(target.config);
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new IntegrationConnectionsBadRequestError(
@@ -105,4 +106,30 @@ export async function resolveOauthHandlerTargetOrThrow(
 
     throw error;
   }
+
+  let parsedSecrets: Record<string, string>;
+  try {
+    parsedSecrets = definition.targetSecretSchema.parse(targetSecrets);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new IntegrationConnectionsBadRequestError(
+        input.invalidInputCode,
+        `Integration target '${input.targetKey}' has invalid target secrets for '${target.familyId}/${target.variantId}'.`,
+      );
+    }
+
+    throw error;
+  }
+
+  return {
+    target: {
+      targetKey: target.targetKey,
+      familyId: target.familyId,
+      variantId: target.variantId,
+      enabled: true,
+      config: parsedConfig,
+      secrets: parsedSecrets,
+    },
+    oauthHandler,
+  };
 }

@@ -25,6 +25,7 @@ export type IntegrationTarget = {
   variantId: string;
   enabled: boolean;
   config: Record<string, unknown>;
+  secrets: Record<string, string>;
 };
 
 export type IntegrationConnectionStatus = "active" | "error" | "revoked";
@@ -59,6 +60,14 @@ export type IntegrationConfigSchema<TOutput> = {
 
 type ParsedSchemaOutput<TSchema extends IntegrationConfigSchema<unknown>> =
   TSchema extends IntegrationConfigSchema<infer TOutput> ? TOutput : never;
+
+export type IntegrationResolvedTarget<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = Omit<IntegrationTarget, "config" | "secrets"> & {
+  config: TTargetConfig;
+  secrets: TTargetSecrets;
+};
 
 export type RuntimeFileFormat = "toml" | "json" | "yaml" | "env" | "text";
 
@@ -129,12 +138,13 @@ export type CompileBindingRefs = {
 export type CompileBindingInput<
   TTargetConfig = Record<string, unknown>,
   TBindingConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
 > = {
   organizationId: string;
   sandboxProfileId: string;
   version: number;
   targetKey: string;
-  target: Omit<IntegrationTarget, "config"> & { config: TTargetConfig };
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
   connection: IntegrationConnection;
   binding: Pick<IntegrationBinding, "id" | "kind"> & { config: TBindingConfig };
   refs: CompileBindingRefs;
@@ -174,10 +184,13 @@ export type IntegrationOAuthCredentialMaterial = {
   metadata?: Record<string, unknown>;
 };
 
-export type IntegrationOAuthStartInput<TTargetConfig = Record<string, unknown>> = {
+export type IntegrationOAuthStartInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
   organizationId: string;
   targetKey: string;
-  target: Omit<IntegrationTarget, "config"> & { config: TTargetConfig };
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
   state: string;
 };
 
@@ -185,10 +198,13 @@ export type IntegrationOAuthStartResult = {
   authorizationUrl: string;
 };
 
-export type IntegrationOAuthCompleteInput<TTargetConfig = Record<string, unknown>> = {
+export type IntegrationOAuthCompleteInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
   organizationId: string;
   targetKey: string;
-  target: Omit<IntegrationTarget, "config"> & { config: TTargetConfig };
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
   query: URLSearchParams;
 };
 
@@ -198,12 +214,15 @@ export type IntegrationOAuthCompleteResult = {
   credentialMaterials: ReadonlyArray<IntegrationOAuthCredentialMaterial>;
 };
 
-export type IntegrationOAuthHandler<TTargetConfig = Record<string, unknown>> = {
+export type IntegrationOAuthHandler<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
   start(
-    input: IntegrationOAuthStartInput<TTargetConfig>,
+    input: IntegrationOAuthStartInput<TTargetConfig, TTargetSecrets>,
   ): MaybePromise<IntegrationOAuthStartResult>;
   complete(
-    input: IntegrationOAuthCompleteInput<TTargetConfig>,
+    input: IntegrationOAuthCompleteInput<TTargetConfig, TTargetSecrets>,
   ): MaybePromise<IntegrationOAuthCompleteResult>;
 };
 
@@ -224,9 +243,12 @@ export const IntegrationWebhookVerifyFailureCodes: {
   INVALID_BODY: "invalid-body",
 };
 
-export type IntegrationWebhookVerifyInput<TTargetConfig = Record<string, unknown>> = {
+export type IntegrationWebhookVerifyInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
   targetKey: string;
-  target: Omit<IntegrationTarget, "config"> & { config: TTargetConfig };
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
   headers: IntegrationWebhookHeaders;
   rawBody: Uint8Array;
 };
@@ -244,9 +266,12 @@ export type IntegrationWebhookConnectionRef = {
   externalSubjectId?: string;
 };
 
-export type IntegrationWebhookParseInput<TTargetConfig = Record<string, unknown>> = {
+export type IntegrationWebhookParseInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
   targetKey: string;
-  target: Omit<IntegrationTarget, "config"> & { config: TTargetConfig };
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
   headers: IntegrationWebhookHeaders;
   rawBody: Uint8Array;
 };
@@ -261,11 +286,16 @@ export type IntegrationWebhookEvent = {
   connectionRef: IntegrationWebhookConnectionRef;
 };
 
-export type IntegrationWebhookHandler<TTargetConfig = Record<string, unknown>> = {
+export type IntegrationWebhookHandler<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
   verify(
-    input: IntegrationWebhookVerifyInput<TTargetConfig>,
+    input: IntegrationWebhookVerifyInput<TTargetConfig, TTargetSecrets>,
   ): MaybePromise<IntegrationWebhookVerifyResult>;
-  parse(input: IntegrationWebhookParseInput<TTargetConfig>): MaybePromise<IntegrationWebhookEvent>;
+  parse(
+    input: IntegrationWebhookParseInput<TTargetConfig, TTargetSecrets>,
+  ): MaybePromise<IntegrationWebhookEvent>;
   supportedEventTypes: ReadonlyArray<string>;
 };
 
@@ -438,6 +468,9 @@ export type IntegrationDefinition<
   TTargetConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
     Record<string, unknown>
   >,
+  TTargetSecretsSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
+    Record<string, string>
+  >,
   TBindingConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
     Record<string, unknown>
   >,
@@ -449,19 +482,27 @@ export type IntegrationDefinition<
   description?: string;
   logoKey: string;
   targetConfigSchema: TTargetConfigSchema;
+  targetSecretSchema: TTargetSecretsSchema;
   bindingConfigSchema: TBindingConfigSchema;
   supportedAuthSchemes: ReadonlyArray<IntegrationSupportedAuthScheme>;
   credentialResolvers?: IntegrationCredentialResolvers;
   authHandlers?: {
-    oauth?: IntegrationOAuthHandler<ParsedSchemaOutput<TTargetConfigSchema>>;
+    oauth?: IntegrationOAuthHandler<
+      ParsedSchemaOutput<TTargetConfigSchema>,
+      ParsedSchemaOutput<TTargetSecretsSchema>
+    >;
   };
-  webhookHandler?: IntegrationWebhookHandler<ParsedSchemaOutput<TTargetConfigSchema>>;
+  webhookHandler?: IntegrationWebhookHandler<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>
+  >;
   triggerEventTypes: ReadonlyArray<string>;
   userConfigSlots: ReadonlyArray<IntegrationUserConfigSlot>;
   compileBinding(
     input: CompileBindingInput<
       ParsedSchemaOutput<TTargetConfigSchema>,
-      ParsedSchemaOutput<TBindingConfigSchema>
+      ParsedSchemaOutput<TBindingConfigSchema>,
+      ParsedSchemaOutput<TTargetSecretsSchema>
     >,
   ): CompileBindingResult;
 };

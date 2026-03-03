@@ -28,10 +28,12 @@ export function createSandboxProfilesService(
       ? {
           db: input.db,
           openWorkflow: input.openWorkflow,
+          integrationsConfig: input.integrationsConfig,
         }
       : {
           db: input.db,
           openWorkflow: input.openWorkflow,
+          integrationsConfig: input.integrationsConfig,
           mintSandboxInstanceConnectionToken: input.mintSandboxInstanceConnectionToken,
         };
 
@@ -61,6 +63,7 @@ export function createSandboxProfilesService(
       compileProfileVersionRuntimePlan(
         {
           db: input.db,
+          integrationsConfig: input.integrationsConfig,
         },
         serviceInput,
       ),

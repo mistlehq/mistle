@@ -59,16 +59,19 @@ export function normalizeWebhookHeaders(
   return normalizedHeaders;
 }
 
-export type WebhookDefinition<TTargetConfig = Record<string, unknown>> = Pick<
-  IntegrationDefinition,
-  "familyId" | "variantId"
-> & {
-  webhookHandler?: IntegrationWebhookHandler<TTargetConfig>;
+export type WebhookDefinition<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = Pick<IntegrationDefinition, "familyId" | "variantId"> & {
+  webhookHandler?: IntegrationWebhookHandler<TTargetConfig, TTargetSecrets>;
 };
 
-export function getWebhookHandlerOrThrow<TTargetConfig = Record<string, unknown>>(
-  input: WebhookDefinition<TTargetConfig>,
-): IntegrationWebhookHandler<TTargetConfig> {
+export function getWebhookHandlerOrThrow<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+>(
+  input: WebhookDefinition<TTargetConfig, TTargetSecrets>,
+): IntegrationWebhookHandler<TTargetConfig, TTargetSecrets> {
   const webhookHandler = input.webhookHandler;
   if (webhookHandler !== undefined) {
     return webhookHandler;
@@ -108,16 +111,25 @@ export function assertWebhookConnectionRefOrThrow(input: {
   );
 }
 
-export type VerifyAndParseWebhookInput<TTargetConfig = Record<string, unknown>> = {
-  definition: WebhookDefinition<TTargetConfig>;
+export type VerifyAndParseWebhookInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
+  definition: WebhookDefinition<TTargetConfig, TTargetSecrets>;
   targetKey: string;
-  target: Omit<IntegrationTarget, "config"> & { config: TTargetConfig };
+  target: Omit<IntegrationTarget, "config" | "secrets"> & {
+    config: TTargetConfig;
+    secrets: TTargetSecrets;
+  };
   headers: IntegrationWebhookHeaders;
   rawBody: Uint8Array;
 };
 
-export async function verifyAndParseWebhookOrThrow<TTargetConfig = Record<string, unknown>>(
-  input: VerifyAndParseWebhookInput<TTargetConfig>,
+export async function verifyAndParseWebhookOrThrow<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+>(
+  input: VerifyAndParseWebhookInput<TTargetConfig, TTargetSecrets>,
 ): Promise<IntegrationWebhookEvent> {
   const webhookHandler = getWebhookHandlerOrThrow(input.definition);
   const verifyResult = await webhookHandler.verify({

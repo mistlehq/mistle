@@ -55,9 +55,10 @@ async function persistOAuthSession(input: {
 
 export async function startOAuthConnection(
   db: AppContext["var"]["db"],
+  integrationsConfig: AppContext["var"]["config"]["integrations"],
   input: StartOauthConnectionInput,
 ): Promise<StartedOauthConnection> {
-  const resolved = await resolveOauthHandlerTargetOrThrow(db, {
+  const resolved = await resolveOauthHandlerTargetOrThrow(db, integrationsConfig, {
     targetKey: input.targetKey,
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_START_INPUT,
   });

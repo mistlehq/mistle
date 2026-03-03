@@ -21,6 +21,10 @@ export type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenW
 export type CreateSandboxProfilesServiceInput = {
   db: ControlPlaneDatabase;
   openWorkflow: ControlPlaneOpenWorkflow;
+  integrationsConfig: {
+    activeMasterEncryptionKeyVersion: number;
+    masterEncryptionKeys: Record<string, string>;
+  };
   mintSandboxInstanceConnectionToken?: (input: {
     organizationId: string;
     instanceId: string;

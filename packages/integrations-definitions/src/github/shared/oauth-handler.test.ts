@@ -11,6 +11,7 @@ describe("GitHubAppOAuthHandler", () => {
         familyId: "github",
         variantId: "github-cloud",
         enabled: true,
+        secrets: {},
         config: {
           apiBaseUrl: "https://api.github.com/",
           webBaseUrl: "https://github.com/",
@@ -33,6 +34,7 @@ describe("GitHubAppOAuthHandler", () => {
         familyId: "github",
         variantId: "github-enterprise-server",
         enabled: true,
+        secrets: {},
         config: {
           apiBaseUrl: "https://ghe.example.com/api/v3",
           webBaseUrl: "https://ghe.example.com/",
@@ -56,6 +58,7 @@ describe("GitHubAppOAuthHandler", () => {
           familyId: "github",
           variantId: "github-cloud",
           enabled: true,
+          secrets: {},
           config: {
             apiBaseUrl: "https://api.github.com/",
             webBaseUrl: "https://github.com/",
@@ -74,6 +77,7 @@ describe("GitHubAppOAuthHandler", () => {
         familyId: "github",
         variantId: "github-cloud",
         enabled: true,
+        secrets: {},
         config: {
           apiBaseUrl: "https://api.github.com/",
           webBaseUrl: "https://github.com/",
@@ -106,6 +110,7 @@ describe("GitHubAppOAuthHandler", () => {
           familyId: "github",
           variantId: "github-cloud",
           enabled: true,
+          secrets: {},
           config: {
             apiBaseUrl: "https://api.github.com/",
             webBaseUrl: "https://github.com/",

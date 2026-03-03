@@ -7,6 +7,7 @@ import {
 } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 
+import { resolveIntegrationTargetSecrets } from "../../integration-targets/services/resolve-target-secrets.js";
 import {
   SandboxProfilesCompileError,
   type SandboxProfilesCompileErrorCode,
@@ -42,6 +43,8 @@ function mapCompilerErrorCodeToSandboxProfilesCompileErrorCode(
       return SandboxProfilesCompileErrorCodes.KIND_MISMATCH;
     case CompilerErrorCodes.INVALID_TARGET_CONFIG:
       return SandboxProfilesCompileErrorCodes.INVALID_TARGET_CONFIG;
+    case CompilerErrorCodes.INVALID_TARGET_SECRETS:
+      return SandboxProfilesCompileErrorCodes.INVALID_TARGET_SECRETS;
     case CompilerErrorCodes.INVALID_BINDING_CONFIG:
       return SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONFIG;
     case CompilerErrorCodes.ROUTE_CONFLICT:
@@ -68,7 +71,7 @@ function normalizeConnectionConfig(
 }
 
 async function resolveCompileBindingsForVersion(
-  { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
+  { db, integrationsConfig }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig">,
   input: {
     organizationId: string;
     profileId: string;
@@ -120,6 +123,22 @@ async function resolveCompileBindingsForVersion(
       );
     }
 
+    let targetSecrets: Record<string, string>;
+    try {
+      targetSecrets = resolveIntegrationTargetSecrets({
+        integrationsConfig,
+        target: {
+          targetKey: target.targetKey,
+          secrets: target.secrets,
+        },
+      });
+    } catch {
+      throw new SandboxProfilesCompileError(
+        SandboxProfilesCompileErrorCodes.INVALID_TARGET_SECRETS,
+        `Target '${target.targetKey}' has invalid encrypted target secrets.`,
+      );
+    }
+
     return {
       targetKey: target.targetKey,
       target: {
@@ -127,6 +146,7 @@ async function resolveCompileBindingsForVersion(
         variantId: target.variantId,
         enabled: target.enabled,
         config: target.config,
+        secrets: targetSecrets,
       },
       connection: {
         id: connection.id,
@@ -147,7 +167,7 @@ async function resolveCompileBindingsForVersion(
 }
 
 export async function compileProfileVersionRuntimePlan(
-  { db }: Pick<CreateSandboxProfilesServiceInput, "db">,
+  { db, integrationsConfig }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig">,
   input: CompileProfileVersionRuntimePlanInput,
 ): Promise<CompiledRuntimePlan> {
   const sandboxProfile = await db.query.sandboxProfiles.findFirst({
@@ -183,6 +203,7 @@ export async function compileProfileVersionRuntimePlan(
   const compileBindings = await resolveCompileBindingsForVersion(
     {
       db,
+      integrationsConfig,
     },
     {
       organizationId: input.organizationId,
@@ -206,6 +227,7 @@ export async function compileProfileVersionRuntimePlan(
       : await resolveCompileBindingsForVersion(
           {
             db,
+            integrationsConfig,
           },
           {
             organizationId: input.organizationId,

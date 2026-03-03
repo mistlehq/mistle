@@ -1,6 +1,10 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
 import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
+import {
+  GitHubTargetSecretSchema,
+  type GitHubTargetSecrets,
+} from "../../shared/target-secret-schema.js";
 import { GitHubEnterpriseServerSupportedAuthSchemes } from "./auth.js";
 import {
   GitHubEnterpriseServerBindingConfigSchema,
@@ -15,6 +19,7 @@ import { GitHubEnterpriseServerTriggerEventTypes } from "./webhook.js";
 
 type GitHubEnterpriseServerIntegrationDefinition = IntegrationDefinition<
   { parse: (input: unknown) => GitHubEnterpriseServerTargetConfig },
+  { parse: (input: unknown) => GitHubTargetSecrets },
   { parse: (input: unknown) => GitHubEnterpriseServerBindingConfig }
 >;
 
@@ -26,6 +31,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   description: "GitHub Enterprise Server integration scaffold for PAT and GitHub App auth modes.",
   logoKey: "github",
   targetConfigSchema: GitHubEnterpriseServerTargetConfigSchema,
+  targetSecretSchema: GitHubTargetSecretSchema,
   bindingConfigSchema: GitHubEnterpriseServerBindingConfigSchema,
   supportedAuthSchemes: GitHubEnterpriseServerSupportedAuthSchemes,
   authHandlers: {
