@@ -19,7 +19,7 @@ import type {
 
 function createConnectionUrl(input: { gatewayWebsocketUrl: string; token: string }): string {
   const gatewayUrl = new URL(input.gatewayWebsocketUrl);
-  gatewayUrl.searchParams.set("token", input.token);
+  gatewayUrl.searchParams.set("connect_token", input.token);
 
   return gatewayUrl.toString();
 }
