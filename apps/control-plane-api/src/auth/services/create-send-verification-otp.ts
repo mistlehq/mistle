@@ -1,17 +1,11 @@
 import {
   SendVerificationOTPWorkflowSpec,
-  type SendVerificationOTPWorkflowInput,
   type createControlPlaneOpenWorkflow,
 } from "@mistle/workflows/control-plane";
+import type { EmailOTPOptions } from "better-auth/plugins";
 
-type OTPVerificationType = SendVerificationOTPWorkflowInput["type"];
 type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
-
-type SendVerificationOTPRequest = {
-  email: string;
-  otp: string;
-  type: OTPVerificationType;
-};
+type SendVerificationOTPRequest = Parameters<EmailOTPOptions["sendVerificationOTP"]>[0];
 
 type CreateSendVerificationOTPServiceInput = {
   openWorkflow: ControlPlaneOpenWorkflow;
@@ -22,6 +16,10 @@ export function createSendVerificationOTPService(input: CreateSendVerificationOT
   const { openWorkflow, expiresInSeconds } = input;
 
   return async (data: SendVerificationOTPRequest): Promise<void> => {
+    if (data.type === "change-email") {
+      throw new Error("Unsupported OTP verification type: change-email.");
+    }
+
     await openWorkflow.runWorkflow(SendVerificationOTPWorkflowSpec, {
       email: data.email,
       otp: data.otp,

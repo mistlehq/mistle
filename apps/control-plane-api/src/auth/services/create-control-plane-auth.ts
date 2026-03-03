@@ -32,9 +32,7 @@ type CreateControlPlaneAuthOptions = {
   openWorkflow: ControlPlaneOpenWorkflow;
 };
 
-export type ControlPlaneAuth = ReturnType<typeof betterAuth>;
-
-export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions): ControlPlaneAuth {
+export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
   const { config, db, openWorkflow } = options;
   const sendVerificationOTP = createSendVerificationOTPService({
     openWorkflow,
@@ -149,3 +147,5 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions): 
     ],
   });
 }
+
+export type ControlPlaneAuth = ReturnType<typeof createControlPlaneAuth>;
