@@ -1,0 +1,79 @@
+# syntax=docker/dockerfile:1.7
+
+FROM node:22-alpine AS base
+
+ENV PNPM_HOME=/pnpm
+ENV PATH=${PNPM_HOME}:${PATH}
+WORKDIR /workspace
+
+RUN corepack enable && corepack prepare pnpm@10.30.3 --activate
+
+FROM base AS source
+
+COPY . .
+
+FROM source AS control-plane-api-test-deps
+RUN pnpm install --frozen-lockfile --prod --filter @mistle/control-plane-api...
+
+FROM base AS control-plane-api-test-runtime
+COPY --from=control-plane-api-test-deps /workspace /workspace
+COPY docker/apps/control-plane-api/entrypoint.sh /usr/local/bin/mistle-control-plane-api-entrypoint
+RUN chmod +x /usr/local/bin/mistle-control-plane-api-entrypoint
+ENV MISTLE_CONFIG_PATH=/workspace/config/config.development.toml
+EXPOSE 5100
+ENTRYPOINT ["/usr/local/bin/mistle-control-plane-api-entrypoint"]
+
+FROM source AS control-plane-worker-test-deps
+RUN pnpm install --frozen-lockfile --prod --filter @mistle/control-plane-worker...
+
+FROM base AS control-plane-worker-test-runtime
+COPY --from=control-plane-worker-test-deps /workspace /workspace
+COPY docker/apps/control-plane-worker/entrypoint.sh /usr/local/bin/mistle-control-plane-worker-entrypoint
+RUN chmod +x /usr/local/bin/mistle-control-plane-worker-entrypoint
+ENV MISTLE_CONFIG_PATH=/workspace/config/config.development.toml
+EXPOSE 5101
+ENTRYPOINT ["/usr/local/bin/mistle-control-plane-worker-entrypoint"]
+
+FROM source AS data-plane-api-test-deps
+RUN pnpm install --frozen-lockfile --prod --filter @mistle/data-plane-api...
+
+FROM base AS data-plane-api-test-runtime
+COPY --from=data-plane-api-test-deps /workspace /workspace
+COPY docker/apps/data-plane-api/entrypoint.sh /usr/local/bin/mistle-data-plane-api-entrypoint
+RUN chmod +x /usr/local/bin/mistle-data-plane-api-entrypoint
+ENV MISTLE_CONFIG_PATH=/workspace/config/config.development.toml
+EXPOSE 5200
+ENTRYPOINT ["/usr/local/bin/mistle-data-plane-api-entrypoint"]
+
+FROM source AS data-plane-worker-test-deps
+RUN pnpm install --frozen-lockfile --prod --filter @mistle/data-plane-worker...
+
+FROM base AS data-plane-worker-test-runtime
+COPY --from=data-plane-worker-test-deps /workspace /workspace
+COPY docker/apps/data-plane-worker/entrypoint.sh /usr/local/bin/mistle-data-plane-worker-entrypoint
+RUN chmod +x /usr/local/bin/mistle-data-plane-worker-entrypoint
+ENV MISTLE_CONFIG_PATH=/workspace/config/config.development.toml
+EXPOSE 5201
+ENTRYPOINT ["/usr/local/bin/mistle-data-plane-worker-entrypoint"]
+
+FROM source AS data-plane-gateway-test-deps
+RUN pnpm install --frozen-lockfile --prod --filter @mistle/data-plane-gateway...
+
+FROM base AS data-plane-gateway-test-runtime
+COPY --from=data-plane-gateway-test-deps /workspace /workspace
+COPY docker/apps/data-plane-gateway/entrypoint.sh /usr/local/bin/mistle-data-plane-gateway-entrypoint
+RUN chmod +x /usr/local/bin/mistle-data-plane-gateway-entrypoint
+ENV MISTLE_CONFIG_PATH=/workspace/config/config.development.toml
+EXPOSE 5202
+ENTRYPOINT ["/usr/local/bin/mistle-data-plane-gateway-entrypoint"]
+
+FROM source AS tokenizer-proxy-test-deps
+RUN pnpm install --frozen-lockfile --prod --filter @mistle/tokenizer-proxy...
+
+FROM base AS tokenizer-proxy-test-runtime
+COPY --from=tokenizer-proxy-test-deps /workspace /workspace
+COPY docker/apps/tokenizer-proxy/entrypoint.sh /usr/local/bin/mistle-tokenizer-proxy-entrypoint
+RUN chmod +x /usr/local/bin/mistle-tokenizer-proxy-entrypoint
+ENV MISTLE_CONFIG_PATH=/workspace/config/config.development.toml
+EXPOSE 5205
+ENTRYPOINT ["/usr/local/bin/mistle-tokenizer-proxy-entrypoint"]

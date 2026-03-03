@@ -22,7 +22,11 @@ import {
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
 import { SMTPEmailSender } from "@mistle/emails";
-import { reserveAvailablePort, startMailpit, startPostgresWithPgBouncer } from "@mistle/test-core";
+import {
+  reserveAvailablePort,
+  startMailpit,
+  startPostgresWithPgBouncer,
+} from "@mistle/test-harness";
 import {
   ControlPlaneWorkerWorkflowIds,
   createControlPlaneBackend,

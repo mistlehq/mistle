@@ -2,7 +2,7 @@
  * Vitest fixture extension file intentionally uses `vitestIt.extend(...)`.
  */
 
-import { reserveAvailablePort } from "@mistle/test-core";
+import { reserveAvailablePort } from "@mistle/test-harness";
 import { it as vitestIt } from "vitest";
 
 import { createTokenizerProxyRuntime } from "../src/runtime/index.js";

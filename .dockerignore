@@ -6,6 +6,10 @@ node_modules
 **/node_modules
 **/.turbo
 **/dist
+!apps/**/dist
+!apps/**/dist/**
+!packages/**/dist
+!packages/**/dist/**
 **/coverage
 **/test-results
 **/.DS_Store

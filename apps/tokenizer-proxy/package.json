@@ -21,6 +21,6 @@
     "hono": "^4.12.3"
   },
   "devDependencies": {
-    "@mistle/test-core": "workspace:*"
+    "@mistle/test-harness": "workspace:*"
   }
 }

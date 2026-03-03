@@ -46,7 +46,7 @@
 - Import and call the app's code directly (e.g., `import { createApp } from "@mistle/control-plane-api/app.js"`)
 - Located in `apps/*/integration/` folders
 - Use real infrastructure (Postgres, etc.) but test the app as a unit
-- **Infrastructure:** Prefer Testcontainers for databases and other dependencies. Compose custom stacks using service primitives from `@mistle/test-core` (for example `startPostgresWithPgBouncer()`) or use `PostgreSqlContainer` from `@testcontainers/postgresql` directly. Start containers in test setup/`beforeAll` and stop them in teardown/`afterAll`. Only spin up what your test needs (e.g., just Postgres for database tests, Postgres + Restate for tests that need both).
+- **Infrastructure:** Prefer Testcontainers for databases and other dependencies. Compose custom stacks using service primitives from `@mistle/test-harness` (for example `startPostgresWithPgBouncer()`) or use `PostgreSqlContainer` from `@testcontainers/postgresql` directly. Start containers in test setup/`beforeAll` and stop them in teardown/`afterAll`. Only spin up what your test needs (e.g., just Postgres for database tests, Postgres + Restate for tests that need both).
 - Example: Testing auth routes by importing `createApp()` and making requests to it, verifying database state
 
 **System tests** (`*.system.test.ts`):
@@ -55,7 +55,7 @@
 - Make HTTP requests to running services (do not import service code directly)
 - Located in `tests/system/` folder
 - Require services to be running and accessible via URLs (e.g., `CONTROL_PLANE_BASE_URL`, `DATA_PLANE_BASE_URL`)
-- **Infrastructure:** Services are typically started via Testcontainers using `@mistle/test-environments` (which composes `@mistle/test-core` primitives). Tests receive service URLs via environment variables.
+- **Infrastructure:** Services are typically started via Testcontainers by composing `@mistle/test-harness` primitives (for example app launchers in `src/apps/*` plus backing services). Tests receive service URLs via environment variables.
 - Example: Testing that control-plane, data-plane, and restate services all respond to health checks
 
 **E2E tests** (`*.e2e.test.ts`):
@@ -64,7 +64,7 @@
 - Located in `tests/e2e/` for cross-cutting flows, or `apps/*/e2e/` for app-specific flows
 - Require the full stack to be running and accessible via public URLs
 - Interact with the UI as a real user would (clicking buttons, filling forms, etc.)
-- **Infrastructure:** Use `startE2eEnvironment()` from `@mistle/test-environments` for the full-stack composition. All infrastructure runs via Testcontainers.
+- **Infrastructure:** Compose full-stack dependencies using `@mistle/test-harness` and Testcontainers (or equivalent repo-level scripts) so browser tests run against real services.
 - Example: Testing the complete email OTP auth login flow from browser navigation through code verification to dashboard rendering
 
 **When to use which:**

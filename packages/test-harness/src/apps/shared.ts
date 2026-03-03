@@ -1,0 +1,454 @@
+import { createHash } from "node:crypto";
+import { stat } from "node:fs/promises";
+import { isAbsolute, relative, resolve, sep } from "node:path";
+
+import {
+  GenericContainer,
+  Network,
+  Wait,
+  type StartedNetwork,
+  type StartedTestContainer,
+} from "testcontainers";
+
+export type WorkspaceAppReadiness =
+  | {
+      kind: "http";
+      path: string;
+      expectedStatus: number;
+    }
+  | {
+      kind: "command";
+      command: string;
+    }
+  | {
+      kind: "log";
+      pattern: RegExp;
+      times: number;
+    };
+
+export type StartWorkspaceAppInput = {
+  baseImage: string;
+  projectRootHostPath: string;
+  workspaceDirInContainer: string;
+  command: readonly string[];
+  environment: Record<string, string>;
+  containerPort: number;
+  networkAlias: string;
+  startupTimeoutMs: number;
+  readiness: WorkspaceAppReadiness;
+  network?: StartedNetwork;
+};
+
+export type StartDockerTargetAppInput = {
+  buildContextHostPath: string;
+  dockerfileRelativePath: string;
+  dockerTarget: string;
+  cacheBustKey?: string;
+  buildArgs?: Record<string, string>;
+  command?: readonly string[];
+  environment: Record<string, string>;
+  containerPort: number;
+  networkAlias: string;
+  startupTimeoutMs: number;
+  readiness: WorkspaceAppReadiness;
+  network?: StartedNetwork;
+};
+
+export type StartedWorkspaceApp = {
+  host: string;
+  mappedPort: number;
+  hostBaseUrl: string;
+  containerBaseUrl: string;
+  networkAlias: string;
+  networkName: string;
+  stop: () => Promise<void>;
+};
+
+const DockerTargetImageCache = new Map<string, string>();
+
+function normalizeError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
+function validatePositiveInteger(value: number, label: string): void {
+  if (!Number.isInteger(value) || value < 1) {
+    throw new Error(`${label} must be a positive integer.`);
+  }
+}
+
+function validateNonEmpty(value: string, label: string): void {
+  if (value.length === 0) {
+    throw new Error(`${label} must be a non-empty string.`);
+  }
+}
+
+async function validateAbsoluteDirectoryPath(path: string, label: string): Promise<void> {
+  validateNonEmpty(path, label);
+
+  if (!isAbsolute(path)) {
+    throw new Error(`${label} must be an absolute path.`);
+  }
+
+  let pathStats;
+  try {
+    pathStats = await stat(path);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${label} could not be accessed: ${message}`);
+  }
+
+  if (!pathStats.isDirectory()) {
+    throw new Error(`${label} must point to a directory.`);
+  }
+}
+
+async function validateDockerfilePath(input: {
+  buildContextHostPath: string;
+  dockerfileRelativePath: string;
+}): Promise<void> {
+  validateNonEmpty(input.dockerfileRelativePath, "dockerfileRelativePath");
+
+  if (isAbsolute(input.dockerfileRelativePath)) {
+    throw new Error("dockerfileRelativePath must be relative to buildContextHostPath.");
+  }
+
+  const resolvedDockerfilePath = resolve(input.buildContextHostPath, input.dockerfileRelativePath);
+  const dockerfilePathRelativeToContext = relative(
+    input.buildContextHostPath,
+    resolvedDockerfilePath,
+  );
+
+  if (
+    dockerfilePathRelativeToContext === ".." ||
+    dockerfilePathRelativeToContext.startsWith(`..${sep}`)
+  ) {
+    throw new Error("dockerfileRelativePath must stay within buildContextHostPath.");
+  }
+
+  let dockerfileStats;
+  try {
+    dockerfileStats = await stat(resolvedDockerfilePath);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`dockerfileRelativePath could not be accessed: ${message}`);
+  }
+
+  if (!dockerfileStats.isFile()) {
+    throw new Error("dockerfileRelativePath must point to a file.");
+  }
+}
+
+function createWaitStrategy(input: {
+  readiness: WorkspaceAppReadiness;
+  containerPort: number;
+  startupTimeoutMs: number;
+}) {
+  if (input.readiness.kind === "http") {
+    if (!input.readiness.path.startsWith("/")) {
+      throw new Error("HTTP readiness path must start with '/'.");
+    }
+
+    validatePositiveInteger(input.readiness.expectedStatus, "HTTP readiness expectedStatus");
+
+    const httpWaitStrategy = Wait.forHttp(input.readiness.path, input.containerPort, {
+      abortOnContainerExit: true,
+    })
+      .forStatusCode(input.readiness.expectedStatus)
+      .withReadTimeout(input.startupTimeoutMs);
+
+    return Wait.forAll([Wait.forListeningPorts(), httpWaitStrategy]);
+  }
+
+  if (input.readiness.kind === "command") {
+    validateNonEmpty(input.readiness.command, "Command readiness command");
+    return Wait.forSuccessfulCommand(input.readiness.command);
+  }
+
+  if (input.readiness.kind === "log") {
+    validatePositiveInteger(input.readiness.times, "Log readiness times");
+    return Wait.forLogMessage(input.readiness.pattern, input.readiness.times);
+  }
+
+  throw new Error("Unsupported readiness strategy.");
+}
+
+async function cleanupResources(input: {
+  container: StartedTestContainer | undefined;
+  createdNetwork: StartedNetwork | undefined;
+}): Promise<void> {
+  if (input.container !== undefined) {
+    await input.container.stop();
+  }
+
+  if (input.createdNetwork !== undefined) {
+    await input.createdNetwork.stop();
+  }
+}
+
+async function resolveNetwork(network: StartedNetwork | undefined): Promise<{
+  network: StartedNetwork;
+  createdNetwork: StartedNetwork | undefined;
+}> {
+  if (network !== undefined) {
+    return {
+      network,
+      createdNetwork: undefined,
+    };
+  }
+
+  const createdNetwork = await new Network().start();
+  return {
+    network: createdNetwork,
+    createdNetwork,
+  };
+}
+
+function createStartedWorkspaceApp(input: {
+  container: StartedTestContainer;
+  network: StartedNetwork;
+  networkAlias: string;
+  containerPort: number;
+  createdNetwork: StartedNetwork | undefined;
+}): StartedWorkspaceApp {
+  let container: StartedTestContainer | undefined = input.container;
+  let createdNetwork: StartedNetwork | undefined = input.createdNetwork;
+  let stopped = false;
+
+  const host = input.container.getHost();
+  const mappedPort = input.container.getMappedPort(input.containerPort);
+
+  return {
+    host,
+    mappedPort,
+    hostBaseUrl: `http://${host}:${String(mappedPort)}`,
+    containerBaseUrl: `http://${input.networkAlias}:${String(input.containerPort)}`,
+    networkAlias: input.networkAlias,
+    networkName: input.network.getName(),
+    stop: async () => {
+      if (stopped) {
+        throw new Error("Workspace app container was already stopped.");
+      }
+
+      stopped = true;
+      await cleanupResources({
+        container,
+        createdNetwork,
+      });
+      container = undefined;
+      createdNetwork = undefined;
+    },
+  };
+}
+
+function toBuildArgsRecord(buildArgs: Record<string, string> | undefined): Record<string, string> {
+  if (buildArgs === undefined) {
+    return {};
+  }
+
+  return buildArgs;
+}
+
+function stringifyBuildArgs(buildArgs: Record<string, string> | undefined): string {
+  if (buildArgs === undefined) {
+    return "";
+  }
+
+  const entries = Object.entries(buildArgs).sort(([left], [right]) => left.localeCompare(right));
+  return JSON.stringify(entries);
+}
+
+function createDockerTargetImageCacheKey(input: {
+  buildContextHostPath: string;
+  dockerfileRelativePath: string;
+  dockerTarget: string;
+  cacheBustKey: string;
+  buildArgs: Record<string, string> | undefined;
+}): string {
+  return JSON.stringify({
+    buildContextHostPath: resolve(input.buildContextHostPath),
+    dockerfileRelativePath: input.dockerfileRelativePath,
+    dockerTarget: input.dockerTarget,
+    cacheBustKey: input.cacheBustKey,
+    buildArgs: stringifyBuildArgs(input.buildArgs),
+  });
+}
+
+function createDockerTargetImageName(cacheKey: string): string {
+  const digest = createHash("sha256").update(cacheKey).digest("hex").slice(0, 20);
+  return `mistle-test-target-${digest}`;
+}
+
+async function resolveDockerTargetImageName(input: {
+  buildContextHostPath: string;
+  dockerfileRelativePath: string;
+  dockerTarget: string;
+  cacheBustKey: string;
+  buildArgs: Record<string, string> | undefined;
+}): Promise<string> {
+  const cacheKey = createDockerTargetImageCacheKey(input);
+  const cachedImageName = DockerTargetImageCache.get(cacheKey);
+  if (cachedImageName !== undefined) {
+    return cachedImageName;
+  }
+
+  const imageName = createDockerTargetImageName(cacheKey);
+  await GenericContainer.fromDockerfile(input.buildContextHostPath, input.dockerfileRelativePath)
+    .withBuildArgs(toBuildArgsRecord(input.buildArgs))
+    .withTarget(input.dockerTarget)
+    .build(imageName, {
+      deleteOnExit: false,
+    });
+
+  DockerTargetImageCache.set(cacheKey, imageName);
+  return imageName;
+}
+
+export async function startWorkspaceApp(
+  input: StartWorkspaceAppInput,
+): Promise<StartedWorkspaceApp> {
+  validateNonEmpty(input.baseImage, "baseImage");
+  validateNonEmpty(input.workspaceDirInContainer, "workspaceDirInContainer");
+  validateNonEmpty(input.networkAlias, "networkAlias");
+
+  if (!input.workspaceDirInContainer.startsWith("/")) {
+    throw new Error("workspaceDirInContainer must be an absolute path inside the container.");
+  }
+
+  if (input.command.length === 0) {
+    throw new Error("command must include at least one segment.");
+  }
+
+  validatePositiveInteger(input.containerPort, "containerPort");
+  validatePositiveInteger(input.startupTimeoutMs, "startupTimeoutMs");
+
+  await validateAbsoluteDirectoryPath(input.projectRootHostPath, "projectRootHostPath");
+
+  let container: StartedTestContainer | undefined;
+
+  const { network, createdNetwork } = await resolveNetwork(input.network);
+
+  try {
+    const waitStrategy = createWaitStrategy({
+      readiness: input.readiness,
+      containerPort: input.containerPort,
+      startupTimeoutMs: input.startupTimeoutMs,
+    });
+
+    container = await new GenericContainer(input.baseImage)
+      .withBindMounts([
+        {
+          source: input.projectRootHostPath,
+          target: input.workspaceDirInContainer,
+          mode: "rw",
+        },
+      ])
+      .withWorkingDir(input.workspaceDirInContainer)
+      .withCommand([...input.command])
+      .withEnvironment(input.environment)
+      .withNetwork(network)
+      .withNetworkAliases(input.networkAlias)
+      .withExposedPorts(input.containerPort)
+      .withWaitStrategy(waitStrategy)
+      .withStartupTimeout(input.startupTimeoutMs)
+      .start();
+
+    return createStartedWorkspaceApp({
+      container,
+      network,
+      networkAlias: input.networkAlias,
+      containerPort: input.containerPort,
+      createdNetwork,
+    });
+  } catch (startupError) {
+    try {
+      await cleanupResources({
+        container,
+        createdNetwork,
+      });
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [normalizeError(startupError), normalizeError(cleanupError)],
+        "Failed to start workspace app and failed during startup cleanup.",
+      );
+    }
+
+    throw startupError;
+  }
+}
+
+export async function startDockerTargetApp(
+  input: StartDockerTargetAppInput,
+): Promise<StartedWorkspaceApp> {
+  validateNonEmpty(input.networkAlias, "networkAlias");
+  validateNonEmpty(input.dockerTarget, "dockerTarget");
+  validatePositiveInteger(input.containerPort, "containerPort");
+  validatePositiveInteger(input.startupTimeoutMs, "startupTimeoutMs");
+
+  await validateAbsoluteDirectoryPath(input.buildContextHostPath, "buildContextHostPath");
+  await validateDockerfilePath({
+    buildContextHostPath: input.buildContextHostPath,
+    dockerfileRelativePath: input.dockerfileRelativePath,
+  });
+
+  if (input.command !== undefined && input.command.length === 0) {
+    throw new Error("command must include at least one segment when provided.");
+  }
+
+  let container: StartedTestContainer | undefined;
+
+  const { network, createdNetwork } = await resolveNetwork(input.network);
+
+  try {
+    const waitStrategy = createWaitStrategy({
+      readiness: input.readiness,
+      containerPort: input.containerPort,
+      startupTimeoutMs: input.startupTimeoutMs,
+    });
+
+    const imageName = await resolveDockerTargetImageName({
+      buildContextHostPath: input.buildContextHostPath,
+      dockerfileRelativePath: input.dockerfileRelativePath,
+      dockerTarget: input.dockerTarget,
+      cacheBustKey: input.cacheBustKey ?? "",
+      buildArgs: input.buildArgs,
+    });
+
+    let containerDefinition = new GenericContainer(imageName);
+
+    containerDefinition = containerDefinition
+      .withEnvironment(input.environment)
+      .withNetwork(network)
+      .withNetworkAliases(input.networkAlias)
+      .withExposedPorts(input.containerPort)
+      .withWaitStrategy(waitStrategy)
+      .withStartupTimeout(input.startupTimeoutMs);
+
+    if (input.command !== undefined) {
+      containerDefinition = containerDefinition.withCommand([...input.command]);
+    }
+
+    container = await containerDefinition.start();
+
+    return createStartedWorkspaceApp({
+      container,
+      network,
+      networkAlias: input.networkAlias,
+      containerPort: input.containerPort,
+      createdNetwork,
+    });
+  } catch (startupError) {
+    try {
+      await cleanupResources({
+        container,
+        createdNetwork,
+      });
+    } catch (cleanupError) {
+      throw new AggregateError(
+        [normalizeError(startupError), normalizeError(cleanupError)],
+        "Failed to start Docker target app and failed during startup cleanup.",
+      );
+    }
+
+    throw startupError;
+  }
+}

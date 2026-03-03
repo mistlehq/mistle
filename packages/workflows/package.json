@@ -47,6 +47,6 @@
   },
   "devDependencies": {
     "@mistle/db": "workspace:*",
-    "@mistle/test-core": "workspace:*"
+    "@mistle/test-harness": "workspace:*"
   }
 }
