@@ -10,7 +10,7 @@ func TestValidateRuntimeClientProcessReadiness(t *testing.T) {
 		err := validateRuntimeClientProcessReadiness(
 			RuntimeClientProcessReadiness{
 				Type:      "ws",
-				URL:       "ws://127.0.0.1:4747",
+				URL:       "ws://127.0.0.1:4500",
 				TimeoutMs: 5000,
 			},
 			0,
@@ -24,7 +24,7 @@ func TestValidateRuntimeClientProcessReadiness(t *testing.T) {
 		err := validateRuntimeClientProcessReadiness(
 			RuntimeClientProcessReadiness{
 				Type:      "ws",
-				URL:       "http://127.0.0.1:4747",
+				URL:       "http://127.0.0.1:4500",
 				TimeoutMs: 5000,
 			},
 			0,
