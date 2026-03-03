@@ -1,6 +1,5 @@
-import { randomUUID } from "node:crypto";
-
 import type { SandboxAdapter } from "@mistle/sandbox";
+import { typeid } from "typeid-js";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
 import type { StartSandboxInput, StartSandboxOutput } from "./types.js";
@@ -10,7 +9,7 @@ const SandboxRuntimeTokenizerProxyEgressBaseURLEnv =
   "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 
 function createSandboxInstanceId(): string {
-  return `sbi_${randomUUID().replaceAll("-", "")}`;
+  return typeid("sbi").toString();
 }
 
 export async function startSandbox(
