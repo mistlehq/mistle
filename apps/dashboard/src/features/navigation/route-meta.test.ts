@@ -61,21 +61,22 @@ describe("route breadcrumb metadata", () => {
       },
       {
         handle: {
-          breadcrumb: "Providers",
-          breadcrumbTo: "/settings/organization/providers",
+          breadcrumb: "Integrations",
+          breadcrumbTo: "/settings/organization/integrations",
         },
         params: {},
-        pathname: "/settings/organization/providers",
+        pathname: "/settings/organization/integrations",
       },
       {
         handle: {
-          breadcrumb: ({ params }: { params: Readonly<Record<string, string | undefined>> }) =>
-            `${params["providerId"] ?? "provider"} callback`,
+          breadcrumb: ({ params }: { params: Readonly<Record<string, string | undefined>> }) => {
+            return `${params["targetKey"] ?? "integration"} callback`;
+          },
         },
         params: {
-          providerId: "github",
+          targetKey: "github",
         },
-        pathname: "/settings/organization/providers/github/callback-result",
+        pathname: "/settings/organization/integrations/github/callback-result",
       },
     ]);
 
@@ -87,8 +88,8 @@ describe("route breadcrumb metadata", () => {
       },
       {
         isCurrent: false,
-        label: "Providers",
-        to: "/settings/organization/providers",
+        label: "Integrations",
+        to: "/settings/organization/integrations",
       },
       {
         isCurrent: true,

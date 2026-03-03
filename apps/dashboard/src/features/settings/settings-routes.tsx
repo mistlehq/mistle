@@ -8,8 +8,8 @@ export type SettingsRouteElements = {
   personal: React.JSX.Element;
   organizationGeneral: React.JSX.Element;
   organizationMembers: React.JSX.Element;
-  organizationProviders: React.JSX.Element;
-  organizationProviderCallbackResult: React.JSX.Element;
+  organizationIntegrations: React.JSX.Element;
+  organizationIntegrationCallbackResult: React.JSX.Element;
 };
 
 export function createSettingsRoutes(elements: SettingsRouteElements): React.JSX.Element {
@@ -38,14 +38,14 @@ export function createSettingsRoutes(elements: SettingsRouteElements): React.JSX
         />
         <Route
           element={<RouteOutlet />}
-          handle={ROUTE_HANDLES.settingsOrganizationProviders}
-          path="providers"
+          handle={ROUTE_HANDLES.settingsOrganizationIntegrations}
+          path="integrations"
         >
-          <Route element={elements.organizationProviders} index />
+          <Route element={elements.organizationIntegrations} index />
           <Route
-            element={elements.organizationProviderCallbackResult}
-            handle={ROUTE_HANDLES.settingsOrganizationProviderCallbackResult}
-            path=":providerId/callback-result"
+            element={elements.organizationIntegrationCallbackResult}
+            handle={ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult}
+            path=":targetKey/callback-result"
           />
         </Route>
       </Route>

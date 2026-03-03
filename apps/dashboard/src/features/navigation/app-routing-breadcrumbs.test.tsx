@@ -41,14 +41,14 @@ describe("app routing breadcrumb integration", () => {
           />
           <Route
             element={<Outlet />}
-            handle={ROUTE_HANDLES.settingsOrganizationProviders}
-            path="providers"
+            handle={ROUTE_HANDLES.settingsOrganizationIntegrations}
+            path="integrations"
           >
             <Route element={<PageHarness />} index />
             <Route
               element={<PageHarness />}
-              handle={ROUTE_HANDLES.settingsOrganizationProviderCallbackResult}
-              path=":providerId/callback-result"
+              handle={ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult}
+              path=":targetKey/callback-result"
             />
           </Route>
         </Route>
@@ -89,17 +89,17 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain("Personal");
     expect(markup).toContain('data-slot="meta-description"></p>');
 
-    await router.navigate("/settings/organization/providers/github/callback-result");
+    await router.navigate("/settings/organization/integrations/github/callback-result");
     markup = renderToStaticMarkup(<RouterProvider router={router} />);
 
     expect(markup).toContain('href="/settings/organization/general"');
-    expect(markup).toContain('href="/settings/organization/providers"');
+    expect(markup).toContain('href="/settings/organization/integrations"');
     expect(markup).toContain("GitHub callback");
-    expect(markup).toContain("Provider callback result");
-    expect(markup).toContain("Review provider connection callback outcome.");
+    expect(markup).toContain("Integration callback result");
+    expect(markup).toContain("Review integration connection callback outcome.");
 
-    await router.navigate("/settings/organization/providers");
-    expect(router.state.location.pathname).toBe("/settings/organization/providers");
+    await router.navigate("/settings/organization/integrations");
+    expect(router.state.location.pathname).toBe("/settings/organization/integrations");
   });
 
   it("enforces breadcrumb and page metadata coverage for settings destinations", () => {
@@ -107,8 +107,8 @@ describe("app routing breadcrumb integration", () => {
       "/settings/personal",
       "/settings/organization/general",
       "/settings/organization/members",
-      "/settings/organization/providers",
-      "/settings/organization/providers/github/callback-result",
+      "/settings/organization/integrations",
+      "/settings/organization/integrations/github/callback-result",
     ];
 
     for (const destination of settingsDestinations) {

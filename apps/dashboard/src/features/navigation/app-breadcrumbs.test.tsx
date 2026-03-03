@@ -70,7 +70,11 @@ describe("app-breadcrumbs", () => {
               handle={{ breadcrumb: "Organization", breadcrumbClickable: false }}
               path="organization"
             >
-              <Route element={<Outlet />} handle={{ breadcrumb: "Providers" }} path="providers">
+              <Route
+                element={<Outlet />}
+                handle={{ breadcrumb: "Integrations" }}
+                path="integrations"
+              >
                 <Route
                   element={<BreadcrumbHarness />}
                   handle={{
@@ -78,9 +82,9 @@ describe("app-breadcrumbs", () => {
                       params,
                     }: {
                       params: Readonly<Record<string, string | undefined>>;
-                    }) => `${params["providerId"] ?? "provider"} callback`,
+                    }) => `${params["targetKey"] ?? "integration"} callback`,
                   }}
-                  path=":providerId/callback-result"
+                  path=":targetKey/callback-result"
                 />
               </Route>
             </Route>
@@ -88,11 +92,11 @@ describe("app-breadcrumbs", () => {
         </Route>,
       ),
       {
-        initialEntries: ["/settings/organization/providers/github/callback-result"],
+        initialEntries: ["/settings/organization/integrations/github/callback-result"],
       },
     );
 
     const markup = renderToStaticMarkup(<RouterProvider router={router} />);
-    expect(markup).toContain('href="/settings/organization/providers"');
+    expect(markup).toContain('href="/settings/organization/integrations"');
   });
 });

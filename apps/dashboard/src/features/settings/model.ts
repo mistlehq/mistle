@@ -25,9 +25,9 @@ export const SETTINGS_NAV_GROUPS: readonly SidebarNavGroup[] = [
         icon: MembersNavIcon,
       },
       {
-        to: "/settings/organization/providers",
-        label: "Providers",
-        icon: ProvidersNavIcon,
+        to: "/settings/organization/integrations",
+        label: "Integrations",
+        icon: IntegrationsNavIcon,
       },
     ],
   },
@@ -57,7 +57,7 @@ function MembersNavIcon(props: { className?: string; "aria-hidden"?: boolean }):
   return createElement(UsersIcon, props);
 }
 
-function ProvidersNavIcon(props: {
+function IntegrationsNavIcon(props: {
   className?: string;
   "aria-hidden"?: boolean;
 }): React.JSX.Element {

@@ -31,14 +31,14 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.settingsOrganizationMembers.title).toBe("Members");
     expect(ROUTE_HANDLES.settingsOrganizationMembers.description).toBe("");
 
-    expect(ROUTE_HANDLES.settingsOrganizationProviders.title).toBe("Providers");
-    expect(ROUTE_HANDLES.settingsOrganizationProviders.description).toBe("");
+    expect(ROUTE_HANDLES.settingsOrganizationIntegrations.title).toBe("Integrations");
+    expect(ROUTE_HANDLES.settingsOrganizationIntegrations.description).toBe("");
 
-    expect(ROUTE_HANDLES.settingsOrganizationProviderCallbackResult.title).toBe(
-      "Provider callback result",
+    expect(ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult.title).toBe(
+      "Integration callback result",
     );
-    expect(ROUTE_HANDLES.settingsOrganizationProviderCallbackResult.description).toBe(
-      "Review provider connection callback outcome.",
+    expect(ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult.description).toBe(
+      "Review integration connection callback outcome.",
     );
   });
 
@@ -56,18 +56,21 @@ describe("route handles", () => {
     }
   });
 
-  it("normalizes callback breadcrumb labels for known and unknown provider ids", () => {
-    const callbackBreadcrumb = ROUTE_HANDLES.settingsOrganizationProviderCallbackResult.breadcrumb;
+  it("normalizes callback breadcrumb labels for known and unknown integration target keys", () => {
+    const callbackBreadcrumb =
+      ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult.breadcrumb;
     expect(typeof callbackBreadcrumb).toBe("function");
 
     if (typeof callbackBreadcrumb !== "function") {
-      throw new Error("settingsOrganizationProviderCallbackResult breadcrumb must be a function");
+      throw new Error(
+        "settingsOrganizationIntegrationCallbackResult breadcrumb must be a function",
+      );
     }
 
-    expect(callbackBreadcrumb({ params: { providerId: "github" } })).toBe("GitHub callback");
-    expect(callbackBreadcrumb({ params: { providerId: "openai" } })).toBe("OpenAI callback");
-    expect(callbackBreadcrumb({ params: { providerId: "custom-provider_v2" } })).toBe(
-      "Custom Provider V2 callback",
+    expect(callbackBreadcrumb({ params: { targetKey: "github" } })).toBe("GitHub callback");
+    expect(callbackBreadcrumb({ params: { targetKey: "openai" } })).toBe("OpenAI callback");
+    expect(callbackBreadcrumb({ params: { targetKey: "custom-integration_v2" } })).toBe(
+      "Custom Integration V2 callback",
     );
   });
 
