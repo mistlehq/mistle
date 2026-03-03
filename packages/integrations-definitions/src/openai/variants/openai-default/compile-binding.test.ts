@@ -160,7 +160,25 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(compiled.runtimeClientSetups[0]?.files[0]?.content).not.toContain(
       "[model_providers.openai]",
     );
-    expect(compiled.runtimeClientProcesses).toEqual([]);
+    expect(compiled.runtimeClientProcesses).toEqual([
+      {
+        processKey: "codex-app-server",
+        clientId: "codex-cli",
+        command: {
+          args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
+        },
+        readiness: {
+          type: "ws",
+          url: "ws://127.0.0.1:4500",
+          timeoutMs: 5_000,
+        },
+        stop: {
+          signal: "sigterm",
+          timeoutMs: 10_000,
+          gracePeriodMs: 2_000,
+        },
+      },
+    ]);
   });
 
   it("uses target base-url host and path for custom upstreams", () => {
@@ -209,5 +227,7 @@ describe("compileOpenAiApiKeyBinding", () => {
       kind: "egress_url",
       routeId: "route_ibd_123",
     });
+    expect(compiled.runtimeClientProcesses).toHaveLength(1);
+    expect(compiled.runtimeClientProcesses[0]?.processKey).toBe("codex-app-server");
   });
 });

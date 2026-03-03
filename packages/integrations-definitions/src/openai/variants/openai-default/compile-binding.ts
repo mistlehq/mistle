@@ -11,6 +11,8 @@ export type OpenAiApiKeyCompileBindingInput = CompileBindingInput<
 
 const CodexCliArtifactKey = "codex-cli";
 const CodexCliInstallPath = "/usr/local/bin/codex";
+const CodexAppServerProcessKey = "codex-app-server";
+const CodexAppServerListenUrl = "ws://127.0.0.1:4500";
 const CodexGitHubRepository = "openai/codex";
 const CodexGitHubAssets = {
   x86_64: {
@@ -23,6 +25,9 @@ const CodexGitHubAssets = {
   },
 };
 const ArtifactCommandTimeoutMs = 120_000;
+const RuntimeClientProcessReadinessTimeoutMs = 5_000;
+const RuntimeClientProcessStopTimeoutMs = 10_000;
+const RuntimeClientProcessStopGracePeriodMs = 2_000;
 
 function resolveRoutePathPrefix(baseUrl: string): string {
   const parsedUrl = new URL(baseUrl);
@@ -120,6 +125,24 @@ export function compileOpenAiApiKeyBinding(
         ],
       },
     ],
-    runtimeClientProcesses: [],
+    runtimeClientProcesses: [
+      {
+        processKey: CodexAppServerProcessKey,
+        clientId: input.binding.config.runtime,
+        command: {
+          args: [CodexCliInstallPath, "app-server", "--listen", CodexAppServerListenUrl],
+        },
+        readiness: {
+          type: "ws",
+          url: CodexAppServerListenUrl,
+          timeoutMs: RuntimeClientProcessReadinessTimeoutMs,
+        },
+        stop: {
+          signal: "sigterm",
+          timeoutMs: RuntimeClientProcessStopTimeoutMs,
+          gracePeriodMs: RuntimeClientProcessStopGracePeriodMs,
+        },
+      },
+    ],
   };
 }
