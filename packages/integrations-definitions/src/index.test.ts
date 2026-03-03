@@ -36,6 +36,9 @@ describe("integrations-definitions index", () => {
       "webhook_secret",
     ]);
     expect(githubCloudDefinition?.authHandlers?.oauth).toBeDefined();
+    expect(
+      githubCloudDefinition?.credentialResolvers?.custom?.github_app_installation_token,
+    ).toBeDefined();
     expect(githubEnterpriseServerDefinition).toMatchObject({
       familyId: "github",
       variantId: "github-enterprise-server",
@@ -47,6 +50,9 @@ describe("integrations-definitions index", () => {
       "webhook_secret",
     ]);
     expect(githubEnterpriseServerDefinition?.authHandlers?.oauth).toBeDefined();
+    expect(
+      githubEnterpriseServerDefinition?.credentialResolvers?.custom?.github_app_installation_token,
+    ).toBeDefined();
   });
 
   it("lists registered definitions", () => {

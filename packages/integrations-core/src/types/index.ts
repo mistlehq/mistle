@@ -218,6 +218,8 @@ export type IntegrationCredentialResolverInput = {
   organizationId: string;
   targetKey: string;
   connectionId: string;
+  target: IntegrationResolvedTarget;
+  connection: IntegrationConnection;
   secretType: string;
   purpose?: string;
 };

@@ -162,6 +162,9 @@ describe("compileGitHubEnterpriseServerBinding", () => {
     });
 
     expect(compiled.egressRoutes[0]?.credentialResolver.secretType).toBe("oauth_access_token");
+    expect(compiled.egressRoutes[0]?.credentialResolver.resolverKey).toBe(
+      "github_app_installation_token",
+    );
   });
 
   it("fails fast when oauth config omits installation_id", () => {
