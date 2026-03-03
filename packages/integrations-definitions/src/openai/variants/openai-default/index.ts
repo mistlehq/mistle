@@ -11,4 +11,3 @@ export {
 } from "./binding-config-schema.js";
 export { compileOpenAiApiKeyBinding } from "./compile-binding.js";
 export { OpenAiApiKeyCredentialSecretTypes, OpenAiApiKeySupportedAuthSchemes } from "./auth.js";
-export { OpenAiApiKeyTriggerEventTypes } from "./webhook.js";

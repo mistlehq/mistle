@@ -39,7 +39,6 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
     oauth: GitHubAppOAuthHandler,
   },
   webhookHandler: GitHubEnterpriseServerWebhookHandler,
-  triggerEventTypes: [],
   userConfigSlots: [],
   userSecretSlots: GitHubUserSecretSlots,
   compileBinding: compileGitHubEnterpriseServerBinding,

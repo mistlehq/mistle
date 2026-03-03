@@ -31,7 +31,6 @@ function createOpenAiDefinition(): IntegrationDefinition<
     targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
-    triggerEventTypes: [],
     userConfigSlots: [],
     compileBinding: (input) => ({
       egressRoutes: [
@@ -155,7 +154,6 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
     targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
-    triggerEventTypes: [],
     userConfigSlots: [],
     compileBinding: () => ({
       egressRoutes: [],
@@ -209,7 +207,6 @@ function createOpenAiNoArtifactDefinition(): IntegrationDefinition<
     targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
-    triggerEventTypes: [],
     userConfigSlots: [],
     compileBinding: () => ({
       egressRoutes: [],
@@ -745,7 +742,6 @@ describe("compileRuntimePlan", () => {
       targetSecretSchema,
       bindingConfigSchema: OpenAiBindingConfigSchema,
       supportedAuthSchemes: ["api-key"],
-      triggerEventTypes: [],
       userConfigSlots: [],
       compileBinding: () => ({
         egressRoutes: [],
@@ -975,7 +971,6 @@ describe("compileRuntimePlan", () => {
       targetSecretSchema: EmptyTargetSecretsSchema,
       bindingConfigSchema,
       supportedAuthSchemes: ["api-key"],
-      triggerEventTypes: [],
       userConfigSlots: [],
       compileBinding: (input) => ({
         egressRoutes: [],

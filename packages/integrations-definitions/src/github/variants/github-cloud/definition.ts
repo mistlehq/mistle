@@ -39,7 +39,6 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
     oauth: GitHubAppOAuthHandler,
   },
   webhookHandler: GitHubCloudWebhookHandler,
-  triggerEventTypes: [],
   userConfigSlots: [],
   userSecretSlots: GitHubUserSecretSlots,
   compileBinding: compileGitHubCloudBinding,

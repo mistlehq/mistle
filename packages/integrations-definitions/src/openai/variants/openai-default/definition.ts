@@ -13,7 +13,6 @@ import {
   OpenAiApiKeyTargetConfigSchema,
   type OpenAiApiKeyTargetConfig,
 } from "./target-config-schema.js";
-import { OpenAiApiKeyTriggerEventTypes } from "./webhook.js";
 
 type OpenAiApiKeyIntegrationDefinition = IntegrationDefinition<
   { parse: (input: unknown) => OpenAiApiKeyTargetConfig },
@@ -41,7 +40,6 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   targetSecretSchema: OpenAiApiKeyTargetSecretSchema,
   bindingConfigSchema: OpenAiApiKeyBindingConfigSchema,
   supportedAuthSchemes: OpenAiApiKeySupportedAuthSchemes,
-  triggerEventTypes: OpenAiApiKeyTriggerEventTypes,
   userConfigSlots: [
     {
       kind: "file",

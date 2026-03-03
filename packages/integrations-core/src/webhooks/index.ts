@@ -85,24 +85,6 @@ export function getWebhookHandlerOrThrow<
   );
 }
 
-export function assertSupportedWebhookEventTypeOrThrow(input: {
-  eventType: string;
-  supportedEventTypes?: ReadonlyArray<string>;
-}): void {
-  if (input.supportedEventTypes === undefined) {
-    return;
-  }
-
-  if (input.supportedEventTypes.includes(input.eventType)) {
-    return;
-  }
-
-  throw createWebhookError(
-    WebhookErrorCodes.WEBHOOK_UNSUPPORTED_EVENT_TYPE,
-    `Unsupported webhook event type '${input.eventType}'.`,
-  );
-}
-
 export function assertWebhookConnectionRefOrThrow(input: {
   routeTargetKey: string;
   connectionRef: IntegrationWebhookConnectionRef;
@@ -174,13 +156,6 @@ export async function verifyAndParseWebhookOrThrow<
       WebhookErrorCodes.WEBHOOK_VERIFY_FAILED,
       `Webhook verification failed (${verifyResult.code}): ${verifyResult.message}`,
     );
-  }
-
-  if (webhookHandler.supportedEventTypes !== undefined) {
-    assertSupportedWebhookEventTypeOrThrow({
-      eventType: webhookEvent.eventType,
-      supportedEventTypes: webhookHandler.supportedEventTypes,
-    });
   }
 
   return webhookEvent;

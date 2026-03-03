@@ -25,7 +25,6 @@ describe("integration registry", () => {
       targetSecretSchema: EmptySecretsSchema,
       bindingConfigSchema: ConfigSchema,
       supportedAuthSchemes: ["api-key"],
-      triggerEventTypes: [],
       userConfigSlots: [],
       compileBinding: () => ({
         egressRoutes: [],
@@ -54,7 +53,6 @@ describe("integration registry", () => {
       targetSecretSchema: EmptySecretsSchema,
       bindingConfigSchema: ConfigSchema,
       supportedAuthSchemes: ["api-key"],
-      triggerEventTypes: [],
       userConfigSlots: [],
       compileBinding: () => ({
         egressRoutes: [],
@@ -91,7 +89,6 @@ describe("integration registry", () => {
         targetSecretSchema: EmptySecretsSchema,
         bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["oauth"],
-        triggerEventTypes: ["github.issue_comment.created"],
         userConfigSlots: [],
         compileBinding: () => ({
           egressRoutes: [],
@@ -109,7 +106,6 @@ describe("integration registry", () => {
         targetSecretSchema: EmptySecretsSchema,
         bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["api-key"],
-        triggerEventTypes: [],
         userConfigSlots: [],
         compileBinding: () => ({
           egressRoutes: [],
@@ -141,7 +137,6 @@ describe("integration registry", () => {
         targetSecretSchema: EmptySecretsSchema,
         bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["api-key"],
-        triggerEventTypes: [],
         userConfigSlots: [
           {
             kind: "env",
@@ -191,7 +186,6 @@ describe("integration registry", () => {
         targetSecretSchema: EmptySecretsSchema,
         bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["oauth"],
-        triggerEventTypes: [],
         userConfigSlots: [],
         userSecretSlots: [
           {
@@ -240,7 +234,6 @@ describe("integration registry", () => {
           },
         },
       },
-      triggerEventTypes: [],
       userConfigSlots: [],
       compileBinding: () => ({
         egressRoutes: [],

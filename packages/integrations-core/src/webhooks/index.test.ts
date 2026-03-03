@@ -29,7 +29,6 @@ function createWebhookHandler(input?: {
         externalSubjectId: "subj_123",
       },
     }),
-    supportedEventTypes: ["github.issue_comment.created"],
   };
 }
 
@@ -136,34 +135,7 @@ describe("webhook helpers", () => {
     ).rejects.toBeInstanceOf(IntegrationWebhookError);
   });
 
-  it("throws when parsed webhook event type is not supported", async () => {
-    await expect(
-      verifyAndParseWebhookOrThrow({
-        definition: {
-          familyId: "github",
-          variantId: "github-cloud",
-          webhookHandler: createWebhookHandler({
-            eventType: "github.pull_request.closed",
-          }),
-        },
-        targetKey: "github_cloud",
-        target: {
-          familyId: "github",
-          variantId: "github-cloud",
-          enabled: true,
-          config: {},
-          secrets: {},
-        },
-        resolveConnectionSecrets: () => ({}),
-        headers: {},
-        rawBody: new Uint8Array(),
-      }),
-    ).rejects.toMatchObject({
-      code: WebhookErrorCodes.WEBHOOK_UNSUPPORTED_EVENT_TYPE,
-    });
-  });
-
-  it("does not filter webhook event types when supportedEventTypes is undefined", async () => {
+  it("does not filter webhook event types", async () => {
     const webhookEvent = await verifyAndParseWebhookOrThrow({
       definition: {
         familyId: "github",
@@ -225,7 +197,6 @@ describe("webhook helpers", () => {
               externalSubjectId: "subj_789",
             },
           }),
-          supportedEventTypes: ["github.issue_comment.created"],
         },
       },
       targetKey: "github_cloud",

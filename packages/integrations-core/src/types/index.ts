@@ -361,7 +361,6 @@ export type IntegrationWebhookHandler<
   parse(
     input: IntegrationWebhookParseInput<TTargetConfig, TTargetSecrets>,
   ): MaybePromise<IntegrationWebhookEvent>;
-  supportedEventTypes?: ReadonlyArray<string>;
 };
 
 export type EgressCredentialResolverRef = {
@@ -588,7 +587,6 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetSecretsSchema>,
     Record<string, string>
   >;
-  triggerEventTypes: ReadonlyArray<string>;
   agentCapabilities?: IntegrationDefinitionAgentCapabilities;
   userConfigSlots: ReadonlyArray<IntegrationUserConfigSlot>;
   userSecretSlots?: ReadonlyArray<IntegrationUserSecretSlot>;
