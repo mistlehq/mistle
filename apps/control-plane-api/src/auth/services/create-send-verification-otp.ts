@@ -6,11 +6,12 @@ import {
 
 type OTPVerificationType = SendVerificationOTPWorkflowInput["type"];
 type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
+type BetterAuthOTPVerificationType = OTPVerificationType | "change-email";
 
 type SendVerificationOTPRequest = {
   email: string;
   otp: string;
-  type: OTPVerificationType;
+  type: BetterAuthOTPVerificationType;
 };
 
 type CreateSendVerificationOTPServiceInput = {
@@ -22,6 +23,10 @@ export function createSendVerificationOTPService(input: CreateSendVerificationOT
   const { openWorkflow, expiresInSeconds } = input;
 
   return async (data: SendVerificationOTPRequest): Promise<void> => {
+    if (data.type === "change-email") {
+      throw new Error("Unsupported OTP verification type: change-email.");
+    }
+
     await openWorkflow.runWorkflow(SendVerificationOTPWorkflowSpec, {
       email: data.email,
       otp: data.otp,
