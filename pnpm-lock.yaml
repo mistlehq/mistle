@@ -351,19 +351,22 @@ importers:
       pg:
         specifier: ^8.19.0
         version: 8.19.0
+      typeid-js:
+        specifier: ^1.2.0
+        version: 1.2.0
     devDependencies:
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
+      '@mistle/time':
+        specifier: workspace:*
+        version: link:../../packages/time
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
-      typeid-js:
-        specifier: ^1.2.0
-        version: 1.2.0
       ws:
         specifier: ^8.18.3
         version: 8.19.0

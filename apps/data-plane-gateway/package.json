@@ -23,13 +23,14 @@
     "@mistle/gateway-tunnel-auth": "workspace:*",
     "@mistle/logging": "workspace:*",
     "hono": "^4.12.3",
-    "pg": "^8.19.0"
+    "pg": "^8.19.0",
+    "typeid-js": "^1.2.0"
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
+    "@mistle/time": "workspace:*",
     "@types/pg": "^8.18.0",
     "@types/ws": "^8.18.1",
-    "typeid-js": "^1.2.0",
     "ws": "^8.18.3"
   }
 }

@@ -16,6 +16,7 @@ import {
   connectWebSocket,
   sendWebSocketMessage,
   sendWebSocketPingAndExpectPong,
+  waitForWebSocketClose,
   waitForWebSocketMessage,
 } from "./websocket-test-helpers.js";
 
@@ -146,6 +147,213 @@ describe("sandbox tunnel websocket ping integration", () => {
         await Promise.all([
           closeWebSocketIfOpen(sandboxSocket),
           closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "replaces an existing bootstrap peer with a newer one for the same sandbox instance",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const bootstrapTokenOne = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const bootstrapTokenTwo = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let firstBootstrapSocket: WebSocket | undefined;
+      let secondBootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        firstBootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapTokenOne)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const firstBootstrapClosedPromise = waitForWebSocketClose(firstBootstrapSocket);
+        secondBootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapTokenTwo)}`,
+        );
+        const firstBootstrapClosed = await firstBootstrapClosedPromise;
+
+        expect(firstBootstrapClosed.code).toBe(1012);
+        expect(firstBootstrapClosed.reason).toBe("Replaced by newer sandbox tunnel connection.");
+
+        const clientPayload = "message to replacement bootstrap socket";
+        const forwardedToReplacementPromise = waitForWebSocketMessage(secondBootstrapSocket);
+        await sendWebSocketMessage(clientSocket, clientPayload);
+        const forwardedToReplacement = await forwardedToReplacementPromise;
+
+        expect(forwardedToReplacement.isBinary).toBe(false);
+        expect(forwardedToReplacement.data).toBe(clientPayload);
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(firstBootstrapSocket),
+          closeWebSocketIfOpen(secondBootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "closes the connection peer when bootstrap peer disconnects",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        [bootstrapSocket, clientSocket] = await Promise.all([
+          connectWebSocket(
+            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+          ),
+          connectWebSocket(
+            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+          ),
+        ]);
+
+        const clientClosedPromise = waitForWebSocketClose(clientSocket);
+        await closeWebSocket(bootstrapSocket);
+        const clientClosed = await clientClosedPromise;
+
+        expect(clientClosed.code).toBe(1012);
+        expect(clientClosed.reason).toBe("Sandbox tunnel peer disconnected.");
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "keeps the bootstrap peer connected when connection peer disconnects",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const firstConnectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const secondConnectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let firstClientSocket: WebSocket | undefined;
+      let secondClientSocket: WebSocket | undefined;
+
+      try {
+        [bootstrapSocket, firstClientSocket] = await Promise.all([
+          connectWebSocket(
+            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+          ),
+          connectWebSocket(
+            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(firstConnectionToken)}`,
+          ),
+        ]);
+
+        await closeWebSocket(firstClientSocket);
+        firstClientSocket = undefined;
+
+        await sendWebSocketPingAndExpectPong(
+          bootstrapSocket,
+          Buffer.from("bootstrap-still-open", "utf8"),
+        );
+
+        secondClientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(secondConnectionToken)}`,
+        );
+
+        const reconnectPayload = "connection reattached";
+        const forwardedToBootstrapPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(secondClientSocket, reconnectPayload);
+        const forwardedToBootstrap = await forwardedToBootstrapPromise;
+
+        expect(forwardedToBootstrap.isBinary).toBe(false);
+        expect(forwardedToBootstrap.data).toBe(reconnectPayload);
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(firstClientSocket),
+          closeWebSocketIfOpen(secondClientSocket),
         ]);
       }
     },
