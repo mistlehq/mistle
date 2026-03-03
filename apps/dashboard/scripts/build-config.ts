@@ -70,7 +70,19 @@ function resolveConfigPath(
   }
 
   const workspaceRoot = resolveWorkspaceRoot();
-  return resolve(workspaceRoot, "config", `config.${dashboardBuildEnvironment}.toml`);
+  const developmentConfigPath = resolve(workspaceRoot, "config", "config.development.toml");
+  if (existsSync(developmentConfigPath)) {
+    return developmentConfigPath;
+  }
+
+  const productionConfigPath = resolve(workspaceRoot, "config", "config.production.toml");
+  if (existsSync(productionConfigPath)) {
+    return productionConfigPath;
+  }
+
+  throw new Error(
+    `Missing required dashboard config file. Set MISTLE_CONFIG_PATH or add ${developmentConfigPath} (preferred) or ${productionConfigPath}. Requested build environment: ${dashboardBuildEnvironment}.`,
+  );
 }
 
 export function loadDashboardBuildConfig(
