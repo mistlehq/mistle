@@ -135,11 +135,13 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                     },
                   });
                   const bootstrapTokenJti = randomUUID();
+                  const sandboxInstanceId = `sbi_${randomUUID().replaceAll("-", "")}`;
 
                   startedSandboxIds.push(startedSandbox.sandboxId);
                   startedBootstrapTokenJtis.push(bootstrapTokenJti);
 
                   return {
+                    sandboxInstanceId,
                     provider: startedSandbox.provider,
                     providerSandboxId: startedSandbox.sandboxId,
                     bootstrapTokenJti,
@@ -153,7 +155,6 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
               },
               sandboxInstances: {
                 createSandboxInstance: async (workflowInput) => {
-                  const sandboxInstanceId = `sbi_${randomUUID().replaceAll("-", "")}`;
                   let insertedRows: Array<{ id: string }>;
                   try {
                     insertedRows = await sql<{ id: string }[]>`
@@ -170,7 +171,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                         source
                       )
                       values (
-                        ${sandboxInstanceId},
+                        ${workflowInput.sandboxInstanceId},
                         ${workflowInput.organizationId},
                         ${workflowInput.sandboxProfileId},
                         ${workflowInput.sandboxProfileVersion},
@@ -195,7 +196,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                       )
                       values (
                         ${`srp_${randomUUID().replaceAll("-", "")}`},
-                        ${sandboxInstanceId},
+                        ${workflowInput.sandboxInstanceId},
                         ${1},
                         ${sql.json(workflowInput.runtimePlan)},
                         ${workflowInput.sandboxProfileId},

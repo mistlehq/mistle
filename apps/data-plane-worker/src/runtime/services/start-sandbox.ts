@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type { SandboxAdapter } from "@mistle/sandbox";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
@@ -7,6 +9,10 @@ import { writeSandboxStartupInput } from "./write-sandbox-startup-input.js";
 const SandboxRuntimeTokenizerProxyEgressBaseURLEnv =
   "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 
+function createSandboxInstanceId(): string {
+  return `sbi_${randomUUID().replaceAll("-", "")}`;
+}
+
 export async function startSandbox(
   deps: {
     config: DataPlaneWorkerRuntimeConfig;
@@ -14,6 +20,7 @@ export async function startSandbox(
   },
   input: StartSandboxInput,
 ): Promise<StartSandboxOutput> {
+  const sandboxInstanceId = createSandboxInstanceId();
   const startedSandbox = await deps.sandboxAdapter.start({
     image: {
       ...input.image,
@@ -32,11 +39,13 @@ export async function startSandbox(
   const bootstrapTokenJti = await writeSandboxStartupInput({
     config: deps.config,
     sandboxAdapter: deps.sandboxAdapter,
+    sandboxInstanceId,
     runtimePlan: input.runtimePlan,
     sandbox: startedSandbox,
   });
 
   return {
+    sandboxInstanceId,
     provider: startedSandbox.provider,
     providerSandboxId: startedSandbox.sandboxId,
     bootstrapTokenJti,

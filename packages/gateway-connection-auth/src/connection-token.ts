@@ -13,11 +13,13 @@ export type ConnectionTokenConfig = {
 
 export type VerifiedConnectionToken = {
   jti: string;
+  sandboxInstanceId: string;
 };
 
 export const ConnectionTokenErrorCode = {
   TOKEN_REQUIRED: "TOKEN_REQUIRED",
   JTI_REQUIRED: "JTI_REQUIRED",
+  SANDBOX_INSTANCE_ID_REQUIRED: "SANDBOX_INSTANCE_ID_REQUIRED",
   INVALID_TTL_SECONDS: "INVALID_TTL_SECONDS",
   TOKEN_EXPIRED: "TOKEN_EXPIRED",
   TOKEN_INVALID_ISSUER: "TOKEN_INVALID_ISSUER",
@@ -76,6 +78,7 @@ function mapClaimValidationErrorCode(
 export async function mintConnectionToken(input: {
   config: ConnectionTokenConfig;
   jti: string;
+  sandboxInstanceId: string;
   ttlSeconds: number;
 }): Promise<string> {
   const normalizedJti = toNonEmptyString(input.jti);
@@ -83,6 +86,13 @@ export async function mintConnectionToken(input: {
     throw new ConnectionTokenError({
       code: ConnectionTokenErrorCode.JTI_REQUIRED,
       message: "Connection token jti claim is required.",
+    });
+  }
+  const normalizedSandboxInstanceId = toNonEmptyString(input.sandboxInstanceId);
+  if (normalizedSandboxInstanceId === undefined) {
+    throw new ConnectionTokenError({
+      code: ConnectionTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED,
+      message: "Connection token sandboxInstanceId claim is required.",
     });
   }
 
@@ -96,7 +106,9 @@ export async function mintConnectionToken(input: {
   const nowEpochSeconds = Math.floor(Date.now() / 1000);
 
   try {
-    return await new SignJWT({})
+    return await new SignJWT({
+      sandboxInstanceId: normalizedSandboxInstanceId,
+    })
       .setProtectedHeader({ alg: "HS256" })
       .setJti(normalizedJti)
       .setIssuer(input.config.tokenIssuer)
@@ -126,6 +138,7 @@ export async function verifyConnectionToken(input: {
   }
 
   let payloadJti: string | undefined;
+  let payloadSandboxInstanceId: string | undefined;
   try {
     const verificationResult = await jwtVerify(
       normalizedToken,
@@ -137,6 +150,9 @@ export async function verifyConnectionToken(input: {
       },
     );
     payloadJti = verificationResult.payload.jti;
+    if (typeof verificationResult.payload.sandboxInstanceId === "string") {
+      payloadSandboxInstanceId = verificationResult.payload.sandboxInstanceId;
+    }
   } catch (error) {
     if (error instanceof JoseErrors.JWTExpired) {
       throw new ConnectionTokenError({
@@ -176,8 +192,16 @@ export async function verifyConnectionToken(input: {
       message: "Connection token jti claim is required.",
     });
   }
+  const normalizedSandboxInstanceId = toNonEmptyString(payloadSandboxInstanceId);
+  if (normalizedSandboxInstanceId === undefined) {
+    throw new ConnectionTokenError({
+      code: ConnectionTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED,
+      message: "Connection token sandboxInstanceId claim is required.",
+    });
+  }
 
   return {
     jti: normalizedJti,
+    sandboxInstanceId: normalizedSandboxInstanceId,
   };
 }

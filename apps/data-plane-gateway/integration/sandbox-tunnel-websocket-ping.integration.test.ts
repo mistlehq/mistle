@@ -40,6 +40,7 @@ describe("sandbox tunnel websocket ping integration", () => {
           tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
         },
         jti: randomUUID(),
+        sandboxInstanceId: `sbi_${randomUUID().replaceAll("-", "")}`,
         ttlSeconds: 120,
       });
       const connectionToken = await mintConnectionToken({
@@ -49,6 +50,7 @@ describe("sandbox tunnel websocket ping integration", () => {
           tokenAudience: fixture.config.sandbox.connect.tokenAudience,
         },
         jti: randomUUID(),
+        sandboxInstanceId: `sbi_${randomUUID().replaceAll("-", "")}`,
         ttlSeconds: 120,
       });
 
