@@ -21,6 +21,12 @@ afterEach(() => {
 });
 
 describe("loadDashboardBuildConfig", () => {
+  it("falls back to config/config.development.toml when MISTLE_CONFIG_PATH is unset", () => {
+    const config = loadDashboardBuildConfig({}, "production");
+
+    expect(config.controlPlaneApiOrigin).toMatch(/^https?:\/\/.+/);
+  });
+
   it("loads dashboard origin from MISTLE_CONFIG_PATH", () => {
     const directory = createTempDirectory();
     const configPath = join(directory, "config.toml");

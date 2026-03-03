@@ -14,8 +14,10 @@ Minimal dashboard scaffold using Vite + React.
 ## Dashboard Config
 
 - Build config uses the shared root config files:
-  - `config/config.development.toml` for `pnpm --filter @mistle/dashboard dev`
-  - `config/config.production.toml` for `pnpm --filter @mistle/dashboard build` and `preview`
+  - default precedence when `MISTLE_CONFIG_PATH` is unset:
+    1. `config/config.development.toml`
+    2. `config/config.production.toml`
+  - this applies for `dev`, `build`, and `preview`
 - CI should pass `MISTLE_CONFIG_PATH` (for example `config/config.ci.toml`) instead of relying on production defaults.
 - Override config file path by setting:
   - `MISTLE_CONFIG_PATH`
