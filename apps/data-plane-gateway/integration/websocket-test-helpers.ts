@@ -1,4 +1,4 @@
-import WebSocket from "ws";
+import WebSocket, { type RawData } from "ws";
 
 const ConnectTimeoutMs = 4_000;
 type UnexpectedResponse = {
@@ -81,6 +81,59 @@ export function closeWebSocket(socket: WebSocket): Promise<void> {
     });
 
     socket.close();
+  });
+}
+
+function toBuffer(data: RawData): Buffer {
+  if (Buffer.isBuffer(data)) {
+    return data;
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data);
+  }
+
+  return Buffer.concat(data);
+}
+
+export type ReceivedWebSocketMessage = {
+  data: string | Buffer;
+  isBinary: boolean;
+};
+
+export function waitForWebSocketMessage(socket: WebSocket): Promise<ReceivedWebSocketMessage> {
+  return new Promise((resolve, reject) => {
+    const onMessage = (data: RawData, isBinary: boolean): void => {
+      cleanup();
+      resolve({
+        data: isBinary ? toBuffer(data) : toBuffer(data).toString("utf8"),
+        isBinary,
+      });
+    };
+
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+
+    const cleanup = (): void => {
+      socket.off("message", onMessage);
+      socket.off("error", onError);
+    };
+
+    socket.once("message", onMessage);
+    socket.once("error", onError);
+  });
+}
+
+export function sendWebSocketMessage(socket: WebSocket, payload: string | Buffer): Promise<void> {
+  return new Promise((resolve, reject) => {
+    socket.send(payload, (error) => {
+      if (error == null) {
+        resolve();
+        return;
+      }
+      reject(error);
+    });
   });
 }
 
