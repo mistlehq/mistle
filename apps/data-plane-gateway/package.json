@@ -19,6 +19,7 @@
     "@hono/node-ws": "^1.3.0",
     "@mistle/config": "workspace:*",
     "@mistle/db": "workspace:*",
+    "@mistle/gateway-connection-auth": "workspace:*",
     "@mistle/gateway-tunnel-auth": "workspace:*",
     "@mistle/logging": "workspace:*",
     "hono": "^4.12.3",

@@ -2,12 +2,12 @@ import { sandboxTunnelConnectAcks, type DataPlaneDatabase } from "@mistle/db/dat
 
 export async function insertSandboxTunnelConnectAck(input: {
   db: DataPlaneDatabase;
-  bootstrapTokenJti: string;
+  tokenJti: string;
 }): Promise<boolean> {
   const insertedRows = await input.db
     .insert(sandboxTunnelConnectAcks)
     .values({
-      bootstrapTokenJti: input.bootstrapTokenJti,
+      bootstrapTokenJti: input.tokenJti,
     })
     .onConflictDoNothing({
       target: sandboxTunnelConnectAcks.bootstrapTokenJti,

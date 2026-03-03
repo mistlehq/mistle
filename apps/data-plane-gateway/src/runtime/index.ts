@@ -1,4 +1,5 @@
 import { createNodeWebSocket } from "@hono/node-ws";
+import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
 
 import { createApp, stopApp } from "../app.js";
@@ -24,6 +25,11 @@ export function createDataPlaneGatewayRuntime(
       tokenIssuer: config.sandbox.bootstrap.tokenIssuer,
       tokenAudience: config.sandbox.bootstrap.tokenAudience,
     } satisfies BootstrapTokenConfig,
+    connectionTokenConfig: {
+      connectionTokenSecret: config.sandbox.connect.tokenSecret,
+      tokenIssuer: config.sandbox.connect.tokenIssuer,
+      tokenAudience: config.sandbox.connect.tokenAudience,
+    } satisfies ConnectionTokenConfig,
   });
 
   let startedServer: StartedServer | undefined;
