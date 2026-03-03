@@ -2,7 +2,10 @@ import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflows/data-p
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { encodeSandboxStartupInput } from "./sandbox-startup-input.js";
+import {
+  createSandboxTunnelGatewayWsUrl,
+  encodeSandboxStartupInput,
+} from "./sandbox-startup-input.js";
 
 const Decoder = new TextDecoder();
 
@@ -215,6 +218,24 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
 }
 
 describe("encodeSandboxStartupInput", () => {
+  it("appends sandbox instance id to the tunnel gateway ws url path", () => {
+    const url = createSandboxTunnelGatewayWsUrl({
+      gatewayWebsocketUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      sandboxInstanceId: "sbi_example_001",
+    });
+
+    expect(url).toBe("ws://127.0.0.1:5003/tunnel/sandbox/sbi_example_001");
+  });
+
+  it("trims a trailing slash before appending sandbox instance id to the tunnel gateway ws url path", () => {
+    const url = createSandboxTunnelGatewayWsUrl({
+      gatewayWebsocketUrl: "ws://127.0.0.1:5003/tunnel/sandbox/",
+      sandboxInstanceId: "sbi_example_001",
+    });
+
+    expect(url).toBe("ws://127.0.0.1:5003/tunnel/sandbox/sbi_example_001");
+  });
+
   it("encodes bootstrap token, tunnel gateway ws url, and runtime plan as newline-delimited json", () => {
     const encoded = encodeSandboxStartupInput({
       bootstrapToken: "bootstrap-token-value",

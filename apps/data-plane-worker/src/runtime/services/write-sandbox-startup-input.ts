@@ -5,7 +5,10 @@ import type { SandboxAdapter, SandboxHandle } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflows/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
-import { encodeSandboxStartupInput } from "./sandbox-startup-input.js";
+import {
+  createSandboxTunnelGatewayWsUrl,
+  encodeSandboxStartupInput,
+} from "./sandbox-startup-input.js";
 
 export async function writeSandboxStartupInput(input: {
   config: DataPlaneWorkerRuntimeConfig;
@@ -30,7 +33,10 @@ export async function writeSandboxStartupInput(input: {
     await input.sandbox.writeStdin({
       payload: encodeSandboxStartupInput({
         bootstrapToken,
-        tunnelGatewayWsUrl: input.config.app.tunnel.gatewayWsUrl,
+        tunnelGatewayWsUrl: createSandboxTunnelGatewayWsUrl({
+          gatewayWebsocketUrl: input.config.app.tunnel.gatewayWsUrl,
+          sandboxInstanceId: input.sandboxInstanceId,
+        }),
         runtimePlan: input.runtimePlan,
       }),
     });

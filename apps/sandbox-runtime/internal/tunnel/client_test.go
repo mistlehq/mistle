@@ -46,8 +46,10 @@ func TestRun(t *testing.T) {
 
 	t.Run("dials websocket with bootstrap token query", func(t *testing.T) {
 		tokenQueryValues := make(chan string, 1)
+		requestPathValues := make(chan string, 1)
 		server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			tokenQueryValues <- request.URL.Query().Get(bootstrapTokenQueryParam)
+			requestPathValues <- request.URL.Path
 
 			conn, err := websocket.Accept(writer, request, nil)
 			if err != nil {
@@ -62,7 +64,7 @@ func TestRun(t *testing.T) {
 		}))
 		defer server.Close()
 
-		gatewayWSURL := "ws" + strings.TrimPrefix(server.URL, "http")
+		gatewayWSURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/tunnel/sandbox/sbi_tunnel_test_001"
 		runCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
 
@@ -86,6 +88,15 @@ func TestRun(t *testing.T) {
 			}
 		default:
 			t.Fatal("expected token query to be recorded")
+		}
+
+		select {
+		case requestPath := <-requestPathValues:
+			if requestPath != "/tunnel/sandbox/sbi_tunnel_test_001" {
+				t.Fatalf("expected request path to match, got %s", requestPath)
+			}
+		default:
+			t.Fatal("expected request path to be recorded")
 		}
 	})
 }

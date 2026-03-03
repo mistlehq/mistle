@@ -17,8 +17,17 @@ import type {
   SandboxInstanceConnectionToken,
 } from "./types.js";
 
-function createConnectionUrl(input: { gatewayWebsocketUrl: string; token: string }): string {
+function trimTrailingSlash(value: string): string {
+  return value.endsWith("/") ? value.slice(0, -1) : value;
+}
+
+function createConnectionUrl(input: {
+  gatewayWebsocketUrl: string;
+  sandboxInstanceId: string;
+  token: string;
+}): string {
   const gatewayUrl = new URL(input.gatewayWebsocketUrl);
+  gatewayUrl.pathname = `${trimTrailingSlash(gatewayUrl.pathname)}/${encodeURIComponent(input.sandboxInstanceId)}`;
   gatewayUrl.searchParams.set("connect_token", input.token);
 
   return gatewayUrl.toString();
@@ -71,6 +80,7 @@ export async function mintConnectionToken(
     instanceId: sandboxInstance.id,
     url: createConnectionUrl({
       gatewayWebsocketUrl: input.gatewayWebsocketUrl,
+      sandboxInstanceId: sandboxInstance.id,
       token,
     }),
     token,
