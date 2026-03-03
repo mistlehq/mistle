@@ -36,11 +36,10 @@ function createGitHubCloudTargetConfig(input?: { webhookSecret?: string }) {
     familyId: "github",
     variantId: "github-cloud",
     enabled: true,
-    secrets: {},
+    secrets: input?.webhookSecret === undefined ? {} : { webhook_secret: input.webhookSecret },
     config: {
       apiBaseUrl: "https://api.github.com/",
       webBaseUrl: "https://github.com/",
-      ...(input?.webhookSecret === undefined ? {} : { webhookSecret: input.webhookSecret }),
     },
   };
 }
@@ -188,7 +187,7 @@ describe("GitHubWebhookHandler", () => {
     expect(verificationResult).toEqual({
       ok: false,
       code: "invalid-body",
-      message: "GitHub webhook target config is missing webhookSecret.",
+      message: "GitHub webhook target secrets are missing webhook_secret.",
     });
   });
 

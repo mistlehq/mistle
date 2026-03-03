@@ -22,7 +22,6 @@ describe("GitHubCloudTargetConfigSchema", () => {
       app_id: 12345,
       app_slug: "mistle-app",
       client_id: "Iv1.abc123",
-      webhook_secret: "whsec_github_cloud",
     });
 
     expect(parsed).toEqual({
@@ -31,7 +30,6 @@ describe("GitHubCloudTargetConfigSchema", () => {
       appId: "12345",
       appSlug: "mistle-app",
       clientId: "Iv1.abc123",
-      webhookSecret: "whsec_github_cloud",
     });
   });
 

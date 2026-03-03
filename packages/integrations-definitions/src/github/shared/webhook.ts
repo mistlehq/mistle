@@ -161,12 +161,12 @@ async function verifyGitHubSignature(input: {
 export const GitHubWebhookHandler: IntegrationWebhookHandler<GitHubTargetConfig> = {
   supportedEventTypes: GitHubTriggerEventTypes,
   async verify(input) {
-    const webhookSecret = input.target.config.webhookSecret;
+    const webhookSecret = input.target.secrets.webhook_secret;
     if (webhookSecret === undefined || webhookSecret.length === 0) {
       return {
         ok: false,
         code: "invalid-body",
-        message: "GitHub webhook target config is missing webhookSecret.",
+        message: "GitHub webhook target secrets are missing webhook_secret.",
       };
     }
 
