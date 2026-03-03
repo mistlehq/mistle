@@ -43,6 +43,7 @@ const BadRequestCodeSchema = z.enum([
   IntegrationConnectionsBadRequestCodes.INVALID_LIST_CONNECTIONS_INPUT,
   IntegrationConnectionsBadRequestCodes.INVALID_PAGINATION_CURSOR,
   IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
+  IntegrationConnectionsBadRequestCodes.API_KEY_NOT_SUPPORTED,
   IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_START_INPUT,
   IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_COMPLETE_INPUT,
   IntegrationConnectionsBadRequestCodes.OAUTH_NOT_SUPPORTED,

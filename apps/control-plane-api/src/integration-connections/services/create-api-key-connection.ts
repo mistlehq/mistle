@@ -5,7 +5,11 @@ import {
   integrationCredentials,
   IntegrationCredentialSecretKinds,
 } from "@mistle/db/control-plane";
-import { IntegrationSupportedAuthSchemes } from "@mistle/integrations-core";
+import {
+  type IntegrationSupportedAuthScheme,
+  IntegrationSupportedAuthSchemes,
+} from "@mistle/integrations-core";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 
 import {
   encryptCredentialUtf8,
@@ -15,6 +19,7 @@ import {
 } from "../../integration-credentials/crypto.js";
 import type { AppContext } from "../../types.js";
 import {
+  IntegrationConnectionsBadRequestError,
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
   IntegrationConnectionsNotFoundError,
@@ -22,6 +27,7 @@ import {
 import { resolveConnectionUserSecretsOrThrow } from "./resolve-user-secrets.js";
 
 const API_KEY_CREDENTIAL_PURPOSE = "api_key";
+const registry = createIntegrationRegistry();
 
 export type CreateApiKeyConnectionInput = {
   organizationId: string;
@@ -41,6 +47,18 @@ type CreatedConnection = {
   updatedAt: string;
 };
 
+export function assertApiKeyAuthSchemeSupportedOrThrow(input: {
+  targetKey: string;
+  supportedAuthSchemes: ReadonlyArray<IntegrationSupportedAuthScheme>;
+}): void {
+  if (!input.supportedAuthSchemes.includes(IntegrationSupportedAuthSchemes.API_KEY)) {
+    throw new IntegrationConnectionsBadRequestError(
+      IntegrationConnectionsBadRequestCodes.API_KEY_NOT_SUPPORTED,
+      `Integration target '${input.targetKey}' does not support API-key authentication.`,
+    );
+  }
+}
+
 export async function createApiKeyConnection(
   db: AppContext["var"]["db"],
   integrationsConfig: AppContext["var"]["config"]["integrations"],
@@ -57,6 +75,22 @@ export async function createApiKeyConnection(
       `Integration target '${input.targetKey}' was not found.`,
     );
   }
+
+  const definition = registry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+  if (definition === undefined) {
+    throw new IntegrationConnectionsBadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
+      `Integration definition '${target.familyId}/${target.variantId}' is not registered.`,
+    );
+  }
+
+  assertApiKeyAuthSchemeSupportedOrThrow({
+    targetKey: input.targetKey,
+    supportedAuthSchemes: definition.supportedAuthSchemes,
+  });
 
   const organizationCredentialKey = await db.query.organizationCredentialKeys.findFirst({
     where: (table, { eq }) => eq(table.organizationId, input.organizationId),
