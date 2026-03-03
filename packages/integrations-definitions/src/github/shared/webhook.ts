@@ -5,6 +5,8 @@ import type {
 import { verify } from "@octokit/webhooks-methods";
 
 import type { GitHubTargetConfig } from "./target-config-schema.js";
+import type { GitHubTargetSecrets } from "./target-secret-schema.js";
+import type { GitHubUserSecrets } from "./user-secret-slots.js";
 
 const GitHubIssueCommentCreatedEventType = "github.issue_comment.created";
 const GitHubPullRequestCommentCreatedEventType = "github.pull_request_comment.created";
@@ -158,15 +160,19 @@ async function verifyGitHubSignature(input: {
   };
 }
 
-export const GitHubWebhookHandler: IntegrationWebhookHandler<GitHubTargetConfig> = {
+export const GitHubWebhookHandler: IntegrationWebhookHandler<
+  GitHubTargetConfig,
+  GitHubTargetSecrets,
+  GitHubUserSecrets
+> = {
   supportedEventTypes: GitHubTriggerEventTypes,
   async verify(input) {
-    const webhookSecret = input.target.secrets.webhook_secret;
+    const webhookSecret = input.connectionSecrets.webhook_secret;
     if (webhookSecret === undefined || webhookSecret.length === 0) {
       return {
         ok: false,
         code: "invalid-body",
-        message: "GitHub webhook target secrets are missing webhook_secret.",
+        message: "GitHub webhook connection secrets are missing webhook_secret.",
       };
     }
 

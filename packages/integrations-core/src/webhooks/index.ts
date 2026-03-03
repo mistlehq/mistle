@@ -62,16 +62,18 @@ export function normalizeWebhookHeaders(
 export type WebhookDefinition<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
+  TConnectionSecrets = Record<string, string>,
 > = Pick<IntegrationDefinition, "familyId" | "variantId"> & {
-  webhookHandler?: IntegrationWebhookHandler<TTargetConfig, TTargetSecrets>;
+  webhookHandler?: IntegrationWebhookHandler<TTargetConfig, TTargetSecrets, TConnectionSecrets>;
 };
 
 export function getWebhookHandlerOrThrow<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
+  TConnectionSecrets = Record<string, string>,
 >(
-  input: WebhookDefinition<TTargetConfig, TTargetSecrets>,
-): IntegrationWebhookHandler<TTargetConfig, TTargetSecrets> {
+  input: WebhookDefinition<TTargetConfig, TTargetSecrets, TConnectionSecrets>,
+): IntegrationWebhookHandler<TTargetConfig, TTargetSecrets, TConnectionSecrets> {
   const webhookHandler = input.webhookHandler;
   if (webhookHandler !== undefined) {
     return webhookHandler;
@@ -114,13 +116,17 @@ export function assertWebhookConnectionRefOrThrow(input: {
 export type VerifyAndParseWebhookInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
+  TConnectionSecrets = Record<string, string>,
 > = {
-  definition: WebhookDefinition<TTargetConfig, TTargetSecrets>;
+  definition: WebhookDefinition<TTargetConfig, TTargetSecrets, TConnectionSecrets>;
   targetKey: string;
   target: Omit<IntegrationTarget, "config" | "secrets"> & {
     config: TTargetConfig;
     secrets: TTargetSecrets;
   };
+  resolveConnectionSecrets(input: {
+    connectionRef: IntegrationWebhookConnectionRef;
+  }): TConnectionSecrets | Promise<TConnectionSecrets>;
   headers: IntegrationWebhookHeaders;
   rawBody: Uint8Array;
 };
@@ -128,13 +134,33 @@ export type VerifyAndParseWebhookInput<
 export async function verifyAndParseWebhookOrThrow<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
+  TConnectionSecrets = Record<string, string>,
 >(
-  input: VerifyAndParseWebhookInput<TTargetConfig, TTargetSecrets>,
+  input: VerifyAndParseWebhookInput<TTargetConfig, TTargetSecrets, TConnectionSecrets>,
 ): Promise<IntegrationWebhookEvent> {
   const webhookHandler = getWebhookHandlerOrThrow(input.definition);
+
+  const webhookEvent = await webhookHandler.parse({
+    targetKey: input.targetKey,
+    target: input.target,
+    headers: input.headers,
+    rawBody: input.rawBody,
+  });
+
+  assertWebhookConnectionRefOrThrow({
+    routeTargetKey: input.targetKey,
+    connectionRef: webhookEvent.connectionRef,
+  });
+
+  const connectionSecrets = await input.resolveConnectionSecrets({
+    connectionRef: webhookEvent.connectionRef,
+  });
+
   const verifyResult = await webhookHandler.verify({
     targetKey: input.targetKey,
     target: input.target,
+    connectionRef: webhookEvent.connectionRef,
+    connectionSecrets,
     headers: input.headers,
     rawBody: input.rawBody,
   });
@@ -146,21 +172,9 @@ export async function verifyAndParseWebhookOrThrow<
     );
   }
 
-  const webhookEvent = await webhookHandler.parse({
-    targetKey: input.targetKey,
-    target: input.target,
-    headers: input.headers,
-    rawBody: input.rawBody,
-  });
-
   assertSupportedWebhookEventTypeOrThrow({
     eventType: webhookEvent.eventType,
     supportedEventTypes: webhookHandler.supportedEventTypes,
-  });
-
-  assertWebhookConnectionRefOrThrow({
-    routeTargetKey: input.targetKey,
-    connectionRef: webhookEvent.connectionRef,
   });
 
   return webhookEvent;

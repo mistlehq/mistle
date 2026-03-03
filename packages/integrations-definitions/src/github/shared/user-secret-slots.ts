@@ -8,3 +8,7 @@ export const GitHubUserSecretSlots = [
     valueSchema: z.string().min(1),
   },
 ] as const;
+
+export type GitHubUserSecrets = {
+  webhook_secret?: string;
+};

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { IntegrationWebhookError, WebhookErrorCodes } from "../errors/index.js";
-import type { IntegrationWebhookHandler } from "../types/index.js";
+import type { IntegrationWebhookConnectionRef, IntegrationWebhookHandler } from "../types/index.js";
 import {
   assertWebhookConnectionRefOrThrow,
   getWebhookHandlerOrThrow,
@@ -96,6 +96,7 @@ describe("webhook helpers", () => {
         config: {},
         secrets: {},
       },
+      resolveConnectionSecrets: () => ({}),
       headers: {
         "x-event": "issue_comment",
       },
@@ -128,6 +129,7 @@ describe("webhook helpers", () => {
           config: {},
           secrets: {},
         },
+        resolveConnectionSecrets: () => ({}),
         headers: {},
         rawBody: new Uint8Array(),
       }),
@@ -152,11 +154,72 @@ describe("webhook helpers", () => {
           config: {},
           secrets: {},
         },
+        resolveConnectionSecrets: () => ({}),
         headers: {},
         rawBody: new Uint8Array(),
       }),
     ).rejects.toMatchObject({
       code: WebhookErrorCodes.WEBHOOK_UNSUPPORTED_EVENT_TYPE,
+    });
+  });
+
+  it("resolves connection secrets using parsed connectionRef before verification", async () => {
+    let resolvedConnectionRef: IntegrationWebhookConnectionRef | undefined;
+    let verifyConnectionRef: IntegrationWebhookConnectionRef | undefined;
+    let verifyConnectionSecrets: Record<string, string> | undefined;
+
+    await verifyAndParseWebhookOrThrow({
+      definition: {
+        familyId: "github",
+        variantId: "github-cloud",
+        webhookHandler: {
+          verify: (input) => {
+            verifyConnectionRef = input.connectionRef;
+            verifyConnectionSecrets = input.connectionSecrets;
+            return { ok: true };
+          },
+          parse: ({ targetKey }) => ({
+            externalEventId: "evt_123",
+            externalDeliveryId: "delivery_123",
+            providerEventType: "issue_comment",
+            eventType: "github.issue_comment.created",
+            payload: {},
+            connectionRef: {
+              targetKey,
+              externalSubjectId: "subj_789",
+            },
+          }),
+          supportedEventTypes: ["github.issue_comment.created"],
+        },
+      },
+      targetKey: "github_cloud",
+      target: {
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      resolveConnectionSecrets: ({ connectionRef }) => {
+        resolvedConnectionRef = connectionRef;
+        return {
+          webhook_secret: "whsec_123",
+        };
+      },
+      headers: {},
+      rawBody: new Uint8Array(),
+    });
+
+    expect(resolvedConnectionRef).toEqual({
+      targetKey: "github_cloud",
+      externalSubjectId: "subj_789",
+    });
+    expect(verifyConnectionRef).toEqual({
+      targetKey: "github_cloud",
+      externalSubjectId: "subj_789",
+    });
+    expect(verifyConnectionSecrets).toEqual({
+      webhook_secret: "whsec_123",
     });
   });
 

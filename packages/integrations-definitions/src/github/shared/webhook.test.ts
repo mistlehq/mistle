@@ -31,16 +31,23 @@ function encodePayload(input: unknown): Uint8Array {
   return encoder.encode(JSON.stringify(input));
 }
 
-function createGitHubCloudTargetConfig(input?: { webhookSecret?: string }) {
+function createGitHubCloudTargetConfig() {
   return {
     familyId: "github",
     variantId: "github-cloud",
     enabled: true,
-    secrets: input?.webhookSecret === undefined ? {} : { webhook_secret: input.webhookSecret },
+    secrets: {},
     config: {
       apiBaseUrl: "https://api.github.com/",
       webBaseUrl: "https://github.com/",
     },
+  };
+}
+
+function createConnectionRef() {
+  return {
+    targetKey: "github_cloud",
+    externalSubjectId: IssueCommentCreatedPayload.installation.id.toString(),
   };
 }
 
@@ -160,9 +167,11 @@ describe("GitHubWebhookHandler", () => {
 
     const verificationResult = await GitHubWebhookHandler.verify({
       targetKey: "github_cloud",
-      target: createGitHubCloudTargetConfig({
-        webhookSecret: "whsec_123",
-      }),
+      target: createGitHubCloudTargetConfig(),
+      connectionRef: createConnectionRef(),
+      connectionSecrets: {
+        webhook_secret: "whsec_123",
+      },
       headers: {
         "x-hub-signature-256": signature,
       },
@@ -178,6 +187,8 @@ describe("GitHubWebhookHandler", () => {
     const verificationResult = await GitHubWebhookHandler.verify({
       targetKey: "github_cloud",
       target: createGitHubCloudTargetConfig(),
+      connectionRef: createConnectionRef(),
+      connectionSecrets: {},
       headers: {
         "x-hub-signature-256": "sha256=invalid",
       },
@@ -187,16 +198,18 @@ describe("GitHubWebhookHandler", () => {
     expect(verificationResult).toEqual({
       ok: false,
       code: "invalid-body",
-      message: "GitHub webhook target secrets are missing webhook_secret.",
+      message: "GitHub webhook connection secrets are missing webhook_secret.",
     });
   });
 
   it("fails verification when signature header is missing", async () => {
     const verificationResult = await GitHubWebhookHandler.verify({
       targetKey: "github_cloud",
-      target: createGitHubCloudTargetConfig({
-        webhookSecret: "whsec_123",
-      }),
+      target: createGitHubCloudTargetConfig(),
+      connectionRef: createConnectionRef(),
+      connectionSecrets: {
+        webhook_secret: "whsec_123",
+      },
       headers: {},
       rawBody: encodePayload(IssueCommentCreatedPayload),
     });
@@ -211,9 +224,7 @@ describe("GitHubWebhookHandler", () => {
   it("parses issue_comment created events", async () => {
     const parsed = await GitHubWebhookHandler.parse({
       targetKey: "github_cloud",
-      target: createGitHubCloudTargetConfig({
-        webhookSecret: "whsec_123",
-      }),
+      target: createGitHubCloudTargetConfig(),
       headers: {
         "x-github-event": "issue_comment",
         "x-github-delivery": "delivery_123",
@@ -237,9 +248,7 @@ describe("GitHubWebhookHandler", () => {
   it("maps pull_request_review_comment created to pull_request_comment", async () => {
     const parsed = await GitHubWebhookHandler.parse({
       targetKey: "github_cloud",
-      target: createGitHubCloudTargetConfig({
-        webhookSecret: "whsec_123",
-      }),
+      target: createGitHubCloudTargetConfig(),
       headers: {
         "x-github-event": "pull_request_review_comment",
         "x-github-delivery": "delivery_456",
@@ -253,9 +262,7 @@ describe("GitHubWebhookHandler", () => {
   it("returns derived event type for unsupported official GitHub events", async () => {
     const parsed = await GitHubWebhookHandler.parse({
       targetKey: "github_cloud",
-      target: createGitHubCloudTargetConfig({
-        webhookSecret: "whsec_123",
-      }),
+      target: createGitHubCloudTargetConfig(),
       headers: {
         "x-github-event": "pull_request",
         "x-github-delivery": "delivery_789",
@@ -270,9 +277,7 @@ describe("GitHubWebhookHandler", () => {
     expect(() =>
       GitHubWebhookHandler.parse({
         targetKey: "github_cloud",
-        target: createGitHubCloudTargetConfig({
-          webhookSecret: "whsec_123",
-        }),
+        target: createGitHubCloudTargetConfig(),
         headers: {
           "x-github-event": "issue_comment",
         },
@@ -287,9 +292,7 @@ describe("GitHubWebhookHandler", () => {
     expect(() =>
       GitHubWebhookHandler.parse({
         targetKey: "github_cloud",
-        target: createGitHubCloudTargetConfig({
-          webhookSecret: "whsec_123",
-        }),
+        target: createGitHubCloudTargetConfig(),
         headers: {
           "x-github-event": "issue_comment",
           "x-github-delivery": "delivery_111",

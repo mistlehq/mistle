@@ -307,9 +307,12 @@ export const IntegrationWebhookVerifyFailureCodes: {
 export type IntegrationWebhookVerifyInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
+  TConnectionSecrets = Record<string, string>,
 > = {
   targetKey: string;
   target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connectionRef: IntegrationWebhookConnectionRef;
+  connectionSecrets: TConnectionSecrets;
   headers: IntegrationWebhookHeaders;
   rawBody: Uint8Array;
 };
@@ -350,9 +353,10 @@ export type IntegrationWebhookEvent = {
 export type IntegrationWebhookHandler<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
+  TConnectionSecrets = Record<string, string>,
 > = {
   verify(
-    input: IntegrationWebhookVerifyInput<TTargetConfig, TTargetSecrets>,
+    input: IntegrationWebhookVerifyInput<TTargetConfig, TTargetSecrets, TConnectionSecrets>,
   ): MaybePromise<IntegrationWebhookVerifyResult>;
   parse(
     input: IntegrationWebhookParseInput<TTargetConfig, TTargetSecrets>,
@@ -581,7 +585,8 @@ export type IntegrationDefinition<
   };
   webhookHandler?: IntegrationWebhookHandler<
     ParsedSchemaOutput<TTargetConfigSchema>,
-    ParsedSchemaOutput<TTargetSecretsSchema>
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    Record<string, string>
   >;
   triggerEventTypes: ReadonlyArray<string>;
   agentCapabilities?: IntegrationDefinitionAgentCapabilities;
