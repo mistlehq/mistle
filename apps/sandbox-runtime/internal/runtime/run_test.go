@@ -52,4 +52,28 @@ func TestRun(t *testing.T) {
 			t.Fatalf("expected runtime plan apply failure, got %v", err)
 		}
 	})
+
+	t.Run("fails when runtime client process startup fails", func(t *testing.T) {
+		startupInputJSON := `{"bootstrapToken":"test-token","tunnelGatewayWsUrl":"ws://127.0.0.1:5003/tunnel/sandbox","runtimePlan":{"sandboxProfileId":"sbp_test","version":1,"image":{"source":"base","imageRef":"mistle/sandbox-base:dev"},"egressRoutes":[],"artifacts":[],"artifactRemovals":[],"runtimeClientSetups":[],"runtimeClientProcesses":[{"processKey":"process_codex_server","clientId":"client_codex","command":{"args":["/definitely/missing/binary"],"env":{},"cwd":"","timeoutMs":0},"readiness":{"type":"none","host":"","port":0,"timeoutMs":0,"url":"","expectedStatus":0},"stop":{"signal":"sigterm","timeoutMs":1000,"gracePeriodMs":100}}]}}`
+
+		err := Run(RunInput{
+			LookupEnv: func(key string) (string, bool) {
+				switch key {
+				case config.ListenAddrEnv:
+					return ":8090", true
+				case config.TokenizerProxyEgressBaseURLEnv:
+					return "http://127.0.0.1:5004/tokenizer-proxy/egress", true
+				default:
+					return "", false
+				}
+			},
+			Stdin: bytes.NewBufferString(startupInputJSON),
+		})
+		if err == nil {
+			t.Fatal("expected error when runtime client process startup fails")
+		}
+		if !strings.Contains(err.Error(), "failed to start runtime client processes") {
+			t.Fatalf("expected runtime client process startup failure, got %v", err)
+		}
+	})
 }
