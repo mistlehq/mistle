@@ -10,6 +10,14 @@ export const IntegrationKinds: {
   CONNECTOR: "connector",
 };
 
+export type AgentCapabilityKind = "mcp";
+
+export const AgentCapabilityKinds: {
+  MCP: AgentCapabilityKind;
+} = {
+  MCP: "mcp",
+};
+
 export type IntegrationSupportedAuthScheme = "oauth" | "api-key";
 
 export const IntegrationSupportedAuthSchemes: {
@@ -139,6 +147,50 @@ export function egressUrlRef(routeId: string): EgressUrlRef {
   };
 }
 
+export type AgentCapabilityRefValue = string | EgressUrlRef;
+
+export type AgentMcpCapabilityTransport = "streamable-http" | "sse" | "stdio";
+
+export const AgentMcpCapabilityTransports: {
+  STREAMABLE_HTTP: AgentMcpCapabilityTransport;
+  SSE: AgentMcpCapabilityTransport;
+  STDIO: AgentMcpCapabilityTransport;
+} = {
+  STREAMABLE_HTTP: "streamable-http",
+  SSE: "sse",
+  STDIO: "stdio",
+};
+
+type AgentCapabilityBase = {
+  kind: AgentCapabilityKind;
+  capabilityId: string;
+  displayName?: string;
+  description?: string;
+};
+
+export type AgentMcpCapability = AgentCapabilityBase & {
+  kind: "mcp";
+  serverName: string;
+  transport: AgentMcpCapabilityTransport;
+  endpoint: AgentCapabilityRefValue;
+  headers?: Readonly<Record<string, AgentCapabilityRefValue>>;
+};
+
+export type AgentCapability = AgentMcpCapability;
+
+export type IntegrationBindingAgentCapabilitySource = {
+  bindingId: string;
+  connectionId: string;
+  targetKey: string;
+  familyId: string;
+  variantId: string;
+};
+
+export type IntegrationBindingAgentCapability = {
+  source: IntegrationBindingAgentCapabilitySource;
+  capability: AgentCapability;
+};
+
 export type CompileBindingRefs = {
   egressUrl: EgressUrlRef;
 };
@@ -155,6 +207,7 @@ export type CompileBindingInput<
   target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
   connection: IntegrationConnection;
   binding: Pick<IntegrationBinding, "id" | "kind"> & { config: TBindingConfig };
+  agentCapabilities?: ReadonlyArray<IntegrationBindingAgentCapability>;
   refs: CompileBindingRefs;
   runtimeContext: {
     sandboxdEgressBaseUrl: string;
@@ -463,6 +516,7 @@ export type CompileBindingResult = {
   artifacts: ReadonlyArray<RuntimeArtifactSpec>;
   runtimeClientSetups: ReadonlyArray<CompiledRuntimeClientSetup>;
   runtimeClientProcesses: ReadonlyArray<RuntimeClientProcessSpec>;
+  agentCapabilities?: ReadonlyArray<AgentCapability>;
 };
 
 export type CompiledBindingResult = {
@@ -470,6 +524,12 @@ export type CompiledBindingResult = {
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClientSetups: ReadonlyArray<CompiledRuntimeClientSetup>;
   runtimeClientProcesses: ReadonlyArray<RuntimeClientProcessSpec>;
+  agentCapabilities?: ReadonlyArray<IntegrationBindingAgentCapability>;
+};
+
+export type IntegrationDefinitionAgentCapabilities = {
+  advertises?: ReadonlyArray<AgentCapabilityKind>;
+  consumes?: ReadonlyArray<AgentCapabilityKind>;
 };
 
 export type IntegrationDefinition<
@@ -505,6 +565,7 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetSecretsSchema>
   >;
   triggerEventTypes: ReadonlyArray<string>;
+  agentCapabilities?: IntegrationDefinitionAgentCapabilities;
   userConfigSlots: ReadonlyArray<IntegrationUserConfigSlot>;
   userSecretSlots?: ReadonlyArray<IntegrationUserSecretSlot>;
   compileBinding(
