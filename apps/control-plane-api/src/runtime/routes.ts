@@ -4,6 +4,7 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { createAuthApp } from "../auth/app.js";
 import { createIntegrationConnectionsApp } from "../integration-connections/index.js";
 import { createIntegrationTargetsApp } from "../integration-targets/index.js";
+import { createIntegrationWebhooksApp } from "../integration-webhooks/index.js";
 import { createInternalIntegrationCredentialsApp } from "../internal-integration-credentials/index.js";
 import { createAppContextMiddleware } from "../middleware/app-context.js";
 import { createCorsMiddleware } from "../middleware/cors.js";
@@ -52,6 +53,7 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
   const internalIntegrationCredentialsApp = createInternalIntegrationCredentialsApp();
   const integrationConnectionsApp = withAuthSession(createIntegrationConnectionsApp());
   const integrationTargetsApp = withAuthSession(createIntegrationTargetsApp());
+  const integrationWebhooksApp = createIntegrationWebhooksApp();
   const organizationMembershipCapabilitiesApp = withAuthSession(
     createOrganizationMembershipCapabilitiesApp(),
   );
@@ -61,6 +63,7 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
   app.route(internalIntegrationCredentialsApp.basePath, internalIntegrationCredentialsApp.routes);
   app.route(integrationConnectionsApp.basePath, integrationConnectionsApp.routes);
   app.route(integrationTargetsApp.basePath, integrationTargetsApp.routes);
+  app.route(integrationWebhooksApp.basePath, integrationWebhooksApp.routes);
   app.route(
     organizationMembershipCapabilitiesApp.basePath,
     organizationMembershipCapabilitiesApp.routes,
