@@ -22,6 +22,7 @@ describe("GitHubEnterpriseServerTargetConfigSchema", () => {
       app_id: "9999",
       app_slug: "mistle-enterprise-app",
       client_id: "Iv1.enterprise",
+      webhook_secret: "whsec_github_enterprise",
     });
 
     expect(parsed).toEqual({
@@ -30,6 +31,7 @@ describe("GitHubEnterpriseServerTargetConfigSchema", () => {
       appId: "9999",
       appSlug: "mistle-enterprise-app",
       clientId: "Iv1.enterprise",
+      webhookSecret: "whsec_github_enterprise",
     });
   });
 

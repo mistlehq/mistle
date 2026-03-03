@@ -16,7 +16,10 @@ import {
   GitHubEnterpriseServerTargetConfigSchema,
   type GitHubEnterpriseServerTargetConfig,
 } from "./target-config-schema.js";
-import { GitHubEnterpriseServerTriggerEventTypes } from "./webhook.js";
+import {
+  GitHubEnterpriseServerTriggerEventTypes,
+  GitHubEnterpriseServerWebhookHandler,
+} from "./webhook.js";
 
 type GitHubEnterpriseServerIntegrationDefinition = IntegrationDefinition<
   { parse: (input: unknown) => GitHubEnterpriseServerTargetConfig },
@@ -38,6 +41,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   authHandlers: {
     oauth: GitHubAppOAuthHandler,
   },
+  webhookHandler: GitHubEnterpriseServerWebhookHandler,
   triggerEventTypes: GitHubEnterpriseServerTriggerEventTypes,
   userConfigSlots: [],
   userSecretSlots: GitHubUserSecretSlots,

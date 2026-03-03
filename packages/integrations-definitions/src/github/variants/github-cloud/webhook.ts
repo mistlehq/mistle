@@ -1,3 +1,4 @@
-import { GitHubTriggerEventTypes } from "../../shared/webhook.js";
+import { GitHubTriggerEventTypes, GitHubWebhookHandler } from "../../shared/webhook.js";
 
 export const GitHubCloudTriggerEventTypes = GitHubTriggerEventTypes;
+export const GitHubCloudWebhookHandler = GitHubWebhookHandler;

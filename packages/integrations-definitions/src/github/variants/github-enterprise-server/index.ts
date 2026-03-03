@@ -12,4 +12,7 @@ export {
   GitHubEnterpriseServerCredentialSecretTypes,
   GitHubEnterpriseServerSupportedAuthSchemes,
 } from "./auth.js";
-export { GitHubEnterpriseServerTriggerEventTypes } from "./webhook.js";
+export {
+  GitHubEnterpriseServerTriggerEventTypes,
+  GitHubEnterpriseServerWebhookHandler,
+} from "./webhook.js";
