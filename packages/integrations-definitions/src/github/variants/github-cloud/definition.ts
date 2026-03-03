@@ -1,6 +1,10 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
 import { GitHubFamilyId } from "../../shared/constants.js";
+import {
+  GitHubAppInstallationCredentialResolver,
+  GitHubCredentialResolverKeys,
+} from "../../shared/credential-resolver.js";
 import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
 import {
   GitHubTargetSecretSchema,
@@ -36,6 +40,12 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
   targetSecretSchema: GitHubTargetSecretSchema,
   bindingConfigSchema: GitHubCloudBindingConfigSchema,
   supportedAuthSchemes: GitHubCloudSupportedAuthSchemes,
+  credentialResolvers: {
+    custom: {
+      [GitHubCredentialResolverKeys.GITHUB_APP_INSTALLATION_TOKEN]:
+        GitHubAppInstallationCredentialResolver,
+    },
+  },
   authHandlers: {
     oauth: GitHubAppOAuthHandler,
   },

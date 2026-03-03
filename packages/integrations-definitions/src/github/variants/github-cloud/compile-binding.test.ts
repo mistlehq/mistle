@@ -207,6 +207,9 @@ describe("compileGitHubCloudBinding", () => {
     });
 
     expect(compiled.egressRoutes[0]?.credentialResolver.secretType).toBe("oauth_access_token");
+    expect(compiled.egressRoutes[0]?.credentialResolver.resolverKey).toBe(
+      "github_app_installation_token",
+    );
   });
 
   it("fails fast when connection auth_scheme is missing", () => {

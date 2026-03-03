@@ -1,6 +1,7 @@
 import {
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
+  type IntegrationTarget,
   type IntegrationCredentialSecretKind,
 } from "@mistle/db/control-plane";
 
@@ -9,6 +10,7 @@ import {
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../integration-credentials/crypto.js";
+import { resolveIntegrationTargetSecrets } from "../../integration-targets/services/resolve-target-secrets.js";
 import type { AppContext } from "../../types.js";
 import {
   InternalIntegrationCredentialsError,
@@ -35,6 +37,109 @@ type ResolvePersistedCredentialInput = {
   secretType: string;
   purpose?: string | undefined;
 };
+
+type ResolverContextConnection = {
+  id: string;
+  status: "active" | "error" | "revoked";
+  externalSubjectId?: string;
+  config: Record<string, unknown>;
+};
+
+type ResolverContextTarget = {
+  familyId: string;
+  variantId: string;
+  enabled: boolean;
+  config: Record<string, unknown>;
+  secrets: Record<string, string>;
+};
+
+function isRecord(input: unknown): input is Record<string, unknown> {
+  return typeof input === "object" && input !== null && !Array.isArray(input);
+}
+
+function resolveConnectionConfigOrThrow(input: {
+  connectionId: string;
+  config: unknown;
+}): Record<string, unknown> {
+  if (!isRecord(input.config)) {
+    throw new Error(`Integration connection '${input.connectionId}' has invalid config.`);
+  }
+
+  return input.config;
+}
+
+function resolveResolverContextConnection(input: {
+  id: string;
+  status: "active" | "error" | "revoked";
+  externalSubjectId: string | null;
+  config: unknown;
+}): ResolverContextConnection {
+  const config = resolveConnectionConfigOrThrow({
+    connectionId: input.id,
+    config: input.config,
+  });
+
+  return {
+    id: input.id,
+    status: input.status,
+    config,
+    ...(input.externalSubjectId === null ? {} : { externalSubjectId: input.externalSubjectId }),
+  };
+}
+
+function resolveResolverContextTarget(input: {
+  target: Pick<
+    IntegrationTarget,
+    "targetKey" | "familyId" | "variantId" | "enabled" | "config" | "secrets"
+  >;
+  definition: {
+    targetConfigSchema: {
+      parse: (input: unknown) => unknown;
+    };
+    targetSecretSchema: {
+      parse: (input: unknown) => unknown;
+    };
+  };
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+}): ResolverContextTarget {
+  const parsedTargetConfig = input.definition.targetConfigSchema.parse(input.target.config);
+  if (!isRecord(parsedTargetConfig)) {
+    throw new Error(
+      `Integration target '${input.target.targetKey}' has invalid parsed target config.`,
+    );
+  }
+
+  const decryptedTargetSecrets = resolveIntegrationTargetSecrets({
+    integrationsConfig: input.integrationsConfig,
+    target: {
+      targetKey: input.target.targetKey,
+      secrets: input.target.secrets,
+    },
+  });
+  const parsedTargetSecrets = input.definition.targetSecretSchema.parse(decryptedTargetSecrets);
+  if (!isRecord(parsedTargetSecrets)) {
+    throw new Error(
+      `Integration target '${input.target.targetKey}' has invalid parsed target secrets.`,
+    );
+  }
+
+  const normalizedTargetSecrets: Record<string, string> = {};
+  for (const [key, value] of Object.entries(parsedTargetSecrets)) {
+    if (typeof value !== "string") {
+      throw new Error(`Integration target '${input.target.targetKey}' secrets must be strings.`);
+    }
+
+    normalizedTargetSecrets[key] = value;
+  }
+
+  return {
+    familyId: input.target.familyId,
+    variantId: input.target.variantId,
+    enabled: input.target.enabled,
+    config: parsedTargetConfig,
+    secrets: normalizedTargetSecrets,
+  };
+}
 
 function parsePersistedSecretType(secretType: string): IntegrationCredentialSecretKind | undefined {
   if (secretType === IntegrationCredentialSecretKinds.API_KEY) {
@@ -182,6 +287,8 @@ export async function resolveIntegrationCredential(
       organizationId: true,
       targetKey: true,
       status: true,
+      externalSubjectId: true,
+      config: true,
     },
     where: (table, { eq }) => eq(table.id, input.connectionId),
   });
@@ -204,8 +311,12 @@ export async function resolveIntegrationCredential(
 
   const target = await db.query.integrationTargets.findFirst({
     columns: {
+      targetKey: true,
       familyId: true,
       variantId: true,
+      enabled: true,
+      config: true,
+      secrets: true,
     },
     where: (table, { eq }) => eq(table.targetKey, connection.targetKey),
   });
@@ -235,10 +346,24 @@ export async function resolveIntegrationCredential(
       );
     }
 
+    const targetResolverContext = resolveResolverContextTarget({
+      target,
+      definition,
+      integrationsConfig,
+    });
+    const connectionResolverContext = resolveResolverContextConnection({
+      id: connection.id,
+      status: connection.status,
+      externalSubjectId: connection.externalSubjectId,
+      config: connection.config,
+    });
+
     return customResolver.resolve({
       organizationId: connection.organizationId,
       targetKey: connection.targetKey,
       connectionId: connection.id,
+      target: targetResolverContext,
+      connection: connectionResolverContext,
       secretType: input.secretType,
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     });
@@ -246,10 +371,24 @@ export async function resolveIntegrationCredential(
 
   const defaultResolver = definition.credentialResolvers?.default;
   if (defaultResolver !== undefined) {
+    const targetResolverContext = resolveResolverContextTarget({
+      target,
+      definition,
+      integrationsConfig,
+    });
+    const connectionResolverContext = resolveResolverContextConnection({
+      id: connection.id,
+      status: connection.status,
+      externalSubjectId: connection.externalSubjectId,
+      config: connection.config,
+    });
+
     return defaultResolver.resolve({
       organizationId: connection.organizationId,
       targetKey: connection.targetKey,
       connectionId: connection.id,
+      target: targetResolverContext,
+      connection: connectionResolverContext,
       secretType: input.secretType,
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     });

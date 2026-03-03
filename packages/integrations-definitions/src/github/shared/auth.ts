@@ -14,14 +14,18 @@ export const GitHubSupportedAuthSchemes = [
   IntegrationSupportedAuthSchemes.OAUTH,
 ];
 
-const GitHubApiKeyConnectionConfigSchema = z.looseObject({
-  auth_scheme: z.literal(IntegrationSupportedAuthSchemes.API_KEY),
-});
+const GitHubApiKeyConnectionConfigSchema = z
+  .object({
+    auth_scheme: z.literal(IntegrationSupportedAuthSchemes.API_KEY),
+  })
+  .loose();
 
-const GitHubOAuthConnectionConfigSchema = z.looseObject({
-  auth_scheme: z.literal(IntegrationSupportedAuthSchemes.OAUTH),
-  installation_id: z.union([z.string().min(1), z.number().int().nonnegative()]),
-});
+const GitHubOAuthConnectionConfigSchema = z
+  .object({
+    auth_scheme: z.literal(IntegrationSupportedAuthSchemes.OAUTH),
+    installation_id: z.union([z.string().min(1), z.number().int().nonnegative()]),
+  })
+  .loose();
 
 export const GitHubConnectionConfigSchema = z.union([
   GitHubApiKeyConnectionConfigSchema,
