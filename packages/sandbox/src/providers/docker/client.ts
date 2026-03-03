@@ -139,6 +139,16 @@ function toDockerEnv(env: Record<string, string> | undefined): string[] | undefi
   return entries.map(([key, value]) => `${key}=${value}`);
 }
 
+type DestroyableReadWriteStream = NodeJS.ReadWriteStream & {
+  destroy: (error?: Error) => void;
+};
+
+function isDestroyableReadWriteStream(
+  stream: NodeJS.ReadWriteStream,
+): stream is DestroyableReadWriteStream {
+  return "destroy" in stream && typeof stream.destroy === "function";
+}
+
 export class DockerApiClient implements DockerClient {
   readonly #config: DockerSandboxConfig;
   readonly #docker: Docker;
@@ -160,8 +170,7 @@ export class DockerApiClient implements DockerClient {
       Image: parsedRequest.imageRef,
       OpenStdin: true,
       AttachStdin: true,
-      AttachStdout: true,
-      AttachStderr: true,
+      StdinOnce: true,
       ...(parsedRequest.env === undefined ? {} : { Env: toDockerEnv(parsedRequest.env) }),
       Labels: {
         "mistle.sandbox.provider": "docker",
@@ -179,8 +188,8 @@ export class DockerApiClient implements DockerClient {
           hijack: true,
           stdin: true,
           stream: true,
-          stdout: true,
-          stderr: true,
+          stdout: false,
+          stderr: false,
         }),
     );
     this.#trackAttachedStdinStream(container.id, attachedStdinStream);
@@ -324,8 +333,8 @@ export class DockerApiClient implements DockerClient {
           stdin: true,
           stream: true,
           logs: false,
-          stdout: true,
-          stderr: true,
+          stdout: false,
+          stderr: false,
         }),
     );
     this.#trackAttachedStdinStream(sandboxId, attachedStdinStream);
@@ -367,13 +376,48 @@ export class DockerApiClient implements DockerClient {
 
   async #closeAttachedStdinStream(attachedStdinStream: NodeJS.ReadWriteStream): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-      attachedStdinStream.end((error?: Error | null) => {
+      let settled = false;
+
+      const finish = (error?: Error | null) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+
+        attachedStdinStream.off("close", handleClose);
+        attachedStdinStream.off("error", handleError);
+
         if (error !== undefined && error !== null) {
           reject(error);
           return;
         }
 
         resolve();
+      };
+
+      const handleClose = () => {
+        finish();
+      };
+      const handleError = (error: Error) => {
+        finish(error);
+      };
+
+      attachedStdinStream.once("close", handleClose);
+      attachedStdinStream.once("error", handleError);
+
+      attachedStdinStream.end((error?: Error | null) => {
+        if (error !== undefined && error !== null) {
+          finish(error);
+          return;
+        }
+
+        // Docker closes container stdin on attach disconnect (StdinOnce), so ensure
+        // the hijacked stream is fully disconnected after writing EOF.
+        if (!isDestroyableReadWriteStream(attachedStdinStream)) {
+          finish(new Error("Attached stdin stream is not destroyable."));
+          return;
+        }
+        attachedStdinStream.destroy();
       });
     });
   }

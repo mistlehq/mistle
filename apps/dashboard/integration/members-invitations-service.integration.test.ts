@@ -21,6 +21,8 @@ import { createMembersInvitationsService } from "../src/features/settings/member
 import type { DashboardMembersInvitationsFixture } from "./members-invitations-test-context.js";
 import { it } from "./members-invitations-test-context.js";
 
+const AUTH_ORIGIN = "http://localhost:5100";
+
 function readErrorMessage(value: unknown): string | null {
   if (typeof value === "object" && value !== null) {
     const direct = Reflect.get(value, "message");
@@ -86,6 +88,7 @@ function createFixtureMembersFetchClient(input: {
           headers: {
             "content-type": "application/json",
             cookie: input.cookieHeader,
+            origin: AUTH_ORIGIN,
           },
           body: options.body === undefined ? undefined : JSON.stringify(options.body),
         },

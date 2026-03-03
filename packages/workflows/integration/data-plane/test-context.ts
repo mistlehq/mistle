@@ -7,7 +7,7 @@ import {
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
 import { SandboxProvider, createSandboxAdapter, type SandboxAdapter } from "@mistle/sandbox";
-import { startPostgresWithPgBouncer } from "@mistle/test-harness";
+import { runCleanupTasks, startPostgresWithPgBouncer } from "@mistle/test-harness";
 import type { Worker } from "openworkflow";
 import type { BackendPostgres } from "openworkflow/postgres";
 import postgres from "postgres";
@@ -27,6 +27,10 @@ export type DataPlaneWorkflowFixture = {
   startedSandboxIds: string[];
   startedBootstrapTokenJtis: string[];
 };
+
+function normalizeError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(String(error));
+}
 
 function resolveDockerWorkflowIntegrationEnabled(): boolean {
   if (process.env.MISTLE_SANDBOX_INTEGRATION !== "1") {
@@ -71,6 +75,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
       const startedSandboxIds: string[] = [];
       const startedBootstrapTokenJtis: string[] = [];
       let sandboxAdapter: SandboxAdapter | undefined;
+      let cleanupFailure: Error | undefined;
 
       try {
         const dockerSocketPath = resolveDockerSocketPath();
@@ -299,23 +304,46 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
           startedBootstrapTokenJtis,
         });
       } finally {
+        const cleanupErrors: Error[] = [];
         const uniqueStartedSandboxIds = Array.from(new Set(startedSandboxIds));
         if (sandboxAdapter !== undefined) {
           const cleanupSandboxAdapter = sandboxAdapter;
-          const sandboxStopResults = await Promise.allSettled(
-            uniqueStartedSandboxIds.map((sandboxId) => cleanupSandboxAdapter.stop({ sandboxId })),
+          const sandboxStopTasks = uniqueStartedSandboxIds.map(
+            (sandboxId) => async () => cleanupSandboxAdapter.stop({ sandboxId }),
           );
 
-          for (const stopResult of sandboxStopResults) {
-            if (stopResult.status === "rejected") {
-              // Best-effort cleanup in shared Docker daemon environments.
-            }
+          try {
+            await runCleanupTasks({
+              tasks: sandboxStopTasks,
+              context: "workflows data-plane sandbox adapter cleanup",
+            });
+          } catch (error) {
+            cleanupErrors.push(normalizeError(error));
           }
         }
 
-        for (const cleanupTask of cleanupTasks) {
-          await cleanupTask();
+        try {
+          await runCleanupTasks({
+            tasks: cleanupTasks,
+            context: "workflows data-plane fixture cleanup",
+          });
+        } catch (error) {
+          cleanupErrors.push(normalizeError(error));
         }
+
+        if (cleanupErrors.length === 1) {
+          const firstError = cleanupErrors[0];
+          cleanupFailure = firstError ?? new Error("Expected exactly one cleanup error.");
+        } else if (cleanupErrors.length > 1) {
+          cleanupFailure = new AggregateError(
+            cleanupErrors,
+            "Multiple cleanup operations failed in workflows data-plane fixture.",
+          );
+        }
+      }
+
+      if (cleanupFailure !== undefined) {
+        throw cleanupFailure;
       }
     },
     {

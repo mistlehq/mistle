@@ -8,13 +8,14 @@ import { fileURLToPath } from "node:url";
 
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import {
+  runCleanupTasks,
   startControlPlaneApi,
   startControlPlaneWorker,
+  startDockerNetwork,
   startMailpit,
   startPostgresWithPgBouncer,
 } from "@mistle/test-harness";
 import { Pool } from "pg";
-import { Network } from "testcontainers";
 import { it as vitestIt } from "vitest";
 
 export type AuthenticatedSession = {
@@ -33,10 +34,13 @@ const AUTH_OTP_LENGTH = 6;
 const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../../..", import.meta.url));
 const CONFIG_PATH_IN_CONTAINER = "/workspace/config/config.development.toml";
 const APP_STARTUP_TIMEOUT_MS = 120_000;
+const POSTGRES_NETWORK_ALIAS = "postgres";
+const POSTGRES_PORT_IN_NETWORK = 5432;
 const PGBOUNCER_NETWORK_ALIAS = "pgbouncer";
 const PGBOUNCER_PORT_IN_NETWORK = 5432;
 const MAILPIT_NETWORK_ALIAS = "mailpit";
 const MAILPIT_SMTP_PORT_IN_NETWORK = 1025;
+const AUTH_ORIGIN = "http://localhost:5100";
 
 function extractOTPCode(text: string): string | undefined {
   const pattern = new RegExp(`\\b(\\d{${String(AUTH_OTP_LENGTH)}})\\b`);
@@ -67,6 +71,10 @@ function generateIntegrationAuthEmail(): string {
   return `integration-auth-${randomUUID()}@example.com`;
 }
 
+function generateIntegrationDatabaseName(): string {
+  return `mistle_dashboard_${randomUUID().replaceAll("-", "")}`;
+}
+
 function createDatabaseUrl(input: {
   username: string;
   password: string;
@@ -90,14 +98,15 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
       const cleanupTasks: Array<() => Promise<void>> = [];
       try {
         const workflowNamespaceId = `integration_${randomUUID().replaceAll("-", "_")}`;
-        const network = await new Network().start();
+        const network = await startDockerNetwork();
         cleanupTasks.unshift(async () => {
           await network.stop();
         });
 
         const databaseStack = await startPostgresWithPgBouncer({
-          databaseName: `mistle_dashboard_integration_${randomUUID().replaceAll("-", "_")}`,
+          databaseName: generateIntegrationDatabaseName(),
           network,
+          postgresNetworkAlias: POSTGRES_NETWORK_ALIAS,
           pgbouncerNetworkAlias: PGBOUNCER_NETWORK_ALIAS,
         });
         cleanupTasks.unshift(async () => {
@@ -119,6 +128,13 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
           port: PGBOUNCER_PORT_IN_NETWORK,
           databaseName: databaseStack.postgres.databaseName,
         });
+        const directDatabaseUrlInNetwork = createDatabaseUrl({
+          username: databaseStack.postgres.username,
+          password: databaseStack.postgres.password,
+          host: POSTGRES_NETWORK_ALIAS,
+          port: POSTGRES_PORT_IN_NETWORK,
+          databaseName: databaseStack.postgres.databaseName,
+        });
 
         const apiService = await startControlPlaneApi({
           buildContextHostPath: PROJECT_ROOT_HOST_PATH,
@@ -129,6 +145,11 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
             MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL: pooledDatabaseUrlInNetwork,
             MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: pooledDatabaseUrlInNetwork,
             MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: workflowNamespaceId,
+            MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL: AUTH_ORIGIN,
+            MISTLE_APPS_CONTROL_PLANE_API_AUTH_INVITATION_ACCEPT_BASE_URL:
+              "http://localhost:5173/invitations/accept",
+            MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS:
+              "http://localhost:5100,http://127.0.0.1:5100,http://localhost:5173,http://127.0.0.1:5173",
           },
         });
         cleanupTasks.unshift(async () => {
@@ -141,13 +162,11 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
           startupTimeoutMs: APP_STARTUP_TIMEOUT_MS,
           network,
           environment: {
-            MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL: pooledDatabaseUrlInNetwork,
+            MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL: directDatabaseUrlInNetwork,
             MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: workflowNamespaceId,
             MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_HOST: MAILPIT_NETWORK_ALIAS,
             MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT: String(MAILPIT_SMTP_PORT_IN_NETWORK),
             MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE: "false",
-            MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_USERNAME: "",
-            MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PASSWORD: "",
           },
         });
         cleanupTasks.unshift(async () => {
@@ -174,6 +193,7 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
               method: "POST",
               headers: {
                 "content-type": "application/json",
+                origin: AUTH_ORIGIN,
               },
               body: JSON.stringify({
                 email,
@@ -203,6 +223,7 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
               method: "POST",
               headers: {
                 "content-type": "application/json",
+                origin: AUTH_ORIGIN,
               },
               body: JSON.stringify({
                 email,
@@ -254,6 +275,7 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
                 headers: {
                   "content-type": "application/json",
                   cookie: requestCookie,
+                  origin: AUTH_ORIGIN,
                 },
                 body: JSON.stringify({
                   name: "Integration Organization",
@@ -261,8 +283,9 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
                 }),
               });
               if (createOrganizationResponse.status !== 200) {
+                const errorBody = await createOrganizationResponse.text().catch(() => "");
                 throw new Error(
-                  `Expected organization create response status 200, got ${String(createOrganizationResponse.status)}.`,
+                  `Expected organization create response status 200, got ${String(createOrganizationResponse.status)}. Response body: ${errorBody}`,
                 );
               }
 
@@ -285,9 +308,10 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
           },
         });
       } finally {
-        for (const cleanupTask of cleanupTasks) {
-          await cleanupTask();
-        }
+        await runCleanupTasks({
+          tasks: cleanupTasks,
+          context: "dashboard members invitations fixture cleanup",
+        });
       }
     },
     {

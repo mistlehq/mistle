@@ -1,14 +1,20 @@
+import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { stat } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
+import { promisify } from "node:util";
 
 import {
   GenericContainer,
+  ImageName,
   Network,
   Wait,
+  getContainerRuntimeClient,
   type StartedNetwork,
   type StartedTestContainer,
 } from "testcontainers";
+
+import { runCleanupTasks } from "../cleanup/index.js";
 
 export type WorkspaceAppReadiness =
   | {
@@ -51,6 +57,11 @@ export type StartDockerTargetAppInput = {
   networkAlias: string;
   startupTimeoutMs: number;
   readiness: WorkspaceAppReadiness;
+  bindMounts?: ReadonlyArray<{
+    source: string;
+    target: string;
+    mode?: "rw" | "ro";
+  }>;
   network?: StartedNetwork;
 };
 
@@ -65,6 +76,10 @@ export type StartedWorkspaceApp = {
 };
 
 const DockerTargetImageCache = new Map<string, string>();
+const DockerTargetImageBuildPromises = new Map<string, Promise<string>>();
+const DockerTargetManagedImages = new Set<string>();
+const DockerTargetImageReferenceCounts = new Map<string, number>();
+const execFileAsync = promisify(execFile);
 
 function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
@@ -176,13 +191,22 @@ async function cleanupResources(input: {
   container: StartedTestContainer | undefined;
   createdNetwork: StartedNetwork | undefined;
 }): Promise<void> {
-  if (input.container !== undefined) {
-    await input.container.stop();
-  }
-
-  if (input.createdNetwork !== undefined) {
-    await input.createdNetwork.stop();
-  }
+  const tasks = [
+    async () => {
+      if (input.container !== undefined) {
+        await input.container.stop();
+      }
+    },
+    async () => {
+      if (input.createdNetwork !== undefined) {
+        await input.createdNetwork.stop();
+      }
+    },
+  ];
+  await runCleanupTasks({
+    tasks,
+    context: "test-harness app resource cleanup",
+  });
 }
 
 async function resolveNetwork(network: StartedNetwork | undefined): Promise<{
@@ -209,6 +233,7 @@ function createStartedWorkspaceApp(input: {
   networkAlias: string;
   containerPort: number;
   createdNetwork: StartedNetwork | undefined;
+  postStopCleanupTask?: () => Promise<void>;
 }): StartedWorkspaceApp {
   let container: StartedTestContainer | undefined = input.container;
   let createdNetwork: StartedNetwork | undefined = input.createdNetwork;
@@ -230,9 +255,19 @@ function createStartedWorkspaceApp(input: {
       }
 
       stopped = true;
-      await cleanupResources({
-        container,
-        createdNetwork,
+      const tasks = [
+        async () =>
+          cleanupResources({
+            container,
+            createdNetwork,
+          }),
+      ];
+      if (input.postStopCleanupTask !== undefined) {
+        tasks.push(input.postStopCleanupTask);
+      }
+      await runCleanupTasks({
+        tasks,
+        context: "test-harness workspace app stop",
       });
       container = undefined;
       createdNetwork = undefined;
@@ -255,6 +290,50 @@ function stringifyBuildArgs(buildArgs: Record<string, string> | undefined): stri
 
   const entries = Object.entries(buildArgs).sort(([left], [right]) => left.localeCompare(right));
   return JSON.stringify(entries);
+}
+
+function deleteDockerTargetImageFromCache(imageName: string): void {
+  for (const [cacheKey, cachedImageName] of DockerTargetImageCache.entries()) {
+    if (cachedImageName === imageName) {
+      DockerTargetImageCache.delete(cacheKey);
+    }
+  }
+}
+
+function retainDockerTargetImage(imageName: string): void {
+  const activeReferences = DockerTargetImageReferenceCounts.get(imageName) ?? 0;
+  DockerTargetImageReferenceCounts.set(imageName, activeReferences + 1);
+}
+
+async function removeDockerImage(imageName: string): Promise<void> {
+  try {
+    await execFileAsync("docker", ["image", "rm", "--force", imageName]);
+  } catch (error) {
+    const normalizedError = normalizeError(error);
+    throw new Error(`Failed to remove Docker image ${imageName}: ${normalizedError.message}`);
+  }
+}
+
+async function releaseDockerTargetImage(imageName: string): Promise<void> {
+  const activeReferences = DockerTargetImageReferenceCounts.get(imageName);
+  if (activeReferences === undefined) {
+    return;
+  }
+
+  const remainingReferences = activeReferences - 1;
+  if (remainingReferences > 0) {
+    DockerTargetImageReferenceCounts.set(imageName, remainingReferences);
+    return;
+  }
+
+  DockerTargetImageReferenceCounts.delete(imageName);
+  if (!DockerTargetManagedImages.has(imageName)) {
+    return;
+  }
+
+  await removeDockerImage(imageName);
+  DockerTargetManagedImages.delete(imageName);
+  deleteDockerTargetImageFromCache(imageName);
 }
 
 function createDockerTargetImageCacheKey(input: {
@@ -291,16 +370,39 @@ async function resolveDockerTargetImageName(input: {
     return cachedImageName;
   }
 
-  const imageName = createDockerTargetImageName(cacheKey);
-  await GenericContainer.fromDockerfile(input.buildContextHostPath, input.dockerfileRelativePath)
-    .withBuildArgs(toBuildArgsRecord(input.buildArgs))
-    .withTarget(input.dockerTarget)
-    .build(imageName, {
-      deleteOnExit: false,
-    });
+  const inFlightBuild = DockerTargetImageBuildPromises.get(cacheKey);
+  if (inFlightBuild !== undefined) {
+    return inFlightBuild;
+  }
 
-  DockerTargetImageCache.set(cacheKey, imageName);
-  return imageName;
+  const buildPromise = (async () => {
+    const imageName = createDockerTargetImageName(cacheKey);
+    const containerRuntimeClient = await getContainerRuntimeClient();
+    const imageExists = await containerRuntimeClient.image.exists(ImageName.fromString(imageName));
+
+    if (!imageExists) {
+      await GenericContainer.fromDockerfile(
+        input.buildContextHostPath,
+        input.dockerfileRelativePath,
+      )
+        .withBuildArgs(toBuildArgsRecord(input.buildArgs))
+        .withTarget(input.dockerTarget)
+        .build(imageName, {
+          deleteOnExit: true,
+        });
+      DockerTargetManagedImages.add(imageName);
+    }
+
+    DockerTargetImageCache.set(cacheKey, imageName);
+    return imageName;
+  })();
+
+  DockerTargetImageBuildPromises.set(cacheKey, buildPromise);
+  try {
+    return await buildPromise;
+  } finally {
+    DockerTargetImageBuildPromises.delete(cacheKey);
+  }
 }
 
 export async function startWorkspaceApp(
@@ -423,11 +525,22 @@ export async function startDockerTargetApp(
       .withWaitStrategy(waitStrategy)
       .withStartupTimeout(input.startupTimeoutMs);
 
+    if (input.bindMounts !== undefined && input.bindMounts.length > 0) {
+      containerDefinition = containerDefinition.withBindMounts(
+        input.bindMounts.map((mount) => ({
+          source: mount.source,
+          target: mount.target,
+          mode: mount.mode ?? "rw",
+        })),
+      );
+    }
+
     if (input.command !== undefined) {
       containerDefinition = containerDefinition.withCommand([...input.command]);
     }
 
     container = await containerDefinition.start();
+    retainDockerTargetImage(imageName);
 
     return createStartedWorkspaceApp({
       container,
@@ -435,6 +548,9 @@ export async function startDockerTargetApp(
       networkAlias: input.networkAlias,
       containerPort: input.containerPort,
       createdNetwork,
+      postStopCleanupTask: async () => {
+        await releaseDockerTargetImage(imageName);
+      },
     });
   } catch (startupError) {
     try {

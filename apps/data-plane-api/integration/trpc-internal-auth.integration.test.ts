@@ -1,6 +1,7 @@
-import { DATA_PLANE_INTERNAL_AUTH_HEADER } from "@mistle/data-plane-trpc/constants";
+import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import type { StartSandboxInstanceInput } from "@mistle/data-plane-trpc/contracts";
 import type { DataPlaneTrpcRouter } from "@mistle/data-plane-trpc/router";
+import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { describe, expect } from "vitest";
 
@@ -55,16 +56,10 @@ function createStartSandboxInput(input: {
 function createTrpcClient(
   baseUrl: string,
   serviceToken: string,
-): ReturnType<typeof createTRPCClient<DataPlaneTrpcRouter>> {
-  return createTRPCClient<DataPlaneTrpcRouter>({
-    links: [
-      httpBatchLink({
-        url: new URL("/trpc", baseUrl).toString(),
-        headers: {
-          [DATA_PLANE_INTERNAL_AUTH_HEADER]: serviceToken,
-        },
-      }),
-    ],
+): ReturnType<typeof createDataPlaneSandboxInstancesClient> {
+  return createDataPlaneSandboxInstancesClient({
+    baseUrl,
+    serviceToken,
   });
 }
 
@@ -72,18 +67,29 @@ describe("tRPC internal service auth integration", () => {
   it("allows requests with valid service token", async ({ fixture }) => {
     const client = createTrpcClient(fixture.baseUrl, fixture.internalAuthServiceToken);
 
-    const response = await client.sandboxInstances.start.mutate(
-      createStartSandboxInput({
-        organizationId: "org_dp_api_integration_auth_valid",
-        sandboxProfileId: "sbp_dp_api_integration_auth_valid",
-        sandboxProfileVersion: 1,
-        userId: "usr_dp_api_integration_auth_valid",
-        imageId: "im_dp_api_integration_auth_valid",
-      }),
-    );
+    const organizationId = "org_dp_api_integration_auth_valid";
+    const sandboxInstanceId = "sbi_dp_api_integration_auth_valid";
+    await fixture.db.insert(sandboxInstances).values({
+      id: sandboxInstanceId,
+      organizationId,
+      sandboxProfileId: "sbp_dp_api_integration_auth_valid",
+      sandboxProfileVersion: 1,
+      provider: "docker",
+      providerSandboxId: "provider-sandbox-auth-valid",
+      status: SandboxInstanceStatuses.RUNNING,
+      startedByKind: "user",
+      startedById: "usr_dp_api_integration_auth_valid",
+      source: "dashboard",
+    });
 
-    expect(response.status).toBe("completed");
-    expect(response.workflowRunId).not.toBe("");
+    const response = await client.getSandboxInstance({
+      organizationId,
+      instanceId: sandboxInstanceId,
+    });
+    expect(response).toEqual({
+      id: sandboxInstanceId,
+      status: "running",
+    });
   }, 60_000);
 
   it("rejects requests missing service token", async ({ fixture }) => {
@@ -112,7 +118,7 @@ describe("tRPC internal service auth integration", () => {
     const client = createTrpcClient(fixture.baseUrl, "invalid-service-token");
 
     await expect(
-      client.sandboxInstances.start.mutate(
+      client.startSandboxInstance(
         createStartSandboxInput({
           organizationId: "org_dp_api_integration_unauth_invalid",
           sandboxProfileId: "sbp_dp_api_integration_unauth_invalid",

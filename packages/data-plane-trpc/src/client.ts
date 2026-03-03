@@ -40,13 +40,14 @@ export type DataPlaneSandboxInstancesClient = {
 export type CreateDataPlaneSandboxInstancesClientInput = {
   baseUrl: string;
   serviceToken: string;
+  links?: TRPCLink<DataPlaneTrpcRouter>[];
 };
 
 export function createDataPlaneSandboxInstancesClient(
   input: CreateDataPlaneSandboxInstancesClientInput,
 ): DataPlaneSandboxInstancesClient {
   const trpcClient = createTRPCClient<DataPlaneTrpcRouter>({
-    links: [
+    links: input.links ?? [
       httpBatchLink({
         url: createDataPlaneTrpcUrl(input.baseUrl),
         headers: {
