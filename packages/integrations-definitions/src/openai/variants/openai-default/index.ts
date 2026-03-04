@@ -24,7 +24,15 @@ export { compileOpenAiApiKeyBinding } from "./compile-binding.js";
 export { OpenAiApiKeyCredentialSecretTypes, OpenAiApiKeySupportedAuthSchemes } from "./auth.js";
 export { projectOpenAiTargetUi } from "./project-target-ui.js";
 export {
+  createDefaultOpenAiBindingConfig,
+  parseOpenAiAgentBindingConfig,
   OpenAiTargetUiProjectionSchema,
+  readOpenAiAuthScheme,
+  resolveOpenAiCapabilitySet,
+  type OpenAiAgentBindingConfig,
+  type OpenAiAuthScheme,
+  type OpenAiCapabilitySet,
+  type OpenAiReasoningEffort,
   parseOpenAiTargetUiProjection,
   type OpenAiTargetUiProjection,
 } from "./ui-contract.js";
