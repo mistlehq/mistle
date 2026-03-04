@@ -7,6 +7,7 @@ import { resolveErrorMessage } from "../auth/messages.js";
 import { NoOrganizationAccessViewContent } from "./no-organization-access-view-content.js";
 import {
   createOrganizationCreateSlug,
+  resolveOrganizationOnboardingNameError,
   resolveOrganizationOnboardingValidation,
 } from "./organization-onboarding.js";
 import { requireAuthenticatedSession } from "./session-context.js";
@@ -17,6 +18,7 @@ export function NoOrganizationAccessView(): React.JSX.Element {
   const queryClient = useQueryClient();
   const session = requireAuthenticatedSession(sessionQuery.data ?? null);
   const [organizationName, setOrganizationName] = useState("");
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
   const [createOrganizationError, setCreateOrganizationError] = useState<string | null>(null);
 
   const signOutMutation = useMutation({
@@ -71,6 +73,7 @@ export function NoOrganizationAccessView(): React.JSX.Element {
 
   function handleCreateOrganization(event: React.SyntheticEvent<HTMLFormElement>): void {
     event.preventDefault();
+    setHasAttemptedSubmit(true);
 
     if (onboardingValidation.nameError !== null || createOrganizationMutation.isPending) {
       return;
@@ -92,7 +95,10 @@ export function NoOrganizationAccessView(): React.JSX.Element {
         onOrganizationNameChange={handleOrganizationNameChange}
         onSignOut={handleSignOut}
         organizationName={organizationName}
-        organizationNameError={onboardingValidation.nameError}
+        organizationNameError={resolveOrganizationOnboardingNameError({
+          hasAttemptedSubmit,
+          nameError: onboardingValidation.nameError,
+        })}
       />
     </AuthPageShell>
   );
