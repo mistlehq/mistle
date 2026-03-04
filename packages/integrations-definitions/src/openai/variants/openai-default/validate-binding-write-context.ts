@@ -1,11 +1,7 @@
 import type { BindingWriteValidationResult } from "@mistle/integrations-core";
 
 import type { OpenAiApiKeyBindingConfig } from "./binding-config-schema.js";
-import {
-  isOpenAiModelSupported,
-  isOpenAiReasoningEffortSupported,
-  OpenAiConnectionAuthSchemes,
-} from "./model-capabilities.js";
+import { OpenAiConnectionAuthSchemes } from "./model-capabilities.js";
 import type { OpenAiApiKeyTargetConfig } from "./target-config-schema.js";
 
 type OpenAiBindingWriteValidationInput = {
@@ -70,10 +66,9 @@ export function validateOpenAiBindingWriteContext(
   }
 
   if (
-    !isOpenAiModelSupported({
-      authScheme,
-      model: input.binding.config.defaultModel,
-    })
+    !input.target.config.bindingCapabilities.byAuthScheme[authScheme].models.includes(
+      input.binding.config.defaultModel,
+    )
   ) {
     return {
       ok: false,
@@ -88,11 +83,9 @@ export function validateOpenAiBindingWriteContext(
   }
 
   if (
-    !isOpenAiReasoningEffortSupported({
-      authScheme,
-      model: input.binding.config.defaultModel,
-      reasoningEffort: input.binding.config.reasoningEffort,
-    })
+    !input.target.config.bindingCapabilities.byAuthScheme[authScheme].allowedReasoningByModel[
+      input.binding.config.defaultModel
+    ].includes(input.binding.config.reasoningEffort)
   ) {
     return {
       ok: false,
