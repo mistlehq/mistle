@@ -5,9 +5,11 @@ import { z } from "zod";
 const DataPlaneSandboxImageKinds = SandboxImageKind;
 const DataPlaneSandboxInstanceStarterKinds = {
   USER: "user",
+  SYSTEM: "system",
 } as const;
 const DataPlaneSandboxInstanceSources = {
   DASHBOARD: "dashboard",
+  WEBHOOK: "webhook",
 } as const;
 export const DataPlaneSandboxInstanceStatuses = {
   STARTING: "starting",

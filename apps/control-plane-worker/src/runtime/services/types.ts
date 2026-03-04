@@ -1,8 +1,13 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type {
+  AcquireAutomationConnectionInput,
   ControlPlaneWorkerServices,
+  DeliverAutomationPayloadInput,
+  EnsuredAutomationSandbox,
+  EnsureAutomationSandboxInput,
   HandleAutomationRunWorkflowInput,
+  PreparedAutomationRun,
   HandleIntegrationWebhookEventWorkflowInput,
   HandleIntegrationWebhookEventWorkflowOutput,
   StartSandboxProfileInstanceWorkflowInput,
@@ -29,10 +34,16 @@ export type StartSandboxProfileInstanceServiceOutput = StartSandboxProfileInstan
 
 export type HandleAutomationRunServiceDependencies = {
   db: ControlPlaneDatabase;
+  dataPlaneSandboxInstancesClient: Pick<DataPlaneSandboxInstancesClient, "startSandboxInstance">;
 };
 
 export type HandleAutomationRunServiceInput = HandleAutomationRunWorkflowInput;
 export type HandleAutomationRunTransitionServiceOutput = { shouldProcess: boolean };
+export type PrepareAutomationRunServiceOutput = PreparedAutomationRun;
+export type EnsureAutomationSandboxServiceInput = EnsureAutomationSandboxInput;
+export type EnsureAutomationSandboxServiceOutput = EnsuredAutomationSandbox;
+export type AcquireAutomationConnectionServiceInput = AcquireAutomationConnectionInput;
+export type DeliverAutomationPayloadServiceInput = DeliverAutomationPayloadInput;
 export type HandleAutomationRunMarkFailedServiceInput = {
   automationRunId: string;
   failureCode: string;

@@ -89,6 +89,141 @@ describe("handleAutomationRun integration", () => {
   }
 
   it(
+    "prepares a structured automation run context with rendered templates",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const organizationId = "org_worker_automation_prepare";
+        const sandboxProfileId = "sbp_worker_automation_prepare";
+        const automationId = "atm_worker_automation_prepare";
+        const automationTargetId = "atg_worker_automation_prepare";
+        const webhookEventId = "iwe_worker_automation_prepare";
+        const automationRunId = "aru_worker_automation_prepare";
+        const connectionId = "icn_worker_automation_prepare";
+        const targetKey = "github-cloud-worker-automation-prepare";
+
+        await database.db.insert(organizations).values({
+          id: organizationId,
+          name: "Worker Automation Prepare",
+          slug: "worker-automation-prepare",
+        });
+        await database.db.insert(sandboxProfiles).values({
+          id: sandboxProfileId,
+          organizationId,
+          displayName: "Automation Prepare Profile",
+          status: "active",
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey,
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: connectionId,
+          organizationId,
+          targetKey,
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "123456",
+          config: {},
+        });
+        await database.db.insert(automations).values({
+          id: automationId,
+          organizationId,
+          kind: AutomationKinds.WEBHOOK,
+          name: "Automation Prepare",
+          enabled: true,
+        });
+        await database.db.insert(webhookAutomations).values({
+          automationId,
+          integrationConnectionId: connectionId,
+          eventTypes: ["github.issue_comment.created"],
+          payloadFilter: null,
+          inputTemplate: "Handle {{payload.comment.body}}",
+          conversationKeyTemplate: "issue-{{payload.issue.number}}",
+          idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
+        });
+        await database.db.insert(automationTargets).values({
+          id: automationTargetId,
+          automationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 7,
+        });
+        await database.db.insert(integrationWebhookEvents).values({
+          id: webhookEventId,
+          organizationId,
+          integrationConnectionId: connectionId,
+          targetKey,
+          externalEventId: "evt_prepare",
+          externalDeliveryId: "delivery_prepare",
+          providerEventType: "issue_comment",
+          eventType: "github.issue_comment.created",
+          payload: {
+            issue: {
+              number: 777,
+            },
+            comment: {
+              body: "@mistlebot prepare",
+            },
+          },
+          status: IntegrationWebhookEventStatuses.PROCESSED,
+        });
+        await database.db.insert(automationRuns).values({
+          id: automationRunId,
+          automationId,
+          automationTargetId,
+          sourceWebhookEventId: webhookEventId,
+          status: AutomationRunStatuses.QUEUED,
+        });
+
+        const preparedRun = await prepareAutomationRun(
+          {
+            db: database.db,
+          },
+          {
+            automationRunId,
+          },
+        );
+
+        expect(preparedRun).toMatchObject({
+          automationRunId,
+          automationId,
+          automationTargetId,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 7,
+          webhookEventId,
+          webhookEventType: "github.issue_comment.created",
+          webhookProviderEventType: "issue_comment",
+          webhookExternalEventId: "evt_prepare",
+          webhookExternalDeliveryId: "delivery_prepare",
+          renderedInput: "Handle @mistlebot prepare",
+          renderedConversationKey: "issue-777",
+          renderedIdempotencyKey: "delivery_prepare",
+        });
+        expect(preparedRun.webhookPayload).toEqual({
+          issue: {
+            number: 777,
+          },
+          comment: {
+            body: "@mistlebot prepare",
+          },
+        });
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
     "marks queued runs completed when templates compile successfully",
     async ({ fixture }) => {
       const database = await createTestDatabase({

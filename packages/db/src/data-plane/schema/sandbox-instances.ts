@@ -23,6 +23,7 @@ export type SandboxInstanceStatus =
 
 export const SandboxInstanceStarterKinds = {
   USER: "user",
+  SYSTEM: "system",
 } as const;
 
 export type SandboxInstanceStarterKind =
@@ -30,6 +31,7 @@ export type SandboxInstanceStarterKind =
 
 export const SandboxInstanceSources = {
   DASHBOARD: "dashboard",
+  WEBHOOK: "webhook",
 } as const;
 
 export type SandboxInstanceSource =
