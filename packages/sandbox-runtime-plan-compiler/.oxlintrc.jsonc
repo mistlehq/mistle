@@ -1,0 +1,36 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../.oxlintrc.jsonc"],
+  "overrides": [
+    {
+      "files": ["src/**/*.ts"],
+      "rules": {
+        "eslint/no-restricted-globals": [
+          "error",
+          {
+            "name": "vi",
+            "message": "Do not use vi-based mocks/spies. Assert observable behavior instead.",
+          },
+          {
+            "name": "jest",
+            "message": "Do not use jest-based mocks/spies. Assert observable behavior instead.",
+          },
+        ],
+      },
+    },
+    {
+      "files": ["integration/**/test-context.ts"],
+      "rules": {
+        "jest/expect-expect": "off",
+        "jest/no-disabled-tests": "off",
+        "no-empty-pattern": "off",
+      },
+    },
+    {
+      "files": ["integration/**/*.integration.test.ts"],
+      "rules": {
+        "jest/no-standalone-expect": "off",
+      },
+    },
+  ],
+}

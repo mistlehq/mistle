@@ -116,6 +116,9 @@ importers:
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@mistle/sandbox-runtime-plan-compiler':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-runtime-plan-compiler
       '@mistle/time':
         specifier: workspace:*
         version: link:../../packages/time
@@ -619,6 +622,28 @@ importers:
       testcontainers:
         specifier: ^11.7.2
         version: 11.12.0
+
+  packages/sandbox-runtime-plan-compiler:
+    dependencies:
+      '@mistle/db':
+        specifier: workspace:*
+        version: link:../db
+      '@mistle/integrations-core':
+        specifier: workspace:*
+        version: link:../integrations-core
+    devDependencies:
+      '@mistle/integrations-definitions':
+        specifier: workspace:*
+        version: link:../integrations-definitions
+      '@mistle/test-harness':
+        specifier: workspace:*
+        version: link:../test-harness
+      '@types/pg':
+        specifier: ^8.18.0
+        version: 8.18.0
+      pg:
+        specifier: ^8.19.0
+        version: 8.19.0
 
   packages/test-harness:
     dependencies:

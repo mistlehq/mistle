@@ -10,12 +10,15 @@ import {
   InternalIntegrationCredentialErrorResponseSchema,
   ResolveIntegrationCredentialRequestSchema,
   ResolveIntegrationCredentialResponseSchema,
+  ResolveIntegrationTargetSecretsRequestSchema,
+  ResolveIntegrationTargetSecretsResponseSchema,
 } from "./contracts.js";
 import {
   InternalIntegrationCredentialsError,
   InternalIntegrationCredentialsErrorCodes,
 } from "./services/errors.js";
 import { resolveIntegrationCredential } from "./services/resolve-credential.js";
+import { resolveInternalIntegrationTargetSecrets } from "./services/resolve-target-secrets.js";
 
 export function createInternalIntegrationCredentialsApp(): AppRoutes<
   typeof INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH
@@ -23,16 +26,9 @@ export function createInternalIntegrationCredentialsApp(): AppRoutes<
   const routes = new OpenAPIHono<AppContextBindings>();
 
   routes.post("/resolve", async (ctx) => {
-    const providedServiceToken = ctx.req.header(CONTROL_PLANE_INTERNAL_AUTH_HEADER);
-    if (
-      providedServiceToken === undefined ||
-      providedServiceToken !== ctx.get("internalAuthServiceToken")
-    ) {
-      const responseBody: z.infer<typeof InternalIntegrationCredentialErrorResponseSchema> = {
-        code: InternalIntegrationCredentialsErrorCodes.UNAUTHORIZED,
-        message: "Internal service authentication failed.",
-      };
-      return ctx.json(responseBody, 401);
+    const authorizationFailureResponse = resolveAuthorizationFailureResponse(ctx);
+    if (authorizationFailureResponse !== null) {
+      return authorizationFailureResponse;
     }
 
     const requestBody = await ctx.req
@@ -67,10 +63,57 @@ export function createInternalIntegrationCredentialsApp(): AppRoutes<
     }
   });
 
+  routes.post("/resolve-target-secrets", async (ctx) => {
+    const authorizationFailureResponse = resolveAuthorizationFailureResponse(ctx);
+    if (authorizationFailureResponse !== null) {
+      return authorizationFailureResponse;
+    }
+
+    const requestBody = await ctx.req
+      .json()
+      .catch((): unknown => ({ __parseError: "invalid_json_body" }));
+    const parsedInput = ResolveIntegrationTargetSecretsRequestSchema.safeParse(requestBody);
+    if (!parsedInput.success) {
+      const responseBody: z.infer<typeof InternalIntegrationCredentialErrorResponseSchema> = {
+        code: InternalIntegrationCredentialsErrorCodes.INVALID_RESOLVE_INPUT,
+        message: "Target secrets resolve request body is invalid.",
+      };
+      return ctx.json(responseBody, 400);
+    }
+
+    try {
+      const resolvedTargetSecrets = resolveInternalIntegrationTargetSecrets(
+        ctx.get("config").integrations,
+        parsedInput.data,
+      );
+      const responseBody: z.infer<typeof ResolveIntegrationTargetSecretsResponseSchema> =
+        resolvedTargetSecrets;
+      return ctx.json(responseBody, 200);
+    } catch (error) {
+      return handleResolveIntegrationCredentialError(ctx, error);
+    }
+  });
+
   return {
     basePath: INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH,
     routes,
   };
+}
+
+function resolveAuthorizationFailureResponse(ctx: AppContext) {
+  const providedServiceToken = ctx.req.header(CONTROL_PLANE_INTERNAL_AUTH_HEADER);
+  if (
+    providedServiceToken !== undefined &&
+    providedServiceToken === ctx.get("internalAuthServiceToken")
+  ) {
+    return null;
+  }
+
+  const responseBody: z.infer<typeof InternalIntegrationCredentialErrorResponseSchema> = {
+    code: InternalIntegrationCredentialsErrorCodes.UNAUTHORIZED,
+    message: "Internal service authentication failed.",
+  };
+  return ctx.json(responseBody, 401);
 }
 
 function handleResolveIntegrationCredentialError(ctx: AppContext, error: unknown) {

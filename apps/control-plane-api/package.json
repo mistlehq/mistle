@@ -31,6 +31,7 @@
     "@mistle/integrations-core": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
     "@mistle/logging": "workspace:*",
+    "@mistle/sandbox-runtime-plan-compiler": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "better-auth": "1.5.2",
