@@ -112,8 +112,8 @@ describe("handleIntegrationWebhookEvent integration", () => {
             value: "@mistlebot",
           },
           inputTemplate: "Handle issue comment webhook",
-          conversationKeyTemplate: "github/{{installation.id}}",
-          idempotencyKeyTemplate: "{{delivery.id}}",
+          conversationKeyTemplate: "github/{{payload.installation.id}}",
+          idempotencyKeyTemplate: "{{payload.delivery.id}}",
         });
         await database.db.insert(automationTargets).values({
           id: automationTargetId,

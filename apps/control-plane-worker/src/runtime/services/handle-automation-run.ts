@@ -167,21 +167,19 @@ function compileTemplates(input: {
   };
 }): void {
   const templateContext: Record<string, unknown> = {
-    ...input.webhookEvent.payload,
-    mistle: {
-      webhookEvent: {
-        id: input.webhookEvent.id,
-        eventType: input.webhookEvent.eventType,
-        providerEventType: input.webhookEvent.providerEventType,
-        externalEventId: input.webhookEvent.externalEventId,
-        externalDeliveryId: input.webhookEvent.externalDeliveryId,
-      },
-      automationRun: {
-        id: input.automationRun.id,
-        automationId: input.automationRun.automationId,
-        automationTargetId: input.automationRun.automationTargetId,
-      },
+    webhookEvent: {
+      id: input.webhookEvent.id,
+      eventType: input.webhookEvent.eventType,
+      providerEventType: input.webhookEvent.providerEventType,
+      externalEventId: input.webhookEvent.externalEventId,
+      externalDeliveryId: input.webhookEvent.externalDeliveryId,
     },
+    automationRun: {
+      id: input.automationRun.id,
+      automationId: input.automationRun.automationId,
+      automationTargetId: input.automationRun.automationTargetId,
+    },
+    payload: input.webhookEvent.payload,
   };
 
   const renderedInput = renderTemplateString({

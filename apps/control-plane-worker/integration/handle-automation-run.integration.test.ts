@@ -109,9 +109,9 @@ describe("handleAutomationRun integration", () => {
           integrationConnectionId: connectionId,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: null,
-          inputTemplate: "Handle {{comment.body}}",
-          conversationKeyTemplate: "issue-{{issue.number}}",
-          idempotencyKeyTemplate: "{{mistle.webhookEvent.externalDeliveryId}}",
+          inputTemplate: "Handle {{payload.comment.body}}",
+          conversationKeyTemplate: "issue-{{payload.issue.number}}",
+          idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
         });
         await database.db.insert(automationTargets).values({
           id: automationTargetId,
@@ -236,8 +236,8 @@ describe("handleAutomationRun integration", () => {
           integrationConnectionId: connectionId,
           eventTypes: ["github.issue_comment.created"],
           payloadFilter: null,
-          inputTemplate: "Handle {{comment.missing_field}}",
-          conversationKeyTemplate: "issue-{{issue.number}}",
+          inputTemplate: "Handle {{payload.comment.missing_field}}",
+          conversationKeyTemplate: "issue-{{payload.issue.number}}",
           idempotencyKeyTemplate: null,
         });
         await database.db.insert(automationTargets).values({
