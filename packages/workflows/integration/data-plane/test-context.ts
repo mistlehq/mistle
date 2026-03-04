@@ -7,12 +7,11 @@ import {
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
 import { SandboxProvider, createSandboxAdapter, type SandboxAdapter } from "@mistle/sandbox";
-import { runCleanupTasks, startPostgresWithPgBouncer } from "@mistle/test-harness";
+import { runCleanupTasks } from "@mistle/test-harness";
 import type { Worker } from "openworkflow";
 import type { BackendPostgres } from "openworkflow/postgres";
 import postgres from "postgres";
 import { typeid } from "typeid-js";
-import { it as vitestIt } from "vitest";
 
 import {
   DataPlaneWorkerWorkflowIds,
@@ -20,6 +19,7 @@ import {
   createDataPlaneOpenWorkflow,
   createDataPlaneWorker,
 } from "../../src/data-plane/index.js";
+import { it as baseIt } from "../test-context.js";
 
 export type DataPlaneWorkflowFixture = {
   sql: ReturnType<typeof postgres>;
@@ -63,9 +63,9 @@ function resolveDockerSocketPath(): string {
 export const dockerStartSandboxWorkflowIntegrationEnabled =
   resolveDockerWorkflowIntegrationEnabled();
 
-export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
+export const it = baseIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
   fixture: [
-    async ({}, use) => {
+    async ({ databaseStack }, use) => {
       if (!dockerStartSandboxWorkflowIntegrationEnabled) {
         throw new Error(
           'Docker workflow integration fixture requested while docker provider integration is disabled. Set MISTLE_SANDBOX_INTEGRATION=1 and include "docker" in MISTLE_SANDBOX_INTEGRATION_PROVIDERS.',
@@ -80,13 +80,6 @@ export const it = vitestIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
 
       try {
         const dockerSocketPath = resolveDockerSocketPath();
-        const databaseStack = await startPostgresWithPgBouncer({
-          databaseName: "mistle_workflows_test",
-        });
-        cleanupTasks.unshift(async () => {
-          await databaseStack.stop();
-        });
-
         await runDataPlaneMigrations({
           connectionString: databaseStack.directUrl,
           schemaName: MigrationTracking.DATA_PLANE.SCHEMA_NAME,

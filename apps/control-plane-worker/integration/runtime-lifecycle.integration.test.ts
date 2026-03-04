@@ -2,8 +2,23 @@ import { reserveAvailablePort } from "@mistle/test-harness";
 import { describe, expect } from "vitest";
 
 import { createControlPlaneWorkerRuntime } from "../src/runtime/index.js";
-import { createRuntimeConfigWithPort } from "./config.js";
+import type { ControlPlaneWorkerConfig } from "../src/types.js";
 import { it } from "./test-context.js";
+
+function createRuntimeConfigWithPort(input: {
+  config: ControlPlaneWorkerConfig;
+  host: string;
+  port: number;
+}): ControlPlaneWorkerConfig {
+  return {
+    ...input.config,
+    server: {
+      ...input.config.server,
+      host: input.host,
+      port: input.port,
+    },
+  };
+}
 
 describe("runtime lifecycle integration", () => {
   it("enforces start/stop runtime lifecycle semantics", async ({ fixture }) => {
