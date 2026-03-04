@@ -19,8 +19,6 @@ import { ProfileSettingsPage } from "./features/pages/profile-settings-page.js";
 import { SandboxProfileEditorPage } from "./features/pages/sandbox-profile-editor-page.js";
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
 import { SessionsPage } from "./features/pages/sessions-page.js";
-import { SandboxProfilesApiError } from "./features/sandbox-profiles/sandbox-profiles-api-errors.js";
-import { getSandboxProfile } from "./features/sandbox-profiles/sandbox-profiles-service.js";
 import { SettingsLayout } from "./features/settings/settings-layout.js";
 import { createSettingsRoutes } from "./features/settings/settings-routes.js";
 import { AppShell } from "./features/shell/app-shell.js";
@@ -56,32 +54,6 @@ export const APP_ROUTES = createRoutesFromElements(
           <Route
             element={<SandboxProfileEditorPage mode="edit" />}
             handle={ROUTE_HANDLES.sandboxProfilesDetail}
-            loader={async ({ params, request }) => {
-              const profileId = params["profileId"];
-              if (profileId === undefined) {
-                throw new Error("profileId is required.");
-              }
-
-              try {
-                const profile = await getSandboxProfile({
-                  profileId,
-                  signal: request.signal,
-                });
-
-                return {
-                  displayName: profile.displayName,
-                };
-              } catch (error) {
-                if (error instanceof SandboxProfilesApiError) {
-                  throw new Response(error.message, {
-                    status: error.status,
-                    statusText: error.message,
-                  });
-                }
-
-                throw error;
-              }
-            }}
             path=":profileId"
           />
         </Route>
