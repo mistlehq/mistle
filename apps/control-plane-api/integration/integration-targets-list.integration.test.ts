@@ -2,40 +2,12 @@ import { integrationTargets } from "@mistle/db/control-plane";
 import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { parseIntegrationBindingEditorUiProjection } from "@mistle/integrations-definitions/ui";
 import { describe, expect } from "vitest";
-import { z } from "zod";
 
 import {
   ListIntegrationTargetsResponseSchema,
   ValidationErrorResponseSchema,
 } from "../src/integration-targets/contracts.js";
 import { it } from "./test-context.js";
-
-const OpenAiTargetProjectionSchema = z
-  .object({
-    openaiAgent: z
-      .object({
-        kind: z.literal("agent"),
-        runtime: z.literal("codex-cli"),
-        familyId: z.literal("openai"),
-        variantId: z.literal("openai-default"),
-        byAuthScheme: z
-          .object({
-            "api-key": z
-              .object({
-                models: z.array(z.string().min(1)),
-              })
-              .strict(),
-            oauth: z
-              .object({
-                models: z.array(z.string().min(1)),
-              })
-              .strict(),
-          })
-          .strict(),
-      })
-      .strict(),
-  })
-  .strict();
 
 describe("integration targets discovery integration", () => {
   it("returns keyset paginated enabled integration targets for an authenticated session", async ({
@@ -111,10 +83,13 @@ describe("integration targets discovery integration", () => {
         },
         displayName: "GitHub Cloud",
         description: "GitHub Cloud target",
+        logoKey: "github",
+        supportedAuthSchemes: ["oauth", "api-key"],
         displayNameOverride: "GitHub Cloud",
         descriptionOverride: "GitHub Cloud target",
         targetHealth: {
           configStatus: "invalid",
+          reason: "invalid-config",
         },
       },
       {
@@ -165,8 +140,11 @@ describe("integration targets discovery integration", () => {
         displayName: "OpenAI",
         description:
           "Enable OpenAI model access with API key or ChatGPT subscription authentication.",
+        logoKey: "openai",
+        supportedAuthSchemes: ["api-key", "oauth"],
         targetHealth: {
           configStatus: "invalid",
+          reason: "invalid-config",
         },
       },
     ]);
@@ -240,7 +218,9 @@ describe("integration targets discovery integration", () => {
     });
   }, 60_000);
 
-  it("returns OpenAI projection payload when target config is valid", async ({ fixture }) => {
+  it("returns OpenAI binding editor projection payload when target config is valid", async ({
+    fixture,
+  }) => {
     await fixture.db.insert(integrationTargets).values({
       targetKey: "openai-default",
       familyId: "openai",
@@ -267,9 +247,7 @@ describe("integration targets discovery integration", () => {
     const openAiTarget = page.items.find((item) => item.targetKey === "openai-default");
     expect(openAiTarget).toBeDefined();
     expect(openAiTarget?.targetHealth.configStatus).toBe("valid");
-    const openAiProjection = OpenAiTargetProjectionSchema.parse(openAiTarget?.resolvedBindingUi);
-    expect(openAiProjection.openaiAgent.runtime).toBe("codex-cli");
-    expect(openAiProjection.openaiAgent.byAuthScheme["api-key"].models).toContain("gpt-5.3-codex");
+    expect(openAiTarget?.supportedAuthSchemes).toEqual(["api-key", "oauth"]);
     const bindingEditorProjection = parseIntegrationBindingEditorUiProjection(
       openAiTarget?.resolvedBindingEditorUi,
     );

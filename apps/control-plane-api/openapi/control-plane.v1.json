@@ -973,6 +973,18 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "logoKey": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "supportedAuthSchemes": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "enum": ["oauth", "api-key"]
+                            },
+                            "minItems": 1
+                          },
                           "displayNameOverride": {
                             "type": "string",
                             "minLength": 1
@@ -987,14 +999,14 @@
                               "configStatus": {
                                 "type": "string",
                                 "enum": ["valid", "invalid"]
+                              },
+                              "reason": {
+                                "type": "string",
+                                "enum": ["invalid-config", "invalid-projection"]
                               }
                             },
                             "required": ["configStatus"],
                             "additionalProperties": false
-                          },
-                          "resolvedBindingUi": {
-                            "type": "object",
-                            "additionalProperties": {}
                           },
                           "resolvedBindingEditorUi": {
                             "type": "object",

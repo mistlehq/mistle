@@ -65,12 +65,6 @@ type SandboxProfileEditorFormState = {
   status: SandboxProfileStatus;
 };
 
-const SANDBOX_INTEGRATION_BINDING_KIND_OPTIONS: readonly SandboxIntegrationBindingKind[] = [
-  "agent",
-  "git",
-  "connector",
-];
-
 type IntegrationBindingEditorRow = {
   clientId: string;
   id?: string;
@@ -170,22 +164,6 @@ function createIntegrationBindingClientId(): string {
   return clientId;
 }
 
-function parseIntegrationBindingKind(value: string | null): SandboxIntegrationBindingKind {
-  if (value === null) {
-    throw new Error("Sandbox integration binding kind must not be null.");
-  }
-  if (value === "agent") {
-    return value;
-  }
-  if (value === "git") {
-    return value;
-  }
-  if (value === "connector") {
-    return value;
-  }
-  throw new Error(`Unsupported sandbox integration binding kind: ${value}`);
-}
-
 function formatBindingKind(kind: SandboxIntegrationBindingKind): string {
   if (kind === "agent") {
     return "Agent";
@@ -194,6 +172,16 @@ function formatBindingKind(kind: SandboxIntegrationBindingKind): string {
     return "Git";
   }
   return "Connector";
+}
+
+function resolveBindingKindFromTarget(
+  target: IntegrationTargetSummary | undefined,
+): SandboxIntegrationBindingKind | undefined {
+  if (target === undefined) {
+    return undefined;
+  }
+  const projection = parseIntegrationBindingEditorUiProjection(target.resolvedBindingEditorUi);
+  return projection?.bindingEditor.kind;
 }
 
 function readStringValue(record: Record<string, unknown>, key: string): string | undefined {
@@ -506,11 +494,10 @@ function readInvalidBindingConfigIssues(
 }
 
 function createDefaultBindingConfig(input: {
-  kind: SandboxIntegrationBindingKind;
   connection?: IntegrationConnectionSummary;
   target?: IntegrationTargetSummary;
 }): Record<string, unknown> {
-  if (input.kind === "connector" || input.target === undefined || input.connection === undefined) {
+  if (input.target === undefined || input.connection === undefined) {
     return {};
   }
   const projection = parseIntegrationBindingEditorUiProjection(
@@ -548,12 +535,6 @@ function resolveBindingConfigUiModel(input: {
     return {
       mode: "unsupported",
       message: `Connection '${connection.id}' references unknown target '${connection.targetKey}'.`,
-    };
-  }
-
-  if (input.row.kind === "connector") {
-    return {
-      mode: "connector",
     };
   }
 
@@ -1153,14 +1134,15 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
           <div>
             <Button
               onClick={() => {
+                const resolvedKind = resolveBindingKindFromTarget(selectedTarget);
                 const resetConfig =
                   configUiModel.defaultConfig ??
                   createDefaultBindingConfig({
-                    kind: row.kind,
                     ...(selectedConnection === undefined ? {} : { connection: selectedConnection }),
                     ...(selectedTarget === undefined ? {} : { target: selectedTarget }),
                   });
                 handleIntegrationBindingRowChange(row.clientId, {
+                  ...(resolvedKind === undefined ? {} : { kind: resolvedKind }),
                   config: resetConfig,
                 });
               }}
@@ -1502,46 +1484,9 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
                 </div>
 
                 <Field>
-                  <FieldLabel htmlFor={`binding-kind-${row.clientId}`}>Kind</FieldLabel>
+                  <FieldLabel>Kind</FieldLabel>
                   <FieldContent>
-                    <Select
-                      onValueChange={(nextValue) => {
-                        const nextKind = parseIntegrationBindingKind(nextValue);
-                        const selectedConnection = availableConnections.find(
-                          (connection) => connection.id === row.connectionId,
-                        );
-                        const selectedTarget =
-                          selectedConnection === undefined
-                            ? undefined
-                            : availableTargets.find(
-                                (target) => target.targetKey === selectedConnection.targetKey,
-                              );
-                        handleIntegrationBindingRowChange(row.clientId, {
-                          kind: nextKind,
-                          config: createDefaultBindingConfig({
-                            kind: nextKind,
-                            ...(selectedConnection === undefined
-                              ? {}
-                              : { connection: selectedConnection }),
-                            ...(selectedTarget === undefined ? {} : { target: selectedTarget }),
-                          }),
-                        });
-                      }}
-                      value={row.kind}
-                    >
-                      <SelectTrigger aria-label="Binding kind" id={`binding-kind-${row.clientId}`}>
-                        <SelectValue placeholder="Select binding kind">
-                          {formatBindingKind(row.kind)}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SANDBOX_INTEGRATION_BINDING_KIND_OPTIONS.map((kind) => (
-                          <SelectItem key={kind} value={kind}>
-                            {formatBindingKind(kind)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <p className="text-muted-foreground text-sm">{formatBindingKind(row.kind)}</p>
                   </FieldContent>
                 </Field>
 
@@ -1562,10 +1507,11 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
                             : availableTargets.find(
                                 (target) => target.targetKey === selectedConnection.targetKey,
                               );
+                        const resolvedKind = resolveBindingKindFromTarget(selectedTarget);
                         handleIntegrationBindingRowChange(row.clientId, {
                           connectionId: nextValue,
+                          ...(resolvedKind === undefined ? {} : { kind: resolvedKind }),
                           config: createDefaultBindingConfig({
-                            kind: row.kind,
                             ...(selectedConnection === undefined
                               ? {}
                               : { connection: selectedConnection }),

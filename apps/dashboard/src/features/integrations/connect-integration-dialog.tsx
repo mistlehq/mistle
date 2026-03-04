@@ -12,10 +12,18 @@ import {
 } from "@mistle/ui";
 
 export type ConnectMethodId = "api-key" | "oauth";
+export const ConnectMethodIds: {
+  API_KEY: ConnectMethodId;
+  OAUTH: ConnectMethodId;
+} = {
+  API_KEY: "api-key",
+  OAUTH: "oauth",
+};
 
 export type ConnectDialogState = {
   displayName: string;
   targetKey: string;
+  methods: readonly ConnectMethodId[];
 };
 
 type ConnectIntegrationDialogProps = {
@@ -30,7 +38,16 @@ type ConnectIntegrationDialogProps = {
   onSubmit: () => void;
 };
 
+function formatConnectMethodLabel(methodId: ConnectMethodId): string {
+  if (methodId === ConnectMethodIds.API_KEY) {
+    return "API key";
+  }
+  return "OAuth";
+}
+
 export function ConnectIntegrationDialog(props: ConnectIntegrationDialogProps) {
+  const dialog = props.dialog;
+
   return (
     <Dialog
       onOpenChange={(nextOpen) => {
@@ -38,12 +55,12 @@ export function ConnectIntegrationDialog(props: ConnectIntegrationDialogProps) {
           props.onClose();
         }
       }}
-      open={props.dialog !== null}
+      open={dialog !== null}
     >
-      {props.dialog ? (
+      {dialog ? (
         <DialogContent showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>Connect {props.dialog.displayName}?</DialogTitle>
+            <DialogTitle>Connect {dialog.displayName}?</DialogTitle>
             <DialogDescription>
               Choose an authentication method to create the integration connection.
             </DialogDescription>
@@ -51,39 +68,31 @@ export function ConnectIntegrationDialog(props: ConnectIntegrationDialogProps) {
 
           <RadioGroup
             className="gap-2"
-            name={`connect-auth-method-${props.dialog.targetKey}`}
+            name={`connect-auth-method-${dialog.targetKey}`}
             onValueChange={(nextValue) => {
-              if (nextValue === "api-key" || nextValue === "oauth") {
+              if (nextValue === ConnectMethodIds.API_KEY || nextValue === ConnectMethodIds.OAUTH) {
                 props.onMethodChange(nextValue);
               }
             }}
             value={props.connectMethodId}
           >
-            <label
-              className="inline-flex items-center gap-2 text-sm"
-              htmlFor={`connect-auth-method-${props.dialog.targetKey}-api-key`}
-            >
-              <RadioGroupItem
-                aria-label="API key"
-                id={`connect-auth-method-${props.dialog.targetKey}-api-key`}
-                value="api-key"
-              />
-              <span>API key</span>
-            </label>
-            <label
-              className="inline-flex items-center gap-2 text-sm"
-              htmlFor={`connect-auth-method-${props.dialog.targetKey}-oauth`}
-            >
-              <RadioGroupItem
-                aria-label="OAuth"
-                id={`connect-auth-method-${props.dialog.targetKey}-oauth`}
-                value="oauth"
-              />
-              <span>OAuth</span>
-            </label>
+            {dialog.methods.map((methodId) => (
+              <label
+                className="inline-flex items-center gap-2 text-sm"
+                htmlFor={`connect-auth-method-${dialog.targetKey}-${methodId}`}
+                key={methodId}
+              >
+                <RadioGroupItem
+                  aria-label={formatConnectMethodLabel(methodId)}
+                  id={`connect-auth-method-${dialog.targetKey}-${methodId}`}
+                  value={methodId}
+                />
+                <span>{formatConnectMethodLabel(methodId)}</span>
+              </label>
+            ))}
           </RadioGroup>
 
-          {props.connectMethodId === "api-key" ? (
+          {props.connectMethodId === ConnectMethodIds.API_KEY ? (
             <div className="gap-2 flex flex-col">
               <p className="text-sm font-medium">API key</p>
               <Input
@@ -111,7 +120,9 @@ export function ConnectIntegrationDialog(props: ConnectIntegrationDialogProps) {
               Cancel
             </Button>
             <Button disabled={props.pending} onClick={props.onSubmit} type="button">
-              {props.connectMethodId === "api-key" ? "Create connection" : "Continue with OAuth"}
+              {props.connectMethodId === ConnectMethodIds.API_KEY
+                ? "Create connection"
+                : "Continue with OAuth"}
             </Button>
           </DialogFooter>
         </DialogContent>

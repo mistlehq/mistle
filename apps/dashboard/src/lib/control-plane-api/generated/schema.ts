@@ -586,15 +586,16 @@ export interface paths {
                 displayNameOverride?: string;
                 enabled: boolean;
                 familyId: string;
+                logoKey?: string;
                 resolvedBindingEditorUi?: {
                   [key: string]: unknown;
                 };
-                resolvedBindingUi?: {
-                  [key: string]: unknown;
-                };
+                supportedAuthSchemes?: ("oauth" | "api-key")[];
                 targetHealth: {
                   /** @enum {string} */
                   configStatus: "valid" | "invalid";
+                  /** @enum {string} */
+                  reason?: "invalid-config" | "invalid-projection";
                 };
                 targetKey: string;
                 variantId: string;

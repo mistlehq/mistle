@@ -15,14 +15,19 @@ export const IntegrationTargetSchema = z
     config: z.record(z.string(), z.unknown()),
     displayName: z.string().min(1),
     description: z.string().min(1),
+    logoKey: z.string().min(1).optional(),
+    supportedAuthSchemes: z
+      .array(z.enum(["oauth", "api-key"]))
+      .min(1)
+      .optional(),
     displayNameOverride: z.string().min(1).optional(),
     descriptionOverride: z.string().min(1).optional(),
     targetHealth: z
       .object({
         configStatus: z.enum(["valid", "invalid"]),
+        reason: z.enum(["invalid-config", "invalid-projection"]).optional(),
       })
       .strict(),
-    resolvedBindingUi: z.record(z.string().min(1), z.unknown()).optional(),
     resolvedBindingEditorUi: z.record(z.string().min(1), z.unknown()).optional(),
   })
   .strict();

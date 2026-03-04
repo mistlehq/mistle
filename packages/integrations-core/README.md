@@ -129,7 +129,7 @@ flowchart TD
 
 - Targets are operator-managed records persisted in control-plane DB.
 - Discovery resolves metadata from definitions (`displayName`, `description`) with optional DB overrides.
-- Control-plane target discovery may also include projected UI-safe metadata derived from validated target config (for example `targetHealth` and `resolvedBindingUi`).
+- Control-plane target discovery may also include projected UI-safe metadata derived from validated target config (for example `targetHealth` and `resolvedBindingEditorUi`).
 - UI consumers should prefer projection fields for behavior and rendering instead of parsing raw target config payloads directly.
 - Provider projection logic and projection schema are definition-owned. Control-plane only orchestrates parse/project/validate and returns generic projection envelopes.
 - For browser clients, definitions can expose browser-safe projection contracts/parsers through `@mistle/integrations-definitions/ui` (for example `ui-contract.ts` modules), so dashboard code does not duplicate provider schema logic.
@@ -197,7 +197,7 @@ This is the recommended workflow.
 - `target-secret-schema.ts` (if needed)
 - `binding-config-schema.ts`
 - `connection-config-schema.ts` (if connection config has integration-specific shape)
-- `ui-contract.ts` (recommended): browser-safe projection schema/parser for `resolvedBindingUi` payload consumed by frontend clients
+- `ui-contract.ts` (recommended): browser-safe projection schema/parser for `resolvedBindingEditorUi` payload consumed by frontend clients
 - Keep schemas strict and normalized (for example URL normalization).
 - If binding semantics depend on cross-object context (target + connection + binding), implement `validateBindingWriteContext(...)` in the definition.
 

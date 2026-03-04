@@ -4,9 +4,9 @@ const IntegrationRegistry = createIntegrationRegistry();
 
 export type ProjectedTargetHealth = {
   configStatus: "valid" | "invalid";
+  reason?: "invalid-config" | "invalid-projection";
 };
 
-export type ProjectedBindingUi = Record<string, unknown>;
 export type ProjectedBindingEditorUi = Record<string, unknown>;
 
 export function projectTargetUi(input: {
@@ -15,7 +15,6 @@ export function projectTargetUi(input: {
   config: Record<string, unknown>;
 }): {
   targetHealth: ProjectedTargetHealth;
-  resolvedBindingUi?: ProjectedBindingUi;
   resolvedBindingEditorUi?: ProjectedBindingEditorUi;
 } {
   const definition = IntegrationRegistry.getDefinition({
@@ -30,23 +29,19 @@ export function projectTargetUi(input: {
     };
   }
 
+  let parsedTargetConfig: Record<string, unknown>;
   try {
-    const parsedTargetConfig = definition.targetConfigSchema.parse(input.config);
-    const projectedBindingUi =
-      definition.projectTargetUi === undefined
-        ? undefined
-        : definition.projectTargetUi({
-            familyId: input.familyId,
-            variantId: input.variantId,
-            kind: definition.kind,
-            targetConfig: parsedTargetConfig,
-          });
-    const resolvedBindingUi =
-      projectedBindingUi === undefined
-        ? undefined
-        : definition.targetUiProjectionSchema === undefined
-          ? projectedBindingUi
-          : definition.targetUiProjectionSchema.parse(projectedBindingUi);
+    parsedTargetConfig = definition.targetConfigSchema.parse(input.config);
+  } catch {
+    return {
+      targetHealth: {
+        configStatus: "invalid",
+        reason: "invalid-config",
+      },
+    };
+  }
+
+  try {
     const projectedBindingEditorUi =
       definition.projectBindingEditorUi === undefined
         ? undefined
@@ -63,12 +58,11 @@ export function projectTargetUi(input: {
           ? projectedBindingEditorUi
           : definition.bindingEditorUiProjectionSchema.parse(projectedBindingEditorUi);
 
-    if (resolvedBindingUi !== undefined || resolvedBindingEditorUi !== undefined) {
+    if (resolvedBindingEditorUi !== undefined) {
       return {
         targetHealth: {
           configStatus: "valid",
         },
-        ...(resolvedBindingUi === undefined ? {} : { resolvedBindingUi }),
         ...(resolvedBindingEditorUi === undefined ? {} : { resolvedBindingEditorUi }),
       };
     }
@@ -82,6 +76,7 @@ export function projectTargetUi(input: {
     return {
       targetHealth: {
         configStatus: "invalid",
+        reason: "invalid-projection",
       },
     };
   }
