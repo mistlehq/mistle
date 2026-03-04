@@ -32,7 +32,7 @@ export type CreateHandleAutomationRunWorkflowInput = {
 };
 
 export function createHandleAutomationRunWorkflow(
-  input: CreateHandleAutomationRunWorkflowInput,
+  ctx: CreateHandleAutomationRunWorkflowInput,
 ): Workflow<
   HandleAutomationRunWorkflowInput,
   HandleAutomationRunWorkflowOutput,
@@ -41,7 +41,7 @@ export function createHandleAutomationRunWorkflow(
   return defineWorkflow(HandleAutomationRunWorkflowSpec, async ({ input: workflowInput, step }) => {
     const transitionResult = await step.run(
       { name: "transition-automation-run-to-running" },
-      async () => input.transitionAutomationRunToRunning(workflowInput),
+      async () => ctx.transitionAutomationRunToRunning(workflowInput),
     );
     if (!transitionResult.shouldProcess) {
       return {
@@ -51,18 +51,18 @@ export function createHandleAutomationRunWorkflow(
 
     try {
       await step.run({ name: "prepare-automation-run" }, async () =>
-        input.prepareAutomationRun(workflowInput),
+        ctx.prepareAutomationRun(workflowInput),
       );
 
       await step.run({ name: "mark-automation-run-completed" }, async () =>
-        input.markAutomationRunCompleted(workflowInput),
+        ctx.markAutomationRunCompleted(workflowInput),
       );
     } catch (error) {
-      const failure = input.resolveAutomationRunFailure({
+      const failure = ctx.resolveAutomationRunFailure({
         error,
       });
       await step.run({ name: "mark-automation-run-failed" }, async () =>
-        input.markAutomationRunFailed({
+        ctx.markAutomationRunFailed({
           automationRunId: workflowInput.automationRunId,
           failureCode: failure.code,
           failureMessage: failure.message,

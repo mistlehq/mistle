@@ -5,10 +5,7 @@ import {
   type AutomationRunStatus,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
-import type {
-  HandleAutomationRunWorkflowInput,
-  HandleAutomationRunWorkflowOutput,
-} from "@mistle/workflows/control-plane";
+import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
 export type HandleAutomationRunDependencies = {
@@ -75,45 +72,11 @@ export function resolveAutomationRunFailure(input: unknown): { code: string; mes
   };
 }
 
-async function markAutomationRunCompletedInDatabase(input: {
-  db: ControlPlaneDatabase;
-  automationRunId: string;
-}): Promise<void> {
-  await input.db
-    .update(automationRuns)
-    .set({
-      status: AutomationRunStatuses.COMPLETED,
-      failureCode: null,
-      failureMessage: null,
-      finishedAt: sql`now()`,
-      updatedAt: sql`now()`,
-    })
-    .where(eq(automationRuns.id, input.automationRunId));
-}
-
-async function markAutomationRunFailedInDatabase(input: {
-  db: ControlPlaneDatabase;
-  automationRunId: string;
-  failureCode: string;
-  failureMessage: string;
-}): Promise<void> {
-  await input.db
-    .update(automationRuns)
-    .set({
-      status: AutomationRunStatuses.FAILED,
-      failureCode: input.failureCode,
-      failureMessage: input.failureMessage,
-      finishedAt: sql`now()`,
-      updatedAt: sql`now()`,
-    })
-    .where(eq(automationRuns.id, input.automationRunId));
-}
-
-async function transitionAutomationRunToRunningRecord(input: {
-  db: ControlPlaneDatabase;
-  automationRunId: string;
-}) {
-  const transitionedRows = await input.db
+export async function transitionAutomationRunToRunning(
+  deps: HandleAutomationRunDependencies,
+  input: HandleAutomationRunWorkflowInput,
+): Promise<TransitionAutomationRunToRunningOutput> {
+  const transitionedRows = await deps.db
     .update(automationRuns)
     .set({
       status: AutomationRunStatuses.RUNNING,
@@ -130,10 +93,12 @@ async function transitionAutomationRunToRunningRecord(input: {
 
   const transitionedRun = transitionedRows[0];
   if (transitionedRun !== undefined) {
-    return transitionedRun;
+    return {
+      shouldProcess: true,
+    };
   }
 
-  const existingRun = await input.db.query.automationRuns.findFirst({
+  const existingRun = await deps.db.query.automationRuns.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
   });
   if (existingRun === undefined) {
@@ -143,11 +108,16 @@ async function transitionAutomationRunToRunningRecord(input: {
     });
   }
 
-  if (
-    TerminalAutomationRunStatuses.has(existingRun.status) ||
-    existingRun.status === AutomationRunStatuses.RUNNING
-  ) {
-    return null;
+  if (TerminalAutomationRunStatuses.has(existingRun.status)) {
+    return {
+      shouldProcess: false,
+    };
+  }
+
+  if (existingRun.status === AutomationRunStatuses.RUNNING) {
+    return {
+      shouldProcess: true,
+    };
   }
 
   throw new AutomationRunExecutionError({
@@ -226,20 +196,6 @@ function compileTemplates(input: {
       });
     }
   }
-}
-
-export async function transitionAutomationRunToRunning(
-  deps: HandleAutomationRunDependencies,
-  input: HandleAutomationRunWorkflowInput,
-): Promise<TransitionAutomationRunToRunningOutput> {
-  const automationRun = await transitionAutomationRunToRunningRecord({
-    db: deps.db,
-    automationRunId: input.automationRunId,
-  });
-
-  return {
-    shouldProcess: automationRun !== null,
-  };
 }
 
 export async function prepareAutomationRun(
@@ -338,9 +294,45 @@ export async function markAutomationRunCompleted(
   deps: HandleAutomationRunDependencies,
   input: HandleAutomationRunWorkflowInput,
 ): Promise<void> {
-  await markAutomationRunCompletedInDatabase({
-    db: deps.db,
-    automationRunId: input.automationRunId,
+  const updatedRows = await deps.db
+    .update(automationRuns)
+    .set({
+      status: AutomationRunStatuses.COMPLETED,
+      failureCode: null,
+      failureMessage: null,
+      finishedAt: sql`now()`,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(automationRuns.id, input.automationRunId),
+        eq(automationRuns.status, AutomationRunStatuses.RUNNING),
+      ),
+    )
+    .returning({
+      id: automationRuns.id,
+    });
+  if (updatedRows.length > 0) {
+    return;
+  }
+
+  const existingRun = await deps.db.query.automationRuns.findFirst({
+    where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
+  });
+  if (existingRun === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_NOT_FOUND,
+      message: `Automation run '${input.automationRunId}' was not found.`,
+    });
+  }
+
+  if (existingRun.status === AutomationRunStatuses.COMPLETED) {
+    return;
+  }
+
+  throw new AutomationRunExecutionError({
+    code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+    message: `Automation run '${input.automationRunId}' could not be marked completed from status '${existingRun.status}'.`,
   });
 }
 
@@ -348,40 +340,48 @@ export async function markAutomationRunFailed(
   deps: HandleAutomationRunDependencies,
   input: MarkAutomationRunFailedInput,
 ): Promise<void> {
-  await markAutomationRunFailedInDatabase({
-    db: deps.db,
-    automationRunId: input.automationRunId,
-    failureCode: input.failureCode,
-    failureMessage: input.failureMessage,
-  });
-}
-
-export async function handleAutomationRun(
-  deps: HandleAutomationRunDependencies,
-  input: HandleAutomationRunWorkflowInput,
-): Promise<HandleAutomationRunWorkflowOutput> {
-  const transitionResult = await transitionAutomationRunToRunning(deps, input);
-  if (!transitionResult.shouldProcess) {
-    return {
-      automationRunId: input.automationRunId,
-    };
-  }
-
-  try {
-    await prepareAutomationRun(deps, input);
-    await markAutomationRunCompleted(deps, input);
-  } catch (error) {
-    const failure = resolveAutomationRunFailure(error);
-    await markAutomationRunFailed(deps, {
-      automationRunId: input.automationRunId,
-      failureCode: failure.code,
-      failureMessage: failure.message,
+  const updatedRows = await deps.db
+    .update(automationRuns)
+    .set({
+      status: AutomationRunStatuses.FAILED,
+      failureCode: input.failureCode,
+      failureMessage: input.failureMessage,
+      finishedAt: sql`now()`,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(automationRuns.id, input.automationRunId),
+        eq(automationRuns.status, AutomationRunStatuses.RUNNING),
+      ),
+    )
+    .returning({
+      id: automationRuns.id,
     });
-
-    throw error;
+  if (updatedRows.length > 0) {
+    return;
   }
 
-  return {
-    automationRunId: input.automationRunId,
-  };
+  const existingRun = await deps.db.query.automationRuns.findFirst({
+    where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
+  });
+  if (existingRun === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_NOT_FOUND,
+      message: `Automation run '${input.automationRunId}' was not found.`,
+    });
+  }
+
+  if (
+    existingRun.status === AutomationRunStatuses.FAILED &&
+    existingRun.failureCode === input.failureCode &&
+    existingRun.failureMessage === input.failureMessage
+  ) {
+    return;
+  }
+
+  throw new AutomationRunExecutionError({
+    code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+    message: `Automation run '${input.automationRunId}' could not be marked failed from status '${existingRun.status}'.`,
+  });
 }

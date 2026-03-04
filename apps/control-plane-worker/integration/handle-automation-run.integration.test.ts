@@ -20,10 +20,17 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
+import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
-import { handleAutomationRun } from "../src/runtime/services/handle-automation-run.js";
+import {
+  markAutomationRunCompleted,
+  markAutomationRunFailed,
+  prepareAutomationRun,
+  resolveAutomationRunFailure,
+  transitionAutomationRunToRunning,
+} from "../src/runtime/services/handle-automation-run.js";
 import { it } from "./test-context.js";
 
 const TestTimeoutMs = 120_000;
@@ -51,6 +58,36 @@ async function createTestDatabase(input: { databaseUrl: string }) {
 }
 
 describe("handleAutomationRun integration", () => {
+  async function executeHandleAutomationRunSteps(input: {
+    db: ReturnType<typeof createControlPlaneDatabase>;
+    automationRunId: string;
+  }) {
+    const workflowInput: HandleAutomationRunWorkflowInput = {
+      automationRunId: input.automationRunId,
+    };
+    const deps = {
+      db: input.db,
+    };
+
+    const transitionResult = await transitionAutomationRunToRunning(deps, workflowInput);
+    if (!transitionResult.shouldProcess) {
+      return;
+    }
+
+    try {
+      await prepareAutomationRun(deps, workflowInput);
+      await markAutomationRunCompleted(deps, workflowInput);
+    } catch (error) {
+      const failure = resolveAutomationRunFailure(error);
+      await markAutomationRunFailed(deps, {
+        automationRunId: workflowInput.automationRunId,
+        failureCode: failure.code,
+        failureMessage: failure.message,
+      });
+      throw error;
+    }
+  }
+
   it(
     "marks queued runs completed when templates compile successfully",
     async ({ fixture }) => {
@@ -146,16 +183,8 @@ describe("handleAutomationRun integration", () => {
           status: AutomationRunStatuses.QUEUED,
         });
 
-        const workflowOutput = await handleAutomationRun(
-          {
-            db: database.db,
-          },
-          {
-            automationRunId,
-          },
-        );
-
-        expect(workflowOutput).toEqual({
+        await executeHandleAutomationRunSteps({
+          db: database.db,
           automationRunId,
         });
 
@@ -169,6 +198,124 @@ describe("handleAutomationRun integration", () => {
 
         expect(persistedRun.status).toBe(AutomationRunStatuses.COMPLETED);
         expect(persistedRun.startedAt).toBeDefined();
+        expect(persistedRun.finishedAt).toBeDefined();
+        expect(persistedRun.failureCode).toBeNull();
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "continues processing and completes runs already in running status",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const organizationId = "org_worker_automation_run_running";
+        const sandboxProfileId = "sbp_worker_automation_run_running";
+        const automationId = "atm_worker_automation_run_running";
+        const automationTargetId = "atg_worker_automation_run_running";
+        const webhookEventId = "iwe_worker_automation_run_running";
+        const automationRunId = "aru_worker_automation_run_running";
+        const connectionId = "icn_worker_automation_run_running";
+        const targetKey = "github-cloud-worker-automation-run-running";
+
+        await database.db.insert(organizations).values({
+          id: organizationId,
+          name: "Worker Automation Run Running",
+          slug: "worker-automation-run-running",
+        });
+        await database.db.insert(sandboxProfiles).values({
+          id: sandboxProfileId,
+          organizationId,
+          displayName: "Automation Run Running Profile",
+          status: "active",
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey,
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: connectionId,
+          organizationId,
+          targetKey,
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "123456",
+          config: {},
+        });
+        await database.db.insert(automations).values({
+          id: automationId,
+          organizationId,
+          kind: AutomationKinds.WEBHOOK,
+          name: "Automation Run Running",
+          enabled: true,
+        });
+        await database.db.insert(webhookAutomations).values({
+          automationId,
+          integrationConnectionId: connectionId,
+          eventTypes: ["github.issue_comment.created"],
+          payloadFilter: null,
+          inputTemplate: "Handle {{payload.comment.body}}",
+          conversationKeyTemplate: "issue-{{payload.issue.number}}",
+          idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
+        });
+        await database.db.insert(automationTargets).values({
+          id: automationTargetId,
+          automationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+        });
+        await database.db.insert(integrationWebhookEvents).values({
+          id: webhookEventId,
+          organizationId,
+          integrationConnectionId: connectionId,
+          targetKey,
+          externalEventId: "evt_running",
+          externalDeliveryId: "delivery_running",
+          providerEventType: "issue_comment",
+          eventType: "github.issue_comment.created",
+          payload: {
+            issue: {
+              number: 101,
+            },
+            comment: {
+              body: "@mistlebot replay",
+            },
+          },
+          status: IntegrationWebhookEventStatuses.PROCESSED,
+        });
+        await database.db.insert(automationRuns).values({
+          id: automationRunId,
+          automationId,
+          automationTargetId,
+          sourceWebhookEventId: webhookEventId,
+          status: AutomationRunStatuses.RUNNING,
+        });
+
+        await executeHandleAutomationRunSteps({
+          db: database.db,
+          automationRunId,
+        });
+
+        const persistedRun = await database.db.query.automationRuns.findFirst({
+          where: (table, { eq }) => eq(table.id, automationRunId),
+        });
+        expect(persistedRun).toBeDefined();
+        if (persistedRun === undefined) {
+          throw new Error("Expected persisted automation run.");
+        }
+
+        expect(persistedRun.status).toBe(AutomationRunStatuses.COMPLETED);
         expect(persistedRun.finishedAt).toBeDefined();
         expect(persistedRun.failureCode).toBeNull();
       } finally {
@@ -274,15 +421,13 @@ describe("handleAutomationRun integration", () => {
         });
 
         await expect(
-          handleAutomationRun(
-            {
-              db: database.db,
-            },
-            {
-              automationRunId,
-            },
-          ),
-        ).rejects.toThrowError("Template path 'comment.missing_field' could not be resolved.");
+          executeHandleAutomationRunSteps({
+            db: database.db,
+            automationRunId,
+          }),
+        ).rejects.toThrowError(
+          "Template path 'payload.comment.missing_field' could not be resolved.",
+        );
 
         const persistedRun = await database.db.query.automationRuns.findFirst({
           where: (table, { eq }) => eq(table.id, automationRunId),

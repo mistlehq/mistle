@@ -18,10 +18,17 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
+import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
-import { handleAutomationRun } from "../src/runtime/services/handle-automation-run.js";
+import {
+  markAutomationRunCompleted,
+  markAutomationRunFailed,
+  prepareAutomationRun,
+  resolveAutomationRunFailure,
+  transitionAutomationRunToRunning,
+} from "../src/runtime/services/handle-automation-run.js";
 import { handleIntegrationWebhookEvent } from "../src/runtime/services/handle-integration-webhook-event.js";
 import { it } from "./test-context.js";
 
@@ -50,6 +57,36 @@ async function createTestDatabase(input: { databaseUrl: string }) {
 }
 
 describe("handleIntegrationWebhookEvent integration", () => {
+  async function executeHandleAutomationRunSteps(input: {
+    db: ReturnType<typeof createControlPlaneDatabase>;
+    automationRunId: string;
+  }) {
+    const workflowInput: HandleAutomationRunWorkflowInput = {
+      automationRunId: input.automationRunId,
+    };
+    const deps = {
+      db: input.db,
+    };
+
+    const transitionResult = await transitionAutomationRunToRunning(deps, workflowInput);
+    if (!transitionResult.shouldProcess) {
+      return;
+    }
+
+    try {
+      await prepareAutomationRun(deps, workflowInput);
+      await markAutomationRunCompleted(deps, workflowInput);
+    } catch (error) {
+      const failure = resolveAutomationRunFailure(error);
+      await markAutomationRunFailed(deps, {
+        automationRunId: workflowInput.automationRunId,
+        failureCode: failure.code,
+        failureMessage: failure.message,
+      });
+      throw error;
+    }
+  }
+
   it(
     "resolves matching webhook automations and queues automation runs",
     async ({ fixture }) => {
@@ -149,14 +186,10 @@ describe("handleIntegrationWebhookEvent integration", () => {
             db: database.db,
             enqueueAutomationRuns: async ({ automationRunIds }) => {
               for (const automationRunId of automationRunIds) {
-                await handleAutomationRun(
-                  {
-                    db: database.db,
-                  },
-                  {
-                    automationRunId,
-                  },
-                );
+                await executeHandleAutomationRunSteps({
+                  db: database.db,
+                  automationRunId,
+                });
               }
             },
           },
