@@ -17,7 +17,7 @@ services:
       timeout: 2s
       retries: 30
     volumes:
-      - mistle_local_postgres_data:/var/lib/postgresql/data
+      - mistle_local_postgres_data:/var/lib/postgresql
 
   pgbouncer:
     image: edoburu/pgbouncer:v1.25.1-p0
@@ -62,14 +62,14 @@ services:
   tunnel:
     image: "${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}"
     volumes:
-      - "${CLOUDFLARED_CONFIG_PATH:?CLOUDFLARED_CONFIG_PATH is required}:/etc/cloudflared/config.yml:ro"
+      - "${CLOUDFLARED_CONFIG_PATH:-./.generated/cloudflared-config.yml}:/etc/cloudflared/config.yml:ro"
     command:
       - tunnel
       - --config
       - /etc/cloudflared/config.yml
       - run
       - --token
-      - "${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is required}"
+      - "${CLOUDFLARE_TUNNEL_TOKEN:-}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
