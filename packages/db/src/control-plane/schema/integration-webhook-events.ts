@@ -1,8 +1,10 @@
 import { index, jsonb, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
+import { integrationConnections } from "./integration-connections.js";
 import { integrationTargets } from "./integration-targets.js";
 import { controlPlaneSchema } from "./namespace.js";
+import { organizations } from "./organizations.js";
 
 export const IntegrationWebhookEventStatuses = {
   RECEIVED: "received",
@@ -22,6 +24,12 @@ export const integrationWebhookEvents = controlPlaneSchema.table(
     id: text("id")
       .primaryKey()
       .$defaultFn(() => typeid("iwe").toString()),
+    organizationId: text("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    integrationConnectionId: text("integration_connection_id")
+      .notNull()
+      .references(() => integrationConnections.id, { onDelete: "cascade" }),
     targetKey: text("target_key")
       .notNull()
       .references(() => integrationTargets.targetKey, { onDelete: "restrict" }),
@@ -40,6 +48,10 @@ export const integrationWebhookEvents = controlPlaneSchema.table(
     uniqueIndex("integration_webhook_events_target_key_external_event_id_uidx").on(
       table.targetKey,
       table.externalEventId,
+    ),
+    index("integration_webhook_events_organization_id_idx").on(table.organizationId),
+    index("integration_webhook_events_integration_connection_id_idx").on(
+      table.integrationConnectionId,
     ),
     index("integration_webhook_events_target_key_idx").on(table.targetKey),
     index("integration_webhook_events_status_idx").on(table.status),

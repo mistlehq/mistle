@@ -1,32 +1,41 @@
 import { describe, expect, it } from "vitest";
 
 import { IntegrationWebhookError, WebhookErrorCodes } from "../errors/index.js";
-import type { IntegrationWebhookConnectionRef, IntegrationWebhookHandler } from "../types/index.js";
+import type { IntegrationConnection, IntegrationWebhookHandler } from "../types/index.js";
 import {
-  assertWebhookConnectionRefOrThrow,
   getWebhookHandlerOrThrow,
   normalizeWebhookHeaders,
   verifyAndParseWebhookOrThrow,
 } from "./index.js";
 
+const CandidateConnection: IntegrationConnection = {
+  id: "icn_123",
+  status: "active",
+  externalSubjectId: "subj_123",
+  config: {},
+};
+
 function createWebhookHandler(input?: {
+  resolveConnectionResult?:
+    | { ok: true; connectionId: string }
+    | { ok: false; code: "connection-not-found" | "connection-ambiguous"; message: string };
   verifyResult?: { ok: true } | { ok: false; code: "invalid-signature"; message: string };
   eventType?: string;
-  targetKey?: string;
 }): IntegrationWebhookHandler {
   return {
+    resolveConnection: () =>
+      input?.resolveConnectionResult ?? {
+        ok: true,
+        connectionId: CandidateConnection.id,
+      },
     verify: () => input?.verifyResult ?? { ok: true },
-    parse: ({ targetKey }) => ({
+    parse: () => ({
       externalEventId: "evt_123",
       externalDeliveryId: "delivery_123",
       providerEventType: "issue_comment",
       eventType: input?.eventType ?? "github.issue_comment.created",
       payload: {
         hello: "world",
-      },
-      connectionRef: {
-        targetKey: input?.targetKey ?? targetKey,
-        externalSubjectId: "subj_123",
       },
     }),
   };
@@ -80,8 +89,8 @@ describe("webhook helpers", () => {
     }
   });
 
-  it("verifies and parses webhook events", async () => {
-    const webhookEvent = await verifyAndParseWebhookOrThrow({
+  it("parses, resolves connection, and verifies webhook events", async () => {
+    const resolvedWebhook = await verifyAndParseWebhookOrThrow({
       definition: {
         familyId: "github",
         variantId: "github-cloud",
@@ -95,6 +104,7 @@ describe("webhook helpers", () => {
         config: {},
         secrets: {},
       },
+      connections: [CandidateConnection],
       resolveConnectionSecrets: () => ({}),
       headers: {
         "x-event": "issue_comment",
@@ -102,8 +112,8 @@ describe("webhook helpers", () => {
       rawBody: new TextEncoder().encode('{"ok":true}'),
     });
 
-    expect(webhookEvent.eventType).toBe("github.issue_comment.created");
-    expect(webhookEvent.connectionRef.targetKey).toBe("github_cloud");
+    expect(resolvedWebhook.event.eventType).toBe("github.issue_comment.created");
+    expect(resolvedWebhook.connectionId).toBe(CandidateConnection.id);
   });
 
   it("throws when webhook verification fails", async () => {
@@ -128,6 +138,7 @@ describe("webhook helpers", () => {
           config: {},
           secrets: {},
         },
+        connections: [CandidateConnection],
         resolveConnectionSecrets: () => ({}),
         headers: {},
         rawBody: new Uint8Array(),
@@ -135,45 +146,105 @@ describe("webhook helpers", () => {
     ).rejects.toBeInstanceOf(IntegrationWebhookError);
   });
 
-  it("does not filter webhook event types", async () => {
-    const webhookEvent = await verifyAndParseWebhookOrThrow({
-      definition: {
-        familyId: "github",
-        variantId: "github-cloud",
-        webhookHandler: {
-          verify: () => ({ ok: true }),
-          parse: ({ targetKey }) => ({
-            externalEventId: "evt_123",
-            externalDeliveryId: "delivery_123",
-            providerEventType: "pull_request",
-            eventType: "github.pull_request.opened",
-            payload: {},
-            connectionRef: {
-              targetKey,
-              externalSubjectId: "subj_123",
+  it("maps missing connection resolution to webhook connection-not-found error", async () => {
+    await expect(
+      verifyAndParseWebhookOrThrow({
+        definition: {
+          familyId: "github",
+          variantId: "github-cloud",
+          webhookHandler: createWebhookHandler({
+            resolveConnectionResult: {
+              ok: false,
+              code: "connection-not-found",
+              message: "No active connection matches webhook subject.",
             },
           }),
         },
-      },
-      targetKey: "github_cloud",
-      target: {
-        familyId: "github",
-        variantId: "github-cloud",
-        enabled: true,
-        config: {},
-        secrets: {},
-      },
-      resolveConnectionSecrets: () => ({}),
-      headers: {},
-      rawBody: new Uint8Array(),
+        targetKey: "github_cloud",
+        target: {
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {},
+          secrets: {},
+        },
+        connections: [CandidateConnection],
+        resolveConnectionSecrets: () => ({}),
+        headers: {},
+        rawBody: new Uint8Array(),
+      }),
+    ).rejects.toMatchObject({
+      code: WebhookErrorCodes.WEBHOOK_CONNECTION_NOT_FOUND,
     });
-
-    expect(webhookEvent.eventType).toBe("github.pull_request.opened");
   });
 
-  it("resolves connection secrets using parsed connectionRef before verification", async () => {
-    let resolvedConnectionRef: IntegrationWebhookConnectionRef | undefined;
-    let verifyConnectionRef: IntegrationWebhookConnectionRef | undefined;
+  it("maps ambiguous connection resolution to webhook connection-ambiguous error", async () => {
+    await expect(
+      verifyAndParseWebhookOrThrow({
+        definition: {
+          familyId: "github",
+          variantId: "github-cloud",
+          webhookHandler: createWebhookHandler({
+            resolveConnectionResult: {
+              ok: false,
+              code: "connection-ambiguous",
+              message: "Multiple connections match webhook subject.",
+            },
+          }),
+        },
+        targetKey: "github_cloud",
+        target: {
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {},
+          secrets: {},
+        },
+        connections: [CandidateConnection],
+        resolveConnectionSecrets: () => ({}),
+        headers: {},
+        rawBody: new Uint8Array(),
+      }),
+    ).rejects.toMatchObject({
+      code: WebhookErrorCodes.WEBHOOK_CONNECTION_AMBIGUOUS,
+    });
+  });
+
+  it("fails when resolver returns a connection id that is not in candidates", async () => {
+    await expect(
+      verifyAndParseWebhookOrThrow({
+        definition: {
+          familyId: "github",
+          variantId: "github-cloud",
+          webhookHandler: createWebhookHandler({
+            resolveConnectionResult: {
+              ok: true,
+              connectionId: "icn_unknown",
+            },
+          }),
+        },
+        targetKey: "github_cloud",
+        target: {
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {},
+          secrets: {},
+        },
+        connections: [CandidateConnection],
+        resolveConnectionSecrets: () => ({}),
+        headers: {},
+        rawBody: new Uint8Array(),
+      }),
+    ).rejects.toMatchObject({
+      code: WebhookErrorCodes.WEBHOOK_CONNECTION_RESOLUTION_FAILED,
+    });
+  });
+
+  it("passes resolved connection and event into verify and secret resolver", async () => {
+    let resolvedConnectionId: string | undefined;
+    let verifyConnectionId: string | undefined;
+    let verifyEventType: string | undefined;
     let verifyConnectionSecrets: Record<string, string> | undefined;
 
     await verifyAndParseWebhookOrThrow({
@@ -181,21 +252,22 @@ describe("webhook helpers", () => {
         familyId: "github",
         variantId: "github-cloud",
         webhookHandler: {
+          resolveConnection: () => ({
+            ok: true,
+            connectionId: CandidateConnection.id,
+          }),
           verify: (input) => {
-            verifyConnectionRef = input.connectionRef;
+            verifyConnectionId = input.connection.id;
+            verifyEventType = input.event.eventType;
             verifyConnectionSecrets = input.connectionSecrets;
             return { ok: true };
           },
-          parse: ({ targetKey }) => ({
+          parse: () => ({
             externalEventId: "evt_123",
             externalDeliveryId: "delivery_123",
             providerEventType: "issue_comment",
             eventType: "github.issue_comment.created",
             payload: {},
-            connectionRef: {
-              targetKey,
-              externalSubjectId: "subj_789",
-            },
           }),
         },
       },
@@ -207,8 +279,9 @@ describe("webhook helpers", () => {
         config: {},
         secrets: {},
       },
-      resolveConnectionSecrets: ({ connectionRef }) => {
-        resolvedConnectionRef = connectionRef;
+      connections: [CandidateConnection],
+      resolveConnectionSecrets: ({ connectionId }) => {
+        resolvedConnectionId = connectionId;
         return {
           webhook_secret: "whsec_123",
         };
@@ -217,28 +290,11 @@ describe("webhook helpers", () => {
       rawBody: new Uint8Array(),
     });
 
-    expect(resolvedConnectionRef).toEqual({
-      targetKey: "github_cloud",
-      externalSubjectId: "subj_789",
-    });
-    expect(verifyConnectionRef).toEqual({
-      targetKey: "github_cloud",
-      externalSubjectId: "subj_789",
-    });
+    expect(resolvedConnectionId).toBe(CandidateConnection.id);
+    expect(verifyConnectionId).toBe(CandidateConnection.id);
+    expect(verifyEventType).toBe("github.issue_comment.created");
     expect(verifyConnectionSecrets).toEqual({
       webhook_secret: "whsec_123",
     });
-  });
-
-  it("throws when connectionRef targetKey does not match route targetKey", () => {
-    expect(() =>
-      assertWebhookConnectionRefOrThrow({
-        routeTargetKey: "github_cloud",
-        connectionRef: {
-          targetKey: "github_enterprise",
-          externalSubjectId: "subj_123",
-        },
-      }),
-    ).toThrowError(IntegrationWebhookError);
   });
 });

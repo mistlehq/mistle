@@ -5,9 +5,11 @@ import {
 } from "@mistle/db/control-plane";
 import {
   IntegrationWebhookError,
+  WebhookErrorCodes,
   normalizeWebhookHeaders,
   verifyAndParseWebhookOrThrow,
 } from "@mistle/integrations-core";
+import type { IntegrationConnection } from "@mistle/integrations-core";
 
 import {
   decryptIntegrationConnectionSecrets,
@@ -34,37 +36,50 @@ export type ReceivedIntegrationWebhook = {
   webhookEventId?: string;
 };
 
-async function resolveConnectionSecretsOrThrow(input: {
-  db: AppContext["var"]["db"];
-  integrationsConfig: AppContext["var"]["config"]["integrations"];
+type ActiveWebhookConnection = {
+  id: string;
+  organizationId: string;
+  status: IntegrationConnection["status"];
+  externalSubjectId: string | null;
+  config: Record<string, unknown> | null;
+  secrets: {
+    ciphertext: string;
+    nonce: string;
+    masterKeyVersion: number;
+  } | null;
+};
+
+function toWebhookConnectionOrThrow(input: {
   targetKey: string;
-  externalSubjectId: string | undefined;
-}): Promise<IntegrationConnectionSecrets> {
-  if (input.externalSubjectId === undefined || input.externalSubjectId.length === 0) {
-    throw new IntegrationWebhooksBadRequestError(
-      IntegrationWebhooksBadRequestCodes.INVALID_WEBHOOK_REQUEST,
-      "Webhook connection reference is missing externalSubjectId.",
+  connection: ActiveWebhookConnection;
+}): IntegrationConnection {
+  if (input.connection.config === null) {
+    throw new Error(
+      `Integration connection '${input.connection.id}' for target '${input.targetKey}' is missing config.`,
     );
   }
 
-  const candidateConnections = await input.db.query.integrationConnections.findMany({
-    where: (table, { and, eq }) =>
-      and(
-        eq(table.targetKey, input.targetKey),
-        eq(table.status, IntegrationConnectionStatuses.ACTIVE),
-      ),
-  });
-  const connection = candidateConnections.find(
-    (candidateConnection) => candidateConnection.externalSubjectId === input.externalSubjectId,
-  );
+  return {
+    id: input.connection.id,
+    status: input.connection.status,
+    config: input.connection.config,
+    ...(input.connection.externalSubjectId === null
+      ? {}
+      : { externalSubjectId: input.connection.externalSubjectId }),
+  };
+}
+
+async function resolveConnectionSecretsOrThrow(input: {
+  connectionId: string;
+  connectionsById: ReadonlyMap<string, ActiveWebhookConnection>;
+  integrationsConfig: AppContext["var"]["config"]["integrations"];
+}): Promise<IntegrationConnectionSecrets> {
+  const connection = input.connectionsById.get(input.connectionId);
 
   if (connection === undefined) {
-    throw new IntegrationWebhooksNotFoundError(
-      IntegrationWebhooksNotFoundCodes.CONNECTION_NOT_FOUND,
-      [
-        `Integration connection was not found for target '${input.targetKey}'`,
-        `with externalSubjectId '${input.externalSubjectId}'.`,
-      ].join(" "),
+    throw new IntegrationWebhooksBadRequestError(
+      IntegrationWebhooksBadRequestCodes.INVALID_WEBHOOK_REQUEST,
+      `Webhook connection '${input.connectionId}' is not an active connection for this target.`,
     );
   }
 
@@ -77,11 +92,13 @@ async function resolveConnectionSecretsOrThrow(input: {
     masterEncryptionKeys: input.integrationsConfig.masterEncryptionKeys,
   });
 
-  return decryptIntegrationConnectionSecrets({
-    nonce: connection.secrets.nonce,
-    ciphertext: connection.secrets.ciphertext,
-    masterEncryptionKeyMaterial,
-  });
+  return {
+    ...decryptIntegrationConnectionSecrets({
+      nonce: connection.secrets.nonce,
+      ciphertext: connection.secrets.ciphertext,
+      masterEncryptionKeyMaterial,
+    }),
+  };
 }
 
 export async function receiveIntegrationWebhook(
@@ -119,6 +136,31 @@ export async function receiveIntegrationWebhook(
     target,
   });
   const parsedTargetSecrets = definition.targetSecretSchema.parse(resolvedTargetSecrets);
+  const activeConnections = await db.query.integrationConnections.findMany({
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.targetKey, input.targetKey),
+        eq(table.status, IntegrationConnectionStatuses.ACTIVE),
+      ),
+    columns: {
+      id: true,
+      organizationId: true,
+      status: true,
+      externalSubjectId: true,
+      config: true,
+      secrets: true,
+    },
+  });
+  const activeConnectionsById: ReadonlyMap<string, ActiveWebhookConnection> = new Map(
+    activeConnections.map((connection) => [connection.id, connection]),
+  );
+  const webhookConnections: ReadonlyArray<IntegrationConnection> = activeConnections.map(
+    (connection) =>
+      toWebhookConnectionOrThrow({
+        targetKey: input.targetKey,
+        connection,
+      }),
+  );
 
   let webhookEvent: Awaited<ReturnType<typeof verifyAndParseWebhookOrThrow>> | undefined;
 
@@ -133,19 +175,25 @@ export async function receiveIntegrationWebhook(
         config: parsedTargetConfig,
         secrets: parsedTargetSecrets,
       },
-      resolveConnectionSecrets: async ({ connectionRef }) => {
-        return resolveConnectionSecretsOrThrow({
-          db,
+      connections: webhookConnections,
+      resolveConnectionSecrets: ({ connectionId }) =>
+        resolveConnectionSecretsOrThrow({
+          connectionId,
+          connectionsById: activeConnectionsById,
           integrationsConfig,
-          targetKey: connectionRef.targetKey,
-          externalSubjectId: connectionRef.externalSubjectId,
-        });
-      },
+        }),
       headers: normalizeWebhookHeaders(input.headers),
       rawBody: input.rawBody,
     });
   } catch (error) {
     if (error instanceof IntegrationWebhookError) {
+      if (error.code === WebhookErrorCodes.WEBHOOK_CONNECTION_NOT_FOUND) {
+        throw new IntegrationWebhooksNotFoundError(
+          IntegrationWebhooksNotFoundCodes.CONNECTION_NOT_FOUND,
+          error.message,
+        );
+      }
+
       throw new IntegrationWebhooksBadRequestError(
         IntegrationWebhooksBadRequestCodes.INVALID_WEBHOOK_REQUEST,
         error.message,
@@ -158,16 +206,24 @@ export async function receiveIntegrationWebhook(
   if (webhookEvent === undefined) {
     throw new Error("Expected webhook event to be parsed.");
   }
+  const resolvedConnection = activeConnectionsById.get(webhookEvent.connectionId);
+  if (resolvedConnection === undefined) {
+    throw new Error(
+      `Expected resolved webhook connection '${webhookEvent.connectionId}' to exist in active connection candidates.`,
+    );
+  }
 
   const insertedRows = await db
     .insert(integrationWebhookEvents)
     .values({
+      organizationId: resolvedConnection.organizationId,
+      integrationConnectionId: resolvedConnection.id,
       targetKey: input.targetKey,
-      externalEventId: webhookEvent.externalEventId,
-      externalDeliveryId: webhookEvent.externalDeliveryId,
-      eventType: webhookEvent.eventType,
-      providerEventType: webhookEvent.providerEventType,
-      payload: webhookEvent.payload,
+      externalEventId: webhookEvent.event.externalEventId,
+      externalDeliveryId: webhookEvent.event.externalDeliveryId,
+      eventType: webhookEvent.event.eventType,
+      providerEventType: webhookEvent.event.providerEventType,
+      payload: webhookEvent.event.payload,
       status: IntegrationWebhookEventStatuses.RECEIVED,
     })
     .onConflictDoNothing({

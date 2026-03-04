@@ -4,12 +4,13 @@ import {
   type WebhookErrorCode,
 } from "../errors/index.js";
 import type {
+  IntegrationConnection,
   IntegrationDefinition,
   IntegrationTarget,
-  IntegrationWebhookConnectionRef,
-  IntegrationWebhookEvent,
   IntegrationWebhookHandler,
   IntegrationWebhookHeaders,
+  IntegrationWebhookResolveConnectionFailureCode,
+  IntegrationWebhookResolvedEvent,
 } from "../types/index.js";
 
 export type NormalizeWebhookHeadersInput = Readonly<Record<string, string | string[] | undefined>>;
@@ -85,18 +86,18 @@ export function getWebhookHandlerOrThrow<
   );
 }
 
-export function assertWebhookConnectionRefOrThrow(input: {
-  routeTargetKey: string;
-  connectionRef: IntegrationWebhookConnectionRef;
-}): void {
-  if (input.connectionRef.targetKey === input.routeTargetKey) {
-    return;
+function getWebhookConnectionResolutionErrorCode(
+  input: IntegrationWebhookResolveConnectionFailureCode,
+): WebhookErrorCode {
+  if (input === "connection-not-found") {
+    return WebhookErrorCodes.WEBHOOK_CONNECTION_NOT_FOUND;
   }
 
-  throw createWebhookError(
-    WebhookErrorCodes.WEBHOOK_TARGET_KEY_MISMATCH,
-    `Webhook connection targetKey '${input.connectionRef.targetKey}' does not match route targetKey '${input.routeTargetKey}'.`,
-  );
+  if (input === "connection-ambiguous") {
+    return WebhookErrorCodes.WEBHOOK_CONNECTION_AMBIGUOUS;
+  }
+
+  return WebhookErrorCodes.WEBHOOK_CONNECTION_RESOLUTION_FAILED;
 }
 
 export type VerifyAndParseWebhookInput<
@@ -110,8 +111,9 @@ export type VerifyAndParseWebhookInput<
     config: TTargetConfig;
     secrets: TTargetSecrets;
   };
+  connections: ReadonlyArray<IntegrationConnection>;
   resolveConnectionSecrets(input: {
-    connectionRef: IntegrationWebhookConnectionRef;
+    connectionId: string;
   }): TConnectionSecrets | Promise<TConnectionSecrets>;
   headers: IntegrationWebhookHeaders;
   rawBody: Uint8Array;
@@ -123,7 +125,7 @@ export async function verifyAndParseWebhookOrThrow<
   TConnectionSecrets = Record<string, string>,
 >(
   input: VerifyAndParseWebhookInput<TTargetConfig, TTargetSecrets, TConnectionSecrets>,
-): Promise<IntegrationWebhookEvent> {
+): Promise<IntegrationWebhookResolvedEvent> {
   const webhookHandler = getWebhookHandlerOrThrow(input.definition);
 
   const webhookEvent = await webhookHandler.parse({
@@ -133,19 +135,42 @@ export async function verifyAndParseWebhookOrThrow<
     rawBody: input.rawBody,
   });
 
-  assertWebhookConnectionRefOrThrow({
-    routeTargetKey: input.targetKey,
-    connectionRef: webhookEvent.connectionRef,
+  const resolvedConnection = await webhookHandler.resolveConnection({
+    targetKey: input.targetKey,
+    target: input.target,
+    event: webhookEvent,
+    candidates: input.connections,
   });
+  if (!resolvedConnection.ok) {
+    throw createWebhookError(
+      getWebhookConnectionResolutionErrorCode(resolvedConnection.code),
+      [
+        "Webhook connection resolution failed",
+        `(${resolvedConnection.code}):`,
+        resolvedConnection.message,
+      ].join(" "),
+    );
+  }
+
+  const connection = input.connections.find(
+    (candidateConnection) => candidateConnection.id === resolvedConnection.connectionId,
+  );
+  if (connection === undefined) {
+    throw createWebhookError(
+      WebhookErrorCodes.WEBHOOK_CONNECTION_RESOLUTION_FAILED,
+      `Webhook connection resolution returned unknown connectionId '${resolvedConnection.connectionId}'.`,
+    );
+  }
 
   const connectionSecrets = await input.resolveConnectionSecrets({
-    connectionRef: webhookEvent.connectionRef,
+    connectionId: connection.id,
   });
 
   const verifyResult = await webhookHandler.verify({
     targetKey: input.targetKey,
     target: input.target,
-    connectionRef: webhookEvent.connectionRef,
+    event: webhookEvent,
+    connection,
     connectionSecrets,
     headers: input.headers,
     rawBody: input.rawBody,
@@ -158,5 +183,8 @@ export async function verifyAndParseWebhookOrThrow<
     );
   }
 
-  return webhookEvent;
+  return {
+    event: webhookEvent,
+    connectionId: connection.id,
+  };
 }

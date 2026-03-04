@@ -1,3 +1,4 @@
+import type { IntegrationConnection } from "@mistle/integrations-core";
 import GitHubWebhookDefinitions from "@octokit/webhooks-examples/api.github.com/index.json" with { type: "json" };
 import { sign } from "@octokit/webhooks-methods";
 import type {
@@ -31,6 +32,18 @@ function encodePayload(input: unknown): Uint8Array {
   return encoder.encode(JSON.stringify(input));
 }
 
+function isPayloadRecord(input: unknown): input is Record<string, unknown> {
+  return typeof input === "object" && input !== null && !Array.isArray(input);
+}
+
+function toPayloadRecord(input: unknown): Record<string, unknown> {
+  if (!isPayloadRecord(input)) {
+    throw new Error("Expected webhook payload to be a JSON object.");
+  }
+
+  return { ...input };
+}
+
 function createGitHubCloudTargetConfig() {
   return {
     familyId: "github",
@@ -44,10 +57,29 @@ function createGitHubCloudTargetConfig() {
   };
 }
 
-function createConnectionRef() {
+function createConnection(): IntegrationConnection {
   return {
-    targetKey: "github_cloud",
+    id: "icn_123",
+    status: "active",
     externalSubjectId: IssueCommentCreatedPayload.installation.id.toString(),
+    config: {},
+  };
+}
+
+function createParsedEvent(input?: {
+  eventType?: string;
+  providerEventType?: string;
+  payload?: unknown;
+}) {
+  return {
+    externalEventId: "delivery_123",
+    externalDeliveryId: "delivery_123",
+    providerEventType: input?.providerEventType ?? "issue_comment",
+    eventType: input?.eventType ?? "github.issue_comment.created",
+    payload:
+      input?.payload === undefined
+        ? toPayloadRecord(IssueCommentCreatedPayload)
+        : toPayloadRecord(input.payload),
   };
 }
 
@@ -168,7 +200,8 @@ describe("GitHubWebhookHandler", () => {
     const verificationResult = await GitHubWebhookHandler.verify({
       targetKey: "github_cloud",
       target: createGitHubCloudTargetConfig(),
-      connectionRef: createConnectionRef(),
+      event: createParsedEvent(),
+      connection: createConnection(),
       connectionSecrets: {
         webhook_secret: "whsec_123",
       },
@@ -187,7 +220,8 @@ describe("GitHubWebhookHandler", () => {
     const verificationResult = await GitHubWebhookHandler.verify({
       targetKey: "github_cloud",
       target: createGitHubCloudTargetConfig(),
-      connectionRef: createConnectionRef(),
+      event: createParsedEvent(),
+      connection: createConnection(),
       connectionSecrets: {},
       headers: {
         "x-hub-signature-256": "sha256=invalid",
@@ -206,7 +240,8 @@ describe("GitHubWebhookHandler", () => {
     const verificationResult = await GitHubWebhookHandler.verify({
       targetKey: "github_cloud",
       target: createGitHubCloudTargetConfig(),
-      connectionRef: createConnectionRef(),
+      event: createParsedEvent(),
+      connection: createConnection(),
       connectionSecrets: {
         webhook_secret: "whsec_123",
       },
@@ -237,12 +272,73 @@ describe("GitHubWebhookHandler", () => {
       externalDeliveryId: "delivery_123",
       providerEventType: "issue_comment",
       eventType: "github.issue_comment.created",
-      connectionRef: {
-        targetKey: "github_cloud",
-        externalSubjectId: IssueCommentCreatedPayload.installation.id.toString(),
-      },
     });
     expect(parsed.payload).toEqual(IssueCommentCreatedPayload);
+  });
+
+  it("resolves matching connection by installation id", async () => {
+    const result = GitHubWebhookHandler.resolveConnection({
+      targetKey: "github_cloud",
+      target: createGitHubCloudTargetConfig(),
+      event: createParsedEvent(),
+      candidates: [createConnection()],
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      connectionId: "icn_123",
+    });
+  });
+
+  it("returns not-found when no connection matches installation id", async () => {
+    const result = GitHubWebhookHandler.resolveConnection({
+      targetKey: "github_cloud",
+      target: createGitHubCloudTargetConfig(),
+      event: createParsedEvent(),
+      candidates: [
+        {
+          id: "icn_other",
+          status: "active",
+          externalSubjectId: "999999",
+          config: {},
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "connection-not-found",
+      message: `No active connection found for GitHub installation '${IssueCommentCreatedPayload.installation.id.toString()}'.`,
+    });
+  });
+
+  it("returns ambiguous when multiple connections match installation id", async () => {
+    const installationId = IssueCommentCreatedPayload.installation.id.toString();
+    const result = GitHubWebhookHandler.resolveConnection({
+      targetKey: "github_cloud",
+      target: createGitHubCloudTargetConfig(),
+      event: createParsedEvent(),
+      candidates: [
+        {
+          id: "icn_1",
+          status: "active",
+          externalSubjectId: installationId,
+          config: {},
+        },
+        {
+          id: "icn_2",
+          status: "active",
+          externalSubjectId: installationId,
+          config: {},
+        },
+      ],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      code: "connection-ambiguous",
+      message: `Multiple active connections found for GitHub installation '${installationId}'.`,
+    });
   });
 
   it("uses canonical provider event type for pull_request_review_comment", async () => {

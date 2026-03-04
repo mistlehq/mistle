@@ -102,6 +102,7 @@ async function listWebhookWorkflowRuns(input: {
 describe("integration webhooks ingest integration", () => {
   it("accepts a valid GitHub webhook and stores the event", async ({ fixture }) => {
     const targetKey = "github-cloud-webhook-ingest-success";
+    const connectionId = "icn_webhook_ingest_success";
     const webhookSecret = "whsec_test_valid";
     const externalDeliveryId = "delivery_success_1";
     const authenticatedSession = await fixture.authSession({
@@ -131,11 +132,12 @@ describe("integration webhooks ingest integration", () => {
       masterEncryptionKeyMaterial,
     });
     await fixture.db.insert(integrationConnections).values({
-      id: "icn_webhook_ingest_success",
+      id: connectionId,
       organizationId: authenticatedSession.organizationId,
       targetKey,
       status: IntegrationConnectionStatuses.ACTIVE,
       externalSubjectId: InstallationId,
+      config: {},
       secrets: encryptedConnectionSecrets,
     });
 
@@ -174,6 +176,8 @@ describe("integration webhooks ingest integration", () => {
     expect(persistedEvent.providerEventType).toBe("issue_comment");
     expect(persistedEvent.eventType).toBe("github.issue_comment.created");
     expect(persistedEvent.status).toBe("received");
+    expect(persistedEvent.organizationId).toBe(authenticatedSession.organizationId);
+    expect(persistedEvent.integrationConnectionId).toBe(connectionId);
     expect(persistedEvent.payload).toEqual(payloadObject);
 
     const workflowRuns = await listWebhookWorkflowRuns({
@@ -225,6 +229,7 @@ describe("integration webhooks ingest integration", () => {
       targetKey,
       status: IntegrationConnectionStatuses.ACTIVE,
       externalSubjectId: InstallationId,
+      config: {},
       secrets: encryptedConnectionSecrets,
     });
 
@@ -330,6 +335,7 @@ describe("integration webhooks ingest integration", () => {
       targetKey,
       status: IntegrationConnectionStatuses.ACTIVE,
       externalSubjectId: InstallationId,
+      config: {},
       secrets: encryptedConnectionSecrets,
     });
 
