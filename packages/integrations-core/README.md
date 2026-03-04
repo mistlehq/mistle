@@ -68,21 +68,21 @@ Kinds are used on bindings and definitions to enforce compatibility (`binding.ki
 
 Key fields and what they drive:
 
-| Field | Purpose | Where it is used |
-| --- | --- | --- |
-| `familyId`, `variantId` | Global identity of a provider variant | Registry lookup, target records |
-| `kind` | Integration kind (`agent` / `git` / `connector`) | Binding validation during compile |
-| `displayName`, `description`, `logoKey` | UI metadata | Target discovery responses |
-| `targetConfigSchema` | Parse/validate target config | target list/use, OAuth, compile, webhooks |
-| `targetSecretSchema` | Parse/validate decrypted target secrets | OAuth, compile, webhooks |
-| `bindingConfigSchema` | Parse/validate per-binding config | Runtime plan compile |
-| `supportedAuthSchemes` | Declares allowed auth methods | Connection creation and OAuth gating |
-| `credentialResolvers` (optional) | Dynamic credential generation/lookup | Internal credential resolution endpoint |
-| `authHandlers.oauth` (optional) | OAuth start/complete behavior | OAuth connection flows |
-| `webhookHandler` (optional) | Verify + parse inbound webhooks | Webhook ingest |
-| `userConfigSlots` | User-configurable runtime setup slots | Runtime/client customization contract |
-| `userSecretSlots` (optional) | User-supplied connection secret slots | Connection create/complete validation |
-| `compileBinding(...)` | Generate egress/artifacts/runtime clients | Runtime plan compiler |
+| Field                                   | Purpose                                          | Where it is used                          |
+| --------------------------------------- | ------------------------------------------------ | ----------------------------------------- |
+| `familyId`, `variantId`                 | Global identity of a provider variant            | Registry lookup, target records           |
+| `kind`                                  | Integration kind (`agent` / `git` / `connector`) | Binding validation during compile         |
+| `displayName`, `description`, `logoKey` | UI metadata                                      | Target discovery responses                |
+| `targetConfigSchema`                    | Parse/validate target config                     | target list/use, OAuth, compile, webhooks |
+| `targetSecretSchema`                    | Parse/validate decrypted target secrets          | OAuth, compile, webhooks                  |
+| `bindingConfigSchema`                   | Parse/validate per-binding config                | Runtime plan compile                      |
+| `supportedAuthSchemes`                  | Declares allowed auth methods                    | Connection creation and OAuth gating      |
+| `credentialResolvers` (optional)        | Dynamic credential generation/lookup             | Internal credential resolution endpoint   |
+| `authHandlers.oauth` (optional)         | OAuth start/complete behavior                    | OAuth connection flows                    |
+| `webhookHandler` (optional)             | Verify + parse inbound webhooks                  | Webhook ingest                            |
+| `userConfigSlots`                       | User-configurable runtime setup slots            | Runtime/client customization contract     |
+| `userSecretSlots` (optional)            | User-supplied connection secret slots            | Connection create/complete validation     |
+| `compileBinding(...)`                   | Generate egress/artifacts/runtime clients        | Runtime plan compiler                     |
 
 ## Lifecycle End-To-End
 
@@ -154,44 +154,54 @@ Current registry includes:
 This is the recommended workflow.
 
 1. Choose identity and kind.
+
 - Decide `familyId`, `variantId`, and `kind`.
 - Keep `familyId` stable across variants.
 
 2. Add a definition folder in `packages/integrations-definitions`.
+
 - Follow existing provider structure (`openai/variants/...`, `github/variants/...`).
 
 3. Define schemas.
+
 - `target-config-schema.ts`
 - `target-secret-schema.ts` (if needed)
 - `binding-config-schema.ts`
 - Keep schemas strict and normalized (for example URL normalization).
 
 4. Define auth behavior.
+
 - Set `supportedAuthSchemes`.
 - If OAuth is needed, implement `authHandlers.oauth.start/complete`.
 - If credential material is dynamic, implement `credentialResolvers`.
 
 5. Define user slots.
+
 - `userConfigSlots` for runtime file/env customization.
 - `userSecretSlots` for connection secrets (for example webhook secrets).
 
 6. Implement `compileBinding`.
+
 - Emit minimal scoped egress routes.
 - Set correct `credentialResolver` secret type/purpose/resolver key.
 - Add runtime artifacts and runtime clients only when required.
 
 7. Add webhook support if provider emits events.
+
 - Implement `webhookHandler.verify` and `webhookHandler.parse`.
 - Ensure `connectionRef` can be resolved deterministically.
 
 8. Register the definition.
+
 - Export from provider index and root `packages/integrations-definitions/src/index.ts`.
 
 9. Make the target available.
+
 - Add to seed logic (`apps/control-plane-api/src/integration-targets/services/seed-default-targets.ts`) if it should exist by default.
 - Otherwise create target rows through your environment provisioning process.
 
 10. Add tests.
+
 - Schema tests for target/binding/secret parsing.
 - Compile tests for egress/artifacts/runtime clients.
 - OAuth/webhook handler tests (if implemented).
