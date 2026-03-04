@@ -4,8 +4,15 @@
     "builtin": true,
   },
   "plugins": ["eslint", "typescript", "node", "vitest"],
+  "jsPlugins": [
+    {
+      "name": "dashboard-select",
+      "specifier": "./apps/dashboard/lint/dashboard-select-plugin.mjs",
+    },
+  ],
   "rules": {
     "typescript/no-deprecated": "error",
+    "dashboard-select/no-undefined-select-value": "error",
     "eslint/no-restricted-imports": [
       "error",
       {
