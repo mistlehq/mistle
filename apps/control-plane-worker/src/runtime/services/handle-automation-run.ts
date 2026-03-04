@@ -11,8 +11,18 @@ import type {
 } from "@mistle/workflows/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
-type HandleAutomationRunDependencies = {
+export type HandleAutomationRunDependencies = {
   db: ControlPlaneDatabase;
+};
+
+export type TransitionAutomationRunToRunningOutput = {
+  shouldProcess: boolean;
+};
+
+export type MarkAutomationRunFailedInput = {
+  automationRunId: string;
+  failureCode: string;
+  failureMessage: string;
 };
 
 const TerminalAutomationRunStatuses = new Set<AutomationRunStatus>([
@@ -44,7 +54,7 @@ class AutomationRunExecutionError extends Error {
   }
 }
 
-function resolveAutomationRunFailure(input: unknown): { code: string; message: string } {
+export function resolveAutomationRunFailure(input: unknown): { code: string; message: string } {
   if (input instanceof AutomationRunExecutionError) {
     return {
       code: input.code,
@@ -65,7 +75,7 @@ function resolveAutomationRunFailure(input: unknown): { code: string; message: s
   };
 }
 
-async function markAutomationRunCompleted(input: {
+async function markAutomationRunCompletedInDatabase(input: {
   db: ControlPlaneDatabase;
   automationRunId: string;
 }): Promise<void> {
@@ -81,7 +91,7 @@ async function markAutomationRunCompleted(input: {
     .where(eq(automationRuns.id, input.automationRunId));
 }
 
-async function markAutomationRunFailed(input: {
+async function markAutomationRunFailedInDatabase(input: {
   db: ControlPlaneDatabase;
   automationRunId: string;
   failureCode: string;
@@ -99,7 +109,7 @@ async function markAutomationRunFailed(input: {
     .where(eq(automationRuns.id, input.automationRunId));
 }
 
-async function transitionAutomationRunToRunning(input: {
+async function transitionAutomationRunToRunningRecord(input: {
   db: ControlPlaneDatabase;
   automationRunId: string;
 }) {
@@ -218,106 +228,151 @@ function compileTemplates(input: {
   }
 }
 
+export async function transitionAutomationRunToRunning(
+  deps: HandleAutomationRunDependencies,
+  input: HandleAutomationRunWorkflowInput,
+): Promise<TransitionAutomationRunToRunningOutput> {
+  const automationRun = await transitionAutomationRunToRunningRecord({
+    db: deps.db,
+    automationRunId: input.automationRunId,
+  });
+
+  return {
+    shouldProcess: automationRun !== null,
+  };
+}
+
+export async function prepareAutomationRun(
+  deps: HandleAutomationRunDependencies,
+  input: HandleAutomationRunWorkflowInput,
+): Promise<void> {
+  const automationRun = await deps.db.query.automationRuns.findFirst({
+    where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
+  });
+  if (automationRun === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_NOT_FOUND,
+      message: `Automation run '${input.automationRunId}' was not found.`,
+    });
+  }
+
+  const automationTargetId = automationRun.automationTargetId;
+  if (automationTargetId === null) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_TARGET_REFERENCE_MISSING,
+      message: `Automation run '${input.automationRunId}' does not reference an automation target.`,
+    });
+  }
+
+  const sourceWebhookEventId = automationRun.sourceWebhookEventId;
+  if (sourceWebhookEventId === null) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.WEBHOOK_EVENT_REFERENCE_MISSING,
+      message: `Automation run '${input.automationRunId}' does not reference a source webhook event.`,
+    });
+  }
+
+  const automationTarget = await deps.db.query.automationTargets.findFirst({
+    where: (table, { eq: whereEq }) => whereEq(table.id, automationTargetId),
+  });
+  if (automationTarget === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_TARGET_NOT_FOUND,
+      message: `Automation target '${automationRun.automationTargetId}' was not found.`,
+    });
+  }
+
+  const webhookAutomation = await deps.db.query.webhookAutomations.findFirst({
+    where: (table, { eq: whereEq }) => whereEq(table.automationId, automationRun.automationId),
+  });
+  if (webhookAutomation === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.WEBHOOK_AUTOMATION_NOT_FOUND,
+      message: `Webhook automation for automation '${automationRun.automationId}' was not found.`,
+    });
+  }
+
+  const webhookEvent = await deps.db.query.integrationWebhookEvents.findFirst({
+    where: (table, { eq: whereEq }) => whereEq(table.id, sourceWebhookEventId),
+  });
+  if (webhookEvent === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.WEBHOOK_EVENT_NOT_FOUND,
+      message: `Webhook event '${sourceWebhookEventId}' was not found.`,
+    });
+  }
+
+  const idempotencyKeyTemplate = webhookAutomation.idempotencyKeyTemplate;
+
+  try {
+    compileTemplates({
+      webhookEvent: {
+        id: webhookEvent.id,
+        eventType: webhookEvent.eventType,
+        providerEventType: webhookEvent.providerEventType,
+        externalEventId: webhookEvent.externalEventId,
+        externalDeliveryId: webhookEvent.externalDeliveryId,
+        payload: webhookEvent.payload,
+      },
+      automationRun: {
+        id: automationRun.id,
+        automationId: automationRun.automationId,
+        automationTargetId: automationTarget.id,
+      },
+      templates: {
+        inputTemplate: webhookAutomation.inputTemplate,
+        conversationKeyTemplate: webhookAutomation.conversationKeyTemplate,
+        idempotencyKeyTemplate,
+      },
+    });
+  } catch (error) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.TEMPLATE_RENDER_FAILED,
+      message: error instanceof Error ? error.message : "Template rendering failed.",
+      cause: error,
+    });
+  }
+}
+
+export async function markAutomationRunCompleted(
+  deps: HandleAutomationRunDependencies,
+  input: HandleAutomationRunWorkflowInput,
+): Promise<void> {
+  await markAutomationRunCompletedInDatabase({
+    db: deps.db,
+    automationRunId: input.automationRunId,
+  });
+}
+
+export async function markAutomationRunFailed(
+  deps: HandleAutomationRunDependencies,
+  input: MarkAutomationRunFailedInput,
+): Promise<void> {
+  await markAutomationRunFailedInDatabase({
+    db: deps.db,
+    automationRunId: input.automationRunId,
+    failureCode: input.failureCode,
+    failureMessage: input.failureMessage,
+  });
+}
+
 export async function handleAutomationRun(
   deps: HandleAutomationRunDependencies,
   input: HandleAutomationRunWorkflowInput,
 ): Promise<HandleAutomationRunWorkflowOutput> {
-  const automationRun = await transitionAutomationRunToRunning({
-    db: deps.db,
-    automationRunId: input.automationRunId,
-  });
-  if (automationRun === null) {
+  const transitionResult = await transitionAutomationRunToRunning(deps, input);
+  if (!transitionResult.shouldProcess) {
     return {
       automationRunId: input.automationRunId,
     };
   }
 
   try {
-    const automationTargetId = automationRun.automationTargetId;
-    if (automationTargetId === null) {
-      throw new AutomationRunExecutionError({
-        code: AutomationRunFailureCodes.AUTOMATION_TARGET_REFERENCE_MISSING,
-        message: `Automation run '${input.automationRunId}' does not reference an automation target.`,
-      });
-    }
-
-    const sourceWebhookEventId = automationRun.sourceWebhookEventId;
-    if (sourceWebhookEventId === null) {
-      throw new AutomationRunExecutionError({
-        code: AutomationRunFailureCodes.WEBHOOK_EVENT_REFERENCE_MISSING,
-        message: `Automation run '${input.automationRunId}' does not reference a source webhook event.`,
-      });
-    }
-
-    const automationTarget = await deps.db.query.automationTargets.findFirst({
-      where: (table, { eq: whereEq }) => whereEq(table.id, automationTargetId),
-    });
-    if (automationTarget === undefined) {
-      throw new AutomationRunExecutionError({
-        code: AutomationRunFailureCodes.AUTOMATION_TARGET_NOT_FOUND,
-        message: `Automation target '${automationRun.automationTargetId}' was not found.`,
-      });
-    }
-
-    const webhookAutomation = await deps.db.query.webhookAutomations.findFirst({
-      where: (table, { eq: whereEq }) => whereEq(table.automationId, automationRun.automationId),
-    });
-    if (webhookAutomation === undefined) {
-      throw new AutomationRunExecutionError({
-        code: AutomationRunFailureCodes.WEBHOOK_AUTOMATION_NOT_FOUND,
-        message: `Webhook automation for automation '${automationRun.automationId}' was not found.`,
-      });
-    }
-
-    const webhookEvent = await deps.db.query.integrationWebhookEvents.findFirst({
-      where: (table, { eq: whereEq }) => whereEq(table.id, sourceWebhookEventId),
-    });
-    if (webhookEvent === undefined) {
-      throw new AutomationRunExecutionError({
-        code: AutomationRunFailureCodes.WEBHOOK_EVENT_NOT_FOUND,
-        message: `Webhook event '${sourceWebhookEventId}' was not found.`,
-      });
-    }
-
-    const idempotencyKeyTemplate = webhookAutomation.idempotencyKeyTemplate;
-
-    try {
-      compileTemplates({
-        webhookEvent: {
-          id: webhookEvent.id,
-          eventType: webhookEvent.eventType,
-          providerEventType: webhookEvent.providerEventType,
-          externalEventId: webhookEvent.externalEventId,
-          externalDeliveryId: webhookEvent.externalDeliveryId,
-          payload: webhookEvent.payload,
-        },
-        automationRun: {
-          id: automationRun.id,
-          automationId: automationRun.automationId,
-          automationTargetId: automationTarget.id,
-        },
-        templates: {
-          inputTemplate: webhookAutomation.inputTemplate,
-          conversationKeyTemplate: webhookAutomation.conversationKeyTemplate,
-          idempotencyKeyTemplate,
-        },
-      });
-    } catch (error) {
-      throw new AutomationRunExecutionError({
-        code: AutomationRunFailureCodes.TEMPLATE_RENDER_FAILED,
-        message: error instanceof Error ? error.message : "Template rendering failed.",
-        cause: error,
-      });
-    }
-
-    await markAutomationRunCompleted({
-      db: deps.db,
-      automationRunId: input.automationRunId,
-    });
+    await prepareAutomationRun(deps, input);
+    await markAutomationRunCompleted(deps, input);
   } catch (error) {
     const failure = resolveAutomationRunFailure(error);
-    await markAutomationRunFailed({
-      db: deps.db,
+    await markAutomationRunFailed(deps, {
       automationRunId: input.automationRunId,
       failureCode: failure.code,
       failureMessage: failure.message,

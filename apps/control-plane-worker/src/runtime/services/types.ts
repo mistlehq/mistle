@@ -3,7 +3,6 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type {
   ControlPlaneWorkerServices,
   HandleAutomationRunWorkflowInput,
-  HandleAutomationRunWorkflowOutput,
   HandleIntegrationWebhookEventWorkflowInput,
   HandleIntegrationWebhookEventWorkflowOutput,
   StartSandboxProfileInstanceWorkflowInput,
@@ -33,7 +32,19 @@ export type HandleAutomationRunServiceDependencies = {
 };
 
 export type HandleAutomationRunServiceInput = HandleAutomationRunWorkflowInput;
-export type HandleAutomationRunServiceOutput = HandleAutomationRunWorkflowOutput;
+export type HandleAutomationRunTransitionServiceOutput = { shouldProcess: boolean };
+export type HandleAutomationRunMarkFailedServiceInput = {
+  automationRunId: string;
+  failureCode: string;
+  failureMessage: string;
+};
+export type HandleAutomationRunResolveFailureServiceInput = {
+  error: unknown;
+};
+export type HandleAutomationRunResolveFailureServiceOutput = {
+  code: string;
+  message: string;
+};
 
 export type HandleIntegrationWebhookEventServiceDependencies = {
   db: ControlPlaneDatabase;

@@ -2,10 +2,7 @@ import type { EmailSender } from "@mistle/emails";
 import type { OpenWorkflow, Worker } from "openworkflow";
 
 import { createHandleAutomationRunWorkflow } from "./workflows/handle-automation-run/index.js";
-import type {
-  HandleAutomationRunWorkflowInput,
-  HandleAutomationRunWorkflowOutput,
-} from "./workflows/handle-automation-run/index.js";
+import type { HandleAutomationRunWorkflowInput } from "./workflows/handle-automation-run/index.js";
 import { createHandleIntegrationWebhookEventWorkflow } from "./workflows/handle-integration-webhook-event/index.js";
 import type {
   HandleIntegrationWebhookEventWorkflowInput,
@@ -30,9 +27,17 @@ export type ControlPlaneWorkerEmailDelivery = {
 
 export type ControlPlaneWorkerServices = {
   automationRuns?: {
-    handleAutomationRun: (
+    transitionAutomationRunToRunning: (
       input: HandleAutomationRunWorkflowInput,
-    ) => Promise<HandleAutomationRunWorkflowOutput>;
+    ) => Promise<{ shouldProcess: boolean }>;
+    prepareAutomationRun: (input: HandleAutomationRunWorkflowInput) => Promise<void>;
+    markAutomationRunCompleted: (input: HandleAutomationRunWorkflowInput) => Promise<void>;
+    markAutomationRunFailed: (input: {
+      automationRunId: string;
+      failureCode: string;
+      failureMessage: string;
+    }) => Promise<void>;
+    resolveAutomationRunFailure: (input: { error: unknown }) => { code: string; message: string };
   };
   integrationWebhooks?: {
     handleWebhookEvent: (
@@ -85,7 +90,12 @@ export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): 
         );
       }
       const workflow = createHandleAutomationRunWorkflow({
-        handleAutomationRun: input.services.automationRuns.handleAutomationRun,
+        transitionAutomationRunToRunning:
+          input.services.automationRuns.transitionAutomationRunToRunning,
+        prepareAutomationRun: input.services.automationRuns.prepareAutomationRun,
+        markAutomationRunCompleted: input.services.automationRuns.markAutomationRunCompleted,
+        markAutomationRunFailed: input.services.automationRuns.markAutomationRunFailed,
+        resolveAutomationRunFailure: input.services.automationRuns.resolveAutomationRunFailure,
       });
       input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
       continue;

@@ -19,7 +19,11 @@ Reference catalog of control-plane workflows in `@mistle/workflows`.
 
 - `enabledWorkflows` with workflow ids from `ControlPlaneWorkerWorkflowIds`
 - `services.automationRuns`:
-  - `handleAutomationRun`
+  - `transitionAutomationRunToRunning`
+  - `prepareAutomationRun`
+  - `markAutomationRunCompleted`
+  - `markAutomationRunFailed`
+  - `resolveAutomationRunFailure`
 - `services.integrationWebhooks`:
   - `handleWebhookEvent`
 - `services.emailDelivery`:
