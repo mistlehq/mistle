@@ -334,6 +334,11 @@ function start(): void {
     args: ["--filter", "@mistle/db", "build"],
     env: sharedDevEnv,
   });
+  runOrThrow({
+    command: "pnpm",
+    args: ["--filter", "@mistle/logging", "build"],
+    env: sharedDevEnv,
+  });
 
   console.log("Running control-plane DB migrations...");
   runOrThrow({
