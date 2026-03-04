@@ -628,6 +628,19 @@ importers:
       '@mistle/integrations-core':
         specifier: workspace:*
         version: link:../integrations-core
+    devDependencies:
+      '@mistle/integrations-definitions':
+        specifier: workspace:*
+        version: link:../integrations-definitions
+      '@mistle/test-harness':
+        specifier: workspace:*
+        version: link:../test-harness
+      '@types/pg':
+        specifier: ^8.18.0
+        version: 8.18.0
+      pg:
+        specifier: ^8.19.0
+        version: 8.19.0
 
   packages/test-harness:
     dependencies:
