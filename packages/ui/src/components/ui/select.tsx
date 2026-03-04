@@ -4,7 +4,16 @@ import * as React from "react";
 
 import { cn } from "../../lib/utils.js";
 
-const Select = SelectPrimitive.Root;
+function Select<Value, Multiple extends boolean | undefined = false>(
+  props: SelectPrimitive.Root.Props<Value, Multiple>,
+) {
+  if (!Object.prototype.hasOwnProperty.call(props, "value")) {
+    return <SelectPrimitive.Root {...props} />;
+  }
+
+  const normalizedValue = props.value === undefined ? null : props.value;
+  return <SelectPrimitive.Root {...props} value={normalizedValue} />;
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (

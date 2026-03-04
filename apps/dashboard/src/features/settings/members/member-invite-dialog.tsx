@@ -97,7 +97,7 @@ export function MemberInviteDialog(input: {
                     form.setSelectedRole(parsedRole);
                     form.clearRoleError();
                   }}
-                  value={form.selectedRole ?? undefined}
+                  value={form.selectedRole ?? ""}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select a role">
