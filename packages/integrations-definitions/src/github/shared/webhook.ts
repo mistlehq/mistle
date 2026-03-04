@@ -1,5 +1,6 @@
 import type {
   IntegrationWebhookHandler,
+  IntegrationWebhookResolveConnectionResult,
   IntegrationWebhookVerifyResult,
 } from "@mistle/integrations-core";
 import { verify } from "@octokit/webhooks-methods";
@@ -150,6 +151,42 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
   GitHubTargetSecrets,
   GitHubUserSecrets
 > = {
+  resolveConnection(input): IntegrationWebhookResolveConnectionResult {
+    const installationId = resolveInstallationId(input.event.payload);
+    const matchingCandidates = input.candidates.filter(
+      (candidateConnection) => candidateConnection.externalSubjectId === installationId,
+    );
+
+    if (matchingCandidates.length === 0) {
+      return {
+        ok: false,
+        code: "connection-not-found",
+        message: `No active connection found for GitHub installation '${installationId}'.`,
+      };
+    }
+
+    if (matchingCandidates.length > 1) {
+      return {
+        ok: false,
+        code: "connection-ambiguous",
+        message: `Multiple active connections found for GitHub installation '${installationId}'.`,
+      };
+    }
+
+    const [resolvedConnection] = matchingCandidates;
+    if (resolvedConnection === undefined) {
+      return {
+        ok: false,
+        code: "invalid-connection",
+        message: `Failed to resolve connection for GitHub installation '${installationId}'.`,
+      };
+    }
+
+    return {
+      ok: true,
+      connectionId: resolvedConnection.id,
+    };
+  },
   async verify(input) {
     const webhookSecret = input.connectionSecrets.webhook_secret;
     if (webhookSecret === undefined || webhookSecret.length === 0) {
@@ -191,7 +228,7 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
     const providerEventType = resolveProviderEventType(input.headers);
     const action = resolveAction(payload);
     const deliveryId = resolveDeliveryId(input.headers);
-    const externalSubjectId = resolveInstallationId(payload);
+    resolveInstallationId(payload);
 
     return {
       externalEventId: deliveryId,
@@ -202,10 +239,6 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
         action,
       }),
       payload,
-      connectionRef: {
-        targetKey: input.targetKey,
-        externalSubjectId,
-      },
     };
   },
 };

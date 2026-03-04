@@ -205,8 +205,8 @@ This is the recommended workflow.
 
 7. Add webhook support if provider emits events.
 
-- Implement `webhookHandler.verify` and `webhookHandler.parse`.
-- Ensure `connectionRef` can be resolved deterministically.
+- Implement `webhookHandler.parse`, `webhookHandler.resolveConnection`, and `webhookHandler.verify`.
+- Keep connection resolution explicit and deterministic from parsed event payload + candidate connections.
 
 8. Register the definition.
 

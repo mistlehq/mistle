@@ -313,7 +313,8 @@ export type IntegrationWebhookVerifyInput<
 > = {
   targetKey: string;
   target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
-  connectionRef: IntegrationWebhookConnectionRef;
+  event: IntegrationWebhookEvent;
+  connection: IntegrationConnection;
   connectionSecrets: TConnectionSecrets;
   headers: IntegrationWebhookHeaders;
   rawBody: Uint8Array;
@@ -327,9 +328,42 @@ export type IntegrationWebhookVerifyResult =
       message: string;
     };
 
-export type IntegrationWebhookConnectionRef = {
+export type IntegrationWebhookResolveConnectionFailureCode =
+  | "connection-not-found"
+  | "connection-ambiguous"
+  | "invalid-connection";
+
+export const IntegrationWebhookResolveConnectionFailureCodes: {
+  CONNECTION_NOT_FOUND: IntegrationWebhookResolveConnectionFailureCode;
+  CONNECTION_AMBIGUOUS: IntegrationWebhookResolveConnectionFailureCode;
+  INVALID_CONNECTION: IntegrationWebhookResolveConnectionFailureCode;
+} = {
+  CONNECTION_NOT_FOUND: "connection-not-found",
+  CONNECTION_AMBIGUOUS: "connection-ambiguous",
+  INVALID_CONNECTION: "invalid-connection",
+};
+
+export type IntegrationWebhookResolveConnectionInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
   targetKey: string;
-  externalSubjectId?: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  event: IntegrationWebhookEvent;
+  candidates: ReadonlyArray<IntegrationConnection>;
+};
+
+export type IntegrationWebhookResolveConnectionResult =
+  | { ok: true; connectionId: string }
+  | {
+      ok: false;
+      code: IntegrationWebhookResolveConnectionFailureCode;
+      message: string;
+    };
+
+export type IntegrationWebhookResolvedEvent = {
+  event: IntegrationWebhookEvent;
+  connectionId: string;
 };
 
 export type IntegrationWebhookParseInput<
@@ -349,7 +383,6 @@ export type IntegrationWebhookEvent = {
   eventType: string;
   payload: Record<string, unknown>;
   occurredAt?: string;
-  connectionRef: IntegrationWebhookConnectionRef;
 };
 
 export type IntegrationWebhookHandler<
@@ -357,6 +390,9 @@ export type IntegrationWebhookHandler<
   TTargetSecrets = Record<string, string>,
   TConnectionSecrets = Record<string, string>,
 > = {
+  resolveConnection(
+    input: IntegrationWebhookResolveConnectionInput<TTargetConfig, TTargetSecrets>,
+  ): MaybePromise<IntegrationWebhookResolveConnectionResult>;
   verify(
     input: IntegrationWebhookVerifyInput<TTargetConfig, TTargetSecrets, TConnectionSecrets>,
   ): MaybePromise<IntegrationWebhookVerifyResult>;
