@@ -29,14 +29,6 @@ type UseSandboxProfileMetaStateInput = {
   invalidateProfileDetail: (profileId: string) => Promise<void>;
 };
 
-function resolveStatusFromToggleChecked(checked: boolean): SandboxProfileStatus {
-  return checked ? "active" : "inactive";
-}
-
-function resolveStatusToggleChecked(status: SandboxProfileStatus): boolean {
-  return status === "active";
-}
-
 export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInput): {
   formState: SandboxProfileEditorFormState;
   saveError: string | null;
@@ -51,7 +43,7 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
   onProfileNameDraftChange: (nextValue: string) => void;
   onProfileNameEditCancel: () => void;
   onProfileNameEditCommit: () => void;
-  onStatusToggleChange: (checked: boolean) => void;
+  onStatusSelectChange: (nextStatus: SandboxProfileStatus) => void;
   onCreate: () => void;
   onCancelCreate: () => void;
 } {
@@ -198,7 +190,7 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
     });
   }
 
-  function onStatusChange(nextValue: string): void {
+  function setDraftStatus(nextValue: string): void {
     if (!isSandboxProfileStatus(nextValue)) {
       throw new Error(`Unsupported sandbox profile status: ${nextValue}`);
     }
@@ -206,11 +198,9 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
     setSaveError(null);
   }
 
-  function onStatusToggleChange(checked: boolean): void {
-    const nextStatus = resolveStatusFromToggleChecked(checked);
-
+  function onStatusSelectChange(nextStatus: SandboxProfileStatus): void {
     if (input.mode === "create") {
-      onStatusChange(nextStatus);
+      setDraftStatus(nextStatus);
       return;
     }
     if (input.profileId === undefined || updateMutation.isPending) {
@@ -221,7 +211,7 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
     }
 
     const previousPersistedStatus = persistedStatus;
-    onStatusChange(nextStatus);
+    setDraftStatus(nextStatus);
     updateMutation.mutate(
       {
         profileId: input.profileId,
@@ -271,10 +261,8 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
     onProfileNameDraftChange,
     onProfileNameEditCancel,
     onProfileNameEditCommit,
-    onStatusToggleChange,
+    onStatusSelectChange,
     onCreate,
     onCancelCreate,
   };
 }
-
-export { resolveStatusToggleChecked };

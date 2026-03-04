@@ -16,7 +16,6 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
-  Switch,
 } from "@mistle/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router";
@@ -43,10 +42,8 @@ import {
   type SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
 import { useSandboxProfileIntegrationsState } from "./sandbox-profile-integrations-state.js";
-import {
-  resolveStatusToggleChecked,
-  useSandboxProfileMetaState,
-} from "./sandbox-profile-meta-state.js";
+import { useSandboxProfileMetaState } from "./sandbox-profile-meta-state.js";
+import { SandboxProfileStatusSelect } from "./sandbox-profile-status-select.js";
 import { SandboxProfileTitleEditor } from "./sandbox-profile-title-editor.js";
 
 type SandboxProfileEditorPageProps = {
@@ -431,32 +428,13 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
           />
         )}
 
-        <div className="inline-flex h-11 items-center gap-2 rounded-md border px-3">
-          <Label
-            className={
-              metaState.formState.status === "inactive"
-                ? "text-foreground"
-                : "text-muted-foreground"
-            }
-            htmlFor="sandbox-profile-status-toggle"
-          >
-            Inactive
-          </Label>
-          <Switch
-            aria-label="Sandbox profile status"
-            checked={resolveStatusToggleChecked(metaState.formState.status)}
+        <div className="inline-flex h-11 items-center gap-2.5">
+          <span className="text-muted-foreground text-sm font-medium">Status</span>
+          <SandboxProfileStatusSelect
             disabled={metaState.isCreating || metaState.isUpdating}
-            id="sandbox-profile-status-toggle"
-            onCheckedChange={metaState.onStatusToggleChange}
+            onValueChange={metaState.onStatusSelectChange}
+            value={metaState.formState.status}
           />
-          <Label
-            className={
-              metaState.formState.status === "active" ? "text-foreground" : "text-muted-foreground"
-            }
-            htmlFor="sandbox-profile-status-toggle"
-          >
-            Active
-          </Label>
         </div>
       </div>
       {metaState.saveError ? (
