@@ -1,49 +1,8 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  evaluateWebhookPayloadFilter,
-  getWebhookPayloadValueAtPath,
-  parseWebhookPayloadFilter,
-  WebhookPayloadFilterSchema,
-} from "./webhook-filter.js";
+import { evaluateWebhookPayloadFilter, getWebhookPayloadValueAtPath } from "./index.js";
 
-describe("webhook payload filters", () => {
-  it("parses valid nested filters", () => {
-    const parsedFilter = parseWebhookPayloadFilter({
-      op: "all",
-      filters: [
-        {
-          op: "eq",
-          path: ["action"],
-          value: "created",
-        },
-        {
-          op: "contains",
-          path: ["comment", "body"],
-          value: "@mistlebot",
-        },
-      ],
-    });
-
-    expect(parsedFilter.op).toBe("all");
-    if (parsedFilter.op === "all") {
-      expect(parsedFilter.filters).toHaveLength(2);
-      return;
-    }
-
-    throw new Error("Expected op to be all");
-  });
-
-  it("rejects string-based paths to enforce array segment paths", () => {
-    const parsedFilter = WebhookPayloadFilterSchema.safeParse({
-      op: "eq",
-      path: "comment.body",
-      value: "@mistlebot",
-    });
-
-    expect(parsedFilter.success).toBe(false);
-  });
-
+describe("webhook filter evaluator", () => {
   it("resolves nested values by path segments", () => {
     const value = getWebhookPayloadValueAtPath({
       payload: {
@@ -121,7 +80,7 @@ describe("webhook payload filters", () => {
 
     const matches = evaluateWebhookPayloadFilter({
       filter: {
-        op: "all",
+        op: "and",
         filters: [
           {
             op: "eq",
@@ -166,10 +125,10 @@ describe("webhook payload filters", () => {
     expect(matches).toBe(true);
   });
 
-  it("supports any and not composition", () => {
+  it("supports or and not composition", () => {
     const matches = evaluateWebhookPayloadFilter({
       filter: {
-        op: "any",
+        op: "or",
         filters: [
           {
             op: "eq",

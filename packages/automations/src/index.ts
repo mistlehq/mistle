@@ -1,1 +1,1 @@
-export * from "./webhook-filter.js";
+export * from "./webhook-filter/index.js";

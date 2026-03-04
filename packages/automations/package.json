@@ -10,10 +10,10 @@
       "default": "./src/index.ts"
     },
     "./webhook-filter": {
-      "types": "./src/webhook-filter.ts",
-      "node": "./dist/webhook-filter.js",
-      "import": "./src/webhook-filter.ts",
-      "default": "./src/webhook-filter.ts"
+      "types": "./src/webhook-filter/index.ts",
+      "node": "./dist/webhook-filter/index.js",
+      "import": "./src/webhook-filter/index.ts",
+      "default": "./src/webhook-filter/index.ts"
     },
     "./*.js": {
       "types": "./src/*.ts",
