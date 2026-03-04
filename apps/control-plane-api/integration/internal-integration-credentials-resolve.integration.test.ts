@@ -87,6 +87,28 @@ describe("internal integration credentials resolve", () => {
     });
   });
 
+  it("rejects requests without internal service token", async ({ fixture }) => {
+    const response = await fixture.request(
+      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          connectionId: "icn_missing",
+          secretType: "api_key",
+        }),
+      },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      code: "UNAUTHORIZED",
+      message: "Internal service authentication failed.",
+    });
+  });
+
   it("resolves encrypted integration target secrets", async ({ fixture }) => {
     const encryptedSecrets = encryptIntegrationTargetSecrets({
       secrets: {
