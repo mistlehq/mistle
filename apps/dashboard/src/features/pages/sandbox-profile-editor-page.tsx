@@ -16,99 +16,42 @@ import {
   SelectTrigger,
   SelectValue,
   Skeleton,
+  Switch,
 } from "@mistle/ui";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams } from "react-router";
-import { z } from "zod";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
-import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import { formatSandboxProfileVersionLabel } from "../sandbox-profiles/format-sandbox-profile-version-label.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
-  formatSandboxProfileStatus,
-  isSandboxProfileStatus,
-  SANDBOX_PROFILE_STATUS_OPTIONS,
-} from "../sandbox-profiles/sandbox-profiles-formatters.js";
-import {
   sandboxProfileDetailQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
-  sandboxProfileVersionsQueryKey,
-  SANDBOX_PROFILES_QUERY_KEY_PREFIX,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
-import {
-  createSandboxProfile,
-  getSandboxProfileVersionIntegrationBindings,
-  getSandboxProfile,
-  listSandboxProfileVersions,
-  putSandboxProfileVersionIntegrationBindings,
-  updateSandboxProfile,
-} from "../sandbox-profiles/sandbox-profiles-service.js";
+import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type {
   SandboxIntegrationBindingKind,
   SandboxProfileVersion,
-  SandboxProfileStatus,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { SaveActions } from "../settings/save-actions.js";
 import {
   createDefaultBindingConfig,
-  resolveBindingConfigUiModel,
   resolveBindingKindFromTarget,
   SandboxProfileBindingConfigEditor,
   type IntegrationConnectionSummary,
   type IntegrationTargetSummary,
   type SandboxProfileBindingEditorRow,
 } from "./sandbox-profile-binding-config-editor.js";
-import { resolveProfileNameCommitDecision } from "./sandbox-profile-title-edit.js";
+import { useSandboxProfileIntegrationsState } from "./sandbox-profile-integrations-state.js";
+import {
+  resolveStatusToggleChecked,
+  useSandboxProfileMetaState,
+} from "./sandbox-profile-meta-state.js";
 import { SandboxProfileTitleEditor } from "./sandbox-profile-title-editor.js";
 
 type SandboxProfileEditorPageProps = {
   mode: "create" | "edit";
 };
-
-type SandboxProfileEditorFormState = {
-  displayName: string;
-  status: SandboxProfileStatus;
-};
-
-type InvalidBindingConfigIssue = {
-  clientRef?: string | undefined;
-  bindingIdOrDraftIndex: string;
-  validatorCode: string;
-  field: string;
-  safeMessage: string;
-};
-
-const InvalidBindingConfigReferenceErrorSchema = z
-  .object({
-    code: z.literal("INVALID_BINDING_CONFIG_REFERENCE"),
-    details: z
-      .object({
-        issues: z.array(
-          z
-            .object({
-              clientRef: z.string().min(1).optional(),
-              bindingIdOrDraftIndex: z.string().min(1),
-              validatorCode: z.string().min(1),
-              field: z.string().min(1),
-              safeMessage: z.string().min(1),
-            })
-            .strict(),
-        ),
-      })
-      .strict(),
-  })
-  .strict();
-
-let nextIntegrationBindingClientId = 1;
-
-function createIntegrationBindingClientId(): string {
-  const clientId = `binding-${String(nextIntegrationBindingClientId)}`;
-  nextIntegrationBindingClientId += 1;
-  return clientId;
-}
 
 function formatBindingKind(kind: SandboxIntegrationBindingKind): string {
   if (kind === "agent") {
@@ -118,31 +61,6 @@ function formatBindingKind(kind: SandboxIntegrationBindingKind): string {
     return "Git";
   }
   return "Connector";
-}
-
-function readInvalidBindingConfigIssues(
-  error: unknown,
-): readonly InvalidBindingConfigIssue[] | null {
-  if (!(error instanceof SandboxProfilesApiError)) {
-    return null;
-  }
-  const parsed = InvalidBindingConfigReferenceErrorSchema.safeParse(error.body);
-  if (!parsed.success) {
-    return null;
-  }
-  return parsed.data.details.issues;
-}
-
-function parseStatusValue(value: string | null): SandboxProfileStatus {
-  if (value === null) {
-    throw new Error("Sandbox profile status must not be null.");
-  }
-
-  if (isSandboxProfileStatus(value)) {
-    return value;
-  }
-
-  throw new Error(`Unsupported sandbox profile status: ${value}`);
 }
 
 type IntegrationsEditorSectionProps = {
@@ -392,61 +310,6 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
   const queryClient = useQueryClient();
   const params = useParams();
   const profileId = params["profileId"];
-
-  const [formState, setFormState] = useState<SandboxProfileEditorFormState>({
-    displayName: "",
-    status: "active",
-  });
-  const [persistedFormState, setPersistedFormState] = useState<SandboxProfileEditorFormState>({
-    displayName: "",
-    status: "active",
-  });
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [isEditingProfileName, setIsEditingProfileName] = useState(false);
-  const [profileNameDraft, setProfileNameDraft] = useState("");
-  const [explicitSelectedVersion, setExplicitSelectedVersion] = useState<number | null>(null);
-  const [integrationRows, setIntegrationRows] = useState<SandboxProfileBindingEditorRow[]>([]);
-  const [integrationSaveError, setIntegrationSaveError] = useState<string | null>(null);
-  const [integrationRowErrorsByClientId, setIntegrationRowErrorsByClientId] = useState<
-    Record<string, string>
-  >({});
-  const [integrationSaveSuccess, setIntegrationSaveSuccess] = useState(false);
-
-  function resetIntegrationSaveState(): void {
-    markIntegrationDirty();
-  }
-
-  function clearIntegrationRowError(clientId: string): void {
-    setIntegrationRowErrorsByClientId((currentErrors) => {
-      if (currentErrors[clientId] === undefined) {
-        return currentErrors;
-      }
-      const nextErrors: Record<string, string> = {};
-      for (const [key, value] of Object.entries(currentErrors)) {
-        if (key !== clientId) {
-          nextErrors[key] = value;
-        }
-      }
-      return nextErrors;
-    });
-  }
-
-  function markIntegrationDirty(input?: { clientId: string }): void {
-    setIntegrationSaveError(null);
-    if (input === undefined) {
-      setIntegrationRowErrorsByClientId({});
-    } else {
-      clearIntegrationRowError(input.clientId);
-    }
-    setIntegrationSaveSuccess(false);
-  }
-
-  function setIntegrationSaveFailure(message: string): void {
-    setIntegrationSaveError(message);
-    setIntegrationSaveSuccess(false);
-  }
-
   const profileQuery = useQuery({
     queryKey:
       props.mode === "edit" && profileId !== undefined
@@ -462,521 +325,40 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
     enabled: props.mode === "edit",
     retry: false,
   });
-
-  const profileVersionsQuery = useQuery({
-    queryKey:
-      props.mode === "edit" && profileId !== undefined
-        ? sandboxProfileVersionsQueryKey(profileId)
-        : sandboxProfileVersionsQueryKey("missing-profile-id"),
-    queryFn: async ({ signal }) => {
-      if (profileId === undefined) {
-        throw new Error("profileId is required.");
-      }
-      return listSandboxProfileVersions({
-        profileId,
-        signal,
-      });
-    },
-    enabled: props.mode === "edit",
-    retry: false,
-  });
-
-  const integrationDirectoryQuery = useQuery({
-    queryKey: ["sandbox-profiles", "integration-directory"],
-    queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
-    enabled: props.mode === "edit",
-  });
-
-  const availableProfileVersions: readonly SandboxProfileVersion[] =
-    profileVersionsQuery.data?.versions ?? [];
-  const resolvedSelectedVersion =
-    explicitSelectedVersion !== null &&
-    availableProfileVersions.some((version) => version.version === explicitSelectedVersion)
-      ? explicitSelectedVersion
-      : (availableProfileVersions[0]?.version ?? null);
-
-  const integrationBindingsQuery = useQuery({
-    queryKey:
-      props.mode === "edit" && profileId !== undefined && resolvedSelectedVersion !== null
-        ? sandboxProfileVersionIntegrationBindingsQueryKey({
-            profileId,
-            version: resolvedSelectedVersion,
-          })
-        : sandboxProfileVersionIntegrationBindingsQueryKey({
-            profileId: "missing-profile-id",
-            version: 0,
-          }),
-    queryFn: async ({ signal }) => {
-      if (profileId === undefined || resolvedSelectedVersion === null) {
-        throw new Error("profileId and selectedVersion are required.");
-      }
-      return getSandboxProfileVersionIntegrationBindings({
-        profileId,
-        version: resolvedSelectedVersion,
-        signal,
-      });
-    },
-    enabled: props.mode === "edit" && profileId !== undefined && resolvedSelectedVersion !== null,
-    retry: false,
-  });
-
-  const createMutation = useMutation({
-    mutationFn: async (input: SandboxProfileEditorFormState) =>
-      createSandboxProfile({
-        payload: {
-          displayName: input.displayName,
-          status: input.status,
-        },
-      }),
-    onSuccess: async (createdProfile) => {
-      setSaveError(null);
+  const metaState = useSandboxProfileMetaState({
+    mode: props.mode,
+    profileId,
+    loadedProfile: profileQuery.data,
+    navigate,
+    invalidateSandboxProfiles: async () => {
       await queryClient.invalidateQueries({
-        queryKey: SANDBOX_PROFILES_QUERY_KEY_PREFIX,
+        queryKey: ["sandbox-profiles"],
       });
-      await navigate(`/sandbox-profiles/${createdProfile.id}`);
     },
-    onError: (error: unknown) => {
-      setSaveError(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not create sandbox profile.",
+    invalidateProfileDetail: async (invalidateProfileId) => {
+      await queryClient.invalidateQueries({
+        queryKey: sandboxProfileDetailQueryKey(invalidateProfileId),
+      });
+    },
+  });
+
+  const integrationsState = useSandboxProfileIntegrationsState({
+    mode: props.mode,
+    profileId,
+    invalidateVersionBindings: async ({ profileId: invalidateProfileId, version }) => {
+      await queryClient.invalidateQueries({
+        queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
+          profileId: invalidateProfileId,
+          version,
         }),
-      );
-      setSaveSuccess(false);
+      });
     },
   });
-
-  const updateMutation = useMutation({
-    mutationFn: async (input: {
-      profileId: string;
-      changes: Partial<SandboxProfileEditorFormState>;
-    }) =>
-      updateSandboxProfile({
-        payload: {
-          profileId: input.profileId,
-          ...(input.changes.displayName === undefined
-            ? {}
-            : { displayName: input.changes.displayName }),
-          ...(input.changes.status === undefined ? {} : { status: input.changes.status }),
-        },
-      }),
-    onSuccess: async (updatedProfile, variables) => {
-      setFormState((currentState) => ({
-        ...currentState,
-        ...(variables.changes.displayName === undefined
-          ? {}
-          : { displayName: updatedProfile.displayName }),
-        ...(variables.changes.status === undefined ? {} : { status: updatedProfile.status }),
-      }));
-      setPersistedFormState((currentState) => ({
-        ...currentState,
-        ...(variables.changes.displayName === undefined
-          ? {}
-          : { displayName: updatedProfile.displayName }),
-        ...(variables.changes.status === undefined ? {} : { status: updatedProfile.status }),
-      }));
-      setProfileNameDraft(updatedProfile.displayName);
-      setSaveError(null);
-      setSaveSuccess(true);
-
-      await queryClient.invalidateQueries({
-        queryKey: SANDBOX_PROFILES_QUERY_KEY_PREFIX,
-      });
-      await queryClient.invalidateQueries({
-        queryKey: sandboxProfileDetailQueryKey(updatedProfile.id),
-      });
-    },
-    onError: (error: unknown) => {
-      setSaveError(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not update sandbox profile.",
-        }),
-      );
-      setSaveSuccess(false);
-    },
-  });
-
-  const putIntegrationBindingsMutation = useMutation({
-    mutationFn: async (input: {
-      profileId: string;
-      version: number;
-      bindings: Array<{
-        id?: string;
-        clientRef: string;
-        connectionId: string;
-        kind: SandboxIntegrationBindingKind;
-        config: Record<string, unknown>;
-      }>;
-    }) =>
-      putSandboxProfileVersionIntegrationBindings({
-        profileId: input.profileId,
-        version: input.version,
-        bindings: input.bindings,
-      }),
-    onSuccess: async (updatedBindings) => {
-      const nextRows = updatedBindings.bindings.map((binding) => ({
-        clientId: createIntegrationBindingClientId(),
-        id: binding.id,
-        connectionId: binding.connectionId,
-        kind: binding.kind,
-        config: binding.config,
-      }));
-      setIntegrationRows(nextRows);
-      setIntegrationSaveError(null);
-      setIntegrationRowErrorsByClientId({});
-      setIntegrationSaveSuccess(true);
-
-      if (profileId !== undefined && resolvedSelectedVersion !== null) {
-        await queryClient.invalidateQueries({
-          queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
-            profileId,
-            version: resolvedSelectedVersion,
-          }),
-        });
-      }
-    },
-    onError: (error: unknown) => {
-      const issues = readInvalidBindingConfigIssues(error);
-      if (issues !== null) {
-        const rowErrors: Record<string, string> = {};
-        const rowsByPersistedId = new Map<string, SandboxProfileBindingEditorRow>();
-        for (const row of integrationRows) {
-          if (row.id !== undefined) {
-            rowsByPersistedId.set(row.id, row);
-          }
-        }
-
-        for (const issue of issues) {
-          const clientId =
-            issue.clientRef ?? rowsByPersistedId.get(issue.bindingIdOrDraftIndex)?.clientId;
-          if (clientId === undefined) {
-            continue;
-          }
-          if (rowErrors[clientId] !== undefined) {
-            continue;
-          }
-          rowErrors[clientId] = issue.safeMessage;
-        }
-        setIntegrationRowErrorsByClientId(rowErrors);
-      } else {
-        setIntegrationRowErrorsByClientId({});
-      }
-      setIntegrationSaveError(
-        issues?.[0]?.safeMessage ??
-          resolveApiErrorMessage({
-            error,
-            fallbackMessage: "Could not save sandbox profile integrations.",
-          }),
-      );
-      setIntegrationSaveSuccess(false);
-    },
-  });
-
-  useEffect(() => {
-    if (props.mode !== "edit") {
-      return;
-    }
-
-    if (!profileQuery.data) {
-      return;
-    }
-
-    const loadedState: SandboxProfileEditorFormState = {
-      displayName: profileQuery.data.displayName,
-      status: profileQuery.data.status,
-    };
-
-    setFormState(loadedState);
-    setPersistedFormState(loadedState);
-    setProfileNameDraft(loadedState.displayName);
-  }, [profileQuery.data, props.mode]);
-
-  useEffect(() => {
-    const bindings = integrationBindingsQuery.data?.bindings;
-    if (bindings === undefined) {
-      return;
-    }
-
-    const nextRows = bindings.map((binding) => ({
-      clientId: createIntegrationBindingClientId(),
-      id: binding.id,
-      connectionId: binding.connectionId,
-      kind: binding.kind,
-      config: binding.config,
-    }));
-
-    setIntegrationRows(nextRows);
-    resetIntegrationSaveState();
-  }, [integrationBindingsQuery.data]);
-
-  const trimmedDisplayName = formState.displayName.trim();
-  const editTitleProfileName =
-    trimmedDisplayName.length > 0 ? trimmedDisplayName : (profileId ?? "Profile");
-  const pageTitle = props.mode === "create" ? "Create Profile" : editTitleProfileName;
-  const isDisplayNameInvalid = trimmedDisplayName.length === 0;
-  const hasEditChanges =
-    trimmedDisplayName !== persistedFormState.displayName.trim() ||
-    formState.status !== persistedFormState.status;
-  const availableConnections: readonly IntegrationConnectionSummary[] =
-    integrationDirectoryQuery.data?.connections ?? [];
-  const availableTargets: readonly IntegrationTargetSummary[] =
-    integrationDirectoryQuery.data?.targets ?? [];
-  const canEditIntegrations = props.mode === "edit" && profileId !== undefined;
-
-  function handleDisplayNameChange(nextValue: string): void {
-    setFormState((currentState) => ({
-      ...currentState,
-      displayName: nextValue,
-    }));
-    setSaveError(null);
-    setSaveSuccess(false);
-  }
-
-  function handleProfileNameEditStart(): void {
-    setProfileNameDraft(formState.displayName);
-    setIsEditingProfileName(true);
-    setSaveError(null);
-    setSaveSuccess(false);
-  }
-
-  function handleProfileNameDraftChange(nextValue: string): void {
-    setProfileNameDraft(nextValue);
-    setSaveError(null);
-    setSaveSuccess(false);
-  }
-
-  function handleProfileNameEditCancel(): void {
-    setProfileNameDraft(formState.displayName);
-    setIsEditingProfileName(false);
-    setSaveError(null);
-    setSaveSuccess(false);
-  }
-
-  function handleProfileNameEditCommit(): void {
-    if (props.mode !== "edit" || profileId === undefined || updateMutation.isPending) {
-      setIsEditingProfileName(false);
-      return;
-    }
-    const decision = resolveProfileNameCommitDecision({
-      draftDisplayName: profileNameDraft,
-      persistedDisplayName: persistedFormState.displayName,
-    });
-    setIsEditingProfileName(false);
-    if (decision.action === "revert") {
-      setProfileNameDraft(persistedFormState.displayName);
-      return;
-    }
-    setFormState((currentState) => ({
-      ...currentState,
-      displayName: decision.displayName,
-    }));
-    if (decision.action === "noop") {
-      return;
-    }
-
-    updateMutation.mutate({
-      profileId,
-      changes: {
-        displayName: decision.displayName,
-      },
-    });
-  }
-
-  function handleStatusChange(nextValue: string | null): void {
-    const nextStatus = parseStatusValue(nextValue);
-    setFormState((currentState) => ({
-      ...currentState,
-      status: nextStatus,
-    }));
-    setSaveError(null);
-    setSaveSuccess(false);
-  }
-
-  function handleCancel(): void {
-    if (props.mode === "create") {
-      void navigate("/sandbox-profiles");
-      return;
-    }
-
-    setFormState(persistedFormState);
-    setSaveError(null);
-    setSaveSuccess(false);
-  }
-
-  function handleCreate(): void {
-    if (isDisplayNameInvalid || createMutation.isPending) {
-      return;
-    }
-
-    createMutation.mutate({
-      displayName: trimmedDisplayName,
-      status: formState.status,
-    });
-  }
-
-  function handleSave(): void {
-    if (
-      props.mode !== "edit" ||
-      profileId === undefined ||
-      !hasEditChanges ||
-      isDisplayNameInvalid ||
-      updateMutation.isPending
-    ) {
-      return;
-    }
-
-    updateMutation.mutate({
-      profileId,
-      changes: {
-        ...(trimmedDisplayName === persistedFormState.displayName.trim()
-          ? {}
-          : { displayName: trimmedDisplayName }),
-        ...(formState.status === persistedFormState.status ? {} : { status: formState.status }),
-      },
-    });
-  }
-
-  function handleSelectedVersionChange(nextValue: string | null): void {
-    if (nextValue === null) {
-      throw new Error("Sandbox profile version must not be null.");
-    }
-    const parsed = Number(nextValue);
-    if (!Number.isInteger(parsed) || parsed < 1) {
-      throw new Error(`Unsupported sandbox profile version: ${nextValue}`);
-    }
-    setExplicitSelectedVersion(parsed);
-    resetIntegrationSaveState();
-  }
-
-  function resolveSelectedVersionDisplayName(): string | undefined {
-    if (resolvedSelectedVersion === null) {
-      return undefined;
-    }
-    const explicitSelectedVersionSummary = availableProfileVersions.find(
-      (version) => version.version === resolvedSelectedVersion,
-    );
-    if (explicitSelectedVersionSummary === undefined) {
-      return undefined;
-    }
-    return formatSandboxProfileVersionLabel(explicitSelectedVersionSummary.version);
-  }
-
-  function handleAddIntegrationBindingRow(): void {
-    setIntegrationRows((currentRows) => [
-      ...currentRows,
-      {
-        clientId: createIntegrationBindingClientId(),
-        connectionId: "",
-        kind: "agent",
-        config: {},
-      },
-    ]);
-    resetIntegrationSaveState();
-  }
-
-  function handleRemoveIntegrationBindingRow(clientId: string): void {
-    setIntegrationRows((currentRows) => currentRows.filter((row) => row.clientId !== clientId));
-    markIntegrationDirty({ clientId });
-  }
-
-  function handleIntegrationBindingRowChange(
-    clientId: string,
-    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
-  ): void {
-    setIntegrationRows((currentRows) =>
-      currentRows.map((row) => {
-        if (row.clientId !== clientId) {
-          return row;
-        }
-        return {
-          ...row,
-          ...changes,
-        };
-      }),
-    );
-    markIntegrationDirty({ clientId });
-  }
-
-  function handleSaveIntegrationBindings(): void {
-    if (
-      props.mode !== "edit" ||
-      profileId === undefined ||
-      resolvedSelectedVersion === null ||
-      putIntegrationBindingsMutation.isPending
-    ) {
-      return;
-    }
-
-    const parsedBindings: Array<{
-      id?: string;
-      clientRef: string;
-      connectionId: string;
-      kind: SandboxIntegrationBindingKind;
-      config: Record<string, unknown>;
-    }> = [];
-
-    for (const row of integrationRows) {
-      const normalizedConnectionId = row.connectionId.trim();
-      if (normalizedConnectionId.length === 0) {
-        setIntegrationSaveFailure("Each integration binding must select a connection.");
-        return;
-      }
-
-      const configUiModel = resolveBindingConfigUiModel({
-        row,
-        connections: availableConnections,
-        targets: availableTargets,
-      });
-      if (configUiModel.mode === "missing-connection") {
-        setIntegrationSaveFailure("Each integration binding must select a connection.");
-        return;
-      }
-      if (configUiModel.mode === "unsupported") {
-        setIntegrationSaveFailure(configUiModel.message);
-        return;
-      }
-
-      const config = configUiModel.mode === "editor" ? configUiModel.value : {};
-
-      parsedBindings.push({
-        ...(row.id === undefined ? {} : { id: row.id }),
-        clientRef: row.clientId,
-        connectionId: normalizedConnectionId,
-        kind: row.kind,
-        config,
-      });
-    }
-
-    putIntegrationBindingsMutation.mutate({
-      profileId,
-      version: resolvedSelectedVersion,
-      bindings: parsedBindings,
-    });
-  }
-
-  function resolveSelectedConnectionDisplayName(
-    row: SandboxProfileBindingEditorRow,
-  ): string | undefined {
-    if (row.connectionId === "") {
-      return undefined;
-    }
-    const selectedConnection = availableConnections.find(
-      (connection) => connection.id === row.connectionId,
-    );
-    if (selectedConnection === undefined) {
-      return undefined;
-    }
-    return formatConnectionDisplayName({
-      connection: selectedConnection,
-      targets: availableTargets,
-    });
-  }
 
   if (props.mode === "edit" && profileQuery.isPending) {
     return (
       <div className="gap-4 flex flex-col">
-        <h1 className="text-xl font-semibold">{pageTitle}</h1>
+        <h1 className="text-xl font-semibold">{metaState.pageTitle}</h1>
         <Card>
           <CardContent className="pt-4">
             <div className="gap-3 flex flex-col">
@@ -998,7 +380,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
 
     return (
       <div className="gap-4 flex flex-col">
-        <h1 className="text-xl font-semibold">{pageTitle}</h1>
+        <h1 className="text-xl font-semibold">{metaState.pageTitle}</h1>
         <Card>
           <CardContent className="gap-3 flex flex-col pt-4">
             <Alert variant="destructive">
@@ -1033,30 +415,60 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
 
   return (
     <div className="gap-4 flex flex-col">
-      {props.mode === "create" ? (
-        <h1 className="text-xl font-semibold">{pageTitle}</h1>
-      ) : (
-        <SandboxProfileTitleEditor
-          draftValue={profileNameDraft}
-          isEditing={isEditingProfileName}
-          onCancel={handleProfileNameEditCancel}
-          onCommit={handleProfileNameEditCommit}
-          onDraftValueChange={handleProfileNameDraftChange}
-          onEditStart={handleProfileNameEditStart}
-          saveDisabled={updateMutation.isPending}
-          title={pageTitle}
-        />
-      )}
-      <Card>
-        <CardContent className="gap-4 flex flex-col pt-4">
-          {saveError ? (
-            <Alert variant="destructive">
-              <AlertTitle>{props.mode === "create" ? "Create failed" : "Update failed"}</AlertTitle>
-              <AlertDescription>{saveError}</AlertDescription>
-            </Alert>
-          ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {props.mode === "create" ? (
+          <h1 className="text-xl font-semibold">{metaState.pageTitle}</h1>
+        ) : (
+          <SandboxProfileTitleEditor
+            draftValue={metaState.profileNameDraft}
+            isEditing={metaState.isEditingProfileName}
+            onCancel={metaState.onProfileNameEditCancel}
+            onCommit={metaState.onProfileNameEditCommit}
+            onDraftValueChange={metaState.onProfileNameDraftChange}
+            onEditStart={metaState.onProfileNameEditStart}
+            saveDisabled={metaState.isUpdating}
+            title={metaState.pageTitle}
+          />
+        )}
 
-          {props.mode === "create" ? (
+        <div className="inline-flex h-11 items-center gap-2 rounded-md border px-3">
+          <Label
+            className={
+              metaState.formState.status === "inactive"
+                ? "text-foreground"
+                : "text-muted-foreground"
+            }
+            htmlFor="sandbox-profile-status-toggle"
+          >
+            Inactive
+          </Label>
+          <Switch
+            aria-label="Sandbox profile status"
+            checked={resolveStatusToggleChecked(metaState.formState.status)}
+            disabled={metaState.isCreating || metaState.isUpdating}
+            id="sandbox-profile-status-toggle"
+            onCheckedChange={metaState.onStatusToggleChange}
+          />
+          <Label
+            className={
+              metaState.formState.status === "active" ? "text-foreground" : "text-muted-foreground"
+            }
+            htmlFor="sandbox-profile-status-toggle"
+          >
+            Active
+          </Label>
+        </div>
+      </div>
+      {metaState.saveError ? (
+        <Alert variant="destructive">
+          <AlertTitle>{props.mode === "create" ? "Create failed" : "Update failed"}</AlertTitle>
+          <AlertDescription>{metaState.saveError}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      {props.mode === "create" ? (
+        <Card>
+          <CardContent className="gap-4 flex flex-col pt-4">
             <Field>
               <FieldLabel htmlFor="sandbox-profile-display-name">
                 <span className="inline-flex items-center gap-0.5">
@@ -1071,93 +483,51 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
                   className="w-full max-w-2xl"
                   id="sandbox-profile-display-name"
                   onChange={(event) => {
-                    handleDisplayNameChange(event.currentTarget.value);
+                    metaState.onDisplayNameChange(event.currentTarget.value);
                   }}
-                  value={formState.displayName}
+                  value={metaState.formState.displayName}
                 />
               </FieldContent>
             </Field>
-          ) : null}
 
-          <Field>
-            <FieldLabel htmlFor="sandbox-profile-status">Status</FieldLabel>
-            <FieldContent>
-              <Select onValueChange={handleStatusChange} value={formState.status}>
-                <SelectTrigger aria-label="Sandbox profile status" id="sandbox-profile-status">
-                  <SelectValue placeholder="Select status">
-                    {formatSandboxProfileStatus(formState.status)}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {SANDBOX_PROFILE_STATUS_OPTIONS.map((statusOption) => (
-                    <SelectItem key={statusOption} value={statusOption}>
-                      {formatSandboxProfileStatus(statusOption)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FieldContent>
-          </Field>
-
-          {props.mode === "create" ? (
             <div className="gap-2 flex">
               <Button
-                disabled={isDisplayNameInvalid || createMutation.isPending}
-                onClick={handleCreate}
+                disabled={metaState.isDisplayNameInvalid || metaState.isCreating}
+                onClick={metaState.onCreate}
                 type="button"
               >
-                {createMutation.isPending ? "Creating..." : "Create profile"}
+                {metaState.isCreating ? "Creating..." : "Create profile"}
               </Button>
-              <Button onClick={handleCancel} type="button" variant="outline">
+              <Button onClick={metaState.onCancelCreate} type="button" variant="outline">
                 Cancel
               </Button>
             </div>
-          ) : (
-            <SaveActions
-              cancelDisabled={!hasEditChanges || updateMutation.isPending}
-              onCancel={handleCancel}
-              onSave={handleSave}
-              saveDisabled={!hasEditChanges || isDisplayNameInvalid || updateMutation.isPending}
-              saveSuccess={saveSuccess}
-              saving={updateMutation.isPending}
-            />
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : null}
 
-      {canEditIntegrations ? (
+      {integrationsState.canEditIntegrations ? (
         <IntegrationsEditorSection
-          availableConnections={availableConnections}
-          availableTargets={availableTargets}
-          integrationBindingsQuery={{
-            isError: integrationBindingsQuery.isError,
-            error: integrationBindingsQuery.error,
-            isPending: integrationBindingsQuery.isPending,
-          }}
-          integrationDirectoryQuery={{
-            isError: integrationDirectoryQuery.isError,
-            error: integrationDirectoryQuery.error,
-            isPending: integrationDirectoryQuery.isPending,
-          }}
-          integrationRowErrorsByClientId={integrationRowErrorsByClientId}
-          integrationRows={integrationRows}
-          integrationSaveError={integrationSaveError}
-          integrationSaveSuccess={integrationSaveSuccess}
-          isSavingIntegrationBindings={putIntegrationBindingsMutation.isPending}
-          onAddIntegrationBindingRow={handleAddIntegrationBindingRow}
-          onIntegrationBindingRowChange={handleIntegrationBindingRowChange}
-          onRemoveIntegrationBindingRow={handleRemoveIntegrationBindingRow}
-          onSaveIntegrationBindings={handleSaveIntegrationBindings}
-          onSelectedVersionChange={handleSelectedVersionChange}
-          profileVersionsQuery={{
-            isError: profileVersionsQuery.isError,
-            error: profileVersionsQuery.error,
-            isPending: profileVersionsQuery.isPending,
-            data: profileVersionsQuery.data,
-          }}
-          resolveSelectedConnectionDisplayName={resolveSelectedConnectionDisplayName}
-          resolvedSelectedVersion={resolvedSelectedVersion}
-          selectedVersionDisplayName={resolveSelectedVersionDisplayName()}
+          availableConnections={integrationsState.availableConnections}
+          availableTargets={integrationsState.availableTargets}
+          integrationBindingsQuery={integrationsState.integrationBindingsQuery}
+          integrationDirectoryQuery={integrationsState.integrationDirectoryQuery}
+          integrationRowErrorsByClientId={integrationsState.integrationRowErrorsByClientId}
+          integrationRows={integrationsState.integrationRows}
+          integrationSaveError={integrationsState.integrationSaveError}
+          integrationSaveSuccess={integrationsState.integrationSaveSuccess}
+          isSavingIntegrationBindings={integrationsState.isSavingIntegrationBindings}
+          onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}
+          onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
+          onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
+          onSaveIntegrationBindings={integrationsState.onSaveIntegrationBindings}
+          onSelectedVersionChange={integrationsState.onSelectedVersionChange}
+          profileVersionsQuery={integrationsState.profileVersionsQuery}
+          resolveSelectedConnectionDisplayName={
+            integrationsState.resolveSelectedConnectionDisplayName
+          }
+          resolvedSelectedVersion={integrationsState.resolvedSelectedVersion}
+          selectedVersionDisplayName={integrationsState.selectedVersionDisplayName}
         />
       ) : null}
     </div>
