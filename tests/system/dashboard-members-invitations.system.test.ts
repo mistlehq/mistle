@@ -1,5 +1,5 @@
 /* eslint-disable jest/no-standalone-expect --
- * This suite uses an extended test `it` fixture imported from dashboard system test context.
+ * This suite uses an extended test `it` fixture imported from shared system test context.
  */
 
 import { randomUUID } from "node:crypto";
@@ -11,8 +11,8 @@ import { z } from "zod";
 import { mapInviteAttemptResult } from "../../apps/dashboard/src/features/settings/members/member-invite-state.js";
 import { MembersApiError } from "../../apps/dashboard/src/features/settings/members/members-api-errors.js";
 import { createMembersInvitationsService } from "../../apps/dashboard/src/features/settings/members/members-invitations-service-core.js";
-import type { DashboardMembersInvitationsFixture } from "./dashboard-members-invitations-test-context.js";
-import { it } from "./dashboard-members-invitations-test-context.js";
+import type { SystemTestFixture } from "./system-test-context.js";
+import { it } from "./system-test-context.js";
 
 const AUTH_ORIGIN = "http://localhost:5100";
 const ErrorPayloadSchema = z
@@ -62,7 +62,7 @@ function buildPath(input: { path: string; query?: Record<string, string> }): str
 }
 
 function createFixtureMembersFetchClient(input: {
-  fixture: DashboardMembersInvitationsFixture;
+  fixture: SystemTestFixture;
   cookieHeader: string;
 }): {
   $fetch: (
@@ -123,7 +123,7 @@ type AuthenticatedInviteContext = {
 };
 
 async function createAuthenticatedInviteContext(
-  fixture: DashboardMembersInvitationsFixture,
+  fixture: SystemTestFixture,
 ): Promise<AuthenticatedInviteContext> {
   const session = await fixture.authSession();
 

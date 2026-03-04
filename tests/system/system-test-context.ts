@@ -21,10 +21,15 @@ export type AuthenticatedSession = {
   userId: string;
 };
 
-export type DashboardMembersInvitationsFixture = {
+export type SystemTestFixture = {
   controlPlaneApiClient: ControlPlaneApiClient;
   db: ControlPlaneDatabase;
   request: (path: string, init?: RequestInit) => Promise<Response>;
+  sendSignInOtp: (input: { email: string }) => Promise<Response>;
+  waitForSignInOtp: (input: { email: string }) => Promise<string>;
+  signInWithOtp: (input: { email: string; otp: string }) => Promise<Response>;
+  readRequestCookie: (signInResponse: Response) => string;
+  createOrganization: (input: { cookie: string; name: string; slug: string }) => Promise<string>;
   authSession: (input?: { email?: string }) => Promise<AuthenticatedSession>;
 };
 
@@ -76,7 +81,7 @@ function requireEnv(name: string): string {
   return value;
 }
 
-export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture }>({
+export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
   fixture: [
     async ({}, use) => {
       const controlPlaneApiBaseUrl = requireEnv("MISTLE_SYSTEM_CONTROL_PLANE_API_BASE_URL");
@@ -89,25 +94,106 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
       const mailpitInbox = createMailpitInbox({
         httpBaseUrl: requireEnv("MISTLE_SYSTEM_MAILPIT_HTTP_BASE_URL"),
       });
+      const sendSignInOtp = async (input: { email: string }): Promise<Response> => {
+        return request("/v1/auth/email-otp/send-verification-otp", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin: AUTH_ORIGIN,
+          },
+          body: JSON.stringify({
+            email: input.email,
+            type: "sign-in",
+          }),
+        });
+      };
+      const waitForSignInOtp = async (input: { email: string }): Promise<string> => {
+        const listItem = await mailpitInbox.waitForMessage({
+          timeoutMs: 15_000,
+          description: `OTP email for ${input.email}`,
+          matcher: ({ message }) =>
+            message.Subject === "Your sign-in code" &&
+            message.To.some((address) => address.Address === input.email),
+        });
+        const message = await mailpitInbox.getMessageSummary(listItem.ID);
+        const otp = extractOTPCode(message.Text);
+        if (otp === undefined) {
+          throw new Error("OTP was not found in Mailpit message text.");
+        }
+
+        return otp;
+      };
+      const signInWithOtp = async (input: { email: string; otp: string }): Promise<Response> => {
+        return request("/v1/auth/sign-in/email-otp", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            origin: AUTH_ORIGIN,
+          },
+          body: JSON.stringify({
+            email: input.email,
+            otp: input.otp,
+          }),
+        });
+      };
+      const readRequestCookie = (signInResponse: Response): string => {
+        const setCookie = signInResponse.headers.get("set-cookie");
+        if (typeof setCookie !== "string" || setCookie.length === 0) {
+          throw new Error("Expected sign-in response to include set-cookie.");
+        }
+
+        return extractRequestCookie(setCookie);
+      };
+      const createOrganization = async (input: {
+        cookie: string;
+        name: string;
+        slug: string;
+      }): Promise<string> => {
+        const createOrganizationResponse = await request("/v1/auth/organization/create", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            cookie: input.cookie,
+            origin: AUTH_ORIGIN,
+          },
+          body: JSON.stringify({
+            name: input.name,
+            slug: input.slug,
+          }),
+        });
+        if (createOrganizationResponse.status !== 200) {
+          const errorBody = await createOrganizationResponse.text().catch(() => "");
+          throw new Error(
+            `Expected organization create response status 200, got ${String(createOrganizationResponse.status)}. Response body: ${errorBody}`,
+          );
+        }
+
+        const createOrganizationPayload: unknown = await createOrganizationResponse
+          .json()
+          .catch(() => null);
+        const organizationId = readOrganizationIdFromPayload(createOrganizationPayload);
+        if (organizationId === null) {
+          throw new Error("Expected organization create response to include organization id.");
+        }
+
+        return organizationId;
+      };
 
       try {
         await use({
           controlPlaneApiClient,
           db,
           request,
+          sendSignInOtp,
+          waitForSignInOtp,
+          signInWithOtp,
+          readRequestCookie,
+          createOrganization,
           authSession: async (input) => {
             const email = input?.email ?? generateAuthEmail();
 
-            const sendResponse = await request("/v1/auth/email-otp/send-verification-otp", {
-              method: "POST",
-              headers: {
-                "content-type": "application/json",
-                origin: AUTH_ORIGIN,
-              },
-              body: JSON.stringify({
-                email,
-                type: "sign-in",
-              }),
+            const sendResponse = await sendSignInOtp({
+              email,
             });
             if (sendResponse.status !== 200) {
               throw new Error(
@@ -115,29 +201,12 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
               );
             }
 
-            const listItem = await mailpitInbox.waitForMessage({
-              timeoutMs: 15_000,
-              description: `OTP email for ${email}`,
-              matcher: ({ message }) =>
-                message.Subject === "Your sign-in code" &&
-                message.To.some((address) => address.Address === email),
+            const otp = await waitForSignInOtp({
+              email,
             });
-            const message = await mailpitInbox.getMessageSummary(listItem.ID);
-            const otp = extractOTPCode(message.Text);
-            if (otp === undefined) {
-              throw new Error("OTP was not found in Mailpit message text.");
-            }
-
-            const signInResponse = await request("/v1/auth/sign-in/email-otp", {
-              method: "POST",
-              headers: {
-                "content-type": "application/json",
-                origin: AUTH_ORIGIN,
-              },
-              body: JSON.stringify({
-                email,
-                otp,
-              }),
+            const signInResponse = await signInWithOtp({
+              email,
+              otp,
             });
             if (signInResponse.status !== 200) {
               throw new Error(
@@ -145,10 +214,7 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
               );
             }
 
-            const setCookie = signInResponse.headers.get("set-cookie");
-            if (typeof setCookie !== "string" || setCookie.length === 0) {
-              throw new Error("Expected sign-in response to include set-cookie.");
-            }
+            const requestCookie = readRequestCookie(signInResponse);
 
             const user = await db.query.users.findFirst({
               columns: {
@@ -171,7 +237,6 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
               throw new Error("Expected session to exist after OTP sign-in.");
             }
 
-            const requestCookie = extractRequestCookie(setCookie);
             let activeOrganizationId =
               typeof session.activeOrganizationId === "string" &&
               session.activeOrganizationId.length > 0
@@ -179,34 +244,11 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
                 : null;
 
             if (activeOrganizationId === null) {
-              const createOrganizationResponse = await request("/v1/auth/organization/create", {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json",
-                  cookie: requestCookie,
-                  origin: AUTH_ORIGIN,
-                },
-                body: JSON.stringify({
-                  name: "System Test Organization",
-                  slug: `system-${randomUUID()}`,
-                }),
+              activeOrganizationId = await createOrganization({
+                cookie: requestCookie,
+                name: "System Test Organization",
+                slug: `system-${randomUUID()}`,
               });
-              if (createOrganizationResponse.status !== 200) {
-                const errorBody = await createOrganizationResponse.text().catch(() => "");
-                throw new Error(
-                  `Expected organization create response status 200, got ${String(createOrganizationResponse.status)}. Response body: ${errorBody}`,
-                );
-              }
-
-              const createOrganizationPayload: unknown = await createOrganizationResponse
-                .json()
-                .catch(() => null);
-              activeOrganizationId = readOrganizationIdFromPayload(createOrganizationPayload);
-              if (activeOrganizationId === null) {
-                throw new Error(
-                  "Expected organization create response to include organization id.",
-                );
-              }
             }
 
             return {
