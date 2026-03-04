@@ -1,7 +1,7 @@
 import { AppIds, loadConfig } from "@mistle/config";
 import { createControlPlaneBackend } from "@mistle/workflows/control-plane";
 
-import { logger } from "../logger.js";
+import { logger } from "../src/logger.js";
 
 async function main(): Promise<void> {
   const loadedConfig = loadConfig({

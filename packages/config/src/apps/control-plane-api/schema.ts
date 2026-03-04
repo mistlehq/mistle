@@ -45,46 +45,10 @@ export const ControlPlaneApiSandboxConfigSchema = z
   })
   .strict();
 
-export const ControlPlaneApiIntegrationsTargetCatalogGithubConfigSchema = z
-  .object({
-    appSlug: z.string().min(1).optional(),
-    appId: z.string().min(1).optional(),
-    clientId: z.string().min(1).optional(),
-    apiBaseUrl: z.string().min(1).optional(),
-    webBaseUrl: z.string().min(1).optional(),
-  })
-  .strict();
-
-export const ControlPlaneApiIntegrationsTargetCatalogGithubEnterpriseConfigSchema = z
-  .object({
-    appSlug: z.string().min(1).optional(),
-    appId: z.string().min(1).optional(),
-    clientId: z.string().min(1).optional(),
-    apiBaseUrl: z.string().min(1).optional(),
-    webBaseUrl: z.string().min(1).optional(),
-  })
-  .strict();
-
-export const ControlPlaneApiIntegrationsTargetCatalogOpenAiConfigSchema = z
-  .object({
-    apiBaseUrl: z.string().min(1).optional(),
-  })
-  .strict();
-
-export const ControlPlaneApiIntegrationsTargetCatalogConfigSchema = z
-  .object({
-    github: ControlPlaneApiIntegrationsTargetCatalogGithubConfigSchema.optional(),
-    githubEnterprise:
-      ControlPlaneApiIntegrationsTargetCatalogGithubEnterpriseConfigSchema.optional(),
-    openai: ControlPlaneApiIntegrationsTargetCatalogOpenAiConfigSchema.optional(),
-  })
-  .strict();
-
 const ControlPlaneApiIntegrationsConfigObjectSchema = z
   .object({
     activeMasterEncryptionKeyVersion: z.number().int().min(1),
     masterEncryptionKeys: z.record(z.string().regex(/^[1-9]\d*$/), z.string().min(1)),
-    targetCatalog: ControlPlaneApiIntegrationsTargetCatalogConfigSchema.optional(),
   })
   .strict();
 

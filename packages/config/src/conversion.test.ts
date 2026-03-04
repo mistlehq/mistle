@@ -28,20 +28,6 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "3",
       MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON:
         '{"3":"integration-master-key"}',
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_APP_SLUG: "mistle-github-app",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_APP_ID: "123456",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_CLIENT_ID: "github-client-id",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_API_BASE_URL: "https://api.github.com",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_WEB_BASE_URL: "https://github.com",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_APP_SLUG: "mistle-ghe-app",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_APP_ID: "7890",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_CLIENT_ID:
-        "github-enterprise-client-id",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_API_BASE_URL:
-        "https://ghe.example.com/api/v3",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_WEB_BASE_URL:
-        "https://ghe.example.com",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_OPENAI_API_BASE_URL: "https://api.openai.com",
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "http://a.local,http://b.local",
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_LENGTH: "6",
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "true",
@@ -84,25 +70,6 @@ describe("convertEnvToTomlRecord", () => {
             active_master_encryption_key_version: 3,
             master_encryption_keys: {
               "3": "integration-master-key",
-            },
-            target_catalog: {
-              github: {
-                app_slug: "mistle-github-app",
-                app_id: "123456",
-                client_id: "github-client-id",
-                api_base_url: "https://api.github.com",
-                web_base_url: "https://github.com",
-              },
-              github_enterprise: {
-                app_slug: "mistle-ghe-app",
-                app_id: "7890",
-                client_id: "github-enterprise-client-id",
-                api_base_url: "https://ghe.example.com/api/v3",
-                web_base_url: "https://ghe.example.com",
-              },
-              openai: {
-                api_base_url: "https://api.openai.com",
-              },
             },
           },
           auth: {
@@ -166,25 +133,6 @@ describe("convertTomlToEnvRecord", () => {
             master_encryption_keys: {
               "9": "integration-master-key",
             },
-            target_catalog: {
-              github: {
-                app_slug: "mistle-github-app",
-                app_id: "123456",
-                client_id: "github-client-id",
-                api_base_url: "https://api.github.com",
-                web_base_url: "https://github.com",
-              },
-              github_enterprise: {
-                app_slug: "mistle-ghe-app",
-                app_id: "7890",
-                client_id: "github-enterprise-client-id",
-                api_base_url: "https://ghe.example.com/api/v3",
-                web_base_url: "https://ghe.example.com",
-              },
-              openai: {
-                api_base_url: "https://api.openai.com",
-              },
-            },
           },
         },
         control_plane_worker: {
@@ -219,20 +167,6 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "9",
       MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON:
         '{"9":"integration-master-key"}',
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_APP_SLUG: "mistle-github-app",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_APP_ID: "123456",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_CLIENT_ID: "github-client-id",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_API_BASE_URL: "https://api.github.com",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_WEB_BASE_URL: "https://github.com",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_APP_SLUG: "mistle-ghe-app",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_APP_ID: "7890",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_CLIENT_ID:
-        "github-enterprise-client-id",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_API_BASE_URL:
-        "https://ghe.example.com/api/v3",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_GITHUB_ENTERPRISE_WEB_BASE_URL:
-        "https://ghe.example.com",
-      MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_OPENAI_API_BASE_URL: "https://api.openai.com",
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "2",
       MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",

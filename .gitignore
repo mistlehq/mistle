@@ -20,3 +20,4 @@ config/config.development.toml
 config/config.ci.toml
 config/config.production.toml
 infra/local/.generated/
+integration-targets.provision.json

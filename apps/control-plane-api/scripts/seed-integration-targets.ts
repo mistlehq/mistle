@@ -2,10 +2,11 @@ import { pathToFileURL } from "node:url";
 
 import { AppIds, loadConfig } from "@mistle/config";
 import { createControlPlaneDatabase } from "@mistle/db/control-plane";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { Pool } from "pg";
 
-import { seedDefaultIntegrationTargets } from "../integration-targets/services/seed-default-targets.js";
-import { logger } from "../logger.js";
+import { logger } from "../src/logger.js";
+import { syncIntegrationTargets } from "./integration-targets/sync-integration-targets.js";
 
 async function main(): Promise<void> {
   const loadedConfig = loadConfig({
@@ -18,18 +19,16 @@ async function main(): Promise<void> {
     connectionString: loadedConfig.app.database.url,
   });
   const db = createControlPlaneDatabase(pool);
+  const integrationRegistry = createIntegrationRegistry();
 
   try {
-    const seededTargets = await seedDefaultIntegrationTargets(
-      db,
-      loadedConfig.app.integrations.targetCatalog,
-    );
+    const syncedTargets = await syncIntegrationTargets(db, integrationRegistry);
 
     logger.info(
       {
-        seededTargets,
+        syncedTargets,
       },
-      "Seeded integration targets.",
+      "Synced integration targets from integration registry.",
     );
   } finally {
     await pool.end();
@@ -38,7 +37,7 @@ async function main(): Promise<void> {
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   void main().catch((error) => {
-    logger.error({ err: error }, "Failed to seed integration targets");
+    logger.error({ err: error }, "Failed to sync integration targets");
     process.exit(1);
   });
 }
