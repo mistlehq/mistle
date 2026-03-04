@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "targets": [
+    {
+      "targetKey": "openai-default",
+      "enabled": true,
+      "config": {
+        "api_base_url": "https://api.openai.com",
+        "binding_capabilities": {
+          "by_auth_scheme": {
+            "api-key": {
+              "models": [
+                "gpt-5.3-codex",
+                "gpt-5.3-codex-spark",
+                "gpt-5.2-codex",
+                "gpt-5.1-codex-max",
+                "gpt-5.2",
+                "gpt-5.1-codex-mini"
+              ],
+              "allowed_reasoning_by_model": {
+                "gpt-5.3-codex": ["low", "medium", "high", "xhigh"],
+                "gpt-5.3-codex-spark": ["low", "medium", "high", "xhigh"],
+                "gpt-5.2-codex": ["low", "medium", "high", "xhigh"],
+                "gpt-5.1-codex-max": ["low", "medium", "high", "xhigh"],
+                "gpt-5.2": ["low", "medium", "high", "xhigh"],
+                "gpt-5.1-codex-mini": ["medium", "high"]
+              },
+              "default_reasoning_by_model": {
+                "gpt-5.3-codex": "medium",
+                "gpt-5.3-codex-spark": "high",
+                "gpt-5.2-codex": "medium",
+                "gpt-5.1-codex-max": "medium",
+                "gpt-5.2": "medium",
+                "gpt-5.1-codex-mini": "medium"
+              }
+            },
+            "oauth": {
+              "models": [
+                "gpt-5.3-codex",
+                "gpt-5.3-codex-spark",
+                "gpt-5.2-codex",
+                "gpt-5.1-codex-max",
+                "gpt-5.2",
+                "gpt-5.1-codex-mini"
+              ],
+              "allowed_reasoning_by_model": {
+                "gpt-5.3-codex": ["low", "medium", "high", "xhigh"],
+                "gpt-5.3-codex-spark": ["low", "medium", "high", "xhigh"],
+                "gpt-5.2-codex": ["low", "medium", "high", "xhigh"],
+                "gpt-5.1-codex-max": ["low", "medium", "high", "xhigh"],
+                "gpt-5.2": ["low", "medium", "high", "xhigh"],
+                "gpt-5.1-codex-mini": ["medium", "high"]
+              },
+              "default_reasoning_by_model": {
+                "gpt-5.3-codex": "medium",
+                "gpt-5.3-codex-spark": "high",
+                "gpt-5.2-codex": "medium",
+                "gpt-5.1-codex-max": "medium",
+                "gpt-5.2": "medium",
+                "gpt-5.1-codex-mini": "medium"
+              }
+            }
+          }
+        }
+      },
+      "secrets": {}
+    },
+    {
+      "targetKey": "github-cloud",
+      "enabled": true,
+      "config": {
+        "api_base_url": "https://api.github.com",
+        "web_base_url": "https://github.com",
+        "app_slug": "your-github-app-slug",
+        "app_id": "123456",
+        "client_id": "Iv1.yourclientid"
+      },
+      "secrets": {
+        "app_private_key_pem": "-----BEGIN PRIVATE KEY-----\\n<replace-with-real-key>\\n-----END PRIVATE KEY-----"
+      }
+    },
+    {
+      "targetKey": "github-enterprise-server",
+      "enabled": false,
+      "config": {
+        "api_base_url": "https://ghe.example.com/api/v3",
+        "web_base_url": "https://ghe.example.com",
+        "app_slug": "your-ghe-app-slug",
+        "app_id": "7890",
+        "client_id": "Iv1.yourgheclientid"
+      },
+      "secrets": {
+        "app_private_key_pem": "-----BEGIN PRIVATE KEY-----\\n<replace-with-real-key>\\n-----END PRIVATE KEY-----"
+      }
+    }
+  ]
+}
