@@ -753,7 +753,23 @@ importers:
         specifier: ^1.2.0
         version: 1.2.0
 
-  tests: {}
+  tests:
+    devDependencies:
+      '@mistle/db':
+        specifier: workspace:*
+        version: link:../packages/db
+      '@mistle/test-harness':
+        specifier: workspace:*
+        version: link:../packages/test-harness
+      '@types/pg':
+        specifier: ^8.18.0
+        version: 8.18.0
+      pg:
+        specifier: ^8.19.0
+        version: 8.19.0
+      vite-tsconfig-paths:
+        specifier: ^6.1.0
+        version: 6.1.1(typescript@5.9.3)(vite@7.3.1(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
 
 packages:
 

@@ -1,26 +1,18 @@
 /* eslint-disable jest/no-standalone-expect --
- * This suite uses an extended integration `it` fixture imported from control-plane test context.
- * TODO(migration): Extract a shared control-plane fixture factory and define a local
- * `it = vitestIt.extend(...)` in this file so lint can identify test blocks without suppression.
+ * This suite uses an extended test `it` fixture imported from dashboard system test context.
  */
 
 import { randomUUID } from "node:crypto";
 
-import { systemClock } from "@mistle/time";
+import { MemberRoles, invitations, members, users } from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
-import {
-  MemberRoles,
-  invitations,
-  members,
-  users,
-} from "../../../packages/db/src/control-plane/index.js";
-import { mapInviteAttemptResult } from "../src/features/settings/members/member-invite-state.js";
-import { MembersApiError } from "../src/features/settings/members/members-api-errors.js";
-import { createMembersInvitationsService } from "../src/features/settings/members/members-invitations-service-core.js";
-import type { DashboardMembersInvitationsFixture } from "./members-invitations-test-context.js";
-import { it } from "./members-invitations-test-context.js";
+import { mapInviteAttemptResult } from "../../apps/dashboard/src/features/settings/members/member-invite-state.js";
+import { MembersApiError } from "../../apps/dashboard/src/features/settings/members/members-api-errors.js";
+import { createMembersInvitationsService } from "../../apps/dashboard/src/features/settings/members/members-invitations-service-core.js";
+import type { DashboardMembersInvitationsFixture } from "./dashboard-members-invitations-test-context.js";
+import { it } from "./dashboard-members-invitations-test-context.js";
 
 const AUTH_ORIGIN = "http://localhost:5100";
 const ErrorPayloadSchema = z
@@ -101,7 +93,11 @@ function createFixtureMembersFetchClient(input: {
             cookie: input.cookieHeader,
             origin: AUTH_ORIGIN,
           },
-          body: options.body === undefined ? undefined : JSON.stringify(options.body),
+          ...(options.body === undefined
+            ? {}
+            : {
+                body: JSON.stringify(options.body),
+              }),
         },
       );
 
@@ -187,7 +183,7 @@ async function inviteAndMap(input: {
   }
 }
 
-describe("integration dashboard members invitations service", () => {
+describe("system dashboard members invitations service", () => {
   it("maps inviting a new email to invited and persists an invitation row", async ({ fixture }) => {
     const context = await createAuthenticatedInviteContext(fixture);
 
@@ -236,7 +232,7 @@ describe("integration dashboard members invitations service", () => {
       email: inviteEmail,
       role: "member",
       status: "pending",
-      expiresAt: new Date(systemClock.nowMs() + 86_400_000),
+      expiresAt: new Date(Date.now() + 86_400_000),
       inviterId: inviter.userId,
     });
 
