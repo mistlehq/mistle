@@ -7,7 +7,7 @@ import { compileProfileVersionRuntimePlan } from "./compile-profile-version-runt
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 const START_SANDBOX_PROFILE_INSTANCE_WAIT_TIMEOUT_MS = 5 * 60 * 1000;
-const SandboxdEgressBaseUrl = "http://sandboxd.internal/egress";
+export const SandboxdEgressBaseUrl = "http://127.0.0.1:8090/egress";
 
 type StartProfileInstanceInput = {
   organizationId: string;
