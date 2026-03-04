@@ -425,9 +425,7 @@ describe("handleAutomationRun integration", () => {
             db: database.db,
             automationRunId,
           }),
-        ).rejects.toThrowError(
-          "Template path 'payload.comment.missing_field' could not be resolved.",
-        );
+        ).rejects.toThrowError("undefined variable: payload.comment.missing_field");
 
         const persistedRun = await database.db.query.automationRuns.findFirst({
           where: (table, { eq }) => eq(table.id, automationRunId),

@@ -19,7 +19,7 @@ describe("renderTemplateString", () => {
 
   it("renders placeholders from array paths", () => {
     const rendered = renderTemplateString({
-      template: "First label: {{issue.labels.0.name}}",
+      template: "First label: {{issue.labels[0].name}}",
       context: {
         issue: {
           labels: [
@@ -34,7 +34,7 @@ describe("renderTemplateString", () => {
     expect(rendered).toBe("First label: bug");
   });
 
-  it("renders object values as JSON", () => {
+  it("renders object values using Liquid string coercion", () => {
     const rendered = renderTemplateString({
       template: "Payload={{payload}}",
       context: {
@@ -45,7 +45,7 @@ describe("renderTemplateString", () => {
       },
     });
 
-    expect(rendered).toBe('Payload={"id":1,"ok":true}');
+    expect(rendered).toBe("Payload=[object Object]");
   });
 
   it("throws when a placeholder path is missing", () => {
@@ -54,7 +54,7 @@ describe("renderTemplateString", () => {
         template: "{{comment.body}}",
         context: {},
       }),
-    ).toThrowError("Template path 'comment.body' could not be resolved.");
+    ).toThrowError("undefined variable: comment");
   });
 
   it("throws when a placeholder expression is empty", () => {
@@ -65,6 +65,6 @@ describe("renderTemplateString", () => {
           value: "x",
         },
       }),
-    ).toThrowError("Template path expression must not be empty.");
+    ).toThrowError('invalid value expression: ""');
   });
 });
