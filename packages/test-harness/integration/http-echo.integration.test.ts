@@ -2,6 +2,19 @@ import { describe, expect, test } from "vitest";
 
 import { startHttpEcho } from "../src/index.js";
 
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const record: Record<string, unknown> = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    record[key] = entryValue;
+  }
+
+  return record;
+}
+
 function readHeaderValue(headers: unknown, headerName: string): string | undefined {
   if (typeof headers !== "object" || headers === null) {
     return undefined;
@@ -36,16 +49,15 @@ describe("http echo service integration", () => {
 
       expect(response.status).toBe(200);
       const responseBody: unknown = await response.json();
-      if (typeof responseBody !== "object" || responseBody === null) {
+      const responseRecord = toRecord(responseBody);
+      if (responseRecord === null) {
         throw new Error("Expected HTTP echo response body to be an object.");
       }
 
-      expect(Reflect.get(responseBody, "method")).toBe("POST");
-      expect(Reflect.get(responseBody, "path")).toBe("/echo-path");
-      expect(readHeaderValue(Reflect.get(responseBody, "headers"), "x-tokenizer-test")).toBe(
-        "hello",
-      );
-      expect(Reflect.get(responseBody, "body")).toBe("hello-echo");
+      expect(responseRecord["method"]).toBe("POST");
+      expect(responseRecord["path"]).toBe("/echo-path");
+      expect(readHeaderValue(responseRecord["headers"], "x-tokenizer-test")).toBe("hello");
+      expect(responseRecord["body"]).toBe("hello-echo");
     } finally {
       await echoService.stop();
     }

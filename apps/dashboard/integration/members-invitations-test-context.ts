@@ -46,6 +46,19 @@ type SharedInfraConfig = {
   containerHostGateway: string;
 };
 
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const record: Record<string, unknown> = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    record[key] = entryValue;
+  }
+
+  return record;
+}
+
 function extractOTPCode(text: string): string | undefined {
   const pattern = new RegExp(`\\b(\\d{${String(AUTH_OTP_LENGTH)}})\\b`);
   const match = text.match(pattern);
@@ -63,11 +76,12 @@ function extractRequestCookie(setCookieHeader: string): string {
 }
 
 function readOrganizationIdFromPayload(payload: unknown): string | null {
-  if (typeof payload !== "object" || payload === null) {
+  const record = toRecord(payload);
+  if (record === null) {
     return null;
   }
 
-  const id = Reflect.get(payload, "id");
+  const id = record["id"];
   return typeof id === "string" && id.length > 0 ? id : null;
 }
 

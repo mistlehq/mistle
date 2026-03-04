@@ -23,16 +23,30 @@ import { it } from "./members-invitations-test-context.js";
 
 const AUTH_ORIGIN = "http://localhost:5100";
 
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const record: Record<string, unknown> = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    record[key] = entryValue;
+  }
+
+  return record;
+}
+
 function readErrorMessage(value: unknown): string | null {
-  if (typeof value === "object" && value !== null) {
-    const direct = Reflect.get(value, "message");
+  const record = toRecord(value);
+  if (record !== null) {
+    const direct = record["message"];
     if (typeof direct === "string" && direct.length > 0) {
       return direct;
     }
 
-    const nested = Reflect.get(value, "error");
-    if (typeof nested === "object" && nested !== null) {
-      const nestedMessage = Reflect.get(nested, "message");
+    const nested = toRecord(record["error"]);
+    if (nested !== null) {
+      const nestedMessage = nested["message"];
       if (typeof nestedMessage === "string" && nestedMessage.length > 0) {
         return nestedMessage;
       }

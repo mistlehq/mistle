@@ -32,11 +32,12 @@ function readNumber(record: UnknownRecord, key: string): number | null {
 }
 
 function readPropertyUnknown(value: unknown, key: string): unknown {
-  if (typeof value !== "object" || value === null) {
+  const record = toRecord(value);
+  if (record === null) {
     return null;
   }
 
-  return Reflect.get(value, key);
+  return record[key];
 }
 
 export function readApiErrorMessage(value: unknown): string | null {

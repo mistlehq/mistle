@@ -13,6 +13,19 @@ function isWebhookPayloadFilterScalar(value: unknown): value is WebhookPayloadFi
   );
 }
 
+function readOwnPropertyValue(target: object, key: string): unknown {
+  const descriptor = Object.getOwnPropertyDescriptor(target, key);
+  if (descriptor === undefined) {
+    return undefined;
+  }
+
+  if ("value" in descriptor) {
+    return descriptor.value;
+  }
+
+  return descriptor.get?.call(target);
+}
+
 export function getWebhookPayloadValueAtPath(input: {
   payload: unknown;
   path: WebhookPayloadFilterPath;
@@ -38,7 +51,7 @@ export function getWebhookPayloadValueAtPath(input: {
       return undefined;
     }
 
-    cursor = Reflect.get(cursor, segment);
+    cursor = readOwnPropertyValue(cursor, segment);
   }
 
   return cursor;

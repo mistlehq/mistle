@@ -17,14 +17,28 @@ type ResolveRouteErrorDisplayOptions = {
 };
 const COPY_SUCCESS_DISPLAY_MS = 1200;
 
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const record: Record<string, unknown> = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    record[key] = entryValue;
+  }
+
+  return record;
+}
+
 function readRouteResponseMessage(data: unknown): string | null {
   if (typeof data === "string") {
     const message = data.trim();
     return message.length > 0 ? message : null;
   }
 
-  if (typeof data === "object" && data !== null) {
-    const message = Reflect.get(data, "message");
+  const record = toRecord(data);
+  if (record !== null) {
+    const message = record["message"];
     if (typeof message === "string" && message.trim().length > 0) {
       return message;
     }
@@ -65,7 +79,7 @@ function buildThrownErrorDetail(error: Error): string {
     error.stack ? `Stack:\n${error.stack}` : null,
   ];
 
-  const cause = Reflect.get(error, "cause");
+  const cause = error.cause;
   if (cause !== undefined) {
     lines.push(`Cause:\n${stringifyUnknown(cause)}`);
   }

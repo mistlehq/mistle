@@ -6,6 +6,19 @@ type SettingsPageRouteHandle = AppRouteHandle & {
   description: RouteTextValue;
 };
 
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const record: Record<string, unknown> = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    record[key] = entryValue;
+  }
+
+  return record;
+}
+
 function toTitleCaseWord(value: string): string {
   const [head = "", ...tail] = value;
   return `${head.toUpperCase()}${tail.join("")}`;
@@ -37,9 +50,9 @@ function resolveIntegrationCallbackBreadcrumb(input: RouteTextResolverInput): st
 }
 
 function resolveSandboxProfileDetailBreadcrumb(input: RouteTextResolverInput): string {
-  const data = input.data;
-  if (typeof data === "object" && data !== null) {
-    const displayName = Reflect.get(data, "displayName");
+  const data = toRecord(input.data);
+  if (data !== null) {
+    const displayName = data["displayName"];
     if (typeof displayName === "string" && displayName.trim().length > 0) {
       return displayName;
     }

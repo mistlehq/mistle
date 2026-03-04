@@ -18,6 +18,19 @@ type ControlPlaneCredentialResolverClientInput = {
   requestTimeoutMs: number;
 };
 
+function toRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  const record: Record<string, unknown> = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    record[key] = entryValue;
+  }
+
+  return record;
+}
+
 export class ControlPlaneCredentialResolverClient {
   readonly #resolveEndpoint: string;
   readonly #internalAuthServiceToken: string;
@@ -54,18 +67,18 @@ export class ControlPlaneCredentialResolverClient {
       );
     }
 
-    const responseBody = await response.json();
-
-    if (typeof responseBody !== "object" || responseBody === null) {
+    const responseBody: unknown = await response.json();
+    const responseRecord = toRecord(responseBody);
+    if (responseRecord === null) {
       throw new Error("Control-plane credential resolver response must be an object.");
     }
 
-    const resolvedValue = Reflect.get(responseBody, "value");
+    const resolvedValue = responseRecord["value"];
     if (typeof resolvedValue !== "string" || resolvedValue.length === 0) {
       throw new Error("Control-plane credential resolver response is missing `value`.");
     }
 
-    const expiresAtValue = Reflect.get(responseBody, "expiresAt");
+    const expiresAtValue = responseRecord["expiresAt"];
     if (expiresAtValue !== undefined && typeof expiresAtValue !== "string") {
       throw new Error(
         "Control-plane credential resolver response `expiresAt` must be a string when provided.",
@@ -80,11 +93,12 @@ export class ControlPlaneCredentialResolverClient {
 }
 
 function extractErrorMessage(input: unknown): string {
-  if (typeof input !== "object" || input === null) {
+  const record = toRecord(input);
+  if (record === null) {
     return "Unknown control-plane resolver error.";
   }
 
-  const message = Reflect.get(input, "message");
+  const message = record["message"];
   if (typeof message !== "string" || message.length === 0) {
     return "Unknown control-plane resolver error.";
   }
