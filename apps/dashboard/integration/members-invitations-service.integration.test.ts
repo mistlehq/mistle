@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 
 import { systemClock } from "@mistle/time";
 import { describe, expect } from "vitest";
+import { z } from "zod";
 
 import {
   MemberRoles,
@@ -22,21 +23,31 @@ import type { DashboardMembersInvitationsFixture } from "./members-invitations-t
 import { it } from "./members-invitations-test-context.js";
 
 const AUTH_ORIGIN = "http://localhost:5100";
+const ErrorPayloadSchema = z
+  .object({
+    message: z.string().optional(),
+    error: z
+      .object({
+        message: z.string().optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+  })
+  .catchall(z.unknown());
 
 function readErrorMessage(value: unknown): string | null {
-  if (typeof value === "object" && value !== null) {
-    const direct = Reflect.get(value, "message");
-    if (typeof direct === "string" && direct.length > 0) {
-      return direct;
-    }
+  const parsed = ErrorPayloadSchema.safeParse(value);
+  if (!parsed.success) {
+    return null;
+  }
 
-    const nested = Reflect.get(value, "error");
-    if (typeof nested === "object" && nested !== null) {
-      const nestedMessage = Reflect.get(nested, "message");
-      if (typeof nestedMessage === "string" && nestedMessage.length > 0) {
-        return nestedMessage;
-      }
-    }
+  if (typeof parsed.data.message === "string" && parsed.data.message.length > 0) {
+    return parsed.data.message;
+  }
+
+  const nestedMessage = parsed.data.error?.message;
+  if (typeof nestedMessage === "string" && nestedMessage.length > 0) {
+    return nestedMessage;
   }
 
   return null;

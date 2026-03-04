@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { z } from "zod";
 
 import { readLatestSignInOtp } from "./sign-in-otp.js";
 
@@ -17,6 +18,10 @@ export type CreateAuthenticatedSessionInput = {
   email?: string;
 };
 
+const OrganizationCreateResponseSchema = z.object({
+  id: z.string().trim().min(1),
+});
+
 function extractRequestCookie(setCookieHeader: string): string {
   const [cookiePair] = setCookieHeader.split(";");
   if (cookiePair === undefined || cookiePair.length === 0) {
@@ -31,12 +36,12 @@ function generateIntegrationAuthEmail(): string {
 }
 
 function readOrganizationIdFromPayload(payload: unknown): string | null {
-  if (typeof payload !== "object" || payload === null) {
+  const parsed = OrganizationCreateResponseSchema.safeParse(payload);
+  if (!parsed.success) {
     return null;
   }
 
-  const id = Reflect.get(payload, "id");
-  return typeof id === "string" && id.length > 0 ? id : null;
+  return parsed.data.id;
 }
 
 export async function createAuthenticatedSession(

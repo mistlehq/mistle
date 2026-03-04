@@ -1,6 +1,9 @@
 import { describe, expect, test } from "vitest";
+import { z } from "zod";
 
 import { startHttpEcho } from "../src/index.js";
+
+const UnknownRecordSchema = z.object({}).catchall(z.unknown());
 
 function readHeaderValue(headers: unknown, headerName: string): string | undefined {
   if (typeof headers !== "object" || headers === null) {
@@ -36,16 +39,16 @@ describe("http echo service integration", () => {
 
       expect(response.status).toBe(200);
       const responseBody: unknown = await response.json();
-      if (typeof responseBody !== "object" || responseBody === null) {
+      const parsedResponseRecord = UnknownRecordSchema.safeParse(responseBody);
+      if (!parsedResponseRecord.success) {
         throw new Error("Expected HTTP echo response body to be an object.");
       }
+      const responseRecord = parsedResponseRecord.data;
 
-      expect(Reflect.get(responseBody, "method")).toBe("POST");
-      expect(Reflect.get(responseBody, "path")).toBe("/echo-path");
-      expect(readHeaderValue(Reflect.get(responseBody, "headers"), "x-tokenizer-test")).toBe(
-        "hello",
-      );
-      expect(Reflect.get(responseBody, "body")).toBe("hello-echo");
+      expect(responseRecord["method"]).toBe("POST");
+      expect(responseRecord["path"]).toBe("/echo-path");
+      expect(readHeaderValue(responseRecord["headers"], "x-tokenizer-test")).toBe("hello");
+      expect(responseRecord["body"]).toBe("hello-echo");
     } finally {
       await echoService.stop();
     }

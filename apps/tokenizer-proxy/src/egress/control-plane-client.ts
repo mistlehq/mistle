@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "./constants.js";
 
 export type ResolveCredentialInput = {
@@ -17,6 +19,17 @@ type ControlPlaneCredentialResolverClientInput = {
   internalAuthServiceToken: string;
   requestTimeoutMs: number;
 };
+
+const ResolvedCredentialSchema = z.object({
+  value: z.string().min(1),
+  expiresAt: z.string().optional(),
+});
+
+const ResolverErrorSchema = z
+  .object({
+    message: z.string().optional(),
+  })
+  .catchall(z.unknown());
 
 export class ControlPlaneCredentialResolverClient {
   readonly #resolveEndpoint: string;
@@ -54,37 +67,27 @@ export class ControlPlaneCredentialResolverClient {
       );
     }
 
-    const responseBody = await response.json();
-
-    if (typeof responseBody !== "object" || responseBody === null) {
-      throw new Error("Control-plane credential resolver response must be an object.");
+    const responseBody: unknown = await response.json();
+    const parsedResponse = ResolvedCredentialSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new Error("Control-plane credential resolver response payload is invalid.");
     }
 
-    const resolvedValue = Reflect.get(responseBody, "value");
-    if (typeof resolvedValue !== "string" || resolvedValue.length === 0) {
-      throw new Error("Control-plane credential resolver response is missing `value`.");
-    }
-
-    const expiresAtValue = Reflect.get(responseBody, "expiresAt");
-    if (expiresAtValue !== undefined && typeof expiresAtValue !== "string") {
-      throw new Error(
-        "Control-plane credential resolver response `expiresAt` must be a string when provided.",
-      );
-    }
-
+    const { value, expiresAt } = parsedResponse.data;
     return {
-      value: resolvedValue,
-      ...(expiresAtValue === undefined ? {} : { expiresAt: expiresAtValue }),
+      value,
+      ...(expiresAt === undefined ? {} : { expiresAt }),
     };
   }
 }
 
 function extractErrorMessage(input: unknown): string {
-  if (typeof input !== "object" || input === null) {
+  const parsedError = ResolverErrorSchema.safeParse(input);
+  if (!parsedError.success) {
     return "Unknown control-plane resolver error.";
   }
 
-  const message = Reflect.get(input, "message");
+  const message = parsedError.data.message;
   if (typeof message !== "string" || message.length === 0) {
     return "Unknown control-plane resolver error.";
   }

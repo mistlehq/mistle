@@ -442,6 +442,9 @@ importers:
       hono:
         specifier: ^4.12.3
         version: 4.12.3
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@mistle/test-harness':
         specifier: workspace:*
@@ -631,6 +634,9 @@ importers:
       testcontainers:
         specifier: ^11.7.2
         version: 11.12.0
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
 
   packages/time: {}
 

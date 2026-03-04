@@ -138,7 +138,7 @@ function resolveRouteText(
     return value;
   }
 
-  const resolved = Reflect.apply(value, undefined, [input]);
+  const resolved = value(input);
   if (typeof resolved === "string") {
     return resolved;
   }
@@ -158,7 +158,7 @@ function resolveRouteHref(
     return value;
   }
 
-  const resolved = Reflect.apply(value, undefined, [input]);
+  const resolved = value(input);
   return typeof resolved === "string" ? resolved : null;
 }
 

@@ -1,12 +1,23 @@
+import { z } from "zod";
+
+const ObjectValueSchema = z.custom<object>(
+  (value): value is object => typeof value === "object" && value !== null,
+);
+const UnknownArraySchema = z.array(z.unknown());
+const StringSchema = z.string();
+const NumberSchema = z.number();
+const BooleanSchema = z.boolean();
+
 export type UnknownRecord = Record<string, unknown>;
 
 export function toRecord(value: unknown): UnknownRecord | null {
-  if (typeof value !== "object" || value === null) {
+  const parsed = ObjectValueSchema.safeParse(value);
+  if (!parsed.success) {
     return null;
   }
 
   const record: UnknownRecord = {};
-  for (const [key, entryValue] of Object.entries(value)) {
+  for (const [key, entryValue] of Object.entries(parsed.data)) {
     record[key] = entryValue;
   }
 
@@ -14,34 +25,39 @@ export function toRecord(value: unknown): UnknownRecord | null {
 }
 
 export function readString(record: UnknownRecord, key: string): string | null {
-  const value = record[key];
-  if (typeof value !== "string") {
+  const parsed = StringSchema.safeParse(record[key]);
+  if (!parsed.success) {
     return null;
   }
-  return value;
+
+  return parsed.data;
 }
 
 export function readNumber(record: UnknownRecord, key: string): number | null {
-  const value = record[key];
-  if (typeof value !== "number") {
+  const parsed = NumberSchema.safeParse(record[key]);
+  if (!parsed.success) {
     return null;
   }
-  return value;
+
+  return parsed.data;
 }
 
 export function readBoolean(record: UnknownRecord, key: string): boolean | null {
-  const value = record[key];
-  if (typeof value !== "boolean") {
+  const parsed = BooleanSchema.safeParse(record[key]);
+  if (!parsed.success) {
     return null;
   }
-  return value;
+
+  return parsed.data;
 }
 
 export function readArray(value: unknown): unknown[] | null {
-  if (!Array.isArray(value)) {
+  const parsed = UnknownArraySchema.safeParse(value);
+  if (!parsed.success) {
     return null;
   }
-  return value;
+
+  return parsed.data;
 }
 
 export function compactMap<TInput, TOutput>(
