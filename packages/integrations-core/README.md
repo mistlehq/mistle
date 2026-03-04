@@ -1,4 +1,4 @@
-# Integrations API
+ # Integrations API
 
 This README describes Mistle's Integrations API architecture and how to add a new integration.
 
@@ -92,12 +92,14 @@ Key fields and what they drive:
 | `targetConfigSchema`                    | Parse/validate target config                     | target list/use, OAuth, compile, webhooks |
 | `targetSecretSchema`                    | Parse/validate decrypted target secrets          | OAuth, compile, webhooks                  |
 | `bindingConfigSchema`                   | Parse/validate per-binding config                | Runtime plan compile                      |
+| `connectionConfigSchema`                | Parse/validate per-connection config             | Binding write validation, compile         |
 | `supportedAuthSchemes`                  | Declares allowed auth methods                    | Connection creation and OAuth gating      |
 | `credentialResolvers` (optional)        | Dynamic credential generation/lookup             | Internal credential resolution endpoint   |
 | `authHandlers.oauth` (optional)         | OAuth start/complete behavior                    | OAuth connection flows                    |
 | `webhookHandler` (optional)             | Verify + parse inbound webhooks                  | Webhook ingest                            |
 | `userConfigSlots`                       | User-configurable runtime setup slots            | Runtime/client customization contract     |
 | `userSecretSlots` (optional)            | User-supplied connection secret slots            | Connection create/complete validation     |
+| `validateBindingWriteContext(...)`      | Contextual target/connection/binding validation  | Binding write and compile parity checks   |
 | `compileBinding(...)`                   | Generate egress/artifacts/runtime clients        | Runtime plan compiler                     |
 
 ## Lifecycle End-To-End
@@ -125,6 +127,8 @@ flowchart TD
 
 - Targets are operator-managed records persisted in control-plane DB.
 - Discovery resolves metadata from definitions (`displayName`, `description`) with optional DB overrides.
+- Control-plane target discovery may also include projected UI-safe metadata derived from validated target config (for example `targetHealth` and `resolvedBindingUi`).
+- UI consumers should prefer projection fields for behavior and rendering instead of parsing raw target config payloads directly.
 
 ### 2) Connection creation
 
@@ -135,7 +139,11 @@ flowchart TD
 
 - Bindings reference `connectionId`, `kind`, and provider-specific binding config.
 - This is user-scoped usage of operator-managed capabilities (targets) through org-owned connections.
-- On compile, schemas are parsed and validated through the definition.
+- Validation now runs in two phases through shared definition logic:
+- Write-time: on binding `PUT`, control-plane parses target/connection/binding config through definition schemas and runs `validateBindingWriteContext(...)` when provided.
+- Compile-time: before `compileBinding(...)`, compiler runs the same definition-level binding write validation contract to keep parity with write-time checks.
+- Contextual validation covers cross-object semantics (for example auth scheme compatibility with model/reasoning) beyond schema shape parsing.
+- Validation issues are surfaced as stable machine codes plus safe messages for UI/API consumers.
 
 ### 4) Runtime plan compilation
 
@@ -184,7 +192,9 @@ This is the recommended workflow.
 - `target-config-schema.ts`
 - `target-secret-schema.ts` (if needed)
 - `binding-config-schema.ts`
+- `connection-config-schema.ts` (if connection config has integration-specific shape)
 - Keep schemas strict and normalized (for example URL normalization).
+- If binding semantics depend on cross-object context (target + connection + binding), implement `validateBindingWriteContext(...)` in the definition.
 
 4. Define auth behavior.
 
@@ -255,6 +265,7 @@ Useful entrypoints when reading the code:
 - `packages/integrations-core/src/types/index.ts`
 - `packages/integrations-core/src/compiler/index.ts`
 - `packages/integrations-core/src/validation/index.ts`
+- `packages/integrations-core/src/binding-validation/index.ts`
 - `packages/integrations-core/src/webhooks/index.ts`
 - `packages/integrations-definitions/src/index.ts`
 - `apps/control-plane-api/src/integration-targets/*`
