@@ -6,6 +6,8 @@ import {
 } from "mailpit-api";
 import { GenericContainer, type StartedNetwork, type StartedTestContainer } from "testcontainers";
 
+import { registerProcessCleanupTask } from "../../cleanup/index.js";
+
 const MAILPIT_SMTP_PORT = 1025;
 const MAILPIT_HTTP_PORT = 8025;
 const MAILPIT_IMAGE = "axllent/mailpit:v1.27";
@@ -13,6 +15,8 @@ const MAILPIT_POLL_INTERVAL_MS = 100;
 const DEFAULT_MAILPIT_NETWORK_ALIAS = "mailpit";
 
 export type StartMailpitInput = {
+  manageProcessCleanup?: boolean;
+  containerLabels?: Record<string, string>;
   network?: StartedNetwork;
   networkAlias?: string;
 };
@@ -32,8 +36,16 @@ export type MailpitService = {
     timeoutMs: number;
     description?: string;
   }) => Promise<MailpitMessageListItem>;
+  runtimeMetadata: {
+    containerId: string;
+  };
   stop: () => Promise<void>;
 };
+
+export type MailpitInbox = Pick<
+  MailpitService,
+  "listMessages" | "getMessageSummary" | "waitForMessage"
+>;
 
 async function listMessages(client: MailpitClient): Promise<readonly MailpitMessageListItem[]> {
   const response = await client.listMessages();
@@ -84,6 +96,7 @@ export async function startMailpit(input: StartMailpitInput = {}): Promise<Mailp
     MAILPIT_SMTP_PORT,
     MAILPIT_HTTP_PORT,
   );
+  containerDefinition = containerDefinition.withLabels(input.containerLabels ?? {});
 
   if (input.network !== undefined) {
     containerDefinition = containerDefinition
@@ -97,6 +110,32 @@ export async function startMailpit(input: StartMailpitInput = {}): Promise<Mailp
   const smtpPort = container.getMappedPort(MAILPIT_SMTP_PORT);
   const httpBaseUrl = `http://${container.getHost()}:${container.getMappedPort(MAILPIT_HTTP_PORT)}`;
   const client = new MailpitClient(httpBaseUrl);
+
+  const stopInternal = async (): Promise<void> => {
+    stopped = true;
+
+    if (container === undefined) {
+      throw new Error("Mailpit container was not started.");
+    }
+
+    await container.stop({
+      remove: true,
+      removeVolumes: true,
+      timeout: 0,
+    });
+    container = undefined;
+  };
+
+  const unregisterProcessCleanupTask =
+    (input.manageProcessCleanup ?? true)
+      ? registerProcessCleanupTask(async () => {
+          if (stopped || container === undefined) {
+            return;
+          }
+
+          await stopInternal();
+        })
+      : () => {};
 
   return {
     smtpHost,
@@ -115,18 +154,36 @@ export async function startMailpit(input: StartMailpitInput = {}): Promise<Mailp
               description: input.description,
             }),
       }),
+    runtimeMetadata: {
+      containerId: container.getId(),
+    },
     stop: async () => {
       if (stopped) {
         throw new Error("Mailpit container was already stopped.");
       }
 
-      if (container === undefined) {
-        throw new Error("Mailpit container was not started.");
-      }
-
-      stopped = true;
-      await container.stop();
-      container = undefined;
+      await stopInternal();
+      unregisterProcessCleanupTask();
     },
+  };
+}
+
+export function createMailpitInbox(input: { httpBaseUrl: string }): MailpitInbox {
+  const client = new MailpitClient(input.httpBaseUrl);
+
+  return {
+    listMessages: async () => listMessages(client),
+    getMessageSummary: async (id: string) => client.getMessageSummary(id),
+    waitForMessage: (waitInput) =>
+      waitForMessage({
+        listMessages: async () => listMessages(client),
+        matcher: waitInput.matcher,
+        timeoutMs: waitInput.timeoutMs,
+        ...(waitInput.description === undefined
+          ? {}
+          : {
+              description: waitInput.description,
+            }),
+      }),
   };
 }

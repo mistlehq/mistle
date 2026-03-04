@@ -1,6 +1,8 @@
 import { systemClock, systemSleeper } from "@mistle/time";
 import { GenericContainer, type StartedTestContainer } from "testcontainers";
 
+import { registerProcessCleanupTask } from "../../cleanup/index.js";
+
 const HTTP_ECHO_IMAGE = "mendhak/http-https-echo:38";
 const HTTP_ECHO_PORT = 8080;
 const DEFAULT_STARTUP_TIMEOUT_MS = 15_000;
@@ -51,19 +53,38 @@ export async function startHttpEcho(input: StartHttpEchoInput = {}): Promise<Htt
     timeoutMs: input.startupTimeoutMs ?? DEFAULT_STARTUP_TIMEOUT_MS,
   });
 
+  const stopInternal = async (): Promise<void> => {
+    stopped = true;
+
+    if (container === undefined) {
+      throw new Error("HTTP echo container was not started.");
+    }
+
+    await container.stop({
+      remove: true,
+      removeVolumes: true,
+      timeout: 0,
+    });
+    container = undefined;
+  };
+
+  const unregisterProcessCleanupTask = registerProcessCleanupTask(async () => {
+    if (stopped || container === undefined) {
+      return;
+    }
+
+    await stopInternal();
+  });
+
   return {
     baseUrl,
     stop: async () => {
       if (stopped) {
         throw new Error("HTTP echo container was already stopped.");
       }
-      if (container === undefined) {
-        throw new Error("HTTP echo container was not started.");
-      }
 
-      stopped = true;
-      await container.stop();
-      container = undefined;
+      await stopInternal();
+      unregisterProcessCleanupTask();
     },
   };
 }
