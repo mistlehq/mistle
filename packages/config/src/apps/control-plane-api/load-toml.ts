@@ -49,51 +49,11 @@ export function loadControlPlaneApiFromToml(
   };
 
   if (hasEntries(integrations)) {
-    const targetCatalog = asObjectRecord(integrations.target_catalog);
-    const githubTargetCatalog = asObjectRecord(targetCatalog.github);
-    const githubEnterpriseTargetCatalog = asObjectRecord(targetCatalog.github_enterprise);
-    const openAiTargetCatalog = asObjectRecord(targetCatalog.openai);
-
     partialConfig = {
       ...partialConfig,
       integrations: {
         activeMasterEncryptionKeyVersion: integrations.active_master_encryption_key_version,
         masterEncryptionKeys: asObjectRecord(integrations.master_encryption_keys),
-        ...(hasEntries(targetCatalog)
-          ? {
-              targetCatalog: {
-                ...(hasEntries(githubTargetCatalog)
-                  ? {
-                      github: {
-                        appSlug: githubTargetCatalog.app_slug,
-                        appId: githubTargetCatalog.app_id,
-                        clientId: githubTargetCatalog.client_id,
-                        apiBaseUrl: githubTargetCatalog.api_base_url,
-                        webBaseUrl: githubTargetCatalog.web_base_url,
-                      },
-                    }
-                  : {}),
-                ...(hasEntries(githubEnterpriseTargetCatalog)
-                  ? {
-                      githubEnterprise: {
-                        appSlug: githubEnterpriseTargetCatalog.app_slug,
-                        appId: githubEnterpriseTargetCatalog.app_id,
-                        clientId: githubEnterpriseTargetCatalog.client_id,
-                        apiBaseUrl: githubEnterpriseTargetCatalog.api_base_url,
-                        webBaseUrl: githubEnterpriseTargetCatalog.web_base_url,
-                      },
-                    }
-                  : {}),
-                ...(hasEntries(openAiTargetCatalog)
-                  ? {
-                      openai: {
-                        apiBaseUrl: openAiTargetCatalog.api_base_url,
-                      },
-                    }
-                  : {}),
-              },
-            }
-          : {}),
       },
     };
   }

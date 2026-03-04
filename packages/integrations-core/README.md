@@ -231,9 +231,9 @@ This is the recommended workflow.
 
 9. Make the target available.
 
-- Add to default target catalog construction (`packages/integrations-definitions/src/default-targets.ts`) if it should exist by default.
-- Control-plane seeding calls this definitions-owned catalog builder.
-- Otherwise create target rows through your environment provisioning process.
+- Register the definition in `packages/integrations-definitions/src/index.ts`.
+- Control-plane target sync scripts will insert/update the `integration_targets` row from registry definitions.
+- Provide operator-owned config/secrets through `integration-targets.provision.json`.
 
 10. Add tests.
 
