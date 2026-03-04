@@ -81,7 +81,8 @@ describe("sandbox profile version put integration bindings service integration",
         kind: IntegrationBindingKinds.AGENT,
         config: {
           runtime: "codex-cli",
-          defaultModel: "gpt-4.1",
+          defaultModel: "gpt-5.3-codex",
+          reasoningEffort: "medium",
         },
       },
       {
@@ -111,14 +112,17 @@ describe("sandbox profile version put integration bindings service integration",
             kind: IntegrationBindingKinds.AGENT,
             config: {
               runtime: "codex-cli",
-              defaultModel: "gpt-5",
+              defaultModel: "gpt-5.2",
+              reasoningEffort: "medium",
             },
           },
           {
             connectionId: connectionA.id,
-            kind: IntegrationBindingKinds.GIT,
+            kind: IntegrationBindingKinds.AGENT,
             config: {
-              repositories: ["mistlehq/mistle"],
+              runtime: "codex-cli",
+              defaultModel: "gpt-5.3-codex-spark",
+              reasoningEffort: "high",
             },
           },
         ],
@@ -135,14 +139,22 @@ describe("sandbox profile version put integration bindings service integration",
     expect(updatedBinding?.kind).toBe(IntegrationBindingKinds.AGENT);
     expect(updatedBinding?.config).toEqual({
       runtime: "codex-cli",
-      defaultModel: "gpt-5",
+      defaultModel: "gpt-5.2",
+      reasoningEffort: "medium",
     });
 
     const insertedBinding = result.bindings.find(
-      (binding) => binding.kind === IntegrationBindingKinds.GIT,
+      (binding) =>
+        binding.id !== "ibd_put_bindings_existing_001" && binding.connectionId === connectionA.id,
     );
     expect(insertedBinding).toBeDefined();
     expect(insertedBinding?.id).not.toBe("");
+    expect(insertedBinding?.kind).toBe(IntegrationBindingKinds.AGENT);
+    expect(insertedBinding?.config).toEqual({
+      runtime: "codex-cli",
+      defaultModel: "gpt-5.3-codex-spark",
+      reasoningEffort: "high",
+    });
 
     const deletedBinding =
       await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
@@ -266,6 +278,8 @@ describe("sandbox profile version put integration bindings service integration",
               kind: IntegrationBindingKinds.AGENT,
               config: {
                 runtime: "codex-cli",
+                defaultModel: "gpt-5.3-codex",
+                reasoningEffort: "medium",
               },
             },
           ],
@@ -337,6 +351,8 @@ describe("sandbox profile version put integration bindings service integration",
               kind: IntegrationBindingKinds.AGENT,
               config: {
                 runtime: "codex-cli",
+                defaultModel: "gpt-5.3-codex",
+                reasoningEffort: "medium",
               },
             },
           ],

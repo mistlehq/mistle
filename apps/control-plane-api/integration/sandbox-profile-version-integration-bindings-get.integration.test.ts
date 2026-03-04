@@ -61,6 +61,8 @@ describe("sandbox profile version integration bindings get integration", () => {
       kind: IntegrationBindingKinds.AGENT,
       config: {
         runtime: "codex-cli",
+        defaultModel: "gpt-5.3-codex",
+        reasoningEffort: "medium",
       },
     });
 

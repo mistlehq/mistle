@@ -81,7 +81,8 @@ describe("sandbox profile version put integration bindings integration", () => {
         kind: IntegrationBindingKinds.AGENT,
         config: {
           runtime: "codex-cli",
-          defaultModel: "gpt-4.1",
+          defaultModel: "gpt-5.3-codex",
+          reasoningEffort: "medium",
         },
       },
       {
@@ -112,14 +113,17 @@ describe("sandbox profile version put integration bindings integration", () => {
               kind: IntegrationBindingKinds.AGENT,
               config: {
                 runtime: "codex-cli",
-                defaultModel: "gpt-5",
+                defaultModel: "gpt-5.2",
+                reasoningEffort: "medium",
               },
             },
             {
               connectionId: connectionA.id,
-              kind: IntegrationBindingKinds.GIT,
+              kind: IntegrationBindingKinds.AGENT,
               config: {
-                repositories: ["mistlehq/mistle"],
+                runtime: "codex-cli",
+                defaultModel: "gpt-5.3-codex-spark",
+                reasoningEffort: "high",
               },
             },
           ],
@@ -141,7 +145,8 @@ describe("sandbox profile version put integration bindings integration", () => {
     expect(updatedBinding?.kind).toBe(IntegrationBindingKinds.AGENT);
     expect(updatedBinding?.config).toEqual({
       runtime: "codex-cli",
-      defaultModel: "gpt-5",
+      defaultModel: "gpt-5.2",
+      reasoningEffort: "medium",
     });
 
     const deletedBinding =
@@ -185,6 +190,8 @@ describe("sandbox profile version put integration bindings integration", () => {
               kind: IntegrationBindingKinds.AGENT,
               config: {
                 runtime: "codex-cli",
+                defaultModel: "gpt-5.3-codex",
+                reasoningEffort: "medium",
               },
             },
           ],
@@ -246,6 +253,7 @@ describe("sandbox profile version put integration bindings integration", () => {
       enabled: true,
       config: {
         api_base_url: "https://api.openai.com",
+        binding_capabilities: createOpenAiRawBindingCapabilities(),
       },
     });
     await fixture.db.insert(sandboxProfiles).values({
@@ -265,6 +273,9 @@ describe("sandbox profile version put integration bindings integration", () => {
         id: "icn_put_bindings_route_invalid_binding_id_001",
         organizationId: authenticatedSession.organizationId,
         targetKey: "openai-default-put-bindings-route-invalid-binding-id",
+        config: {
+          auth_scheme: "api-key",
+        },
       })
       .returning();
 
@@ -288,6 +299,8 @@ describe("sandbox profile version put integration bindings integration", () => {
               kind: IntegrationBindingKinds.AGENT,
               config: {
                 runtime: "codex-cli",
+                defaultModel: "gpt-5.3-codex",
+                reasoningEffort: "medium",
               },
             },
           ],

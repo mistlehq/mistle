@@ -434,7 +434,7 @@ describe("integration connections oauth integration", () => {
     expect(responseBody.code).toBe("OAUTH_STATE_ALREADY_USED");
   });
 
-  it("returns 400 when the target does not support oauth", async ({ fixture }) => {
+  it("returns 400 when the target oauth handler is not configured", async ({ fixture }) => {
     await ensureOpenAiDefaultTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
@@ -455,7 +455,7 @@ describe("integration connections oauth integration", () => {
     const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
       await response.json(),
     );
-    expect(responseBody.code).toBe("OAUTH_NOT_SUPPORTED");
+    expect(responseBody.code).toBe("OAUTH_HANDLER_NOT_CONFIGURED");
   });
 });
 

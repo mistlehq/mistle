@@ -87,7 +87,7 @@ describe("integration targets discovery integration", () => {
         displayName: "GitHub Cloud",
         description: "GitHub Cloud target",
         logoKey: "github",
-        supportedAuthSchemes: ["oauth", "api-key"],
+        supportedAuthSchemes: ["api-key", "oauth"],
         displayNameOverride: "GitHub Cloud",
         descriptionOverride: "GitHub Cloud target",
         targetHealth: {
@@ -131,26 +131,27 @@ describe("integration targets discovery integration", () => {
     const secondPage = ListIntegrationTargetsResponseSchema.parse(await secondPageResponse.json());
 
     expect(secondPage.totalResults).toBe(3);
-    expect(secondPage.items).toEqual([
-      {
-        targetKey: "openai-default",
-        familyId: "openai",
-        variantId: "openai-default",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.openai.com",
-        },
-        displayName: "OpenAI",
-        description:
-          "Enable OpenAI model access with API key or ChatGPT subscription authentication.",
-        logoKey: "openai",
-        supportedAuthSchemes: ["api-key", "oauth"],
-        targetHealth: {
-          configStatus: "invalid",
-          reason: "invalid-config",
-        },
+    expect(secondPage.items).toHaveLength(1);
+    const openAiTarget = secondPage.items[0];
+    if (openAiTarget === undefined) {
+      throw new Error("Expected OpenAI target in second page.");
+    }
+
+    expect(openAiTarget).toMatchObject({
+      targetKey: "openai-default",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      displayName: "OpenAI",
+      description:
+        "Enable OpenAI model access with API key or ChatGPT subscription authentication.",
+      logoKey: "openai",
+      supportedAuthSchemes: ["api-key", "oauth"],
+      targetHealth: {
+        configStatus: "valid",
       },
-    ]);
+    });
+    expect(openAiTarget.config.api_base_url).toBe("https://api.openai.com");
     expect(secondPage.nextPage).toBeNull();
     expect(secondPage.previousPage).not.toBeNull();
 
@@ -224,16 +225,30 @@ describe("integration targets discovery integration", () => {
   it("returns OpenAI binding editor projection payload when target config is valid", async ({
     fixture,
   }) => {
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com",
-        binding_capabilities: createOpenAiRawBindingCapabilities(),
-      },
-    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "openai-default",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com",
+          binding_capabilities: createOpenAiRawBindingCapabilities(),
+        },
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com",
+            binding_capabilities: createOpenAiRawBindingCapabilities(),
+          },
+        },
+      });
 
     const authenticatedSession = await fixture.authSession({
       email: "integration-targets-list-openai-projection@example.com",
