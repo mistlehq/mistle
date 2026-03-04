@@ -97,6 +97,7 @@ export function ConnectIntegrationDialog(props: ConnectIntegrationDialogProps) {
               <p className="text-sm font-medium">API key</p>
               <Input
                 autoComplete="off"
+                data-1p-ignore="true"
                 onChange={(event) => {
                   props.onApiKeyChange(event.currentTarget.value);
                 }}
