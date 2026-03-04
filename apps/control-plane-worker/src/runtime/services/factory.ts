@@ -1,5 +1,8 @@
+import { HandleAutomationRunWorkflowSpec } from "@mistle/workflows/control-plane";
+
 import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
+import { handleAutomationRun } from "./handle-automation-run.js";
 import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";
 import { startSandboxProfileInstance } from "./start-sandbox-profile-instance.js";
 import type {
@@ -13,11 +16,34 @@ export function createControlPlaneWorkerServices(
   const emailSender = createEmailSender(input.config);
 
   return {
+    automationRuns: {
+      handleAutomationRun: async (workflowInput) => {
+        return handleAutomationRun(
+          {
+            db: input.db,
+          },
+          workflowInput,
+        );
+      },
+    },
     integrationWebhooks: {
       handleWebhookEvent: async (workflowInput) => {
         return handleIntegrationWebhookEvent(
           {
             db: input.db,
+            enqueueAutomationRuns: async ({ automationRunIds }) => {
+              for (const automationRunId of automationRunIds) {
+                await input.openWorkflow.runWorkflow(
+                  HandleAutomationRunWorkflowSpec,
+                  {
+                    automationRunId,
+                  },
+                  {
+                    idempotencyKey: automationRunId,
+                  },
+                );
+              }
+            },
           },
           workflowInput,
         );

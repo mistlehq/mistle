@@ -15,6 +15,7 @@ import { resolveWebhookAutomationTargets } from "./resolve-webhook-automation-ta
 
 type HandleIntegrationWebhookEventDependencies = {
   db: ControlPlaneDatabase;
+  enqueueAutomationRuns: (input: { automationRunIds: ReadonlyArray<string> }) => Promise<void>;
 };
 
 function isTerminalWebhookEventStatus(input: string): boolean {
@@ -97,6 +98,28 @@ export async function handleIntegrationWebhookEvent(
       .onConflictDoNothing({
         target: [automationRuns.automationTargetId, automationRuns.sourceWebhookEventId],
       });
+
+    const queuedAutomationRuns = await deps.db.query.automationRuns.findMany({
+      columns: {
+        id: true,
+      },
+      where: (table, { and: whereAnd, eq: whereEq, inArray: whereInArray }) =>
+        whereAnd(
+          whereEq(table.sourceWebhookEventId, input.webhookEventId),
+          whereEq(table.status, AutomationRunStatuses.QUEUED),
+          whereInArray(
+            table.automationTargetId,
+            resolvedTargets.map((target) => target.automationTargetId),
+          ),
+        ),
+    });
+
+    const queuedAutomationRunIds = queuedAutomationRuns.map((queuedRun) => queuedRun.id);
+    if (queuedAutomationRunIds.length > 0) {
+      await deps.enqueueAutomationRuns({
+        automationRunIds: queuedAutomationRunIds,
+      });
+    }
 
     await updateWebhookEventStatus({
       db: deps.db,

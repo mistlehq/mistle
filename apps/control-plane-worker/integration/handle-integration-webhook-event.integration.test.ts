@@ -21,6 +21,7 @@ import {
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
+import { handleAutomationRun } from "../src/runtime/services/handle-automation-run.js";
 import { handleIntegrationWebhookEvent } from "../src/runtime/services/handle-integration-webhook-event.js";
 import { it } from "./test-context.js";
 
@@ -130,6 +131,12 @@ describe("handleIntegrationWebhookEvent integration", () => {
           providerEventType: "issue_comment",
           eventType: "github.issue_comment.created",
           payload: {
+            installation: {
+              id: 12345,
+            },
+            delivery: {
+              id: "delivery_queue_payload",
+            },
             comment: {
               body: "please run @mistlebot",
             },
@@ -140,6 +147,18 @@ describe("handleIntegrationWebhookEvent integration", () => {
         const workflowOutput = await handleIntegrationWebhookEvent(
           {
             db: database.db,
+            enqueueAutomationRuns: async ({ automationRunIds }) => {
+              for (const automationRunId of automationRunIds) {
+                await handleAutomationRun(
+                  {
+                    db: database.db,
+                  },
+                  {
+                    automationRunId,
+                  },
+                );
+              }
+            },
           },
           {
             webhookEventId,
@@ -172,7 +191,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
 
         expect(queuedRun.automationId).toBe(automationId);
         expect(queuedRun.automationTargetId).toBe(automationTargetId);
-        expect(queuedRun.status).toBe("queued");
+        expect(queuedRun.status).toBe("completed");
       } finally {
         await database.stop();
       }
@@ -236,6 +255,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
         const workflowOutput = await handleIntegrationWebhookEvent(
           {
             db: database.db,
+            enqueueAutomationRuns: async () => {},
           },
           {
             webhookEventId,

@@ -82,12 +82,23 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
           openWorkflow,
           maxConcurrentWorkflows: 1,
           enabledWorkflows: [
+            ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_RUN,
             ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT,
             ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
             ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
             ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE,
           ],
           services: {
+            automationRuns: {
+              handleAutomationRun: async (input) => ({
+                automationRunId: input.automationRunId,
+              }),
+            },
+            integrationWebhooks: {
+              handleWebhookEvent: async (input) => ({
+                webhookEventId: input.webhookEventId,
+              }),
+            },
             emailDelivery: {
               emailSender,
               from: {

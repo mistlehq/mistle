@@ -1,6 +1,11 @@
 import type { EmailSender } from "@mistle/emails";
 import type { OpenWorkflow, Worker } from "openworkflow";
 
+import { createHandleAutomationRunWorkflow } from "./workflows/handle-automation-run/index.js";
+import type {
+  HandleAutomationRunWorkflowInput,
+  HandleAutomationRunWorkflowOutput,
+} from "./workflows/handle-automation-run/index.js";
 import { createHandleIntegrationWebhookEventWorkflow } from "./workflows/handle-integration-webhook-event/index.js";
 import type {
   HandleIntegrationWebhookEventWorkflowInput,
@@ -24,6 +29,11 @@ export type ControlPlaneWorkerEmailDelivery = {
 };
 
 export type ControlPlaneWorkerServices = {
+  automationRuns?: {
+    handleAutomationRun: (
+      input: HandleAutomationRunWorkflowInput,
+    ) => Promise<HandleAutomationRunWorkflowOutput>;
+  };
   integrationWebhooks?: {
     handleWebhookEvent: (
       input: HandleIntegrationWebhookEventWorkflowInput,
@@ -41,6 +51,7 @@ export type ControlPlaneWorkerServices = {
 };
 
 export const ControlPlaneWorkerWorkflowIds = {
+  HANDLE_AUTOMATION_RUN: "handleAutomationRun",
   HANDLE_INTEGRATION_WEBHOOK_EVENT: "handleIntegrationWebhookEvent",
   SEND_ORGANIZATION_INVITATION: "sendOrganizationInvitation",
   SEND_VERIFICATION_OTP: "sendVerificationOTP",
@@ -67,6 +78,19 @@ function assertNever(value: never): never {
  */
 export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): Worker {
   for (const workflowId of input.enabledWorkflows) {
+    if (workflowId === ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_RUN) {
+      if (input.services.automationRuns === undefined) {
+        throw new Error(
+          "Control-plane automation runs service is required for handleAutomationRun workflow.",
+        );
+      }
+      const workflow = createHandleAutomationRunWorkflow({
+        handleAutomationRun: input.services.automationRuns.handleAutomationRun,
+      });
+      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
+      continue;
+    }
+
     if (workflowId === ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT) {
       if (input.services.integrationWebhooks === undefined) {
         throw new Error(

@@ -1,4 +1,11 @@
 import {
+  createHandleAutomationRunWorkflow,
+  HandleAutomationRunWorkflowSpec,
+  type CreateHandleAutomationRunWorkflowInput,
+  type HandleAutomationRunWorkflowInput,
+  type HandleAutomationRunWorkflowOutput,
+} from "./handle-automation-run/index.js";
+import {
   createHandleIntegrationWebhookEventWorkflow,
   HandleIntegrationWebhookEventWorkflowSpec,
   type CreateHandleIntegrationWebhookEventWorkflowInput,
@@ -30,6 +37,7 @@ import {
  * Control-plane workflow implementations.
  */
 export type ControlPlaneWorkflowDefinition =
+  | ReturnType<typeof createHandleAutomationRunWorkflow>
   | ReturnType<typeof createHandleIntegrationWebhookEventWorkflow>
   | ReturnType<typeof createSendOrganizationInvitationWorkflow>
   | ReturnType<typeof createSendVerificationOTPWorkflow>
@@ -37,6 +45,7 @@ export type ControlPlaneWorkflowDefinition =
   | ReturnType<typeof createStartSandboxProfileInstanceWorkflow>;
 
 export type ControlPlaneWorkflowDefinitions = {
+  handleAutomationRun: ReturnType<typeof createHandleAutomationRunWorkflow>;
   handleIntegrationWebhookEvent: ReturnType<typeof createHandleIntegrationWebhookEventWorkflow>;
   sendOrganizationInvitation: ReturnType<typeof createSendOrganizationInvitationWorkflow>;
   sendVerificationOTP: ReturnType<typeof createSendVerificationOTPWorkflow>;
@@ -45,6 +54,7 @@ export type ControlPlaneWorkflowDefinitions = {
 };
 
 export type CreateControlPlaneWorkflowDefinitionsInput = {
+  handleAutomationRun: CreateHandleAutomationRunWorkflowInput;
   handleIntegrationWebhookEvent: CreateHandleIntegrationWebhookEventWorkflowInput;
   sendOrganizationInvitation: CreateSendOrganizationInvitationWorkflowInput;
   sendVerificationOTP: CreateSendVerificationOTPWorkflowInput;
@@ -56,6 +66,7 @@ export function createControlPlaneWorkflowDefinitions(
   ctx: CreateControlPlaneWorkflowDefinitionsInput,
 ): ControlPlaneWorkflowDefinitions {
   return {
+    handleAutomationRun: createHandleAutomationRunWorkflow(ctx.handleAutomationRun),
     handleIntegrationWebhookEvent: createHandleIntegrationWebhookEventWorkflow(
       ctx.handleIntegrationWebhookEvent,
     ),
@@ -72,6 +83,8 @@ export function createControlPlaneWorkflowDefinitions(
   };
 }
 
+export { HandleAutomationRunWorkflowSpec };
+export type { HandleAutomationRunWorkflowInput, HandleAutomationRunWorkflowOutput };
 export { HandleIntegrationWebhookEventWorkflowSpec };
 export type {
   HandleIntegrationWebhookEventWorkflowInput,
