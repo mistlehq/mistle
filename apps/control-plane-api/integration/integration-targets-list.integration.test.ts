@@ -1,5 +1,6 @@
 import { integrationTargets } from "@mistle/db/control-plane";
 import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
+import { parseIntegrationBindingEditorUiProjection } from "@mistle/integrations-definitions/ui";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
@@ -269,5 +270,9 @@ describe("integration targets discovery integration", () => {
     const openAiProjection = OpenAiTargetProjectionSchema.parse(openAiTarget?.resolvedBindingUi);
     expect(openAiProjection.openaiAgent.runtime).toBe("codex-cli");
     expect(openAiProjection.openaiAgent.byAuthScheme["api-key"].models).toContain("gpt-5.3-codex");
+    const bindingEditorProjection = parseIntegrationBindingEditorUiProjection(
+      openAiTarget?.resolvedBindingEditorUi,
+    );
+    expect(bindingEditorProjection?.bindingEditor.config.mode).toBe("connection-config-key");
   }, 60_000);
 });

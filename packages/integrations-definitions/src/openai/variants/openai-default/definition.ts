@@ -1,6 +1,7 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 import { z } from "zod";
 
+import { IntegrationBindingEditorUiProjectionSchema } from "../../../ui/binding-editor-ui-contract.js";
 import { OpenAiApiKeySupportedAuthSchemes, OpenAiConnectionConfigSchema } from "./auth.js";
 import {
   OpenAiApiKeyBindingConfigSchema,
@@ -9,6 +10,7 @@ import {
   OpenAiRuntimes,
 } from "./binding-config-schema.js";
 import { compileOpenAiApiKeyBinding } from "./compile-binding.js";
+import { projectOpenAiBindingEditorUi } from "./project-binding-editor-ui.js";
 import { projectOpenAiTargetUi } from "./project-target-ui.js";
 import {
   OpenAiApiKeyTargetConfigSchema,
@@ -51,6 +53,11 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
       targetConfig,
     }),
   targetUiProjectionSchema: OpenAiTargetUiProjectionSchema,
+  projectBindingEditorUi: ({ targetConfig }) =>
+    projectOpenAiBindingEditorUi({
+      targetConfig,
+    }),
+  bindingEditorUiProjectionSchema: IntegrationBindingEditorUiProjectionSchema,
   userConfigSlots: [
     {
       kind: "file",

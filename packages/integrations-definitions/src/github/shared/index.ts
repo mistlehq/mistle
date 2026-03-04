@@ -13,6 +13,7 @@ export { GitHubTargetConfigSchema, type GitHubTargetConfig } from "./target-conf
 export { GitHubTargetSecretSchema, type GitHubTargetSecrets } from "./target-secret-schema.js";
 export { GitHubUserSecretSlots } from "./user-secret-slots.js";
 export { compileGitHubBinding, type GitHubCompileBindingInput } from "./compile-binding.js";
+export { projectGitHubBindingEditorUi } from "./project-binding-editor-ui.js";
 export { GitHubAppOAuthHandler } from "./oauth-handler.js";
 export {
   GitHubAppInstallationCredentialResolver,

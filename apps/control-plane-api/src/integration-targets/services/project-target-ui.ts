@@ -7,6 +7,7 @@ export type ProjectedTargetHealth = {
 };
 
 export type ProjectedBindingUi = Record<string, unknown>;
+export type ProjectedBindingEditorUi = Record<string, unknown>;
 
 export function projectTargetUi(input: {
   familyId: string;
@@ -15,6 +16,7 @@ export function projectTargetUi(input: {
 }): {
   targetHealth: ProjectedTargetHealth;
   resolvedBindingUi?: ProjectedBindingUi;
+  resolvedBindingEditorUi?: ProjectedBindingEditorUi;
 } {
   const definition = IntegrationRegistry.getDefinition({
     familyId: input.familyId,
@@ -45,13 +47,29 @@ export function projectTargetUi(input: {
         : definition.targetUiProjectionSchema === undefined
           ? projectedBindingUi
           : definition.targetUiProjectionSchema.parse(projectedBindingUi);
+    const projectedBindingEditorUi =
+      definition.projectBindingEditorUi === undefined
+        ? undefined
+        : definition.projectBindingEditorUi({
+            familyId: input.familyId,
+            variantId: input.variantId,
+            kind: definition.kind,
+            targetConfig: parsedTargetConfig,
+          });
+    const resolvedBindingEditorUi =
+      projectedBindingEditorUi === undefined
+        ? undefined
+        : definition.bindingEditorUiProjectionSchema === undefined
+          ? projectedBindingEditorUi
+          : definition.bindingEditorUiProjectionSchema.parse(projectedBindingEditorUi);
 
-    if (resolvedBindingUi !== undefined) {
+    if (resolvedBindingUi !== undefined || resolvedBindingEditorUi !== undefined) {
       return {
         targetHealth: {
           configStatus: "valid",
         },
-        resolvedBindingUi,
+        ...(resolvedBindingUi === undefined ? {} : { resolvedBindingUi }),
+        ...(resolvedBindingEditorUi === undefined ? {} : { resolvedBindingEditorUi }),
       };
     }
 

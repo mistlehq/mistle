@@ -995,6 +995,10 @@
                           "resolvedBindingUi": {
                             "type": "object",
                             "additionalProperties": {}
+                          },
+                          "resolvedBindingEditorUi": {
+                            "type": "object",
+                            "additionalProperties": {}
                           }
                         },
                         "required": [

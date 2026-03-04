@@ -193,6 +193,9 @@ export async function listIntegrationTargets(
           ...(projectedTargetUi.resolvedBindingUi === undefined
             ? {}
             : { resolvedBindingUi: projectedTargetUi.resolvedBindingUi }),
+          ...(projectedTargetUi.resolvedBindingEditorUi === undefined
+            ? {}
+            : { resolvedBindingEditorUi: projectedTargetUi.resolvedBindingEditorUi }),
           ...(target.displayNameOverride === null
             ? {}
             : { displayNameOverride: target.displayNameOverride }),

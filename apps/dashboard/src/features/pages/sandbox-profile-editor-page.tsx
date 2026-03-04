@@ -1,4 +1,10 @@
 import {
+  parseIntegrationBindingEditorUiProjection,
+  type BindingEditorField,
+  type BindingEditorVariant,
+  type IntegrationBindingEditorUiProjection,
+} from "@mistle/integrations-definitions/ui";
+import {
   Alert,
   AlertDescription,
   AlertTitle,
@@ -49,15 +55,6 @@ import type {
   SandboxProfileStatus,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { SaveActions } from "../settings/save-actions.js";
-import {
-  createDefaultOpenAiBindingConfig,
-  parseOpenAiAgentBindingConfig,
-  readOpenAiAuthScheme,
-  resolveOpenAiCapabilitySet,
-  type OpenAiAgentBindingConfig,
-  type OpenAiCapabilitySet,
-  type OpenAiReasoningEffort,
-} from "./openai-binding-capabilities.js";
 
 type SandboxProfileEditorPageProps = {
   mode: "create" | "edit";
@@ -96,12 +93,7 @@ type IntegrationTargetSummary = {
   targetHealth: {
     configStatus: "valid" | "invalid";
   };
-  resolvedBindingUi?: Record<string, unknown> | undefined;
-};
-
-type GitHubBindingConfig = {
-  repositories: string[];
-  includeGhCli: boolean;
+  resolvedBindingEditorUi?: Record<string, unknown> | undefined;
 };
 
 type BindingConfigUiModel =
@@ -109,13 +101,10 @@ type BindingConfigUiModel =
       mode: "missing-connection";
     }
   | {
-      mode: "openai";
-      value: OpenAiAgentBindingConfig;
-      capabilitySet?: OpenAiCapabilitySet;
-    }
-  | {
-      mode: "github";
-      value: GitHubBindingConfig;
+      mode: "editor";
+      variant: BindingEditorVariant;
+      value: Record<string, unknown>;
+      fields: readonly BindingEditorRenderableField[];
     }
   | {
       mode: "connector";
@@ -123,6 +112,25 @@ type BindingConfigUiModel =
   | {
       mode: "unsupported";
       message: string;
+      defaultConfig?: Record<string, unknown> | undefined;
+    };
+
+type BindingEditorSelectField = Extract<BindingEditorField, { type: "select" }>;
+
+type BindingEditorRenderableField =
+  | {
+      type: "select";
+      key: string;
+      label: string;
+      value: string;
+      options: readonly { value: string; label: string }[];
+    }
+  | {
+      type: "string-array";
+      key: string;
+      label: string;
+      value: readonly string[];
+      delimiter: string;
     };
 
 type InvalidBindingConfigIssue = {
@@ -188,9 +196,9 @@ function formatBindingKind(kind: SandboxIntegrationBindingKind): string {
   return "Connector";
 }
 
-function readBooleanValue(record: Record<string, unknown>, key: string): boolean | undefined {
+function readStringValue(record: Record<string, unknown>, key: string): string | undefined {
   const value = record[key];
-  if (typeof value !== "boolean") {
+  if (typeof value !== "string") {
     return undefined;
   }
 
@@ -205,40 +213,283 @@ function isStringArray(value: unknown): value is string[] {
   return value.every((entry) => typeof entry === "string");
 }
 
-function isGitHubBindingConfig(config: Record<string, unknown>): config is GitHubBindingConfig {
-  const repositories = config["repositories"];
-  const includeGhCli = readBooleanValue(config, "includeGhCli");
-
-  return isStringArray(repositories) && includeGhCli !== undefined;
+function readStringArrayValue(
+  record: Record<string, unknown>,
+  key: string,
+): readonly string[] | undefined {
+  const value = record[key];
+  if (!isStringArray(value)) {
+    return undefined;
+  }
+  return value;
 }
 
-function isOpenAiDefaultTarget(target: IntegrationTargetSummary): boolean {
-  return target.familyId === "openai" && target.variantId === "openai-default";
+function resolveSelectOptions(input: {
+  field: BindingEditorSelectField;
+  config: Record<string, unknown>;
+}): readonly { value: string; label: string }[] {
+  if (input.field.optionsByFieldValue === undefined) {
+    return input.field.options;
+  }
+
+  const parentValue = readStringValue(input.config, input.field.optionsByFieldValue.fieldKey);
+  if (parentValue === undefined) {
+    return [];
+  }
+  const options = input.field.optionsByFieldValue.optionsByValue[parentValue];
+  if (options === undefined) {
+    throw new Error(
+      `Missing '${input.field.key}' options for '${input.field.optionsByFieldValue.fieldKey}=${parentValue}'.`,
+    );
+  }
+  return options;
 }
 
-function isGitHubTarget(target: IntegrationTargetSummary): boolean {
-  return (
-    target.familyId === "github" &&
-    (target.variantId === "github-cloud" || target.variantId === "github-enterprise-server")
-  );
+function createDefaultConfigFromVariant(input: {
+  variant: BindingEditorVariant;
+}): Record<string, unknown> {
+  const config: Record<string, unknown> = {};
+  for (const field of input.variant.fields) {
+    if (field.type === "literal") {
+      config[field.key] = field.value;
+      continue;
+    }
+    if (field.type === "select") {
+      if (field.optionsByFieldValue === undefined) {
+        config[field.key] = field.defaultValue;
+        continue;
+      }
+
+      const parentValue = readStringValue(config, field.optionsByFieldValue.fieldKey);
+      if (parentValue === undefined) {
+        throw new Error(
+          `Default config for '${field.key}' requires '${field.optionsByFieldValue.fieldKey}'.`,
+        );
+      }
+      const defaultValue = field.optionsByFieldValue.defaultValueByValue[parentValue];
+      if (defaultValue === undefined) {
+        throw new Error(
+          `Missing default value for '${field.key}' when '${field.optionsByFieldValue.fieldKey}=${parentValue}'.`,
+        );
+      }
+      config[field.key] = defaultValue;
+      continue;
+    }
+
+    config[field.key] = [...field.defaultValue];
+  }
+  return config;
 }
 
-function formatOpenAiReasoningEffort(input: {
-  reasoningEffort: OpenAiReasoningEffort;
-  capabilitySet?: OpenAiCapabilitySet | undefined;
-}): string {
-  const label =
-    input.capabilitySet === undefined
-      ? undefined
-      : input.capabilitySet.reasoningLabels[input.reasoningEffort];
-  return label ?? input.reasoningEffort;
+function parseConfigAgainstVariant(input: {
+  config: Record<string, unknown>;
+  variant: BindingEditorVariant;
+}):
+  | {
+      ok: true;
+      value: Record<string, unknown>;
+    }
+  | {
+      ok: false;
+      message: string;
+    } {
+  const expectedKeys = new Set<string>(input.variant.fields.map((field) => field.key));
+  for (const key of Object.keys(input.config)) {
+    if (!expectedKeys.has(key)) {
+      return {
+        ok: false,
+        message: `Binding config includes unsupported key '${key}'.`,
+      };
+    }
+  }
+
+  const parsed: Record<string, unknown> = {};
+  for (const field of input.variant.fields) {
+    if (field.type === "literal") {
+      const value = readStringValue(input.config, field.key);
+      if (value === undefined || value !== field.value) {
+        return {
+          ok: false,
+          message: `Binding config has invalid value for '${field.key}'.`,
+        };
+      }
+      parsed[field.key] = value;
+      continue;
+    }
+    if (field.type === "select") {
+      const value = readStringValue(input.config, field.key);
+      if (value === undefined) {
+        return {
+          ok: false,
+          message: `Binding config is missing '${field.key}'.`,
+        };
+      }
+      const options = resolveSelectOptions({
+        field,
+        config: parsed,
+      });
+      if (!options.some((option) => option.value === value)) {
+        return {
+          ok: false,
+          message: `Binding config has unsupported value for '${field.key}'.`,
+        };
+      }
+      parsed[field.key] = value;
+      continue;
+    }
+
+    const value = readStringArrayValue(input.config, field.key);
+    if (value === undefined) {
+      return {
+        ok: false,
+        message: `Binding config is missing '${field.key}'.`,
+      };
+    }
+    parsed[field.key] = [...value];
+  }
+
+  return {
+    ok: true,
+    value: parsed,
+  };
 }
 
-function isSupportedOpenAiReasoningEffort(input: {
-  value: string;
-  options: readonly OpenAiReasoningEffort[];
-}): input is { value: OpenAiReasoningEffort; options: readonly OpenAiReasoningEffort[] } {
-  return input.options.some((option) => option === input.value);
+function buildRenderableFields(input: {
+  variant: BindingEditorVariant;
+  value: Record<string, unknown>;
+}): readonly BindingEditorRenderableField[] {
+  const fields: BindingEditorRenderableField[] = [];
+  for (const field of input.variant.fields) {
+    if (field.type === "literal") {
+      continue;
+    }
+    if (field.type === "select") {
+      const value = readStringValue(input.value, field.key);
+      if (value === undefined) {
+        throw new Error(`Resolved binding config is missing '${field.key}'.`);
+      }
+      fields.push({
+        type: "select",
+        key: field.key,
+        label: field.label,
+        value,
+        options: resolveSelectOptions({
+          field,
+          config: input.value,
+        }),
+      });
+      continue;
+    }
+
+    const value = readStringArrayValue(input.value, field.key);
+    if (value === undefined) {
+      throw new Error(`Resolved binding config is missing '${field.key}'.`);
+    }
+    fields.push({
+      type: "string-array",
+      key: field.key,
+      label: field.label,
+      value,
+      delimiter: field.delimiter,
+    });
+  }
+  return fields;
+}
+
+function resolveBindingEditorVariant(input: {
+  projection: IntegrationBindingEditorUiProjection;
+  connection: IntegrationConnectionSummary;
+}):
+  | {
+      ok: true;
+      variant: BindingEditorVariant;
+    }
+  | {
+      ok: false;
+      message: string;
+    } {
+  const configModel = input.projection.bindingEditor.config;
+  if (configModel.mode === "static") {
+    return {
+      ok: true,
+      variant: configModel.variant,
+    };
+  }
+
+  if (input.connection.config === undefined) {
+    return {
+      ok: false,
+      message: `Connection '${input.connection.id}' is missing config required for binding editor.`,
+    };
+  }
+  const selectedVariantKey = readStringValue(input.connection.config, configModel.key);
+  if (selectedVariantKey === undefined) {
+    return {
+      ok: false,
+      message: `Connection '${input.connection.id}' is missing '${configModel.key}' in config.`,
+    };
+  }
+  const variant = configModel.variants[selectedVariantKey];
+  if (variant === undefined) {
+    return {
+      ok: false,
+      message: `No binding editor variant for '${configModel.key}=${selectedVariantKey}'.`,
+    };
+  }
+
+  return {
+    ok: true,
+    variant,
+  };
+}
+
+function updateBindingEditorConfig(input: {
+  variant: BindingEditorVariant;
+  currentConfig: Record<string, unknown>;
+  fieldKey: string;
+  nextValue: string | readonly string[];
+}): Record<string, unknown> {
+  const nextConfig: Record<string, unknown> = {
+    ...input.currentConfig,
+    [input.fieldKey]: Array.isArray(input.nextValue) ? [...input.nextValue] : input.nextValue,
+  };
+
+  for (const field of input.variant.fields) {
+    if (field.type !== "select" || field.optionsByFieldValue === undefined) {
+      continue;
+    }
+    if (field.optionsByFieldValue.fieldKey !== input.fieldKey) {
+      continue;
+    }
+
+    const options = resolveSelectOptions({
+      field,
+      config: nextConfig,
+    });
+    const currentValue = readStringValue(nextConfig, field.key);
+    if (currentValue !== undefined && options.some((option) => option.value === currentValue)) {
+      continue;
+    }
+
+    const parentValue = readStringValue(nextConfig, field.optionsByFieldValue.fieldKey);
+    if (parentValue === undefined) {
+      throw new Error(`Dependent value for '${field.key}' is missing.`);
+    }
+    const defaultValue = field.optionsByFieldValue.defaultValueByValue[parentValue];
+    if (defaultValue === undefined) {
+      throw new Error(
+        `Default value for '${field.key}' is missing when '${field.optionsByFieldValue.fieldKey}=${parentValue}'.`,
+      );
+    }
+    if (!options.some((option) => option.value === defaultValue)) {
+      throw new Error(
+        `Default value '${defaultValue}' for '${field.key}' is not present in available options.`,
+      );
+    }
+    nextConfig[field.key] = defaultValue;
+  }
+
+  return nextConfig;
 }
 
 function readInvalidBindingConfigIssues(
@@ -259,35 +510,25 @@ function createDefaultBindingConfig(input: {
   connection?: IntegrationConnectionSummary;
   target?: IntegrationTargetSummary;
 }): Record<string, unknown> {
-  if (input.target === undefined) {
+  if (input.kind === "connector" || input.target === undefined || input.connection === undefined) {
     return {};
   }
-
-  if (input.kind === "agent" && isOpenAiDefaultTarget(input.target)) {
-    const authScheme = readOpenAiAuthScheme(input.connection?.config);
-    if (authScheme === undefined) {
-      return {};
-    }
-    const capabilitySet = resolveOpenAiCapabilitySet({
-      resolvedBindingUi: input.target.resolvedBindingUi,
-      authScheme,
-    });
-    const defaultConfig = createDefaultOpenAiBindingConfig({ capabilitySet });
-    return defaultConfig ?? {};
-  }
-
-  if (input.kind === "git" && isGitHubTarget(input.target)) {
-    return {
-      repositories: [],
-      includeGhCli: false,
-    };
-  }
-
-  if (input.kind === "connector") {
+  const projection = parseIntegrationBindingEditorUiProjection(
+    input.target.resolvedBindingEditorUi,
+  );
+  if (projection === undefined) {
     return {};
   }
-
-  return {};
+  const resolvedVariant = resolveBindingEditorVariant({
+    projection,
+    connection: input.connection,
+  });
+  if (!resolvedVariant.ok) {
+    return {};
+  }
+  return createDefaultConfigFromVariant({
+    variant: resolvedVariant.variant,
+  });
 }
 
 function resolveBindingConfigUiModel(input: {
@@ -310,51 +551,61 @@ function resolveBindingConfigUiModel(input: {
     };
   }
 
-  if (input.row.kind === "agent" && isOpenAiDefaultTarget(target)) {
-    const parsedConfig = parseOpenAiAgentBindingConfig(input.row.config);
-    if (parsedConfig === undefined) {
-      return {
-        mode: "unsupported",
-        message: "OpenAI binding config is invalid for this connection.",
-      };
-    }
-    const authScheme = readOpenAiAuthScheme(connection.config);
-    const capabilitySet =
-      authScheme === undefined
-        ? undefined
-        : resolveOpenAiCapabilitySet({
-            resolvedBindingUi: target.resolvedBindingUi,
-            authScheme,
-          });
-    return {
-      mode: "openai",
-      value: parsedConfig,
-      ...(capabilitySet === undefined ? {} : { capabilitySet }),
-    };
-  }
-
-  if (input.row.kind === "git" && isGitHubTarget(target)) {
-    if (!isGitHubBindingConfig(input.row.config)) {
-      return {
-        mode: "unsupported",
-        message: "GitHub binding config is invalid for this connection.",
-      };
-    }
-    return {
-      mode: "github",
-      value: input.row.config,
-    };
-  }
-
   if (input.row.kind === "connector") {
     return {
       mode: "connector",
     };
   }
 
+  const projection = parseIntegrationBindingEditorUiProjection(target.resolvedBindingEditorUi);
+  if (projection === undefined) {
+    return {
+      mode: "unsupported",
+      message: `Target '${target.familyId}/${target.variantId}' does not define binding editor UI metadata.`,
+    };
+  }
+
+  if (projection.bindingEditor.kind !== input.row.kind) {
+    return {
+      mode: "unsupported",
+      message: `Binding kind '${input.row.kind}' is not compatible with target '${target.familyId}/${target.variantId}'.`,
+    };
+  }
+
+  const resolvedVariant = resolveBindingEditorVariant({
+    projection,
+    connection,
+  });
+  if (!resolvedVariant.ok) {
+    return {
+      mode: "unsupported",
+      message: resolvedVariant.message,
+    };
+  }
+
+  const defaultConfig = createDefaultConfigFromVariant({
+    variant: resolvedVariant.variant,
+  });
+  const parsedConfig = parseConfigAgainstVariant({
+    config: input.row.config,
+    variant: resolvedVariant.variant,
+  });
+  if (!parsedConfig.ok) {
+    return {
+      mode: "unsupported",
+      message: parsedConfig.message,
+      defaultConfig,
+    };
+  }
+
   return {
-    mode: "unsupported",
-    message: `Binding kind '${input.row.kind}' is not compatible with target '${target.familyId}/${target.variantId}'.`,
+    mode: "editor",
+    variant: resolvedVariant.variant,
+    value: parsedConfig.value,
+    fields: buildRenderableFields({
+      variant: resolvedVariant.variant,
+      value: parsedConfig.value,
+    }),
   };
 }
 
@@ -851,12 +1102,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
         return;
       }
 
-      const config =
-        configUiModel.mode === "openai"
-          ? configUiModel.value
-          : configUiModel.mode === "github"
-            ? configUiModel.value
-            : {};
+      const config = configUiModel.mode === "editor" ? configUiModel.value : {};
 
       parsedBindings.push({
         ...(row.id === undefined ? {} : { id: row.id }),
@@ -907,12 +1153,15 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
           <div>
             <Button
               onClick={() => {
-                handleIntegrationBindingRowChange(row.clientId, {
-                  config: createDefaultBindingConfig({
+                const resetConfig =
+                  configUiModel.defaultConfig ??
+                  createDefaultBindingConfig({
                     kind: row.kind,
                     ...(selectedConnection === undefined ? {} : { connection: selectedConnection }),
                     ...(selectedTarget === undefined ? {} : { target: selectedTarget }),
-                  }),
+                  });
+                handleIntegrationBindingRowChange(row.clientId, {
+                  config: resetConfig,
                 });
               }}
               type="button"
@@ -933,187 +1182,92 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
       );
     }
 
-    if (configUiModel.mode === "openai") {
-      if (configUiModel.capabilitySet === undefined) {
-        return (
-          <p className="text-muted-foreground text-sm">
-            OpenAI capability options are unavailable for this target configuration.
-          </p>
-        );
-      }
-
-      const modelOptions = configUiModel.capabilitySet.models;
-      const currentModelSupported = modelOptions.includes(configUiModel.value.defaultModel);
-      const reasoningOptions =
-        configUiModel.capabilitySet.allowedReasoningByModel[configUiModel.value.defaultModel] ?? [];
-      const currentReasoningSupported = reasoningOptions.includes(
-        configUiModel.value.reasoningEffort,
-      );
-
-      return (
-        <div className="gap-3 flex flex-col">
-          <p className="text-muted-foreground text-sm">Runtime: {configUiModel.value.runtime}</p>
-          {!currentModelSupported || !currentReasoningSupported ? (
-            <Alert variant="destructive">
-              <AlertTitle>Current OpenAI config is not supported</AlertTitle>
-              <AlertDescription>
-                Save to validate this binding and update the model/reasoning selection.
-              </AlertDescription>
-            </Alert>
-          ) : null}
-          <Field>
-            <FieldLabel htmlFor={`binding-openai-model-${row.clientId}`}>Default model</FieldLabel>
-            <FieldContent>
-              <Select
-                onValueChange={(nextValue) => {
-                  if (nextValue === null) {
-                    throw new Error("OpenAI default model must not be null.");
-                  }
-                  if (!modelOptions.includes(nextValue)) {
-                    throw new Error(`Unsupported OpenAI default model: ${nextValue}`);
-                  }
-                  const reasoningEffort =
-                    configUiModel.capabilitySet?.defaultReasoningByModel[nextValue];
-                  if (reasoningEffort === undefined) {
-                    throw new Error(
-                      `OpenAI default reasoning effort is missing for model: ${nextValue}`,
-                    );
-                  }
-                  handleIntegrationBindingRowChange(row.clientId, {
-                    config: {
-                      runtime: configUiModel.value.runtime,
-                      defaultModel: nextValue,
-                      reasoningEffort,
-                    },
-                  });
-                }}
-                value={currentModelSupported ? configUiModel.value.defaultModel : undefined}
-              >
-                <SelectTrigger
-                  aria-label="OpenAI default model"
-                  id={`binding-openai-model-${row.clientId}`}
-                >
-                  <SelectValue placeholder="Select default model" />
-                </SelectTrigger>
-                <SelectContent>
-                  {modelOptions.map((model) => (
-                    <SelectItem key={model} value={model}>
-                      {model}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FieldContent>
-          </Field>
-          <Field>
-            <FieldLabel htmlFor={`binding-openai-reasoning-${row.clientId}`}>
-              Reasoning effort
-            </FieldLabel>
-            <FieldContent>
-              <Select
-                onValueChange={(nextValue) => {
-                  if (nextValue === null) {
-                    throw new Error("OpenAI reasoning effort must not be null.");
-                  }
-                  if (
-                    !isSupportedOpenAiReasoningEffort({
-                      value: nextValue,
-                      options: reasoningOptions,
-                    })
-                  ) {
-                    throw new Error(`Unsupported OpenAI reasoning effort: ${nextValue}`);
-                  }
-                  handleIntegrationBindingRowChange(row.clientId, {
-                    config: {
-                      runtime: configUiModel.value.runtime,
-                      defaultModel: configUiModel.value.defaultModel,
-                      reasoningEffort: nextValue,
-                    },
-                  });
-                }}
-                value={currentReasoningSupported ? configUiModel.value.reasoningEffort : undefined}
-              >
-                <SelectTrigger
-                  aria-label="OpenAI reasoning effort"
-                  id={`binding-openai-reasoning-${row.clientId}`}
-                >
-                  <SelectValue placeholder="Select reasoning effort" />
-                </SelectTrigger>
-                <SelectContent>
-                  {reasoningOptions.map((reasoningEffort) => (
-                    <SelectItem key={reasoningEffort} value={reasoningEffort}>
-                      {formatOpenAiReasoningEffort({
-                        reasoningEffort,
-                        capabilitySet: configUiModel.capabilitySet,
-                      })}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FieldContent>
-          </Field>
-        </div>
-      );
+    if (configUiModel.mode !== "editor") {
+      throw new Error("Unsupported binding config ui mode.");
     }
 
-    const repositoriesText = configUiModel.value.repositories.join(", ");
     return (
       <div className="gap-3 flex flex-col">
-        <Field>
-          <FieldLabel htmlFor={`binding-github-repos-${row.clientId}`}>Repositories</FieldLabel>
-          <FieldContent>
-            <Input
-              id={`binding-github-repos-${row.clientId}`}
-              onChange={(event) => {
-                const repositories = event.currentTarget.value
-                  .split(",")
-                  .map((repository) => repository.trim())
-                  .filter((repository) => repository.length > 0);
-                handleIntegrationBindingRowChange(row.clientId, {
-                  config: {
-                    repositories,
-                    includeGhCli: configUiModel.value.includeGhCli,
-                  },
-                });
-              }}
-              value={repositoriesText}
-            />
-          </FieldContent>
-        </Field>
-        <Field>
-          <FieldLabel htmlFor={`binding-github-gh-cli-${row.clientId}`}>Include GH CLI</FieldLabel>
-          <FieldContent>
-            <Select
-              onValueChange={(nextValue) => {
-                if (nextValue === null) {
-                  throw new Error("GitHub includeGhCli must not be null.");
-                }
-                if (nextValue !== "true" && nextValue !== "false") {
-                  throw new Error(`Unsupported GitHub includeGhCli value: ${nextValue}`);
-                }
+        {configUiModel.fields.map((field) => {
+          if (field.type === "select") {
+            return (
+              <Field key={field.key}>
+                <FieldLabel htmlFor={`binding-field-${field.key}-${row.clientId}`}>
+                  {field.label}
+                </FieldLabel>
+                <FieldContent>
+                  <Select
+                    onValueChange={(nextValue) => {
+                      if (nextValue === null) {
+                        throw new Error(
+                          `Binding config value for '${field.key}' must not be null.`,
+                        );
+                      }
+                      if (!field.options.some((option) => option.value === nextValue)) {
+                        throw new Error(
+                          `Unsupported binding config value '${nextValue}' for field '${field.key}'.`,
+                        );
+                      }
+                      const nextConfig = updateBindingEditorConfig({
+                        variant: configUiModel.variant,
+                        currentConfig: configUiModel.value,
+                        fieldKey: field.key,
+                        nextValue,
+                      });
+                      handleIntegrationBindingRowChange(row.clientId, {
+                        config: nextConfig,
+                      });
+                    }}
+                    value={field.value}
+                  >
+                    <SelectTrigger
+                      aria-label={field.label}
+                      id={`binding-field-${field.key}-${row.clientId}`}
+                    >
+                      <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {field.options.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FieldContent>
+              </Field>
+            );
+          }
 
-                handleIntegrationBindingRowChange(row.clientId, {
-                  config: {
-                    repositories: configUiModel.value.repositories,
-                    includeGhCli: nextValue === "true",
-                  },
-                });
-              }}
-              value={configUiModel.value.includeGhCli ? "true" : "false"}
-            >
-              <SelectTrigger
-                aria-label="Include GH CLI"
-                id={`binding-github-gh-cli-${row.clientId}`}
-              >
-                <SelectValue placeholder="Select include GH CLI option" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="true">Yes</SelectItem>
-                <SelectItem value="false">No</SelectItem>
-              </SelectContent>
-            </Select>
-          </FieldContent>
-        </Field>
+          return (
+            <Field key={field.key}>
+              <FieldLabel htmlFor={`binding-field-${field.key}-${row.clientId}`}>
+                {field.label}
+              </FieldLabel>
+              <FieldContent>
+                <Input
+                  id={`binding-field-${field.key}-${row.clientId}`}
+                  onChange={(event) => {
+                    const values = event.currentTarget.value
+                      .split(field.delimiter)
+                      .map((entry) => entry.trim())
+                      .filter((entry) => entry.length > 0);
+                    const nextConfig = updateBindingEditorConfig({
+                      variant: configUiModel.variant,
+                      currentConfig: configUiModel.value,
+                      fieldKey: field.key,
+                      nextValue: values,
+                    });
+                    handleIntegrationBindingRowChange(row.clientId, {
+                      config: nextConfig,
+                    });
+                  }}
+                  value={field.value.join(`${field.delimiter} `)}
+                />
+              </FieldContent>
+            </Field>
+          );
+        })}
       </div>
     );
   }

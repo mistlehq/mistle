@@ -1,11 +1,13 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
+import { IntegrationBindingEditorUiProjectionSchema } from "../../../ui/binding-editor-ui-contract.js";
 import { GitHubFamilyId } from "../../shared/constants.js";
 import {
   GitHubAppInstallationCredentialResolver,
   GitHubCredentialResolverKeys,
 } from "../../shared/credential-resolver.js";
 import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
+import { projectGitHubBindingEditorUi } from "../../shared/project-binding-editor-ui.js";
 import {
   GitHubTargetSecretSchema,
   type GitHubTargetSecrets,
@@ -50,6 +52,8 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
     oauth: GitHubAppOAuthHandler,
   },
   webhookHandler: GitHubEnterpriseServerWebhookHandler,
+  projectBindingEditorUi: () => projectGitHubBindingEditorUi(),
+  bindingEditorUiProjectionSchema: IntegrationBindingEditorUiProjectionSchema,
   userConfigSlots: [],
   userSecretSlots: GitHubUserSecretSlots,
   compileBinding: compileGitHubEnterpriseServerBinding,

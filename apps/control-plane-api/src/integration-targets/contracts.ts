@@ -23,6 +23,7 @@ export const IntegrationTargetSchema = z
       })
       .strict(),
     resolvedBindingUi: z.record(z.string().min(1), z.unknown()).optional(),
+    resolvedBindingEditorUi: z.record(z.string().min(1), z.unknown()).optional(),
   })
   .strict();
 

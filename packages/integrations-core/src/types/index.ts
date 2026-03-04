@@ -105,6 +105,7 @@ export type BindingWriteValidationResult =
     };
 
 export type IntegrationTargetUiProjection = Record<string, unknown>;
+export type IntegrationBindingEditorUiProjection = Record<string, unknown>;
 
 export type IntegrationResolvedTarget<
   TTargetConfig = Record<string, unknown>,
@@ -644,6 +645,13 @@ export type IntegrationDefinition<
     targetConfig: ParsedSchemaOutput<TTargetConfigSchema>;
   }): IntegrationTargetUiProjection;
   targetUiProjectionSchema?: IntegrationConfigSchema<IntegrationTargetUiProjection>;
+  projectBindingEditorUi?(input: {
+    familyId: string;
+    variantId: string;
+    kind: IntegrationKind;
+    targetConfig: ParsedSchemaOutput<TTargetConfigSchema>;
+  }): IntegrationBindingEditorUiProjection;
+  bindingEditorUiProjectionSchema?: IntegrationConfigSchema<IntegrationBindingEditorUiProjection>;
   compileBinding(
     input: CompileBindingInput<
       ParsedSchemaOutput<TTargetConfigSchema>,

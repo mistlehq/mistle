@@ -1,4 +1,5 @@
 import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
+import { parseIntegrationBindingEditorUiProjection } from "@mistle/integrations-definitions/ui";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -30,6 +31,10 @@ describe("project-target-ui", () => {
     const openAiProjection = OpenAiProjectionSchema.parse(projected.resolvedBindingUi);
     expect(openAiProjection.openaiAgent.kind).toBe("agent");
     expect(openAiProjection.openaiAgent.runtime).toBe("codex-cli");
+    const bindingEditorProjection = parseIntegrationBindingEditorUiProjection(
+      projected.resolvedBindingEditorUi,
+    );
+    expect(bindingEditorProjection?.bindingEditor.config.mode).toBe("connection-config-key");
   });
 
   it("marks OpenAI config invalid when projection parse fails", () => {
@@ -43,9 +48,10 @@ describe("project-target-ui", () => {
 
     expect(projected.targetHealth.configStatus).toBe("invalid");
     expect(projected.resolvedBindingUi).toBeUndefined();
+    expect(projected.resolvedBindingEditorUi).toBeUndefined();
   });
 
-  it("returns valid target health without projection for definitions that do not project ui", () => {
+  it("projects binding editor UI for github targets with valid config", () => {
     const projected = projectTargetUi({
       familyId: "github",
       variantId: "github-cloud",
@@ -57,5 +63,9 @@ describe("project-target-ui", () => {
 
     expect(projected.targetHealth.configStatus).toBe("valid");
     expect(projected.resolvedBindingUi).toBeUndefined();
+    const bindingEditorProjection = parseIntegrationBindingEditorUiProjection(
+      projected.resolvedBindingEditorUi,
+    );
+    expect(bindingEditorProjection?.bindingEditor.kind).toBe("git");
   });
 });

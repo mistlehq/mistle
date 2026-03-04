@@ -586,6 +586,9 @@ export interface paths {
                 displayNameOverride?: string;
                 enabled: boolean;
                 familyId: string;
+                resolvedBindingEditorUi?: {
+                  [key: string]: unknown;
+                };
                 resolvedBindingUi?: {
                   [key: string]: unknown;
                 };
