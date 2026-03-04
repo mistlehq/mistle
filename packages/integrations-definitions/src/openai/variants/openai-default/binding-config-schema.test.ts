@@ -17,6 +17,30 @@ describe("OpenAiApiKeyBindingConfigSchema", () => {
     });
   });
 
+  it("parses a valid codex binding config with xhigh reasoning", () => {
+    const parsed = OpenAiApiKeyBindingConfigSchema.parse({
+      runtime: OpenAiRuntimes.CODEX_CLI,
+      defaultModel: "gpt-5.3-codex",
+      reasoningEffort: "xhigh",
+    });
+
+    expect(parsed).toEqual({
+      runtime: "codex-cli",
+      defaultModel: "gpt-5.3-codex",
+      reasoningEffort: "xhigh",
+    });
+  });
+
+  it("fails for unsupported default model", () => {
+    expect(() =>
+      OpenAiApiKeyBindingConfigSchema.parse({
+        runtime: "codex-cli",
+        defaultModel: "gpt-4.1",
+        reasoningEffort: "medium",
+      }),
+    ).toThrowError();
+  });
+
   it("fails when runtime is not codex-cli", () => {
     expect(() =>
       OpenAiApiKeyBindingConfigSchema.parse({

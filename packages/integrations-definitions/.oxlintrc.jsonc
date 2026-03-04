@@ -18,5 +18,21 @@
         ],
       },
     },
+    {
+      "files": ["src/ui/**/*.ts", "src/**/ui-contract.ts"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["node:*", "@octokit/*"],
+                "message": "UI contract modules must remain browser-safe and cannot import Node or server-only dependencies.",
+              },
+            ],
+          },
+        ],
+      },
+    },
   ],
 }

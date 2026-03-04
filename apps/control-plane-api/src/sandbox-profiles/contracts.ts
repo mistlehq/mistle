@@ -3,6 +3,7 @@ import {
   IntegrationBindingKinds,
   SandboxProfileStatuses,
   sandboxProfileVersionIntegrationBindings,
+  sandboxProfileVersions,
   sandboxProfiles,
 } from "@mistle/db/control-plane";
 import {
@@ -43,6 +44,14 @@ export const SandboxProfileVersionIntegrationBindingSchema = createSelectSchema(
     updatedAt: z.string().min(1),
   },
 ).strict();
+export const SandboxProfileVersionSchema = createSelectSchema(sandboxProfileVersions, {
+  version: z.number().int().min(1),
+}).strict();
+export const ListSandboxProfileVersionsResponseSchema = z
+  .object({
+    versions: z.array(SandboxProfileVersionSchema),
+  })
+  .strict();
 
 export const PutSandboxProfileVersionIntegrationBindingsBodySchema = z
   .object({
@@ -50,6 +59,7 @@ export const PutSandboxProfileVersionIntegrationBindingsBodySchema = z
       z
         .object({
           id: z.string().min(1).optional(),
+          clientRef: z.string().min(1).optional(),
           connectionId: z.string().min(1),
           kind: IntegrationBindingKindSchema,
           config: z.record(z.string(), z.unknown()),
@@ -64,6 +74,8 @@ export const PutSandboxProfileVersionIntegrationBindingsResponseSchema = z
     bindings: z.array(SandboxProfileVersionIntegrationBindingSchema),
   })
   .strict();
+export const GetSandboxProfileVersionIntegrationBindingsResponseSchema =
+  PutSandboxProfileVersionIntegrationBindingsResponseSchema;
 
 export const CreateSandboxProfileBodySchema = z
   .object({
@@ -135,11 +147,6 @@ const StartSandboxProfileInstanceBadRequestCodeSchema = z.enum([
   SandboxProfilesCompileErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
   SandboxProfilesCompileErrorCodes.RUNTIME_CLIENT_SETUP_INVALID_REF,
 ]);
-const PutSandboxProfileVersionIntegrationBindingsBadRequestCodeSchema = z.enum([
-  SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_REFERENCE,
-  SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONNECTION_REFERENCE,
-]);
-
 export const BadRequestResponseSchema = z
   .object({
     code: BadRequestCodeSchema,
@@ -187,8 +194,38 @@ export const StartSandboxProfileInstanceBadRequestResponseSchema = z.union([
 export const PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema = z.union([
   z
     .object({
-      code: PutSandboxProfileVersionIntegrationBindingsBadRequestCodeSchema,
+      code: z.union([
+        z.literal(SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_REFERENCE),
+        z.literal(
+          SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONNECTION_REFERENCE,
+        ),
+      ]),
       message: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      code: z.literal(
+        SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
+      ),
+      message: z.string().min(1),
+      details: z
+        .object({
+          issues: z
+            .array(
+              z
+                .object({
+                  clientRef: z.string().min(1).optional(),
+                  bindingIdOrDraftIndex: z.string().min(1),
+                  validatorCode: z.string().min(1),
+                  field: z.string().min(1),
+                  safeMessage: z.string().min(1),
+                })
+                .strict(),
+            )
+            .min(1),
+        })
+        .strict(),
     })
     .strict(),
   ValidationErrorResponseSchema,
@@ -508,6 +545,124 @@ export const deleteSandboxProfileRoute = createRoute({
       content: {
         "application/json": {
           schema: NotFoundResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: UnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: ForbiddenResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: InternalServerErrorResponseSchema,
+        },
+      },
+    },
+  },
+});
+
+export const listSandboxProfileVersionsRoute = createRoute({
+  method: "get",
+  path: "/{profileId}/versions",
+  tags: ["Sandbox Profiles"],
+  request: {
+    params: SandboxProfileIdParamsSchema,
+  },
+  responses: {
+    200: {
+      description: "List sandbox profile versions for a sandbox profile.",
+      content: {
+        "application/json": {
+          schema: ListSandboxProfileVersionsResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ValidationErrorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Sandbox profile was not found.",
+      content: {
+        "application/json": {
+          schema: NotFoundResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: UnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: ForbiddenResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: InternalServerErrorResponseSchema,
+        },
+      },
+    },
+  },
+});
+
+export const getSandboxProfileVersionIntegrationBindingsRoute = createRoute({
+  method: "get",
+  path: "/{profileId}/versions/{version}/integration-bindings",
+  tags: ["Sandbox Profiles"],
+  request: {
+    params: SandboxProfileVersionParamsSchema,
+  },
+  responses: {
+    200: {
+      description: "List integration bindings for the specified sandbox profile version.",
+      content: {
+        "application/json": {
+          schema: GetSandboxProfileVersionIntegrationBindingsResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ValidationErrorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Sandbox profile or profile version was not found.",
+      content: {
+        "application/json": {
+          schema: SandboxProfileVersionNotFoundResponseSchema,
         },
       },
     },

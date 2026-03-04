@@ -44,6 +44,7 @@ Practical consequence: provider targets are the capability boundary. Users canno
 - `@mistle/integrations-definitions`
 - Registers concrete provider definitions (currently OpenAI and GitHub variants).
 - Each definition provides schemas and behavior for compile/auth/webhook handling.
+- Owns provider default target catalog construction (`buildDefaultSeedIntegrationTargets`) and shared browser-safe UI contracts/helpers consumed by dashboard.
 
 - `apps/control-plane-api`
 - Hosts public Integrations HTTP endpoints.
@@ -84,21 +85,27 @@ Kinds are used on bindings and definitions to enforce compatibility (`binding.ki
 
 Key fields and what they drive:
 
-| Field                                   | Purpose                                          | Where it is used                          |
-| --------------------------------------- | ------------------------------------------------ | ----------------------------------------- |
-| `familyId`, `variantId`                 | Global identity of a provider variant            | Registry lookup, target records           |
-| `kind`                                  | Integration kind (`agent` / `git` / `connector`) | Binding validation during compile         |
-| `displayName`, `description`, `logoKey` | UI metadata                                      | Target discovery responses                |
-| `targetConfigSchema`                    | Parse/validate target config                     | target list/use, OAuth, compile, webhooks |
-| `targetSecretSchema`                    | Parse/validate decrypted target secrets          | OAuth, compile, webhooks                  |
-| `bindingConfigSchema`                   | Parse/validate per-binding config                | Runtime plan compile                      |
-| `supportedAuthSchemes`                  | Declares allowed auth methods                    | Connection creation and OAuth gating      |
-| `credentialResolvers` (optional)        | Dynamic credential generation/lookup             | Internal credential resolution endpoint   |
-| `authHandlers.oauth` (optional)         | OAuth start/complete behavior                    | OAuth connection flows                    |
-| `webhookHandler` (optional)             | Verify + parse inbound webhooks                  | Webhook ingest                            |
-| `userConfigSlots`                       | User-configurable runtime setup slots            | Runtime/client customization contract     |
-| `userSecretSlots` (optional)            | User-supplied connection secret slots            | Connection create/complete validation     |
-| `compileBinding(...)`                   | Generate egress/artifacts/runtime clients        | Runtime plan compiler                     |
+| Field                                        | Purpose                                                     | Where it is used                          |
+| -------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------- |
+| `familyId`, `variantId`                      | Global identity of a provider variant                       | Registry lookup, target records           |
+| `kind`                                       | Integration kind (`agent` / `git` / `connector`)            | Binding validation during compile         |
+| `displayName`, `description`, `logoKey`      | UI metadata                                                 | Target discovery responses                |
+| `targetConfigSchema`                         | Parse/validate target config                                | target list/use, OAuth, compile, webhooks |
+| `targetSecretSchema`                         | Parse/validate decrypted target secrets                     | OAuth, compile, webhooks                  |
+| `bindingConfigSchema`                        | Parse/validate per-binding config                           | Runtime plan compile                      |
+| `connectionConfigSchema`                     | Parse/validate per-connection config                        | Binding write validation, compile         |
+| `supportedAuthSchemes`                       | Declares allowed auth methods                               | Connection creation and OAuth gating      |
+| `credentialResolvers` (optional)             | Dynamic credential generation/lookup                        | Internal credential resolution endpoint   |
+| `authHandlers.oauth` (optional)              | OAuth start/complete behavior                               | OAuth connection flows                    |
+| `webhookHandler` (optional)                  | Verify + parse inbound webhooks                             | Webhook ingest                            |
+| `userConfigSlots`                            | User-configurable runtime setup slots                       | Runtime/client customization contract     |
+| `userSecretSlots` (optional)                 | User-supplied connection secret slots                       | Connection create/complete validation     |
+| `validateBindingWriteContext(...)`           | Contextual target/connection/binding validation             | Binding write and compile parity checks   |
+| `projectTargetUi(...)` (optional)            | Projects validated target config to UI-safe data            | Target discovery projection               |
+| `targetUiProjectionSchema` (optional)        | Validates projected UI payload shape                        | Target discovery projection               |
+| `projectBindingEditorUi(...)` (optional)     | Projects validated target config to binding editor metadata | Target discovery projection               |
+| `bindingEditorUiProjectionSchema` (optional) | Validates projected binding editor payload shape            | Target discovery projection               |
+| `compileBinding(...)`                        | Generate egress/artifacts/runtime clients                   | Runtime plan compiler                     |
 
 ## Lifecycle End-To-End
 
@@ -125,6 +132,10 @@ flowchart TD
 
 - Targets are operator-managed records persisted in control-plane DB.
 - Discovery resolves metadata from definitions (`displayName`, `description`) with optional DB overrides.
+- Control-plane target discovery also returns definition-owned capability metadata (`logoKey`, `supportedAuthSchemes`) and projected UI-safe metadata derived from validated target config (`targetHealth`, `resolvedBindingEditorUi`).
+- UI consumers should prefer projection fields for behavior and rendering instead of parsing raw target config payloads directly.
+- Provider projection logic and projection schema are definition-owned. Control-plane only orchestrates parse/project/validate and returns generic projection envelopes.
+- For browser clients, definitions expose browser-safe contracts/parsers/helpers through `@mistle/integrations-definitions/ui` so dashboard code does not duplicate provider or contract logic.
 
 ### 2) Connection creation
 
@@ -135,7 +146,11 @@ flowchart TD
 
 - Bindings reference `connectionId`, `kind`, and provider-specific binding config.
 - This is user-scoped usage of operator-managed capabilities (targets) through org-owned connections.
-- On compile, schemas are parsed and validated through the definition.
+- Validation now runs in two phases through shared definition logic:
+- Write-time: on binding `PUT`, control-plane parses target/connection/binding config through definition schemas and runs `validateBindingWriteContext(...)` when provided.
+- Compile-time: before `compileBinding(...)`, compiler runs the same definition-level binding write validation contract to keep parity with write-time checks.
+- Contextual validation covers cross-object semantics (for example auth scheme compatibility with model/reasoning) beyond schema shape parsing.
+- Validation issues are surfaced as stable machine codes plus safe messages for UI/API consumers.
 
 ### 4) Runtime plan compilation
 
@@ -184,7 +199,11 @@ This is the recommended workflow.
 - `target-config-schema.ts`
 - `target-secret-schema.ts` (if needed)
 - `binding-config-schema.ts`
+- `connection-config-schema.ts` (if connection config has integration-specific shape)
+- `ui-contract.ts` (provider-specific, optional): browser-safe provider projection schema/parser helpers when needed.
+- `projectBindingEditorUi(...)` + `bindingEditorUiProjectionSchema` (recommended): provider-owned binding editor projection and schema for `resolvedBindingEditorUi`.
 - Keep schemas strict and normalized (for example URL normalization).
+- If binding semantics depend on cross-object context (target + connection + binding), implement `validateBindingWriteContext(...)` in the definition.
 
 4. Define auth behavior.
 
@@ -214,7 +233,8 @@ This is the recommended workflow.
 
 9. Make the target available.
 
-- Add to seed logic (`apps/control-plane-api/src/integration-targets/services/seed-default-targets.ts`) if it should exist by default.
+- Add to default target catalog construction (`packages/integrations-definitions/src/default-targets.ts`) if it should exist by default.
+- Control-plane seeding calls this definitions-owned catalog builder.
 - Otherwise create target rows through your environment provisioning process.
 
 10. Add tests.
@@ -223,6 +243,8 @@ This is the recommended workflow.
 - Compile tests for egress/artifacts/runtime clients.
 - OAuth/webhook handler tests (if implemented).
 - Control-plane integration tests for connection and compile flows.
+- Projection contract tests: ensure `projectTargetUi(...)` output validates against `targetUiProjectionSchema`.
+- Browser-safe contract tests: ensure `ui-contract.ts` parser accepts valid projections and rejects invalid payloads.
 
 ## Design Principles
 
@@ -255,6 +277,7 @@ Useful entrypoints when reading the code:
 - `packages/integrations-core/src/types/index.ts`
 - `packages/integrations-core/src/compiler/index.ts`
 - `packages/integrations-core/src/validation/index.ts`
+- `packages/integrations-core/src/binding-validation/index.ts`
 - `packages/integrations-core/src/webhooks/index.ts`
 - `packages/integrations-definitions/src/index.ts`
 - `apps/control-plane-api/src/integration-targets/*`

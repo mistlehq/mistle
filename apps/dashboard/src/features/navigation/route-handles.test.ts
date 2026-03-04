@@ -67,8 +67,8 @@ describe("route handles", () => {
       );
     }
 
-    expect(callbackBreadcrumb({ params: { targetKey: "github" } })).toBe("GitHub callback");
-    expect(callbackBreadcrumb({ params: { targetKey: "openai" } })).toBe("OpenAI callback");
+    expect(callbackBreadcrumb({ params: { targetKey: "github" } })).toBe("Github callback");
+    expect(callbackBreadcrumb({ params: { targetKey: "openai" } })).toBe("Openai callback");
     expect(callbackBreadcrumb({ params: { targetKey: "custom-integration_v2" } })).toBe(
       "Custom Integration V2 callback",
     );

@@ -1,7 +1,8 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 import { z } from "zod";
 
-import { OpenAiApiKeySupportedAuthSchemes } from "./auth.js";
+import { IntegrationBindingEditorUiProjectionSchema } from "../../../ui/binding-editor-ui-contract.js";
+import { OpenAiApiKeySupportedAuthSchemes, OpenAiConnectionConfigSchema } from "./auth.js";
 import {
   OpenAiApiKeyBindingConfigSchema,
   type OpenAiApiKeyBindingConfig,
@@ -9,10 +10,14 @@ import {
   OpenAiRuntimes,
 } from "./binding-config-schema.js";
 import { compileOpenAiApiKeyBinding } from "./compile-binding.js";
+import { projectOpenAiBindingEditorUi } from "./project-binding-editor-ui.js";
+import { projectOpenAiTargetUi } from "./project-target-ui.js";
 import {
   OpenAiApiKeyTargetConfigSchema,
   type OpenAiApiKeyTargetConfig,
 } from "./target-config-schema.js";
+import { OpenAiTargetUiProjectionSchema } from "./ui-contract.js";
+import { validateOpenAiBindingWriteContext } from "./validate-binding-write-context.js";
 
 type OpenAiApiKeyIntegrationDefinition = IntegrationDefinition<
   { parse: (input: unknown) => OpenAiApiKeyTargetConfig },
@@ -26,6 +31,7 @@ const OpenAiUserReasoningEffortSchema = z.enum([
   OpenAiReasoningEfforts.LOW,
   OpenAiReasoningEfforts.MEDIUM,
   OpenAiReasoningEfforts.HIGH,
+  OpenAiReasoningEfforts.XHIGH,
 ]);
 const OpenAiApiKeyTargetSecretSchema = z.object({}).strict();
 
@@ -39,7 +45,19 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   targetConfigSchema: OpenAiApiKeyTargetConfigSchema,
   targetSecretSchema: OpenAiApiKeyTargetSecretSchema,
   bindingConfigSchema: OpenAiApiKeyBindingConfigSchema,
+  connectionConfigSchema: OpenAiConnectionConfigSchema,
   supportedAuthSchemes: OpenAiApiKeySupportedAuthSchemes,
+  validateBindingWriteContext: validateOpenAiBindingWriteContext,
+  projectTargetUi: ({ targetConfig }) =>
+    projectOpenAiTargetUi({
+      targetConfig,
+    }),
+  targetUiProjectionSchema: OpenAiTargetUiProjectionSchema,
+  projectBindingEditorUi: ({ targetConfig }) =>
+    projectOpenAiBindingEditorUi({
+      targetConfig,
+    }),
+  bindingEditorUiProjectionSchema: IntegrationBindingEditorUiProjectionSchema,
   userConfigSlots: [
     {
       kind: "file",

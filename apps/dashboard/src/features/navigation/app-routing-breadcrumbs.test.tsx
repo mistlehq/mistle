@@ -94,7 +94,7 @@ describe("app routing breadcrumb integration", () => {
 
     expect(markup).toContain('href="/settings/organization/general"');
     expect(markup).toContain('href="/settings/organization/integrations"');
-    expect(markup).toContain("GitHub callback");
+    expect(markup).toContain("Github callback");
     expect(markup).toContain("Integration callback result");
     expect(markup).toContain("Review integration connection callback outcome.");
 

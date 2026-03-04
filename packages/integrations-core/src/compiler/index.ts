@@ -1,5 +1,6 @@
 import { quote } from "shell-quote";
 
+import { runDefinitionBindingWriteValidation } from "../binding-validation/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { assembleCompiledRuntimePlan } from "../runtime-plan/index.js";
 import {
@@ -303,6 +304,30 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         `Binding config for '${bindingInput.binding.id}' did not satisfy '${definition.familyId}::${definition.variantId}' schema.`,
         { cause: error },
       );
+    }
+
+    const bindingWriteValidation = runDefinitionBindingWriteValidation({
+      definition,
+      targetKey: bindingInput.targetKey,
+      target: {
+        familyId: bindingInput.target.familyId,
+        variantId: bindingInput.target.variantId,
+        config: bindingInput.target.config,
+      },
+      connection: {
+        id: bindingInput.connection.id,
+        config: bindingInput.connection.config,
+      },
+      binding: {
+        kind: bindingInput.binding.kind,
+        config: bindingInput.binding.config,
+      },
+      bindingIdOrDraftIndex: bindingInput.binding.id,
+    });
+    if (!bindingWriteValidation.ok) {
+      const firstIssue = bindingWriteValidation.issues[0];
+      const message = firstIssue?.safeMessage ?? "Binding contextual validation failed.";
+      throw new IntegrationCompilerError(CompilerErrorCodes.INVALID_BINDING_CONFIG, message);
     }
 
     const compileBindingResult: CompileBindingResult = definition.compileBinding({

@@ -15,7 +15,9 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppContext } from "../../types.js";
+import { IntegrationTargetSchema } from "../contracts.js";
 import { IntegrationTargetsBadRequestCodes, IntegrationTargetsBadRequestError } from "./errors.js";
+import { projectTargetUi } from "./project-target-ui.js";
 
 const PAGE_SIZE_OPTIONS = {
   defaultLimit: 20,
@@ -34,17 +36,7 @@ export type ListIntegrationTargetsInput = {
   before?: string | undefined;
 };
 
-type IntegrationTargetListItem = {
-  targetKey: string;
-  familyId: string;
-  variantId: string;
-  enabled: boolean;
-  config: Record<string, unknown>;
-  displayName: string;
-  description: string;
-  displayNameOverride?: string;
-  descriptionOverride?: string;
-};
+type IntegrationTargetListItem = z.infer<typeof IntegrationTargetSchema>;
 
 type IntegrationTargetsCursor = z.infer<typeof CursorSchema>;
 
@@ -55,7 +47,12 @@ function resolveTargetMetadata(input: {
   variantId: string;
   displayNameOverride: string | null;
   descriptionOverride: string | null;
-}): { displayName: string; description: string } {
+}): {
+  displayName: string;
+  description: string;
+  logoKey?: string;
+  supportedAuthSchemes?: ("oauth" | "api-key")[];
+} {
   const definition = IntegrationRegistry.getDefinition({
     familyId: input.familyId,
     variantId: input.variantId,
@@ -79,6 +76,8 @@ function resolveTargetMetadata(input: {
       return {
         displayName: input.displayNameOverride ?? definition.displayName,
         description: input.descriptionOverride,
+        logoKey: definition.logoKey,
+        supportedAuthSchemes: [...definition.supportedAuthSchemes],
       };
     }
 
@@ -90,6 +89,8 @@ function resolveTargetMetadata(input: {
   return {
     displayName: input.displayNameOverride ?? definition.displayName,
     description: input.descriptionOverride ?? definition.description,
+    logoKey: definition.logoKey,
+    supportedAuthSchemes: [...definition.supportedAuthSchemes],
   };
 }
 
@@ -183,6 +184,11 @@ export async function listIntegrationTargets(
           displayNameOverride: target.displayNameOverride,
           descriptionOverride: target.descriptionOverride,
         });
+        const projectedTargetUi = projectTargetUi({
+          familyId: target.familyId,
+          variantId: target.variantId,
+          config: target.config,
+        });
 
         return {
           targetKey: target.targetKey,
@@ -192,6 +198,14 @@ export async function listIntegrationTargets(
           config: target.config,
           displayName: resolvedMetadata.displayName,
           description: resolvedMetadata.description,
+          ...(resolvedMetadata.logoKey === undefined ? {} : { logoKey: resolvedMetadata.logoKey }),
+          ...(resolvedMetadata.supportedAuthSchemes === undefined
+            ? {}
+            : { supportedAuthSchemes: resolvedMetadata.supportedAuthSchemes }),
+          targetHealth: projectedTargetUi.targetHealth,
+          ...(projectedTargetUi.resolvedBindingEditorUi === undefined
+            ? {}
+            : { resolvedBindingEditorUi: projectedTargetUi.resolvedBindingEditorUi }),
           ...(target.displayNameOverride === null
             ? {}
             : { displayNameOverride: target.displayNameOverride }),

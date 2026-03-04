@@ -24,14 +24,6 @@ function normalizeIntegrationBreadcrumbLabel(targetKey: string): string {
     return "Integration";
   }
 
-  if (normalizedId === "github") {
-    return "GitHub";
-  }
-
-  if (normalizedId === "openai") {
-    return "OpenAI";
-  }
-
   return normalizedId.split(" ").map(toTitleCaseWord).join(" ");
 }
 

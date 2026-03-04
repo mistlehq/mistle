@@ -47,14 +47,14 @@ describe("cors integration", () => {
       method: "OPTIONS",
       headers: {
         origin: trustedOrigin,
-        "access-control-request-method": "GET",
+        "access-control-request-method": "PUT",
         "access-control-request-headers": "content-type,authorization",
       },
     });
     expect(response.status).toBe(204);
     expect(response.headers.get("access-control-allow-origin")).toBe(trustedOrigin);
     expect(response.headers.get("access-control-allow-credentials")).toBe("true");
-    expect(response.headers.get("access-control-allow-methods")).toContain("GET");
+    expect(response.headers.get("access-control-allow-methods")).toContain("PUT");
     expect(response.headers.get("access-control-allow-methods")).toContain("OPTIONS");
     expect(response.headers.get("access-control-max-age")).toBe("600");
 

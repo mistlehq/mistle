@@ -1,4 +1,6 @@
 import { integrationTargets } from "@mistle/db/control-plane";
+import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
+import { parseIntegrationBindingEditorUiProjection } from "@mistle/integrations-definitions/ui";
 import { describe, expect } from "vitest";
 
 import {
@@ -81,8 +83,14 @@ describe("integration targets discovery integration", () => {
         },
         displayName: "GitHub Cloud",
         description: "GitHub Cloud target",
+        logoKey: "github",
+        supportedAuthSchemes: ["oauth", "api-key"],
         displayNameOverride: "GitHub Cloud",
         descriptionOverride: "GitHub Cloud target",
+        targetHealth: {
+          configStatus: "invalid",
+          reason: "invalid-config",
+        },
       },
       {
         targetKey: "linear_cloud",
@@ -96,6 +104,9 @@ describe("integration targets discovery integration", () => {
         description: "Linear Cloud target",
         displayNameOverride: "Linear Cloud",
         descriptionOverride: "Linear Cloud target",
+        targetHealth: {
+          configStatus: "valid",
+        },
       },
     ]);
     expect(firstPage.previousPage).toBeNull();
@@ -129,6 +140,12 @@ describe("integration targets discovery integration", () => {
         displayName: "OpenAI",
         description:
           "Enable OpenAI model access with API key or ChatGPT subscription authentication.",
+        logoKey: "openai",
+        supportedAuthSchemes: ["api-key", "oauth"],
+        targetHealth: {
+          configStatus: "invalid",
+          reason: "invalid-config",
+        },
       },
     ]);
     expect(secondPage.nextPage).toBeNull();
@@ -199,5 +216,41 @@ describe("integration targets discovery integration", () => {
       code: "UNAUTHORIZED",
       message: "Unauthorized API request.",
     });
+  }, 60_000);
+
+  it("returns OpenAI binding editor projection payload when target config is valid", async ({
+    fixture,
+  }) => {
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai-default",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com",
+        binding_capabilities: createOpenAiRawBindingCapabilities(),
+      },
+    });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-targets-list-openai-projection@example.com",
+    });
+
+    const response = await fixture.request("/v1/integration/targets?limit=100", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    const page = ListIntegrationTargetsResponseSchema.parse(await response.json());
+    const openAiTarget = page.items.find((item) => item.targetKey === "openai-default");
+    expect(openAiTarget).toBeDefined();
+    expect(openAiTarget?.targetHealth.configStatus).toBe("valid");
+    expect(openAiTarget?.supportedAuthSchemes).toEqual(["api-key", "oauth"]);
+    const bindingEditorProjection = parseIntegrationBindingEditorUiProjection(
+      openAiTarget?.resolvedBindingEditorUi,
+    );
+    expect(bindingEditorProjection?.bindingEditor.config.mode).toBe("connection-config-key");
   }, 60_000);
 });

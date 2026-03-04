@@ -16,6 +16,7 @@ import { useMemo, useState } from "react";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
   type ConnectDialogState,
+  ConnectMethodIds,
   ConnectIntegrationDialog,
   type ConnectMethodId,
 } from "../integrations/connect-integration-dialog.js";
@@ -39,11 +40,22 @@ const SETTINGS_INTEGRATIONS_QUERY_KEY: readonly ["settings", "integrations", "di
   "directory",
 ];
 
+function toConnectMethods(
+  supportedAuthSchemes: readonly ("oauth" | "api-key")[] | undefined,
+): readonly ConnectMethodId[] {
+  if (supportedAuthSchemes === undefined) {
+    return [];
+  }
+  return supportedAuthSchemes.map((scheme) =>
+    scheme === "api-key" ? ConnectMethodIds.API_KEY : ConnectMethodIds.OAUTH,
+  );
+}
+
 export function IntegrationsPage() {
   const queryClient = useQueryClient();
   const [connectDialog, setConnectDialog] = useState<ConnectDialogState | null>(null);
   const [viewDialog, setViewDialog] = useState<ViewDialogState | null>(null);
-  const [connectMethodId, setConnectMethodId] = useState<ConnectMethodId>("api-key");
+  const [connectMethodId, setConnectMethodId] = useState<ConnectMethodId>(ConnectMethodIds.API_KEY);
   const [apiKeyValue, setApiKeyValue] = useState("");
   const [connectError, setConnectError] = useState<string | null>(null);
 
@@ -92,17 +104,28 @@ export function IntegrationsPage() {
 
   function resetConnectDialogState(): void {
     setConnectDialog(null);
-    setConnectMethodId("api-key");
+    setConnectMethodId(ConnectMethodIds.API_KEY);
     setApiKeyValue("");
     setConnectError(null);
   }
 
-  function openConnectDialog(input: { targetKey: string; displayName: string }): void {
+  function openConnectDialog(input: {
+    targetKey: string;
+    displayName: string;
+    methods: readonly ConnectMethodId[];
+  }): void {
     setConnectDialog({
       targetKey: input.targetKey,
       displayName: input.displayName,
+      methods: input.methods,
     });
-    setConnectMethodId("api-key");
+    const defaultMethod = input.methods[0];
+    if (defaultMethod === undefined) {
+      throw new Error(
+        `Integration target '${input.targetKey}' does not declare any supported auth scheme.`,
+      );
+    }
+    setConnectMethodId(defaultMethod);
     setApiKeyValue("");
     setConnectError(null);
   }
@@ -118,8 +141,13 @@ export function IntegrationsPage() {
     if (connectDialog === null) {
       throw new Error("Connect dialog is required to run a connect action.");
     }
+    if (!connectDialog.methods.includes(connectMethodId)) {
+      throw new Error(
+        `Connect method '${connectMethodId}' is not supported for target '${connectDialog.targetKey}'.`,
+      );
+    }
 
-    if (connectMethodId === "api-key") {
+    if (connectMethodId === ConnectMethodIds.API_KEY) {
       const normalizedApiKey = apiKeyValue.trim();
       if (normalizedApiKey.length === 0) {
         setConnectError("API key is required.");
@@ -212,40 +240,50 @@ export function IntegrationsPage() {
       <IntegrationSection
         cards={activeIntegrationCards}
         emptyStateMessage="No active integration connections yet. Add one from the integrations list below."
-        renderTile={(card) => (
-          <IntegrationTile
-            actionLabel="View"
-            actionVariant="outline"
-            description={formatConnectionCount(card.connections.length)}
-            displayName={card.displayName}
-            familyId={card.target.familyId}
-            onAction={() =>
-              openViewDialog({
-                targetKey: card.target.targetKey,
-                displayName: card.displayName,
-              })
-            }
-          />
-        )}
+        renderTile={(card) => {
+          return (
+            <IntegrationTile
+              actionLabel="View"
+              actionVariant="outline"
+              description={formatConnectionCount(card.connections.length)}
+              displayName={card.displayName}
+              {...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey })}
+              {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
+              onAction={() =>
+                openViewDialog({
+                  targetKey: card.target.targetKey,
+                  displayName: card.displayName,
+                })
+              }
+            />
+          );
+        }}
         title="Connected"
       />
 
       <IntegrationSection
         cards={cards}
-        renderTile={(card) => (
-          <IntegrationTile
-            actionLabel="Add"
-            description={card.description}
-            displayName={card.displayName}
-            familyId={card.target.familyId}
-            onAction={() =>
-              openConnectDialog({
-                targetKey: card.target.targetKey,
-                displayName: card.displayName,
-              })
-            }
-          />
-        )}
+        renderTile={(card) => {
+          const methods = toConnectMethods(card.target.supportedAuthSchemes);
+
+          return (
+            <IntegrationTile
+              actionDisabled={methods.length === 0}
+              actionLabel={methods.length === 0 ? "N/A" : "Add"}
+              description={card.description}
+              displayName={card.displayName}
+              {...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey })}
+              {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
+              onAction={() =>
+                openConnectDialog({
+                  targetKey: card.target.targetKey,
+                  displayName: card.displayName,
+                  methods,
+                })
+              }
+            />
+          );
+        }}
         title="Available Integrations"
       />
 

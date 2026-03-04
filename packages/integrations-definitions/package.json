@@ -9,6 +9,12 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./ui": {
+      "types": "./src/ui/index.ts",
+      "node": "./dist/ui/index.js",
+      "import": "./src/ui/index.ts",
+      "default": "./src/ui/index.ts"
+    },
     "./*.js": {
       "types": "./src/*.ts",
       "node": "./dist/*.js",

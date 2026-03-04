@@ -18,6 +18,9 @@ function createTarget(input: {
     variantId: input.variantId,
     enabled: true,
     config: {},
+    targetHealth: {
+      configStatus: "valid",
+    },
     displayName: input.displayName,
     description: input.description,
     ...(input.displayNameOverride === undefined

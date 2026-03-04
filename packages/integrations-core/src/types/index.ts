@@ -69,6 +69,44 @@ export type IntegrationConfigSchema<TOutput> = {
 type ParsedSchemaOutput<TSchema extends IntegrationConfigSchema<unknown>> =
   TSchema extends IntegrationConfigSchema<infer TOutput> ? TOutput : never;
 
+export type BindingWriteValidationContext<
+  TTargetConfig = Record<string, unknown>,
+  TBindingConfig = Record<string, unknown>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  targetKey: string;
+  bindingIdOrDraftIndex: string;
+  target: {
+    familyId: string;
+    variantId: string;
+    config: TTargetConfig;
+  };
+  connection: {
+    id: string;
+    config: TConnectionConfig;
+  };
+  binding: {
+    kind: string;
+    config: TBindingConfig;
+  };
+};
+
+export type BindingWriteValidationIssue = {
+  code: `${string}.${string}`;
+  field: string;
+  safeMessage: string;
+};
+
+export type BindingWriteValidationResult =
+  | { ok: true }
+  | {
+      ok: false;
+      issues: readonly BindingWriteValidationIssue[];
+    };
+
+export type IntegrationTargetUiProjection = Record<string, unknown>;
+export type IntegrationBindingEditorUiProjection = Record<string, unknown>;
+
 export type IntegrationResolvedTarget<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -612,6 +650,7 @@ export type IntegrationDefinition<
   targetConfigSchema: TTargetConfigSchema;
   targetSecretSchema: TTargetSecretsSchema;
   bindingConfigSchema: TBindingConfigSchema;
+  connectionConfigSchema?: IntegrationConfigSchema<Record<string, unknown>>;
   supportedAuthSchemes: ReadonlyArray<IntegrationSupportedAuthScheme>;
   credentialResolvers?: IntegrationCredentialResolvers;
   authHandlers?: {
@@ -628,6 +667,27 @@ export type IntegrationDefinition<
   agentCapabilities?: IntegrationDefinitionAgentCapabilities;
   userConfigSlots: ReadonlyArray<IntegrationUserConfigSlot>;
   userSecretSlots?: ReadonlyArray<IntegrationUserSecretSlot>;
+  validateBindingWriteContext?(
+    input: BindingWriteValidationContext<
+      ParsedSchemaOutput<TTargetConfigSchema>,
+      ParsedSchemaOutput<TBindingConfigSchema>,
+      Record<string, unknown>
+    >,
+  ): BindingWriteValidationResult;
+  projectTargetUi?(input: {
+    familyId: string;
+    variantId: string;
+    kind: IntegrationKind;
+    targetConfig: ParsedSchemaOutput<TTargetConfigSchema>;
+  }): IntegrationTargetUiProjection;
+  targetUiProjectionSchema?: IntegrationConfigSchema<IntegrationTargetUiProjection>;
+  projectBindingEditorUi?(input: {
+    familyId: string;
+    variantId: string;
+    kind: IntegrationKind;
+    targetConfig: ParsedSchemaOutput<TTargetConfigSchema>;
+  }): IntegrationBindingEditorUiProjection;
+  bindingEditorUiProjectionSchema?: IntegrationConfigSchema<IntegrationBindingEditorUiProjection>;
   compileBinding(
     input: CompileBindingInput<
       ParsedSchemaOutput<TTargetConfigSchema>,

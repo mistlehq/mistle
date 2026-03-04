@@ -47,6 +47,7 @@ export class SandboxProfilesBadRequestError extends Error {
 export const SandboxProfilesIntegrationBindingsBadRequestCodes = {
   INVALID_BINDING_REFERENCE: "INVALID_BINDING_REFERENCE",
   INVALID_BINDING_CONNECTION_REFERENCE: "INVALID_BINDING_CONNECTION_REFERENCE",
+  INVALID_BINDING_CONFIG_REFERENCE: "INVALID_BINDING_CONFIG_REFERENCE",
 } as const;
 
 export type SandboxProfilesIntegrationBindingsBadRequestCode =
@@ -54,11 +55,35 @@ export type SandboxProfilesIntegrationBindingsBadRequestCode =
 
 export class SandboxProfilesIntegrationBindingsBadRequestError extends Error {
   code: SandboxProfilesIntegrationBindingsBadRequestCode;
+  details?: {
+    issues: ReadonlyArray<{
+      clientRef?: string;
+      bindingIdOrDraftIndex: string;
+      validatorCode: string;
+      field: string;
+      safeMessage: string;
+    }>;
+  };
 
-  constructor(code: SandboxProfilesIntegrationBindingsBadRequestCode, message: string) {
+  constructor(
+    code: SandboxProfilesIntegrationBindingsBadRequestCode,
+    message: string,
+    details?: {
+      issues: ReadonlyArray<{
+        clientRef?: string;
+        bindingIdOrDraftIndex: string;
+        validatorCode: string;
+        field: string;
+        safeMessage: string;
+      }>;
+    },
+  ) {
     super(message);
     this.name = "SandboxProfilesIntegrationBindingsBadRequestError";
     this.code = code;
+    if (details !== undefined) {
+      this.details = details;
+    }
   }
 }
 

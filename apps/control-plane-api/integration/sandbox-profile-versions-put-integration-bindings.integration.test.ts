@@ -6,6 +6,7 @@ import {
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
+import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import {
@@ -31,6 +32,7 @@ describe("sandbox profile version put integration bindings integration", () => {
       enabled: true,
       config: {
         api_base_url: "https://api.openai.com",
+        binding_capabilities: createOpenAiRawBindingCapabilities(),
       },
     });
 
@@ -41,11 +43,17 @@ describe("sandbox profile version put integration bindings integration", () => {
           id: "icn_put_bindings_route_001",
           organizationId: authenticatedSession.organizationId,
           targetKey: "openai-default-put-bindings-route",
+          config: {
+            auth_scheme: "api-key",
+          },
         },
         {
           id: "icn_put_bindings_route_002",
           organizationId: authenticatedSession.organizationId,
           targetKey: "openai-default-put-bindings-route",
+          config: {
+            auth_scheme: "api-key",
+          },
         },
       ])
       .returning();
@@ -225,78 +233,6 @@ describe("sandbox profile version put integration bindings integration", () => {
     expect(responseBody.code).toBe("PROFILE_VERSION_NOT_FOUND");
   }, 60_000);
 
-  it("returns 400 when request references a non-existent binding id", async ({ fixture }) => {
-    const authenticatedSession = await fixture.authSession({
-      email:
-        "integration-sandbox-profile-version-put-bindings-route-invalid-binding-id@example.com",
-    });
-
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default-put-bindings-route-invalid-binding-id",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com",
-      },
-    });
-    await fixture.db.insert(sandboxProfiles).values({
-      id: "sbp_put_bindings_route_invalid_binding_id_001",
-      organizationId: authenticatedSession.organizationId,
-      displayName: "Invalid Binding Id Profile",
-      status: "active",
-    });
-    await fixture.db.insert(sandboxProfileVersions).values({
-      sandboxProfileId: "sbp_put_bindings_route_invalid_binding_id_001",
-      version: 1,
-    });
-
-    const [connection] = await fixture.db
-      .insert(integrationConnections)
-      .values({
-        id: "icn_put_bindings_route_invalid_binding_id_001",
-        organizationId: authenticatedSession.organizationId,
-        targetKey: "openai-default-put-bindings-route-invalid-binding-id",
-      })
-      .returning();
-
-    if (connection === undefined) {
-      throw new Error("Expected integration connection to be inserted.");
-    }
-
-    const response = await fixture.request(
-      "/v1/sandbox/profiles/sbp_put_bindings_route_invalid_binding_id_001/versions/1/integration-bindings",
-      {
-        method: "PUT",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
-        },
-        body: JSON.stringify({
-          bindings: [
-            {
-              id: "ibd_missing_for_route",
-              connectionId: connection.id,
-              kind: IntegrationBindingKinds.AGENT,
-              config: {
-                runtime: "codex-cli",
-              },
-            },
-          ],
-        }),
-      },
-    );
-
-    expect(response.status).toBe(400);
-    const responseBody = PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema.parse(
-      await response.json(),
-    );
-    if (!("code" in responseBody)) {
-      throw new Error("Expected integration bindings bad-request error response.");
-    }
-    expect(responseBody.code).toBe("INVALID_BINDING_REFERENCE");
-  }, 60_000);
-
   it("returns 400 for invalid request payload shape", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
       email: "integration-sandbox-profile-version-put-bindings-route-validation@example.com",
@@ -337,6 +273,90 @@ describe("sandbox profile version put integration bindings integration", () => {
     const responseBody = ValidationErrorResponseSchema.parse(await response.json());
     expect(responseBody.success).toBe(false);
     expect(responseBody.error.name).toBe("ZodError");
+  }, 60_000);
+
+  it("returns INVALID_BINDING_CONFIG_REFERENCE for unsupported reasoning per model", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-invalid-reasoning@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai-default-put-bindings-invalid-reasoning",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com",
+        binding_capabilities: createOpenAiRawBindingCapabilities(),
+      },
+    });
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_put_bindings_invalid_reasoning_001",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Invalid Reasoning Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_put_bindings_invalid_reasoning_001",
+      version: 1,
+    });
+
+    const [connection] = await fixture.db
+      .insert(integrationConnections)
+      .values({
+        id: "icn_put_bindings_invalid_reasoning_001",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "openai-default-put-bindings-invalid-reasoning",
+        config: {
+          auth_scheme: "api-key",
+        },
+      })
+      .returning();
+    if (connection === undefined) {
+      throw new Error("Expected integration connection to be inserted.");
+    }
+
+    const response = await fixture.request(
+      "/v1/sandbox/profiles/sbp_put_bindings_invalid_reasoning_001/versions/1/integration-bindings",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          bindings: [
+            {
+              clientRef: "row-2",
+              connectionId: connection.id,
+              kind: IntegrationBindingKinds.AGENT,
+              config: {
+                runtime: "codex-cli",
+                defaultModel: "gpt-5.1-codex-mini",
+                reasoningEffort: "low",
+              },
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    if (!("code" in responseBody)) {
+      throw new Error("Expected integration bindings bad-request error response.");
+    }
+    expect(responseBody.code).toBe("INVALID_BINDING_CONFIG_REFERENCE");
+    if (responseBody.code !== "INVALID_BINDING_CONFIG_REFERENCE") {
+      throw new Error("Expected invalid binding config reference response.");
+    }
+    expect(responseBody.details.issues[0]?.validatorCode).toBe(
+      "openai.unsupported_reasoning_for_model",
+    );
   }, 60_000);
 
   it("returns 401 when request is unauthenticated", async ({ fixture }) => {

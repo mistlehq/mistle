@@ -7,8 +7,17 @@ import type {
 import { describe, expect, it } from "vitest";
 
 import { compileOpenAiApiKeyBinding } from "./compile-binding.js";
+import { createOpenAiRawBindingCapabilities } from "./model-capabilities.js";
+import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 
 const OpenAiApiKeyAuthScheme: IntegrationSupportedAuthScheme = "api-key";
+
+function createOpenAiTargetConfig(apiBaseUrl: string) {
+  return OpenAiApiKeyTargetConfigSchema.parse({
+    api_base_url: apiBaseUrl,
+    binding_capabilities: createOpenAiRawBindingCapabilities(),
+  });
+}
 
 function createRuntimeArtifactRefs(): RuntimeArtifactRefs {
   const exec = (input: RuntimeArtifactCommand): RuntimeArtifactCommand => ({
@@ -72,9 +81,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         variantId: "openai-default",
         enabled: true,
         secrets: {},
-        config: {
-          apiBaseUrl: "https://api.openai.com/v1",
-        },
+        config: createOpenAiTargetConfig("https://api.openai.com/v1"),
       },
       connection: {
         id: "icn_123",
@@ -207,9 +214,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         variantId: "openai-default",
         enabled: true,
         secrets: {},
-        config: {
-          apiBaseUrl: "https://proxy.example.com/openai-v2",
-        },
+        config: createOpenAiTargetConfig("https://proxy.example.com/openai-v2"),
       },
       connection: {
         id: "icn_123",
@@ -259,9 +264,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         variantId: "openai-default",
         enabled: true,
         secrets: {},
-        config: {
-          apiBaseUrl: "https://api.openai.com",
-        },
+        config: createOpenAiTargetConfig("https://api.openai.com"),
       },
       connection: {
         id: "icn_123",
@@ -305,9 +308,7 @@ describe("compileOpenAiApiKeyBinding", () => {
           variantId: "openai-default",
           enabled: true,
           secrets: {},
-          config: {
-            apiBaseUrl: "https://api.openai.com/v1",
-          },
+          config: createOpenAiTargetConfig("https://api.openai.com/v1"),
         },
         connection: {
           id: "icn_123",

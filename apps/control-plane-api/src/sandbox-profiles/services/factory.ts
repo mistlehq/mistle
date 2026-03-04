@@ -1,6 +1,8 @@
 import { compileProfileVersionRuntimePlan } from "./compile-profile-version-runtime-plan.js";
 import { createProfile } from "./create-profile.js";
+import { getProfileVersionIntegrationBindings } from "./get-profile-version-integration-bindings.js";
 import { getProfile } from "./get-profile.js";
+import { listProfileVersions } from "./list-profile-versions.js";
 import { listProfiles } from "./list-profiles.js";
 import { putProfileVersionIntegrationBindings } from "./put-profile-version-integration-bindings.js";
 import { requestDeleteProfile } from "./request-delete-profile.js";
@@ -47,6 +49,14 @@ export function createSandboxProfilesService(
         {
           db: input.db,
           openWorkflow: input.openWorkflow,
+        },
+        serviceInput,
+      ),
+    listProfileVersions: (serviceInput) => listProfileVersions({ db: input.db }, serviceInput),
+    getProfileVersionIntegrationBindings: (serviceInput) =>
+      getProfileVersionIntegrationBindings(
+        {
+          db: input.db,
         },
         serviceInput,
       ),

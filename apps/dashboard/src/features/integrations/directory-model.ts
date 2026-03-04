@@ -7,6 +7,7 @@ export type IntegrationCardViewModel = {
   displayName: string;
   description: string;
   status: IntegrationCardStatus;
+  configStatus: "valid" | "invalid";
   connections: readonly IntegrationConnection[];
 };
 
@@ -51,6 +52,7 @@ export function buildIntegrationCards(input: {
       displayName: target.displayName,
       description: target.description,
       status: deriveIntegrationStatus(targetConnections),
+      configStatus: target.targetHealth.configStatus,
       connections: targetConnections,
     };
   });
