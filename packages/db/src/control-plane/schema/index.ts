@@ -1,5 +1,24 @@
 export { accounts } from "./accounts.js";
 export {
+  automations,
+  AutomationKinds,
+  type InsertAutomation,
+  type Automation,
+  type AutomationKind,
+} from "./automations.js";
+export {
+  automationRuns,
+  AutomationRunStatuses,
+  type InsertAutomationRun,
+  type AutomationRun,
+  type AutomationRunStatus,
+} from "./automation-runs.js";
+export {
+  automationTargets,
+  type InsertAutomationTarget,
+  type AutomationTarget,
+} from "./automation-targets.js";
+export {
   integrationConnectionCredentials,
   type InsertIntegrationConnectionCredential,
   type IntegrationConnectionCredential,
@@ -40,6 +59,11 @@ export {
   type IntegrationWebhookEvent,
   type IntegrationWebhookEventStatus,
 } from "./integration-webhook-events.js";
+export {
+  webhookAutomations,
+  type InsertWebhookAutomation,
+  type WebhookAutomation,
+} from "./webhook-automations.js";
 export { invitations } from "./invitations.js";
 export { members, MemberRoles } from "./members.js";
 export type { MemberRole } from "./members.js";
