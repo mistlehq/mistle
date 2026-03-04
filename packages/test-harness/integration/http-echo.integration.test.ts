@@ -1,19 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import { startHttpEcho } from "../src/index.js";
-
-function toRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-
-  const record: Record<string, unknown> = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
-}
+import { toRecord } from "../src/unknown-record.js";
 
 function readHeaderValue(headers: unknown, headerName: string): string | undefined {
   if (typeof headers !== "object" || headers === null) {

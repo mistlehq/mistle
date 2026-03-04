@@ -16,6 +16,8 @@ import {
 import { Client, Pool } from "pg";
 import { it as vitestIt } from "vitest";
 
+import { toRecord } from "../src/lib/unknown-record.js";
+
 export type AuthenticatedSession = {
   cookie: string;
   organizationId: string;
@@ -45,19 +47,6 @@ type SharedInfraConfig = {
   mailpitSmtpPort: number;
   containerHostGateway: string;
 };
-
-function toRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-
-  const record: Record<string, unknown> = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
-}
 
 function extractOTPCode(text: string): string | undefined {
   const pattern = new RegExp(`\\b(\\d{${String(AUTH_OTP_LENGTH)}})\\b`);

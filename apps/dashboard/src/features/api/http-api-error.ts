@@ -1,35 +1,4 @@
-type UnknownRecord = Record<string, unknown>;
-
-function toRecord(value: unknown): UnknownRecord | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-
-  const record: UnknownRecord = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
-}
-
-function readString(record: UnknownRecord, key: string): string | null {
-  const value = record[key];
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  return value;
-}
-
-function readNumber(record: UnknownRecord, key: string): number | null {
-  const value = record[key];
-  if (typeof value !== "number") {
-    return null;
-  }
-
-  return value;
-}
+import { readNumber, readString, toRecord } from "../../lib/unknown-record.js";
 
 function readPropertyUnknown(value: unknown, key: string): unknown {
   const record = toRecord(value);

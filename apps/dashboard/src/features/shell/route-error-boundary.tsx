@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { isRouteErrorResponse, useNavigate, useRouteError } from "react-router";
 
 import { getRuntimeEnv, type RuntimeEnv } from "../../lib/runtime-env.js";
+import { toRecord } from "../../lib/unknown-record.js";
 
 type RouteErrorDisplay = {
   title: string;
@@ -16,19 +17,6 @@ type ResolveRouteErrorDisplayOptions = {
   showDiagnostics: boolean;
 };
 const COPY_SUCCESS_DISPLAY_MS = 1200;
-
-function toRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-
-  const record: Record<string, unknown> = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
-}
 
 function readRouteResponseMessage(data: unknown): string | null {
   if (typeof data === "string") {

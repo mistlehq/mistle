@@ -1,3 +1,4 @@
+import { toRecord } from "../lib/unknown-record.js";
 import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "./constants.js";
 
 export type ResolveCredentialInput = {
@@ -17,19 +18,6 @@ type ControlPlaneCredentialResolverClientInput = {
   internalAuthServiceToken: string;
   requestTimeoutMs: number;
 };
-
-function toRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-
-  const record: Record<string, unknown> = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
-}
 
 export class ControlPlaneCredentialResolverClient {
   readonly #resolveEndpoint: string;

@@ -18,23 +18,11 @@ import {
 import { mapInviteAttemptResult } from "../src/features/settings/members/member-invite-state.js";
 import { MembersApiError } from "../src/features/settings/members/members-api-errors.js";
 import { createMembersInvitationsService } from "../src/features/settings/members/members-invitations-service-core.js";
+import { toRecord } from "../src/lib/unknown-record.js";
 import type { DashboardMembersInvitationsFixture } from "./members-invitations-test-context.js";
 import { it } from "./members-invitations-test-context.js";
 
 const AUTH_ORIGIN = "http://localhost:5100";
-
-function toRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-
-  const record: Record<string, unknown> = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
-}
 
 function readErrorMessage(value: unknown): string | null {
   const record = toRecord(value);

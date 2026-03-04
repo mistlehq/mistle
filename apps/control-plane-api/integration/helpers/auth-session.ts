@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 
 import { readLatestSignInOtp } from "./sign-in-otp.js";
+import { toRecord } from "./unknown-record.js";
 
 export type AuthenticatedSession = {
   cookie: string;
@@ -16,19 +17,6 @@ export type CreateAuthenticatedSessionInput = {
   otpLength: number;
   email?: string;
 };
-
-function toRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-
-  const record: Record<string, unknown> = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
-}
 
 function extractRequestCookie(setCookieHeader: string): string {
   const [cookiePair] = setCookieHeader.split(";");
