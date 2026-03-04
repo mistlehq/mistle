@@ -1,6 +1,7 @@
 import { integrationTargets } from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
 
+import { encryptIntegrationTargetSecrets } from "../src/integration-credentials/crypto.js";
 import {
   CONTROL_PLANE_INTERNAL_AUTH_HEADER,
   INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH,
@@ -83,6 +84,80 @@ describe("internal integration credentials resolve", () => {
     await expect(response.json()).resolves.toEqual({
       code: "UNAUTHORIZED",
       message: "Internal service authentication failed.",
+    });
+  });
+
+  it("resolves encrypted integration target secrets", async ({ fixture }) => {
+    const encryptedSecrets = encryptIntegrationTargetSecrets({
+      secrets: {
+        webhook_secret: "super-secret",
+        app_private_key: "private-key",
+      },
+      masterKeyVersion: 1,
+      masterEncryptionKeyMaterial: "integration-master-key-testing",
+    });
+
+    const response = await fixture.request(
+      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve-target-secrets`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+        body: JSON.stringify({
+          targets: [
+            {
+              targetKey: "github-cloud",
+              encryptedSecrets,
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      targets: [
+        {
+          targetKey: "github-cloud",
+          secrets: {
+            webhook_secret: "super-secret",
+            app_private_key: "private-key",
+          },
+        },
+      ],
+    });
+  });
+
+  it("rejects malformed encrypted integration target secrets", async ({ fixture }) => {
+    const response = await fixture.request(
+      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve-target-secrets`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+        body: JSON.stringify({
+          targets: [
+            {
+              targetKey: "github-cloud",
+              encryptedSecrets: {
+                masterKeyVersion: 1,
+                nonce: "broken",
+                ciphertext: "broken",
+              },
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      code: "INVALID_TARGET_SECRETS",
+      message: "Target 'github-cloud' has invalid encrypted target secrets.",
     });
   });
 });
