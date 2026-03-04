@@ -1,14 +1,4 @@
 import {
-  buildBindingEditorRenderableFields,
-  createDefaultConfigFromBindingEditorVariant,
-  parseConfigAgainstBindingEditorVariant,
-  parseIntegrationBindingEditorUiProjection,
-  resolveBindingEditorVariant,
-  type BindingEditorRenderableField,
-  type BindingEditorVariant,
-  updateBindingEditorConfigByField,
-} from "@mistle/integrations-definitions/ui";
-import {
   Alert,
   AlertDescription,
   AlertTitle,
@@ -62,6 +52,17 @@ import type {
   SandboxProfileStatus,
 } from "../sandbox-profiles/sandbox-profiles-types.js";
 import { SaveActions } from "../settings/save-actions.js";
+import {
+  createDefaultBindingConfig,
+  resolveBindingConfigUiModel,
+  resolveBindingKindFromTarget,
+  SandboxProfileBindingConfigEditor,
+  type IntegrationConnectionSummary,
+  type IntegrationTargetSummary,
+  type SandboxProfileBindingEditorRow,
+} from "./sandbox-profile-binding-config-editor.js";
+import { resolveProfileNameCommitDecision } from "./sandbox-profile-title-edit.js";
+import { SandboxProfileTitleEditor } from "./sandbox-profile-title-editor.js";
 
 type SandboxProfileEditorPageProps = {
   mode: "create" | "edit";
@@ -71,51 +72,6 @@ type SandboxProfileEditorFormState = {
   displayName: string;
   status: SandboxProfileStatus;
 };
-
-type IntegrationBindingEditorRow = {
-  clientId: string;
-  id?: string;
-  connectionId: string;
-  kind: SandboxIntegrationBindingKind;
-  config: Record<string, unknown>;
-};
-
-type IntegrationConnectionSummary = {
-  id: string;
-  targetKey: string;
-  status: "active" | "error" | "revoked";
-  config?: Record<string, unknown> | undefined;
-};
-
-type IntegrationTargetSummary = {
-  targetKey: string;
-  displayName: string;
-  familyId: string;
-  variantId: string;
-  targetHealth: {
-    configStatus: "valid" | "invalid";
-  };
-  resolvedBindingEditorUi?: Record<string, unknown> | undefined;
-};
-
-type BindingConfigUiModel =
-  | {
-      mode: "missing-connection";
-    }
-  | {
-      mode: "editor";
-      variant: BindingEditorVariant;
-      value: Record<string, unknown>;
-      fields: readonly BindingEditorRenderableField[];
-    }
-  | {
-      mode: "connector";
-    }
-  | {
-      mode: "unsupported";
-      message: string;
-      defaultConfig?: Record<string, unknown> | undefined;
-    };
 
 type InvalidBindingConfigIssue = {
   clientRef?: string | undefined;
@@ -164,16 +120,6 @@ function formatBindingKind(kind: SandboxIntegrationBindingKind): string {
   return "Connector";
 }
 
-function resolveBindingKindFromTarget(
-  target: IntegrationTargetSummary | undefined,
-): SandboxIntegrationBindingKind | undefined {
-  if (target === undefined) {
-    return undefined;
-  }
-  const projection = parseIntegrationBindingEditorUiProjection(target.resolvedBindingEditorUi);
-  return projection?.bindingEditor.kind;
-}
-
 function readInvalidBindingConfigIssues(
   error: unknown,
 ): readonly InvalidBindingConfigIssue[] | null {
@@ -185,103 +131,6 @@ function readInvalidBindingConfigIssues(
     return null;
   }
   return parsed.data.details.issues;
-}
-
-function createDefaultBindingConfig(input: {
-  connection?: IntegrationConnectionSummary;
-  target?: IntegrationTargetSummary;
-}): Record<string, unknown> {
-  if (input.target === undefined || input.connection === undefined) {
-    return {};
-  }
-  const projection = parseIntegrationBindingEditorUiProjection(
-    input.target.resolvedBindingEditorUi,
-  );
-  if (projection === undefined) {
-    return {};
-  }
-  const resolvedVariant = resolveBindingEditorVariant({
-    projection,
-    ...(input.connection.config === undefined ? {} : { connectionConfig: input.connection.config }),
-  });
-  if (!resolvedVariant.ok) {
-    return {};
-  }
-  return createDefaultConfigFromBindingEditorVariant({
-    variant: resolvedVariant.variant,
-  });
-}
-
-function resolveBindingConfigUiModel(input: {
-  row: IntegrationBindingEditorRow;
-  connections: readonly IntegrationConnectionSummary[];
-  targets: readonly IntegrationTargetSummary[];
-}): BindingConfigUiModel {
-  const connection = input.connections.find((candidate) => candidate.id === input.row.connectionId);
-  if (connection === undefined) {
-    return {
-      mode: "missing-connection",
-    };
-  }
-
-  const target = input.targets.find((candidate) => candidate.targetKey === connection.targetKey);
-  if (target === undefined) {
-    return {
-      mode: "unsupported",
-      message: `Connection '${connection.id}' references unknown target '${connection.targetKey}'.`,
-    };
-  }
-
-  const projection = parseIntegrationBindingEditorUiProjection(target.resolvedBindingEditorUi);
-  if (projection === undefined) {
-    return {
-      mode: "unsupported",
-      message: `Target '${target.familyId}/${target.variantId}' does not define binding editor UI metadata.`,
-    };
-  }
-
-  if (projection.bindingEditor.kind !== input.row.kind) {
-    return {
-      mode: "unsupported",
-      message: `Binding kind '${input.row.kind}' is not compatible with target '${target.familyId}/${target.variantId}'.`,
-    };
-  }
-
-  const resolvedVariant = resolveBindingEditorVariant({
-    projection,
-    ...(connection.config === undefined ? {} : { connectionConfig: connection.config }),
-  });
-  if (!resolvedVariant.ok) {
-    return {
-      mode: "unsupported",
-      message: resolvedVariant.message,
-    };
-  }
-
-  const defaultConfig = createDefaultConfigFromBindingEditorVariant({
-    variant: resolvedVariant.variant,
-  });
-  const parsedConfig = parseConfigAgainstBindingEditorVariant({
-    config: input.row.config,
-    variant: resolvedVariant.variant,
-  });
-  if (!parsedConfig.ok) {
-    return {
-      mode: "unsupported",
-      message: parsedConfig.message,
-      defaultConfig,
-    };
-  }
-
-  return {
-    mode: "editor",
-    variant: resolvedVariant.variant,
-    value: parsedConfig.value,
-    fields: buildBindingEditorRenderableFields({
-      variant: resolvedVariant.variant,
-      value: parsedConfig.value,
-    }),
-  };
 }
 
 function parseStatusValue(value: string | null): SandboxProfileStatus {
@@ -317,17 +166,16 @@ type IntegrationsEditorSectionProps = {
     isPending: boolean;
   };
   integrationSaveError: string | null;
-  integrationRows: readonly IntegrationBindingEditorRow[];
+  integrationRows: readonly SandboxProfileBindingEditorRow[];
   integrationRowErrorsByClientId: Readonly<Record<string, string>>;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
   onRemoveIntegrationBindingRow: (clientId: string) => void;
   onIntegrationBindingRowChange: (
     clientId: string,
-    changes: Partial<Omit<IntegrationBindingEditorRow, "clientId">>,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
-  resolveSelectedConnectionDisplayName: (row: IntegrationBindingEditorRow) => string | undefined;
-  renderBindingConfigField: (row: IntegrationBindingEditorRow) => React.JSX.Element;
+  resolveSelectedConnectionDisplayName: (row: SandboxProfileBindingEditorRow) => string | undefined;
   onAddIntegrationBindingRow: () => void;
   onSaveIntegrationBindings: () => void;
   isSavingIntegrationBindings: boolean;
@@ -496,7 +344,14 @@ function IntegrationsEditorSection(props: IntegrationsEditorSectionProps): React
 
             <Field>
               <FieldLabel>Config</FieldLabel>
-              <FieldContent>{props.renderBindingConfigField(row)}</FieldContent>
+              <FieldContent>
+                <SandboxProfileBindingConfigEditor
+                  availableConnections={props.availableConnections}
+                  availableTargets={props.availableTargets}
+                  onIntegrationBindingRowChange={props.onIntegrationBindingRowChange}
+                  row={row}
+                />
+              </FieldContent>
             </Field>
 
             {props.integrationRowErrorsByClientId[row.clientId] !== undefined ? (
@@ -548,8 +403,10 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
   });
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isEditingProfileName, setIsEditingProfileName] = useState(false);
+  const [profileNameDraft, setProfileNameDraft] = useState("");
   const [explicitSelectedVersion, setExplicitSelectedVersion] = useState<number | null>(null);
-  const [integrationRows, setIntegrationRows] = useState<IntegrationBindingEditorRow[]>([]);
+  const [integrationRows, setIntegrationRows] = useState<SandboxProfileBindingEditorRow[]>([]);
   const [integrationSaveError, setIntegrationSaveError] = useState<string | null>(null);
   const [integrationRowErrorsByClientId, setIntegrationRowErrorsByClientId] = useState<
     Record<string, string>
@@ -690,22 +547,35 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
   });
 
   const updateMutation = useMutation({
-    mutationFn: async (input: { profileId: string; changes: SandboxProfileEditorFormState }) =>
+    mutationFn: async (input: {
+      profileId: string;
+      changes: Partial<SandboxProfileEditorFormState>;
+    }) =>
       updateSandboxProfile({
         payload: {
           profileId: input.profileId,
-          displayName: input.changes.displayName,
-          status: input.changes.status,
+          ...(input.changes.displayName === undefined
+            ? {}
+            : { displayName: input.changes.displayName }),
+          ...(input.changes.status === undefined ? {} : { status: input.changes.status }),
         },
       }),
-    onSuccess: async (updatedProfile) => {
-      const latestState: SandboxProfileEditorFormState = {
-        displayName: updatedProfile.displayName,
-        status: updatedProfile.status,
-      };
-
-      setFormState(latestState);
-      setPersistedFormState(latestState);
+    onSuccess: async (updatedProfile, variables) => {
+      setFormState((currentState) => ({
+        ...currentState,
+        ...(variables.changes.displayName === undefined
+          ? {}
+          : { displayName: updatedProfile.displayName }),
+        ...(variables.changes.status === undefined ? {} : { status: updatedProfile.status }),
+      }));
+      setPersistedFormState((currentState) => ({
+        ...currentState,
+        ...(variables.changes.displayName === undefined
+          ? {}
+          : { displayName: updatedProfile.displayName }),
+        ...(variables.changes.status === undefined ? {} : { status: updatedProfile.status }),
+      }));
+      setProfileNameDraft(updatedProfile.displayName);
       setSaveError(null);
       setSaveSuccess(true);
 
@@ -770,7 +640,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
       const issues = readInvalidBindingConfigIssues(error);
       if (issues !== null) {
         const rowErrors: Record<string, string> = {};
-        const rowsByPersistedId = new Map<string, IntegrationBindingEditorRow>();
+        const rowsByPersistedId = new Map<string, SandboxProfileBindingEditorRow>();
         for (const row of integrationRows) {
           if (row.id !== undefined) {
             rowsByPersistedId.set(row.id, row);
@@ -819,6 +689,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
 
     setFormState(loadedState);
     setPersistedFormState(loadedState);
+    setProfileNameDraft(loadedState.displayName);
   }, [profileQuery.data, props.mode]);
 
   useEffect(() => {
@@ -842,8 +713,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
   const trimmedDisplayName = formState.displayName.trim();
   const editTitleProfileName =
     trimmedDisplayName.length > 0 ? trimmedDisplayName : (profileId ?? "Profile");
-  const pageTitle =
-    props.mode === "create" ? "Create Profile" : `Sandbox Profile: ${editTitleProfileName}`;
+  const pageTitle = props.mode === "create" ? "Create Profile" : editTitleProfileName;
   const isDisplayNameInvalid = trimmedDisplayName.length === 0;
   const hasEditChanges =
     trimmedDisplayName !== persistedFormState.displayName.trim() ||
@@ -861,6 +731,56 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
     }));
     setSaveError(null);
     setSaveSuccess(false);
+  }
+
+  function handleProfileNameEditStart(): void {
+    setProfileNameDraft(formState.displayName);
+    setIsEditingProfileName(true);
+    setSaveError(null);
+    setSaveSuccess(false);
+  }
+
+  function handleProfileNameDraftChange(nextValue: string): void {
+    setProfileNameDraft(nextValue);
+    setSaveError(null);
+    setSaveSuccess(false);
+  }
+
+  function handleProfileNameEditCancel(): void {
+    setProfileNameDraft(formState.displayName);
+    setIsEditingProfileName(false);
+    setSaveError(null);
+    setSaveSuccess(false);
+  }
+
+  function handleProfileNameEditCommit(): void {
+    if (props.mode !== "edit" || profileId === undefined || updateMutation.isPending) {
+      setIsEditingProfileName(false);
+      return;
+    }
+    const decision = resolveProfileNameCommitDecision({
+      draftDisplayName: profileNameDraft,
+      persistedDisplayName: persistedFormState.displayName,
+    });
+    setIsEditingProfileName(false);
+    if (decision.action === "revert") {
+      setProfileNameDraft(persistedFormState.displayName);
+      return;
+    }
+    setFormState((currentState) => ({
+      ...currentState,
+      displayName: decision.displayName,
+    }));
+    if (decision.action === "noop") {
+      return;
+    }
+
+    updateMutation.mutate({
+      profileId,
+      changes: {
+        displayName: decision.displayName,
+      },
+    });
   }
 
   function handleStatusChange(nextValue: string | null): void {
@@ -909,8 +829,10 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
     updateMutation.mutate({
       profileId,
       changes: {
-        displayName: trimmedDisplayName,
-        status: formState.status,
+        ...(trimmedDisplayName === persistedFormState.displayName.trim()
+          ? {}
+          : { displayName: trimmedDisplayName }),
+        ...(formState.status === persistedFormState.status ? {} : { status: formState.status }),
       },
     });
   }
@@ -960,7 +882,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
 
   function handleIntegrationBindingRowChange(
     clientId: string,
-    changes: Partial<Omit<IntegrationBindingEditorRow, "clientId">>,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ): void {
     setIntegrationRows((currentRows) =>
       currentRows.map((row) => {
@@ -1034,7 +956,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
   }
 
   function resolveSelectedConnectionDisplayName(
-    row: IntegrationBindingEditorRow,
+    row: SandboxProfileBindingEditorRow,
   ): string | undefined {
     if (row.connectionId === "") {
       return undefined;
@@ -1049,159 +971,6 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
       connection: selectedConnection,
       targets: availableTargets,
     });
-  }
-
-  function renderBindingConfigField(row: IntegrationBindingEditorRow): React.JSX.Element {
-    const configUiModel = resolveBindingConfigUiModel({
-      row,
-      connections: availableConnections,
-      targets: availableTargets,
-    });
-
-    if (configUiModel.mode === "missing-connection") {
-      return (
-        <p className="text-muted-foreground text-sm">
-          Select a connection to configure this binding.
-        </p>
-      );
-    }
-
-    if (configUiModel.mode === "unsupported") {
-      const selectedConnection = availableConnections.find(
-        (connection) => connection.id === row.connectionId,
-      );
-      const selectedTarget =
-        selectedConnection === undefined
-          ? undefined
-          : availableTargets.find((target) => target.targetKey === selectedConnection.targetKey);
-
-      return (
-        <div className="gap-2 flex flex-col">
-          <Alert variant="destructive">
-            <AlertTitle>Unsupported binding config</AlertTitle>
-            <AlertDescription>{configUiModel.message}</AlertDescription>
-          </Alert>
-          <div>
-            <Button
-              onClick={() => {
-                const resolvedKind = resolveBindingKindFromTarget(selectedTarget);
-                const resetConfig =
-                  configUiModel.defaultConfig ??
-                  createDefaultBindingConfig({
-                    ...(selectedConnection === undefined ? {} : { connection: selectedConnection }),
-                    ...(selectedTarget === undefined ? {} : { target: selectedTarget }),
-                  });
-                handleIntegrationBindingRowChange(row.clientId, {
-                  ...(resolvedKind === undefined ? {} : { kind: resolvedKind }),
-                  config: resetConfig,
-                });
-              }}
-              type="button"
-              variant="outline"
-            >
-              Reset config
-            </Button>
-          </div>
-        </div>
-      );
-    }
-
-    if (configUiModel.mode === "connector") {
-      return (
-        <p className="text-muted-foreground text-sm">
-          Connector bindings currently do not require additional config.
-        </p>
-      );
-    }
-
-    if (configUiModel.mode !== "editor") {
-      throw new Error("Unsupported binding config ui mode.");
-    }
-
-    return (
-      <div className="gap-3 flex flex-col">
-        {configUiModel.fields.map((field) => {
-          if (field.type === "select") {
-            return (
-              <Field key={field.key}>
-                <FieldLabel htmlFor={`binding-field-${field.key}-${row.clientId}`}>
-                  {field.label}
-                </FieldLabel>
-                <FieldContent>
-                  <Select
-                    onValueChange={(nextValue) => {
-                      if (nextValue === null) {
-                        throw new Error(
-                          `Binding config value for '${field.key}' must not be null.`,
-                        );
-                      }
-                      if (!field.options.some((option) => option.value === nextValue)) {
-                        throw new Error(
-                          `Unsupported binding config value '${nextValue}' for field '${field.key}'.`,
-                        );
-                      }
-                      const nextConfig = updateBindingEditorConfigByField({
-                        variant: configUiModel.variant,
-                        currentConfig: configUiModel.value,
-                        fieldKey: field.key,
-                        nextValue,
-                      });
-                      handleIntegrationBindingRowChange(row.clientId, {
-                        config: nextConfig,
-                      });
-                    }}
-                    value={field.value}
-                  >
-                    <SelectTrigger
-                      aria-label={field.label}
-                      id={`binding-field-${field.key}-${row.clientId}`}
-                    >
-                      <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {field.options.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </FieldContent>
-              </Field>
-            );
-          }
-
-          return (
-            <Field key={field.key}>
-              <FieldLabel htmlFor={`binding-field-${field.key}-${row.clientId}`}>
-                {field.label}
-              </FieldLabel>
-              <FieldContent>
-                <Input
-                  id={`binding-field-${field.key}-${row.clientId}`}
-                  onChange={(event) => {
-                    const values = event.currentTarget.value
-                      .split(field.delimiter)
-                      .map((entry) => entry.trim())
-                      .filter((entry) => entry.length > 0);
-                    const nextConfig = updateBindingEditorConfigByField({
-                      variant: configUiModel.variant,
-                      currentConfig: configUiModel.value,
-                      fieldKey: field.key,
-                      nextValue: values,
-                    });
-                    handleIntegrationBindingRowChange(row.clientId, {
-                      config: nextConfig,
-                    });
-                  }}
-                  value={field.value.join(`${field.delimiter} `)}
-                />
-              </FieldContent>
-            </Field>
-          );
-        })}
-      </div>
-    );
   }
 
   if (props.mode === "edit" && profileQuery.isPending) {
@@ -1264,7 +1033,20 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
 
   return (
     <div className="gap-4 flex flex-col">
-      <h1 className="text-xl font-semibold">{pageTitle}</h1>
+      {props.mode === "create" ? (
+        <h1 className="text-xl font-semibold">{pageTitle}</h1>
+      ) : (
+        <SandboxProfileTitleEditor
+          draftValue={profileNameDraft}
+          isEditing={isEditingProfileName}
+          onCancel={handleProfileNameEditCancel}
+          onCommit={handleProfileNameEditCommit}
+          onDraftValueChange={handleProfileNameDraftChange}
+          onEditStart={handleProfileNameEditStart}
+          saveDisabled={updateMutation.isPending}
+          title={pageTitle}
+        />
+      )}
       <Card>
         <CardContent className="gap-4 flex flex-col pt-4">
           {saveError ? (
@@ -1274,26 +1056,28 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
             </Alert>
           ) : null}
 
-          <Field>
-            <FieldLabel htmlFor="sandbox-profile-display-name">
-              <span className="inline-flex items-center gap-0.5">
-                Profile Name
-                <span aria-hidden="true" className="text-destructive">
-                  *
+          {props.mode === "create" ? (
+            <Field>
+              <FieldLabel htmlFor="sandbox-profile-display-name">
+                <span className="inline-flex items-center gap-0.5">
+                  Profile Name
+                  <span aria-hidden="true" className="text-destructive">
+                    *
+                  </span>
                 </span>
-              </span>
-            </FieldLabel>
-            <FieldContent>
-              <Input
-                className="w-full max-w-2xl"
-                id="sandbox-profile-display-name"
-                onChange={(event) => {
-                  handleDisplayNameChange(event.currentTarget.value);
-                }}
-                value={formState.displayName}
-              />
-            </FieldContent>
-          </Field>
+              </FieldLabel>
+              <FieldContent>
+                <Input
+                  className="w-full max-w-2xl"
+                  id="sandbox-profile-display-name"
+                  onChange={(event) => {
+                    handleDisplayNameChange(event.currentTarget.value);
+                  }}
+                  value={formState.displayName}
+                />
+              </FieldContent>
+            </Field>
+          ) : null}
 
           <Field>
             <FieldLabel htmlFor="sandbox-profile-status">Status</FieldLabel>
@@ -1371,7 +1155,6 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
             isPending: profileVersionsQuery.isPending,
             data: profileVersionsQuery.data,
           }}
-          renderBindingConfigField={renderBindingConfigField}
           resolveSelectedConnectionDisplayName={resolveSelectedConnectionDisplayName}
           resolvedSelectedVersion={resolvedSelectedVersion}
           selectedVersionDisplayName={resolveSelectedVersionDisplayName()}
