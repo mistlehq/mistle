@@ -1,3 +1,8 @@
+import {
+  createOpenAiRawBindingCapabilities,
+  OpenAiApiKeyTargetConfigSchema,
+  projectOpenAiTargetUi,
+} from "@mistle/integrations-definitions";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -7,80 +12,17 @@ import {
   resolveOpenAiCapabilitySet,
 } from "./openai-binding-capabilities.js";
 
-const SAMPLE_RESOLVED_BINDING_UI: Record<string, unknown> = {
-  openaiAgent: {
-    kind: "agent",
-    runtime: "codex-cli",
-    familyId: "openai",
-    variantId: "openai-default",
-    byAuthScheme: {
-      "api-key": {
-        models: [
-          "gpt-5.3-codex",
-          "gpt-5.3-codex-spark",
-          "gpt-5.2-codex",
-          "gpt-5.1-codex-max",
-          "gpt-5.2",
-          "gpt-5.1-codex-mini",
-        ],
-        allowedReasoningByModel: {
-          "gpt-5.3-codex": ["low", "medium", "high", "xhigh"],
-          "gpt-5.3-codex-spark": ["low", "medium", "high", "xhigh"],
-          "gpt-5.2-codex": ["low", "medium", "high", "xhigh"],
-          "gpt-5.1-codex-max": ["low", "medium", "high", "xhigh"],
-          "gpt-5.2": ["low", "medium", "high", "xhigh"],
-          "gpt-5.1-codex-mini": ["medium", "high"],
-        },
-        defaultReasoningByModel: {
-          "gpt-5.3-codex": "medium",
-          "gpt-5.3-codex-spark": "high",
-          "gpt-5.2-codex": "medium",
-          "gpt-5.1-codex-max": "medium",
-          "gpt-5.2": "medium",
-          "gpt-5.1-codex-mini": "medium",
-        },
-        reasoningLabels: {
-          low: "Low",
-          medium: "Medium",
-          high: "High",
-          xhigh: "Extra High",
-        },
-      },
-      oauth: {
-        models: [
-          "gpt-5.3-codex",
-          "gpt-5.3-codex-spark",
-          "gpt-5.2-codex",
-          "gpt-5.1-codex-max",
-          "gpt-5.2",
-          "gpt-5.1-codex-mini",
-        ],
-        allowedReasoningByModel: {
-          "gpt-5.3-codex": ["low", "medium", "high", "xhigh"],
-          "gpt-5.3-codex-spark": ["low", "medium", "high", "xhigh"],
-          "gpt-5.2-codex": ["low", "medium", "high", "xhigh"],
-          "gpt-5.1-codex-max": ["low", "medium", "high", "xhigh"],
-          "gpt-5.2": ["low", "medium", "high", "xhigh"],
-          "gpt-5.1-codex-mini": ["medium", "high"],
-        },
-        defaultReasoningByModel: {
-          "gpt-5.3-codex": "medium",
-          "gpt-5.3-codex-spark": "high",
-          "gpt-5.2-codex": "medium",
-          "gpt-5.1-codex-max": "medium",
-          "gpt-5.2": "medium",
-          "gpt-5.1-codex-mini": "medium",
-        },
-        reasoningLabels: {
-          low: "Low",
-          medium: "Medium",
-          high: "High",
-          xhigh: "Extra High",
-        },
-      },
-    },
-  },
-};
+function createSampleResolvedBindingUi(): Record<string, unknown> {
+  const targetConfig = OpenAiApiKeyTargetConfigSchema.parse({
+    api_base_url: "https://api.openai.com",
+    binding_capabilities: createOpenAiRawBindingCapabilities(),
+  });
+  return projectOpenAiTargetUi({
+    targetConfig,
+  });
+}
+
+const SAMPLE_RESOLVED_BINDING_UI = createSampleResolvedBindingUi();
 
 describe("openai binding capabilities", () => {
   it("reads supported auth scheme from connection config", () => {
