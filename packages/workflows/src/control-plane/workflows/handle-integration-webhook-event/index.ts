@@ -3,4 +3,7 @@ export {
   type HandleIntegrationWebhookEventWorkflowInput,
   type HandleIntegrationWebhookEventWorkflowOutput,
 } from "./spec.js";
-export { createHandleIntegrationWebhookEventWorkflow } from "./workflow.js";
+export {
+  createHandleIntegrationWebhookEventWorkflow,
+  type CreateHandleIntegrationWebhookEventWorkflowInput,
+} from "./workflow.js";

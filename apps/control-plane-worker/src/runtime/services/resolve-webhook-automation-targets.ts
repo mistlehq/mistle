@@ -1,7 +1,5 @@
 import { evaluateWebhookPayloadFilter, parseWebhookPayloadFilter } from "@mistle/automations";
-import { AutomationKinds } from "@mistle/db/control-plane";
-
-import type { AppContext } from "../../types.js";
+import { AutomationKinds, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 
 type ResolveWebhookAutomationTargetsInput = {
   organizationId: string;
@@ -12,20 +10,13 @@ type ResolveWebhookAutomationTargetsInput = {
 
 export type ResolvedWebhookAutomationTarget = {
   automationId: string;
-  automationName: string;
   automationTargetId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number | null;
-  inputTemplate: string;
-  conversationKeyTemplate: string;
-  idempotencyKeyTemplate: string | null;
 };
 
 type EligibleWebhookAutomation = {
   automationId: string;
-  inputTemplate: string;
-  conversationKeyTemplate: string;
-  idempotencyKeyTemplate: string | null;
 };
 
 function isWebhookAutomationMatched(input: {
@@ -52,7 +43,7 @@ function isWebhookAutomationMatched(input: {
 }
 
 export async function resolveWebhookAutomationTargets(
-  db: AppContext["var"]["db"],
+  db: ControlPlaneDatabase,
   input: ResolveWebhookAutomationTargetsInput,
 ): Promise<ReadonlyArray<ResolvedWebhookAutomationTarget>> {
   const candidateWebhookAutomations = await db.query.webhookAutomations.findMany({
@@ -75,9 +66,7 @@ export async function resolveWebhookAutomationTargets(
         inArray(table.id, candidateAutomationIds),
       ),
   });
-  const enabledAutomationsById = new Map(
-    enabledAutomations.map((automation) => [automation.id, automation]),
-  );
+  const enabledAutomationsById = new Set(enabledAutomations.map((automation) => automation.id));
 
   const eligibleWebhookAutomations: EligibleWebhookAutomation[] = [];
   for (const candidateWebhookAutomation of candidateWebhookAutomations) {
@@ -97,9 +86,6 @@ export async function resolveWebhookAutomationTargets(
 
     eligibleWebhookAutomations.push({
       automationId: candidateWebhookAutomation.automationId,
-      inputTemplate: candidateWebhookAutomation.inputTemplate,
-      conversationKeyTemplate: candidateWebhookAutomation.conversationKeyTemplate,
-      idempotencyKeyTemplate: candidateWebhookAutomation.idempotencyKeyTemplate ?? null,
     });
   }
 
@@ -126,11 +112,6 @@ export async function resolveWebhookAutomationTargets(
 
   const resolvedTargets: ResolvedWebhookAutomationTarget[] = [];
   for (const eligibleWebhookAutomation of eligibleWebhookAutomations) {
-    const automation = enabledAutomationsById.get(eligibleWebhookAutomation.automationId);
-    if (automation === undefined) {
-      throw new Error(`Expected enabled automation '${eligibleWebhookAutomation.automationId}'.`);
-    }
-
     const automationTargets = targetsByAutomationId.get(eligibleWebhookAutomation.automationId);
     if (automationTargets === undefined) {
       continue;
@@ -138,14 +119,10 @@ export async function resolveWebhookAutomationTargets(
 
     for (const automationTarget of automationTargets) {
       resolvedTargets.push({
-        automationId: automation.id,
-        automationName: automation.name,
+        automationId: eligibleWebhookAutomation.automationId,
         automationTargetId: automationTarget.id,
         sandboxProfileId: automationTarget.sandboxProfileId,
         sandboxProfileVersion: automationTarget.sandboxProfileVersion ?? null,
-        inputTemplate: eligibleWebhookAutomation.inputTemplate,
-        conversationKeyTemplate: eligibleWebhookAutomation.conversationKeyTemplate,
-        idempotencyKeyTemplate: eligibleWebhookAutomation.idempotencyKeyTemplate,
       });
     }
   }

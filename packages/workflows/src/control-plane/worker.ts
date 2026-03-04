@@ -2,6 +2,10 @@ import type { EmailSender } from "@mistle/emails";
 import type { OpenWorkflow, Worker } from "openworkflow";
 
 import { createHandleIntegrationWebhookEventWorkflow } from "./workflows/handle-integration-webhook-event/index.js";
+import type {
+  HandleIntegrationWebhookEventWorkflowInput,
+  HandleIntegrationWebhookEventWorkflowOutput,
+} from "./workflows/handle-integration-webhook-event/index.js";
 import { createRequestDeleteSandboxProfileWorkflow } from "./workflows/request-delete-sandbox-profile/index.js";
 import { createSendOrganizationInvitationWorkflow } from "./workflows/send-organization-invitation/index.js";
 import { createSendVerificationOTPWorkflow } from "./workflows/send-verification-otp/index.js";
@@ -20,6 +24,11 @@ export type ControlPlaneWorkerEmailDelivery = {
 };
 
 export type ControlPlaneWorkerServices = {
+  integrationWebhooks?: {
+    handleWebhookEvent: (
+      input: HandleIntegrationWebhookEventWorkflowInput,
+    ) => Promise<HandleIntegrationWebhookEventWorkflowOutput>;
+  };
   emailDelivery?: ControlPlaneWorkerEmailDelivery;
   sandboxProfiles?: {
     deleteSandboxProfile: (input: { organizationId: string; profileId: string }) => Promise<void>;
@@ -59,7 +68,14 @@ function assertNever(value: never): never {
 export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): Worker {
   for (const workflowId of input.enabledWorkflows) {
     if (workflowId === ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT) {
-      const workflow = createHandleIntegrationWebhookEventWorkflow();
+      if (input.services.integrationWebhooks === undefined) {
+        throw new Error(
+          "Control-plane integration webhooks service is required for handleIntegrationWebhookEvent workflow.",
+        );
+      }
+      const workflow = createHandleIntegrationWebhookEventWorkflow({
+        handleWebhookEvent: input.services.integrationWebhooks.handleWebhookEvent,
+      });
       input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
       continue;
     }

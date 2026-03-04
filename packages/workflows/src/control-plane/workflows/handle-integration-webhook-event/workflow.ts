@@ -6,11 +6,18 @@ import {
   type HandleIntegrationWebhookEventWorkflowOutput,
 } from "./spec.js";
 
+export type CreateHandleIntegrationWebhookEventWorkflowInput = {
+  handleWebhookEvent: (
+    input: HandleIntegrationWebhookEventWorkflowInput,
+  ) => Promise<HandleIntegrationWebhookEventWorkflowOutput>;
+};
+
 /**
  * Creates the control-plane webhook handling workflow.
- * This is intentionally a no-op placeholder until downstream forwarding is added.
  */
-export function createHandleIntegrationWebhookEventWorkflow(): Workflow<
+export function createHandleIntegrationWebhookEventWorkflow(
+  input: CreateHandleIntegrationWebhookEventWorkflowInput,
+): Workflow<
   HandleIntegrationWebhookEventWorkflowInput,
   HandleIntegrationWebhookEventWorkflowOutput,
   HandleIntegrationWebhookEventWorkflowInput
@@ -18,13 +25,9 @@ export function createHandleIntegrationWebhookEventWorkflow(): Workflow<
   return defineWorkflow(
     HandleIntegrationWebhookEventWorkflowSpec,
     async ({ input: workflowInput, step }) => {
-      await step.run({ name: "noop-handle-webhook-event" }, async () => {
-        return;
-      });
-
-      return {
-        webhookEventId: workflowInput.webhookEventId,
-      };
+      return step.run({ name: "handle-webhook-event" }, async () =>
+        input.handleWebhookEvent(workflowInput),
+      );
     },
   );
 }
