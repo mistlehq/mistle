@@ -20,6 +20,22 @@ Core route families in control-plane-api:
 - `/v1/integration/connections`
 - `/v1/integration/webhooks`
 
+## Personas And Ownership
+
+Two personas interact with this system:
+
+- `operator`
+- Deploys/manages a Mistle environment.
+- Chooses which provider variants are available in that environment.
+- Manages provider target records (`provider_targets` conceptually, implemented as `integration_targets` in the current codebase), including enabled state, environment config, and target secrets.
+
+- `user`
+- Uses a deployed Mistle instance inside an organization.
+- Can only create connections against enabled operator-managed targets.
+- Can bind those connections into sandbox profile versions.
+
+Practical consequence: provider targets are the capability boundary. Users cannot integrate arbitrary providers directly; they integrate only what the operator has exposed through target management.
+
 ## Packages And Responsibilities
 
 - `@mistle/integrations-core`
@@ -41,7 +57,7 @@ Core route families in control-plane-api:
 ## Core Domain Model
 
 - `Target`
-- Environment-level integration endpoint/config (`familyId`, `variantId`, enabled, config, encrypted target secrets).
+- Operator-managed provider target (`provider_targets` concept, stored as `integration_targets`): environment-level integration endpoint/config (`familyId`, `variantId`, enabled, config, encrypted target secrets). This defines what users are allowed to connect/bind.
 
 - `Connection`
 - Organization-level authenticated relationship to a target (`status`, auth config, encrypted connection secrets, linked credentials).
@@ -107,7 +123,7 @@ flowchart TD
 
 ### 1) Target discovery and metadata
 
-- Targets are persisted in control-plane DB.
+- Targets are operator-managed records persisted in control-plane DB.
 - Discovery resolves metadata from definitions (`displayName`, `description`) with optional DB overrides.
 
 ### 2) Connection creation
@@ -118,6 +134,7 @@ flowchart TD
 ### 3) Binding to sandbox profile version
 
 - Bindings reference `connectionId`, `kind`, and provider-specific binding config.
+- This is user-scoped usage of operator-managed capabilities (targets) through org-owned connections.
 - On compile, schemas are parsed and validated through the definition.
 
 ### 4) Runtime plan compilation
