@@ -34,29 +34,36 @@ export type ReceivedIntegrationWebhook = {
   webhookEventId?: string;
 };
 
+type ResolvedConnectionSecrets = {
+  connection: {
+    id: string;
+    organizationId: string;
+  };
+  secrets: IntegrationConnectionSecrets;
+};
+
 async function resolveConnectionSecretsOrThrow(input: {
   db: AppContext["var"]["db"];
   integrationsConfig: AppContext["var"]["config"]["integrations"];
   targetKey: string;
   externalSubjectId: string | undefined;
-}): Promise<IntegrationConnectionSecrets> {
+}): Promise<ResolvedConnectionSecrets> {
   if (input.externalSubjectId === undefined || input.externalSubjectId.length === 0) {
     throw new IntegrationWebhooksBadRequestError(
       IntegrationWebhooksBadRequestCodes.INVALID_WEBHOOK_REQUEST,
       "Webhook connection reference is missing externalSubjectId.",
     );
   }
+  const externalSubjectId = input.externalSubjectId;
 
-  const candidateConnections = await input.db.query.integrationConnections.findMany({
+  const connection = await input.db.query.integrationConnections.findFirst({
     where: (table, { and, eq }) =>
       and(
         eq(table.targetKey, input.targetKey),
         eq(table.status, IntegrationConnectionStatuses.ACTIVE),
+        eq(table.externalSubjectId, externalSubjectId),
       ),
   });
-  const connection = candidateConnections.find(
-    (candidateConnection) => candidateConnection.externalSubjectId === input.externalSubjectId,
-  );
 
   if (connection === undefined) {
     throw new IntegrationWebhooksNotFoundError(
@@ -69,7 +76,13 @@ async function resolveConnectionSecretsOrThrow(input: {
   }
 
   if (connection.secrets === null) {
-    return {};
+    return {
+      connection: {
+        id: connection.id,
+        organizationId: connection.organizationId,
+      },
+      secrets: {},
+    };
   }
 
   const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
@@ -77,11 +90,17 @@ async function resolveConnectionSecretsOrThrow(input: {
     masterEncryptionKeys: input.integrationsConfig.masterEncryptionKeys,
   });
 
-  return decryptIntegrationConnectionSecrets({
-    nonce: connection.secrets.nonce,
-    ciphertext: connection.secrets.ciphertext,
-    masterEncryptionKeyMaterial,
-  });
+  return {
+    connection: {
+      id: connection.id,
+      organizationId: connection.organizationId,
+    },
+    secrets: decryptIntegrationConnectionSecrets({
+      nonce: connection.secrets.nonce,
+      ciphertext: connection.secrets.ciphertext,
+      masterEncryptionKeyMaterial,
+    }),
+  };
 }
 
 export async function receiveIntegrationWebhook(
@@ -121,6 +140,12 @@ export async function receiveIntegrationWebhook(
   const parsedTargetSecrets = definition.targetSecretSchema.parse(resolvedTargetSecrets);
 
   let webhookEvent: Awaited<ReturnType<typeof verifyAndParseWebhookOrThrow>> | undefined;
+  let resolvedConnection:
+    | {
+        id: string;
+        organizationId: string;
+      }
+    | undefined;
 
   try {
     webhookEvent = await verifyAndParseWebhookOrThrow({
@@ -134,12 +159,15 @@ export async function receiveIntegrationWebhook(
         secrets: parsedTargetSecrets,
       },
       resolveConnectionSecrets: async ({ connectionRef }) => {
-        return resolveConnectionSecretsOrThrow({
+        const resolvedConnectionSecrets = await resolveConnectionSecretsOrThrow({
           db,
           integrationsConfig,
           targetKey: connectionRef.targetKey,
           externalSubjectId: connectionRef.externalSubjectId,
         });
+
+        resolvedConnection = resolvedConnectionSecrets.connection;
+        return resolvedConnectionSecrets.secrets;
       },
       headers: normalizeWebhookHeaders(input.headers),
       rawBody: input.rawBody,
@@ -158,10 +186,15 @@ export async function receiveIntegrationWebhook(
   if (webhookEvent === undefined) {
     throw new Error("Expected webhook event to be parsed.");
   }
+  if (resolvedConnection === undefined) {
+    throw new Error("Expected webhook connection to be resolved.");
+  }
 
   const insertedRows = await db
     .insert(integrationWebhookEvents)
     .values({
+      organizationId: resolvedConnection.organizationId,
+      integrationConnectionId: resolvedConnection.id,
       targetKey: input.targetKey,
       externalEventId: webhookEvent.externalEventId,
       externalDeliveryId: webhookEvent.externalDeliveryId,
