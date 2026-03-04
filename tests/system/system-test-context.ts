@@ -21,7 +21,7 @@ export type AuthenticatedSession = {
   userId: string;
 };
 
-export type DashboardMembersInvitationsFixture = {
+export type SystemTestFixture = {
   controlPlaneApiClient: ControlPlaneApiClient;
   db: ControlPlaneDatabase;
   request: (path: string, init?: RequestInit) => Promise<Response>;
@@ -81,7 +81,7 @@ function requireEnv(name: string): string {
   return value;
 }
 
-export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture }>({
+export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
   fixture: [
     async ({}, use) => {
       const controlPlaneApiBaseUrl = requireEnv("MISTLE_SYSTEM_CONTROL_PLANE_API_BASE_URL");

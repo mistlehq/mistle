@@ -1,5 +1,5 @@
 /* eslint-disable jest/no-standalone-expect --
- * This suite uses an extended test `it` fixture imported from dashboard system test context.
+ * This suite uses an extended test `it` fixture imported from shared system test context.
  */
 
 import { randomUUID } from "node:crypto";
@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
-import { it } from "./dashboard-members-invitations-test-context.js";
+import { it } from "./system-test-context.js";
 
 const AuthErrorSchema = z
   .object({
