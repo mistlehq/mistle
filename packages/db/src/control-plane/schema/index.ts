@@ -53,6 +53,11 @@ export {
   type IntegrationOauthSession,
 } from "./integration-oauth-sessions.js";
 export {
+  scheduleAutomations,
+  type InsertScheduleAutomation,
+  type ScheduleAutomation,
+} from "./schedule-automations.js";
+export {
   integrationWebhookEvents,
   IntegrationWebhookEventStatuses,
   type InsertIntegrationWebhookEvent,

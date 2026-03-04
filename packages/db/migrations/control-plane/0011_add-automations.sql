@@ -31,6 +31,19 @@ CREATE TABLE "control_plane"."automations" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "control_plane"."schedule_automations" (
+	"automation_id" text PRIMARY KEY NOT NULL,
+	"cron_expression" text NOT NULL,
+	"timezone" text NOT NULL,
+	"input_template" text NOT NULL,
+	"conversation_key_template" text NOT NULL,
+	"idempotency_key_template" text,
+	"start_at" timestamp with time zone,
+	"end_at" timestamp with time zone,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "control_plane"."webhook_automations" (
 	"automation_id" text PRIMARY KEY NOT NULL,
 	"integration_connection_id" text NOT NULL,
@@ -49,6 +62,7 @@ ALTER TABLE "control_plane"."automation_runs" ADD CONSTRAINT "automation_runs_so
 ALTER TABLE "control_plane"."automation_targets" ADD CONSTRAINT "automation_targets_automation_id_automations_id_fk" FOREIGN KEY ("automation_id") REFERENCES "control_plane"."automations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."automation_targets" ADD CONSTRAINT "automation_targets_sandbox_profile_id_sandbox_profiles_id_fk" FOREIGN KEY ("sandbox_profile_id") REFERENCES "control_plane"."sandbox_profiles"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."automations" ADD CONSTRAINT "automations_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "control_plane"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "control_plane"."schedule_automations" ADD CONSTRAINT "schedule_automations_automation_id_automations_id_fk" FOREIGN KEY ("automation_id") REFERENCES "control_plane"."automations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."webhook_automations" ADD CONSTRAINT "webhook_automations_automation_id_automations_id_fk" FOREIGN KEY ("automation_id") REFERENCES "control_plane"."automations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."webhook_automations" ADD CONSTRAINT "webhook_automations_integration_connection_id_integration_connections_id_fk" FOREIGN KEY ("integration_connection_id") REFERENCES "control_plane"."integration_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "automation_runs_automation_target_id_source_webhook_event_id_uidx" ON "control_plane"."automation_runs" USING btree ("automation_target_id","source_webhook_event_id");--> statement-breakpoint
@@ -62,5 +76,6 @@ CREATE INDEX "automation_targets_automation_id_idx" ON "control_plane"."automati
 CREATE INDEX "automations_organization_id_idx" ON "control_plane"."automations" USING btree ("organization_id");--> statement-breakpoint
 CREATE INDEX "automations_organization_id_kind_idx" ON "control_plane"."automations" USING btree ("organization_id","kind");--> statement-breakpoint
 CREATE INDEX "automations_organization_id_enabled_idx" ON "control_plane"."automations" USING btree ("organization_id","enabled");--> statement-breakpoint
+CREATE INDEX "schedule_automations_automation_id_idx" ON "control_plane"."schedule_automations" USING btree ("automation_id");--> statement-breakpoint
 CREATE INDEX "webhook_automations_integration_connection_id_idx" ON "control_plane"."webhook_automations" USING btree ("integration_connection_id");--> statement-breakpoint
 CREATE INDEX "webhook_automations_automation_id_idx" ON "control_plane"."webhook_automations" USING btree ("automation_id");
