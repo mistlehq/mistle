@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/config"
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
 )
 
 func TestRun(t *testing.T) {
@@ -76,4 +77,95 @@ func TestRun(t *testing.T) {
 			t.Fatalf("expected runtime client process startup failure, got %v", err)
 		}
 	})
+}
+
+func TestFlattenRuntimeClientProcesses(t *testing.T) {
+	t.Run("merges runtime client setup env into process command env", func(t *testing.T) {
+		runtimeClients := []startup.RuntimeClient{
+			{
+				ClientID: "codex-cli",
+				Setup: startup.RuntimeClientSetup{
+					Env: map[string]string{
+						"OPENAI_BASE_URL": "http://sandboxd.internal/egress/routes/route_bind_openai",
+						"OPENAI_MODEL":    "gpt-5.3-codex",
+						"CONFLICT_KEY":    "setup-value",
+					},
+					Files: []startup.RuntimeFileSpec{},
+				},
+				Processes: []startup.RuntimeClientProcessSpec{
+					{
+						ProcessKey: "codex-app-server",
+						Command: startup.RuntimeArtifactCommand{
+							Args: []string{"/usr/local/bin/codex", "app-server"},
+							Env: map[string]string{
+								"PROCESS_ONLY": "enabled",
+								"CONFLICT_KEY": "process-value",
+							},
+						},
+					},
+				},
+				Endpoints: []startup.RuntimeClientEndpointSpec{},
+			},
+		}
+
+		flattened := flattenRuntimeClientProcesses(runtimeClients)
+		if len(flattened) != 1 {
+			t.Fatalf("expected 1 flattened process, got %d", len(flattened))
+		}
+
+		expectedEnv := map[string]string{
+			"OPENAI_BASE_URL": "http://sandboxd.internal/egress/routes/route_bind_openai",
+			"OPENAI_MODEL":    "gpt-5.3-codex",
+			"PROCESS_ONLY":    "enabled",
+			"CONFLICT_KEY":    "process-value",
+		}
+		if !mapsEqual(flattened[0].Command.Env, expectedEnv) {
+			t.Fatalf("unexpected merged env: %#v", flattened[0].Command.Env)
+		}
+	})
+
+	t.Run("uses nil env when setup and process env are both empty", func(t *testing.T) {
+		runtimeClients := []startup.RuntimeClient{
+			{
+				ClientID: "client-empty-env",
+				Setup: startup.RuntimeClientSetup{
+					Env:   map[string]string{},
+					Files: []startup.RuntimeFileSpec{},
+				},
+				Processes: []startup.RuntimeClientProcessSpec{
+					{
+						ProcessKey: "process-no-env",
+						Command: startup.RuntimeArtifactCommand{
+							Args: []string{"/bin/true"},
+							Env:  map[string]string{},
+						},
+					},
+				},
+				Endpoints: []startup.RuntimeClientEndpointSpec{},
+			},
+		}
+
+		flattened := flattenRuntimeClientProcesses(runtimeClients)
+		if len(flattened) != 1 {
+			t.Fatalf("expected 1 flattened process, got %d", len(flattened))
+		}
+
+		if flattened[0].Command.Env != nil {
+			t.Fatalf("expected nil env for empty setup/process env, got %#v", flattened[0].Command.Env)
+		}
+	})
+}
+
+func mapsEqual(left map[string]string, right map[string]string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+
+	for key, value := range left {
+		if right[key] != value {
+			return false
+		}
+	}
+
+	return true
 }

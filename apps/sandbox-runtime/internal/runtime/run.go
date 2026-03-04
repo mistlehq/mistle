@@ -129,8 +129,32 @@ func Run(input RunInput) (runErr error) {
 func flattenRuntimeClientProcesses(runtimeClients []startup.RuntimeClient) []startup.RuntimeClientProcessSpec {
 	processes := make([]startup.RuntimeClientProcessSpec, 0)
 	for _, runtimeClient := range runtimeClients {
-		processes = append(processes, runtimeClient.Processes...)
+		for _, process := range runtimeClient.Processes {
+			processCopy := process
+			processCopy.Command = process.Command
+			processCopy.Command.Env = mergeRuntimeClientProcessEnv(runtimeClient.Setup.Env, process.Command.Env)
+			processes = append(processes, processCopy)
+		}
 	}
 
 	return processes
+}
+
+func mergeRuntimeClientProcessEnv(
+	runtimeClientEnv map[string]string,
+	processCommandEnv map[string]string,
+) map[string]string {
+	if len(runtimeClientEnv) == 0 && len(processCommandEnv) == 0 {
+		return nil
+	}
+
+	merged := make(map[string]string, len(runtimeClientEnv)+len(processCommandEnv))
+	for key, value := range runtimeClientEnv {
+		merged[key] = value
+	}
+	for key, value := range processCommandEnv {
+		merged[key] = value
+	}
+
+	return merged
 }
