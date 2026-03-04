@@ -1,5 +1,6 @@
 import { integrationTargets, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import {
+  createOpenAiRawBindingCapabilities,
   GitHubCloudTargetConfigSchema,
   GitHubEnterpriseServerTargetConfigSchema,
   OpenAiApiKeyTargetConfigSchema,
@@ -60,6 +61,7 @@ function buildSeedIntegrationTargets(
 ): SeedIntegrationTarget[] {
   const openAiConfig = {
     api_base_url: targetCatalog?.openai?.apiBaseUrl ?? OPENAI_DEFAULT_API_BASE_URL,
+    binding_capabilities: createOpenAiRawBindingCapabilities(),
   };
   OpenAiApiKeyTargetConfigSchema.parse(openAiConfig);
 

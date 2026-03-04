@@ -15,7 +15,9 @@ import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import type { AppContext } from "../../types.js";
+import { IntegrationTargetSchema } from "../contracts.js";
 import { IntegrationTargetsBadRequestCodes, IntegrationTargetsBadRequestError } from "./errors.js";
+import { projectTargetUi } from "./project-target-ui.js";
 
 const PAGE_SIZE_OPTIONS = {
   defaultLimit: 20,
@@ -34,17 +36,7 @@ export type ListIntegrationTargetsInput = {
   before?: string | undefined;
 };
 
-type IntegrationTargetListItem = {
-  targetKey: string;
-  familyId: string;
-  variantId: string;
-  enabled: boolean;
-  config: Record<string, unknown>;
-  displayName: string;
-  description: string;
-  displayNameOverride?: string;
-  descriptionOverride?: string;
-};
+type IntegrationTargetListItem = z.infer<typeof IntegrationTargetSchema>;
 
 type IntegrationTargetsCursor = z.infer<typeof CursorSchema>;
 
@@ -183,6 +175,11 @@ export async function listIntegrationTargets(
           displayNameOverride: target.displayNameOverride,
           descriptionOverride: target.descriptionOverride,
         });
+        const projectedTargetUi = projectTargetUi({
+          familyId: target.familyId,
+          variantId: target.variantId,
+          config: target.config,
+        });
 
         return {
           targetKey: target.targetKey,
@@ -192,6 +189,10 @@ export async function listIntegrationTargets(
           config: target.config,
           displayName: resolvedMetadata.displayName,
           description: resolvedMetadata.description,
+          targetHealth: projectedTargetUi.targetHealth,
+          ...(projectedTargetUi.resolvedBindingUi === undefined
+            ? {}
+            : { resolvedBindingUi: projectedTargetUi.resolvedBindingUi }),
           ...(target.displayNameOverride === null
             ? {}
             : { displayNameOverride: target.displayNameOverride }),

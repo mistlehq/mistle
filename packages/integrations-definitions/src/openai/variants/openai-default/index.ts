@@ -9,5 +9,16 @@ export {
   OpenAiRuntimes,
   type OpenAiApiKeyBindingConfig,
 } from "./binding-config-schema.js";
+export {
+  createOpenAiRawBindingCapabilities,
+  OpenAiCapabilitiesByAuthScheme,
+  OpenAiCapabilitiesByAuthSchemeSchema,
+  OpenAiConnectionAuthSchemes,
+  OpenAiModelIds,
+  OpenAiReasoningEffortLabelByValue,
+  isOpenAiModelSupported,
+  isOpenAiReasoningEffortSupported,
+  resolveOpenAiDefaultReasoningEffort,
+} from "./model-capabilities.js";
 export { compileOpenAiApiKeyBinding } from "./compile-binding.js";
 export { OpenAiApiKeyCredentialSecretTypes, OpenAiApiKeySupportedAuthSchemes } from "./auth.js";

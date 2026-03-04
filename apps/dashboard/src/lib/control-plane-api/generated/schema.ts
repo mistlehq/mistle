@@ -586,6 +586,54 @@ export interface paths {
                 displayNameOverride?: string;
                 enabled: boolean;
                 familyId: string;
+                resolvedBindingUi?: {
+                  openaiAgent?: {
+                    byAuthScheme: {
+                      "api-key"?: {
+                        allowedReasoningByModel: {
+                          [key: string]: ("low" | "medium" | "high" | "xhigh")[];
+                        };
+                        defaultReasoningByModel: {
+                          [key: string]: "low" | "medium" | "high" | "xhigh";
+                        };
+                        models: string[];
+                        reasoningLabels: {
+                          high?: string;
+                          low?: string;
+                          medium?: string;
+                          xhigh?: string;
+                        };
+                      };
+                      oauth?: {
+                        allowedReasoningByModel: {
+                          [key: string]: ("low" | "medium" | "high" | "xhigh")[];
+                        };
+                        defaultReasoningByModel: {
+                          [key: string]: "low" | "medium" | "high" | "xhigh";
+                        };
+                        models: string[];
+                        reasoningLabels: {
+                          high?: string;
+                          low?: string;
+                          medium?: string;
+                          xhigh?: string;
+                        };
+                      };
+                    };
+                    /** @enum {string} */
+                    familyId: "openai";
+                    /** @enum {string} */
+                    kind: "agent";
+                    /** @enum {string} */
+                    runtime: "codex-cli";
+                    /** @enum {string} */
+                    variantId: "openai-default";
+                  };
+                };
+                targetHealth: {
+                  /** @enum {string} */
+                  configStatus: "valid" | "invalid";
+                };
                 targetKey: string;
                 variantId: string;
               }[];
@@ -1511,6 +1559,114 @@ export interface paths {
     };
     trace?: never;
   };
+  "/v1/sandbox/profiles/{profileId}/versions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List sandbox profile versions for a sandbox profile. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              versions: {
+                sandboxProfileId: string;
+                version: number;
+              }[];
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              error: {
+                message: string;
+                name: string;
+              } & {
+                [key: string]: unknown;
+              };
+              /** @enum {boolean} */
+              success: false;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/profiles/{profileId}/versions/{version}/instances": {
     parameters: {
       query?: never;
@@ -1659,7 +1815,109 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          profileId: string;
+          version: number;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List integration bindings for the specified sandbox profile version. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              bindings: {
+                config: {
+                  [key: string]: unknown;
+                };
+                connectionId: string;
+                createdAt: string;
+                id: string;
+                /** @enum {string} */
+                kind: "agent" | "git" | "connector";
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+                updatedAt: string;
+              }[];
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              error: {
+                message: string;
+                name: string;
+              } & {
+                [key: string]: unknown;
+              };
+              /** @enum {boolean} */
+              success: false;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox profile or profile version was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
     put: {
       parameters: {
         query?: never;
@@ -1674,6 +1932,7 @@ export interface paths {
         content: {
           "application/json": {
             bindings: {
+              clientRef?: string;
               config: {
                 [key: string]: unknown;
               };
@@ -1717,8 +1976,21 @@ export interface paths {
           content: {
             "application/json":
               | {
-                  /** @enum {string} */
                   code: "INVALID_BINDING_REFERENCE" | "INVALID_BINDING_CONNECTION_REFERENCE";
+                  message: string;
+                }
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_BINDING_CONFIG_REFERENCE";
+                  details: {
+                    issues: {
+                      bindingIdOrDraftIndex: string;
+                      clientRef?: string;
+                      field: string;
+                      safeMessage: string;
+                      validatorCode: string;
+                    }[];
+                  };
                   message: string;
                 }
               | {

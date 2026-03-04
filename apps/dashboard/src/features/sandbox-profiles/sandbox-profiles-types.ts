@@ -18,3 +18,28 @@ export type CreateSandboxProfileInput = CreateSandboxProfileRequest;
 export type UpdateSandboxProfileInput = UpdateSandboxProfileRequest & {
   profileId: string;
 };
+
+export const SandboxIntegrationBindingKinds = {
+  AGENT: "agent",
+  GIT: "git",
+  CONNECTOR: "connector",
+} as const;
+
+export type SandboxIntegrationBindingKind =
+  (typeof SandboxIntegrationBindingKinds)[keyof typeof SandboxIntegrationBindingKinds];
+
+export type SandboxProfileVersion = {
+  sandboxProfileId: string;
+  version: number;
+};
+
+export type SandboxProfileVersionIntegrationBinding = {
+  id: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  connectionId: string;
+  kind: SandboxIntegrationBindingKind;
+  config: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};

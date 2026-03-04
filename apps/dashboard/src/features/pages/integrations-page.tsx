@@ -219,6 +219,7 @@ export function IntegrationsPage() {
             description={formatConnectionCount(card.connections.length)}
             displayName={card.displayName}
             familyId={card.target.familyId}
+            {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
             onAction={() =>
               openViewDialog({
                 targetKey: card.target.targetKey,
@@ -238,6 +239,7 @@ export function IntegrationsPage() {
             description={card.description}
             displayName={card.displayName}
             familyId={card.target.familyId}
+            {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
             onAction={() =>
               openConnectDialog({
                 targetKey: card.target.targetKey,

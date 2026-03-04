@@ -4,6 +4,7 @@ export * from "./registry/index.js";
 export * from "./triggers/index.js";
 export * from "./egress/index.js";
 export * from "./validation/index.js";
+export * from "./binding-validation/index.js";
 export * from "./runtime-plan/index.js";
 export * from "./compiler/index.js";
 export * from "./webhooks/index.js";

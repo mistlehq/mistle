@@ -1,7 +1,7 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 import { z } from "zod";
 
-import { OpenAiApiKeySupportedAuthSchemes } from "./auth.js";
+import { OpenAiApiKeySupportedAuthSchemes, OpenAiConnectionConfigSchema } from "./auth.js";
 import {
   OpenAiApiKeyBindingConfigSchema,
   type OpenAiApiKeyBindingConfig,
@@ -13,6 +13,7 @@ import {
   OpenAiApiKeyTargetConfigSchema,
   type OpenAiApiKeyTargetConfig,
 } from "./target-config-schema.js";
+import { validateOpenAiBindingWriteContext } from "./validate-binding-write-context.js";
 
 type OpenAiApiKeyIntegrationDefinition = IntegrationDefinition<
   { parse: (input: unknown) => OpenAiApiKeyTargetConfig },
@@ -26,6 +27,7 @@ const OpenAiUserReasoningEffortSchema = z.enum([
   OpenAiReasoningEfforts.LOW,
   OpenAiReasoningEfforts.MEDIUM,
   OpenAiReasoningEfforts.HIGH,
+  OpenAiReasoningEfforts.XHIGH,
 ]);
 const OpenAiApiKeyTargetSecretSchema = z.object({}).strict();
 
@@ -39,7 +41,9 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   targetConfigSchema: OpenAiApiKeyTargetConfigSchema,
   targetSecretSchema: OpenAiApiKeyTargetSecretSchema,
   bindingConfigSchema: OpenAiApiKeyBindingConfigSchema,
+  connectionConfigSchema: OpenAiConnectionConfigSchema,
   supportedAuthSchemes: OpenAiApiKeySupportedAuthSchemes,
+  validateBindingWriteContext: validateOpenAiBindingWriteContext,
   userConfigSlots: [
     {
       kind: "file",

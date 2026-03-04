@@ -6,6 +6,31 @@ import {
 
 import { IntegrationTargetsBadRequestCodes } from "./services/errors.js";
 
+const OpenAiReasoningSchema = z.enum(["low", "medium", "high", "xhigh"]);
+const OpenAiAuthSchemeSchema = z.enum(["api-key", "oauth"]);
+const OpenAiBindingUiSchema = z
+  .object({
+    kind: z.literal("agent"),
+    runtime: z.literal("codex-cli"),
+    familyId: z.literal("openai"),
+    variantId: z.literal("openai-default"),
+    byAuthScheme: z.record(
+      OpenAiAuthSchemeSchema,
+      z
+        .object({
+          models: z.array(z.string().min(1)),
+          allowedReasoningByModel: z.record(
+            z.string().min(1),
+            z.array(OpenAiReasoningSchema).min(1),
+          ),
+          defaultReasoningByModel: z.record(z.string().min(1), OpenAiReasoningSchema),
+          reasoningLabels: z.record(OpenAiReasoningSchema, z.string().min(1)),
+        })
+        .strict(),
+    ),
+  })
+  .strict();
+
 export const IntegrationTargetSchema = z
   .object({
     targetKey: z.string().min(1),
@@ -17,6 +42,17 @@ export const IntegrationTargetSchema = z
     description: z.string().min(1),
     displayNameOverride: z.string().min(1).optional(),
     descriptionOverride: z.string().min(1).optional(),
+    targetHealth: z
+      .object({
+        configStatus: z.enum(["valid", "invalid"]),
+      })
+      .strict(),
+    resolvedBindingUi: z
+      .object({
+        openaiAgent: OpenAiBindingUiSchema.optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

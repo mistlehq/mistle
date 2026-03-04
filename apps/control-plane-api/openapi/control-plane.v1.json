@@ -980,6 +980,173 @@
                           "descriptionOverride": {
                             "type": "string",
                             "minLength": 1
+                          },
+                          "targetHealth": {
+                            "type": "object",
+                            "properties": {
+                              "configStatus": {
+                                "type": "string",
+                                "enum": ["valid", "invalid"]
+                              }
+                            },
+                            "required": ["configStatus"],
+                            "additionalProperties": false
+                          },
+                          "resolvedBindingUi": {
+                            "type": "object",
+                            "properties": {
+                              "openaiAgent": {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "enum": ["agent"]
+                                  },
+                                  "runtime": {
+                                    "type": "string",
+                                    "enum": ["codex-cli"]
+                                  },
+                                  "familyId": {
+                                    "type": "string",
+                                    "enum": ["openai"]
+                                  },
+                                  "variantId": {
+                                    "type": "string",
+                                    "enum": ["openai-default"]
+                                  },
+                                  "byAuthScheme": {
+                                    "type": "object",
+                                    "properties": {
+                                      "api-key": {
+                                        "type": "object",
+                                        "properties": {
+                                          "models": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "allowedReasoningByModel": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "string",
+                                                "enum": ["low", "medium", "high", "xhigh"]
+                                              },
+                                              "minItems": 1
+                                            }
+                                          },
+                                          "defaultReasoningByModel": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "type": "string",
+                                              "enum": ["low", "medium", "high", "xhigh"]
+                                            }
+                                          },
+                                          "reasoningLabels": {
+                                            "type": "object",
+                                            "properties": {
+                                              "low": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "medium": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "high": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "xhigh": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "models",
+                                          "allowedReasoningByModel",
+                                          "defaultReasoningByModel",
+                                          "reasoningLabels"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      "oauth": {
+                                        "type": "object",
+                                        "properties": {
+                                          "models": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "allowedReasoningByModel": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "type": "array",
+                                              "items": {
+                                                "type": "string",
+                                                "enum": ["low", "medium", "high", "xhigh"]
+                                              },
+                                              "minItems": 1
+                                            }
+                                          },
+                                          "defaultReasoningByModel": {
+                                            "type": "object",
+                                            "additionalProperties": {
+                                              "type": "string",
+                                              "enum": ["low", "medium", "high", "xhigh"]
+                                            }
+                                          },
+                                          "reasoningLabels": {
+                                            "type": "object",
+                                            "properties": {
+                                              "low": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "medium": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "high": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              },
+                                              "xhigh": {
+                                                "type": "string",
+                                                "minLength": 1
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "required": [
+                                          "models",
+                                          "allowedReasoningByModel",
+                                          "defaultReasoningByModel",
+                                          "reasoningLabels"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "runtime",
+                                  "familyId",
+                                  "variantId",
+                                  "byAuthScheme"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "additionalProperties": false
                           }
                         },
                         "required": [
@@ -989,7 +1156,8 @@
                           "enabled",
                           "config",
                           "displayName",
-                          "description"
+                          "description",
+                          "targetHealth"
                         ],
                         "additionalProperties": false
                       }
@@ -2583,7 +2751,366 @@
         }
       }
     },
+    "/v1/sandbox/profiles/{profileId}/versions": {
+      "get": {
+        "tags": ["Sandbox Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List sandbox profile versions for a sandbox profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sandboxProfileId": {
+                            "type": "string"
+                          },
+                          "version": {
+                            "type": "integer",
+                            "minimum": 1
+                          }
+                        },
+                        "required": ["sandboxProfileId", "version"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["versions"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [false]
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["name", "message"],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["success", "error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox profile was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/sandbox/profiles/{profileId}/versions/{version}/integration-bindings": {
+      "get": {
+        "tags": ["Sandbox Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^sbp_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "profileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "required": true,
+            "name": "version",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List integration bindings for the specified sandbox profile version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "bindings": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "sandboxProfileId": {
+                            "type": "string"
+                          },
+                          "sandboxProfileVersion": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "connectionId": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["agent", "git", "connector"]
+                          },
+                          "config": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "sandboxProfileId",
+                          "sandboxProfileVersion",
+                          "connectionId",
+                          "kind",
+                          "config",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["bindings"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [false]
+                    },
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["name", "message"],
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["success", "error"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Sandbox profile or profile version was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      },
       "put": {
         "tags": ["Sandbox Profiles"],
         "parameters": [
@@ -2620,6 +3147,10 @@
                       "type": "object",
                       "properties": {
                         "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "clientRef": {
                           "type": "string",
                           "minLength": 1
                         },
@@ -2721,10 +3252,15 @@
                       "type": "object",
                       "properties": {
                         "code": {
-                          "type": "string",
-                          "enum": [
-                            "INVALID_BINDING_REFERENCE",
-                            "INVALID_BINDING_CONNECTION_REFERENCE"
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": ["INVALID_BINDING_REFERENCE"]
+                            },
+                            {
+                              "type": "string",
+                              "enum": ["INVALID_BINDING_CONNECTION_REFERENCE"]
+                            }
                           ]
                         },
                         "message": {
@@ -2733,6 +3269,64 @@
                         }
                       },
                       "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": ["INVALID_BINDING_CONFIG_REFERENCE"]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "details": {
+                          "type": "object",
+                          "properties": {
+                            "issues": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "clientRef": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "bindingIdOrDraftIndex": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "validatorCode": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "field": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "safeMessage": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "bindingIdOrDraftIndex",
+                                  "validatorCode",
+                                  "field",
+                                  "safeMessage"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "minItems": 1
+                            }
+                          },
+                          "required": ["issues"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["code", "message", "details"],
                       "additionalProperties": false
                     },
                     {

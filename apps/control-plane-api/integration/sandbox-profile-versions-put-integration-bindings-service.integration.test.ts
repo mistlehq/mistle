@@ -6,6 +6,7 @@ import {
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
+import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import {
@@ -28,6 +29,7 @@ describe("sandbox profile version put integration bindings service integration",
       enabled: true,
       config: {
         api_base_url: "https://api.openai.com",
+        binding_capabilities: createOpenAiRawBindingCapabilities(),
       },
     });
 
@@ -38,11 +40,17 @@ describe("sandbox profile version put integration bindings service integration",
           id: "icn_put_bindings_service_001",
           organizationId: authenticatedSession.organizationId,
           targetKey: "openai-default",
+          config: {
+            auth_scheme: "api-key",
+          },
         },
         {
           id: "icn_put_bindings_service_002",
           organizationId: authenticatedSession.organizationId,
           targetKey: "openai-default",
+          config: {
+            auth_scheme: "api-key",
+          },
         },
       ])
       .returning();
@@ -206,6 +214,7 @@ describe("sandbox profile version put integration bindings service integration",
       enabled: true,
       config: {
         api_base_url: "https://api.openai.com",
+        binding_capabilities: createOpenAiRawBindingCapabilities(),
       },
     });
 
@@ -226,6 +235,9 @@ describe("sandbox profile version put integration bindings service integration",
         id: "icn_put_bindings_other_org_001",
         organizationId: secondOrgSession.organizationId,
         targetKey: "openai-default-connection-reference",
+        config: {
+          auth_scheme: "api-key",
+        },
       })
       .returning();
 
@@ -270,6 +282,7 @@ describe("sandbox profile version put integration bindings service integration",
       enabled: true,
       config: {
         api_base_url: "https://api.openai.com",
+        binding_capabilities: createOpenAiRawBindingCapabilities(),
       },
     });
     await fixture.db.insert(sandboxProfiles).values({
@@ -289,6 +302,9 @@ describe("sandbox profile version put integration bindings service integration",
         id: "icn_put_bindings_valid_reference_001",
         organizationId: authenticatedSession.organizationId,
         targetKey: "openai-default-binding-reference",
+        config: {
+          auth_scheme: "api-key",
+        },
       })
       .returning();
 

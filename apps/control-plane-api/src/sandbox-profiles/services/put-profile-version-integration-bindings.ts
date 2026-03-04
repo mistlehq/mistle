@@ -3,6 +3,8 @@ import type {
   SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
 import { sandboxProfileVersionIntegrationBindings } from "@mistle/db/control-plane";
+import { runDefinitionBindingWriteValidation } from "@mistle/integrations-core";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import {
@@ -19,6 +21,7 @@ type PutProfileVersionIntegrationBindingsInput = {
   profileVersion: number;
   bindings: Array<{
     id?: string;
+    clientRef?: string;
     connectionId: string;
     kind: IntegrationBindingKind;
     config: Record<string, unknown>;
@@ -28,6 +31,8 @@ type PutProfileVersionIntegrationBindingsInput = {
 type PutProfileVersionIntegrationBindingsResult = {
   bindings: SandboxProfileVersionIntegrationBinding[];
 };
+
+const IntegrationRegistry = createIntegrationRegistry();
 
 function findDuplicateBindingId(
   bindings: PutProfileVersionIntegrationBindingsInput["bindings"],
@@ -94,10 +99,20 @@ export async function putProfileVersionIntegrationBindings(
   const requestedConnectionIds = [
     ...new Set(input.bindings.map((binding) => binding.connectionId)),
   ];
+  const availableConnectionsById = new Map<
+    string,
+    {
+      id: string;
+      targetKey: string;
+      config: Record<string, unknown>;
+    }
+  >();
   if (requestedConnectionIds.length > 0) {
     const availableConnections = await db.query.integrationConnections.findMany({
       columns: {
         id: true,
+        targetKey: true,
+        config: true,
       },
       where: (table, { and, eq, inArray }) =>
         and(
@@ -105,6 +120,13 @@ export async function putProfileVersionIntegrationBindings(
           inArray(table.id, requestedConnectionIds),
         ),
     });
+    for (const connection of availableConnections) {
+      availableConnectionsById.set(connection.id, {
+        id: connection.id,
+        targetKey: connection.targetKey,
+        config: connection.config ?? {},
+      });
+    }
     const availableConnectionIdSet = new Set(
       availableConnections.map((connection) => connection.id),
     );
@@ -117,6 +139,102 @@ export async function putProfileVersionIntegrationBindings(
       throw new SandboxProfilesIntegrationBindingsBadRequestError(
         SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONNECTION_REFERENCE,
         `Binding references connection '${invalidConnectionId}' that is missing or inaccessible.`,
+      );
+    }
+  }
+
+  const requestedTargetKeys = [
+    ...new Set([...availableConnectionsById.values()].map((value) => value.targetKey)),
+  ];
+  const targetsByKey = new Map<
+    string,
+    {
+      familyId: string;
+      variantId: string;
+      config: Record<string, unknown>;
+    }
+  >();
+  if (requestedTargetKeys.length > 0) {
+    const targets = await db.query.integrationTargets.findMany({
+      columns: {
+        targetKey: true,
+        familyId: true,
+        variantId: true,
+        config: true,
+      },
+      where: (table, { inArray }) => inArray(table.targetKey, requestedTargetKeys),
+    });
+    for (const target of targets) {
+      targetsByKey.set(target.targetKey, {
+        familyId: target.familyId,
+        variantId: target.variantId,
+        config: target.config,
+      });
+    }
+  }
+
+  for (const [bindingIndex, binding] of input.bindings.entries()) {
+    const resolvedConnection = availableConnectionsById.get(binding.connectionId);
+    if (resolvedConnection === undefined) {
+      throw new SandboxProfilesIntegrationBindingsBadRequestError(
+        SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONNECTION_REFERENCE,
+        `Binding references connection '${binding.connectionId}' that is missing or inaccessible.`,
+      );
+    }
+    const resolvedTarget = targetsByKey.get(resolvedConnection.targetKey);
+    if (resolvedTarget === undefined) {
+      throw new SandboxProfilesIntegrationBindingsBadRequestError(
+        SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
+        `Binding '${binding.id ?? `draft:${String(bindingIndex)}`}' has invalid config reference: Target '${resolvedConnection.targetKey}' could not be resolved.`,
+        {
+          issues: [
+            {
+              ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
+              bindingIdOrDraftIndex: binding.id ?? `draft:${String(bindingIndex)}`,
+              validatorCode: "system.invalid_target_reference",
+              field: "targetKey",
+              safeMessage: `Target '${resolvedConnection.targetKey}' could not be resolved for binding validation.`,
+            },
+          ],
+        },
+      );
+    }
+    const definition = IntegrationRegistry.getDefinitionOrThrow({
+      familyId: resolvedTarget.familyId,
+      variantId: resolvedTarget.variantId,
+    });
+    const validationResult = runDefinitionBindingWriteValidation({
+      definition,
+      targetKey: resolvedConnection.targetKey,
+      target: {
+        familyId: resolvedTarget.familyId,
+        variantId: resolvedTarget.variantId,
+        config: resolvedTarget.config,
+      },
+      connection: {
+        id: resolvedConnection.id,
+        config: resolvedConnection.config,
+      },
+      binding: {
+        kind: binding.kind,
+        config: binding.config,
+      },
+      bindingIdOrDraftIndex: binding.id ?? `draft:${String(bindingIndex)}`,
+    });
+    if (!validationResult.ok) {
+      const firstIssue = validationResult.issues[0];
+      throw new SandboxProfilesIntegrationBindingsBadRequestError(
+        SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
+        `Binding '${binding.id ?? `draft:${String(bindingIndex)}`}' has invalid config reference: ${firstIssue?.safeMessage ?? "Binding config is invalid."}`,
+        {
+          issues: validationResult.issues.map((issue) => ({
+            ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
+            bindingIdOrDraftIndex: binding.id ?? `draft:${String(bindingIndex)}`,
+            validatorCode: issue.code,
+            field: issue.field,
+            safeMessage: issue.safeMessage,
+          })),
+        },
       );
     }
   }

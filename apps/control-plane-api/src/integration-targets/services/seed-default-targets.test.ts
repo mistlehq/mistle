@@ -1,3 +1,4 @@
+import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { describe, expect, it } from "vitest";
 
 import { SeedDefaultIntegrationTargetsForTests } from "./seed-default-targets.js";
@@ -14,6 +15,7 @@ describe("seed-default-targets", () => {
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com",
+          binding_capabilities: createOpenAiRawBindingCapabilities(),
         },
       },
       {
@@ -68,6 +70,7 @@ describe("seed-default-targets", () => {
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com",
+          binding_capabilities: createOpenAiRawBindingCapabilities(),
         },
       },
       {

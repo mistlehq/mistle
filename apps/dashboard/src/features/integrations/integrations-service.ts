@@ -16,11 +16,50 @@ const IntegrationTargetSchema = z
     familyId: z.string().min(1),
     variantId: z.string().min(1),
     enabled: z.boolean(),
-    config: z.record(z.string(), z.unknown()),
+    config: z.unknown(),
     displayName: z.string().min(1),
     description: z.string().min(1),
     displayNameOverride: z.string().min(1).optional(),
     descriptionOverride: z.string().min(1).optional(),
+    targetHealth: z
+      .object({
+        configStatus: z.enum(["valid", "invalid"]),
+      })
+      .strict(),
+    resolvedBindingUi: z
+      .object({
+        openaiAgent: z
+          .object({
+            kind: z.literal("agent"),
+            runtime: z.literal("codex-cli"),
+            familyId: z.literal("openai"),
+            variantId: z.literal("openai-default"),
+            byAuthScheme: z.record(
+              z.enum(["api-key", "oauth"]),
+              z
+                .object({
+                  models: z.array(z.string().min(1)),
+                  allowedReasoningByModel: z.record(
+                    z.string().min(1),
+                    z.array(z.enum(["low", "medium", "high", "xhigh"])).min(1),
+                  ),
+                  defaultReasoningByModel: z.record(
+                    z.string().min(1),
+                    z.enum(["low", "medium", "high", "xhigh"]),
+                  ),
+                  reasoningLabels: z.record(
+                    z.enum(["low", "medium", "high", "xhigh"]),
+                    z.string().min(1),
+                  ),
+                })
+                .strict(),
+            ),
+          })
+          .strict()
+          .optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 

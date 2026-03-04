@@ -9,7 +9,9 @@ import {
   BadRequestResponseSchema,
   createSandboxProfileRoute,
   deleteSandboxProfileRoute,
+  getSandboxProfileVersionIntegrationBindingsRoute,
   getSandboxProfileRoute,
+  listSandboxProfileVersionsRoute,
   listSandboxProfilesRoute,
   NotFoundResponseSchema,
   StartSandboxProfileInstanceNotFoundResponseSchema,
@@ -20,6 +22,7 @@ import {
 import {
   SandboxProfilesBadRequestError,
   SandboxProfilesCompileError,
+  SandboxProfilesIntegrationBindingsBadRequestCodes,
   SandboxProfilesIntegrationBindingsBadRequestError,
   SandboxProfilesNotFoundError,
   SandboxProfilesNotFoundCodes,
@@ -122,6 +125,47 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
     }
   });
 
+  routes.openapi(listSandboxProfileVersionsRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+
+      const versions = await ctx.get("services").sandboxProfiles.listProfileVersions({
+        organizationId: session.session.activeOrganizationId,
+        profileId: params.profileId,
+      });
+
+      return ctx.json(versions, 200);
+    } catch (error) {
+      return handleProfileNotFoundError(ctx, error);
+    }
+  });
+
+  routes.openapi(getSandboxProfileVersionIntegrationBindingsRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+
+      const bindings = await ctx
+        .get("services")
+        .sandboxProfiles.getProfileVersionIntegrationBindings({
+          organizationId: session.session.activeOrganizationId,
+          profileId: params.profileId,
+          profileVersion: params.version,
+        });
+
+      return ctx.json(bindings, 200);
+    } catch (error) {
+      return handleSandboxProfileVersionNotFoundError(ctx, error);
+    }
+  });
+
   routes.openapi(putSandboxProfileVersionIntegrationBindingsRoute, async (ctx) => {
     try {
       const params = ctx.req.valid("param");
@@ -134,6 +178,7 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
       const normalizedBindings = body.bindings.map((binding) => {
         if (binding.id === undefined) {
           return {
+            ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
             connectionId: binding.connectionId,
             kind: binding.kind,
             config: binding.config,
@@ -142,6 +187,7 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
 
         return {
           id: binding.id,
+          ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
           connectionId: binding.connectionId,
           kind: binding.kind,
           config: binding.config,
@@ -253,15 +299,52 @@ function handleStartInstanceError(ctx: AppContext, error: unknown) {
   throw error;
 }
 
+function handleSandboxProfileVersionNotFoundError(ctx: AppContext, error: unknown) {
+  if (error instanceof SandboxProfilesNotFoundError) {
+    const responseBody: z.infer<typeof SandboxProfileVersionNotFoundResponseSchema> = {
+      code: error.code,
+      message: error.message,
+    };
+
+    return ctx.json(responseBody, 404);
+  }
+
+  throw error;
+}
+
 function handlePutIntegrationBindingsError(ctx: AppContext, error: unknown) {
   if (error instanceof SandboxProfilesIntegrationBindingsBadRequestError) {
+    if (
+      error.code ===
+      SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE
+    ) {
+      if (error.details === undefined) {
+        throw new Error("Expected validation details for invalid binding config reference.");
+      }
+      const responseBody: z.infer<
+        typeof PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema
+      > = {
+        code: error.code,
+        message: error.message,
+        details: {
+          issues: error.details.issues.map((issue) => ({
+            ...(issue.clientRef === undefined ? {} : { clientRef: issue.clientRef }),
+            bindingIdOrDraftIndex: issue.bindingIdOrDraftIndex,
+            validatorCode: issue.validatorCode,
+            field: issue.field,
+            safeMessage: issue.safeMessage,
+          })),
+        },
+      };
+      return ctx.json(responseBody, 400);
+    }
+
     const responseBody: z.infer<
       typeof PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema
     > = {
       code: error.code,
       message: error.message,
     };
-
     return ctx.json(responseBody, 400);
   }
 
