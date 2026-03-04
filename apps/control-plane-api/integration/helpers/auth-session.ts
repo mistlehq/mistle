@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { z } from "zod";
 
 import { readLatestSignInOtp } from "./sign-in-otp.js";
-import { toRecord } from "./unknown-record.js";
 
 export type AuthenticatedSession = {
   cookie: string;
@@ -17,6 +17,10 @@ export type CreateAuthenticatedSessionInput = {
   otpLength: number;
   email?: string;
 };
+
+const OrganizationCreateResponseSchema = z.object({
+  id: z.string().trim().min(1),
+});
 
 function extractRequestCookie(setCookieHeader: string): string {
   const [cookiePair] = setCookieHeader.split(";");
@@ -32,13 +36,12 @@ function generateIntegrationAuthEmail(): string {
 }
 
 function readOrganizationIdFromPayload(payload: unknown): string | null {
-  const record = toRecord(payload);
-  if (record === null) {
+  const parsed = OrganizationCreateResponseSchema.safeParse(payload);
+  if (!parsed.success) {
     return null;
   }
 
-  const id = record["id"];
-  return typeof id === "string" && id.length > 0 ? id : null;
+  return parsed.data.id;
 }
 
 export async function createAuthenticatedSession(

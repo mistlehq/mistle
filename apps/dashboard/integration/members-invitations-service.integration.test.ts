@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 
 import { systemClock } from "@mistle/time";
 import { describe, expect } from "vitest";
+import { z } from "zod";
 
 import {
   MemberRoles,
@@ -18,27 +19,35 @@ import {
 import { mapInviteAttemptResult } from "../src/features/settings/members/member-invite-state.js";
 import { MembersApiError } from "../src/features/settings/members/members-api-errors.js";
 import { createMembersInvitationsService } from "../src/features/settings/members/members-invitations-service-core.js";
-import { toRecord } from "../src/lib/unknown-record.js";
 import type { DashboardMembersInvitationsFixture } from "./members-invitations-test-context.js";
 import { it } from "./members-invitations-test-context.js";
 
 const AUTH_ORIGIN = "http://localhost:5100";
+const ErrorPayloadSchema = z
+  .object({
+    message: z.string().optional(),
+    error: z
+      .object({
+        message: z.string().optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+  })
+  .catchall(z.unknown());
 
 function readErrorMessage(value: unknown): string | null {
-  const record = toRecord(value);
-  if (record !== null) {
-    const direct = record["message"];
-    if (typeof direct === "string" && direct.length > 0) {
-      return direct;
-    }
+  const parsed = ErrorPayloadSchema.safeParse(value);
+  if (!parsed.success) {
+    return null;
+  }
 
-    const nested = toRecord(record["error"]);
-    if (nested !== null) {
-      const nestedMessage = nested["message"];
-      if (typeof nestedMessage === "string" && nestedMessage.length > 0) {
-        return nestedMessage;
-      }
-    }
+  if (typeof parsed.data.message === "string" && parsed.data.message.length > 0) {
+    return parsed.data.message;
+  }
+
+  const nestedMessage = parsed.data.error?.message;
+  if (typeof nestedMessage === "string" && nestedMessage.length > 0) {
+    return nestedMessage;
   }
 
   return null;

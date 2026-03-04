@@ -3,9 +3,9 @@ import { Button, cn } from "@mistle/ui";
 import { CheckIcon, CopyIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import { isRouteErrorResponse, useNavigate, useRouteError } from "react-router";
+import { z } from "zod";
 
 import { getRuntimeEnv, type RuntimeEnv } from "../../lib/runtime-env.js";
-import { toRecord } from "../../lib/unknown-record.js";
 
 type RouteErrorDisplay = {
   title: string;
@@ -17,6 +17,9 @@ type ResolveRouteErrorDisplayOptions = {
   showDiagnostics: boolean;
 };
 const COPY_SUCCESS_DISPLAY_MS = 1200;
+const RouteErrorMessageSchema = z.object({
+  message: z.string().trim().min(1),
+});
 
 function readRouteResponseMessage(data: unknown): string | null {
   if (typeof data === "string") {
@@ -24,12 +27,9 @@ function readRouteResponseMessage(data: unknown): string | null {
     return message.length > 0 ? message : null;
   }
 
-  const record = toRecord(data);
-  if (record !== null) {
-    const message = record["message"];
-    if (typeof message === "string" && message.trim().length > 0) {
-      return message;
-    }
+  const parsedMessage = RouteErrorMessageSchema.safeParse(data);
+  if (parsedMessage.success) {
+    return parsedMessage.data.message;
   }
 
   return null;

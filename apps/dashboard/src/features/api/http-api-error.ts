@@ -1,7 +1,37 @@
-import { readNumber, readString, toRecord } from "../../lib/unknown-record.js";
+import { z } from "zod";
 
-function readPropertyUnknown(value: unknown, key: string): unknown {
-  const record = toRecord(value);
+const NestedHttpErrorSchema = z
+  .object({
+    message: z.string().optional(),
+    code: z.string().optional(),
+  })
+  .catchall(z.unknown());
+
+const HttpErrorSchema = z
+  .object({
+    message: z.string().optional(),
+    status: z.number().optional(),
+    statusCode: z.number().optional(),
+    code: z.string().optional(),
+    body: z.unknown().optional(),
+    data: z.unknown().optional(),
+    error: NestedHttpErrorSchema.optional(),
+  })
+  .catchall(z.unknown());
+
+type HttpErrorRecord = z.infer<typeof HttpErrorSchema>;
+
+function parseHttpErrorRecord(value: unknown): HttpErrorRecord | null {
+  const parsed = HttpErrorSchema.safeParse(value);
+  if (!parsed.success) {
+    return null;
+  }
+
+  return parsed.data;
+}
+
+function readPropertyUnknown(value: unknown, key: "body" | "data"): unknown {
+  const record = parseHttpErrorRecord(value);
   if (record === null) {
     return null;
   }
@@ -14,50 +44,42 @@ export function readApiErrorMessage(value: unknown): string | null {
     return value;
   }
 
-  const record = toRecord(value);
+  const record = parseHttpErrorRecord(value);
   if (record === null) {
     return null;
   }
 
-  const message = readString(record, "message");
-  if (message !== null) {
+  if (record.message !== undefined) {
+    return record.message;
+  }
+
+  if (record.error !== undefined && record.error.message !== undefined) {
+    const message = record.error.message;
     return message;
   }
-
-  const nestedError = toRecord(record["error"]);
-  if (nestedError === null) {
-    return null;
-  }
-
-  return readString(nestedError, "message");
+  return null;
 }
 
 export function readHttpErrorStatus(value: unknown): number | null {
-  const record = toRecord(value);
+  const record = parseHttpErrorRecord(value);
   if (record === null) {
     return null;
   }
 
-  return readNumber(record, "status") ?? readNumber(record, "statusCode");
+  return record.status ?? record.statusCode ?? null;
 }
 
 export function readHttpErrorCode(value: unknown): string | null {
-  const record = toRecord(value);
+  const record = parseHttpErrorRecord(value);
   if (record === null) {
     return null;
   }
 
-  const code = readString(record, "code");
-  if (code !== null) {
-    return code;
+  if (record.code !== undefined) {
+    return record.code;
   }
 
-  const nestedError = toRecord(record["error"]);
-  if (nestedError === null) {
-    return null;
-  }
-
-  return readString(nestedError, "code");
+  return record.error?.code ?? null;
 }
 
 export function readHttpErrorBody(value: unknown): unknown {

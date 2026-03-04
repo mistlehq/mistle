@@ -15,8 +15,7 @@ import {
 } from "@mistle/test-harness";
 import { Client, Pool } from "pg";
 import { it as vitestIt } from "vitest";
-
-import { toRecord } from "../src/lib/unknown-record.js";
+import { z } from "zod";
 
 export type AuthenticatedSession = {
   cookie: string;
@@ -36,6 +35,9 @@ const CONFIG_PATH_IN_CONTAINER = "/workspace/config/config.development.toml";
 const APP_STARTUP_TIMEOUT_MS = 120_000;
 const AUTH_ORIGIN = "http://localhost:5100";
 const WORKER_DATABASE_NAME_PREFIX = "mistle_dashboard_it_worker_";
+const OrganizationCreateResponseSchema = z.object({
+  id: z.string().trim().min(1),
+});
 
 type SharedInfraConfig = {
   databaseUsername: string;
@@ -65,13 +67,12 @@ function extractRequestCookie(setCookieHeader: string): string {
 }
 
 function readOrganizationIdFromPayload(payload: unknown): string | null {
-  const record = toRecord(payload);
-  if (record === null) {
+  const parsed = OrganizationCreateResponseSchema.safeParse(payload);
+  if (!parsed.success) {
     return null;
   }
 
-  const id = record["id"];
-  return typeof id === "string" && id.length > 0 ? id : null;
+  return parsed.data.id;
 }
 
 function generateIntegrationAuthEmail(): string {

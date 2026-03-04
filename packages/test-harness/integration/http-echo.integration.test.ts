@@ -1,7 +1,9 @@
 import { describe, expect, test } from "vitest";
+import { z } from "zod";
 
 import { startHttpEcho } from "../src/index.js";
-import { toRecord } from "../src/unknown-record.js";
+
+const UnknownRecordSchema = z.object({}).catchall(z.unknown());
 
 function readHeaderValue(headers: unknown, headerName: string): string | undefined {
   if (typeof headers !== "object" || headers === null) {
@@ -37,10 +39,11 @@ describe("http echo service integration", () => {
 
       expect(response.status).toBe(200);
       const responseBody: unknown = await response.json();
-      const responseRecord = toRecord(responseBody);
-      if (responseRecord === null) {
+      const parsedResponseRecord = UnknownRecordSchema.safeParse(responseBody);
+      if (!parsedResponseRecord.success) {
         throw new Error("Expected HTTP echo response body to be an object.");
       }
+      const responseRecord = parsedResponseRecord.data;
 
       expect(responseRecord["method"]).toBe("POST");
       expect(responseRecord["path"]).toBe("/echo-path");

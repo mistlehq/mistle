@@ -1,4 +1,5 @@
-import { toRecord } from "../../lib/unknown-record.js";
+import { z } from "zod";
+
 import type { AppRouteHandle, RouteTextResolverInput, RouteTextValue } from "./route-meta.js";
 
 type SettingsPageRouteHandle = AppRouteHandle & {
@@ -6,6 +7,10 @@ type SettingsPageRouteHandle = AppRouteHandle & {
   title: RouteTextValue;
   description: RouteTextValue;
 };
+
+const SandboxProfileRouteDataSchema = z.object({
+  displayName: z.string().trim().min(1),
+});
 
 function toTitleCaseWord(value: string): string {
   const [head = "", ...tail] = value;
@@ -38,12 +43,9 @@ function resolveIntegrationCallbackBreadcrumb(input: RouteTextResolverInput): st
 }
 
 function resolveSandboxProfileDetailBreadcrumb(input: RouteTextResolverInput): string {
-  const data = toRecord(input.data);
-  if (data !== null) {
-    const displayName = data["displayName"];
-    if (typeof displayName === "string" && displayName.trim().length > 0) {
-      return displayName;
-    }
+  const parsedData = SandboxProfileRouteDataSchema.safeParse(input.data);
+  if (parsedData.success) {
+    return parsedData.data.displayName;
   }
 
   const profileId = input.params["profileId"];
