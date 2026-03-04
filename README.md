@@ -112,6 +112,25 @@ To stop local infra:
 pnpm dev:down
 ```
 
+To reset local infra state (including Postgres + local registry volumes):
+
+```bash
+pnpm dev:reset
+```
+
+To reset local infra state and remove local compose images:
+
+```bash
+pnpm dev:reset:hard
+```
+
+Behavior summary:
+
+- `pnpm dev`: starts local infra and app dev processes. On stop, it runs compose `down` without deleting volumes, so Postgres and registry state persist.
+- `pnpm dev:down`: stops/removes containers and network, keeps volumes and images.
+- `pnpm dev:reset`: same as `dev:down` plus removes compose volumes (wipes Postgres + local registry state).
+- `pnpm dev:reset:hard`: same as `dev:reset` plus removes local compose images.
+
 ### Optional Direnv
 
 Install `direnv`:
