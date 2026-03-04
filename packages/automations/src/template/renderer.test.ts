@@ -34,7 +34,7 @@ describe("renderTemplateString", () => {
     expect(rendered).toBe("First label: bug");
   });
 
-  it("renders object values using Liquid string coercion", () => {
+  it("renders object values as JSON", () => {
     const rendered = renderTemplateString({
       template: "Payload={{payload}}",
       context: {
@@ -45,7 +45,7 @@ describe("renderTemplateString", () => {
       },
     });
 
-    expect(rendered).toBe("Payload=[object Object]");
+    expect(rendered).toBe('Payload={"id":1,"ok":true}');
   });
 
   it("throws when a placeholder path is missing", () => {
