@@ -4,11 +4,13 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
     "noEmit": true
   },
   "include": [
     "src/**/*.ts",
     "src/**/*.tsx",
+    "lint/**/*.ts",
     "scripts/**/*.ts",
     "vite.config.ts",
     "vitest.config.ts"

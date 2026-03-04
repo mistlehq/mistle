@@ -48,15 +48,26 @@ async function collectInvalidNames(directoryPath: string): Promise<string[]> {
   return invalidNames;
 }
 
-async function run(): Promise<void> {
+export async function checkDashboardFileNames(): Promise<void> {
   const invalidNames = await collectInvalidNames(DashboardRoot);
 
   if (invalidNames.length === 0) {
     return;
   }
 
-  const lines = invalidNames.map((filePath) => `- ${filePath}`).join("\n");
+  const lines = invalidNames.map((filePath: string) => `- ${filePath}`).join("\n");
   throw new Error(`Dashboard files and folders must be kebab-case:\n${lines}`);
 }
 
-await run();
+async function runCli(): Promise<void> {
+  try {
+    await checkDashboardFileNames();
+  } catch (error) {
+    console.error("Dashboard file name lint check failed", error);
+    process.exit(1);
+  }
+}
+
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  void runCli();
+}
