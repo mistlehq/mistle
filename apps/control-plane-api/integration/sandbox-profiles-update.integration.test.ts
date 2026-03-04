@@ -44,7 +44,7 @@ describe("sandbox profiles update integration", () => {
     expect(body.displayName).toBe("After Update");
     expect(body.status).toBe(SandboxProfileStatuses.INACTIVE);
     expect(body.updatedAt).not.toBe("2026-01-01T00:00:00.000Z");
-  }, 60_000);
+  });
 
   it("returns 401 when no authenticated session is provided", async ({ fixture }) => {
     const response = await fixture.request("/v1/sandbox/profiles/sbp_update_unauth", {
@@ -57,7 +57,7 @@ describe("sandbox profiles update integration", () => {
       }),
     });
     expect(response.status).toBe(401);
-  }, 60_000);
+  });
 
   it("returns 400 for invalid update payload", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -77,7 +77,7 @@ describe("sandbox profiles update integration", () => {
     const body = ValidationErrorResponseSchema.parse(await response.json());
     expect(body.success).toBe(false);
     expect(body.error.name).toBe("ZodError");
-  }, 60_000);
+  });
 
   it("returns 404 for profiles outside the authenticated user's organization", async ({
     fixture,
@@ -112,5 +112,5 @@ describe("sandbox profiles update integration", () => {
 
     const body = NotFoundResponseSchema.parse(await response.json());
     expect(body.code).toBe("PROFILE_NOT_FOUND");
-  }, 60_000);
+  });
 });

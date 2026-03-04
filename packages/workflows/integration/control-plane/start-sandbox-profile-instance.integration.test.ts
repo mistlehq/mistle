@@ -1,5 +1,5 @@
-import { runCleanupTasks, startPostgresWithPgBouncer } from "@mistle/test-harness";
-import { describe, expect, it } from "vitest";
+import { runCleanupTasks } from "@mistle/test-harness";
+import { describe, expect } from "vitest";
 
 import {
   createControlPlaneBackend,
@@ -8,6 +8,7 @@ import {
   StartSandboxProfileInstanceWorkflowSpec,
   type StartSandboxProfileInstanceWorkflowInput,
 } from "../../src/control-plane/index.js";
+import { it as workflowIt } from "../test-context.js";
 
 function createRuntimePlan(input: {
   sandboxProfileId: string;
@@ -28,83 +29,80 @@ function createRuntimePlan(input: {
 }
 
 describe("start sandbox profile instance workflow integration", () => {
-  it("resolves profile-version data and starts sandbox through data-plane step", async () => {
-    const cleanupTasks: Array<() => Promise<void>> = [];
+  workflowIt(
+    "resolves profile-version data and starts sandbox through data-plane step",
+    async ({ databaseStack }) => {
+      const cleanupTasks: Array<() => Promise<void>> = [];
 
-    try {
-      const databaseStack = await startPostgresWithPgBouncer({
-        databaseName: `mistle_workflows_start_sandbox_${Date.now().toString()}`,
-      });
-      cleanupTasks.unshift(async () => {
-        await databaseStack.stop();
-      });
+      try {
+        const backend = await createControlPlaneBackend({
+          url: databaseStack.directUrl,
+          namespaceId: `control-plane-start-sandbox-${Date.now().toString()}`,
+          runMigrations: true,
+        });
+        cleanupTasks.unshift(async () => {
+          await backend.stop();
+        });
 
-      const backend = await createControlPlaneBackend({
-        url: databaseStack.directUrl,
-        namespaceId: `control-plane-start-sandbox-${Date.now().toString()}`,
-        runMigrations: true,
-      });
-      cleanupTasks.unshift(async () => {
-        await backend.stop();
-      });
-
-      const openWorkflow = createControlPlaneOpenWorkflow({ backend });
-      const workflowInput: StartSandboxProfileInstanceWorkflowInput = {
-        organizationId: "org_control_plane_start_001",
-        sandboxProfileId: "sbp_control_plane_start_001",
-        sandboxProfileVersion: 3,
-        runtimePlan: createRuntimePlan({
+        const openWorkflow = createControlPlaneOpenWorkflow({ backend });
+        const workflowInput: StartSandboxProfileInstanceWorkflowInput = {
+          organizationId: "org_control_plane_start_001",
           sandboxProfileId: "sbp_control_plane_start_001",
-          version: 3,
-        }),
-        startedBy: {
-          kind: "user",
-          id: "usr_control_plane_start_001",
-        },
-        source: "dashboard",
-        image: {
-          imageId: "im_control_plane_workflow_001",
-          kind: "base",
-          createdAt: "2026-02-27T00:00:00.000Z",
-        },
-      };
+          sandboxProfileVersion: 3,
+          runtimePlan: createRuntimePlan({
+            sandboxProfileId: "sbp_control_plane_start_001",
+            version: 3,
+          }),
+          startedBy: {
+            kind: "user",
+            id: "usr_control_plane_start_001",
+          },
+          source: "dashboard",
+          image: {
+            imageId: "im_control_plane_workflow_001",
+            kind: "base",
+            createdAt: "2026-02-27T00:00:00.000Z",
+          },
+        };
 
-      const workflow = createStartSandboxProfileInstanceWorkflow({
-        startSandboxInstance: async (input) => {
-          expect(input.image).toEqual(workflowInput.image);
-          expect(input.runtimePlan).toEqual(workflowInput.runtimePlan);
+        const workflow = createStartSandboxProfileInstanceWorkflow({
+          startSandboxInstance: async (input) => {
+            expect(input.image).toEqual(workflowInput.image);
+            expect(input.runtimePlan).toEqual(workflowInput.runtimePlan);
 
-          return {
-            workflowRunId: `wf-${input.organizationId}`,
-            sandboxInstanceId: `sbi-${input.startedBy.id}`,
-            providerSandboxId: `${input.source}-${input.image.imageId}`,
-          };
-        },
-      });
+            return {
+              workflowRunId: `wf-${input.organizationId}`,
+              sandboxInstanceId: `sbi-${input.startedBy.id}`,
+              providerSandboxId: `${input.source}-${input.image.imageId}`,
+            };
+          },
+        });
 
-      openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
-      const worker = openWorkflow.newWorker({ concurrency: 1 });
-      cleanupTasks.unshift(async () => {
-        await worker.stop();
-      });
-      await worker.start();
+        openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
+        const worker = openWorkflow.newWorker({ concurrency: 1 });
+        cleanupTasks.unshift(async () => {
+          await worker.stop();
+        });
+        await worker.start();
 
-      const handle = await openWorkflow.runWorkflow(
-        StartSandboxProfileInstanceWorkflowSpec,
-        workflowInput,
-      );
-      const result = await handle.result({ timeoutMs: 30_000 });
+        const handle = await openWorkflow.runWorkflow(
+          StartSandboxProfileInstanceWorkflowSpec,
+          workflowInput,
+        );
+        const result = await handle.result({ timeoutMs: 30_000 });
 
-      expect(result).toEqual({
-        workflowRunId: `wf-${workflowInput.organizationId}`,
-        sandboxInstanceId: `sbi-${workflowInput.startedBy.id}`,
-        providerSandboxId: `${workflowInput.source}-${workflowInput.image.imageId}`,
-      });
-    } finally {
-      await runCleanupTasks({
-        tasks: cleanupTasks,
-        context: "start sandbox profile workflow integration cleanup",
-      });
-    }
-  }, 90_000);
+        expect(result).toEqual({
+          workflowRunId: `wf-${workflowInput.organizationId}`,
+          sandboxInstanceId: `sbi-${workflowInput.startedBy.id}`,
+          providerSandboxId: `${workflowInput.source}-${workflowInput.image.imageId}`,
+        });
+      } finally {
+        await runCleanupTasks({
+          tasks: cleanupTasks,
+          context: "start sandbox profile workflow integration cleanup",
+        });
+      }
+    },
+    90_000,
+  );
 });

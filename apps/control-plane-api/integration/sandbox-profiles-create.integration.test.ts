@@ -54,7 +54,7 @@ describe("sandbox profiles create integration", () => {
     }
     expect(initialVersion.sandboxProfileId).toBe(body.id);
     expect(initialVersion.version).toBe(1);
-  }, 60_000);
+  });
 
   it("creates a sandbox profile with explicit status", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -78,7 +78,7 @@ describe("sandbox profiles create integration", () => {
     expect(body.organizationId).toBe(authenticatedSession.organizationId);
     expect(body.displayName).toBe("Created Inactive Profile");
     expect(body.status).toBe(SandboxProfileStatuses.INACTIVE);
-  }, 60_000);
+  });
 
   it("rejects creation without an authenticated session", async ({ fixture }) => {
     const response = await fixture.request("/v1/sandbox/profiles", {
@@ -91,7 +91,7 @@ describe("sandbox profiles create integration", () => {
       }),
     });
     expect(response.status).toBe(401);
-  }, 60_000);
+  });
 
   it("returns 400 for invalid create payload", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -113,7 +113,7 @@ describe("sandbox profiles create integration", () => {
     const body = ValidationErrorResponseSchema.parse(await response.json());
     expect(body.success).toBe(false);
     expect(body.error.name).toBe("ZodError");
-  }, 60_000);
+  });
 
   it("does not create a profile in another organization", async ({ fixture }) => {
     const firstOrgSession = await fixture.authSession({
@@ -149,5 +149,5 @@ describe("sandbox profiles create integration", () => {
       throw new Error("Expected created sandbox profile to exist.");
     }
     expect(firstOrgProfile.organizationId).toBe(firstOrgSession.organizationId);
-  }, 60_000);
+  });
 });

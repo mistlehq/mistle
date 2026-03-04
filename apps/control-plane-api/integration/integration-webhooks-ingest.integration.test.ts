@@ -191,7 +191,7 @@ describe("integration webhooks ingest integration", () => {
     }
     expect(workflowRun.workflowName).toBe(HandleIntegrationWebhookEventWorkflowName);
     expect(workflowRun.idempotencyKey).toBe(persistedEvent.id);
-  }, 60_000);
+  });
 
   it("returns 400 when webhook signature verification fails", async ({ fixture }) => {
     const targetKey = "github-cloud-webhook-ingest-invalid-signature";
@@ -258,7 +258,7 @@ describe("integration webhooks ingest integration", () => {
         and(eq(table.targetKey, targetKey), eq(table.externalEventId, externalDeliveryId)),
     });
     expect(persistedEvent).toBeUndefined();
-  }, 60_000);
+  });
 
   it("returns 404 when no active integration connection matches the webhook subject", async ({
     fixture,
@@ -295,7 +295,7 @@ describe("integration webhooks ingest integration", () => {
     expect(response.status).toBe(404);
     const responseBody = IntegrationWebhooksNotFoundResponseSchema.parse(await response.json());
     expect(responseBody.code).toBe("CONNECTION_NOT_FOUND");
-  }, 60_000);
+  });
 
   it("returns duplicate for repeated external event ids and keeps one stored row", async ({
     fixture,
@@ -392,5 +392,5 @@ describe("integration webhooks ingest integration", () => {
       throw new Error("Expected exactly one webhook workflow run.");
     }
     expect(workflowRun.idempotencyKey).toBe(persistedEvent.id);
-  }, 60_000);
+  });
 });

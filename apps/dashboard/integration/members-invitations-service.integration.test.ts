@@ -199,7 +199,7 @@ describe("integration dashboard members invitations service", () => {
     });
     expect(seededInvitations.length).toBe(1);
     expect(seededInvitations[0]?.status).toBe("pending");
-  }, 60_000);
+  });
 
   it("maps reinviting an existing pending invitation to already_invited", async ({ fixture }) => {
     const context = await createAuthenticatedInviteContext(fixture);
@@ -245,7 +245,7 @@ describe("integration dashboard members invitations service", () => {
         andFn(eqFn(table.organizationId, context.organizationId), eqFn(table.email, inviteEmail)),
     });
     expect(seededInvitations.length).toBe(1);
-  }, 60_000);
+  });
 
   it("maps invite-member errors for existing members to already_member", async ({ fixture }) => {
     const context = await createAuthenticatedInviteContext(fixture);
@@ -272,7 +272,7 @@ describe("integration dashboard members invitations service", () => {
       role: "member",
     });
     expect(mapped.status).toBe("already_member");
-  }, 60_000);
+  });
 
   it("maps malformed invite email errors to invalid_email", async ({ fixture }) => {
     const context = await createAuthenticatedInviteContext(fixture);
@@ -284,5 +284,5 @@ describe("integration dashboard members invitations service", () => {
       role: "member",
     });
     expect(mapped.status).toBe("invalid_email");
-  }, 60_000);
+  });
 });

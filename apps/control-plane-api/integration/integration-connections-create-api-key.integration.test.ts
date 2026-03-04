@@ -146,7 +146,7 @@ describe("integration connections create api key integration", () => {
     });
 
     expect(decryptedApiKey).toBe(requestBody.apiKey);
-  }, 60_000);
+  });
 
   it("returns 404 when target does not exist", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -170,7 +170,7 @@ describe("integration connections create api key integration", () => {
       code: "TARGET_NOT_FOUND",
       message: "Integration target 'missing_target' was not found.",
     });
-  }, 60_000);
+  });
 
   it("stores encrypted connection secrets when provided for a target secret slot", async ({
     fixture,
@@ -250,7 +250,7 @@ describe("integration connections create api key integration", () => {
     expect(decryptedConnectionSecrets).toEqual({
       webhook_secret: "whsec_123",
     });
-  }, 60_000);
+  });
 
   it("returns 400 when request secrets include unsupported keys", async ({ fixture }) => {
     await fixture.db
@@ -300,7 +300,7 @@ describe("integration connections create api key integration", () => {
     );
     expect(responseBody.code).toBe("INVALID_CREATE_CONNECTION_INPUT");
     expect(responseBody.message).toContain("unsupported key 'webhook_secret'");
-  }, 60_000);
+  });
 
   it("returns 404 when target exists but is disabled", async ({ fixture }) => {
     await fixture.db.insert(integrationTargets).values({
@@ -331,7 +331,7 @@ describe("integration connections create api key integration", () => {
     expect(response.status).toBe(404);
     const responseBody = IntegrationConnectionsNotFoundResponseSchema.parse(await response.json());
     expect(responseBody.code).toBe("TARGET_NOT_FOUND");
-  }, 60_000);
+  });
 
   it("returns 400 for invalid create body payload", async ({ fixture }) => {
     await fixture.db
@@ -376,7 +376,7 @@ describe("integration connections create api key integration", () => {
     const responseBody = ValidationErrorResponseSchema.parse(await response.json());
     expect(responseBody.success).toBe(false);
     expect(responseBody.error.name).toBe("ZodError");
-  }, 60_000);
+  });
 
   it("returns 401 when request is unauthenticated", async ({ fixture }) => {
     const response = await fixture.request("/v1/integration/connections/openai-default/api-key", {
@@ -394,7 +394,7 @@ describe("integration connections create api key integration", () => {
       code: "UNAUTHORIZED",
       message: "Unauthorized API request.",
     });
-  }, 60_000);
+  });
 
   it("does not create connection records when target lookup fails", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -441,7 +441,7 @@ describe("integration connections create api key integration", () => {
       )
       .where(eq(integrationConnections.organizationId, authenticatedSession.organizationId));
     expect(connectionCredentialRows).toHaveLength(0);
-  }, 60_000);
+  });
 });
 
 function decryptStoredApiKey(input: {

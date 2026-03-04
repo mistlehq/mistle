@@ -1,20 +1,6 @@
-import { fileURLToPath } from "node:url";
-
-import { CONTROL_PLANE_SCHEMA_NAME, type ControlPlaneDatabase } from "@mistle/db/control-plane";
-import {
-  CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
-  MigrationTracking,
-  runControlPlaneMigrations,
-} from "@mistle/db/migrator";
-import {
-  runCleanupTasks,
-  startControlPlaneWorker,
-  startDockerNetwork,
-  startMailpit,
-  startPostgresWithPgBouncer,
-  type MailpitService,
-  type PostgresWithPgBouncerService,
-} from "@mistle/test-harness";
+import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { runCleanupTasks } from "@mistle/test-harness";
+import { Client } from "pg";
 import { it as vitestIt } from "vitest";
 
 import { createControlPlaneApiRuntime } from "../src/runtime/index.js";
@@ -22,14 +8,76 @@ import type { ControlPlaneApiConfig } from "../src/types.js";
 import type { AuthenticatedSession } from "./helpers/auth-session.js";
 import { createAuthenticatedSession } from "./helpers/auth-session.js";
 
-const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../../..", import.meta.url));
-const CONFIG_PATH_IN_CONTAINER = "/workspace/config/config.development.toml";
-const APP_STARTUP_TIMEOUT_MS = 120_000;
-const POSTGRES_NETWORK_ALIAS = "control-plane-postgres";
-const POSTGRES_PORT_IN_NETWORK = 5432;
-const PGBOUNCER_NETWORK_ALIAS = "control-plane-pgbouncer";
-const MAILPIT_NETWORK_ALIAS = "mailpit";
-const MAILPIT_SMTP_PORT_IN_NETWORK = 1025;
+const WORKER_DATABASE_NAME_PREFIX = "mistle_control_plane_api_it_worker_";
+
+type SharedInfraConfig = {
+  databaseUsername: string;
+  databasePassword: string;
+  databaseDirectHost: string;
+  databaseDirectPort: number;
+  templateDatabaseName: string;
+  workflowNamespaceId: string;
+  internalAuthServiceToken: string;
+};
+
+export type ControlPlaneApiIntegrationDatabaseStack = {
+  directUrl: string;
+  pooledUrl: string;
+};
+
+export type ControlPlaneApiIntegrationFixture = {
+  config: ControlPlaneApiConfig;
+  internalAuthServiceToken: string;
+  db: ControlPlaneDatabase;
+  databaseStack: ControlPlaneApiIntegrationDatabaseStack;
+  request: (path: string, init?: RequestInit) => Promise<Response>;
+  authSession: (input?: { email?: string }) => Promise<AuthenticatedSession>;
+};
+
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (value === undefined || value.length === 0) {
+    throw new Error(`Missing required integration environment variable: ${name}`);
+  }
+
+  return value;
+}
+
+function parsePort(input: { value: string; variableName: string }): number {
+  const parsedPort = Number.parseInt(input.value, 10);
+  if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65_535) {
+    throw new Error(`Environment variable ${input.variableName} must be a valid TCP port.`);
+  }
+
+  return parsedPort;
+}
+
+function readSharedInfraConfig(): SharedInfraConfig {
+  return {
+    databaseUsername: requireEnv("MISTLE_CP_IT_DB_USER"),
+    databasePassword: requireEnv("MISTLE_CP_IT_DB_PASSWORD"),
+    databaseDirectHost: requireEnv("MISTLE_CP_IT_DB_DIRECT_HOST"),
+    databaseDirectPort: parsePort({
+      value: requireEnv("MISTLE_CP_IT_DB_DIRECT_PORT"),
+      variableName: "MISTLE_CP_IT_DB_DIRECT_PORT",
+    }),
+    templateDatabaseName: requireEnv("MISTLE_CP_IT_TEMPLATE_DB_NAME"),
+    workflowNamespaceId: requireEnv("MISTLE_CP_IT_WORKFLOW_NAMESPACE_ID"),
+    internalAuthServiceToken: requireEnv("MISTLE_CP_IT_INTERNAL_AUTH_SERVICE_TOKEN"),
+  };
+}
+
+function assertSafeIdentifier(identifier: string, label: string): string {
+  if (!/^[a-z0-9_]+$/u.test(identifier)) {
+    throw new Error(`${label} must contain only lowercase alphanumeric and underscore characters.`);
+  }
+
+  return identifier;
+}
+
+function quoteIdentifier(identifier: string): string {
+  return `"${identifier}"`;
+}
 
 function createDatabaseUrl(input: {
   username: string;
@@ -41,80 +89,79 @@ function createDatabaseUrl(input: {
   return `postgresql://${encodeURIComponent(input.username)}:${encodeURIComponent(input.password)}@${input.host}:${String(input.port)}/${input.databaseName}`;
 }
 
-export type ControlPlaneApiIntegrationFixture = {
-  config: ControlPlaneApiConfig;
-  internalAuthServiceToken: string;
-  db: ControlPlaneDatabase;
-  mailpitService: MailpitService;
-  databaseStack: PostgresWithPgBouncerService;
-  request: (path: string, init?: RequestInit) => Promise<Response>;
-  authSession: (input?: { email?: string }) => Promise<AuthenticatedSession>;
-};
+function createWorkerScopedDatabaseName(poolId: string): string {
+  const normalizedPoolId = poolId.replace(/[^a-zA-Z0-9_]/gu, "_").toLowerCase();
+  if (normalizedPoolId.length === 0) {
+    throw new Error("VITEST_POOL_ID must contain at least one alphanumeric character.");
+  }
+
+  return assertSafeIdentifier(
+    `${WORKER_DATABASE_NAME_PREFIX}${normalizedPoolId}`,
+    "runtime database",
+  );
+}
+
+async function resetWorkerDatabaseFromTemplate(input: {
+  username: string;
+  password: string;
+  host: string;
+  port: number;
+  templateDatabaseName: string;
+  runtimeDatabaseName: string;
+}): Promise<void> {
+  const adminClient = new Client({
+    connectionString: createDatabaseUrl({
+      username: input.username,
+      password: input.password,
+      host: input.host,
+      port: input.port,
+      databaseName: "postgres",
+    }),
+  });
+
+  const quotedTemplateDatabaseName = quoteIdentifier(
+    assertSafeIdentifier(input.templateDatabaseName, "template database"),
+  );
+  const quotedRuntimeDatabaseName = quoteIdentifier(
+    assertSafeIdentifier(input.runtimeDatabaseName, "runtime database"),
+  );
+
+  await adminClient.connect();
+  try {
+    await adminClient.query(`DROP DATABASE IF EXISTS ${quotedRuntimeDatabaseName} WITH (FORCE)`);
+    await adminClient.query(
+      `CREATE DATABASE ${quotedRuntimeDatabaseName} TEMPLATE ${quotedTemplateDatabaseName}`,
+    );
+  } finally {
+    await adminClient.end();
+  }
+}
 
 export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }>({
   fixture: [
     async ({}, use) => {
       const cleanupTasks: Array<() => Promise<void>> = [];
+      const sharedInfraConfig = readSharedInfraConfig();
+      const workerScopedDatabaseName = createWorkerScopedDatabaseName(
+        process.env.VITEST_POOL_ID ?? "0",
+      );
 
       try {
-        const network = await startDockerNetwork();
-        cleanupTasks.unshift(async () => {
-          await network.stop();
+        await resetWorkerDatabaseFromTemplate({
+          username: sharedInfraConfig.databaseUsername,
+          password: sharedInfraConfig.databasePassword,
+          host: sharedInfraConfig.databaseDirectHost,
+          port: sharedInfraConfig.databaseDirectPort,
+          templateDatabaseName: sharedInfraConfig.templateDatabaseName,
+          runtimeDatabaseName: workerScopedDatabaseName,
         });
 
-        const databaseStack = await startPostgresWithPgBouncer({
-          databaseName: "mistle_control_plane_api_integration",
-          network,
-          postgresNetworkAlias: POSTGRES_NETWORK_ALIAS,
-          pgbouncerNetworkAlias: PGBOUNCER_NETWORK_ALIAS,
-        });
-        cleanupTasks.unshift(async () => {
-          await databaseStack.stop();
-        });
-
-        const mailpitService = await startMailpit({
-          network,
-          networkAlias: MAILPIT_NETWORK_ALIAS,
-        });
-        cleanupTasks.unshift(async () => {
-          await mailpitService.stop();
-        });
-
-        await runControlPlaneMigrations({
-          connectionString: databaseStack.directUrl,
-          schemaName: CONTROL_PLANE_SCHEMA_NAME,
-          migrationsFolder: CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
-          migrationsSchema: MigrationTracking.CONTROL_PLANE.SCHEMA_NAME,
-          migrationsTable: MigrationTracking.CONTROL_PLANE.TABLE_NAME,
-        });
-
-        const workflowNamespaceId = "integration";
-        const internalAuthServiceToken = "integration-service-token";
-        const directDatabaseUrlInNetwork = createDatabaseUrl({
-          username: databaseStack.postgres.username,
-          password: databaseStack.postgres.password,
-          host: POSTGRES_NETWORK_ALIAS,
-          port: POSTGRES_PORT_IN_NETWORK,
-          databaseName: databaseStack.postgres.databaseName,
-        });
-
-        const workerService = await startControlPlaneWorker({
-          buildContextHostPath: PROJECT_ROOT_HOST_PATH,
-          configPathInContainer: CONFIG_PATH_IN_CONTAINER,
-          startupTimeoutMs: APP_STARTUP_TIMEOUT_MS,
-          network,
-          environment: {
-            MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN: internalAuthServiceToken,
-            MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL: directDatabaseUrlInNetwork,
-            MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: workflowNamespaceId,
-            MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "true",
-            MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_HOST: MAILPIT_NETWORK_ALIAS,
-            MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT: String(MAILPIT_SMTP_PORT_IN_NETWORK),
-            MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE: "false",
-          },
-        });
-        cleanupTasks.unshift(async () => {
-          await workerService.stop();
+        const runtimeDatabaseUrl = createDatabaseUrl({
+          username: sharedInfraConfig.databaseUsername,
+          password: sharedInfraConfig.databasePassword,
+          host: sharedInfraConfig.databaseDirectHost,
+          port: sharedInfraConfig.databaseDirectPort,
+          databaseName: workerScopedDatabaseName,
         });
 
         const config: ControlPlaneApiConfig = {
@@ -123,11 +170,11 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
             port: 3000,
           },
           database: {
-            url: databaseStack.pooledUrl,
+            url: runtimeDatabaseUrl,
           },
           workflow: {
-            databaseUrl: databaseStack.pooledUrl,
-            namespaceId: workflowNamespaceId,
+            databaseUrl: runtimeDatabaseUrl,
+            namespaceId: sharedInfraConfig.workflowNamespaceId,
           },
           dataPlaneApi: {
             baseUrl: "http://127.0.0.1:4000",
@@ -155,7 +202,7 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
 
         const runtime = await createControlPlaneApiRuntime({
           app: config,
-          internalAuthServiceToken,
+          internalAuthServiceToken: sharedInfraConfig.internalAuthServiceToken,
           connectionToken: {
             secret: "integration-connection-secret",
             issuer: "integration-issuer",
@@ -168,16 +215,17 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
 
         await use({
           config,
-          internalAuthServiceToken,
+          internalAuthServiceToken: sharedInfraConfig.internalAuthServiceToken,
           db: runtime.db,
-          mailpitService,
-          databaseStack,
+          databaseStack: {
+            directUrl: runtimeDatabaseUrl,
+            pooledUrl: runtimeDatabaseUrl,
+          },
           request: runtime.request,
           authSession: async (input) =>
             createAuthenticatedSession({
               request: runtime.request,
               db: runtime.db,
-              mailpitService,
               otpLength: config.auth.otpLength,
               ...(input?.email === undefined ? {} : { email: input.email }),
             }),

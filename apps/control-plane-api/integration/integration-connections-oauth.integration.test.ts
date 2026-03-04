@@ -17,11 +17,13 @@ import {
   decryptIntegrationConnectionSecrets,
   resolveMasterEncryptionKeyMaterial,
 } from "../src/integration-credentials/crypto.js";
+import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
 
-describe("integration connections oauth integration", () => {
-  it("creates an oauth authorization URL and persists oauth session state", async ({ fixture }) => {
-    await fixture.db.insert(integrationTargets).values({
+async function ensureGithubCloudTarget(fixture: ControlPlaneApiIntegrationFixture): Promise<void> {
+  await fixture.db
+    .insert(integrationTargets)
+    .values({
       targetKey: "github-cloud",
       familyId: "github",
       variantId: "github-cloud",
@@ -31,7 +33,52 @@ describe("integration connections oauth integration", () => {
         web_base_url: "https://github.com",
         app_slug: "mistle-github-app",
       },
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+          app_slug: "mistle-github-app",
+        },
+      },
     });
+}
+
+async function ensureOpenAiDefaultTarget(
+  fixture: ControlPlaneApiIntegrationFixture,
+): Promise<void> {
+  await fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: "openai-default",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com",
+      },
+    })
+    .onConflictDoUpdate({
+      target: integrationTargets.targetKey,
+      set: {
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com",
+        },
+      },
+    });
+}
+
+describe("integration connections oauth integration", () => {
+  it("creates an oauth authorization URL and persists oauth session state", async ({ fixture }) => {
+    await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
       email: "integration-connections-oauth-start@example.com",
@@ -72,20 +119,10 @@ describe("integration connections oauth integration", () => {
 
     expect(Date.parse(oauthSession.expiresAt)).toBeGreaterThan(Date.parse(oauthSession.createdAt));
     expect(oauthSession.usedAt).toBeNull();
-  }, 60_000);
+  });
 
   it("creates an oauth-backed connection and marks oauth state as used", async ({ fixture }) => {
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "github-cloud",
-      familyId: "github",
-      variantId: "github-cloud",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.github.com",
-        web_base_url: "https://github.com",
-        app_slug: "mistle-github-app",
-      },
-    });
+    await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
       email: "integration-connections-oauth-complete@example.com",
@@ -157,9 +194,9 @@ describe("integration connections oauth integration", () => {
     }
 
     expect(persistedConnection.targetSnapshotConfig).toEqual({
-      api_base_url: "https://api.github.com",
-      web_base_url: "https://github.com",
-      app_slug: "mistle-github-app",
+      apiBaseUrl: "https://api.github.com/",
+      webBaseUrl: "https://github.com/",
+      appSlug: "mistle-github-app",
     });
     expect(persistedConnection.secrets).not.toBeNull();
     if (persistedConnection.secrets === null) {
@@ -196,20 +233,10 @@ describe("integration connections oauth integration", () => {
       .from(integrationConnectionCredentials)
       .where(eq(integrationConnectionCredentials.connectionId, completeBody.id));
     expect(linkedCredentials).toHaveLength(0);
-  }, 60_000);
+  });
 
   it("returns 400 when oauth completion secrets include unsupported keys", async ({ fixture }) => {
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "github-cloud",
-      familyId: "github",
-      variantId: "github-cloud",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.github.com",
-        web_base_url: "https://github.com",
-        app_slug: "mistle-github-app",
-      },
-    });
+    await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
       email: "integration-connections-oauth-complete-unsupported-secret@example.com",
@@ -259,20 +286,10 @@ describe("integration connections oauth integration", () => {
     );
     expect(responseBody.code).toBe("INVALID_OAUTH_COMPLETE_INPUT");
     expect(responseBody.message).toContain("unsupported key 'unknown_secret'");
-  }, 60_000);
+  });
 
   it("returns 400 when oauth completion state is missing", async ({ fixture }) => {
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "github-cloud",
-      familyId: "github",
-      variantId: "github-cloud",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.github.com",
-        web_base_url: "https://github.com",
-        app_slug: "mistle-github-app",
-      },
-    });
+    await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
       email: "integration-connections-oauth-complete-missing-state@example.com",
@@ -299,20 +316,10 @@ describe("integration connections oauth integration", () => {
       await response.json(),
     );
     expect(responseBody.code).toBe("INVALID_OAUTH_COMPLETE_INPUT");
-  }, 60_000);
+  });
 
   it("returns 400 when oauth completion state is invalid", async ({ fixture }) => {
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "github-cloud",
-      familyId: "github",
-      variantId: "github-cloud",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.github.com",
-        web_base_url: "https://github.com",
-        app_slug: "mistle-github-app",
-      },
-    });
+    await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
       email: "integration-connections-oauth-complete-invalid-state@example.com",
@@ -340,20 +347,10 @@ describe("integration connections oauth integration", () => {
       await response.json(),
     );
     expect(responseBody.code).toBe("OAUTH_STATE_INVALID");
-  }, 60_000);
+  });
 
   it("returns 400 when oauth completion state has expired", async ({ fixture }) => {
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "github-cloud",
-      familyId: "github",
-      variantId: "github-cloud",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.github.com",
-        web_base_url: "https://github.com",
-        app_slug: "mistle-github-app",
-      },
-    });
+    await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
       email: "integration-connections-oauth-complete-expired-state@example.com",
@@ -396,20 +393,10 @@ describe("integration connections oauth integration", () => {
       .from(integrationConnections)
       .where(eq(integrationConnections.organizationId, authenticatedSession.organizationId));
     expect(connectionRows).toHaveLength(0);
-  }, 60_000);
+  });
 
   it("returns 400 when oauth completion state was already used", async ({ fixture }) => {
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "github-cloud",
-      familyId: "github",
-      variantId: "github-cloud",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.github.com",
-        web_base_url: "https://github.com",
-        app_slug: "mistle-github-app",
-      },
-    });
+    await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
       email: "integration-connections-oauth-complete-used-state@example.com",
@@ -445,18 +432,10 @@ describe("integration connections oauth integration", () => {
       await response.json(),
     );
     expect(responseBody.code).toBe("OAUTH_STATE_ALREADY_USED");
-  }, 60_000);
+  });
 
-  it("returns 400 when the target does not support oauth", async ({ fixture }) => {
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com",
-      },
-    });
+  it("returns 400 when the target oauth handler is not configured", async ({ fixture }) => {
+    await ensureOpenAiDefaultTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
       email: "integration-connections-oauth-unsupported-target@example.com",
@@ -476,8 +455,8 @@ describe("integration connections oauth integration", () => {
     const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
       await response.json(),
     );
-    expect(responseBody.code).toBe("OAUTH_NOT_SUPPORTED");
-  }, 60_000);
+    expect(responseBody.code).toBe("OAUTH_HANDLER_NOT_CONFIGURED");
+  });
 });
 
 function decryptStoredConnectionSecrets(input: {

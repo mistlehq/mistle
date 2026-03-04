@@ -1,7 +1,7 @@
 import { stat } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { systemClock, systemSleeper } from "@mistle/time";
+import { systemClock, systemScheduler, systemSleeper } from "@mistle/time";
 import type { StartedNetwork } from "testcontainers";
 
 import {
@@ -11,6 +11,8 @@ import {
 } from "./shared.js";
 
 const HOST_HEALTHCHECK_POLL_INTERVAL_MS = 100;
+const HOST_HEALTHCHECK_REQUEST_TIMEOUT_MS = 2_000;
+const TRACE_HTTP_APP_STARTUP = process.env.MISTLE_TEST_HARNESS_TRACE === "1";
 
 export type StartDockerHttpAppInput = {
   buildContextHostPath: string;
@@ -36,6 +38,32 @@ export type DockerHttpAppDefinition = {
 
 function normalizeError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function traceHttpAppStartup(message: string): void {
+  if (!TRACE_HTTP_APP_STARTUP) {
+    return;
+  }
+
+  console.info(`[test-harness:http-app] ${message}`);
+}
+
+async function fetchHealthcheckStatus(url: string): Promise<number | undefined> {
+  const controller = new AbortController();
+  const timeout = systemScheduler.schedule(() => {
+    controller.abort();
+  }, HOST_HEALTHCHECK_REQUEST_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+    });
+    return response.status;
+  } catch {
+    return undefined;
+  } finally {
+    systemScheduler.cancel(timeout);
+  }
 }
 
 async function validatePrebuiltArtifacts(input: {
@@ -71,10 +99,21 @@ async function waitForHostHealthcheck(input: {
 }): Promise<void> {
   const deadline = systemClock.nowMs() + input.timeoutMs;
   const url = `${input.baseUrl}${input.path}`;
+  let attempts = 0;
 
   while (systemClock.nowMs() < deadline) {
-    const response = await fetch(url).catch(() => null);
-    if (response?.status === input.expectedStatus) {
+    attempts += 1;
+    const attemptStartedAt = systemClock.nowMs();
+    const status = await fetchHealthcheckStatus(url);
+
+    traceHttpAppStartup(
+      `${input.appName} host healthcheck attempt ${String(attempts)} status=${String(status ?? "unreachable")} durationMs=${String(systemClock.nowMs() - attemptStartedAt)}`,
+    );
+
+    if (status === input.expectedStatus) {
+      traceHttpAppStartup(
+        `${input.appName} host healthcheck became ready after ${String(attempts)} attempts`,
+      );
       return;
     }
 
@@ -82,7 +121,7 @@ async function waitForHostHealthcheck(input: {
   }
 
   throw new Error(
-    `Timed out waiting for ${input.appName} host healthcheck at ${url} within ${input.timeoutMs}ms.`,
+    `Timed out waiting for ${input.appName} host healthcheck at ${url} within ${input.timeoutMs}ms after ${String(attempts)} attempts.`,
   );
 }
 

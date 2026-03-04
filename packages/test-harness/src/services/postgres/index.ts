@@ -7,7 +7,7 @@ import {
   type StartedTestContainer,
 } from "testcontainers";
 
-import { runCleanupTasks } from "../../cleanup/index.js";
+import { registerProcessCleanupTask, runCleanupTasks } from "../../cleanup/index.js";
 
 const POSTGRES_IMAGE = "postgres:18-alpine";
 const PGBOUNCER_IMAGE = "edoburu/pgbouncer:v1.25.1-p0";
@@ -24,6 +24,8 @@ export type StartPostgresWithPgBouncerInput = {
   poolMode?: "session" | "transaction" | "statement";
   defaultPoolSize?: number;
   maxClientConnections?: number;
+  manageProcessCleanup?: boolean;
+  containerLabels?: Record<string, string>;
   network?: StartedNetwork;
   postgresNetworkAlias?: string;
   pgbouncerNetworkAlias?: string;
@@ -46,6 +48,11 @@ export type PostgresWithPgBouncerService = {
     defaultPoolSize: number;
     maxClientConnections: number;
   };
+  runtimeMetadata: {
+    postgresContainerId: string;
+    pgbouncerContainerId: string;
+    networkId: string | undefined;
+  };
   stop: () => Promise<void>;
 };
 
@@ -57,6 +64,7 @@ type PostgresRuntimeConfig = {
   poolMode: "session" | "transaction" | "statement";
   defaultPoolSize: number;
   maxClientConnections: number;
+  manageProcessCleanup: boolean;
   postgresNetworkAlias: string;
   pgbouncerNetworkAlias: string;
 };
@@ -73,6 +81,7 @@ function resolveConfig(input: StartPostgresWithPgBouncerInput): PostgresRuntimeC
     poolMode: input.poolMode ?? "transaction",
     defaultPoolSize: input.defaultPoolSize ?? 20,
     maxClientConnections: input.maxClientConnections ?? 100,
+    manageProcessCleanup: input.manageProcessCleanup ?? true,
     postgresNetworkAlias: input.postgresNetworkAlias ?? DEFAULT_POSTGRES_NETWORK_ALIAS,
     pgbouncerNetworkAlias: input.pgbouncerNetworkAlias ?? DEFAULT_PGBOUNCER_NETWORK_ALIAS,
   };
@@ -127,12 +136,20 @@ async function stopInReverseOrder(input: StackRuntimeResources): Promise<void> {
   const tasks = [
     async () => {
       if (input.pgbouncerContainer !== undefined) {
-        await input.pgbouncerContainer.stop();
+        await input.pgbouncerContainer.stop({
+          remove: true,
+          removeVolumes: true,
+          timeout: 0,
+        });
       }
     },
     async () => {
       if (input.postgresContainer !== undefined) {
-        await input.postgresContainer.stop();
+        await input.postgresContainer.stop({
+          remove: true,
+          removeVolumes: true,
+          timeout: 0,
+        });
       }
     },
     async () => {
@@ -174,6 +191,7 @@ export async function startPostgresWithPgBouncer(
       .withDatabase(config.databaseName)
       .withUsername(config.username)
       .withPassword(config.password)
+      .withLabels(input.containerLabels ?? {})
       .withNetwork(network)
       .withNetworkAliases(config.postgresNetworkAlias)
       .start();
@@ -182,6 +200,7 @@ export async function startPostgresWithPgBouncer(
       .withNetwork(network)
       .withNetworkAliases(config.pgbouncerNetworkAlias)
       .withExposedPorts(PGBOUNCER_PORT)
+      .withLabels(input.containerLabels ?? {})
       .withEnvironment({
         DB_HOST: config.postgresNetworkAlias,
         DB_PORT: String(POSTGRES_INTERNAL_PORT),
@@ -244,6 +263,28 @@ export async function startPostgresWithPgBouncer(
       timeoutMs: config.startupTimeoutMs,
     });
 
+    const stopInternal = async (): Promise<void> => {
+      stopped = true;
+      await stopInReverseOrder({
+        pgbouncerContainer,
+        postgresContainer,
+        createdNetwork,
+      });
+      pgbouncerContainer = undefined;
+      postgresContainer = undefined;
+      createdNetwork = undefined;
+    };
+
+    const unregisterProcessCleanupTask = config.manageProcessCleanup
+      ? registerProcessCleanupTask(async () => {
+          if (stopped) {
+            return;
+          }
+
+          await stopInternal();
+        })
+      : () => {};
+
     return {
       directUrl,
       pooledUrl,
@@ -261,20 +302,18 @@ export async function startPostgresWithPgBouncer(
         defaultPoolSize: config.defaultPoolSize,
         maxClientConnections: config.maxClientConnections,
       },
+      runtimeMetadata: {
+        postgresContainerId: postgresContainer.getId(),
+        pgbouncerContainerId: pgbouncerContainer.getId(),
+        networkId: createdNetwork?.getId(),
+      },
       stop: async () => {
         if (stopped) {
           throw new Error("Postgres + PgBouncer stack was already stopped.");
         }
 
-        stopped = true;
-        await stopInReverseOrder({
-          pgbouncerContainer,
-          postgresContainer,
-          createdNetwork,
-        });
-        pgbouncerContainer = undefined;
-        postgresContainer = undefined;
-        createdNetwork = undefined;
+        await stopInternal();
+        unregisterProcessCleanupTask();
       },
     };
   } catch (error) {

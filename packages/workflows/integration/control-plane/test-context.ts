@@ -5,16 +5,10 @@ import {
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
 import { SMTPEmailSender } from "@mistle/emails";
-import {
-  runCleanupTasks,
-  startMailpit,
-  startPostgresWithPgBouncer,
-  type MailpitService,
-} from "@mistle/test-harness";
+import { createMailpitInbox, runCleanupTasks, type MailpitService } from "@mistle/test-harness";
 import type { Worker } from "openworkflow";
 import type { BackendPostgres } from "openworkflow/postgres";
 import postgres from "postgres";
-import { it as vitestIt } from "vitest";
 
 import {
   ControlPlaneWorkerWorkflowIds,
@@ -22,6 +16,7 @@ import {
   createControlPlaneOpenWorkflow,
   createControlPlaneWorker,
 } from "../../src/control-plane/index.js";
+import { it as baseIt } from "../test-context.js";
 
 export type ControlPlaneWorkflowFixture = {
   mailpitService: MailpitService;
@@ -29,24 +24,36 @@ export type ControlPlaneWorkflowFixture = {
   openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
 };
 
-export const it = vitestIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (value === undefined || value.length === 0) {
+    throw new Error(`Missing required integration environment variable: ${name}`);
+  }
+
+  return value;
+}
+
+function parsePort(input: { value: string; variableName: string }): number {
+  const parsedPort = Number.parseInt(input.value, 10);
+  if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65_535) {
+    throw new Error(`Environment variable ${input.variableName} must be a valid TCP port.`);
+  }
+
+  return parsedPort;
+}
+
+export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
   fixture: [
-    async ({}, use) => {
+    async ({ databaseStack }, use) => {
       const cleanupTasks: Array<() => Promise<void>> = [];
+      const mailpitSmtpHost = requireEnv("MISTLE_WF_IT_MAILPIT_SMTP_HOST");
+      const mailpitSmtpPort = parsePort({
+        value: requireEnv("MISTLE_WF_IT_MAILPIT_SMTP_PORT"),
+        variableName: "MISTLE_WF_IT_MAILPIT_SMTP_PORT",
+      });
+      const mailpitHttpBaseUrl = requireEnv("MISTLE_WF_IT_MAILPIT_HTTP_BASE_URL");
 
       try {
-        const databaseStack = await startPostgresWithPgBouncer({
-          databaseName: "mistle_workflows_test",
-        });
-        cleanupTasks.unshift(async () => {
-          await databaseStack.stop();
-        });
-
-        const mailpitService = await startMailpit();
-        cleanupTasks.unshift(async () => {
-          await mailpitService.stop();
-        });
-
         await runControlPlaneMigrations({
           connectionString: databaseStack.directUrl,
           schemaName: CONTROL_PLANE_SCHEMA_NAME,
@@ -73,8 +80,8 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
 
         const openWorkflow = createControlPlaneOpenWorkflow({ backend });
         const emailSender = SMTPEmailSender.fromTransportOptions({
-          host: mailpitService.smtpHost,
-          port: mailpitService.smtpPort,
+          host: mailpitSmtpHost,
+          port: mailpitSmtpPort,
           secure: false,
         });
 
@@ -136,6 +143,24 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
         cleanupTasks.unshift(async () => {
           await worker.stop();
         });
+
+        const inbox = createMailpitInbox({
+          httpBaseUrl: mailpitHttpBaseUrl,
+        });
+        const mailpitService: MailpitService = {
+          smtpHost: mailpitSmtpHost,
+          smtpPort: mailpitSmtpPort,
+          httpBaseUrl: mailpitHttpBaseUrl,
+          listMessages: inbox.listMessages,
+          getMessageSummary: inbox.getMessageSummary,
+          waitForMessage: inbox.waitForMessage,
+          runtimeMetadata: {
+            containerId: "shared-mailpit-managed-by-global-setup",
+          },
+          stop: async () => {
+            throw new Error("Shared Mailpit service is managed by global setup.");
+          },
+        };
 
         await use({
           mailpitService,

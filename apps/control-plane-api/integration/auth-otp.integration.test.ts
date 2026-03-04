@@ -1,18 +1,14 @@
 import { randomUUID } from "node:crypto";
 
 import { MemberRoles, members, verifications } from "@mistle/db/control-plane";
+import { SendVerificationOTPWorkflowSpec } from "@mistle/workflows/control-plane";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import { readLatestSignInOtp } from "./helpers/sign-in-otp.js";
+import { countControlPlaneWorkflowRuns } from "./helpers/workflow-runs.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
-
-function extractOTPCode(text: string, otpLength: number): string | undefined {
-  const pattern = new RegExp(`\\b(\\d{${String(otpLength)}})\\b`);
-  const match = text.match(pattern);
-
-  return match?.[1];
-}
 
 async function sendOTPRequest(input: {
   fixture: ControlPlaneApiIntegrationFixture;
@@ -47,9 +43,28 @@ async function signInWithOTP(input: {
   });
 }
 
+async function readIssuedOtp(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  recipient: string;
+}): Promise<string> {
+  return readLatestSignInOtp({
+    db: input.fixture.db,
+    email: input.recipient,
+    otpLength: input.fixture.config.auth.otpLength,
+  });
+}
+
 describe("auth otp integration", () => {
   it("sends OTP, signs in, and leaves organization context empty", async ({ fixture }) => {
     const recipient = "integration-auth-otp@example.com";
+    const workflowRunCountBefore = await countControlPlaneWorkflowRuns({
+      databaseUrl: fixture.databaseStack.directUrl,
+      workflowName: SendVerificationOTPWorkflowSpec.name,
+      inputEquals: {
+        email: recipient,
+        type: "sign-in",
+      },
+    });
 
     const sendResponse = await sendOTPRequest({
       fixture,
@@ -57,25 +72,20 @@ describe("auth otp integration", () => {
     });
     expect(sendResponse.status).toBe(200);
 
-    const listItem = await fixture.mailpitService.waitForMessage({
-      timeoutMs: 15_000,
-      description: `OTP email for ${recipient}`,
-      matcher: ({ message }) =>
-        message.Subject === "Your sign-in code" &&
-        message.To.some((address) => address.Address === recipient),
+    const workflowRunCountAfter = await countControlPlaneWorkflowRuns({
+      databaseUrl: fixture.databaseStack.directUrl,
+      workflowName: SendVerificationOTPWorkflowSpec.name,
+      inputEquals: {
+        email: recipient,
+        type: "sign-in",
+      },
     });
+    expect(workflowRunCountAfter).toBe(workflowRunCountBefore + 1);
 
-    const message = await fixture.mailpitService.getMessageSummary(listItem.ID);
-
-    expect(message.Subject).toBe("Your sign-in code");
-
-    const otp = extractOTPCode(message.Text, fixture.config.auth.otpLength);
-    expect(otp).toBeDefined();
-    if (otp === undefined) {
-      throw new Error("OTP was not found in Mailpit message text.");
-    }
-
-    expect(message.Text).toContain("expires in 5 minutes");
+    const otp = await readIssuedOtp({
+      fixture,
+      recipient,
+    });
 
     const signInResponse = await signInWithOTP({
       fixture,
@@ -126,7 +136,7 @@ describe("auth otp integration", () => {
       throw new Error("Expected session to exist after OTP sign-in.");
     }
     expect(session.activeOrganizationId).toBeNull();
-  }, 60_000);
+  });
 
   it("does not bootstrap an organization for a newly invited user", async ({ fixture }) => {
     const inviterSession = await fixture.authSession({
@@ -154,19 +164,10 @@ describe("auth otp integration", () => {
     });
     expect(sendResponse.status).toBe(200);
 
-    const listItem = await fixture.mailpitService.waitForMessage({
-      timeoutMs: 15_000,
-      description: `OTP email for ${recipient}`,
-      matcher: ({ message }) =>
-        message.Subject === "Your sign-in code" &&
-        message.To.some((address) => address.Address === recipient),
+    const otp = await readIssuedOtp({
+      fixture,
+      recipient,
     });
-    const message = await fixture.mailpitService.getMessageSummary(listItem.ID);
-    const otp = extractOTPCode(message.Text, fixture.config.auth.otpLength);
-    expect(otp).toBeDefined();
-    if (otp === undefined) {
-      throw new Error("OTP was not found in Mailpit message text.");
-    }
 
     const signInResponse = await signInWithOTP({
       fixture,
@@ -215,7 +216,7 @@ describe("auth otp integration", () => {
       throw new Error("Expected session to exist after OTP sign-in.");
     }
     expect(session.activeOrganizationId).toBeNull();
-  }, 60_000);
+  });
 
   it("rejects sign-in with an incorrect OTP and does not create a user", async ({ fixture }) => {
     const recipient = "integration-auth-otp-wrong-code@example.com";
@@ -278,20 +279,10 @@ describe("auth otp integration", () => {
     });
     expect(sendResponse.status).toBe(200);
 
-    const listItem = await fixture.mailpitService.waitForMessage({
-      timeoutMs: 15_000,
-      description: `OTP email for ${recipient}`,
-      matcher: ({ message }) =>
-        message.Subject === "Your sign-in code" &&
-        message.To.some((address) => address.Address === recipient),
+    const otp = await readIssuedOtp({
+      fixture,
+      recipient,
     });
-    const message = await fixture.mailpitService.getMessageSummary(listItem.ID);
-
-    const otp = extractOTPCode(message.Text, fixture.config.auth.otpLength);
-    expect(otp).toBeDefined();
-    if (otp === undefined) {
-      throw new Error("OTP was not found in Mailpit message text.");
-    }
 
     for (
       let attemptIndex = 0;
@@ -339,20 +330,10 @@ describe("auth otp integration", () => {
     });
     expect(sendResponse.status).toBe(200);
 
-    const listItem = await fixture.mailpitService.waitForMessage({
-      timeoutMs: 15_000,
-      description: `OTP email for ${recipient}`,
-      matcher: ({ message }) =>
-        message.Subject === "Your sign-in code" &&
-        message.To.some((address) => address.Address === recipient),
+    const otp = await readIssuedOtp({
+      fixture,
+      recipient,
     });
-    const message = await fixture.mailpitService.getMessageSummary(listItem.ID);
-
-    const otp = extractOTPCode(message.Text, fixture.config.auth.otpLength);
-    expect(otp).toBeDefined();
-    if (otp === undefined) {
-      throw new Error("OTP was not found in Mailpit message text.");
-    }
 
     const verificationIdentifier = `sign-in-otp-${recipient}`;
     const verification = await fixture.db.query.verifications.findFirst({
@@ -396,7 +377,7 @@ describe("auth otp integration", () => {
       where: (users, { eq }) => eq(users.email, recipient),
     });
     expect(user).toBeUndefined();
-  }, 60_000);
+  });
 
   it("does not create organization bootstrap records on repeated sign-ins", async ({ fixture }) => {
     const recipient = "integration-auth-otp-idempotent-bootstrap@example.com";
@@ -407,20 +388,10 @@ describe("auth otp integration", () => {
     });
     expect(firstSendResponse.status).toBe(200);
 
-    const firstMessageListItem = await fixture.mailpitService.waitForMessage({
-      timeoutMs: 15_000,
-      description: `first OTP email for ${recipient}`,
-      matcher: ({ message }) =>
-        message.Subject === "Your sign-in code" &&
-        message.To.some((address) => address.Address === recipient),
+    const firstOTP = await readIssuedOtp({
+      fixture,
+      recipient,
     });
-    const firstMessage = await fixture.mailpitService.getMessageSummary(firstMessageListItem.ID);
-
-    const firstOTP = extractOTPCode(firstMessage.Text, fixture.config.auth.otpLength);
-    expect(firstOTP).toBeDefined();
-    if (firstOTP === undefined) {
-      throw new Error("First OTP was not found in Mailpit message text.");
-    }
 
     const firstSignInResponse = await signInWithOTP({
       fixture,
@@ -493,21 +464,10 @@ describe("auth otp integration", () => {
     });
     expect(secondSendResponse.status).toBe(200);
 
-    const secondMessageListItem = await fixture.mailpitService.waitForMessage({
-      timeoutMs: 15_000,
-      description: `second OTP email for ${recipient}`,
-      matcher: ({ message }) =>
-        message.Subject === "Your sign-in code" &&
-        message.ID !== firstMessageListItem.ID &&
-        message.To.some((address) => address.Address === recipient),
+    const secondOTP = await readIssuedOtp({
+      fixture,
+      recipient,
     });
-    const secondMessage = await fixture.mailpitService.getMessageSummary(secondMessageListItem.ID);
-
-    const secondOTP = extractOTPCode(secondMessage.Text, fixture.config.auth.otpLength);
-    expect(secondOTP).toBeDefined();
-    if (secondOTP === undefined) {
-      throw new Error("Second OTP was not found in Mailpit message text.");
-    }
 
     const secondSignInResponse = await signInWithOTP({
       fixture,
@@ -562,5 +522,5 @@ describe("auth otp integration", () => {
       throw new Error("Expected session to exist after second sign-in.");
     }
     expect(secondSession.activeOrganizationId).toBeNull();
-  }, 60_000);
+  });
 });

@@ -22,16 +22,19 @@ describe("sandbox profile version put integration bindings service integration",
       email: "integration-sandbox-profile-version-put-bindings-service@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com",
-        binding_capabilities: createOpenAiRawBindingCapabilities(),
-      },
-    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "openai-default",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com",
+          binding_capabilities: createOpenAiRawBindingCapabilities(),
+        },
+      })
+      .onConflictDoNothing();
 
     const [connectionA, connectionB] = await fixture.db
       .insert(integrationConnections)
@@ -78,7 +81,8 @@ describe("sandbox profile version put integration bindings service integration",
         kind: IntegrationBindingKinds.AGENT,
         config: {
           runtime: "codex-cli",
-          defaultModel: "gpt-4.1",
+          defaultModel: "gpt-5.3-codex",
+          reasoningEffort: "medium",
         },
       },
       {
@@ -108,14 +112,17 @@ describe("sandbox profile version put integration bindings service integration",
             kind: IntegrationBindingKinds.AGENT,
             config: {
               runtime: "codex-cli",
-              defaultModel: "gpt-5",
+              defaultModel: "gpt-5.2",
+              reasoningEffort: "medium",
             },
           },
           {
             connectionId: connectionA.id,
-            kind: IntegrationBindingKinds.GIT,
+            kind: IntegrationBindingKinds.AGENT,
             config: {
-              repositories: ["mistlehq/mistle"],
+              runtime: "codex-cli",
+              defaultModel: "gpt-5.3-codex-spark",
+              reasoningEffort: "high",
             },
           },
         ],
@@ -132,21 +139,29 @@ describe("sandbox profile version put integration bindings service integration",
     expect(updatedBinding?.kind).toBe(IntegrationBindingKinds.AGENT);
     expect(updatedBinding?.config).toEqual({
       runtime: "codex-cli",
-      defaultModel: "gpt-5",
+      defaultModel: "gpt-5.2",
+      reasoningEffort: "medium",
     });
 
     const insertedBinding = result.bindings.find(
-      (binding) => binding.kind === IntegrationBindingKinds.GIT,
+      (binding) =>
+        binding.id !== "ibd_put_bindings_existing_001" && binding.connectionId === connectionA.id,
     );
     expect(insertedBinding).toBeDefined();
     expect(insertedBinding?.id).not.toBe("");
+    expect(insertedBinding?.kind).toBe(IntegrationBindingKinds.AGENT);
+    expect(insertedBinding?.config).toEqual({
+      runtime: "codex-cli",
+      defaultModel: "gpt-5.3-codex-spark",
+      reasoningEffort: "high",
+    });
 
     const deletedBinding =
       await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
         where: (table, { eq }) => eq(table.id, "ibd_put_bindings_existing_002"),
       });
     expect(deletedBinding).toBeUndefined();
-  }, 60_000);
+  });
 
   it("throws not found when sandbox profile is missing", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -168,7 +183,7 @@ describe("sandbox profile version put integration bindings service integration",
     ).rejects.toMatchObject({
       code: SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
     });
-  }, 60_000);
+  });
 
   it("throws not found when sandbox profile version is missing", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -197,7 +212,7 @@ describe("sandbox profile version put integration bindings service integration",
     ).rejects.toMatchObject({
       code: SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
     });
-  }, 60_000);
+  });
 
   it("throws bad request when binding references inaccessible connection", async ({ fixture }) => {
     const firstOrgSession = await fixture.authSession({
@@ -207,16 +222,19 @@ describe("sandbox profile version put integration bindings service integration",
       email: "integration-sandbox-profile-version-put-bindings-connection-org-b@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default-connection-reference",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com",
-        binding_capabilities: createOpenAiRawBindingCapabilities(),
-      },
-    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "openai-default-connection-reference",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com",
+          binding_capabilities: createOpenAiRawBindingCapabilities(),
+        },
+      })
+      .onConflictDoNothing();
 
     await fixture.db.insert(sandboxProfiles).values({
       id: "sbp_put_bindings_connection_reference_001",
@@ -260,6 +278,8 @@ describe("sandbox profile version put integration bindings service integration",
               kind: IntegrationBindingKinds.AGENT,
               config: {
                 runtime: "codex-cli",
+                defaultModel: "gpt-5.3-codex",
+                reasoningEffort: "medium",
               },
             },
           ],
@@ -268,23 +288,26 @@ describe("sandbox profile version put integration bindings service integration",
     ).rejects.toMatchObject({
       code: SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONNECTION_REFERENCE,
     });
-  }, 60_000);
+  });
 
   it("throws bad request when request references non-existent binding id", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
       email: "integration-sandbox-profile-version-put-bindings-invalid-binding-id@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default-binding-reference",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com",
-        binding_capabilities: createOpenAiRawBindingCapabilities(),
-      },
-    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "openai-default-binding-reference",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com",
+          binding_capabilities: createOpenAiRawBindingCapabilities(),
+        },
+      })
+      .onConflictDoNothing();
     await fixture.db.insert(sandboxProfiles).values({
       id: "sbp_put_bindings_invalid_binding_reference_001",
       organizationId: authenticatedSession.organizationId,
@@ -328,6 +351,8 @@ describe("sandbox profile version put integration bindings service integration",
               kind: IntegrationBindingKinds.AGENT,
               config: {
                 runtime: "codex-cli",
+                defaultModel: "gpt-5.3-codex",
+                reasoningEffort: "medium",
               },
             },
           ],
@@ -336,5 +361,5 @@ describe("sandbox profile version put integration bindings service integration",
     ).rejects.toMatchObject({
       code: SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_REFERENCE,
     });
-  }, 60_000);
+  });
 });
