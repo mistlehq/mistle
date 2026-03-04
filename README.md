@@ -106,30 +106,14 @@ nix develop
 pnpm dev
 ```
 
-To stop local infra:
+Dev command summary:
 
-```bash
-pnpm dev:down
-```
-
-To reset local infra state (including Postgres + local registry volumes):
-
-```bash
-pnpm dev:reset
-```
-
-To reset local infra state and remove local compose images:
-
-```bash
-pnpm dev:reset:hard
-```
-
-Behavior summary:
-
-- `pnpm dev`: starts local infra and app dev processes. On stop, it runs compose `down` without deleting volumes, so Postgres and registry state persist.
-- `pnpm dev:down`: stops/removes containers and network, keeps volumes and images.
-- `pnpm dev:reset`: same as `dev:down` plus removes compose volumes (wipes Postgres + local registry state).
-- `pnpm dev:reset:hard`: same as `dev:reset` plus removes local compose images.
+| Command | What it does |
+| --- | --- |
+| `pnpm dev` | Starts local infra and app dev processes. On stop, runs compose `down --remove-orphans` (keeps volumes and images), so Postgres and registry state persist. |
+| `pnpm dev:down` | Stops/removes containers and network. Keeps volumes and images. |
+| `pnpm dev:reset` | Same as `dev:down`, then removes compose volumes (wipes Postgres + local registry state). |
+| `pnpm dev:reset:hard` | Same as `dev:reset`, then removes local compose images. |
 
 ### Optional Direnv
 
