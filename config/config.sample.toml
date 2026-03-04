@@ -17,6 +17,10 @@ token_secret = "replace-with-bootstrap-token-secret"
 token_issuer = "data-plane-worker"
 token_audience = "data-plane-gateway"
 
+[global.sandbox]
+default_base_image = "registry.example.com/mistle/sandbox-base:prod"
+gateway_ws_url = "wss://gateway.mistle.example/tunnel/sandbox"
+
 [apps.control_plane_api.server]
 host = "0.0.0.0"
 port = 8080
@@ -39,10 +43,6 @@ namespace_id = "production"
 
 [apps.control_plane_api.data_plane_api]
 base_url = "http://data-plane-api:8082"
-
-[apps.control_plane_api.sandbox]
-default_base_image = "registry.example.com/mistle/sandbox-base:prod"
-gateway_ws_url = "wss://gateway.mistle.example/tunnel/sandbox"
 
 [apps.control_plane_api.integrations]
 active_master_encryption_key_version = 1

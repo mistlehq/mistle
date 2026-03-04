@@ -23,6 +23,7 @@ export async function createApp(
   registerAppRoutes({
     app,
     config: runtimeConfig.app,
+    sandboxConfig: runtimeConfig.sandbox,
     internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
     db: resources.db,
     integrationRegistry: resources.integrationRegistry,

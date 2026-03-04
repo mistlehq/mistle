@@ -38,13 +38,6 @@ export const ControlPlaneApiDataPlaneApiConfigSchema = z
   })
   .strict();
 
-export const ControlPlaneApiSandboxConfigSchema = z
-  .object({
-    defaultBaseImage: z.string().min(1),
-    gatewayWsUrl: z.string().min(1),
-  })
-  .strict();
-
 const ControlPlaneApiIntegrationsConfigObjectSchema = z
   .object({
     activeMasterEncryptionKeyVersion: z.number().int().min(1),
@@ -78,7 +71,6 @@ export const ControlPlaneApiConfigSchema = z
     auth: ControlPlaneApiAuthConfigSchema,
     workflow: ControlPlaneApiWorkflowConfigSchema,
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema,
-    sandbox: ControlPlaneApiSandboxConfigSchema,
     integrations: ControlPlaneApiIntegrationsConfigSchema,
   })
   .strict();
@@ -90,7 +82,6 @@ export const PartialControlPlaneApiConfigSchema = z
     auth: ControlPlaneApiAuthConfigSchema.partial().optional(),
     workflow: ControlPlaneApiWorkflowConfigSchema.partial().optional(),
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema.partial().optional(),
-    sandbox: ControlPlaneApiSandboxConfigSchema.partial().optional(),
     integrations: ControlPlaneApiIntegrationsConfigObjectSchema.partial().optional(),
   })
   .strict();

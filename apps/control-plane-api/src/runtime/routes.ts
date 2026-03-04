@@ -13,11 +13,17 @@ import { CONTROL_PLANE_OPENAPI_INFO, CONTROL_PLANE_OPENAPI_PATH } from "../opena
 import { createOrganizationMembershipCapabilitiesApp } from "../organization-membership-capabilities/index.js";
 import { createSandboxInstancesApp } from "../sandbox-instances/index.js";
 import { createSandboxProfilesApp } from "../sandbox-profiles/index.js";
-import type { AppServices, ControlPlaneApiConfig, ControlPlaneApp } from "../types.js";
+import type {
+  AppServices,
+  ControlPlaneApiConfig,
+  ControlPlaneApiSandboxRuntimeConfig,
+  ControlPlaneApp,
+} from "../types.js";
 
 type RegisterAppRoutesInput = {
   app: ControlPlaneApp;
   config: ControlPlaneApiConfig;
+  sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   integrationRegistry: IntegrationRegistry;
@@ -32,6 +38,7 @@ export function registerAppRoutes(input: RegisterAppRoutesInput): void {
     "*",
     createAppContextMiddleware({
       config,
+      sandboxConfig: input.sandboxConfig,
       internalAuthServiceToken: input.internalAuthServiceToken,
       db,
       integrationRegistry: input.integrationRegistry,

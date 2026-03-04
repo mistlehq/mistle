@@ -24,6 +24,8 @@ const globalDevelopmentConfig = {
     serviceToken,
   },
   sandbox: {
+    defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+    gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     connect: {
       tokenSecret: sandboxConnectTokenSecret,
       tokenIssuer: sandboxConnectTokenIssuer,
@@ -43,6 +45,8 @@ const globalProductionConfig = {
     serviceToken,
   },
   sandbox: {
+    defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+    gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     connect: {
       tokenSecret: sandboxConnectTokenSecret,
       tokenIssuer: sandboxConnectTokenIssuer,
@@ -80,10 +84,6 @@ const controlPlaneApiEnvConfig = {
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5002",
   },
-  sandbox: {
-    defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
-    gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
-  },
   integrations: {
     activeMasterEncryptionKeyVersion: 1,
     masterEncryptionKeys: {
@@ -104,10 +104,6 @@ const controlPlaneApiFixtureConfig = {
   },
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5300",
-  },
-  sandbox: {
-    defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:fixture",
-    gatewayWsUrl: "ws://127.0.0.1:5302/tunnel/sandbox",
   },
   integrations: {
     activeMasterEncryptionKeyVersion: 2,

@@ -1,11 +1,12 @@
 import { createEnvLoader, hasEntries } from "../core/load-env.js";
 import {
+  PartialGlobalConfigSchema,
+  PartialGlobalSandboxConfigSchema,
   GlobalSandboxTokenConfigSchema,
   type PartialGlobalConfigInput,
-  GlobalConfigSchema,
 } from "./schema.js";
 
-const loadGlobalEnv = createEnvLoader<typeof GlobalConfigSchema>([
+const loadGlobalEnv = createEnvLoader<typeof PartialGlobalConfigSchema>([
   {
     key: "env",
     envVar: "NODE_ENV",
@@ -50,13 +51,30 @@ const loadSandboxConnectTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConf
   },
 ]);
 
+const loadSandboxEnv = createEnvLoader<typeof PartialGlobalSandboxConfigSchema>([
+  {
+    key: "defaultBaseImage",
+    envVar: "MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE",
+  },
+  {
+    key: "gatewayWsUrl",
+    envVar: "MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL",
+  },
+]);
+
 export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigInput {
   const partialGlobal = loadGlobalEnv(env);
+  const partialSandbox = loadSandboxEnv(env);
   const partialSandboxBootstrapToken = loadSandboxBootstrapTokenEnv(env);
   const partialSandboxConnectToken = loadSandboxConnectTokenEnv(env);
 
-  if (hasEntries(partialSandboxBootstrapToken) || hasEntries(partialSandboxConnectToken)) {
+  if (
+    hasEntries(partialSandbox) ||
+    hasEntries(partialSandboxBootstrapToken) ||
+    hasEntries(partialSandboxConnectToken)
+  ) {
     partialGlobal.sandbox = {
+      ...partialSandbox,
       ...(hasEntries(partialSandboxBootstrapToken)
         ? {
             bootstrap: partialSandboxBootstrapToken,
@@ -70,5 +88,5 @@ export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigIn
     };
   }
 
-  return GlobalConfigSchema.partial().parse(partialGlobal);
+  return PartialGlobalConfigSchema.parse(partialGlobal);
 }

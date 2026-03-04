@@ -23,8 +23,7 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_API_HOST: "127.0.0.1",
       MISTLE_APPS_CONTROL_PLANE_API_PORT: "5000",
       MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
-      MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE:
-        "127.0.0.1:5001/mistle/sandbox-base:dev",
+      MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: "127.0.0.1:5001/mistle/sandbox-base:dev",
       MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "3",
       MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON:
         '{"3":"integration-master-key"}',
@@ -42,6 +41,7 @@ describe("convertEnvToTomlRecord", () => {
       global: {
         env: "development",
         sandbox: {
+          default_base_image: "127.0.0.1:5001/mistle/sandbox-base:dev",
           bootstrap: {
             token_secret: "fixture-bootstrap-secret",
             token_issuer: "data-plane-worker",
@@ -62,9 +62,6 @@ describe("convertEnvToTomlRecord", () => {
           },
           data_plane_api: {
             base_url: "http://127.0.0.1:5300",
-          },
-          sandbox: {
-            default_base_image: "127.0.0.1:5001/mistle/sandbox-base:dev",
           },
           integrations: {
             active_master_encryption_key_version: 3,
@@ -105,6 +102,7 @@ describe("convertTomlToEnvRecord", () => {
       global: {
         env: "production",
         sandbox: {
+          default_base_image: "registry.example.com/mistle/sandbox-base:prod",
           bootstrap: {
             token_secret: "prod-bootstrap-secret",
             token_issuer: "data-plane-worker",
@@ -121,9 +119,6 @@ describe("convertTomlToEnvRecord", () => {
         control_plane_api: {
           data_plane_api: {
             base_url: "http://127.0.0.1:5300",
-          },
-          sandbox: {
-            default_base_image: "registry.example.com/mistle/sandbox-base:prod",
           },
           auth: {
             trusted_origins: ["https://a.example", "https://b.example"],
@@ -160,8 +155,7 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET: "prod-connection-secret",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER: "control-plane-api",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE: "data-plane-gateway",
-      MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE:
-        "registry.example.com/mistle/sandbox-base:prod",
+      MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: "registry.example.com/mistle/sandbox-base:prod",
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "https://a.example,https://b.example",
       MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "9",

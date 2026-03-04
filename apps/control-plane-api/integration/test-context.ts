@@ -179,10 +179,6 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
           dataPlaneApi: {
             baseUrl: "http://127.0.0.1:4000",
           },
-          sandbox: {
-            defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
-            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-          },
           integrations: {
             activeMasterEncryptionKeyVersion: 1,
             masterEncryptionKeys: {
@@ -207,6 +203,10 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
             secret: "integration-connection-secret",
             issuer: "integration-issuer",
             audience: "integration-audience",
+          },
+          sandbox: {
+            defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           },
         });
         cleanupTasks.unshift(async () => {

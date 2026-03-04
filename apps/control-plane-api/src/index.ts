@@ -19,6 +19,10 @@ async function startControlPlaneApi(): Promise<void> {
       issuer: loadedConfig.global.sandbox.connect.tokenIssuer,
       audience: loadedConfig.global.sandbox.connect.tokenAudience,
     },
+    sandbox: {
+      defaultBaseImage: loadedConfig.global.sandbox.defaultBaseImage,
+      gatewayWsUrl: loadedConfig.global.sandbox.gatewayWsUrl,
+    },
   });
 
   await runtime.start();

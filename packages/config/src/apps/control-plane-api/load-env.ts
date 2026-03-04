@@ -6,7 +6,6 @@ import {
   ControlPlaneApiDataPlaneApiConfigSchema,
   ControlPlaneApiDatabaseConfigSchema,
   ControlPlaneApiIntegrationsConfigSchema,
-  ControlPlaneApiSandboxConfigSchema,
   ControlPlaneApiServerConfigSchema,
   ControlPlaneApiWorkflowConfigSchema,
   PartialControlPlaneApiConfigSchema,
@@ -88,17 +87,6 @@ const loadDataPlaneApiEnv = createEnvLoader<typeof ControlPlaneApiDataPlaneApiCo
   },
 ]);
 
-const loadSandboxEnv = createEnvLoader<typeof ControlPlaneApiSandboxConfigSchema>([
-  {
-    key: "defaultBaseImage",
-    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE",
-  },
-  {
-    key: "gatewayWsUrl",
-    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_GATEWAY_WS_URL",
-  },
-]);
-
 const loadIntegrationsEnv = createEnvLoader<typeof ControlPlaneApiIntegrationsConfigSchema>([
   {
     key: "activeMasterEncryptionKeyVersion",
@@ -163,11 +151,6 @@ export function loadControlPlaneApiFromEnv(
   const dataPlaneApi = loadDataPlaneApiEnv(env);
   if (hasEntries(dataPlaneApi)) {
     partialConfig.dataPlaneApi = dataPlaneApi;
-  }
-
-  const sandbox = loadSandboxEnv(env);
-  if (hasEntries(sandbox)) {
-    partialConfig.sandbox = sandbox;
   }
 
   const integrations = loadIntegrationsEnv(env);

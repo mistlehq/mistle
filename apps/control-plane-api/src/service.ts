@@ -24,7 +24,7 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
   const sandboxInstancesService = createSandboxInstancesService({
     dataPlaneClient,
     defaultConnectionToken: {
-      gatewayWebsocketUrl: config.sandbox.gatewayWsUrl,
+      gatewayWebsocketUrl: runtimeConfig.sandbox.gatewayWsUrl,
       tokenTtlSeconds: SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS,
       tokenConfig: {
         connectionTokenSecret: runtimeConfig.connectionToken.secret,

@@ -21,10 +21,15 @@ export type ControlPlaneApiConnectionTokenConfig = {
   issuer: ControlPlaneApiGlobalConfig["sandbox"]["connect"]["tokenIssuer"];
   audience: ControlPlaneApiGlobalConfig["sandbox"]["connect"]["tokenAudience"];
 };
+export type ControlPlaneApiSandboxRuntimeConfig = {
+  defaultBaseImage: ControlPlaneApiGlobalConfig["sandbox"]["defaultBaseImage"];
+  gatewayWsUrl: ControlPlaneApiGlobalConfig["sandbox"]["gatewayWsUrl"];
+};
 export type ControlPlaneApiRuntimeConfig = {
   app: ControlPlaneApiConfig;
   internalAuthServiceToken: ControlPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
   connectionToken: ControlPlaneApiConnectionTokenConfig;
+  sandbox: ControlPlaneApiSandboxRuntimeConfig;
 };
 
 export type AppContextBindings = {
@@ -58,6 +63,7 @@ export type AppSession = {
 
 export type AppContextVariables = {
   config: ControlPlaneApiConfig;
+  sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   integrationRegistry: IntegrationRegistry;

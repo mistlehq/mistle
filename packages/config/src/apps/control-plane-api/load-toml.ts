@@ -15,7 +15,6 @@ export function loadControlPlaneApiFromToml(
   const auth = asObjectRecord(controlPlaneApi.auth);
   const workflow = asObjectRecord(controlPlaneApi.workflow);
   const dataPlaneApi = asObjectRecord(controlPlaneApi.data_plane_api);
-  const sandbox = asObjectRecord(controlPlaneApi.sandbox);
   const integrations = asObjectRecord(controlPlaneApi.integrations);
 
   let partialConfig: Record<string, unknown> = {
@@ -41,10 +40,6 @@ export function loadControlPlaneApiFromToml(
     },
     dataPlaneApi: {
       baseUrl: dataPlaneApi.base_url,
-    },
-    sandbox: {
-      defaultBaseImage: sandbox.default_base_image,
-      gatewayWsUrl: sandbox.gateway_ws_url,
     },
   };
 
