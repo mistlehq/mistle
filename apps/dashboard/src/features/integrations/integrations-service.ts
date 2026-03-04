@@ -26,40 +26,7 @@ const IntegrationTargetSchema = z
         configStatus: z.enum(["valid", "invalid"]),
       })
       .strict(),
-    resolvedBindingUi: z
-      .object({
-        openaiAgent: z
-          .object({
-            kind: z.literal("agent"),
-            runtime: z.literal("codex-cli"),
-            familyId: z.literal("openai"),
-            variantId: z.literal("openai-default"),
-            byAuthScheme: z.record(
-              z.enum(["api-key", "oauth"]),
-              z
-                .object({
-                  models: z.array(z.string().min(1)),
-                  allowedReasoningByModel: z.record(
-                    z.string().min(1),
-                    z.array(z.enum(["low", "medium", "high", "xhigh"])).min(1),
-                  ),
-                  defaultReasoningByModel: z.record(
-                    z.string().min(1),
-                    z.enum(["low", "medium", "high", "xhigh"]),
-                  ),
-                  reasoningLabels: z.record(
-                    z.enum(["low", "medium", "high", "xhigh"]),
-                    z.string().min(1),
-                  ),
-                })
-                .strict(),
-            ),
-          })
-          .strict()
-          .optional(),
-      })
-      .strict()
-      .optional(),
+    resolvedBindingUi: z.record(z.string().min(1), z.unknown()).optional(),
   })
   .strict();
 

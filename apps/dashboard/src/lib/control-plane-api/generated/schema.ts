@@ -587,48 +587,7 @@ export interface paths {
                 enabled: boolean;
                 familyId: string;
                 resolvedBindingUi?: {
-                  openaiAgent?: {
-                    byAuthScheme: {
-                      "api-key"?: {
-                        allowedReasoningByModel: {
-                          [key: string]: ("low" | "medium" | "high" | "xhigh")[];
-                        };
-                        defaultReasoningByModel: {
-                          [key: string]: "low" | "medium" | "high" | "xhigh";
-                        };
-                        models: string[];
-                        reasoningLabels: {
-                          high?: string;
-                          low?: string;
-                          medium?: string;
-                          xhigh?: string;
-                        };
-                      };
-                      oauth?: {
-                        allowedReasoningByModel: {
-                          [key: string]: ("low" | "medium" | "high" | "xhigh")[];
-                        };
-                        defaultReasoningByModel: {
-                          [key: string]: "low" | "medium" | "high" | "xhigh";
-                        };
-                        models: string[];
-                        reasoningLabels: {
-                          high?: string;
-                          low?: string;
-                          medium?: string;
-                          xhigh?: string;
-                        };
-                      };
-                    };
-                    /** @enum {string} */
-                    familyId: "openai";
-                    /** @enum {string} */
-                    kind: "agent";
-                    /** @enum {string} */
-                    runtime: "codex-cli";
-                    /** @enum {string} */
-                    variantId: "openai-default";
-                  };
+                  [key: string]: unknown;
                 };
                 targetHealth: {
                   /** @enum {string} */

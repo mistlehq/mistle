@@ -22,3 +22,9 @@ export {
 } from "./model-capabilities.js";
 export { compileOpenAiApiKeyBinding } from "./compile-binding.js";
 export { OpenAiApiKeyCredentialSecretTypes, OpenAiApiKeySupportedAuthSchemes } from "./auth.js";
+export { projectOpenAiTargetUi } from "./project-target-ui.js";
+export {
+  OpenAiTargetUiProjectionSchema,
+  parseOpenAiTargetUiProjection,
+  type OpenAiTargetUiProjection,
+} from "./ui-contract.js";

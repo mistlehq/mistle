@@ -5,10 +5,9 @@ import {
   parseOpenAiAgentBindingConfig,
   readOpenAiAuthScheme,
   resolveOpenAiCapabilitySet,
-  type OpenAiResolvedBindingUi,
 } from "./openai-binding-capabilities.js";
 
-const SAMPLE_RESOLVED_BINDING_UI: OpenAiResolvedBindingUi = {
+const SAMPLE_RESOLVED_BINDING_UI: Record<string, unknown> = {
   openaiAgent: {
     kind: "agent",
     runtime: "codex-cli",
@@ -16,13 +15,28 @@ const SAMPLE_RESOLVED_BINDING_UI: OpenAiResolvedBindingUi = {
     variantId: "openai-default",
     byAuthScheme: {
       "api-key": {
-        models: ["gpt-5.3-codex", "gpt-5.1-codex-mini"],
+        models: [
+          "gpt-5.3-codex",
+          "gpt-5.3-codex-spark",
+          "gpt-5.2-codex",
+          "gpt-5.1-codex-max",
+          "gpt-5.2",
+          "gpt-5.1-codex-mini",
+        ],
         allowedReasoningByModel: {
           "gpt-5.3-codex": ["low", "medium", "high", "xhigh"],
+          "gpt-5.3-codex-spark": ["low", "medium", "high", "xhigh"],
+          "gpt-5.2-codex": ["low", "medium", "high", "xhigh"],
+          "gpt-5.1-codex-max": ["low", "medium", "high", "xhigh"],
+          "gpt-5.2": ["low", "medium", "high", "xhigh"],
           "gpt-5.1-codex-mini": ["medium", "high"],
         },
         defaultReasoningByModel: {
           "gpt-5.3-codex": "medium",
+          "gpt-5.3-codex-spark": "high",
+          "gpt-5.2-codex": "medium",
+          "gpt-5.1-codex-max": "medium",
+          "gpt-5.2": "medium",
           "gpt-5.1-codex-mini": "medium",
         },
         reasoningLabels: {
@@ -33,12 +47,29 @@ const SAMPLE_RESOLVED_BINDING_UI: OpenAiResolvedBindingUi = {
         },
       },
       oauth: {
-        models: ["gpt-5.3-codex-spark"],
+        models: [
+          "gpt-5.3-codex",
+          "gpt-5.3-codex-spark",
+          "gpt-5.2-codex",
+          "gpt-5.1-codex-max",
+          "gpt-5.2",
+          "gpt-5.1-codex-mini",
+        ],
         allowedReasoningByModel: {
+          "gpt-5.3-codex": ["low", "medium", "high", "xhigh"],
           "gpt-5.3-codex-spark": ["low", "medium", "high", "xhigh"],
+          "gpt-5.2-codex": ["low", "medium", "high", "xhigh"],
+          "gpt-5.1-codex-max": ["low", "medium", "high", "xhigh"],
+          "gpt-5.2": ["low", "medium", "high", "xhigh"],
+          "gpt-5.1-codex-mini": ["medium", "high"],
         },
         defaultReasoningByModel: {
+          "gpt-5.3-codex": "medium",
           "gpt-5.3-codex-spark": "high",
+          "gpt-5.2-codex": "medium",
+          "gpt-5.1-codex-max": "medium",
+          "gpt-5.2": "medium",
+          "gpt-5.1-codex-mini": "medium",
         },
         reasoningLabels: {
           low: "Low",
@@ -65,14 +96,28 @@ describe("openai binding capabilities", () => {
         resolvedBindingUi: SAMPLE_RESOLVED_BINDING_UI,
         authScheme: "api-key",
       })?.models,
-    ).toEqual(["gpt-5.3-codex", "gpt-5.1-codex-mini"]);
+    ).toEqual([
+      "gpt-5.3-codex",
+      "gpt-5.3-codex-spark",
+      "gpt-5.2-codex",
+      "gpt-5.1-codex-max",
+      "gpt-5.2",
+      "gpt-5.1-codex-mini",
+    ]);
 
     expect(
       resolveOpenAiCapabilitySet({
         resolvedBindingUi: SAMPLE_RESOLVED_BINDING_UI,
         authScheme: "oauth",
       })?.models,
-    ).toEqual(["gpt-5.3-codex-spark"]);
+    ).toEqual([
+      "gpt-5.3-codex",
+      "gpt-5.3-codex-spark",
+      "gpt-5.2-codex",
+      "gpt-5.1-codex-max",
+      "gpt-5.2",
+      "gpt-5.1-codex-mini",
+    ]);
   });
 
   it("creates default config from capability set", () => {

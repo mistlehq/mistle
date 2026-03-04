@@ -1,8 +1,4 @@
-import {
-  createIntegrationRegistry,
-  OpenAiApiKeyTargetConfigSchema,
-  OpenAiReasoningEffortLabelByValue,
-} from "@mistle/integrations-definitions";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 
 const IntegrationRegistry = createIntegrationRegistry();
 
@@ -10,25 +6,7 @@ export type ProjectedTargetHealth = {
   configStatus: "valid" | "invalid";
 };
 
-export type ProjectedOpenAiBindingUi = {
-  kind: "agent";
-  runtime: "codex-cli";
-  familyId: "openai";
-  variantId: "openai-default";
-  byAuthScheme: Record<
-    "api-key" | "oauth",
-    {
-      models: string[];
-      allowedReasoningByModel: Record<string, ("low" | "medium" | "high" | "xhigh")[]>;
-      defaultReasoningByModel: Record<string, "low" | "medium" | "high" | "xhigh">;
-      reasoningLabels: Record<"low" | "medium" | "high" | "xhigh", string>;
-    }
-  >;
-};
-
-export type ProjectedBindingUi = {
-  openaiAgent?: ProjectedOpenAiBindingUi;
-};
+export type ProjectedBindingUi = Record<string, unknown>;
 
 export function projectTargetUi(input: {
   familyId: string;
@@ -51,45 +29,29 @@ export function projectTargetUi(input: {
   }
 
   try {
-    definition.targetConfigSchema.parse(input.config);
+    const parsedTargetConfig = definition.targetConfigSchema.parse(input.config);
+    const projectedBindingUi =
+      definition.projectTargetUi === undefined
+        ? undefined
+        : definition.projectTargetUi({
+            familyId: input.familyId,
+            variantId: input.variantId,
+            kind: definition.kind,
+            targetConfig: parsedTargetConfig,
+          });
+    const resolvedBindingUi =
+      projectedBindingUi === undefined
+        ? undefined
+        : definition.targetUiProjectionSchema === undefined
+          ? projectedBindingUi
+          : definition.targetUiProjectionSchema.parse(projectedBindingUi);
 
-    if (
-      input.familyId === "openai" &&
-      input.variantId === "openai-default" &&
-      definition.kind === "agent"
-    ) {
-      const openAiConfig = OpenAiApiKeyTargetConfigSchema.parse(input.config);
-
+    if (resolvedBindingUi !== undefined) {
       return {
         targetHealth: {
           configStatus: "valid",
         },
-        resolvedBindingUi: {
-          openaiAgent: {
-            kind: "agent",
-            runtime: "codex-cli",
-            familyId: "openai",
-            variantId: "openai-default",
-            byAuthScheme: {
-              "api-key": {
-                models: openAiConfig.bindingCapabilities.byAuthScheme["api-key"].models,
-                allowedReasoningByModel:
-                  openAiConfig.bindingCapabilities.byAuthScheme["api-key"].allowedReasoningByModel,
-                defaultReasoningByModel:
-                  openAiConfig.bindingCapabilities.byAuthScheme["api-key"].defaultReasoningByModel,
-                reasoningLabels: OpenAiReasoningEffortLabelByValue,
-              },
-              oauth: {
-                models: openAiConfig.bindingCapabilities.byAuthScheme.oauth.models,
-                allowedReasoningByModel:
-                  openAiConfig.bindingCapabilities.byAuthScheme.oauth.allowedReasoningByModel,
-                defaultReasoningByModel:
-                  openAiConfig.bindingCapabilities.byAuthScheme.oauth.defaultReasoningByModel,
-                reasoningLabels: OpenAiReasoningEffortLabelByValue,
-              },
-            },
-          },
-        },
+        resolvedBindingUi,
       };
     }
 

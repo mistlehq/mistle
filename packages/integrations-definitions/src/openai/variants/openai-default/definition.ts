@@ -9,10 +9,12 @@ import {
   OpenAiRuntimes,
 } from "./binding-config-schema.js";
 import { compileOpenAiApiKeyBinding } from "./compile-binding.js";
+import { projectOpenAiTargetUi } from "./project-target-ui.js";
 import {
   OpenAiApiKeyTargetConfigSchema,
   type OpenAiApiKeyTargetConfig,
 } from "./target-config-schema.js";
+import { OpenAiTargetUiProjectionSchema } from "./ui-contract.js";
 import { validateOpenAiBindingWriteContext } from "./validate-binding-write-context.js";
 
 type OpenAiApiKeyIntegrationDefinition = IntegrationDefinition<
@@ -44,6 +46,11 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   connectionConfigSchema: OpenAiConnectionConfigSchema,
   supportedAuthSchemes: OpenAiApiKeySupportedAuthSchemes,
   validateBindingWriteContext: validateOpenAiBindingWriteContext,
+  projectTargetUi: ({ targetConfig }) =>
+    projectOpenAiTargetUi({
+      targetConfig,
+    }),
+  targetUiProjectionSchema: OpenAiTargetUiProjectionSchema,
   userConfigSlots: [
     {
       kind: "file",

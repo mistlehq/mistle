@@ -104,6 +104,8 @@ export type BindingWriteValidationResult =
       issues: readonly BindingWriteValidationIssue[];
     };
 
+export type IntegrationTargetUiProjection = Record<string, unknown>;
+
 export type IntegrationResolvedTarget<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
@@ -635,6 +637,13 @@ export type IntegrationDefinition<
       Record<string, unknown>
     >,
   ): BindingWriteValidationResult;
+  projectTargetUi?(input: {
+    familyId: string;
+    variantId: string;
+    kind: IntegrationKind;
+    targetConfig: ParsedSchemaOutput<TTargetConfigSchema>;
+  }): IntegrationTargetUiProjection;
+  targetUiProjectionSchema?: IntegrationConfigSchema<IntegrationTargetUiProjection>;
   compileBinding(
     input: CompileBindingInput<
       ParsedSchemaOutput<TTargetConfigSchema>,

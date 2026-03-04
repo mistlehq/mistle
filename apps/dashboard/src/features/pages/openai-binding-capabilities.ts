@@ -1,3 +1,8 @@
+import {
+  parseOpenAiTargetUiProjection,
+  type OpenAiTargetUiProjection,
+} from "@mistle/integrations-definitions/ui";
+
 type UnknownRecord = Record<string, unknown>;
 
 const OPENAI_RUNTIME_CODEX_CLI = "codex-cli";
@@ -10,24 +15,11 @@ const OPENAI_REASONING_VALUES: readonly OpenAiReasoningEffort[] = [
   "xhigh",
 ];
 export type OpenAiAuthScheme = "api-key" | "oauth";
-
 export type OpenAiCapabilitySet = {
   models: readonly string[];
   allowedReasoningByModel: Record<string, readonly OpenAiReasoningEffort[]>;
   defaultReasoningByModel: Record<string, OpenAiReasoningEffort>;
   reasoningLabels: Record<OpenAiReasoningEffort, string>;
-};
-
-export type OpenAiResolvedBindingUi = {
-  openaiAgent?:
-    | {
-        kind: "agent";
-        runtime: "codex-cli";
-        familyId: "openai";
-        variantId: "openai-default";
-        byAuthScheme: Record<OpenAiAuthScheme, OpenAiCapabilitySet>;
-      }
-    | undefined;
 };
 
 export type OpenAiAgentBindingConfig = {
@@ -38,6 +30,27 @@ export type OpenAiAgentBindingConfig = {
 
 function isReasoningEffort(value: string): value is OpenAiReasoningEffort {
   return OPENAI_REASONING_VALUES.some((candidate) => candidate === value);
+}
+
+function mapStrictCapabilitySetToUiCapabilitySet(
+  capabilitySet: OpenAiTargetUiProjection["openaiAgent"]["byAuthScheme"][OpenAiAuthScheme],
+): OpenAiCapabilitySet {
+  const allowedReasoningByModel: Record<string, readonly OpenAiReasoningEffort[]> = {};
+  for (const [modelId, reasoningOptions] of Object.entries(capabilitySet.allowedReasoningByModel)) {
+    allowedReasoningByModel[modelId] = reasoningOptions;
+  }
+
+  const defaultReasoningByModel: Record<string, OpenAiReasoningEffort> = {};
+  for (const [modelId, defaultReasoning] of Object.entries(capabilitySet.defaultReasoningByModel)) {
+    defaultReasoningByModel[modelId] = defaultReasoning;
+  }
+
+  return {
+    models: capabilitySet.models,
+    allowedReasoningByModel,
+    defaultReasoningByModel,
+    reasoningLabels: capabilitySet.reasoningLabels,
+  };
 }
 
 function readString(record: UnknownRecord, key: string): string | undefined {
@@ -62,14 +75,16 @@ export function readOpenAiAuthScheme(
 }
 
 export function resolveOpenAiCapabilitySet(input: {
-  resolvedBindingUi: OpenAiResolvedBindingUi | undefined;
+  resolvedBindingUi: Record<string, unknown> | undefined;
   authScheme: OpenAiAuthScheme;
 }): OpenAiCapabilitySet | undefined {
-  const openAiAgent = input.resolvedBindingUi?.openaiAgent;
-  if (openAiAgent === undefined) {
+  const parsedProjection = parseOpenAiTargetUiProjection(input.resolvedBindingUi);
+  if (parsedProjection === undefined) {
     return undefined;
   }
-  return openAiAgent.byAuthScheme[input.authScheme];
+  return mapStrictCapabilitySetToUiCapabilitySet(
+    parsedProjection.openaiAgent.byAuthScheme[input.authScheme],
+  );
 }
 
 export function parseOpenAiAgentBindingConfig(

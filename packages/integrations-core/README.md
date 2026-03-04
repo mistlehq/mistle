@@ -1,4 +1,4 @@
- # Integrations API
+# Integrations API
 
 This README describes Mistle's Integrations API architecture and how to add a new integration.
 
@@ -100,6 +100,8 @@ Key fields and what they drive:
 | `userConfigSlots`                       | User-configurable runtime setup slots            | Runtime/client customization contract     |
 | `userSecretSlots` (optional)            | User-supplied connection secret slots            | Connection create/complete validation     |
 | `validateBindingWriteContext(...)`      | Contextual target/connection/binding validation  | Binding write and compile parity checks   |
+| `projectTargetUi(...)` (optional)       | Projects validated target config to UI-safe data | Target discovery projection               |
+| `targetUiProjectionSchema` (optional)   | Validates projected UI payload shape             | Target discovery projection               |
 | `compileBinding(...)`                   | Generate egress/artifacts/runtime clients        | Runtime plan compiler                     |
 
 ## Lifecycle End-To-End
@@ -129,6 +131,8 @@ flowchart TD
 - Discovery resolves metadata from definitions (`displayName`, `description`) with optional DB overrides.
 - Control-plane target discovery may also include projected UI-safe metadata derived from validated target config (for example `targetHealth` and `resolvedBindingUi`).
 - UI consumers should prefer projection fields for behavior and rendering instead of parsing raw target config payloads directly.
+- Provider projection logic and projection schema are definition-owned. Control-plane only orchestrates parse/project/validate and returns generic projection envelopes.
+- For browser clients, definitions can expose browser-safe projection contracts/parsers through `@mistle/integrations-definitions/ui` (for example `ui-contract.ts` modules), so dashboard code does not duplicate provider schema logic.
 
 ### 2) Connection creation
 
@@ -193,6 +197,7 @@ This is the recommended workflow.
 - `target-secret-schema.ts` (if needed)
 - `binding-config-schema.ts`
 - `connection-config-schema.ts` (if connection config has integration-specific shape)
+- `ui-contract.ts` (recommended): browser-safe projection schema/parser for `resolvedBindingUi` payload consumed by frontend clients
 - Keep schemas strict and normalized (for example URL normalization).
 - If binding semantics depend on cross-object context (target + connection + binding), implement `validateBindingWriteContext(...)` in the definition.
 
@@ -233,6 +238,8 @@ This is the recommended workflow.
 - Compile tests for egress/artifacts/runtime clients.
 - OAuth/webhook handler tests (if implemented).
 - Control-plane integration tests for connection and compile flows.
+- Projection contract tests: ensure `projectTargetUi(...)` output validates against `targetUiProjectionSchema`.
+- Browser-safe contract tests: ensure `ui-contract.ts` parser accepts valid projections and rejects invalid payloads.
 
 ## Design Principles
 

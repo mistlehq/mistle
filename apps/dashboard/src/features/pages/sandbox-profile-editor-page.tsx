@@ -57,7 +57,6 @@ import {
   type OpenAiAgentBindingConfig,
   type OpenAiCapabilitySet,
   type OpenAiReasoningEffort,
-  type OpenAiResolvedBindingUi,
 } from "./openai-binding-capabilities.js";
 
 type SandboxProfileEditorPageProps = {
@@ -97,7 +96,7 @@ type IntegrationTargetSummary = {
   targetHealth: {
     configStatus: "valid" | "invalid";
   };
-  resolvedBindingUi?: OpenAiResolvedBindingUi | undefined;
+  resolvedBindingUi?: Record<string, unknown> | undefined;
 };
 
 type GitHubBindingConfig = {
