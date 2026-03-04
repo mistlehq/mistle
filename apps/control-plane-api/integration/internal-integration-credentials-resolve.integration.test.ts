@@ -61,7 +61,7 @@ describe("internal integration credentials resolve", () => {
     await expect(resolveResponse.json()).resolves.toEqual({
       value: "sk-integration-test",
     });
-  }, 60_000);
+  });
 
   it("rejects requests with invalid internal service token", async ({ fixture }) => {
     const response = await fixture.request(

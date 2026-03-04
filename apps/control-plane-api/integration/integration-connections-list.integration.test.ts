@@ -22,26 +22,29 @@ describe("integration connections list integration", () => {
       email: "integration-connections-list-org-b@example.com",
     });
 
-    await fixture.db.insert(integrationTargets).values([
-      {
-        targetKey: "github_cloud",
-        familyId: "github",
-        variantId: "github-cloud",
-        enabled: true,
-        config: {
-          base_url: "https://github.com",
+    await fixture.db
+      .insert(integrationTargets)
+      .values([
+        {
+          targetKey: "github_cloud",
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            base_url: "https://github.com",
+          },
         },
-      },
-      {
-        targetKey: "openai-default",
-        familyId: "openai",
-        variantId: "openai-default",
-        enabled: true,
-        config: {
-          api_base_url: "https://api.openai.com",
+        {
+          targetKey: "openai-default",
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com",
+          },
         },
-      },
-    ]);
+      ])
+      .onConflictDoNothing();
 
     const firstConnectionCreatedAt = new Date("2026-01-01T00:00:00.000Z");
     const secondConnectionCreatedAt = new Date("2026-01-02T00:00:00.000Z");
@@ -185,7 +188,7 @@ describe("integration connections list integration", () => {
 
     expect(previousPage.totalResults).toBe(3);
     expect(previousPage.items.map((connection) => connection.id)).toEqual(["icn_001", "icn_002"]);
-  }, 60_000);
+  });
 
   it("returns 400 for invalid pagination cursor", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -201,7 +204,7 @@ describe("integration connections list integration", () => {
 
     const bodyText = await response.text();
     expect(bodyText).toContain('"code":"INVALID_PAGINATION_CURSOR"');
-  }, 60_000);
+  });
 
   it("returns 400 for invalid list query payload", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -218,7 +221,7 @@ describe("integration connections list integration", () => {
     const body = ValidationErrorResponseSchema.parse(await response.json());
     expect(body.success).toBe(false);
     expect(body.error.name).toBe("ZodError");
-  }, 60_000);
+  });
 
   it("returns 401 when the request is unauthenticated", async ({ fixture }) => {
     const response = await fixture.request("/v1/integration/connections");
@@ -228,5 +231,5 @@ describe("integration connections list integration", () => {
       code: "UNAUTHORIZED",
       message: "Unauthorized API request.",
     });
-  }, 60_000);
+  });
 });

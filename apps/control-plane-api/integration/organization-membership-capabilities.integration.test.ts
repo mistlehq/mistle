@@ -44,7 +44,7 @@ describe("organization membership capabilities integration", () => {
       },
       error: null,
     });
-  }, 60_000);
+  });
 
   it("returns 403 for an authenticated actor without organization membership", async ({
     fixture,
@@ -77,7 +77,7 @@ describe("organization membership capabilities integration", () => {
         retryable: false,
       },
     });
-  }, 60_000);
+  });
 
   it("returns 404 for an organization that does not exist", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -105,7 +105,7 @@ describe("organization membership capabilities integration", () => {
         retryable: false,
       },
     });
-  }, 60_000);
+  });
 
   it("returns 401 when the actor is unauthenticated", async ({ fixture }) => {
     const response = await fixture.request("/v1/organizations/org_missing/membership-capabilities");
@@ -115,5 +115,5 @@ describe("organization membership capabilities integration", () => {
       code: "UNAUTHORIZED",
       message: "Unauthorized API request.",
     });
-  }, 60_000);
+  });
 });

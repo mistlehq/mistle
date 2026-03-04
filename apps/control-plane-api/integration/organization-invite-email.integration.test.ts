@@ -1,15 +1,24 @@
 import { randomUUID } from "node:crypto";
 
+import { SendOrganizationInvitationWorkflowSpec } from "@mistle/workflows/control-plane";
 import { describe, expect } from "vitest";
 
+import { countControlPlaneWorkflowRuns } from "./helpers/workflow-runs.js";
 import { it } from "./test-context.js";
 
 describe("organization invite email integration", () => {
-  it("sends an invitation email when inviting a member", async ({ fixture }) => {
+  it("persists an invitation and enqueues invitation delivery workflow", async ({ fixture }) => {
     const inviterSession = await fixture.authSession({
       email: "integration-organization-invite-sender@example.com",
     });
     const inviteeEmail = `invitee-${randomUUID()}@example.com`;
+    const queuedInvitationRunsBefore = await countControlPlaneWorkflowRuns({
+      databaseUrl: fixture.databaseStack.directUrl,
+      workflowName: SendOrganizationInvitationWorkflowSpec.name,
+      inputEquals: {
+        email: inviteeEmail,
+      },
+    });
 
     const inviteResponse = await fixture.request("/v1/auth/organization/invite-member", {
       method: "POST",
@@ -26,17 +35,33 @@ describe("organization invite email integration", () => {
 
     expect(inviteResponse.status).toBe(200);
 
-    const invitationMessage = await fixture.mailpitService.waitForMessage({
-      timeoutMs: 15_000,
-      description: `Organization invitation email for ${inviteeEmail}`,
-      matcher: ({ message }) =>
-        message.Subject.startsWith("You're invited to join") &&
-        message.To.some((address) => address.Address === inviteeEmail),
+    const invitation = await fixture.db.query.invitations.findFirst({
+      columns: {
+        id: true,
+        organizationId: true,
+        email: true,
+        status: true,
+      },
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, inviterSession.organizationId),
+          eq(table.email, inviteeEmail),
+          eq(table.status, "pending"),
+        ),
     });
+    expect(invitation).toBeDefined();
+    if (invitation === undefined) {
+      throw new Error("Expected invitation row to be persisted.");
+    }
+    expect(invitation.email).toBe(inviteeEmail);
 
-    const invitationSummary = await fixture.mailpitService.getMessageSummary(invitationMessage.ID);
-    expect(invitationSummary.Text).toContain("Accept invitation:");
-    expect(invitationSummary.Text).toContain("invitationId=");
-    expect(invitationSummary.Text).toContain(`email=${encodeURIComponent(inviteeEmail)}`);
-  }, 60_000);
+    const queuedInvitationRunsAfter = await countControlPlaneWorkflowRuns({
+      databaseUrl: fixture.databaseStack.directUrl,
+      workflowName: SendOrganizationInvitationWorkflowSpec.name,
+      inputEquals: {
+        email: inviteeEmail,
+      },
+    });
+    expect(queuedInvitationRunsAfter).toBe(queuedInvitationRunsBefore + 1);
+  });
 });

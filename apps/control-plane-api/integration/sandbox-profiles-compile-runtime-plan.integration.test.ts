@@ -7,6 +7,7 @@ import {
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
+import { IntegrationSupportedAuthSchemes } from "@mistle/integrations-core";
 import { describe, expect } from "vitest";
 
 import { compileProfileVersionRuntimePlan } from "../src/sandbox-profiles/services/compile-profile-version-runtime-plan.js";
@@ -36,20 +37,26 @@ describe("sandbox profile compile runtime plan integration", () => {
       sandboxProfileId: "sbp_compile_success",
       version: 1,
     });
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com/v1",
-      },
-    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "openai-default",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com/v1",
+        },
+      })
+      .onConflictDoNothing();
     await fixture.db.insert(integrationConnections).values({
       id: "icn_compile_success",
       organizationId: authenticatedSession.organizationId,
       targetKey: "openai-default",
       status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
+      },
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
       id: "ibd_compile_success",
@@ -160,7 +167,7 @@ model_reasoning_effort = "medium"
         ],
       },
     ]);
-  }, 60_000);
+  });
 
   it("returns profile not found when the sandbox profile does not exist", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -194,7 +201,7 @@ model_reasoning_effort = "medium"
         expect(error.code).toBe(SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND);
       }
     }
-  }, 60_000);
+  });
 
   it("returns profile version not found when the version does not exist", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -235,7 +242,7 @@ model_reasoning_effort = "medium"
         expect(error.code).toBe(SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND);
       }
     }
-  }, 60_000);
+  });
 
   it("fails when a binding references a connection from another organization", async ({
     fixture,
@@ -257,15 +264,18 @@ model_reasoning_effort = "medium"
       sandboxProfileId: "sbp_compile_missing_connection",
       version: 1,
     });
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default-missing-connection",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com/v1",
-      },
-    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "openai-default-missing-connection",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com/v1",
+        },
+      })
+      .onConflictDoNothing();
     await fixture.db.insert(integrationConnections).values({
       id: "icn_missing",
       organizationId: inaccessibleConnectionSession.organizationId,
@@ -314,7 +324,7 @@ model_reasoning_effort = "medium"
         );
       }
     }
-  }, 60_000);
+  });
 
   it("fails when a target has invalid encrypted secrets", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -331,20 +341,23 @@ model_reasoning_effort = "medium"
       sandboxProfileId: "sbp_compile_invalid_target_secrets",
       version: 1,
     });
-    await fixture.db.insert(integrationTargets).values({
-      targetKey: "openai-default-invalid-target-secrets",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      config: {
-        api_base_url: "https://api.openai.com/v1",
-      },
-      secrets: {
-        masterKeyVersion: 999,
-        nonce: "invalid",
-        ciphertext: "invalid",
-      },
-    });
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "openai-default-invalid-target-secrets",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com/v1",
+        },
+        secrets: {
+          masterKeyVersion: 999,
+          nonce: "invalid",
+          ciphertext: "invalid",
+        },
+      })
+      .onConflictDoNothing();
     await fixture.db.insert(integrationConnections).values({
       id: "icn_compile_invalid_target_secrets",
       organizationId: authenticatedSession.organizationId,
@@ -391,5 +404,5 @@ model_reasoning_effort = "medium"
         expect(error.code).toBe(SandboxProfilesCompileErrorCodes.INVALID_TARGET_SECRETS);
       }
     }
-  }, 60_000);
+  });
 });

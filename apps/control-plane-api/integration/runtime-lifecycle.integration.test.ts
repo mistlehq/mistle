@@ -3,7 +3,7 @@ import { describe, expect } from "vitest";
 
 import { createApp, getAppDatabase, stopApp } from "../src/app.js";
 import { createControlPlaneApiRuntime } from "../src/runtime/index.js";
-import { createRuntimeConfigWithPort } from "./config.js";
+import type { ControlPlaneApiConfig } from "../src/types.js";
 import { it } from "./test-context.js";
 
 const IntegrationConnectionTokenConfig = {
@@ -11,6 +11,29 @@ const IntegrationConnectionTokenConfig = {
   issuer: "integration-issuer",
   audience: "integration-audience",
 } as const;
+
+function createRuntimeConfigWithPort(input: {
+  config: ControlPlaneApiConfig;
+  host: string;
+  port: number;
+}): ControlPlaneApiConfig {
+  const baseUrl = `http://${input.host}:${String(input.port)}`;
+
+  return {
+    ...input.config,
+    server: {
+      ...input.config.server,
+      host: input.host,
+      port: input.port,
+    },
+    auth: {
+      ...input.config.auth,
+      baseUrl,
+      trustedOrigins: [baseUrl],
+    },
+  };
+}
+
 describe("runtime lifecycle integration", () => {
   it("enforces start/stop runtime lifecycle semantics", async ({ fixture }) => {
     const host = "127.0.0.1";
@@ -42,7 +65,7 @@ describe("runtime lifecycle integration", () => {
     } finally {
       await runtime.stop();
     }
-  }, 60_000);
+  });
 
   it("serves health checks over HTTP when started and closes listener on stop", async ({
     fixture,
@@ -73,7 +96,7 @@ describe("runtime lifecycle integration", () => {
     }
 
     await expect(fetch(healthURL)).rejects.toThrowError();
-  }, 60_000);
+  });
 
   it("releases app resources after stopApp", async ({ fixture }) => {
     const app = await createApp({
@@ -86,5 +109,5 @@ describe("runtime lifecycle integration", () => {
     await stopApp(app);
 
     expect(() => getAppDatabase(app)).toThrowError("Control plane app instance is unknown.");
-  }, 60_000);
+  });
 });

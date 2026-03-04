@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
-import type { MailpitService } from "@mistle/test-harness";
+
+import { readLatestSignInOtp } from "./sign-in-otp.js";
 
 export type AuthenticatedSession = {
   cookie: string;
@@ -12,17 +13,9 @@ export type AuthenticatedSession = {
 export type CreateAuthenticatedSessionInput = {
   request: (path: string, init?: RequestInit) => Promise<Response>;
   db: ControlPlaneDatabase;
-  mailpitService: MailpitService;
   otpLength: number;
   email?: string;
 };
-
-function extractOTPCode(text: string, otpLength: number): string | undefined {
-  const pattern = new RegExp(`\\b(\\d{${String(otpLength)}})\\b`);
-  const match = text.match(pattern);
-
-  return match?.[1];
-}
 
 function extractRequestCookie(setCookieHeader: string): string {
   const [cookiePair] = setCookieHeader.split(";");
@@ -65,18 +58,11 @@ export async function createAuthenticatedSession(
     throw new Error(`Expected OTP send response status 200, got ${String(sendResponse.status)}.`);
   }
 
-  const listItem = await input.mailpitService.waitForMessage({
-    timeoutMs: 15_000,
-    description: `OTP email for ${email}`,
-    matcher: ({ message }) =>
-      message.Subject === "Your sign-in code" &&
-      message.To.some((address) => address.Address === email),
+  const otp = await readLatestSignInOtp({
+    db: input.db,
+    email,
+    otpLength: input.otpLength,
   });
-  const message = await input.mailpitService.getMessageSummary(listItem.ID);
-  const otp = extractOTPCode(message.Text, input.otpLength);
-  if (otp === undefined) {
-    throw new Error("OTP was not found in Mailpit message text.");
-  }
 
   const signInResponse = await input.request("/v1/auth/sign-in/email-otp", {
     method: "POST",

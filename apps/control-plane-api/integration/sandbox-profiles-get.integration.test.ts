@@ -32,12 +32,12 @@ describe("sandbox profiles get integration", () => {
     expect(body.id).toBe("sbp_get_001");
     expect(body.organizationId).toBe(authenticatedSession.organizationId);
     expect(body.displayName).toBe("Get Profile");
-  }, 60_000);
+  });
 
   it("returns 401 when no authenticated session is provided", async ({ fixture }) => {
     const response = await fixture.request("/v1/sandbox/profiles/sbp_get_unauth");
     expect(response.status).toBe(401);
-  }, 60_000);
+  });
 
   it("returns 404 for profiles outside the authenticated user's organization", async ({
     fixture,
@@ -67,5 +67,5 @@ describe("sandbox profiles get integration", () => {
 
     const body = NotFoundResponseSchema.parse(await response.json());
     expect(body.code).toBe("PROFILE_NOT_FOUND");
-  }, 60_000);
+  });
 });

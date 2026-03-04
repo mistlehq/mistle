@@ -1,5 +1,5 @@
 import { SandboxProfileStatuses, sandboxProfiles } from "@mistle/db/control-plane";
-import { systemClock, systemSleeper } from "@mistle/time";
+import { RequestDeleteSandboxProfileWorkflowSpec } from "@mistle/workflows/control-plane";
 import { describe, expect } from "vitest";
 
 import {
@@ -7,43 +7,21 @@ import {
   SandboxProfileDeletionAcceptedResponseSchema,
   ValidationErrorResponseSchema,
 } from "../src/sandbox-profiles/contracts.js";
-import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
+import { countControlPlaneWorkflowRuns } from "./helpers/workflow-runs.js";
 import { it } from "./test-context.js";
 
-const DELETE_WORKFLOW_TIMEOUT_MS = 10_000;
-const DELETE_WORKFLOW_POLL_INTERVAL_MS = 100;
-
-async function waitForProfileDeletion(input: {
-  fixture: ControlPlaneApiIntegrationFixture;
-  profileId: string;
-  organizationId: string;
-  timeoutMs: number;
-}): Promise<void> {
-  const timeoutAt = systemClock.nowMs() + input.timeoutMs;
-
-  while (systemClock.nowMs() <= timeoutAt) {
-    const profile = await input.fixture.db.query.sandboxProfiles.findFirst({
-      columns: {
-        id: true,
-      },
-      where: (table, { and, eq }) =>
-        and(eq(table.id, input.profileId), eq(table.organizationId, input.organizationId)),
-    });
-
-    if (profile === undefined) {
-      return;
-    }
-
-    await systemSleeper.sleep(DELETE_WORKFLOW_POLL_INTERVAL_MS);
-  }
-
-  throw new Error(`Timed out waiting for sandbox profile ${input.profileId} to be deleted.`);
-}
-
 describe("sandbox profiles request delete integration", () => {
-  it("enqueues deletion and removes the sandbox profile asynchronously", async ({ fixture }) => {
+  it("returns accepted and enqueues sandbox profile deletion workflow", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
       email: "integration-sandbox-profiles-request-delete@example.com",
+    });
+    const workflowRunCountBefore = await countControlPlaneWorkflowRuns({
+      databaseUrl: fixture.databaseStack.directUrl,
+      workflowName: RequestDeleteSandboxProfileWorkflowSpec.name,
+      inputEquals: {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_delete_001",
+      },
     });
 
     await fixture.db.insert(sandboxProfiles).values({
@@ -67,13 +45,28 @@ describe("sandbox profiles request delete integration", () => {
     expect(body.status).toBe("accepted");
     expect(body.profileId).toBe("sbp_delete_001");
 
-    await waitForProfileDeletion({
-      fixture,
-      profileId: "sbp_delete_001",
-      organizationId: authenticatedSession.organizationId,
-      timeoutMs: DELETE_WORKFLOW_TIMEOUT_MS,
+    const workflowRunCountAfter = await countControlPlaneWorkflowRuns({
+      databaseUrl: fixture.databaseStack.directUrl,
+      workflowName: RequestDeleteSandboxProfileWorkflowSpec.name,
+      inputEquals: {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_delete_001",
+      },
     });
-  }, 60_000);
+    expect(workflowRunCountAfter).toBe(workflowRunCountBefore + 1);
+
+    const persistedProfile = await fixture.db.query.sandboxProfiles.findFirst({
+      columns: {
+        id: true,
+      },
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.id, "sbp_delete_001"),
+          eq(table.organizationId, authenticatedSession.organizationId),
+        ),
+    });
+    expect(persistedProfile).toBeDefined();
+  });
 
   it("returns 401 when no authenticated session is provided", async ({ fixture }) => {
     const response = await fixture.request("/v1/sandbox/profiles/sbp_delete_unauth", {
@@ -81,7 +74,7 @@ describe("sandbox profiles request delete integration", () => {
     });
 
     expect(response.status).toBe(401);
-  }, 60_000);
+  });
 
   it("returns 400 for invalid profile id params", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -99,7 +92,7 @@ describe("sandbox profiles request delete integration", () => {
     const body = ValidationErrorResponseSchema.parse(await response.json());
     expect(body.success).toBe(false);
     expect(body.error.name).toBe("ZodError");
-  }, 60_000);
+  });
 
   it("returns 404 for profiles outside the authenticated user's organization", async ({
     fixture,
@@ -130,5 +123,5 @@ describe("sandbox profiles request delete integration", () => {
 
     const body = NotFoundResponseSchema.parse(await response.json());
     expect(body.code).toBe("PROFILE_NOT_FOUND");
-  }, 60_000);
+  });
 });

@@ -92,7 +92,7 @@ describe("sandbox profiles list integration", () => {
 
     expect(previousPage.totalResults).toBe(3);
     expect(previousPage.items.map((item) => item.id)).toEqual(["sbp_003", "sbp_002"]);
-  }, 60_000);
+  });
 
   it("returns 400 for invalid pagination cursor", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -108,7 +108,7 @@ describe("sandbox profiles list integration", () => {
 
     const bodyText = await response.text();
     expect(bodyText).toContain('"code":"INVALID_PAGINATION_CURSOR"');
-  }, 60_000);
+  });
 
   it("returns 400 for invalid list query payload", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
@@ -125,7 +125,7 @@ describe("sandbox profiles list integration", () => {
     const body = ValidationErrorResponseSchema.parse(await response.json());
     expect(body.success).toBe(false);
     expect(body.error.name).toBe("ZodError");
-  }, 60_000);
+  });
 
   it("does not return profiles from another organization", async ({ fixture }) => {
     const firstOrgSession = await fixture.authSession({
@@ -181,5 +181,5 @@ describe("sandbox profiles list integration", () => {
     const secondOrgList = ListSandboxProfilesResponseSchema.parse(await secondOrgResponse.json());
     expect(secondOrgList.totalResults).toBe(1);
     expect(secondOrgList.items.map((item) => item.id)).toEqual(["sbp_b_001"]);
-  }, 60_000);
+  });
 });
