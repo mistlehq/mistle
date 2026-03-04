@@ -33,6 +33,7 @@ import { useNavigate, useParams } from "react-router";
 import { z } from "zod";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
@@ -86,6 +87,7 @@ type IntegrationConnectionSummary = {
 
 type IntegrationTargetSummary = {
   targetKey: string;
+  displayName: string;
   familyId: string;
   variantId: string;
   targetHealth: {
@@ -791,6 +793,24 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
     });
   }
 
+  function resolveSelectedConnectionDisplayName(
+    row: IntegrationBindingEditorRow,
+  ): string | undefined {
+    if (row.connectionId === "") {
+      return undefined;
+    }
+    const selectedConnection = availableConnections.find(
+      (connection) => connection.id === row.connectionId,
+    );
+    if (selectedConnection === undefined) {
+      return undefined;
+    }
+    return formatConnectionDisplayName({
+      connection: selectedConnection,
+      targets: availableTargets,
+    });
+  }
+
   function renderBindingConfigField(row: IntegrationBindingEditorRow): React.JSX.Element {
     const configUiModel = resolveBindingConfigUiModel({
       row,
@@ -1215,12 +1235,17 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
                         aria-label="Binding connection"
                         id={`binding-connection-${row.clientId}`}
                       >
-                        <SelectValue placeholder="Select integration connection" />
+                        <SelectValue placeholder="Select integration connection">
+                          {resolveSelectedConnectionDisplayName(row)}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {availableConnections.map((connection) => (
                           <SelectItem key={connection.id} value={connection.id}>
-                            {connection.targetKey} - {connection.id} ({connection.status})
+                            {formatConnectionDisplayName({
+                              connection,
+                              targets: availableTargets,
+                            })}
                           </SelectItem>
                         ))}
                       </SelectContent>
