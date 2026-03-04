@@ -137,6 +137,7 @@ describe("integration webhooks ingest integration", () => {
       targetKey,
       status: IntegrationConnectionStatuses.ACTIVE,
       externalSubjectId: InstallationId,
+      config: {},
       secrets: encryptedConnectionSecrets,
     });
 
@@ -228,6 +229,7 @@ describe("integration webhooks ingest integration", () => {
       targetKey,
       status: IntegrationConnectionStatuses.ACTIVE,
       externalSubjectId: InstallationId,
+      config: {},
       secrets: encryptedConnectionSecrets,
     });
 
@@ -333,6 +335,7 @@ describe("integration webhooks ingest integration", () => {
       targetKey,
       status: IntegrationConnectionStatuses.ACTIVE,
       externalSubjectId: InstallationId,
+      config: {},
       secrets: encryptedConnectionSecrets,
     });
 
