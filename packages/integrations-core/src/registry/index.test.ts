@@ -25,7 +25,6 @@ describe("integration registry", () => {
       targetSecretSchema: EmptySecretsSchema,
       bindingConfigSchema: ConfigSchema,
       supportedAuthSchemes: ["api-key"],
-      userConfigSlots: [],
       compileBinding: () => ({
         egressRoutes: [],
         artifacts: [],
@@ -53,7 +52,6 @@ describe("integration registry", () => {
       targetSecretSchema: EmptySecretsSchema,
       bindingConfigSchema: ConfigSchema,
       supportedAuthSchemes: ["api-key"],
-      userConfigSlots: [],
       compileBinding: () => ({
         egressRoutes: [],
         artifacts: [],
@@ -89,7 +87,6 @@ describe("integration registry", () => {
         targetSecretSchema: EmptySecretsSchema,
         bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["oauth"],
-        userConfigSlots: [],
         compileBinding: () => ({
           egressRoutes: [],
           artifacts: [],
@@ -106,7 +103,6 @@ describe("integration registry", () => {
         targetSecretSchema: EmptySecretsSchema,
         bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["api-key"],
-        userConfigSlots: [],
         compileBinding: () => ({
           egressRoutes: [],
           artifacts: [],
@@ -123,55 +119,6 @@ describe("integration registry", () => {
     ]);
   });
 
-  it("fails when user config slots have duplicate keys", () => {
-    const registry = new IntegrationRegistry();
-
-    expect(() =>
-      registry.register({
-        familyId: "openai",
-        variantId: "openai-default",
-        kind: "agent",
-        displayName: "OpenAI",
-        logoKey: "openai",
-        targetConfigSchema: ConfigSchema,
-        targetSecretSchema: EmptySecretsSchema,
-        bindingConfigSchema: ConfigSchema,
-        supportedAuthSchemes: ["api-key"],
-        userConfigSlots: [
-          {
-            kind: "env",
-            key: "model",
-            label: "Model",
-            valueSchema: {
-              parse: (input: unknown) => z.string().min(1).parse(input),
-            },
-            applyTo: {
-              clientId: "codex-cli",
-              envKey: "OPENAI_MODEL",
-            },
-          },
-          {
-            kind: "env",
-            key: "model",
-            label: "Model override",
-            valueSchema: {
-              parse: (input: unknown) => z.string().min(1).parse(input),
-            },
-            applyTo: {
-              clientId: "codex-cli",
-              envKey: "OPENAI_MODEL",
-            },
-          },
-        ],
-        compileBinding: () => ({
-          egressRoutes: [],
-          artifacts: [],
-          runtimeClients: [],
-        }),
-      }),
-    ).toThrowError(IntegrationDefinitionRegistryError);
-  });
-
   it("fails when user secret slots have duplicate keys", () => {
     const registry = new IntegrationRegistry();
 
@@ -186,7 +133,6 @@ describe("integration registry", () => {
         targetSecretSchema: EmptySecretsSchema,
         bindingConfigSchema: ConfigSchema,
         supportedAuthSchemes: ["oauth"],
-        userConfigSlots: [],
         userSecretSlots: [
           {
             key: "webhook_secret",
@@ -234,7 +180,6 @@ describe("integration registry", () => {
           },
         },
       },
-      userConfigSlots: [],
       compileBinding: () => ({
         egressRoutes: [],
         artifacts: [],

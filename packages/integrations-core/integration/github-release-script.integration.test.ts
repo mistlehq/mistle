@@ -28,7 +28,6 @@ function createGithubBinaryInstallDefinition(): IntegrationDefinition<
     targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: EmptyBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
-    userConfigSlots: [],
     compileBinding: () => ({
       egressRoutes: [],
       artifacts: [

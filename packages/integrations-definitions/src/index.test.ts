@@ -20,11 +20,6 @@ describe("integrations-definitions index", () => {
 
     expect(openAiDefinition?.displayName).toBe("OpenAI");
     expect(openAiDefinition?.kind).toBe("agent");
-    expect(openAiDefinition?.userConfigSlots.map((slot) => slot.key)).toEqual([
-      "codex_config",
-      "openai_model",
-      "openai_reasoning_effort",
-    ]);
     expect(githubCloudDefinition).toMatchObject({
       familyId: "github",
       variantId: "github-cloud",

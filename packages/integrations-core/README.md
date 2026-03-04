@@ -98,7 +98,6 @@ Key fields and what they drive:
 | `credentialResolvers` (optional)             | Dynamic credential generation/lookup                        | Internal credential resolution endpoint   |
 | `authHandlers.oauth` (optional)              | OAuth start/complete behavior                               | OAuth connection flows                    |
 | `webhookHandler` (optional)                  | Verify + parse inbound webhooks                             | Webhook ingest                            |
-| `userConfigSlots`                            | User-configurable runtime setup slots                       | Runtime/client customization contract     |
 | `userSecretSlots` (optional)                 | User-supplied connection secret slots                       | Connection create/complete validation     |
 | `validateBindingWriteContext(...)`           | Contextual target/connection/binding validation             | Binding write and compile parity checks   |
 | `projectTargetUi(...)` (optional)            | Projects validated target config to UI-safe data            | Target discovery projection               |
@@ -213,7 +212,6 @@ This is the recommended workflow.
 
 5. Define user slots.
 
-- `userConfigSlots` for runtime file/env customization.
 - `userSecretSlots` for connection secrets (for example webhook secrets).
 
 6. Implement `compileBinding`.

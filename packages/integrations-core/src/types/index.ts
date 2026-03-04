@@ -115,60 +115,12 @@ export type IntegrationResolvedTarget<
   secrets: TTargetSecrets;
 };
 
-export type RuntimeFileFormat = "toml" | "json" | "yaml" | "env" | "text";
-
-export type RuntimeFileMergeStrategy = "replace" | "structured-merge";
-
-export type RuntimeFileMergePolicy = {
-  strategy?: RuntimeFileMergeStrategy;
-  preservePaths?: ReadonlyArray<string>;
-  replacePaths?: ReadonlyArray<string>;
-  protectedPaths?: ReadonlyArray<string>;
-};
-
-export type IntegrationUserConfigSlotValueSchema = IntegrationConfigSchema<string>;
-
-export type IntegrationFileUserConfigSlot = {
-  kind: "file";
-  key: string;
-  label: string;
-  description?: string;
-  format: RuntimeFileFormat;
-  required?: boolean;
-  valueSchema: IntegrationUserConfigSlotValueSchema;
-  applyTo: {
-    clientId: string;
-    fileId: string;
-  };
-  mergePolicy?: RuntimeFileMergePolicy;
-};
-
-export type IntegrationEnvUserConfigSlot = {
-  kind: "env";
-  key: string;
-  label: string;
-  description?: string;
-  required?: boolean;
-  valueSchema: IntegrationUserConfigSlotValueSchema;
-  applyTo: {
-    clientId: string;
-    envKey: string;
-  };
-  policy?: {
-    mutable: "user-overrides" | "base-wins";
-  };
-};
-
-export type IntegrationUserConfigSlot =
-  | IntegrationFileUserConfigSlot
-  | IntegrationEnvUserConfigSlot;
-
 export type IntegrationUserSecretSlot = {
   key: string;
   label: string;
   description?: string;
   required?: boolean;
-  valueSchema: IntegrationUserConfigSlotValueSchema;
+  valueSchema: IntegrationConfigSchema<string>;
 };
 
 type MaybePromise<TValue> = TValue | Promise<TValue>;
@@ -665,7 +617,6 @@ export type IntegrationDefinition<
     Record<string, string>
   >;
   agentCapabilities?: IntegrationDefinitionAgentCapabilities;
-  userConfigSlots: ReadonlyArray<IntegrationUserConfigSlot>;
   userSecretSlots?: ReadonlyArray<IntegrationUserSecretSlot>;
   validateBindingWriteContext?(
     input: BindingWriteValidationContext<
