@@ -1,6 +1,7 @@
 import {
   createHandleIntegrationWebhookEventWorkflow,
   HandleIntegrationWebhookEventWorkflowSpec,
+  type CreateHandleIntegrationWebhookEventWorkflowInput,
   type HandleIntegrationWebhookEventWorkflowInput,
   type HandleIntegrationWebhookEventWorkflowOutput,
 } from "./handle-integration-webhook-event/index.js";
@@ -44,6 +45,7 @@ export type ControlPlaneWorkflowDefinitions = {
 };
 
 export type CreateControlPlaneWorkflowDefinitionsInput = {
+  handleIntegrationWebhookEvent: CreateHandleIntegrationWebhookEventWorkflowInput;
   sendOrganizationInvitation: CreateSendOrganizationInvitationWorkflowInput;
   sendVerificationOTP: CreateSendVerificationOTPWorkflowInput;
   requestDeleteSandboxProfile: CreateRequestDeleteSandboxProfileWorkflowInput;
@@ -54,7 +56,9 @@ export function createControlPlaneWorkflowDefinitions(
   ctx: CreateControlPlaneWorkflowDefinitionsInput,
 ): ControlPlaneWorkflowDefinitions {
   return {
-    handleIntegrationWebhookEvent: createHandleIntegrationWebhookEventWorkflow(),
+    handleIntegrationWebhookEvent: createHandleIntegrationWebhookEventWorkflow(
+      ctx.handleIntegrationWebhookEvent,
+    ),
     sendOrganizationInvitation: createSendOrganizationInvitationWorkflow(
       ctx.sendOrganizationInvitation,
     ),

@@ -2,6 +2,8 @@ import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/cl
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type {
   ControlPlaneWorkerServices,
+  HandleIntegrationWebhookEventWorkflowInput,
+  HandleIntegrationWebhookEventWorkflowOutput,
   StartSandboxProfileInstanceWorkflowInput,
   StartSandboxProfileInstanceWorkflowOutput,
 } from "@mistle/workflows/control-plane";
@@ -21,5 +23,13 @@ export type StartSandboxProfileInstanceServiceDependencies = {
 
 export type StartSandboxProfileInstanceServiceInput = StartSandboxProfileInstanceWorkflowInput;
 export type StartSandboxProfileInstanceServiceOutput = StartSandboxProfileInstanceWorkflowOutput;
+
+export type HandleIntegrationWebhookEventServiceDependencies = {
+  db: ControlPlaneDatabase;
+};
+
+export type HandleIntegrationWebhookEventServiceInput = HandleIntegrationWebhookEventWorkflowInput;
+export type HandleIntegrationWebhookEventServiceOutput =
+  HandleIntegrationWebhookEventWorkflowOutput;
 
 export type ControlPlaneWorkerRuntimeServices = ControlPlaneWorkerServices;

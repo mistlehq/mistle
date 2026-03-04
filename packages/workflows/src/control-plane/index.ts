@@ -10,6 +10,7 @@ export {
 } from "./workflows/index.js";
 export {
   createHandleIntegrationWebhookEventWorkflow,
+  type CreateHandleIntegrationWebhookEventWorkflowInput,
   type HandleIntegrationWebhookEventWorkflowInput,
   type HandleIntegrationWebhookEventWorkflowOutput,
 } from "./workflows/handle-integration-webhook-event/index.js";

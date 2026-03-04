@@ -1,5 +1,6 @@
 import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
+import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";
 import { startSandboxProfileInstance } from "./start-sandbox-profile-instance.js";
 import type {
   ControlPlaneWorkerRuntimeServices,
@@ -12,6 +13,16 @@ export function createControlPlaneWorkerServices(
   const emailSender = createEmailSender(input.config);
 
   return {
+    integrationWebhooks: {
+      handleWebhookEvent: async (workflowInput) => {
+        return handleIntegrationWebhookEvent(
+          {
+            db: input.db,
+          },
+          workflowInput,
+        );
+      },
+    },
     emailDelivery: {
       emailSender,
       from: {
