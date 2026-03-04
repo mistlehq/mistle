@@ -159,7 +159,7 @@ List of checks and tests performed to validate the changes. When listing tests, 
 
 - For `apps/dashboard`, all files and folders must use kebab-case names.
 - Exception: `apps/dashboard/README.md` is allowed as-is.
-- This is enforced by dashboard lint via `apps/dashboard/scripts/check-file-names.ts`.
+- This is enforced by dashboard lint via `apps/dashboard/lint/check-file-names.ts`.
 
 ### TypeScript
 

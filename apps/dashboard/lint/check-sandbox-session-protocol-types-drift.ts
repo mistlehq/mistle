@@ -1,9 +1,12 @@
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+
 import {
   generateSandboxSessionProtocolTypesToTemporarySource,
   readGeneratedTypesFile,
-} from "./sandbox-session-protocol-client.js";
+} from "../scripts/sandbox-session-protocol-client.js";
 
-async function run(): Promise<void> {
+export async function checkSandboxSessionProtocolTypesDrift() {
   const result = await generateSandboxSessionProtocolTypesToTemporarySource();
   const currentSource = await readGeneratedTypesFile(result.generatedTypesPath);
 
@@ -26,7 +29,15 @@ async function run(): Promise<void> {
   console.log(`Dashboard sandbox session protocol types are current: ${result.generatedTypesPath}`);
 }
 
-void run().catch((error: unknown) => {
-  console.error("Sandbox session protocol type drift check failed", error);
-  process.exit(1);
-});
+async function runCli() {
+  try {
+    await checkSandboxSessionProtocolTypesDrift();
+  } catch (error) {
+    console.error("Sandbox session protocol type drift check failed", error);
+    process.exit(1);
+  }
+}
+
+if (process.argv[1] !== undefined && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  void runCli();
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "../../node_modules/oxlint/configuration_schema.json",
+  "extends": ["../../.oxlintrc.jsonc"],
+  "plugins": ["eslint", "typescript", "node", "vitest"],
+  "jsPlugins": [
+    {
+      "name": "dashboard-select",
+      "specifier": "./lint/dashboard-select-plugin.ts",
+    },
+    {
+      "name": "dashboard-preflight",
+      "specifier": "./lint/dashboard-preflight-plugin.ts",
+    },
+  ],
+  "rules": {
+    "dashboard-select/no-undefined-select-value": "error",
+    "dashboard-preflight/kebab-case-file-names": "error",
+    "dashboard-preflight/control-plane-client-drift": "error",
+    "dashboard-preflight/sandbox-session-protocol-types-drift": "error",
+  },
+}
