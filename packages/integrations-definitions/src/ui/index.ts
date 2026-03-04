@@ -1,8 +1,14 @@
 export {
+  buildBindingEditorRenderableFields,
   BindingEditorFieldSchema,
+  createDefaultConfigFromBindingEditorVariant,
   IntegrationBindingEditorUiProjectionSchema,
+  parseConfigAgainstBindingEditorVariant,
   parseIntegrationBindingEditorUiProjection,
+  resolveBindingEditorVariant,
+  updateBindingEditorConfigByField,
   type BindingEditorField,
+  type BindingEditorRenderableField,
   type BindingEditorVariant,
   type IntegrationBindingEditorUiProjection,
 } from "./binding-editor-ui-contract.js";

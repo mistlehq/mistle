@@ -1,8 +1,12 @@
 import {
+  buildBindingEditorRenderableFields,
+  createDefaultConfigFromBindingEditorVariant,
+  parseConfigAgainstBindingEditorVariant,
   parseIntegrationBindingEditorUiProjection,
-  type BindingEditorField,
+  resolveBindingEditorVariant,
+  type BindingEditorRenderableField,
   type BindingEditorVariant,
-  type IntegrationBindingEditorUiProjection,
+  updateBindingEditorConfigByField,
 } from "@mistle/integrations-definitions/ui";
 import {
   Alert,
@@ -109,24 +113,6 @@ type BindingConfigUiModel =
       defaultConfig?: Record<string, unknown> | undefined;
     };
 
-type BindingEditorSelectField = Extract<BindingEditorField, { type: "select" }>;
-
-type BindingEditorRenderableField =
-  | {
-      type: "select";
-      key: string;
-      label: string;
-      value: string;
-      options: readonly { value: string; label: string }[];
-    }
-  | {
-      type: "string-array";
-      key: string;
-      label: string;
-      value: readonly string[];
-      delimiter: string;
-    };
-
 type InvalidBindingConfigIssue = {
   clientRef?: string | undefined;
   bindingIdOrDraftIndex: string;
@@ -184,302 +170,6 @@ function resolveBindingKindFromTarget(
   return projection?.bindingEditor.kind;
 }
 
-function readStringValue(record: Record<string, unknown>, key: string): string | undefined {
-  const value = record[key];
-  if (typeof value !== "string") {
-    return undefined;
-  }
-
-  return value;
-}
-
-function isStringArray(value: unknown): value is string[] {
-  if (!Array.isArray(value)) {
-    return false;
-  }
-
-  return value.every((entry) => typeof entry === "string");
-}
-
-function readStringArrayValue(
-  record: Record<string, unknown>,
-  key: string,
-): readonly string[] | undefined {
-  const value = record[key];
-  if (!isStringArray(value)) {
-    return undefined;
-  }
-  return value;
-}
-
-function resolveSelectOptions(input: {
-  field: BindingEditorSelectField;
-  config: Record<string, unknown>;
-}): readonly { value: string; label: string }[] {
-  if (input.field.optionsByFieldValue === undefined) {
-    return input.field.options;
-  }
-
-  const parentValue = readStringValue(input.config, input.field.optionsByFieldValue.fieldKey);
-  if (parentValue === undefined) {
-    return [];
-  }
-  const options = input.field.optionsByFieldValue.optionsByValue[parentValue];
-  if (options === undefined) {
-    throw new Error(
-      `Missing '${input.field.key}' options for '${input.field.optionsByFieldValue.fieldKey}=${parentValue}'.`,
-    );
-  }
-  return options;
-}
-
-function createDefaultConfigFromVariant(input: {
-  variant: BindingEditorVariant;
-}): Record<string, unknown> {
-  const config: Record<string, unknown> = {};
-  for (const field of input.variant.fields) {
-    if (field.type === "literal") {
-      config[field.key] = field.value;
-      continue;
-    }
-    if (field.type === "select") {
-      if (field.optionsByFieldValue === undefined) {
-        config[field.key] = field.defaultValue;
-        continue;
-      }
-
-      const parentValue = readStringValue(config, field.optionsByFieldValue.fieldKey);
-      if (parentValue === undefined) {
-        throw new Error(
-          `Default config for '${field.key}' requires '${field.optionsByFieldValue.fieldKey}'.`,
-        );
-      }
-      const defaultValue = field.optionsByFieldValue.defaultValueByValue[parentValue];
-      if (defaultValue === undefined) {
-        throw new Error(
-          `Missing default value for '${field.key}' when '${field.optionsByFieldValue.fieldKey}=${parentValue}'.`,
-        );
-      }
-      config[field.key] = defaultValue;
-      continue;
-    }
-
-    config[field.key] = [...field.defaultValue];
-  }
-  return config;
-}
-
-function parseConfigAgainstVariant(input: {
-  config: Record<string, unknown>;
-  variant: BindingEditorVariant;
-}):
-  | {
-      ok: true;
-      value: Record<string, unknown>;
-    }
-  | {
-      ok: false;
-      message: string;
-    } {
-  const expectedKeys = new Set<string>(input.variant.fields.map((field) => field.key));
-  for (const key of Object.keys(input.config)) {
-    if (!expectedKeys.has(key)) {
-      return {
-        ok: false,
-        message: `Binding config includes unsupported key '${key}'.`,
-      };
-    }
-  }
-
-  const parsed: Record<string, unknown> = {};
-  for (const field of input.variant.fields) {
-    if (field.type === "literal") {
-      const value = readStringValue(input.config, field.key);
-      if (value === undefined || value !== field.value) {
-        return {
-          ok: false,
-          message: `Binding config has invalid value for '${field.key}'.`,
-        };
-      }
-      parsed[field.key] = value;
-      continue;
-    }
-    if (field.type === "select") {
-      const value = readStringValue(input.config, field.key);
-      if (value === undefined) {
-        return {
-          ok: false,
-          message: `Binding config is missing '${field.key}'.`,
-        };
-      }
-      const options = resolveSelectOptions({
-        field,
-        config: parsed,
-      });
-      if (!options.some((option) => option.value === value)) {
-        return {
-          ok: false,
-          message: `Binding config has unsupported value for '${field.key}'.`,
-        };
-      }
-      parsed[field.key] = value;
-      continue;
-    }
-
-    const value = readStringArrayValue(input.config, field.key);
-    if (value === undefined) {
-      return {
-        ok: false,
-        message: `Binding config is missing '${field.key}'.`,
-      };
-    }
-    parsed[field.key] = [...value];
-  }
-
-  return {
-    ok: true,
-    value: parsed,
-  };
-}
-
-function buildRenderableFields(input: {
-  variant: BindingEditorVariant;
-  value: Record<string, unknown>;
-}): readonly BindingEditorRenderableField[] {
-  const fields: BindingEditorRenderableField[] = [];
-  for (const field of input.variant.fields) {
-    if (field.type === "literal") {
-      continue;
-    }
-    if (field.type === "select") {
-      const value = readStringValue(input.value, field.key);
-      if (value === undefined) {
-        throw new Error(`Resolved binding config is missing '${field.key}'.`);
-      }
-      fields.push({
-        type: "select",
-        key: field.key,
-        label: field.label,
-        value,
-        options: resolveSelectOptions({
-          field,
-          config: input.value,
-        }),
-      });
-      continue;
-    }
-
-    const value = readStringArrayValue(input.value, field.key);
-    if (value === undefined) {
-      throw new Error(`Resolved binding config is missing '${field.key}'.`);
-    }
-    fields.push({
-      type: "string-array",
-      key: field.key,
-      label: field.label,
-      value,
-      delimiter: field.delimiter,
-    });
-  }
-  return fields;
-}
-
-function resolveBindingEditorVariant(input: {
-  projection: IntegrationBindingEditorUiProjection;
-  connection: IntegrationConnectionSummary;
-}):
-  | {
-      ok: true;
-      variant: BindingEditorVariant;
-    }
-  | {
-      ok: false;
-      message: string;
-    } {
-  const configModel = input.projection.bindingEditor.config;
-  if (configModel.mode === "static") {
-    return {
-      ok: true,
-      variant: configModel.variant,
-    };
-  }
-
-  if (input.connection.config === undefined) {
-    return {
-      ok: false,
-      message: `Connection '${input.connection.id}' is missing config required for binding editor.`,
-    };
-  }
-  const selectedVariantKey = readStringValue(input.connection.config, configModel.key);
-  if (selectedVariantKey === undefined) {
-    return {
-      ok: false,
-      message: `Connection '${input.connection.id}' is missing '${configModel.key}' in config.`,
-    };
-  }
-  const variant = configModel.variants[selectedVariantKey];
-  if (variant === undefined) {
-    return {
-      ok: false,
-      message: `No binding editor variant for '${configModel.key}=${selectedVariantKey}'.`,
-    };
-  }
-
-  return {
-    ok: true,
-    variant,
-  };
-}
-
-function updateBindingEditorConfig(input: {
-  variant: BindingEditorVariant;
-  currentConfig: Record<string, unknown>;
-  fieldKey: string;
-  nextValue: string | readonly string[];
-}): Record<string, unknown> {
-  const nextConfig: Record<string, unknown> = {
-    ...input.currentConfig,
-    [input.fieldKey]: Array.isArray(input.nextValue) ? [...input.nextValue] : input.nextValue,
-  };
-
-  for (const field of input.variant.fields) {
-    if (field.type !== "select" || field.optionsByFieldValue === undefined) {
-      continue;
-    }
-    if (field.optionsByFieldValue.fieldKey !== input.fieldKey) {
-      continue;
-    }
-
-    const options = resolveSelectOptions({
-      field,
-      config: nextConfig,
-    });
-    const currentValue = readStringValue(nextConfig, field.key);
-    if (currentValue !== undefined && options.some((option) => option.value === currentValue)) {
-      continue;
-    }
-
-    const parentValue = readStringValue(nextConfig, field.optionsByFieldValue.fieldKey);
-    if (parentValue === undefined) {
-      throw new Error(`Dependent value for '${field.key}' is missing.`);
-    }
-    const defaultValue = field.optionsByFieldValue.defaultValueByValue[parentValue];
-    if (defaultValue === undefined) {
-      throw new Error(
-        `Default value for '${field.key}' is missing when '${field.optionsByFieldValue.fieldKey}=${parentValue}'.`,
-      );
-    }
-    if (!options.some((option) => option.value === defaultValue)) {
-      throw new Error(
-        `Default value '${defaultValue}' for '${field.key}' is not present in available options.`,
-      );
-    }
-    nextConfig[field.key] = defaultValue;
-  }
-
-  return nextConfig;
-}
-
 function readInvalidBindingConfigIssues(
   error: unknown,
 ): readonly InvalidBindingConfigIssue[] | null {
@@ -508,12 +198,12 @@ function createDefaultBindingConfig(input: {
   }
   const resolvedVariant = resolveBindingEditorVariant({
     projection,
-    connection: input.connection,
+    ...(input.connection.config === undefined ? {} : { connectionConfig: input.connection.config }),
   });
   if (!resolvedVariant.ok) {
     return {};
   }
-  return createDefaultConfigFromVariant({
+  return createDefaultConfigFromBindingEditorVariant({
     variant: resolvedVariant.variant,
   });
 }
@@ -555,7 +245,7 @@ function resolveBindingConfigUiModel(input: {
 
   const resolvedVariant = resolveBindingEditorVariant({
     projection,
-    connection,
+    ...(connection.config === undefined ? {} : { connectionConfig: connection.config }),
   });
   if (!resolvedVariant.ok) {
     return {
@@ -564,10 +254,10 @@ function resolveBindingConfigUiModel(input: {
     };
   }
 
-  const defaultConfig = createDefaultConfigFromVariant({
+  const defaultConfig = createDefaultConfigFromBindingEditorVariant({
     variant: resolvedVariant.variant,
   });
-  const parsedConfig = parseConfigAgainstVariant({
+  const parsedConfig = parseConfigAgainstBindingEditorVariant({
     config: input.row.config,
     variant: resolvedVariant.variant,
   });
@@ -583,7 +273,7 @@ function resolveBindingConfigUiModel(input: {
     mode: "editor",
     variant: resolvedVariant.variant,
     value: parsedConfig.value,
-    fields: buildRenderableFields({
+    fields: buildBindingEditorRenderableFields({
       variant: resolvedVariant.variant,
       value: parsedConfig.value,
     }),
@@ -1190,7 +880,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
                           `Unsupported binding config value '${nextValue}' for field '${field.key}'.`,
                         );
                       }
-                      const nextConfig = updateBindingEditorConfig({
+                      const nextConfig = updateBindingEditorConfigByField({
                         variant: configUiModel.variant,
                         currentConfig: configUiModel.value,
                         fieldKey: field.key,
@@ -1234,7 +924,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
                       .split(field.delimiter)
                       .map((entry) => entry.trim())
                       .filter((entry) => entry.length > 0);
-                    const nextConfig = updateBindingEditorConfig({
+                    const nextConfig = updateBindingEditorConfigByField({
                       variant: configUiModel.variant,
                       currentConfig: configUiModel.value,
                       fieldKey: field.key,
