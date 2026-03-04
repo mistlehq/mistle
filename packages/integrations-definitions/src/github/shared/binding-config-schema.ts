@@ -7,7 +7,6 @@ const GitHubRepositorySchema = z
 export const GitHubBindingConfigSchema = z
   .object({
     repositories: z.array(GitHubRepositorySchema).min(1),
-    includeGhCli: z.boolean(),
   })
   .strict();
 

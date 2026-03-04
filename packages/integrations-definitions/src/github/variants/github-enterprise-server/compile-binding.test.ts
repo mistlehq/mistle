@@ -31,7 +31,6 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         kind: "git",
         config: {
           repositories: ["acme/repo"],
-          includeGhCli: true,
         },
       },
       refs: {
@@ -98,7 +97,6 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         kind: "git",
         config: {
           repositories: ["acme/repo-b", "acme/repo-a", "acme/repo-a"],
-          includeGhCli: false,
         },
       },
       refs: {
@@ -147,7 +145,6 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         kind: "git",
         config: {
           repositories: ["acme/repo"],
-          includeGhCli: false,
         },
       },
       refs: {
@@ -196,7 +193,6 @@ describe("compileGitHubEnterpriseServerBinding", () => {
           kind: "git",
           config: {
             repositories: ["acme/repo"],
-            includeGhCli: false,
           },
         },
         refs: {

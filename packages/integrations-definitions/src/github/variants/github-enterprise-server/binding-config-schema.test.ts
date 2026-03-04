@@ -6,12 +6,10 @@ describe("GitHubEnterpriseServerBindingConfigSchema", () => {
   it("parses a valid git binding config", () => {
     const parsed = GitHubEnterpriseServerBindingConfigSchema.parse({
       repositories: ["acme/backend", "acme/frontend"],
-      includeGhCli: false,
     });
 
     expect(parsed).toEqual({
       repositories: ["acme/backend", "acme/frontend"],
-      includeGhCli: false,
     });
   });
 
@@ -19,15 +17,6 @@ describe("GitHubEnterpriseServerBindingConfigSchema", () => {
     expect(() =>
       GitHubEnterpriseServerBindingConfigSchema.parse({
         repositories: ["acme"],
-        includeGhCli: false,
-      }),
-    ).toThrowError();
-  });
-
-  it("fails when includeGhCli is missing", () => {
-    expect(() =>
-      GitHubEnterpriseServerBindingConfigSchema.parse({
-        repositories: ["acme/backend"],
       }),
     ).toThrowError();
   });
