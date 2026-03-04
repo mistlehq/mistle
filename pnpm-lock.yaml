@@ -764,6 +764,9 @@ importers:
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
+      openapi-fetch:
+        specifier: ^0.17.0
+        version: 0.17.0
       pg:
         specifier: ^8.19.0
         version: 8.19.0

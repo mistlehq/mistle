@@ -24,6 +24,7 @@ Exported from [`src/index.ts`](./src/index.ts):
 - `startDataPlaneWorker`
 - `startDataPlaneGateway`
 - `startTokenizerProxy`
+- `startFullSystemEnvironment`
 
 ## Service Modules
 

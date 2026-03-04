@@ -10,6 +10,11 @@ import { createMailpitInbox } from "@mistle/test-harness";
 import { Pool } from "pg";
 import { it as vitestIt } from "vitest";
 
+import {
+  createControlPlaneApiClient,
+  type ControlPlaneApiClient,
+} from "./control-plane-api-client.js";
+
 export type AuthenticatedSession = {
   cookie: string;
   organizationId: string;
@@ -17,6 +22,7 @@ export type AuthenticatedSession = {
 };
 
 export type DashboardMembersInvitationsFixture = {
+  controlPlaneApiClient: ControlPlaneApiClient;
   db: ControlPlaneDatabase;
   request: (path: string, init?: RequestInit) => Promise<Response>;
   authSession: (input?: { email?: string }) => Promise<AuthenticatedSession>;
@@ -73,7 +79,9 @@ function requireEnv(name: string): string {
 export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture }>({
   fixture: [
     async ({}, use) => {
-      const request = createRequestFn(requireEnv("MISTLE_SYSTEM_CONTROL_PLANE_API_BASE_URL"));
+      const controlPlaneApiBaseUrl = requireEnv("MISTLE_SYSTEM_CONTROL_PLANE_API_BASE_URL");
+      const controlPlaneApiClient = createControlPlaneApiClient(controlPlaneApiBaseUrl);
+      const request = createRequestFn(controlPlaneApiBaseUrl);
       const databasePool = new Pool({
         connectionString: requireEnv("MISTLE_SYSTEM_CONTROL_PLANE_DB_URL"),
       });
@@ -84,6 +92,7 @@ export const it = vitestIt.extend<{ fixture: DashboardMembersInvitationsFixture 
 
       try {
         await use({
+          controlPlaneApiClient,
           db,
           request,
           authSession: async (input) => {
