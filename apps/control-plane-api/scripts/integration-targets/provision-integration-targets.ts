@@ -22,6 +22,8 @@ const IntegrationTargetProvisionTargetSchema = z
   })
   .strict();
 
+type IntegrationTargetsProvisionTarget = z.output<typeof IntegrationTargetProvisionTargetSchema>;
+
 const IntegrationTargetsProvisionManifestSchema = z
   .object({
     version: z.literal(1),
@@ -50,6 +52,56 @@ type IntegrationsEncryptionConfig = {
   activeMasterEncryptionKeyVersion: number;
   masterEncryptionKeys: Record<string, string>;
 };
+
+function normalizeEscapedNewlineString(value: string): string {
+  return value
+    .replaceAll("\\\\r\\\\n", "\r\n")
+    .replaceAll("\\\\n", "\n")
+    .replaceAll("\\r\\n", "\r\n")
+    .replaceAll("\\n", "\n");
+}
+
+function normalizeEscapedNewlinesInUnknownValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    return normalizeEscapedNewlineString(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => normalizeEscapedNewlinesInUnknownValue(item));
+  }
+
+  if (value !== null && typeof value === "object") {
+    return normalizeEscapedNewlinesInUnknownObject(value);
+  }
+
+  return value;
+}
+
+function normalizeEscapedNewlinesInUnknownObject(value: object): Record<string, unknown> {
+  const normalizedValue: Record<string, unknown> = {};
+
+  for (const [key, entryValue] of Object.entries(value)) {
+    normalizedValue[key] = normalizeEscapedNewlinesInUnknownValue(entryValue);
+  }
+
+  return normalizedValue;
+}
+
+function normalizeProvisionTarget(
+  target: IntegrationTargetsProvisionTarget,
+): IntegrationTargetsProvisionTarget {
+  const normalizedSecrets: Record<string, string> = {};
+
+  for (const [secretKey, secretValue] of Object.entries(target.secrets)) {
+    normalizedSecrets[secretKey] = normalizeEscapedNewlineString(secretValue);
+  }
+
+  return {
+    ...target,
+    config: normalizeEscapedNewlinesInUnknownObject(target.config),
+    secrets: normalizedSecrets,
+  };
+}
 
 function isRepositoryRoot(directoryPath: string): boolean {
   return existsSync(join(directoryPath, ".git"));
@@ -112,7 +164,12 @@ export function parseIntegrationTargetsProvisionManifest(
     });
   }
 
-  return IntegrationTargetsProvisionManifestSchema.parse(parsedManifest);
+  const manifest = IntegrationTargetsProvisionManifestSchema.parse(parsedManifest);
+
+  return {
+    version: manifest.version,
+    targets: manifest.targets.map((target) => normalizeProvisionTarget(target)),
+  };
 }
 
 export async function provisionIntegrationTargets(input: {

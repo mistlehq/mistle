@@ -67,6 +67,78 @@ describe("provision-integration-targets", () => {
     ).toThrowError(/Duplicate provision target key 'github-cloud'\./u);
   });
 
+  it("normalizes escaped newline sequences in config and secrets", () => {
+    const parsedManifest = parseIntegrationTargetsProvisionManifest(
+      JSON.stringify({
+        version: 1,
+        targets: [
+          {
+            targetKey: "github-cloud",
+            enabled: true,
+            config: {
+              app_private_key_preview: "line-1\\nline-2\\r\\nline-3",
+            },
+            secrets: {
+              app_private_key_pem: "-----BEGIN KEY-----\\nabc\\r\\ndef\\n-----END KEY-----",
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(parsedManifest).toEqual({
+      version: 1,
+      targets: [
+        {
+          targetKey: "github-cloud",
+          enabled: true,
+          config: {
+            app_private_key_preview: "line-1\nline-2\r\nline-3",
+          },
+          secrets: {
+            app_private_key_pem: "-----BEGIN KEY-----\nabc\r\ndef\n-----END KEY-----",
+          },
+        },
+      ],
+    });
+  });
+
+  it("normalizes double-escaped newline sequences in config and secrets", () => {
+    const parsedManifest = parseIntegrationTargetsProvisionManifest(
+      JSON.stringify({
+        version: 1,
+        targets: [
+          {
+            targetKey: "github-cloud",
+            enabled: true,
+            config: {
+              app_private_key_preview: "line-1\\\\nline-2\\\\r\\\\nline-3",
+            },
+            secrets: {
+              app_private_key_pem: "-----BEGIN KEY-----\\\\nabc\\\\r\\\\ndef\\\\n-----END KEY-----",
+            },
+          },
+        ],
+      }),
+    );
+
+    expect(parsedManifest).toEqual({
+      version: 1,
+      targets: [
+        {
+          targetKey: "github-cloud",
+          enabled: true,
+          config: {
+            app_private_key_preview: "line-1\nline-2\r\nline-3",
+          },
+          secrets: {
+            app_private_key_pem: "-----BEGIN KEY-----\nabc\r\ndef\n-----END KEY-----",
+          },
+        },
+      ],
+    });
+  });
+
   it("resolves repository root and discovers provision manifest while walking parents", async () => {
     const temporaryWorkspaceRoot = await mkdtemp(join(tmpdir(), "mistle-provision-manifest-"));
     const repoRoot = join(temporaryWorkspaceRoot, "repo");
