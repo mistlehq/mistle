@@ -28,6 +28,7 @@
     "test": "turbo run test",
     "test:property": "turbo run test:property",
     "test:integration": "tsx ./scripts/test/run-integration.ts",
+    "test:system": "pnpm --filter @mistle/tests test:system",
     "test:e2e": "pnpm --filter @mistle/tests test:e2e",
     "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
     "ci:nix": "nix develop --command pnpm run ci",

@@ -5,7 +5,17 @@
   "scripts": {
     "lint": "oxlint --type-aware --deny-warnings -c ../.oxlintrc.jsonc .",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:system": "vitest -c vitest.system.config.ts --run --passWithNoTests",
+    "test:system:prepare": "pnpm --filter @mistle/control-plane-api... --filter @mistle/control-plane-worker... --filter @mistle/data-plane-api... --filter @mistle/data-plane-worker... --filter @mistle/data-plane-gateway... --filter @mistle/tokenizer-proxy... build",
+    "test:system": "pnpm run test:system:prepare && vitest -c vitest.system.config.ts --run --passWithNoTests",
     "test:e2e": "playwright test --config playwright.config.ts --pass-with-no-tests"
+  },
+  "devDependencies": {
+    "@mistle/db": "workspace:*",
+    "@mistle/test-harness": "workspace:*",
+    "@types/pg": "^8.18.0",
+    "openapi-fetch": "^0.17.0",
+    "pg": "^8.19.0",
+    "vite-tsconfig-paths": "^6.1.0",
+    "zod": "^4.1.12"
   }
 }
