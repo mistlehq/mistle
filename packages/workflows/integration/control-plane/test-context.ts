@@ -82,12 +82,39 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
           openWorkflow,
           maxConcurrentWorkflows: 1,
           enabledWorkflows: [
+            ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_RUN,
             ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT,
             ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
             ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
             ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE,
           ],
           services: {
+            automationRuns: {
+              transitionAutomationRunToRunning: async () => ({
+                shouldProcess: true,
+              }),
+              prepareAutomationRun: async () => {},
+              markAutomationRunCompleted: async () => {},
+              markAutomationRunFailed: async () => {},
+              resolveAutomationRunFailure: ({ error }) => {
+                if (error instanceof Error) {
+                  return {
+                    code: "automation_run_execution_failed",
+                    message: error.message,
+                  };
+                }
+
+                return {
+                  code: "automation_run_execution_failed",
+                  message: "Automation run execution failed with a non-error exception.",
+                };
+              },
+            },
+            integrationWebhooks: {
+              handleWebhookEvent: async (input) => ({
+                webhookEventId: input.webhookEventId,
+              }),
+            },
             emailDelivery: {
               emailSender,
               from: {

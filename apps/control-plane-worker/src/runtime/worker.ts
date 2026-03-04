@@ -22,6 +22,7 @@ export function createRuntimeWorker(ctx: {
     openWorkflow: ctx.resources.openWorkflow,
     maxConcurrentWorkflows: ctx.config.workflow.concurrency,
     enabledWorkflows: [
+      ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_RUN,
       ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT,
       ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
       ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
@@ -31,6 +32,7 @@ export function createRuntimeWorker(ctx: {
     services: createControlPlaneWorkerServices({
       config: ctx.config,
       db: ctx.resources.db,
+      openWorkflow: ctx.resources.openWorkflow,
       dataPlaneSandboxInstancesClient,
     }),
   });

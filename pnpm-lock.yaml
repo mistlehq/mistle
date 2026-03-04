@@ -449,6 +449,9 @@ importers:
 
   packages/automations:
     dependencies:
+      liquidjs:
+        specifier: ^10.24.0
+        version: 10.24.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -5492,6 +5495,11 @@ packages:
   lint-staged@16.3.1:
     resolution: {integrity: sha512-bqvvquXzFBAlSbluugR4KXAe4XnO/QZcKVszpkBtqLWa2KEiVy8n6Xp38OeUbv/gOJOX4Vo9u5pFt/ADvbm42Q==}
     engines: {node: '>=20.17'}
+    hasBin: true
+
+  liquidjs@10.24.0:
+    resolution: {integrity: sha512-TAUNAdgwaAXjjcUFuYVJm9kOVH7zc0mTKxsG9t9Lu4qdWjB2BEblyVIYpjWcmJLMGgiYqnGNJjpNMHx0gp/46A==}
+    engines: {node: '>=16'}
     hasBin: true
 
   listr2@9.0.5:
@@ -11669,6 +11677,10 @@ snapshots:
       string-argv: 0.3.2
       tinyexec: 1.0.2
       yaml: 2.8.2
+
+  liquidjs@10.24.0:
+    dependencies:
+      commander: 10.0.1
 
   listr2@9.0.5:
     dependencies:

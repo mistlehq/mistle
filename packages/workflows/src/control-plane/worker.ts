@@ -1,6 +1,8 @@
 import type { EmailSender } from "@mistle/emails";
 import type { OpenWorkflow, Worker } from "openworkflow";
 
+import { createHandleAutomationRunWorkflow } from "./workflows/handle-automation-run/index.js";
+import type { HandleAutomationRunWorkflowInput } from "./workflows/handle-automation-run/index.js";
 import { createHandleIntegrationWebhookEventWorkflow } from "./workflows/handle-integration-webhook-event/index.js";
 import type {
   HandleIntegrationWebhookEventWorkflowInput,
@@ -24,6 +26,19 @@ export type ControlPlaneWorkerEmailDelivery = {
 };
 
 export type ControlPlaneWorkerServices = {
+  automationRuns?: {
+    transitionAutomationRunToRunning: (
+      input: HandleAutomationRunWorkflowInput,
+    ) => Promise<{ shouldProcess: boolean }>;
+    prepareAutomationRun: (input: HandleAutomationRunWorkflowInput) => Promise<void>;
+    markAutomationRunCompleted: (input: HandleAutomationRunWorkflowInput) => Promise<void>;
+    markAutomationRunFailed: (input: {
+      automationRunId: string;
+      failureCode: string;
+      failureMessage: string;
+    }) => Promise<void>;
+    resolveAutomationRunFailure: (input: { error: unknown }) => { code: string; message: string };
+  };
   integrationWebhooks?: {
     handleWebhookEvent: (
       input: HandleIntegrationWebhookEventWorkflowInput,
@@ -41,6 +56,7 @@ export type ControlPlaneWorkerServices = {
 };
 
 export const ControlPlaneWorkerWorkflowIds = {
+  HANDLE_AUTOMATION_RUN: "handleAutomationRun",
   HANDLE_INTEGRATION_WEBHOOK_EVENT: "handleIntegrationWebhookEvent",
   SEND_ORGANIZATION_INVITATION: "sendOrganizationInvitation",
   SEND_VERIFICATION_OTP: "sendVerificationOTP",
@@ -67,6 +83,24 @@ function assertNever(value: never): never {
  */
 export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): Worker {
   for (const workflowId of input.enabledWorkflows) {
+    if (workflowId === ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_RUN) {
+      if (input.services.automationRuns === undefined) {
+        throw new Error(
+          "Control-plane automation runs service is required for handleAutomationRun workflow.",
+        );
+      }
+      const workflow = createHandleAutomationRunWorkflow({
+        transitionAutomationRunToRunning:
+          input.services.automationRuns.transitionAutomationRunToRunning,
+        prepareAutomationRun: input.services.automationRuns.prepareAutomationRun,
+        markAutomationRunCompleted: input.services.automationRuns.markAutomationRunCompleted,
+        markAutomationRunFailed: input.services.automationRuns.markAutomationRunFailed,
+        resolveAutomationRunFailure: input.services.automationRuns.resolveAutomationRunFailure,
+      });
+      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
+      continue;
+    }
+
     if (workflowId === ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT) {
       if (input.services.integrationWebhooks === undefined) {
         throw new Error(
