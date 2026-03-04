@@ -130,9 +130,7 @@ function IntegrationsEditorSection(props: IntegrationsEditorSectionProps): React
               }
               onValueChange={props.onSelectedVersionChange}
               value={
-                props.resolvedSelectedVersion === null
-                  ? undefined
-                  : String(props.resolvedSelectedVersion)
+                props.resolvedSelectedVersion === null ? "" : String(props.resolvedSelectedVersion)
               }
             >
               <SelectTrigger aria-label="Sandbox profile version" id="sandbox-profile-version">
@@ -209,7 +207,7 @@ function IntegrationsEditorSection(props: IntegrationsEditorSectionProps): React
               <FieldContent>
                 <Select
                   onValueChange={(nextValue) => {
-                    if (nextValue === null) {
+                    if (nextValue === null || nextValue.length === 0) {
                       throw new Error("Binding connection must not be null.");
                     }
                     const selectedConnection = props.availableConnections.find(
@@ -233,7 +231,7 @@ function IntegrationsEditorSection(props: IntegrationsEditorSectionProps): React
                       }),
                     });
                   }}
-                  value={row.connectionId === "" ? undefined : row.connectionId}
+                  value={row.connectionId}
                 >
                   <SelectTrigger
                     aria-label="Binding connection"
