@@ -6,7 +6,6 @@ import type {
   IntegrationDefinition,
   IntegrationDefinitionLocator,
   IntegrationDefinitionResolver,
-  IntegrationUserConfigSlot,
   IntegrationUserSecretSlot,
 } from "../types/index.js";
 
@@ -43,73 +42,7 @@ function validateDefinition(input: IntegrationDefinition): void {
     );
   }
 
-  validateUserConfigSlots(input.userConfigSlots);
   validateUserSecretSlots(input.userSecretSlots);
-}
-
-function validateUserConfigSlotCommon(input: IntegrationUserConfigSlot): void {
-  if (input.key.trim().length === 0) {
-    throw new IntegrationDefinitionRegistryError(
-      DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-      "Integration definition userConfigSlots keys must be non-empty.",
-    );
-  }
-
-  if (input.label.trim().length === 0) {
-    throw new IntegrationDefinitionRegistryError(
-      DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-      `Integration definition userConfigSlots '${input.key}' label must be non-empty.`,
-    );
-  }
-}
-
-function validateUserConfigSlots(input: ReadonlyArray<IntegrationUserConfigSlot>): void {
-  const seenKeys = new Set<string>();
-
-  for (const userConfigSlot of input) {
-    validateUserConfigSlotCommon(userConfigSlot);
-
-    if (seenKeys.has(userConfigSlot.key)) {
-      throw new IntegrationDefinitionRegistryError(
-        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-        `Integration definition userConfigSlots contains duplicate key '${userConfigSlot.key}'.`,
-      );
-    }
-
-    seenKeys.add(userConfigSlot.key);
-
-    if (userConfigSlot.kind === "file") {
-      if (userConfigSlot.applyTo.clientId.trim().length === 0) {
-        throw new IntegrationDefinitionRegistryError(
-          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          `Integration definition userConfigSlots '${userConfigSlot.key}' applyTo.clientId must be non-empty.`,
-        );
-      }
-
-      if (userConfigSlot.applyTo.fileId.trim().length === 0) {
-        throw new IntegrationDefinitionRegistryError(
-          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-          `Integration definition userConfigSlots '${userConfigSlot.key}' applyTo.fileId must be non-empty.`,
-        );
-      }
-
-      continue;
-    }
-
-    if (userConfigSlot.applyTo.clientId.trim().length === 0) {
-      throw new IntegrationDefinitionRegistryError(
-        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-        `Integration definition userConfigSlots '${userConfigSlot.key}' applyTo.clientId must be non-empty.`,
-      );
-    }
-
-    if (userConfigSlot.applyTo.envKey.trim().length === 0) {
-      throw new IntegrationDefinitionRegistryError(
-        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-        `Integration definition userConfigSlots '${userConfigSlot.key}' applyTo.envKey must be non-empty.`,
-      );
-    }
-  }
 }
 
 function validateUserSecretSlotCommon(input: IntegrationUserSecretSlot): void {

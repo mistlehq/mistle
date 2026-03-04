@@ -54,7 +54,6 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
   webhookHandler: GitHubCloudWebhookHandler,
   projectBindingEditorUi: () => projectGitHubBindingEditorUi(),
   bindingEditorUiProjectionSchema: IntegrationBindingEditorUiProjectionSchema,
-  userConfigSlots: [],
   userSecretSlots: GitHubUserSecretSlots,
   compileBinding: compileGitHubCloudBinding,
 };

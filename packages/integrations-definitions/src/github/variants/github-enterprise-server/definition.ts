@@ -54,7 +54,6 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   webhookHandler: GitHubEnterpriseServerWebhookHandler,
   projectBindingEditorUi: () => projectGitHubBindingEditorUi(),
   bindingEditorUiProjectionSchema: IntegrationBindingEditorUiProjectionSchema,
-  userConfigSlots: [],
   userSecretSlots: GitHubUserSecretSlots,
   compileBinding: compileGitHubEnterpriseServerBinding,
 };
