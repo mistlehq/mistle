@@ -16,7 +16,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.4",
+    "@hono/node-server": "^1.19.11",
     "@mistle/config": "workspace:*",
     "@mistle/data-plane-trpc": "workspace:*",
     "@mistle/db": "workspace:*",

@@ -84,8 +84,8 @@ importers:
         specifier: 1.5.3
         version: 1.5.3(@better-auth/core@1.5.3(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1))(@better-auth/utils@0.3.1)(drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.18.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.19.0)(postgres@3.4.8)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)))
       '@hono/node-server':
-        specifier: ^1.19.4
-        version: 1.19.9(hono@4.12.3)
+        specifier: ^1.19.11
+        version: 1.19.11(hono@4.12.3)
       '@hono/zod-openapi':
         specifier: ^1.2.2
         version: 1.2.2(hono@4.12.3)(zod@4.3.6)
@@ -160,8 +160,8 @@ importers:
   apps/control-plane-worker:
     dependencies:
       '@hono/node-server':
-        specifier: ^1.19.4
-        version: 1.19.9(hono@4.12.3)
+        specifier: ^1.19.11
+        version: 1.19.11(hono@4.12.3)
       '@mistle/automations':
         specifier: workspace:*
         version: link:../../packages/automations
@@ -309,8 +309,8 @@ importers:
   apps/data-plane-api:
     dependencies:
       '@hono/node-server':
-        specifier: ^1.19.4
-        version: 1.19.9(hono@4.12.3)
+        specifier: ^1.19.11
+        version: 1.19.11(hono@4.12.3)
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -355,11 +355,11 @@ importers:
   apps/data-plane-gateway:
     dependencies:
       '@hono/node-server':
-        specifier: ^1.19.4
-        version: 1.19.9(hono@4.12.3)
+        specifier: ^1.19.11
+        version: 1.19.11(hono@4.12.3)
       '@hono/node-ws':
         specifier: ^1.3.0
-        version: 1.3.0(@hono/node-server@1.19.9(hono@4.12.3))(hono@4.12.3)
+        version: 1.3.0(@hono/node-server@1.19.11(hono@4.12.3))(hono@4.12.3)
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -404,8 +404,8 @@ importers:
   apps/data-plane-worker:
     dependencies:
       '@hono/node-server':
-        specifier: ^1.19.4
-        version: 1.19.9(hono@4.12.3)
+        specifier: ^1.19.11
+        version: 1.19.11(hono@4.12.3)
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -452,8 +452,8 @@ importers:
   apps/tokenizer-proxy:
     dependencies:
       '@hono/node-server':
-        specifier: ^1.19.4
-        version: 1.19.9(hono@4.12.3)
+        specifier: ^1.19.11
+        version: 1.19.11(hono@4.12.3)
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -1863,6 +1863,12 @@ packages:
     resolution: {integrity: sha512-rc1hOQtjIWGxcxpb9aHAfLpIctjEnsDehj0DAiVfBlmT84uvR0uUtN2hEi/ecvWVjXUGf5qPF4qEgiLOx1YIMQ==}
     engines: {node: '>=6'}
     hasBin: true
+
+  '@hono/node-server@1.19.11':
+    resolution: {integrity: sha512-dr8/3zEaB+p0D2n/IUrlPF1HZm586qgJNXK1a9fhg/PzdtkK7Ksd5l312tJX2yBuALqDYBlG20QEbayqPyxn+g==}
+    engines: {node: '>=18.14.1'}
+    peerDependencies:
+      hono: ^4
 
   '@hono/node-server@1.19.9':
     resolution: {integrity: sha512-vHL6w3ecZsky+8P5MD+eFfaGTyCeOHUIFYMGpQGbrBTSmNNoxv0if69rEZ5giu36weC5saFuznL411gRX7bJDw==}
@@ -8188,18 +8194,18 @@ snapshots:
       protobufjs: 7.5.4
       yargs: 17.7.2
 
+  '@hono/node-server@1.19.11(hono@4.12.3)':
+    dependencies:
+      hono: 4.12.3
+
   '@hono/node-server@1.19.9(hono@4.11.4)':
     dependencies:
       hono: 4.11.4
     optional: true
 
-  '@hono/node-server@1.19.9(hono@4.12.3)':
+  '@hono/node-ws@1.3.0(@hono/node-server@1.19.11(hono@4.12.3))(hono@4.12.3)':
     dependencies:
-      hono: 4.12.3
-
-  '@hono/node-ws@1.3.0(@hono/node-server@1.19.9(hono@4.12.3))(hono@4.12.3)':
-    dependencies:
-      '@hono/node-server': 1.19.9(hono@4.12.3)
+      '@hono/node-server': 1.19.11(hono@4.12.3)
       hono: 4.12.3
       ws: 8.19.0
     transitivePeerDependencies:

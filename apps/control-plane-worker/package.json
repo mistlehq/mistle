@@ -15,7 +15,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@hono/node-server": "^1.19.4",
+    "@hono/node-server": "^1.19.11",
     "@mistle/automations": "workspace:*",
     "@mistle/config": "workspace:*",
     "@mistle/control-plane-internal-client": "workspace:*",
