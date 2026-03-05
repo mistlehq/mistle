@@ -799,8 +799,8 @@ importers:
         specifier: workspace:*
         version: link:../sandbox
       openworkflow:
-        specifier: ^0.8.0
-        version: 0.8.0(postgres@3.4.8)
+        specifier: ^0.8.1
+        version: 0.8.1(postgres@3.4.8)
       postgres:
         specifier: ^3.4.8
         version: 3.4.8
@@ -5972,8 +5972,8 @@ packages:
   openapi3-ts@4.5.0:
     resolution: {integrity: sha512-jaL+HgTq2Gj5jRcfdutgRGLosCy/hT8sQf6VOy+P+g36cZOjI1iukdPnijC+4CmeRzg/jEllJUboEic2FhxhtQ==}
 
-  openworkflow@0.8.0:
-    resolution: {integrity: sha512-9w3ysYOWBBqUlMA+ElMkwAjHUj0dtWqQN8JOSpSyuh+y3ZOiDNs66du2cZnSBl4ob2AeBoAQmf/6yq/KeMXWgQ==}
+  openworkflow@0.8.1:
+    resolution: {integrity: sha512-BFbkj/MWex104V3lcuQR4X5/A1M/ZzDVDssSg99+Vxho09BtLTgm9lITHYmskwSMHMd5Wcifz7T97aDKZE7rNA==}
     engines: {node: '>=20'}
     peerDependencies:
       postgres: '>=3'
@@ -9921,6 +9921,14 @@ snapshots:
     optionalDependencies:
       vite: 7.3.1(@types/node@24.10.15)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
 
+  '@vitest/mocker@4.0.18(vite@7.3.1(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))':
+    dependencies:
+      '@vitest/spy': 4.0.18
+      estree-walker: 3.0.3
+      magic-string: 0.30.21
+    optionalDependencies:
+      vite: 7.3.1(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
+
   '@vitest/pretty-format@4.0.18':
     dependencies:
       tinyrainbow: 3.0.3
@@ -12161,7 +12169,7 @@ snapshots:
     dependencies:
       yaml: 2.8.2
 
-  openworkflow@0.8.0(postgres@3.4.8):
+  openworkflow@0.8.1(postgres@3.4.8):
     optionalDependencies:
       postgres: 3.4.8
 
@@ -13687,7 +13695,7 @@ snapshots:
   vitest@4.0.18(@types/node@25.3.3)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2):
     dependencies:
       '@vitest/expect': 4.0.18
-      '@vitest/mocker': 4.0.18(vite@7.3.1(@types/node@24.10.15)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
+      '@vitest/mocker': 4.0.18(vite@7.3.1(@types/node@25.3.3)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
       '@vitest/pretty-format': 4.0.18
       '@vitest/runner': 4.0.18
       '@vitest/snapshot': 4.0.18
