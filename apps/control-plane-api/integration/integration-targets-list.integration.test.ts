@@ -13,11 +13,23 @@ describe("integration targets discovery integration", () => {
   it("returns keyset paginated enabled integration targets for an authenticated session", async ({
     fixture,
   }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-targets-list@example.com",
+    });
+
+    const baselineResponse = await fixture.request("/v1/integration/targets?limit=1", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+    expect(baselineResponse.status).toBe(200);
+    const baselinePage = ListIntegrationTargetsResponseSchema.parse(await baselineResponse.json());
+
     await fixture.db
       .insert(integrationTargets)
       .values([
         {
-          targetKey: "github_cloud",
+          targetKey: "github_cloud_it",
           familyId: "github",
           variantId: "github-cloud",
           enabled: true,
@@ -29,7 +41,7 @@ describe("integration targets discovery integration", () => {
           descriptionOverride: "GitHub Cloud target",
         },
         {
-          targetKey: "linear_cloud",
+          targetKey: "linear_cloud_it",
           familyId: "linear",
           variantId: "linear-cloud",
           enabled: true,
@@ -40,16 +52,17 @@ describe("integration targets discovery integration", () => {
           descriptionOverride: "Linear Cloud target",
         },
         {
-          targetKey: "openai-default",
+          targetKey: "openai-default-it",
           familyId: "openai",
           variantId: "openai-default",
           enabled: true,
           config: {
             api_base_url: "https://api.openai.com",
+            binding_capabilities: createOpenAiRawBindingCapabilities(),
           },
         },
         {
-          targetKey: "zzz_disabled_target",
+          targetKey: "zzz_disabled_target_it",
           familyId: "slack",
           variantId: "slack-webhooks",
           enabled: false,
@@ -60,10 +73,6 @@ describe("integration targets discovery integration", () => {
       ])
       .onConflictDoNothing();
 
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-targets-list@example.com",
-    });
-
     const firstPageResponse = await fixture.request("/v1/integration/targets?limit=2", {
       headers: {
         cookie: authenticatedSession.cookie,
@@ -73,45 +82,7 @@ describe("integration targets discovery integration", () => {
     expect(firstPageResponse.status).toBe(200);
     const firstPage = ListIntegrationTargetsResponseSchema.parse(await firstPageResponse.json());
 
-    expect(firstPage.totalResults).toBe(3);
-    expect(firstPage.items).toEqual([
-      {
-        targetKey: "github_cloud",
-        familyId: "github",
-        variantId: "github-cloud",
-        enabled: true,
-        config: {
-          base_url: "https://github.com",
-          app_id: "123456",
-        },
-        displayName: "GitHub Cloud",
-        description: "GitHub Cloud target",
-        logoKey: "github",
-        supportedAuthSchemes: ["api-key", "oauth"],
-        displayNameOverride: "GitHub Cloud",
-        descriptionOverride: "GitHub Cloud target",
-        targetHealth: {
-          configStatus: "invalid",
-          reason: "invalid-config",
-        },
-      },
-      {
-        targetKey: "linear_cloud",
-        familyId: "linear",
-        variantId: "linear-cloud",
-        enabled: true,
-        config: {
-          base_url: "https://api.linear.app",
-        },
-        displayName: "Linear Cloud",
-        description: "Linear Cloud target",
-        displayNameOverride: "Linear Cloud",
-        descriptionOverride: "Linear Cloud target",
-        targetHealth: {
-          configStatus: "valid",
-        },
-      },
-    ]);
+    expect(firstPage.totalResults).toBe(baselinePage.totalResults + 3);
     expect(firstPage.previousPage).toBeNull();
     expect(firstPage.nextPage).not.toBeNull();
 
@@ -129,30 +100,7 @@ describe("integration targets discovery integration", () => {
     );
     expect(secondPageResponse.status).toBe(200);
     const secondPage = ListIntegrationTargetsResponseSchema.parse(await secondPageResponse.json());
-
-    expect(secondPage.totalResults).toBe(3);
-    expect(secondPage.items).toHaveLength(1);
-    const openAiTarget = secondPage.items[0];
-    if (openAiTarget === undefined) {
-      throw new Error("Expected OpenAI target in second page.");
-    }
-
-    expect(openAiTarget).toMatchObject({
-      targetKey: "openai-default",
-      familyId: "openai",
-      variantId: "openai-default",
-      enabled: true,
-      displayName: "OpenAI",
-      description:
-        "Enable OpenAI model access with API key or ChatGPT subscription authentication.",
-      logoKey: "openai",
-      supportedAuthSchemes: ["api-key", "oauth"],
-      targetHealth: {
-        configStatus: "valid",
-      },
-    });
-    expect(openAiTarget.config.api_base_url).toBe("https://api.openai.com");
-    expect(secondPage.nextPage).toBeNull();
+    expect(secondPage.totalResults).toBe(baselinePage.totalResults + 3);
     expect(secondPage.previousPage).not.toBeNull();
 
     if (secondPage.previousPage === null) {
@@ -171,12 +119,82 @@ describe("integration targets discovery integration", () => {
     const previousPage = ListIntegrationTargetsResponseSchema.parse(
       await previousPageResponse.json(),
     );
+    expect(previousPage.totalResults).toBe(baselinePage.totalResults + 3);
 
-    expect(previousPage.totalResults).toBe(3);
-    expect(previousPage.items.map((item) => item.targetKey)).toEqual([
-      "github_cloud",
-      "linear_cloud",
-    ]);
+    const allTargetsResponse = await fixture.request("/v1/integration/targets?limit=100", {
+      headers: {
+        cookie: authenticatedSession.cookie,
+      },
+    });
+    expect(allTargetsResponse.status).toBe(200);
+    const allTargets = ListIntegrationTargetsResponseSchema.parse(await allTargetsResponse.json());
+
+    const insertedGitHubTarget = allTargets.items.find(
+      (item) => item.targetKey === "github_cloud_it",
+    );
+    expect(insertedGitHubTarget).toMatchObject({
+      targetKey: "github_cloud_it",
+      familyId: "github",
+      variantId: "github-cloud",
+      enabled: true,
+      config: {
+        base_url: "https://github.com",
+        app_id: "123456",
+      },
+      displayName: "GitHub Cloud",
+      description: "GitHub Cloud target",
+      logoKey: "github",
+      supportedAuthSchemes: ["api-key", "oauth"],
+      displayNameOverride: "GitHub Cloud",
+      descriptionOverride: "GitHub Cloud target",
+      targetHealth: {
+        configStatus: "invalid",
+        reason: "invalid-config",
+      },
+    });
+
+    const insertedLinearTarget = allTargets.items.find(
+      (item) => item.targetKey === "linear_cloud_it",
+    );
+    expect(insertedLinearTarget).toMatchObject({
+      targetKey: "linear_cloud_it",
+      familyId: "linear",
+      variantId: "linear-cloud",
+      enabled: true,
+      config: {
+        base_url: "https://api.linear.app",
+      },
+      displayName: "Linear Cloud",
+      description: "Linear Cloud target",
+      displayNameOverride: "Linear Cloud",
+      descriptionOverride: "Linear Cloud target",
+      targetHealth: {
+        configStatus: "valid",
+      },
+    });
+
+    const insertedOpenAiTarget = allTargets.items.find(
+      (item) => item.targetKey === "openai-default-it",
+    );
+    expect(insertedOpenAiTarget).toMatchObject({
+      targetKey: "openai-default-it",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      displayName: "OpenAI",
+      description:
+        "Enable OpenAI model access with API key or ChatGPT subscription authentication.",
+      logoKey: "openai",
+      supportedAuthSchemes: ["api-key", "oauth"],
+      targetHealth: {
+        configStatus: "valid",
+      },
+    });
+    expect(insertedOpenAiTarget?.config.api_base_url).toBe("https://api.openai.com");
+
+    expect(allTargets.items.some((item) => item.targetKey === "zzz_disabled_target_it")).toBe(
+      false,
+    );
   });
 
   it("returns 400 for invalid pagination cursor", async ({ fixture }) => {

@@ -1,20 +1,34 @@
+import { readFile } from "node:fs/promises";
+
+import { createControlPlaneDatabase } from "@mistle/db/control-plane";
 import { CONTROL_PLANE_SCHEMA_NAME } from "@mistle/db/control-plane";
 import {
   CONTROL_PLANE_MIGRATIONS_FOLDER_PATH,
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import {
   acquireSharedPostgresInfra,
   DEFAULT_SHARED_INTEGRATION_INFRA_KEY,
 } from "@mistle/test-harness";
 import { createControlPlaneBackend } from "@mistle/workflows/control-plane";
-import { Client as PgClient } from "pg";
+import { Client as PgClient, Pool } from "pg";
+
+import {
+  discoverIntegrationTargetProvisionManifestPath,
+  parseIntegrationTargetsProvisionManifest,
+  provisionIntegrationTargets,
+  resolveRepositoryRootFromDirectory,
+} from "../scripts/integration-targets/provision-integration-targets.js";
+import { syncIntegrationTargets } from "../scripts/integration-targets/sync-integration-targets.js";
 
 const SHARED_INFRA_KEY = DEFAULT_SHARED_INTEGRATION_INFRA_KEY;
 const TEMPLATE_DATABASE_NAME = "mistle_control_plane_api_it_template";
 const WORKFLOW_NAMESPACE_ID = "integration";
 const INTERNAL_AUTH_SERVICE_TOKEN = "integration-service-token";
+const INTEGRATIONS_MASTER_KEY_VERSION = 1;
+const INTEGRATIONS_MASTER_KEY_MATERIAL = "integration-master-key-testing";
 
 function setEnv(name: string, value: string): void {
   process.env[name] = value;
@@ -99,6 +113,40 @@ export default async function setup(): Promise<() => Promise<void>> {
       migrationsSchema: MigrationTracking.CONTROL_PLANE.SCHEMA_NAME,
       migrationsTable: MigrationTracking.CONTROL_PLANE.TABLE_NAME,
     });
+
+    const templateDatabasePool = new Pool({
+      connectionString: templateDirectUrl,
+    });
+    try {
+      const database = createControlPlaneDatabase(templateDatabasePool);
+      const integrationRegistry = createIntegrationRegistry();
+
+      await syncIntegrationTargets(database, integrationRegistry);
+
+      const repositoryRoot = resolveRepositoryRootFromDirectory(process.cwd());
+      const provisionManifestPath = discoverIntegrationTargetProvisionManifestPath({
+        startDirectory: process.cwd(),
+        repositoryRoot,
+      });
+      if (provisionManifestPath !== undefined) {
+        const provisionManifest = parseIntegrationTargetsProvisionManifest(
+          await readFile(provisionManifestPath, "utf8"),
+        );
+        await provisionIntegrationTargets({
+          db: database,
+          integrationRegistry,
+          integrationsConfig: {
+            activeMasterEncryptionKeyVersion: INTEGRATIONS_MASTER_KEY_VERSION,
+            masterEncryptionKeys: {
+              [String(INTEGRATIONS_MASTER_KEY_VERSION)]: INTEGRATIONS_MASTER_KEY_MATERIAL,
+            },
+          },
+          manifest: provisionManifest,
+        });
+      }
+    } finally {
+      await templateDatabasePool.end();
+    }
 
     const workflowBackend = await createControlPlaneBackend({
       url: templateDirectUrl,
