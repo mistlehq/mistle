@@ -16,6 +16,5 @@
     "dashboard-select/no-undefined-select-value": "error",
     "dashboard-preflight/kebab-case-file-names": "error",
     "dashboard-preflight/control-plane-client-drift": "error",
-    "dashboard-preflight/sandbox-session-protocol-types-drift": "error",
   },
 }

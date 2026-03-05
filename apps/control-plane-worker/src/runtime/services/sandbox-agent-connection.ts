@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
 
+import type {
+  AgentConnectRequest,
+  ConnectError,
+  ConnectOK,
+} from "@mistle/sandbox-session-protocol";
 import { systemScheduler } from "@mistle/time";
 import WebSocket, { type RawData } from "ws";
 
@@ -7,28 +12,7 @@ const DefaultConnectTimeoutMs = 15_000;
 const DefaultCloseCode = 1000;
 const DefaultCloseReason = "automation payload delivered";
 
-type ConnectOkControlMessage = {
-  type: "connect.ok";
-  requestId: string;
-};
-
-type ConnectErrorControlMessage = {
-  type: "connect.error";
-  requestId: string;
-  code: string;
-  message: string;
-};
-
-type ConnectControlMessage = ConnectOkControlMessage | ConnectErrorControlMessage;
-
-type AgentConnectRequest = {
-  type: "connect";
-  v: 1;
-  requestId: string;
-  channel: {
-    kind: "agent";
-  };
-};
+type ConnectControlMessage = ConnectOK | ConnectError;
 
 export type ConnectSandboxAgentConnectionInput = {
   connectionUrl: string;
