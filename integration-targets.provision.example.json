@@ -5,7 +5,7 @@
       "targetKey": "openai-default",
       "enabled": true,
       "config": {
-        "api_base_url": "https://api.openai.com",
+        "api_base_url": "https://api.openai.com/v1",
         "binding_capabilities": {
           "by_auth_scheme": {
             "api-key": {
