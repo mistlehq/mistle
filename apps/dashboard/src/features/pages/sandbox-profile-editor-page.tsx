@@ -283,11 +283,11 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
   const integrationsState = useSandboxProfileIntegrationsState({
     mode: props.mode,
     profileId,
-    invalidateVersionBindings: async ({ profileId: invalidateProfileId }) => {
+    invalidateVersionBindings: async ({ profileId: invalidateProfileId, version }) => {
       await queryClient.invalidateQueries({
         queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
           profileId: invalidateProfileId,
-          version: 1,
+          version,
         }),
       });
     },
