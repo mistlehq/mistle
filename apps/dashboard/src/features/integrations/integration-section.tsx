@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { SectionHeader } from "../shared/section-header.js";
 import type { IntegrationCardViewModel } from "./directory-model.js";
 
 type IntegrationSectionProps = {
@@ -12,10 +13,7 @@ type IntegrationSectionProps = {
 export function IntegrationSection(props: IntegrationSectionProps) {
   return (
     <div className="gap-2 flex flex-col">
-      <div className="items-center gap-3 flex">
-        <h2 className="text-sm font-semibold tracking-wide uppercase">{props.title}</h2>
-        <div className="bg-border h-px flex-1" />
-      </div>
+      <SectionHeader title={props.title} />
       <div className="w-full max-w-6xl">
         {props.cards.length === 0 && props.emptyStateMessage ? (
           <p className="text-muted-foreground text-sm">{props.emptyStateMessage}</p>
