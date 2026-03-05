@@ -6,6 +6,7 @@ import { createIntegrationConnectionsApp } from "../integration-connections/inde
 import { createIntegrationTargetsApp } from "../integration-targets/index.js";
 import { createIntegrationWebhooksApp } from "../integration-webhooks/index.js";
 import { createInternalIntegrationCredentialsApp } from "../internal-integration-credentials/index.js";
+import { createInternalSandboxRuntimeApp } from "../internal-sandbox-runtime/index.js";
 import { createAppContextMiddleware } from "../middleware/app-context.js";
 import { createCorsMiddleware } from "../middleware/cors.js";
 import { withAuthSession } from "../middleware/with-auth-session.js";
@@ -13,11 +14,17 @@ import { CONTROL_PLANE_OPENAPI_INFO, CONTROL_PLANE_OPENAPI_PATH } from "../opena
 import { createOrganizationMembershipCapabilitiesApp } from "../organization-membership-capabilities/index.js";
 import { createSandboxInstancesApp } from "../sandbox-instances/index.js";
 import { createSandboxProfilesApp } from "../sandbox-profiles/index.js";
-import type { AppServices, ControlPlaneApiConfig, ControlPlaneApp } from "../types.js";
+import type {
+  AppServices,
+  ControlPlaneApiConfig,
+  ControlPlaneApiSandboxRuntimeConfig,
+  ControlPlaneApp,
+} from "../types.js";
 
 type RegisterAppRoutesInput = {
   app: ControlPlaneApp;
   config: ControlPlaneApiConfig;
+  sandboxConfig: ControlPlaneApiSandboxRuntimeConfig;
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   integrationRegistry: IntegrationRegistry;
@@ -32,6 +39,7 @@ export function registerAppRoutes(input: RegisterAppRoutesInput): void {
     "*",
     createAppContextMiddleware({
       config,
+      sandboxConfig: input.sandboxConfig,
       internalAuthServiceToken: input.internalAuthServiceToken,
       db,
       integrationRegistry: input.integrationRegistry,
@@ -49,8 +57,12 @@ export function registerAppRoutes(input: RegisterAppRoutesInput): void {
 }
 
 export function registerApiRouteModules(app: ControlPlaneApp): void {
+  registerPublicApiRouteModules(app);
+  registerInternalApiRouteModules(app);
+}
+
+export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const authApp = createAuthApp();
-  const internalIntegrationCredentialsApp = createInternalIntegrationCredentialsApp();
   const integrationConnectionsApp = withAuthSession(createIntegrationConnectionsApp());
   const integrationTargetsApp = withAuthSession(createIntegrationTargetsApp());
   const integrationWebhooksApp = createIntegrationWebhooksApp();
@@ -60,7 +72,6 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
   const sandboxInstancesApp = withAuthSession(createSandboxInstancesApp());
   const sandboxProfilesApp = withAuthSession(createSandboxProfilesApp());
   app.route(authApp.basePath, authApp.routes);
-  app.route(internalIntegrationCredentialsApp.basePath, internalIntegrationCredentialsApp.routes);
   app.route(integrationConnectionsApp.basePath, integrationConnectionsApp.routes);
   app.route(integrationTargetsApp.basePath, integrationTargetsApp.routes);
   app.route(integrationWebhooksApp.basePath, integrationWebhooksApp.routes);
@@ -70,4 +81,12 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
   );
   app.route(sandboxInstancesApp.basePath, sandboxInstancesApp.routes);
   app.route(sandboxProfilesApp.basePath, sandboxProfilesApp.routes);
+}
+
+export function registerInternalApiRouteModules(app: ControlPlaneApp): void {
+  const internalIntegrationCredentialsApp = createInternalIntegrationCredentialsApp();
+  const internalSandboxRuntimeApp = createInternalSandboxRuntimeApp();
+
+  app.route(internalIntegrationCredentialsApp.basePath, internalIntegrationCredentialsApp.routes);
+  app.route(internalSandboxRuntimeApp.basePath, internalSandboxRuntimeApp.routes);
 }

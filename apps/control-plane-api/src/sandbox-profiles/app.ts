@@ -229,7 +229,7 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
           },
           source: "dashboard",
           image: {
-            imageId: ctx.get("config").sandbox.defaultBaseImage,
+            imageId: ctx.get("sandboxConfig").defaultBaseImage,
             kind: "base",
             createdAt: new Date().toISOString(),
           },

@@ -34,12 +34,19 @@ export const ControlPlaneWorkerDataPlaneApiConfigSchema = z
   })
   .strict();
 
+export const ControlPlaneWorkerControlPlaneApiConfigSchema = z
+  .object({
+    baseUrl: z.string().min(1),
+  })
+  .strict();
+
 export const ControlPlaneWorkerConfigSchema = z
   .object({
     server: ControlPlaneWorkerServerConfigSchema,
     workflow: ControlPlaneWorkerWorkflowConfigSchema,
     email: ControlPlaneWorkerEmailConfigSchema,
     dataPlaneApi: ControlPlaneWorkerDataPlaneApiConfigSchema,
+    controlPlaneApi: ControlPlaneWorkerControlPlaneApiConfigSchema,
   })
   .strict();
 
@@ -49,6 +56,7 @@ export const PartialControlPlaneWorkerConfigSchema = z
     workflow: ControlPlaneWorkerWorkflowConfigSchema.partial().optional(),
     email: ControlPlaneWorkerEmailConfigSchema.partial().optional(),
     dataPlaneApi: ControlPlaneWorkerDataPlaneApiConfigSchema.partial().optional(),
+    controlPlaneApi: ControlPlaneWorkerControlPlaneApiConfigSchema.partial().optional(),
   })
   .strict();
 

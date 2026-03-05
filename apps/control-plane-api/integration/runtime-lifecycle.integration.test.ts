@@ -12,6 +12,11 @@ const IntegrationConnectionTokenConfig = {
   audience: "integration-audience",
 } as const;
 
+const IntegrationSandboxRuntimeConfig = {
+  defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+  gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+} as const;
+
 function createRuntimeConfigWithPort(input: {
   config: ControlPlaneApiConfig;
   host: string;
@@ -46,6 +51,7 @@ describe("runtime lifecycle integration", () => {
       }),
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       connectionToken: IntegrationConnectionTokenConfig,
+      sandbox: IntegrationSandboxRuntimeConfig,
     });
 
     try {
@@ -80,6 +86,7 @@ describe("runtime lifecycle integration", () => {
       }),
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       connectionToken: IntegrationConnectionTokenConfig,
+      sandbox: IntegrationSandboxRuntimeConfig,
     });
     const healthURL = `http://${host}:${String(port)}/__healthz`;
 
@@ -103,6 +110,7 @@ describe("runtime lifecycle integration", () => {
       app: fixture.config,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       connectionToken: IntegrationConnectionTokenConfig,
+      sandbox: IntegrationSandboxRuntimeConfig,
     });
     expect(getAppDatabase(app)).toBeDefined();
 

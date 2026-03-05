@@ -177,6 +177,9 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneWorkerIntegrationFixtur
         dataPlaneApi: {
           baseUrl: "http://127.0.0.1:5300",
         },
+        controlPlaneApi: {
+          baseUrl: "http://127.0.0.1:5000",
+        },
       };
 
       await use({

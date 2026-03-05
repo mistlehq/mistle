@@ -1,5 +1,5 @@
 import { asObjectRecord } from "../core/record.js";
-import { type PartialGlobalConfigInput, GlobalConfigSchema } from "./schema.js";
+import { type PartialGlobalConfigInput, PartialGlobalConfigSchema } from "./schema.js";
 
 export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGlobalConfigInput {
   const global = asObjectRecord(tomlRoot.global);
@@ -8,7 +8,7 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
   const sandboxBootstrap = asObjectRecord(sandbox.bootstrap);
   const sandboxConnect = asObjectRecord(sandbox.connect);
 
-  return GlobalConfigSchema.partial().parse({
+  return PartialGlobalConfigSchema.parse({
     env: global.env,
     ...(typeof internalAuth.service_token === "string"
       ? {
@@ -17,10 +17,14 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
           },
         }
       : {}),
-    ...(typeof sandboxBootstrap.token_secret === "string" ||
+    ...(typeof sandbox.default_base_image === "string" ||
+    typeof sandbox.gateway_ws_url === "string" ||
+    typeof sandboxBootstrap.token_secret === "string" ||
     typeof sandboxConnect.token_secret === "string"
       ? {
           sandbox: {
+            defaultBaseImage: sandbox.default_base_image,
+            gatewayWsUrl: sandbox.gateway_ws_url,
             bootstrap: {
               tokenSecret: sandboxBootstrap.token_secret,
               tokenIssuer: sandboxBootstrap.token_issuer,

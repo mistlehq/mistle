@@ -1,9 +1,19 @@
 import { logger } from "../logger.js";
-import { getOpenApiSpecFilePath, writeOpenApiSpecFile } from "./spec-file.js";
+import {
+  getInternalOpenApiSpecFilePath,
+  getOpenApiSpecFilePath,
+  writeOpenApiSpecFile,
+} from "./spec-file.js";
 
 async function run(): Promise<void> {
   await writeOpenApiSpecFile();
-  logger.info({ openApiSpecPath: getOpenApiSpecFilePath() }, "Wrote OpenAPI spec");
+  logger.info(
+    {
+      openApiSpecPath: getOpenApiSpecFilePath(),
+      internalOpenApiSpecPath: getInternalOpenApiSpecFilePath(),
+    },
+    "Wrote OpenAPI specs",
+  );
 }
 
 void run().catch((error: unknown) => {

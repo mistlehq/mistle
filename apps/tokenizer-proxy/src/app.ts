@@ -1,3 +1,4 @@
+import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import { Hono } from "hono";
 
 import {
@@ -6,7 +7,6 @@ import {
   CREDENTIAL_CACHE_REFRESH_SKEW_SECONDS,
   CREDENTIAL_RESOLVER_REQUEST_TIMEOUT_MS,
 } from "./egress/constants.js";
-import { ControlPlaneCredentialResolverClient } from "./egress/control-plane-client.js";
 import { CredentialCache } from "./egress/credential-cache.js";
 import { createEgressProxyHandler, EGRESS_ROUTE_BASE_PATH } from "./egress/proxy-handler.js";
 import type { AppContextBindings, TokenizerProxyApp, TokenizerProxyConfig } from "./types.js";
@@ -16,7 +16,7 @@ export function createApp(
   internalAuthServiceToken: string,
 ): TokenizerProxyApp {
   const app = new Hono<AppContextBindings>();
-  const controlPlaneCredentialResolverClient = new ControlPlaneCredentialResolverClient({
+  const controlPlaneInternalClient = new ControlPlaneInternalClient({
     baseUrl: config.controlPlaneApi.baseUrl,
     internalAuthServiceToken,
     requestTimeoutMs: CREDENTIAL_RESOLVER_REQUEST_TIMEOUT_MS,
@@ -28,7 +28,7 @@ export function createApp(
     now: () => Date.now(),
   });
   const egressProxyHandler = createEgressProxyHandler({
-    controlPlaneCredentialResolverClient,
+    controlPlaneInternalClient,
     credentialCache,
   });
 

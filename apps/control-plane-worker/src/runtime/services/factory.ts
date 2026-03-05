@@ -1,8 +1,12 @@
+import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import { HandleAutomationRunWorkflowSpec } from "@mistle/workflows/control-plane";
 
 import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 import {
+  acquireAutomationConnection,
+  deliverAutomationPayload,
+  ensureAutomationSandbox,
   markAutomationRunCompleted,
   markAutomationRunFailed,
   prepareAutomationRun,
@@ -20,6 +24,10 @@ export function createControlPlaneWorkerServices(
   input: CreateControlPlaneWorkerServicesInput,
 ): ControlPlaneWorkerRuntimeServices {
   const emailSender = createEmailSender(input.config);
+  const controlPlaneInternalClient = new ControlPlaneInternalClient({
+    baseUrl: input.config.controlPlaneApi.baseUrl,
+    internalAuthServiceToken: input.internalAuthServiceToken,
+  });
 
   return {
     automationRuns: {
@@ -32,12 +40,34 @@ export function createControlPlaneWorkerServices(
         );
       },
       prepareAutomationRun: async (workflowInput) => {
-        await prepareAutomationRun(
+        return prepareAutomationRun(
           {
             db: input.db,
           },
           workflowInput,
         );
+      },
+      ensureAutomationSandbox: async (workflowInput) => {
+        return ensureAutomationSandbox(
+          {
+            db: input.db,
+            startSandboxProfileInstance: (startInput) =>
+              controlPlaneInternalClient.startSandboxProfileInstance(startInput),
+          },
+          workflowInput,
+        );
+      },
+      acquireAutomationConnection: async (workflowInput) => {
+        return acquireAutomationConnection(
+          {
+            mintSandboxConnectionToken: (mintInput) =>
+              controlPlaneInternalClient.mintSandboxConnectionToken(mintInput),
+          },
+          workflowInput,
+        );
+      },
+      deliverAutomationPayload: async (workflowInput) => {
+        await deliverAutomationPayload(workflowInput);
       },
       markAutomationRunCompleted: async (workflowInput) => {
         await markAutomationRunCompleted(

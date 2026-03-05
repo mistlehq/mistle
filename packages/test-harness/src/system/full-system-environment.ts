@@ -211,7 +211,7 @@ export async function startFullSystemEnvironment(
           input.authInvitationAcceptBaseUrl,
         MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: input.authTrustedOrigins,
         MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
-        MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
+        MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
       },
     });
     cleanupTasks.unshift(async () => {
@@ -238,6 +238,8 @@ export async function startFullSystemEnvironment(
         MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT: String(sharedInfraLease.infra.mailpit.smtpPort),
         MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE: "false",
         MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
+        MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL:
+          CONTROL_PLANE_API_CONTAINER_BASE_URL,
       },
     });
     cleanupTasks.unshift(async () => {

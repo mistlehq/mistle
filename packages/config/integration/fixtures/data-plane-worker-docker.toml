@@ -14,6 +14,10 @@ token_secret = "fixture-bootstrap-token-secret"
 token_issuer = "data-plane-worker"
 token_audience = "data-plane-gateway"
 
+[global.sandbox]
+default_base_image = "127.0.0.1:5001/mistle/sandbox-base:dev"
+gateway_ws_url = "ws://127.0.0.1:5003/tunnel/sandbox"
+
 [apps.data_plane_worker.server]
 host = "0.0.0.0"
 port = 5305

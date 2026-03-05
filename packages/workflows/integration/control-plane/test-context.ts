@@ -94,13 +94,43 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
             ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
             ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
             ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE,
+            ControlPlaneWorkerWorkflowIds.START_SANDBOX_PROFILE_INSTANCE,
           ],
           services: {
             automationRuns: {
               transitionAutomationRunToRunning: async () => ({
                 shouldProcess: true,
               }),
-              prepareAutomationRun: async () => {},
+              prepareAutomationRun: async (input) => ({
+                automationRunId: input.automationRunId,
+                automationRunCreatedAt: "2026-01-01T00:00:00.000Z",
+                automationId: "atm_test",
+                automationTargetId: "atg_test",
+                organizationId: "org_test",
+                sandboxProfileId: "sbp_test",
+                sandboxProfileVersion: 1,
+                webhookEventId: "iwe_test",
+                webhookEventType: "github.issue_comment.created",
+                webhookProviderEventType: "issue_comment",
+                webhookExternalEventId: "evt_test",
+                webhookExternalDeliveryId: "delivery_test",
+                webhookPayload: {},
+                renderedInput: "hello",
+                renderedConversationKey: "conversation-key",
+                renderedIdempotencyKey: null,
+              }),
+              ensureAutomationSandbox: async () => ({
+                sandboxInstanceId: "sbi_test",
+                providerSandboxId: "provider_test",
+                startupWorkflowRunId: "wf_start_sandbox_test",
+              }),
+              acquireAutomationConnection: async () => ({
+                instanceId: "sbi_test",
+                url: "ws://gateway.example/sbi_test?connect_token=token_test",
+                token: "token_test",
+                expiresAt: "2026-01-01T00:00:30.000Z",
+              }),
+              deliverAutomationPayload: async () => {},
               markAutomationRunCompleted: async () => {},
               markAutomationRunFailed: async () => {},
               resolveAutomationRunFailure: ({ error }) => {
@@ -136,6 +166,13 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
                   where id = ${input.profileId} and organization_id = ${input.organizationId}
                 `;
               },
+            },
+            sandboxInstances: {
+              startSandboxProfileInstance: async () => ({
+                workflowRunId: "wf_start_sandbox_test",
+                sandboxInstanceId: "sbi_test",
+                providerSandboxId: "provider_test",
+              }),
             },
           },
         });

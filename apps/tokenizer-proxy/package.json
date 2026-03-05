@@ -17,9 +17,9 @@
   "dependencies": {
     "@hono/node-server": "^1.19.4",
     "@mistle/config": "workspace:*",
+    "@mistle/control-plane-internal-client": "workspace:*",
     "@mistle/logging": "workspace:*",
-    "hono": "^4.12.3",
-    "zod": "^4.3.6"
+    "hono": "^4.12.3"
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*"

@@ -1,6 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 
+import { createRequireInternalAuthMiddleware } from "../middleware/require-internal-auth.js";
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 import {
   CONTROL_PLANE_INTERNAL_AUTH_HEADER,
@@ -8,6 +9,9 @@ import {
 } from "./constants.js";
 import {
   InternalIntegrationCredentialErrorResponseSchema,
+  InternalIntegrationCredentialUnauthorizedResponseSchema,
+  resolveIntegrationCredentialRoute,
+  resolveIntegrationTargetSecretsRoute,
   ResolveIntegrationCredentialRequestSchema,
   ResolveIntegrationCredentialResponseSchema,
   ResolveIntegrationTargetSecretsRequestSchema,
@@ -24,13 +28,16 @@ export function createInternalIntegrationCredentialsApp(): AppRoutes<
   typeof INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH
 > {
   const routes = new OpenAPIHono<AppContextBindings>();
+  routes.use(
+    "*",
+    createRequireInternalAuthMiddleware({
+      headerName: CONTROL_PLANE_INTERNAL_AUTH_HEADER,
+      errorCode: InternalIntegrationCredentialsErrorCodes.UNAUTHORIZED,
+      errorMessage: "Internal service authentication failed.",
+    }),
+  );
 
-  routes.post("/resolve", async (ctx) => {
-    const authorizationFailureResponse = resolveAuthorizationFailureResponse(ctx);
-    if (authorizationFailureResponse !== null) {
-      return authorizationFailureResponse;
-    }
-
+  routes.openapi(resolveIntegrationCredentialRoute, async (ctx) => {
     const requestBody = await ctx.req
       .json()
       .catch((): unknown => ({ __parseError: "invalid_json_body" }));
@@ -63,12 +70,7 @@ export function createInternalIntegrationCredentialsApp(): AppRoutes<
     }
   });
 
-  routes.post("/resolve-target-secrets", async (ctx) => {
-    const authorizationFailureResponse = resolveAuthorizationFailureResponse(ctx);
-    if (authorizationFailureResponse !== null) {
-      return authorizationFailureResponse;
-    }
-
+  routes.openapi(resolveIntegrationTargetSecretsRoute, async (ctx) => {
     const requestBody = await ctx.req
       .json()
       .catch((): unknown => ({ __parseError: "invalid_json_body" }));
@@ -90,7 +92,7 @@ export function createInternalIntegrationCredentialsApp(): AppRoutes<
         resolvedTargetSecrets;
       return ctx.json(responseBody, 200);
     } catch (error) {
-      return handleResolveIntegrationCredentialError(ctx, error);
+      return handleResolveTargetSecretsError(ctx, error);
     }
   });
 
@@ -100,30 +102,46 @@ export function createInternalIntegrationCredentialsApp(): AppRoutes<
   };
 }
 
-function resolveAuthorizationFailureResponse(ctx: AppContext) {
-  const providedServiceToken = ctx.req.header(CONTROL_PLANE_INTERNAL_AUTH_HEADER);
-  if (
-    providedServiceToken !== undefined &&
-    providedServiceToken === ctx.get("internalAuthServiceToken")
-  ) {
-    return null;
-  }
-
-  const responseBody: z.infer<typeof InternalIntegrationCredentialErrorResponseSchema> = {
-    code: InternalIntegrationCredentialsErrorCodes.UNAUTHORIZED,
-    message: "Internal service authentication failed.",
-  };
-  return ctx.json(responseBody, 401);
-}
-
 function handleResolveIntegrationCredentialError(ctx: AppContext, error: unknown) {
   if (error instanceof InternalIntegrationCredentialsError) {
+    if (error.statusCode === 401) {
+      const unauthorizedResponseBody: z.infer<
+        typeof InternalIntegrationCredentialUnauthorizedResponseSchema
+      > = {
+        code: InternalIntegrationCredentialsErrorCodes.UNAUTHORIZED,
+        message: error.message,
+      };
+      return ctx.json(unauthorizedResponseBody, 401);
+    }
+
     const responseBody: z.infer<typeof InternalIntegrationCredentialErrorResponseSchema> = {
       code: error.code,
       message: error.message,
     };
 
     return ctx.json(responseBody, error.statusCode);
+  }
+
+  throw error;
+}
+
+function handleResolveTargetSecretsError(ctx: AppContext, error: unknown) {
+  if (error instanceof InternalIntegrationCredentialsError) {
+    if (error.statusCode === 401) {
+      const unauthorizedResponseBody: z.infer<
+        typeof InternalIntegrationCredentialUnauthorizedResponseSchema
+      > = {
+        code: InternalIntegrationCredentialsErrorCodes.UNAUTHORIZED,
+        message: error.message,
+      };
+      return ctx.json(unauthorizedResponseBody, 401);
+    }
+
+    const responseBody: z.infer<typeof InternalIntegrationCredentialErrorResponseSchema> = {
+      code: error.code,
+      message: error.message,
+    };
+    return ctx.json(responseBody, 400);
   }
 
   throw error;

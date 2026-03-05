@@ -24,6 +24,16 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET",
   },
   {
+    configPath: ["global", "sandbox", "defaultBaseImage"],
+    tomlPath: ["global", "sandbox", "default_base_image"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE",
+  },
+  {
+    configPath: ["global", "sandbox", "gatewayWsUrl"],
+    tomlPath: ["global", "sandbox", "gateway_ws_url"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL",
+  },
+  {
     configPath: ["global", "sandbox", "connect", "tokenIssuer"],
     tomlPath: ["global", "sandbox", "connect", "token_issuer"],
     envVar: "MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER",
@@ -115,16 +125,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL",
   },
   {
-    configPath: ["apps", "control_plane_api", "sandbox", "defaultBaseImage"],
-    tomlPath: ["apps", "control_plane_api", "sandbox", "default_base_image"],
-    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_DEFAULT_BASE_IMAGE",
-  },
-  {
-    configPath: ["apps", "control_plane_api", "sandbox", "gatewayWsUrl"],
-    tomlPath: ["apps", "control_plane_api", "sandbox", "gateway_ws_url"],
-    envVar: "MISTLE_APPS_CONTROL_PLANE_API_SANDBOX_GATEWAY_WS_URL",
-  },
-  {
     configPath: ["apps", "control_plane_api", "integrations", "activeMasterEncryptionKeyVersion"],
     tomlPath: ["apps", "control_plane_api", "integrations", "active_master_encryption_key_version"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION",
@@ -204,6 +204,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     configPath: ["apps", "control_plane_worker", "dataPlaneApi", "baseUrl"],
     tomlPath: ["apps", "control_plane_worker", "data_plane_api", "base_url"],
     envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL",
+  },
+  {
+    configPath: ["apps", "control_plane_worker", "controlPlaneApi", "baseUrl"],
+    tomlPath: ["apps", "control_plane_worker", "control_plane_api", "base_url"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL",
   },
   {
     configPath: ["apps", "data_plane_api", "server", "host"],

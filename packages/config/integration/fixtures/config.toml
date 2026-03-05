@@ -14,6 +14,10 @@ token_secret = "fixture-bootstrap-token-secret"
 token_issuer = "data-plane-worker"
 token_audience = "data-plane-gateway"
 
+[global.sandbox]
+default_base_image = "127.0.0.1:5001/mistle/sandbox-base:dev"
+gateway_ws_url = "ws://127.0.0.1:5003/tunnel/sandbox"
+
 [apps.control_plane_api.server]
 host = "0.0.0.0"
 port = 5100
@@ -36,10 +40,6 @@ namespace_id = "fixture"
 
 [apps.control_plane_api.data_plane_api]
 base_url = "http://127.0.0.1:5300"
-
-[apps.control_plane_api.sandbox]
-default_base_image = "127.0.0.1:5001/mistle/sandbox-base:fixture"
-gateway_ws_url = "ws://127.0.0.1:5302/tunnel/sandbox"
 
 [apps.control_plane_api.integrations]
 active_master_encryption_key_version = 2
@@ -68,6 +68,9 @@ smtp_password = "mailpit"
 
 [apps.control_plane_worker.data_plane_api]
 base_url = "http://127.0.0.1:5300"
+
+[apps.control_plane_worker.control_plane_api]
+base_url = "http://127.0.0.1:5100"
 
 [apps.data_plane_api.server]
 host = "0.0.0.0"

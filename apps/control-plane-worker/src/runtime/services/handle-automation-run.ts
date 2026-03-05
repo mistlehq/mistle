@@ -8,8 +8,44 @@ import {
 import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
+import type {
+  AcquireAutomationConnectionServiceOutput,
+  AcquireAutomationConnectionServiceInput,
+  DeliverAutomationPayloadServiceInput,
+  EnsureAutomationSandboxServiceOutput,
+  EnsureAutomationSandboxServiceInput,
+  PrepareAutomationRunServiceOutput,
+} from "./types.js";
+
 export type HandleAutomationRunDependencies = {
   db: ControlPlaneDatabase;
+};
+
+export type EnsureAutomationSandboxDependencies = {
+  db: ControlPlaneDatabase;
+  startSandboxProfileInstance: (input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+    startedBy: {
+      kind: "user" | "system";
+      id: string;
+    };
+    source: "dashboard" | "webhook";
+  }) => Promise<{
+    workflowRunId: string;
+    sandboxInstanceId: string;
+    providerSandboxId: string;
+  }>;
+};
+
+export type AcquireAutomationConnectionDependencies = {
+  mintSandboxConnectionToken: (input: { organizationId: string; instanceId: string }) => Promise<{
+    instanceId: string;
+    url: string;
+    token: string;
+    expiresAt: string;
+  }>;
 };
 
 export type TransitionAutomationRunToRunningOutput = {
@@ -31,6 +67,7 @@ const TerminalAutomationRunStatuses = new Set<AutomationRunStatus>([
 
 const AutomationRunFailureCodes = {
   AUTOMATION_RUN_NOT_FOUND: "automation_run_not_found",
+  AUTOMATION_NOT_FOUND: "automation_not_found",
   AUTOMATION_TARGET_REFERENCE_MISSING: "automation_target_reference_missing",
   AUTOMATION_TARGET_NOT_FOUND: "automation_target_not_found",
   WEBHOOK_EVENT_REFERENCE_MISSING: "webhook_event_reference_missing",
@@ -145,7 +182,11 @@ function compileTemplates(input: {
     conversationKeyTemplate: string;
     idempotencyKeyTemplate: string | null;
   };
-}): void {
+}): {
+  renderedInput: string;
+  renderedConversationKey: string;
+  renderedIdempotencyKey: string | null;
+} {
   const templateContext: Record<string, unknown> = {
     webhookEvent: {
       id: input.webhookEvent.id,
@@ -184,8 +225,9 @@ function compileTemplates(input: {
     });
   }
 
+  let renderedIdempotencyKey: string | null = null;
   if (input.templates.idempotencyKeyTemplate !== null) {
-    const renderedIdempotencyKey = renderTemplateString({
+    renderedIdempotencyKey = renderTemplateString({
       template: input.templates.idempotencyKeyTemplate,
       context: templateContext,
     });
@@ -196,12 +238,18 @@ function compileTemplates(input: {
       });
     }
   }
+
+  return {
+    renderedInput,
+    renderedConversationKey,
+    renderedIdempotencyKey,
+  };
 }
 
 export async function prepareAutomationRun(
   deps: HandleAutomationRunDependencies,
   input: HandleAutomationRunWorkflowInput,
-): Promise<void> {
+): Promise<PrepareAutomationRunServiceOutput> {
   const automationRun = await deps.db.query.automationRuns.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
   });
@@ -209,6 +257,16 @@ export async function prepareAutomationRun(
     throw new AutomationRunExecutionError({
       code: AutomationRunFailureCodes.AUTOMATION_RUN_NOT_FOUND,
       message: `Automation run '${input.automationRunId}' was not found.`,
+    });
+  }
+
+  const automation = await deps.db.query.automations.findFirst({
+    where: (table, { eq: whereEq }) => whereEq(table.id, automationRun.automationId),
+  });
+  if (automation === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_NOT_FOUND,
+      message: `Automation '${automationRun.automationId}' was not found.`,
     });
   }
 
@@ -260,8 +318,9 @@ export async function prepareAutomationRun(
 
   const idempotencyKeyTemplate = webhookAutomation.idempotencyKeyTemplate;
 
+  let compiledTemplates: ReturnType<typeof compileTemplates>;
   try {
-    compileTemplates({
+    compiledTemplates = compileTemplates({
       webhookEvent: {
         id: webhookEvent.id,
         eventType: webhookEvent.eventType,
@@ -286,6 +345,115 @@ export async function prepareAutomationRun(
       code: AutomationRunFailureCodes.TEMPLATE_RENDER_FAILED,
       message: error instanceof Error ? error.message : "Template rendering failed.",
       cause: error,
+    });
+  }
+
+  const sandboxProfileVersion = automationTarget.sandboxProfileVersion;
+  if (sandboxProfileVersion === null) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+      message: `Automation target '${automationTarget.id}' does not define a sandbox profile version.`,
+    });
+  }
+
+  return {
+    automationRunId: automationRun.id,
+    automationRunCreatedAt: automationRun.createdAt,
+    automationId: automationRun.automationId,
+    automationTargetId: automationTarget.id,
+    organizationId: automation.organizationId,
+    sandboxProfileId: automationTarget.sandboxProfileId,
+    sandboxProfileVersion,
+    webhookEventId: webhookEvent.id,
+    webhookEventType: webhookEvent.eventType,
+    webhookProviderEventType: webhookEvent.providerEventType,
+    webhookExternalEventId: webhookEvent.externalEventId,
+    webhookExternalDeliveryId: webhookEvent.externalDeliveryId,
+    webhookPayload: webhookEvent.payload,
+    renderedInput: compiledTemplates.renderedInput,
+    renderedConversationKey: compiledTemplates.renderedConversationKey,
+    renderedIdempotencyKey: compiledTemplates.renderedIdempotencyKey,
+  };
+}
+
+export async function ensureAutomationSandbox(
+  deps: EnsureAutomationSandboxDependencies,
+  input: EnsureAutomationSandboxServiceInput,
+): Promise<EnsureAutomationSandboxServiceOutput> {
+  const automationRun = await deps.db.query.automationRuns.findFirst({
+    where: (table, { eq: whereEq }) =>
+      whereEq(table.id, input.preparedAutomationRun.automationRunId),
+  });
+  if (automationRun === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_NOT_FOUND,
+      message: `Automation run '${input.preparedAutomationRun.automationRunId}' was not found.`,
+    });
+  }
+
+  if (automationRun.status !== AutomationRunStatuses.RUNNING) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+      message: `Automation run '${automationRun.id}' is not running while ensuring sandbox.`,
+    });
+  }
+
+  const startedSandbox = await deps.startSandboxProfileInstance({
+    organizationId: input.preparedAutomationRun.organizationId,
+    profileId: input.preparedAutomationRun.sandboxProfileId,
+    profileVersion: input.preparedAutomationRun.sandboxProfileVersion,
+    startedBy: {
+      kind: "system",
+      id: input.preparedAutomationRun.automationRunId,
+    },
+    source: "webhook",
+  });
+
+  return {
+    sandboxInstanceId: startedSandbox.sandboxInstanceId,
+    providerSandboxId: startedSandbox.providerSandboxId,
+    startupWorkflowRunId: startedSandbox.workflowRunId,
+  };
+}
+
+export async function acquireAutomationConnection(
+  deps: AcquireAutomationConnectionDependencies,
+  input: AcquireAutomationConnectionServiceInput,
+): Promise<AcquireAutomationConnectionServiceOutput> {
+  if (input.preparedAutomationRun.renderedConversationKey.trim().length === 0) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.TEMPLATE_RENDER_FAILED,
+      message: "Rendered automation conversation key template must not be empty.",
+    });
+  }
+
+  const connection = await deps.mintSandboxConnectionToken({
+    organizationId: input.preparedAutomationRun.organizationId,
+    instanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+  });
+
+  return {
+    instanceId: connection.instanceId,
+    url: connection.url,
+    token: connection.token,
+    expiresAt: connection.expiresAt,
+  };
+}
+
+export async function deliverAutomationPayload(
+  input: DeliverAutomationPayloadServiceInput,
+): Promise<void> {
+  if (input.preparedAutomationRun.renderedInput.trim().length === 0) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.TEMPLATE_RENDER_FAILED,
+      message: "Rendered automation input template must not be empty.",
+    });
+  }
+
+  if (input.acquiredAutomationConnection.token.trim().length === 0) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+      message: "Acquired automation connection token must not be empty.",
     });
   }
 }

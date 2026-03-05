@@ -1,8 +1,13 @@
-import { assertOpenApiSpecFileIsCurrent, getOpenApiSpecFilePath } from "./spec-file.js";
+import {
+  assertOpenApiSpecFileIsCurrent,
+  getInternalOpenApiSpecFilePath,
+  getOpenApiSpecFilePath,
+} from "./spec-file.js";
 
 async function run(): Promise<void> {
   await assertOpenApiSpecFileIsCurrent();
   process.stdout.write(`OpenAPI spec is current: ${getOpenApiSpecFilePath()}\n`);
+  process.stdout.write(`Internal OpenAPI spec is current: ${getInternalOpenApiSpecFilePath()}\n`);
 }
 
 void run().catch((error: unknown) => {

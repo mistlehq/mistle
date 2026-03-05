@@ -2,7 +2,15 @@ import type { EmailSender } from "@mistle/emails";
 import type { OpenWorkflow, Worker } from "openworkflow";
 
 import { createHandleAutomationRunWorkflow } from "./workflows/handle-automation-run/index.js";
-import type { HandleAutomationRunWorkflowInput } from "./workflows/handle-automation-run/index.js";
+import type {
+  AcquiredAutomationConnection,
+  AcquireAutomationConnectionInput,
+  DeliverAutomationPayloadInput,
+  EnsureAutomationSandboxInput,
+  EnsuredAutomationSandbox,
+  HandleAutomationRunWorkflowInput,
+  PreparedAutomationRun,
+} from "./workflows/handle-automation-run/index.js";
 import { createHandleIntegrationWebhookEventWorkflow } from "./workflows/handle-integration-webhook-event/index.js";
 import type {
   HandleIntegrationWebhookEventWorkflowInput,
@@ -30,7 +38,16 @@ export type ControlPlaneWorkerServices = {
     transitionAutomationRunToRunning: (
       input: HandleAutomationRunWorkflowInput,
     ) => Promise<{ shouldProcess: boolean }>;
-    prepareAutomationRun: (input: HandleAutomationRunWorkflowInput) => Promise<void>;
+    prepareAutomationRun: (
+      input: HandleAutomationRunWorkflowInput,
+    ) => Promise<PreparedAutomationRun>;
+    ensureAutomationSandbox: (
+      input: EnsureAutomationSandboxInput,
+    ) => Promise<EnsuredAutomationSandbox>;
+    acquireAutomationConnection: (
+      input: AcquireAutomationConnectionInput,
+    ) => Promise<AcquiredAutomationConnection>;
+    deliverAutomationPayload: (input: DeliverAutomationPayloadInput) => Promise<void>;
     markAutomationRunCompleted: (input: HandleAutomationRunWorkflowInput) => Promise<void>;
     markAutomationRunFailed: (input: {
       automationRunId: string;
@@ -93,6 +110,9 @@ export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): 
         transitionAutomationRunToRunning:
           input.services.automationRuns.transitionAutomationRunToRunning,
         prepareAutomationRun: input.services.automationRuns.prepareAutomationRun,
+        ensureAutomationSandbox: input.services.automationRuns.ensureAutomationSandbox,
+        acquireAutomationConnection: input.services.automationRuns.acquireAutomationConnection,
+        deliverAutomationPayload: input.services.automationRuns.deliverAutomationPayload,
         markAutomationRunCompleted: input.services.automationRuns.markAutomationRunCompleted,
         markAutomationRunFailed: input.services.automationRuns.markAutomationRunFailed,
         resolveAutomationRunFailure: input.services.automationRuns.resolveAutomationRunFailure,

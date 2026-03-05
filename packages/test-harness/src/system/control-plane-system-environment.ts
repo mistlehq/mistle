@@ -16,6 +16,7 @@ const OMITTED_POSTGRES_OPTIONS = [
 ] as const;
 
 export const DEFAULT_SHARED_SYSTEM_INFRA_KEY = "mistle-system-shared-v1";
+const CONTROL_PLANE_API_CONTAINER_BASE_URL = "http://control-plane-api:5100";
 
 type SharedPostgresOptions = Omit<
   StartPostgresWithPgBouncerInput,
@@ -138,6 +139,8 @@ export async function startControlPlaneSystemEnvironment(
         MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_HOST: sharedInfraLease.infra.containerHostGateway,
         MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT: String(sharedInfraLease.infra.mailpit.smtpPort),
         MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE: "false",
+        MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL:
+          CONTROL_PLANE_API_CONTAINER_BASE_URL,
       },
     });
     cleanupTasks.unshift(async () => {

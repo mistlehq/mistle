@@ -13,6 +13,10 @@ if (loadedConfig.global === undefined) {
 const runtime = await createControlPlaneWorkerRuntime({
   app: loadedConfig.app,
   internalAuthServiceToken: loadedConfig.global.internalAuth.serviceToken,
+  sandbox: {
+    defaultBaseImage: loadedConfig.global.sandbox.defaultBaseImage,
+    gatewayWsUrl: loadedConfig.global.sandbox.gatewayWsUrl,
+  },
 });
 
 await runtime.start();
