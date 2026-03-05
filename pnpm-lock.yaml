@@ -85,10 +85,10 @@ importers:
         version: 1.5.3(@better-auth/core@1.5.3(@better-auth/utils@0.3.1)(@better-fetch/fetch@1.1.21)(better-call@1.3.2(zod@4.3.6))(jose@6.1.3)(kysely@0.28.11)(nanostores@1.1.1))(@better-auth/utils@0.3.1)(drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.18.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.19.0)(postgres@3.4.8)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)))
       '@hono/node-server':
         specifier: ^1.19.11
-        version: 1.19.11(hono@4.12.3)
+        version: 1.19.11(hono@4.12.5)
       '@hono/zod-openapi':
         specifier: ^1.2.2
-        version: 1.2.2(hono@4.12.3)(zod@4.3.6)
+        version: 1.2.2(hono@4.12.5)(zod@4.3.6)
       '@mistle/automations':
         specifier: workspace:*
         version: link:../../packages/automations
@@ -138,8 +138,8 @@ importers:
         specifier: ^0.8.3
         version: 0.8.3(drizzle-orm@0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.18.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.19.0)(postgres@3.4.8)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3)))(zod@4.3.6)
       hono:
-        specifier: ^4.12.3
-        version: 4.12.3
+        specifier: ^4.12.5
+        version: 4.12.5
       pg:
         specifier: ^8.19.0
         version: 8.19.0
@@ -161,7 +161,7 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: ^1.19.11
-        version: 1.19.11(hono@4.12.3)
+        version: 1.19.11(hono@4.12.5)
       '@mistle/automations':
         specifier: workspace:*
         version: link:../../packages/automations
@@ -196,8 +196,8 @@ importers:
         specifier: ^0.45.1
         version: 0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.18.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.19.0)(postgres@3.4.8)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))
       hono:
-        specifier: ^4.12.3
-        version: 4.12.3
+        specifier: ^4.12.5
+        version: 4.12.5
       pg:
         specifier: ^8.19.0
         version: 8.19.0
@@ -310,7 +310,7 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: ^1.19.11
-        version: 1.19.11(hono@4.12.3)
+        version: 1.19.11(hono@4.12.5)
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -330,8 +330,8 @@ importers:
         specifier: ^11.11.0
         version: 11.11.0(typescript@5.9.3)
       hono:
-        specifier: ^4.12.3
-        version: 4.12.3
+        specifier: ^4.12.5
+        version: 4.12.5
       pg:
         specifier: ^8.19.0
         version: 8.19.0
@@ -356,10 +356,10 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: ^1.19.11
-        version: 1.19.11(hono@4.12.3)
+        version: 1.19.11(hono@4.12.5)
       '@hono/node-ws':
         specifier: ^1.3.0
-        version: 1.3.0(@hono/node-server@1.19.11(hono@4.12.3))(hono@4.12.3)
+        version: 1.3.0(@hono/node-server@1.19.11(hono@4.12.5))(hono@4.12.5)
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -376,8 +376,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/logging
       hono:
-        specifier: ^4.12.3
-        version: 4.12.3
+        specifier: ^4.12.5
+        version: 4.12.5
       pg:
         specifier: ^8.19.0
         version: 8.19.0
@@ -405,7 +405,7 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: ^1.19.11
-        version: 1.19.11(hono@4.12.3)
+        version: 1.19.11(hono@4.12.5)
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -431,8 +431,8 @@ importers:
         specifier: ^0.45.1
         version: 0.45.1(@electric-sql/pglite@0.3.15)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.18.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.19.0)(postgres@3.4.8)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))
       hono:
-        specifier: ^4.12.3
-        version: 4.12.3
+        specifier: ^4.12.5
+        version: 4.12.5
       pg:
         specifier: ^8.19.0
         version: 8.19.0
@@ -453,7 +453,7 @@ importers:
     dependencies:
       '@hono/node-server':
         specifier: ^1.19.11
-        version: 1.19.11(hono@4.12.3)
+        version: 1.19.11(hono@4.12.5)
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -464,8 +464,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/logging
       hono:
-        specifier: ^4.12.3
-        version: 4.12.3
+        specifier: ^4.12.5
+        version: 4.12.5
     devDependencies:
       '@mistle/test-harness':
         specifier: workspace:*
@@ -5136,8 +5136,8 @@ packages:
     resolution: {integrity: sha512-U7tt8JsyrxSRKspfhtLET79pU8K+tInj5QZXs1jSugO1Vq5dFj3kmZsRldo29mTBfcjDRVRXrEZ6LS63Cog9ZA==}
     engines: {node: '>=16.9.0'}
 
-  hono@4.12.3:
-    resolution: {integrity: sha512-SFsVSjp8sj5UumXOOFlkZOG6XS9SJDKw0TbwFeV+AJ8xlST8kxK5Z/5EYa111UY8732lK2S/xB653ceuaoGwpg==}
+  hono@4.12.5:
+    resolution: {integrity: sha512-3qq+FUBtlTHhtYxbxheZgY8NIFnkkC/MR8u5TTsr7YZ3wixryQ3cCwn3iZbg8p8B88iDBBAYSfZDS75t8MN7Vg==}
     engines: {node: '>=16.9.0'}
 
   html-encoding-sniffer@6.0.0:
@@ -8194,35 +8194,35 @@ snapshots:
       protobufjs: 7.5.4
       yargs: 17.7.2
 
-  '@hono/node-server@1.19.11(hono@4.12.3)':
+  '@hono/node-server@1.19.11(hono@4.12.5)':
     dependencies:
-      hono: 4.12.3
+      hono: 4.12.5
 
   '@hono/node-server@1.19.9(hono@4.11.4)':
     dependencies:
       hono: 4.11.4
     optional: true
 
-  '@hono/node-ws@1.3.0(@hono/node-server@1.19.11(hono@4.12.3))(hono@4.12.3)':
+  '@hono/node-ws@1.3.0(@hono/node-server@1.19.11(hono@4.12.5))(hono@4.12.5)':
     dependencies:
-      '@hono/node-server': 1.19.11(hono@4.12.3)
-      hono: 4.12.3
+      '@hono/node-server': 1.19.11(hono@4.12.5)
+      hono: 4.12.5
       ws: 8.19.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@hono/zod-openapi@1.2.2(hono@4.12.3)(zod@4.3.6)':
+  '@hono/zod-openapi@1.2.2(hono@4.12.5)(zod@4.3.6)':
     dependencies:
       '@asteasolutions/zod-to-openapi': 8.4.1(zod@4.3.6)
-      '@hono/zod-validator': 0.7.6(hono@4.12.3)(zod@4.3.6)
-      hono: 4.12.3
+      '@hono/zod-validator': 0.7.6(hono@4.12.5)(zod@4.3.6)
+      hono: 4.12.5
       openapi3-ts: 4.5.0
       zod: 4.3.6
 
-  '@hono/zod-validator@0.7.6(hono@4.12.3)(zod@4.3.6)':
+  '@hono/zod-validator@0.7.6(hono@4.12.5)(zod@4.3.6)':
     dependencies:
-      hono: 4.12.3
+      hono: 4.12.5
       zod: 4.3.6
 
   '@isaacs/cliui@8.0.2':
@@ -11312,7 +11312,7 @@ snapshots:
   hono@4.11.4:
     optional: true
 
-  hono@4.12.3: {}
+  hono@4.12.5: {}
 
   html-encoding-sniffer@6.0.0(@noble/hashes@2.0.1):
     dependencies:
