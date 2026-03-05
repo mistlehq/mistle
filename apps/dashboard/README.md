@@ -35,9 +35,9 @@ Minimal dashboard scaffold using Vite + React.
 
 ## Sandbox Session Protocol Types
 
-- Source schema:
-  - generated from `../sandbox-runtime/cmd/sandbox-session-protocol-schema`
+- Shared package:
+  - `../packages/sandbox-session-protocol`
 - Generate types:
-  - `pnpm --filter @mistle/dashboard sandbox-session-protocol:generate`
+  - `pnpm --filter @mistle/sandbox-session-protocol protocol:generate`
 - Check for drift:
-  - `pnpm --filter @mistle/dashboard sandbox-session-protocol:check`
+  - `pnpm --filter @mistle/sandbox-session-protocol protocol:check`

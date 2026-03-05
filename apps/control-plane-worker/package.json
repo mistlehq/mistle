@@ -23,13 +23,17 @@
     "@mistle/db": "workspace:*",
     "@mistle/emails": "workspace:*",
     "@mistle/logging": "workspace:*",
+    "@mistle/sandbox-session-protocol": "workspace:*",
+    "@mistle/time": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.12.3",
-    "pg": "^8.19.0"
+    "pg": "^8.19.0",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
-    "@types/pg": "^8.18.0"
+    "@types/pg": "^8.18.0",
+    "@types/ws": "^8.18.1"
   }
 }

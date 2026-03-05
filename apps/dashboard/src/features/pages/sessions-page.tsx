@@ -1,3 +1,4 @@
+import type { ConnectError, ConnectOK, PTYConnectRequest } from "@mistle/sandbox-session-protocol";
 import {
   Alert,
   AlertDescription,
@@ -21,11 +22,6 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 
-import type {
-  ConnectError,
-  ConnectOK,
-  PTYConnectRequest,
-} from "../../lib/sandbox-session-protocol/generated/types.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { formatSandboxProfileVersionLabel } from "../sandbox-profiles/format-sandbox-profile-version-label.js";
 import {
