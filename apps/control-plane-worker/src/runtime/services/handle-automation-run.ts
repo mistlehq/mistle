@@ -81,26 +81,6 @@ const AutomationRunFailureCodes = {
   AUTOMATION_RUN_EXECUTION_FAILED: "automation_run_execution_failed",
 } as const;
 
-type AutomationWebhookDeliveryEnvelope = {
-  webhookEvent: {
-    id: string;
-    eventType: string;
-    providerEventType: string;
-    externalEventId: string;
-    externalDeliveryId: string | null;
-  };
-  automationRun: {
-    id: string;
-    automationId: string;
-    automationTargetId: string;
-    createdAt: string;
-    conversationKey: string;
-    idempotencyKey: string | null;
-    input: string;
-  };
-  payload: Record<string, unknown>;
-};
-
 class AutomationRunExecutionError extends Error {
   readonly code: string;
 
@@ -488,33 +468,13 @@ export async function deliverAutomationPayload(
     });
   }
 
-  const outboundPayload: AutomationWebhookDeliveryEnvelope = {
-    webhookEvent: {
-      id: input.preparedAutomationRun.webhookEventId,
-      eventType: input.preparedAutomationRun.webhookEventType,
-      providerEventType: input.preparedAutomationRun.webhookProviderEventType,
-      externalEventId: input.preparedAutomationRun.webhookExternalEventId,
-      externalDeliveryId: input.preparedAutomationRun.webhookExternalDeliveryId,
-    },
-    automationRun: {
-      id: input.preparedAutomationRun.automationRunId,
-      automationId: input.preparedAutomationRun.automationId,
-      automationTargetId: input.preparedAutomationRun.automationTargetId,
-      createdAt: input.preparedAutomationRun.automationRunCreatedAt,
-      conversationKey: input.preparedAutomationRun.renderedConversationKey,
-      idempotencyKey: input.preparedAutomationRun.renderedIdempotencyKey,
-      input: input.preparedAutomationRun.renderedInput,
-    },
-    payload: input.preparedAutomationRun.webhookPayload,
-  };
-
   try {
     const connection = await connectSandboxAgentConnection({
       connectionUrl: input.acquiredAutomationConnection.url,
     });
     await sendSandboxAgentMessage({
       connection,
-      message: JSON.stringify(outboundPayload),
+      message: input.preparedAutomationRun.renderedInput,
     });
   } catch (error) {
     throw new AutomationRunExecutionError({

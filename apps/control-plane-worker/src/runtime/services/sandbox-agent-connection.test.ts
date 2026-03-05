@@ -242,7 +242,7 @@ function createDeliverInput(connectionUrl: string): DeliverAutomationPayloadServ
 }
 
 describe("sandbox agent websocket delivery", () => {
-  it("delivers a structured webhook payload envelope and closes the socket by default", async () => {
+  it("delivers the rendered automation input and closes the socket by default", async () => {
     const server = await startAgentTestServer("accept");
 
     try {
@@ -256,39 +256,7 @@ describe("sandbox agent websocket delivery", () => {
 
       expect(connectRequest.requestId.length).toBeGreaterThan(0);
 
-      let parsedPayload: unknown;
-      try {
-        parsedPayload = JSON.parse(payloadText);
-      } catch {
-        throw new Error("Expected delivered payload to be valid JSON.");
-      }
-
-      expect(parsedPayload).toEqual({
-        webhookEvent: {
-          id: "iwe_test_001",
-          eventType: "github.issue_comment.created",
-          providerEventType: "issue_comment",
-          externalEventId: "evt_test_001",
-          externalDeliveryId: "delivery_test_001",
-        },
-        automationRun: {
-          id: "aru_test_001",
-          automationId: "atm_test_001",
-          automationTargetId: "atg_test_001",
-          createdAt: "2026-03-05T00:00:00.000Z",
-          conversationKey: "issue-42",
-          idempotencyKey: "delivery_test_001",
-          input: "Handle @mistlebot run this",
-        },
-        payload: {
-          comment: {
-            body: "@mistlebot run this",
-          },
-          issue: {
-            number: 42,
-          },
-        },
-      });
+      expect(payloadText).toBe("Handle @mistlebot run this");
     } finally {
       await server.close();
     }
