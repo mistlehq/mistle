@@ -9,7 +9,7 @@ export const tokenizerProxyDevelopmentPreset = {
           port: 5205,
         },
         control_plane_api: {
-          base_url: "http://127.0.0.1:5100",
+          base_url: "http://localhost:5100",
         },
         credential_resolver: {
           request_timeout_ms: 3000,

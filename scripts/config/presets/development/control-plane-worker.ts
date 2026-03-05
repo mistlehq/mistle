@@ -23,6 +23,12 @@ export const controlPlaneWorkerDevelopmentPreset = {
           smtp_username: "mailpit",
           smtp_password: "mailpit",
         },
+        data_plane_api: {
+          base_url: "http://localhost:5200",
+        },
+        control_plane_api: {
+          base_url: "http://localhost:5100",
+        },
       },
     },
   },

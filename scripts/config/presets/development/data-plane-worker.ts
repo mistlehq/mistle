@@ -18,14 +18,14 @@ export const dataPlaneWorkerDevelopmentPreset = {
           concurrency: 1,
         },
         tunnel: {
-          gateway_ws_url: "ws://127.0.0.1:5202/tunnel/sandbox",
           bootstrap_token_ttl_seconds: 120,
         },
         sandbox: {
           provider: "docker",
+          tokenizer_proxy_egress_base_url: "http://localhost:5205/tokenizer-proxy/egress",
           docker: {
             socket_path: "/var/run/docker.sock",
-            snapshot_repository: "127.0.0.1:5001/mistle/snapshots",
+            snapshot_repository: "localhost:5001/mistle/snapshots",
           },
         },
       },

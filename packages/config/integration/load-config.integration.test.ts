@@ -219,7 +219,6 @@ const dataPlaneWorkerEnvConfig = {
     concurrency: 1,
   },
   tunnel: {
-    gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     bootstrapTokenTtlSeconds: 120,
   },
   sandbox: {
@@ -245,10 +244,6 @@ const dataPlaneWorkerFixtureConfig = {
     namespaceId: "fixture",
     concurrency: 2,
   },
-  tunnel: {
-    gatewayWsUrl: "ws://127.0.0.1:5302/tunnel/sandbox",
-    bootstrapTokenTtlSeconds: 120,
-  },
 } as const;
 
 const dataPlaneWorkerDockerFixtureConfig = {
@@ -266,7 +261,6 @@ const dataPlaneWorkerDockerFixtureConfig = {
     concurrency: 3,
   },
   tunnel: {
-    gatewayWsUrl: "ws://127.0.0.1:5302/tunnel/sandbox",
     bootstrapTokenTtlSeconds: 120,
   },
   sandbox: {

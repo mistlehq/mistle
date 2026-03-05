@@ -107,7 +107,6 @@ run_migrations = true
 concurrency = 4
 
 [apps.data_plane_worker.tunnel]
-gateway_ws_url = "wss://gateway.mistle.example/tunnel/sandbox"
 bootstrap_token_ttl_seconds = 120
 
 [apps.data_plane_worker.sandbox]

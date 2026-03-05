@@ -34,7 +34,7 @@ export async function writeSandboxStartupInput(input: {
       payload: encodeSandboxStartupInput({
         bootstrapToken,
         tunnelGatewayWsUrl: createSandboxTunnelGatewayWsUrl({
-          gatewayWebsocketUrl: input.config.app.tunnel.gatewayWsUrl,
+          gatewayWebsocketUrl: input.config.sandbox.gatewayWsUrl,
           sandboxInstanceId: input.sandboxInstanceId,
         }),
         runtimePlan: input.runtimePlan,

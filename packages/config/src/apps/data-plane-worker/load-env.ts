@@ -55,10 +55,6 @@ const loadWorkflowEnv = createEnvLoader<typeof DataPlaneWorkerWorkflowConfigSche
 
 const loadTunnelEnv = createEnvLoader<typeof DataPlaneWorkerTunnelConfigSchema>([
   {
-    key: "gatewayWsUrl",
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_GATEWAY_WS_URL",
-  },
-  {
     key: "bootstrapTokenTtlSeconds",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS",
     parse: Number,
