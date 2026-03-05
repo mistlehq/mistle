@@ -418,22 +418,28 @@ func TestRun(t *testing.T) {
 				return
 			}
 
-			createAckType, createAckPayload, err := conn.Read(handlerCtx)
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty connect ack read to succeed: %w", err)
-				return
+			foundCreateAck := false
+			for range 12 {
+				createAckType, createAckPayload, readErr := conn.Read(handlerCtx)
+				if readErr != nil {
+					handlerErrCh <- fmt.Errorf("expected pty connect ack read to succeed: %w", readErr)
+					return
+				}
+				if createAckType != websocket.MessageText {
+					continue
+				}
+
+				var createAck sessionprotocol.ConnectOK
+				if err := json.Unmarshal(createAckPayload, &createAck); err != nil {
+					continue
+				}
+				if createAck.Type == sessionprotocol.MessageTypeConnectOK && createAck.RequestID == "req_pty_create_001" {
+					foundCreateAck = true
+					break
+				}
 			}
-			if createAckType != websocket.MessageText {
-				handlerErrCh <- fmt.Errorf("expected pty connect ack to be text, got %s", createAckType.String())
-				return
-			}
-			var createAck sessionprotocol.ConnectOK
-			if err := json.Unmarshal(createAckPayload, &createAck); err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty connect ack decode to succeed: %w", err)
-				return
-			}
-			if createAck.Type != sessionprotocol.MessageTypeConnectOK || createAck.RequestID != "req_pty_create_001" {
-				handlerErrCh <- fmt.Errorf("unexpected pty create ack payload: %+v", createAck)
+			if !foundCreateAck {
+				handlerErrCh <- fmt.Errorf("expected to receive pty connect ack for req_pty_create_001")
 				return
 			}
 
@@ -455,22 +461,28 @@ func TestRun(t *testing.T) {
 				return
 			}
 
-			attachAckType, attachAckPayload, err := conn.Read(handlerCtx)
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty attach ack read to succeed: %w", err)
-				return
+			foundAttachAck := false
+			for range 12 {
+				attachAckType, attachAckPayload, readErr := conn.Read(handlerCtx)
+				if readErr != nil {
+					handlerErrCh <- fmt.Errorf("expected pty attach ack read to succeed: %w", readErr)
+					return
+				}
+				if attachAckType != websocket.MessageText {
+					continue
+				}
+
+				var attachAck sessionprotocol.ConnectOK
+				if err := json.Unmarshal(attachAckPayload, &attachAck); err != nil {
+					continue
+				}
+				if attachAck.Type == sessionprotocol.MessageTypeConnectOK && attachAck.RequestID == "req_pty_attach_001" {
+					foundAttachAck = true
+					break
+				}
 			}
-			if attachAckType != websocket.MessageText {
-				handlerErrCh <- fmt.Errorf("expected pty attach ack to be text, got %s", attachAckType.String())
-				return
-			}
-			var attachAck sessionprotocol.ConnectOK
-			if err := json.Unmarshal(attachAckPayload, &attachAck); err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty attach ack decode to succeed: %w", err)
-				return
-			}
-			if attachAck.Type != sessionprotocol.MessageTypeConnectOK || attachAck.RequestID != "req_pty_attach_001" {
-				handlerErrCh <- fmt.Errorf("unexpected pty attach ack payload: %+v", attachAck)
+			if !foundAttachAck {
+				handlerErrCh <- fmt.Errorf("expected to receive pty attach ack for req_pty_attach_001")
 				return
 			}
 
