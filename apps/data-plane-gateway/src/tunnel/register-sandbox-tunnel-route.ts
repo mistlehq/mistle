@@ -221,7 +221,12 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     },
     input.upgradeWebSocket(
       (ctx) => {
-        const instanceId = ctx.req.param("instanceId").trim();
+        const requestedInstanceId = ctx.req.param("instanceId");
+        if (requestedInstanceId === undefined) {
+          throw new Error("Sandbox tunnel websocket request is missing instanceId path parameter.");
+        }
+
+        const instanceId = requestedInstanceId.trim();
         const requestedToken = readRequestedTokenFromRequestUrl(new URL(ctx.req.url));
         if (requestedToken.kind !== "bootstrap" && requestedToken.kind !== "connection") {
           throw new Error("Expected validated sandbox tunnel websocket request token.");
