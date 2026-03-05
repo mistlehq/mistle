@@ -14,6 +14,8 @@ import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 import { INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH } from "./constants.js";
 import {
   InternalSandboxRuntimeErrorResponseSchema,
+  internalSandboxRuntimeMintConnectionTokenRoute,
+  internalSandboxRuntimeStartProfileInstanceRoute,
   InternalSandboxRuntimeMintConnectionRequestSchema,
   InternalSandboxRuntimeMintConnectionResponseSchema,
   InternalSandboxRuntimeStartProfileInstanceRequestSchema,
@@ -30,7 +32,7 @@ export function createInternalSandboxRuntimeApp(): AppRoutes<
 > {
   const routes = new OpenAPIHono<AppContextBindings>();
 
-  routes.post("/start-profile-instance", async (ctx) => {
+  routes.openapi(internalSandboxRuntimeStartProfileInstanceRoute, async (ctx) => {
     const authorizationFailureResponse = resolveAuthorizationFailureResponse(ctx);
     if (authorizationFailureResponse !== null) {
       return authorizationFailureResponse;
@@ -75,11 +77,11 @@ export function createInternalSandboxRuntimeApp(): AppRoutes<
         };
       return ctx.json(responseBody, 200);
     } catch (error) {
-      return handleInternalSandboxRuntimeError(ctx, error);
+      return handleStartProfileInstanceError(ctx, error);
     }
   });
 
-  routes.post("/mint-connection-token", async (ctx) => {
+  routes.openapi(internalSandboxRuntimeMintConnectionTokenRoute, async (ctx) => {
     const authorizationFailureResponse = resolveAuthorizationFailureResponse(ctx);
     if (authorizationFailureResponse !== null) {
       return authorizationFailureResponse;
@@ -109,7 +111,7 @@ export function createInternalSandboxRuntimeApp(): AppRoutes<
         mintedToken;
       return ctx.json(responseBody, 200);
     } catch (error) {
-      return handleInternalSandboxRuntimeError(ctx, error);
+      return handleMintConnectionError(ctx, error);
     }
   });
 
@@ -135,7 +137,7 @@ function resolveAuthorizationFailureResponse(ctx: AppContext) {
   return ctx.json(responseBody, 401);
 }
 
-function handleInternalSandboxRuntimeError(ctx: AppContext, error: unknown) {
+function handleStartProfileInstanceError(ctx: AppContext, error: unknown) {
   if (error instanceof SandboxProfilesCompileError) {
     const responseBody: z.infer<typeof InternalSandboxRuntimeErrorResponseSchema> = {
       code: error.code,
@@ -152,6 +154,10 @@ function handleInternalSandboxRuntimeError(ctx: AppContext, error: unknown) {
     return ctx.json(responseBody, 404);
   }
 
+  throw error;
+}
+
+function handleMintConnectionError(ctx: AppContext, error: unknown) {
   if (error instanceof SandboxInstancesNotFoundError) {
     const responseBody: z.infer<typeof InternalSandboxRuntimeErrorResponseSchema> = {
       code: error.code,

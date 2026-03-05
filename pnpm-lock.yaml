@@ -165,6 +165,9 @@ importers:
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@mistle/control-plane-internal-client':
+        specifier: workspace:*
+        version: link:../../packages/control-plane-internal-client
       '@mistle/data-plane-trpc':
         specifier: workspace:*
         version: link:../../packages/data-plane-trpc
@@ -439,15 +442,15 @@ importers:
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@mistle/control-plane-internal-client':
+        specifier: workspace:*
+        version: link:../../packages/control-plane-internal-client
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
       hono:
         specifier: ^4.12.3
         version: 4.12.3
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
     devDependencies:
       '@mistle/test-harness':
         specifier: workspace:*
@@ -470,6 +473,19 @@ importers:
       zod:
         specifier: ^4.1.12
         version: 4.3.6
+
+  packages/control-plane-internal-client:
+    dependencies:
+      openapi-fetch:
+        specifier: ^0.17.0
+        version: 0.17.0
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
+    devDependencies:
+      openapi-typescript:
+        specifier: ^7.13.0
+        version: 7.13.0(typescript@5.9.3)
 
   packages/data-plane-trpc:
     dependencies:

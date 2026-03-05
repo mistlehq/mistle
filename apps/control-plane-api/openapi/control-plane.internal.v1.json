@@ -1,0 +1,615 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mistle Control Plane Internal API",
+    "version": "0.0.0"
+  },
+  "components": {
+    "schemas": {},
+    "parameters": {}
+  },
+  "paths": {
+    "/internal/integration-credentials/resolve": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "connectionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "secretType": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "resolverKey": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["connectionId", "secretType"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolve integration credential for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "value": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["value"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid resolve request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Credential resolver dependency was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/integration-credentials/resolve-target-secrets": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "targets": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "targetKey": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "encryptedSecrets": {
+                          "type": ["object", "null"],
+                          "properties": {
+                            "ciphertext": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "nonce": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "masterKeyVersion": {
+                              "type": "integer",
+                              "minimum": 1
+                            }
+                          },
+                          "required": ["ciphertext", "nonce", "masterKeyVersion"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["targetKey", "encryptedSecrets"],
+                      "additionalProperties": false
+                    },
+                    "minItems": 1
+                  }
+                },
+                "required": ["targets"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolve integration target secrets for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "targets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "targetKey": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "secrets": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": ["targetKey", "secrets"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["targets"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid target secret resolution request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox-runtime/start-profile-instance": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "profileId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "profileVersion": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "startedBy": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": ["user"]
+                          },
+                          {
+                            "type": "string",
+                            "enum": ["system"]
+                          }
+                        ]
+                      },
+                      "id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": ["kind", "id"]
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": ["dashboard"]
+                      },
+                      {
+                        "type": "string",
+                        "enum": ["webhook"]
+                      }
+                    ]
+                  }
+                },
+                "required": ["organizationId", "profileId", "profileVersion", "startedBy", "source"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Start a sandbox profile instance for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["completed"]
+                    },
+                    "workflowRunId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "sandboxInstanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "providerSandboxId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["status", "workflowRunId", "sandboxInstanceId", "providerSandboxId"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Referenced sandbox profile version was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox-runtime/mint-connection-token": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "instanceId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["organizationId", "instanceId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mint a sandbox connection token for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "instanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "token": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["instanceId", "url", "token", "expiresAt"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Referenced sandbox instance was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Sandbox instance is not running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

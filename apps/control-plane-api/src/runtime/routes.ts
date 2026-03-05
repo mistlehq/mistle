@@ -57,9 +57,12 @@ export function registerAppRoutes(input: RegisterAppRoutesInput): void {
 }
 
 export function registerApiRouteModules(app: ControlPlaneApp): void {
+  registerPublicApiRouteModules(app);
+  registerInternalApiRouteModules(app);
+}
+
+export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const authApp = createAuthApp();
-  const internalIntegrationCredentialsApp = createInternalIntegrationCredentialsApp();
-  const internalSandboxRuntimeApp = createInternalSandboxRuntimeApp();
   const integrationConnectionsApp = withAuthSession(createIntegrationConnectionsApp());
   const integrationTargetsApp = withAuthSession(createIntegrationTargetsApp());
   const integrationWebhooksApp = createIntegrationWebhooksApp();
@@ -69,8 +72,6 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
   const sandboxInstancesApp = withAuthSession(createSandboxInstancesApp());
   const sandboxProfilesApp = withAuthSession(createSandboxProfilesApp());
   app.route(authApp.basePath, authApp.routes);
-  app.route(internalIntegrationCredentialsApp.basePath, internalIntegrationCredentialsApp.routes);
-  app.route(internalSandboxRuntimeApp.basePath, internalSandboxRuntimeApp.routes);
   app.route(integrationConnectionsApp.basePath, integrationConnectionsApp.routes);
   app.route(integrationTargetsApp.basePath, integrationTargetsApp.routes);
   app.route(integrationWebhooksApp.basePath, integrationWebhooksApp.routes);
@@ -80,4 +81,12 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
   );
   app.route(sandboxInstancesApp.basePath, sandboxInstancesApp.routes);
   app.route(sandboxProfilesApp.basePath, sandboxProfilesApp.routes);
+}
+
+export function registerInternalApiRouteModules(app: ControlPlaneApp): void {
+  const internalIntegrationCredentialsApp = createInternalIntegrationCredentialsApp();
+  const internalSandboxRuntimeApp = createInternalSandboxRuntimeApp();
+
+  app.route(internalIntegrationCredentialsApp.basePath, internalIntegrationCredentialsApp.routes);
+  app.route(internalSandboxRuntimeApp.basePath, internalSandboxRuntimeApp.routes);
 }

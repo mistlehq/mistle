@@ -18,6 +18,7 @@
     "@hono/node-server": "^1.19.4",
     "@mistle/automations": "workspace:*",
     "@mistle/config": "workspace:*",
+    "@mistle/control-plane-internal-client": "workspace:*",
     "@mistle/data-plane-trpc": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/emails": "workspace:*",

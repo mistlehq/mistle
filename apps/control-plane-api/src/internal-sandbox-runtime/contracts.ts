@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { createRoute, z } from "@hono/zod-openapi";
 
 export const InternalSandboxRuntimeErrorResponseSchema = z.object({
   code: z.string().min(1),
@@ -33,4 +33,128 @@ export const InternalSandboxRuntimeMintConnectionResponseSchema = z.object({
   url: z.url(),
   token: z.string().min(1),
   expiresAt: z.iso.datetime({ offset: true }),
+});
+
+export const internalSandboxRuntimeStartProfileInstanceRoute = createRoute({
+  method: "post",
+  path: "/start-profile-instance",
+  tags: ["Internal"],
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeStartProfileInstanceRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Start a sandbox profile instance for internal callers.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeStartProfileInstanceResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request body.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeErrorResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Internal service authentication failed.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeErrorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Referenced sandbox profile version was not found.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeErrorResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
+export const internalSandboxRuntimeMintConnectionTokenRoute = createRoute({
+  method: "post",
+  path: "/mint-connection-token",
+  tags: ["Internal"],
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeMintConnectionRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Mint a sandbox connection token for internal callers.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeMintConnectionResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request body.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeErrorResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Internal service authentication failed.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeErrorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Referenced sandbox instance was not found.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeErrorResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: "Sandbox instance is not running.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeErrorResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
 });

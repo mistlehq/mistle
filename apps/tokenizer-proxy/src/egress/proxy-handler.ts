@@ -1,13 +1,13 @@
+import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import type { Context } from "hono";
 
 import { logger } from "../logger.js";
 import type { AppContextBindings } from "../types.js";
 import { EGRESS_ROUTE_BASE_PATH, EgressRequestHeaders } from "./constants.js";
-import { ControlPlaneCredentialResolverClient } from "./control-plane-client.js";
 import { CredentialCache } from "./credential-cache.js";
 
 type CreateEgressProxyHandlerInput = {
-  controlPlaneCredentialResolverClient: ControlPlaneCredentialResolverClient;
+  controlPlaneInternalClient: ControlPlaneInternalClient;
   credentialCache: CredentialCache;
 };
 
@@ -270,7 +270,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
     if (resolvedCredentialValue === undefined) {
       try {
         const resolvedCredential =
-          await input.controlPlaneCredentialResolverClient.resolveCredential({
+          await input.controlPlaneInternalClient.resolveIntegrationCredential({
             connectionId: routeMetadata.connectionId,
             secretType: routeMetadata.secretType,
             ...(routeMetadata.purpose === undefined ? {} : { purpose: routeMetadata.purpose }),
