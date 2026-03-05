@@ -22,17 +22,13 @@ import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
-import { formatSandboxProfileVersionLabel } from "../sandbox-profiles/format-sandbox-profile-version-label.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
   sandboxProfileDetailQueryKey,
   sandboxProfileVersionIntegrationBindingsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
-import type {
-  SandboxIntegrationBindingKind,
-  SandboxProfileVersion,
-} from "../sandbox-profiles/sandbox-profiles-types.js";
+import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 import {
   createDefaultBindingConfig,
   resolveBindingKindFromTarget,
@@ -60,15 +56,6 @@ function formatBindingKind(kind: SandboxIntegrationBindingKind): string {
 }
 
 type IntegrationsEditorSectionProps = {
-  profileVersionsQuery: {
-    isError: boolean;
-    error: unknown;
-    isPending: boolean;
-    data: { versions: SandboxProfileVersion[] } | undefined;
-  };
-  resolvedSelectedVersion: number | null;
-  onSelectedVersionChange: (nextValue: string | null) => void;
-  selectedVersionDisplayName: string | undefined;
   integrationBindingsQuery: {
     isError: boolean;
     error: unknown;
@@ -103,52 +90,10 @@ function IntegrationsEditorSection(props: IntegrationsEditorSectionProps): React
         <div className="gap-1 flex flex-col">
           <h2 className="text-lg font-semibold">Integrations</h2>
           <p className="text-muted-foreground text-sm">
-            Assign integration connections for a specific sandbox profile version.
+            Assign integration connections for this sandbox profile.
           </p>
         </div>
-
-        {props.profileVersionsQuery.isError ? (
-          <Alert variant="destructive">
-            <AlertTitle>Could not load sandbox profile versions</AlertTitle>
-            <AlertDescription>
-              {resolveApiErrorMessage({
-                error: props.profileVersionsQuery.error,
-                fallbackMessage: "Could not load sandbox profile versions.",
-              })}
-            </AlertDescription>
-          </Alert>
-        ) : null}
-
-        <Field>
-          <FieldLabel htmlFor="sandbox-profile-version">Profile version</FieldLabel>
-          <FieldContent>
-            <Select
-              disabled={
-                props.profileVersionsQuery.isPending ||
-                props.profileVersionsQuery.data === undefined
-              }
-              onValueChange={props.onSelectedVersionChange}
-              value={
-                props.resolvedSelectedVersion === null ? "" : String(props.resolvedSelectedVersion)
-              }
-            >
-              <SelectTrigger aria-label="Sandbox profile version" id="sandbox-profile-version">
-                <SelectValue placeholder="Select profile version">
-                  {props.selectedVersionDisplayName}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {(props.profileVersionsQuery.data?.versions ?? []).map((version) => (
-                  <SelectItem key={version.version} value={String(version.version)}>
-                    {formatSandboxProfileVersionLabel(version.version)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </FieldContent>
-        </Field>
-
-        {props.resolvedSelectedVersion === null ? null : props.integrationBindingsQuery.isError ? (
+        {props.integrationBindingsQuery.isError ? (
           <Alert variant="destructive">
             <AlertTitle>Could not load integration bindings</AlertTitle>
             <AlertDescription>
@@ -280,7 +225,6 @@ function IntegrationsEditorSection(props: IntegrationsEditorSectionProps): React
           </Button>
           <Button
             disabled={
-              props.resolvedSelectedVersion === null ||
               props.integrationBindingsQuery.isPending ||
               props.integrationDirectoryQuery.isPending ||
               props.isSavingIntegrationBindings
@@ -339,11 +283,11 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
   const integrationsState = useSandboxProfileIntegrationsState({
     mode: props.mode,
     profileId,
-    invalidateVersionBindings: async ({ profileId: invalidateProfileId, version }) => {
+    invalidateVersionBindings: async ({ profileId: invalidateProfileId }) => {
       await queryClient.invalidateQueries({
         queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
           profileId: invalidateProfileId,
-          version,
+          version: 1,
         }),
       });
     },
@@ -487,13 +431,9 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
           onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
           onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
           onSaveIntegrationBindings={integrationsState.onSaveIntegrationBindings}
-          onSelectedVersionChange={integrationsState.onSelectedVersionChange}
-          profileVersionsQuery={integrationsState.profileVersionsQuery}
           resolveSelectedConnectionDisplayName={
             integrationsState.resolveSelectedConnectionDisplayName
           }
-          resolvedSelectedVersion={integrationsState.resolvedSelectedVersion}
-          selectedVersionDisplayName={integrationsState.selectedVersionDisplayName}
         />
       ) : null}
     </div>
