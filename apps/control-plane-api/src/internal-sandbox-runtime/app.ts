@@ -2,6 +2,7 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 
 import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "../internal-integration-credentials/constants.js";
+import { createRequireInternalAuthMiddleware } from "../middleware/require-internal-auth.js";
 import {
   SandboxInstancesConflictError,
   SandboxInstancesNotFoundError,
@@ -31,13 +32,16 @@ export function createInternalSandboxRuntimeApp(): AppRoutes<
   typeof INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH
 > {
   const routes = new OpenAPIHono<AppContextBindings>();
+  routes.use(
+    "*",
+    createRequireInternalAuthMiddleware({
+      headerName: CONTROL_PLANE_INTERNAL_AUTH_HEADER,
+      errorCode: InternalSandboxRuntimeErrorCodes.UNAUTHORIZED,
+      errorMessage: "Internal service authentication failed.",
+    }),
+  );
 
   routes.openapi(internalSandboxRuntimeStartProfileInstanceRoute, async (ctx) => {
-    const authorizationFailureResponse = resolveAuthorizationFailureResponse(ctx);
-    if (authorizationFailureResponse !== null) {
-      return authorizationFailureResponse;
-    }
-
     const requestBody = await ctx.req
       .json()
       .catch((): unknown => ({ __parseError: "invalid_json_body" }));
@@ -82,11 +86,6 @@ export function createInternalSandboxRuntimeApp(): AppRoutes<
   });
 
   routes.openapi(internalSandboxRuntimeMintConnectionTokenRoute, async (ctx) => {
-    const authorizationFailureResponse = resolveAuthorizationFailureResponse(ctx);
-    if (authorizationFailureResponse !== null) {
-      return authorizationFailureResponse;
-    }
-
     const requestBody = await ctx.req
       .json()
       .catch((): unknown => ({ __parseError: "invalid_json_body" }));
@@ -119,22 +118,6 @@ export function createInternalSandboxRuntimeApp(): AppRoutes<
     basePath: INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH,
     routes,
   };
-}
-
-function resolveAuthorizationFailureResponse(ctx: AppContext) {
-  const providedServiceToken = ctx.req.header(CONTROL_PLANE_INTERNAL_AUTH_HEADER);
-  if (
-    providedServiceToken !== undefined &&
-    providedServiceToken === ctx.get("internalAuthServiceToken")
-  ) {
-    return null;
-  }
-
-  const responseBody: z.infer<typeof InternalSandboxRuntimeErrorResponseSchema> = {
-    code: InternalSandboxRuntimeErrorCodes.UNAUTHORIZED,
-    message: "Internal service authentication failed.",
-  };
-  return ctx.json(responseBody, 401);
 }
 
 function handleStartProfileInstanceError(ctx: AppContext, error: unknown) {
