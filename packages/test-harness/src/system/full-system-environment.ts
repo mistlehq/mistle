@@ -1,4 +1,8 @@
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+
 import { type StartedNetwork } from "testcontainers";
+import { GenericContainer } from "testcontainers";
 
 import { startControlPlaneApi, type ControlPlaneApiService } from "../apps/control-plane-api.js";
 import {
@@ -27,7 +31,20 @@ const DATA_PLANE_API_CONTAINER_BASE_URL = "http://data-plane-api:5200";
 const DATA_PLANE_GATEWAY_CONTAINER_BASE_URL = "http://data-plane-gateway:5202";
 const TOKENIZER_PROXY_CONTAINER_BASE_URL = "http://tokenizer-proxy:5205";
 const DATA_PLANE_GATEWAY_TUNNEL_WS_URL = "ws://data-plane-gateway:5202/tunnel/sandbox";
-const TOKENIZER_PROXY_EGRESS_BASE_URL = "http://tokenizer-proxy:5205/tokenizer-proxy/egress";
+const REGISTRY_IMAGE_REFERENCE = "registry:3";
+const REGISTRY_INTERNAL_PORT = 5000;
+const REGISTRY_NETWORK_ALIAS = "registry";
+const SANDBOX_BASE_IMAGE_LOCAL_REFERENCE = "mistle/sandbox-base:dev";
+const SANDBOX_BASE_IMAGE_REPOSITORY_PATH = "mistle/sandbox-base";
+const SANDBOX_SNAPSHOT_REPOSITORY_PATH = "mistle/snapshots";
+const SANDBOX_BASE_IMAGE_DOCKERFILE_PATH = "apps/sandbox-runtime/images/base/Dockerfile";
+const SANDBOX_BASE_IMAGE_DOCKER_TARGET = "sandbox-base-dev";
+
+const execFileAsync = promisify(execFile);
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 type SharedPostgresOptions = Omit<
   StartPostgresWithPgBouncerInput,
@@ -88,6 +105,84 @@ function createDatabaseUrl(input: {
   return `postgresql://${encodeURIComponent(input.username)}:${encodeURIComponent(input.password)}@${input.host}:${String(input.port)}/${input.databaseName}`;
 }
 
+function readErrorString(error: unknown, key: "stdout" | "stderr"): string {
+  if (!isRecord(error)) {
+    return "";
+  }
+
+  const value = error[key];
+  if (typeof value === "string") {
+    return value.trim();
+  }
+
+  if (Buffer.isBuffer(value)) {
+    return value.toString("utf8").trim();
+  }
+
+  return "";
+}
+
+async function runCommand(input: { command: string; args: string[]; cwd: string }): Promise<void> {
+  try {
+    await execFileAsync(input.command, input.args, {
+      cwd: input.cwd,
+    });
+  } catch (error) {
+    const stderr = readErrorString(error, "stderr");
+    const stdout = readErrorString(error, "stdout");
+    const output = stderr.length > 0 ? stderr : stdout.length > 0 ? stdout : "no command output";
+    throw new Error(`Command failed: ${input.command} ${input.args.join(" ")}. Output: ${output}`);
+  }
+}
+
+async function ensureSandboxBaseImageLocal(buildContextHostPath: string): Promise<void> {
+  try {
+    await runCommand({
+      command: "docker",
+      args: ["image", "inspect", SANDBOX_BASE_IMAGE_LOCAL_REFERENCE],
+      cwd: buildContextHostPath,
+    });
+    return;
+  } catch {
+    await runCommand({
+      command: "docker",
+      args: [
+        "build",
+        "--target",
+        SANDBOX_BASE_IMAGE_DOCKER_TARGET,
+        "-f",
+        SANDBOX_BASE_IMAGE_DOCKERFILE_PATH,
+        "-t",
+        SANDBOX_BASE_IMAGE_LOCAL_REFERENCE,
+        ".",
+      ],
+      cwd: buildContextHostPath,
+    });
+  }
+}
+
+async function publishSandboxBaseImage(input: {
+  buildContextHostPath: string;
+  registryAuthority: string;
+}): Promise<string> {
+  await ensureSandboxBaseImageLocal(input.buildContextHostPath);
+
+  const registryImageReference = `${input.registryAuthority}/${SANDBOX_BASE_IMAGE_REPOSITORY_PATH}:dev`;
+
+  await runCommand({
+    command: "docker",
+    args: ["tag", SANDBOX_BASE_IMAGE_LOCAL_REFERENCE, registryImageReference],
+    cwd: input.buildContextHostPath,
+  });
+  await runCommand({
+    command: "docker",
+    args: ["push", registryImageReference],
+    cwd: input.buildContextHostPath,
+  });
+
+  return registryImageReference;
+}
+
 export async function startFullSystemEnvironment(
   input: StartFullSystemEnvironmentInput,
 ): Promise<StartedFullSystemEnvironment> {
@@ -110,6 +205,28 @@ export async function startFullSystemEnvironment(
         await network.stop();
       }
     });
+
+    const registryContainer = await new GenericContainer(REGISTRY_IMAGE_REFERENCE)
+      .withEnvironment({
+        REGISTRY_STORAGE_DELETE_ENABLED: "true",
+      })
+      .withExposedPorts(REGISTRY_INTERNAL_PORT)
+      .withNetwork(network)
+      .withNetworkAliases(REGISTRY_NETWORK_ALIAS)
+      .start();
+    cleanupTasks.unshift(async () => {
+      await registryContainer.stop({
+        remove: true,
+        removeVolumes: true,
+        timeout: 0,
+      });
+    });
+    const registryAuthority = `${registryContainer.getHost()}:${String(registryContainer.getMappedPort(REGISTRY_INTERNAL_PORT))}`;
+    const sandboxBaseImageReference = await publishSandboxBaseImage({
+      buildContextHostPath: input.buildContextHostPath,
+      registryAuthority,
+    });
+    const sandboxSnapshotRepository = `${registryAuthority}/${SANDBOX_SNAPSHOT_REPOSITORY_PATH}`;
 
     const hostDatabaseUrl = createDatabaseUrl({
       username: sharedInfraLease.infra.postgres.postgres.username,
@@ -165,31 +282,7 @@ export async function startFullSystemEnvironment(
     cleanupTasks.unshift(async () => {
       await dataPlaneGateway.stop();
     });
-
-    const dataPlaneWorker = await startDataPlaneWorker({
-      buildContextHostPath: input.buildContextHostPath,
-      configPathInContainer: input.configPathInContainer,
-      startupTimeoutMs: input.startupTimeoutMs,
-      ...(input.cacheBustKey === undefined
-        ? {}
-        : {
-            cacheBustKey: input.cacheBustKey,
-          }),
-      network,
-      environment: {
-        ...input.dataPlaneWorkerEnvironment,
-        MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL: containerDatabaseUrl,
-        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
-        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
-        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
-        MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
-          TOKENIZER_PROXY_EGRESS_BASE_URL,
-      },
-    });
-    cleanupTasks.unshift(async () => {
-      await dataPlaneWorker.stop();
-    });
+    const sandboxInternalGatewayWsUrl = `ws://${sharedInfraLease.infra.containerHostGateway}:${String(dataPlaneGateway.mappedPort)}/tunnel/sandbox`;
 
     const controlPlaneApi = await startControlPlaneApi({
       buildContextHostPath: input.buildContextHostPath,
@@ -211,6 +304,7 @@ export async function startFullSystemEnvironment(
           input.authInvitationAcceptBaseUrl,
         MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: input.authTrustedOrigins,
         MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
+        MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: sandboxBaseImageReference,
         MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
       },
     });
@@ -264,6 +358,36 @@ export async function startFullSystemEnvironment(
     });
     cleanupTasks.unshift(async () => {
       await tokenizerProxy.stop();
+    });
+    const tokenizerProxyEgressBaseUrl = `http://${sharedInfraLease.infra.containerHostGateway}:${String(tokenizerProxy.mappedPort)}/tokenizer-proxy/egress`;
+
+    const dataPlaneWorker = await startDataPlaneWorker({
+      buildContextHostPath: input.buildContextHostPath,
+      configPathInContainer: input.configPathInContainer,
+      startupTimeoutMs: input.startupTimeoutMs,
+      ...(input.cacheBustKey === undefined
+        ? {}
+        : {
+            cacheBustKey: input.cacheBustKey,
+          }),
+      network,
+      environment: {
+        ...input.dataPlaneWorkerEnvironment,
+        MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL: containerDatabaseUrl,
+        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
+        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID: input.dataPlaneWorkflowNamespaceId,
+        MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_PROVIDER: "docker",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY: sandboxSnapshotRepository,
+        MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
+        MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: sandboxInternalGatewayWsUrl,
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
+          tokenizerProxyEgressBaseUrl,
+      },
+    });
+    cleanupTasks.unshift(async () => {
+      await dataPlaneWorker.stop();
     });
 
     return {

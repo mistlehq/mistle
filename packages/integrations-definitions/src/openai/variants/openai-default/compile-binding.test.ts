@@ -121,7 +121,7 @@ describe("compileOpenAiApiKeyBinding", () => {
       {
         match: {
           hosts: ["api.openai.com"],
-          pathPrefixes: ["/v1"],
+          pathPrefixes: ["/"],
           methods: ["POST"],
         },
         upstream: {
@@ -263,7 +263,7 @@ trust_level = "trusted"
     });
 
     expect(compiled.egressRoutes[0]?.match.hosts).toEqual(["proxy.example.com"]);
-    expect(compiled.egressRoutes[0]?.match.pathPrefixes).toEqual(["/openai-v2"]);
+    expect(compiled.egressRoutes[0]?.match.pathPrefixes).toEqual(["/"]);
     expect(compiled.runtimeClients[0]?.setup.env.OPENAI_BASE_URL).toEqual({
       kind: "egress_url",
       routeId: "route_ibd_123",

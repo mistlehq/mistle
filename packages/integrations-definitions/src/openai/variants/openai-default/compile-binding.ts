@@ -1,8 +1,4 @@
-import {
-  resolveRoutePathPrefixFromBaseUrl,
-  type CompileBindingInput,
-  type CompileBindingResult,
-} from "@mistle/integrations-core";
+import { type CompileBindingInput, type CompileBindingResult } from "@mistle/integrations-core";
 
 import { resolveOpenAiCredentialSecretType } from "./auth.js";
 import type { OpenAiApiKeyBindingConfig } from "./binding-config-schema.js";
@@ -31,6 +27,7 @@ const ArtifactCommandTimeoutMs = 120_000;
 const RuntimeClientProcessReadinessTimeoutMs = 5_000;
 const RuntimeClientProcessStopTimeoutMs = 10_000;
 const RuntimeClientProcessStopGracePeriodMs = 2_000;
+const OpenAiAllowedPathPrefix = "/";
 
 function renderCodexConfig(input: { model: string; reasoningEffort: string }): string {
   return [
@@ -47,7 +44,6 @@ export function compileOpenAiApiKeyBinding(
   input: OpenAiApiKeyCompileBindingInput,
 ): CompileBindingResult {
   const routeHost = new URL(input.target.config.apiBaseUrl).host;
-  const routePathPrefix = resolveRoutePathPrefixFromBaseUrl(input.target.config.apiBaseUrl);
   const credentialSecretType = resolveOpenAiCredentialSecretType(input.connection.config);
   const codexCliInstallPath = input.refs.artifactBinPath("codex");
 
@@ -56,7 +52,7 @@ export function compileOpenAiApiKeyBinding(
       {
         match: {
           hosts: [routeHost],
-          pathPrefixes: [routePathPrefix],
+          pathPrefixes: [OpenAiAllowedPathPrefix],
           methods: ["POST"],
         },
         upstream: {

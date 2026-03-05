@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 
 import { AppIds, loadConfig } from "@mistle/config";
 import { createControlPlaneDatabase, CONTROL_PLANE_SCHEMA_NAME } from "@mistle/db/control-plane";
@@ -46,11 +47,26 @@ async function main(): Promise<void> {
     const syncedTargets = await syncIntegrationTargets(db, integrationRegistry);
     logger.info({ syncedTargets }, "Synced integration targets from integration registry.");
 
-    const repositoryRoot = resolveRepositoryRootFromDirectory(process.cwd());
-    const provisionManifestPath = discoverIntegrationTargetProvisionManifestPath({
-      startDirectory: process.cwd(),
-      repositoryRoot,
+    const cwd = resolve(process.cwd());
+    let provisionManifestPath = discoverIntegrationTargetProvisionManifestPath({
+      startDirectory: cwd,
+      repositoryRoot: cwd,
     });
+    if (provisionManifestPath === undefined) {
+      try {
+        const repositoryRoot = resolveRepositoryRootFromDirectory(cwd);
+        provisionManifestPath = discoverIntegrationTargetProvisionManifestPath({
+          startDirectory: cwd,
+          repositoryRoot,
+        });
+      } catch (error) {
+        logger.info(
+          { err: error },
+          "Could not resolve repository root for integration target provision manifest discovery. Skipping integration target provision.",
+        );
+      }
+    }
+
     if (provisionManifestPath === undefined) {
       logger.info(
         "No integration target provision manifest found. Skipping integration target provision.",

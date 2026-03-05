@@ -149,6 +149,34 @@ function isDestroyableReadWriteStream(
   return "destroy" in stream && typeof stream.destroy === "function";
 }
 
+function createAttachStdinOptions(): Docker.ContainerAttachOptions & {
+  _query: {
+    stdin: true;
+    stream: true;
+    stdout: false;
+    stderr: false;
+    logs: false;
+  };
+} {
+  return {
+    // dockerode uses this field internally to request HTTP upgrade for stdin streaming.
+    hijack: true,
+    stdin: true,
+    stream: true,
+    logs: false,
+    stdout: false,
+    stderr: false,
+    // Ensure only daemon-supported attach query params are sent.
+    _query: {
+      stdin: true,
+      stream: true,
+      stdout: false,
+      stderr: false,
+      logs: false,
+    },
+  };
+}
+
 export class DockerApiClient implements DockerClient {
   readonly #config: DockerSandboxConfig;
   readonly #docker: Docker;
@@ -183,14 +211,7 @@ export class DockerApiClient implements DockerClient {
     );
     const attachedStdinStream = await this.#runDockerClientOperation(
       DockerClientOperationIds.ATTACH_STDIN,
-      () =>
-        container.attach({
-          hijack: true,
-          stdin: true,
-          stream: true,
-          stdout: false,
-          stderr: false,
-        }),
+      () => container.attach(createAttachStdinOptions()),
     );
     this.#trackAttachedStdinStream(container.id, attachedStdinStream);
 
@@ -327,15 +348,7 @@ export class DockerApiClient implements DockerClient {
     const container = this.#docker.getContainer(sandboxId);
     const attachedStdinStream = await this.#runDockerClientOperation(
       DockerClientOperationIds.ATTACH_STDIN,
-      () =>
-        container.attach({
-          hijack: true,
-          stdin: true,
-          stream: true,
-          logs: false,
-          stdout: false,
-          stderr: false,
-        }),
+      () => container.attach(createAttachStdinOptions()),
     );
     this.#trackAttachedStdinStream(sandboxId, attachedStdinStream);
 

@@ -1,6 +1,12 @@
+import { existsSync } from "node:fs";
+import { resolve } from "node:path";
+
 import type { StartDockerHttpAppInput, DockerHttpAppDefinition } from "./http-app.js";
 import { startDockerHttpApp } from "./http-app.js";
 import type { StartedWorkspaceApp } from "./shared.js";
+
+const IntegrationTargetsProvisionManifestFileName = "integration-targets.provision.json";
+const IntegrationTargetsProvisionManifestContainerPath = `/workspace/${IntegrationTargetsProvisionManifestFileName}`;
 
 const ControlPlaneApiDefinition: DockerHttpAppDefinition = {
   appName: "control-plane-api",
@@ -17,8 +23,48 @@ const ControlPlaneApiDefinition: DockerHttpAppDefinition = {
 export type StartControlPlaneApiInput = StartDockerHttpAppInput;
 export type ControlPlaneApiService = StartedWorkspaceApp;
 
+function resolveControlPlaneApiBindMounts(
+  input: StartControlPlaneApiInput,
+): StartDockerHttpAppInput["bindMounts"] {
+  const provisionManifestHostPath = resolve(
+    input.buildContextHostPath,
+    IntegrationTargetsProvisionManifestFileName,
+  );
+  if (!existsSync(provisionManifestHostPath)) {
+    return input.bindMounts;
+  }
+
+  if (
+    input.bindMounts?.some(
+      (bindMount) => bindMount.target === IntegrationTargetsProvisionManifestContainerPath,
+    ) ??
+    false
+  ) {
+    return input.bindMounts;
+  }
+
+  const bindMounts = input.bindMounts ?? [];
+  return [
+    ...bindMounts,
+    {
+      source: provisionManifestHostPath,
+      target: IntegrationTargetsProvisionManifestContainerPath,
+      mode: "ro",
+    },
+  ];
+}
+
 export async function startControlPlaneApi(
   input: StartControlPlaneApiInput,
 ): Promise<ControlPlaneApiService> {
-  return startDockerHttpApp(ControlPlaneApiDefinition, input);
+  const bindMounts = resolveControlPlaneApiBindMounts(input);
+
+  return startDockerHttpApp(ControlPlaneApiDefinition, {
+    ...input,
+    ...(bindMounts === undefined
+      ? {}
+      : {
+          bindMounts,
+        }),
+  });
 }

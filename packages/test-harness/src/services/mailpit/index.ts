@@ -10,7 +10,7 @@ import { registerProcessCleanupTask } from "../../cleanup/index.js";
 
 const MAILPIT_SMTP_PORT = 1025;
 const MAILPIT_HTTP_PORT = 8025;
-const MAILPIT_IMAGE = "axllent/mailpit:v1.27";
+const MAILPIT_IMAGE = "axllent/mailpit:v1.28";
 const MAILPIT_POLL_INTERVAL_MS = 100;
 const DEFAULT_MAILPIT_NETWORK_ALIAS = "mailpit";
 
