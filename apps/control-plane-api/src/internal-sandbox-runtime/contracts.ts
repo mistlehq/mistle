@@ -5,6 +5,21 @@ export const InternalSandboxRuntimeErrorResponseSchema = z.object({
   message: z.string().min(1),
 });
 
+export const InternalSandboxRuntimeValidationErrorResponseSchema = z
+  .object({
+    success: z.literal(false),
+    error: z.looseObject({
+      name: z.string().min(1),
+      message: z.string().min(1),
+    }),
+  })
+  .strict();
+
+export const InternalSandboxRuntimeBadRequestResponseSchema = z.union([
+  InternalSandboxRuntimeErrorResponseSchema,
+  InternalSandboxRuntimeValidationErrorResponseSchema,
+]);
+
 export const InternalSandboxRuntimeStartProfileInstanceRequestSchema = z.object({
   organizationId: z.string().min(1),
   profileId: z.string().min(1),
@@ -62,7 +77,7 @@ export const internalSandboxRuntimeStartProfileInstanceRoute = createRoute({
       description: "Invalid request body.",
       content: {
         "application/json": {
-          schema: InternalSandboxRuntimeErrorResponseSchema,
+          schema: InternalSandboxRuntimeBadRequestResponseSchema,
         },
       },
     },
@@ -120,7 +135,7 @@ export const internalSandboxRuntimeMintConnectionTokenRoute = createRoute({
       description: "Invalid request body.",
       content: {
         "application/json": {
-          schema: InternalSandboxRuntimeErrorResponseSchema,
+          schema: InternalSandboxRuntimeBadRequestResponseSchema,
         },
       },
     },

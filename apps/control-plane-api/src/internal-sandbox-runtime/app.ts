@@ -17,15 +17,12 @@ import {
   InternalSandboxRuntimeErrorResponseSchema,
   internalSandboxRuntimeMintConnectionTokenRoute,
   internalSandboxRuntimeStartProfileInstanceRoute,
-  InternalSandboxRuntimeMintConnectionRequestSchema,
   InternalSandboxRuntimeMintConnectionResponseSchema,
-  InternalSandboxRuntimeStartProfileInstanceRequestSchema,
   InternalSandboxRuntimeStartProfileInstanceResponseSchema,
 } from "./contracts.js";
 
 const InternalSandboxRuntimeErrorCodes = {
   UNAUTHORIZED: "UNAUTHORIZED",
-  INVALID_REQUEST: "INVALID_REQUEST",
 } as const;
 
 export function createInternalSandboxRuntimeApp(): AppRoutes<
@@ -42,28 +39,17 @@ export function createInternalSandboxRuntimeApp(): AppRoutes<
   );
 
   routes.openapi(internalSandboxRuntimeStartProfileInstanceRoute, async (ctx) => {
-    const requestBody = await ctx.req
-      .json()
-      .catch((): unknown => ({ __parseError: "invalid_json_body" }));
-    const parsedInput =
-      InternalSandboxRuntimeStartProfileInstanceRequestSchema.safeParse(requestBody);
-    if (!parsedInput.success) {
-      const responseBody: z.infer<typeof InternalSandboxRuntimeErrorResponseSchema> = {
-        code: InternalSandboxRuntimeErrorCodes.INVALID_REQUEST,
-        message: "Internal start profile instance request body is invalid.",
-      };
-      return ctx.json(responseBody, 400);
-    }
+    const body = ctx.req.valid("json");
 
     try {
       const startedSandboxInstance = await ctx
         .get("services")
         .sandboxProfiles.startProfileInstance({
-          organizationId: parsedInput.data.organizationId,
-          profileId: parsedInput.data.profileId,
-          profileVersion: parsedInput.data.profileVersion,
-          startedBy: parsedInput.data.startedBy,
-          source: parsedInput.data.source,
+          organizationId: body.organizationId,
+          profileId: body.profileId,
+          profileVersion: body.profileVersion,
+          startedBy: body.startedBy,
+          source: body.source,
           issueConnectionToken: false,
           image: {
             imageId: ctx.get("sandboxConfig").defaultBaseImage,
@@ -86,24 +72,14 @@ export function createInternalSandboxRuntimeApp(): AppRoutes<
   });
 
   routes.openapi(internalSandboxRuntimeMintConnectionTokenRoute, async (ctx) => {
-    const requestBody = await ctx.req
-      .json()
-      .catch((): unknown => ({ __parseError: "invalid_json_body" }));
-    const parsedInput = InternalSandboxRuntimeMintConnectionRequestSchema.safeParse(requestBody);
-    if (!parsedInput.success) {
-      const responseBody: z.infer<typeof InternalSandboxRuntimeErrorResponseSchema> = {
-        code: InternalSandboxRuntimeErrorCodes.INVALID_REQUEST,
-        message: "Internal mint connection token request body is invalid.",
-      };
-      return ctx.json(responseBody, 400);
-    }
+    const body = ctx.req.valid("json");
 
     try {
       const mintedToken = await ctx
         .get("services")
         .sandboxInstances.mintConnectionTokenForInstance({
-          organizationId: parsedInput.data.organizationId,
-          instanceId: parsedInput.data.instanceId,
+          organizationId: body.organizationId,
+          instanceId: body.instanceId,
         });
 
       const responseBody: z.infer<typeof InternalSandboxRuntimeMintConnectionResponseSchema> =

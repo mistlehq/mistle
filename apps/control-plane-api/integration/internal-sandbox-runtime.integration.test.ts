@@ -58,9 +58,11 @@ describe("internal sandbox runtime", () => {
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      code: "INVALID_REQUEST",
-      message: "Internal start profile instance request body is invalid.",
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      error: {
+        name: "ZodError",
+      },
     });
   });
 
@@ -105,9 +107,11 @@ describe("internal sandbox runtime", () => {
     );
 
     expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      code: "INVALID_REQUEST",
-      message: "Internal mint connection token request body is invalid.",
+    await expect(response.json()).resolves.toMatchObject({
+      success: false,
+      error: {
+        name: "ZodError",
+      },
     });
   });
 });
