@@ -44,6 +44,7 @@ export type IntegrationConnectionSummary = {
 export type IntegrationTargetSummary = {
   targetKey: string;
   displayName: string;
+  logoKey?: string | undefined;
   familyId: string;
   variantId: string;
   targetHealth: {
@@ -259,8 +260,19 @@ export function SandboxProfileBindingConfigEditor(input: {
     <div className="gap-3 flex flex-col">
       {configUiModel.fields.map((field) => {
         if (field.type === "select") {
+          const selectedOption = field.options.find((option) => option.value === field.value);
+          if (selectedOption === undefined) {
+            throw new Error(
+              `Selected binding config value '${field.value}' is not present in options for '${field.key}'.`,
+            );
+          }
+
           return (
-            <Field key={field.key}>
+            <Field
+              className="items-start gap-4 [&>[data-slot=field-label]]:w-40 [&>[data-slot=field-label]]:pt-2"
+              key={field.key}
+              orientation="horizontal"
+            >
               <FieldLabel htmlFor={`binding-field-${field.key}-${input.row.clientId}`}>
                 {field.label}
               </FieldLabel>
@@ -289,9 +301,12 @@ export function SandboxProfileBindingConfigEditor(input: {
                 >
                   <SelectTrigger
                     aria-label={field.label}
+                    className="w-full max-w-64"
                     id={`binding-field-${field.key}-${input.row.clientId}`}
                   >
-                    <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
+                    <SelectValue placeholder={`Select ${field.label.toLowerCase()}`}>
+                      {selectedOption.label}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {field.options.map((option) => (
@@ -307,12 +322,17 @@ export function SandboxProfileBindingConfigEditor(input: {
         }
 
         return (
-          <Field key={field.key}>
+          <Field
+            className="items-start gap-4 [&>[data-slot=field-label]]:w-40 [&>[data-slot=field-label]]:pt-2"
+            key={field.key}
+            orientation="horizontal"
+          >
             <FieldLabel htmlFor={`binding-field-${field.key}-${input.row.clientId}`}>
               {field.label}
             </FieldLabel>
             <FieldContent>
               <Input
+                className="w-full max-w-64"
                 id={`binding-field-${field.key}-${input.row.clientId}`}
                 onChange={(event) => {
                   const values = event.currentTarget.value

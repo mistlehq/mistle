@@ -142,7 +142,6 @@ export async function updateSandboxProfile(input: {
         ...(input.payload.displayName === undefined
           ? {}
           : { displayName: input.payload.displayName }),
-        ...(input.payload.status === undefined ? {} : { status: input.payload.status }),
       },
     });
 

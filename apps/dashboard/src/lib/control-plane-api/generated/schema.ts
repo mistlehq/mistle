@@ -1133,8 +1133,6 @@ export interface paths {
         content: {
           "application/json": {
             displayName: string;
-            /** @enum {string} */
-            status?: "active" | "inactive";
           };
         };
       };
@@ -1429,8 +1427,6 @@ export interface paths {
         content: {
           "application/json": {
             displayName?: string;
-            /** @enum {string} */
-            status?: "active" | "inactive";
           };
         };
       };

@@ -33,7 +33,6 @@ describe("sandbox profiles update integration", () => {
       },
       body: JSON.stringify({
         displayName: "After Update",
-        status: SandboxProfileStatuses.INACTIVE,
       }),
     });
     expect(response.status).toBe(200);
@@ -42,7 +41,7 @@ describe("sandbox profiles update integration", () => {
     expect(body.id).toBe("sbp_update_001");
     expect(body.organizationId).toBe(authenticatedSession.organizationId);
     expect(body.displayName).toBe("After Update");
-    expect(body.status).toBe(SandboxProfileStatuses.INACTIVE);
+    expect(body.status).toBe(SandboxProfileStatuses.ACTIVE);
     expect(body.updatedAt).not.toBe("2026-01-01T00:00:00.000Z");
   });
 
@@ -71,6 +70,37 @@ describe("sandbox profiles update integration", () => {
         cookie: authenticatedSession.cookie,
       },
       body: JSON.stringify({}),
+    });
+    expect(response.status).toBe(400);
+
+    const body = ValidationErrorResponseSchema.parse(await response.json());
+    expect(body.success).toBe(false);
+    expect(body.error.name).toBe("ZodError");
+  });
+
+  it("returns 400 when status is provided in update payload", async ({ fixture }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profiles-update-status-not-allowed@example.com",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_update_validation_002",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Before Update",
+      status: SandboxProfileStatuses.ACTIVE,
+      createdAt: "2026-01-03T00:00:00.000Z",
+      updatedAt: "2026-01-03T00:00:00.000Z",
+    });
+
+    const response = await fixture.request("/v1/sandbox/profiles/sbp_update_validation_002", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        cookie: authenticatedSession.cookie,
+      },
+      body: JSON.stringify({
+        status: SandboxProfileStatuses.INACTIVE,
+      }),
     });
     expect(response.status).toBe(400);
 

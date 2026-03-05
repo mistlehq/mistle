@@ -1959,10 +1959,6 @@
                   "displayName": {
                     "type": "string",
                     "minLength": 1
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": ["active", "inactive"]
                   }
                 },
                 "required": ["displayName"],
@@ -2299,10 +2295,6 @@
                   "displayName": {
                     "type": "string",
                     "minLength": 1
-                  },
-                  "status": {
-                    "type": "string",
-                    "enum": ["active", "inactive"]
                   }
                 },
                 "additionalProperties": false

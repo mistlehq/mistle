@@ -23,7 +23,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { formatSandboxProfileVersionLabel } from "../sandbox-profiles/format-sandbox-profile-version-label.js";
 import {
   sandboxProfilesListQueryKey,
   sandboxProfileVersionsQueryKey,
@@ -62,7 +61,6 @@ type StartSessionStep = "idle" | "starting" | "securing" | "connecting" | "conne
 
 type ConnectedSession = {
   profileId: string;
-  profileVersion: number;
   sandboxInstanceId: string;
   workflowRunId: string;
   connectionUrl: string;
@@ -221,7 +219,6 @@ export function SessionsPage(): React.JSX.Element {
   const manualDisconnectRef = useRef(false);
 
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
-  const [selectedVersion, setSelectedVersion] = useState<number | null>(null);
   const [step, setStep] = useState<StartSessionStep>("idle");
   const [startErrorMessage, setStartErrorMessage] = useState<string | null>(null);
   const [connectedSession, setConnectedSession] = useState<ConnectedSession | null>(null);
@@ -240,57 +237,27 @@ export function SessionsPage(): React.JSX.Element {
         signal,
       }),
   });
-
   const versionsQuery = useQuery({
     queryKey:
       selectedProfileId === null
-        ? ["sandbox-profiles", "versions", "none"]
+        ? sandboxProfileVersionsQueryKey("none")
         : sandboxProfileVersionsQueryKey(selectedProfileId),
     queryFn: async ({ signal }) => {
       if (selectedProfileId === null) {
         return { versions: [] };
       }
-
       return listSandboxProfileVersions({
         profileId: selectedProfileId,
         signal,
       });
     },
     enabled: selectedProfileId !== null,
+    retry: false,
   });
-
-  const sortedVersions = useMemo(() => {
-    const versions = versionsQuery.data?.versions ?? [];
-    return [...versions].sort((left, right) => right.version - left.version);
-  }, [versionsQuery.data?.versions]);
-
-  useEffect(() => {
-    if (selectedProfileId === null) {
-      setSelectedVersion(null);
-      return;
-    }
-
-    if (versionsQuery.data === undefined) {
-      return;
-    }
-
-    const versionOptions = versionsQuery.data.versions;
-    if (versionOptions.length === 0) {
-      setSelectedVersion(null);
-      return;
-    }
-
-    if (selectedVersion !== null) {
-      const hasSelectedVersion = versionOptions.some(
-        (candidate) => candidate.version === selectedVersion,
-      );
-      if (hasSelectedVersion) {
-        return;
-      }
-    }
-
-    setSelectedVersion(resolveLatestVersion(versionOptions));
-  }, [selectedProfileId, selectedVersion, versionsQuery.data]);
+  const selectedProfileVersion = useMemo(
+    () => resolveLatestVersion(versionsQuery.data?.versions ?? []),
+    [versionsQuery.data?.versions],
+  );
 
   useEffect(() => {
     return () => {
@@ -335,8 +302,8 @@ export function SessionsPage(): React.JSX.Element {
       if (selectedProfileId === null) {
         throw new Error("Select a sandbox profile before starting a session.");
       }
-      if (selectedVersion === null) {
-        throw new Error("Select a profile version before starting a session.");
+      if (selectedProfileVersion === null) {
+        throw new Error("No sandbox profile version is available for the selected profile.");
       }
 
       disconnectSession();
@@ -345,7 +312,7 @@ export function SessionsPage(): React.JSX.Element {
 
       const startedInstance = await startSandboxInstanceFromProfileVersion({
         profileId: selectedProfileId,
-        profileVersion: selectedVersion,
+        profileVersion: selectedProfileVersion,
       });
 
       setStep("securing");
@@ -360,7 +327,7 @@ export function SessionsPage(): React.JSX.Element {
 
       return {
         selectedProfileId,
-        selectedVersion,
+        selectedProfileVersion,
         startedInstance,
         mintedConnection,
         websocket,
@@ -372,7 +339,6 @@ export function SessionsPage(): React.JSX.Element {
       result.websocket.addEventListener("close", handleSocketClose);
       setConnectedSession({
         profileId: result.selectedProfileId,
-        profileVersion: result.selectedVersion,
         sandboxInstanceId: result.startedInstance.sandboxInstanceId,
         workflowRunId: result.startedInstance.workflowRunId,
         connectionUrl: result.mintedConnection.connectionUrl,
@@ -393,21 +359,16 @@ export function SessionsPage(): React.JSX.Element {
     },
   });
 
-  const selectedVersionDisplayText =
-    selectedVersion === null
-      ? "Select profile version"
-      : formatSandboxProfileVersionLabel(selectedVersion);
   const selectedProfileDisplayText =
     selectedProfileId === null
       ? "Select sandbox profile"
       : (profilesQuery.data?.items.find((profile) => profile.id === selectedProfileId)
           ?.displayName ?? "Select sandbox profile");
   const selectedProfileSelectValue = selectedProfileId ?? "";
-  const selectedVersionSelectValue = selectedVersion === null ? "" : String(selectedVersion);
 
   const canStartSession =
     selectedProfileId !== null &&
-    selectedVersion !== null &&
+    selectedProfileVersion !== null &&
     !profilesQuery.isPending &&
     !versionsQuery.isPending &&
     !startSessionMutation.isPending;
@@ -418,7 +379,7 @@ export function SessionsPage(): React.JSX.Element {
         <CardHeader>
           <CardTitle>Start New Session</CardTitle>
           <CardDescription>
-            Select a sandbox profile and version, then establish a sandbox session connection.
+            Select a sandbox profile, then establish a sandbox session connection.
           </CardDescription>
         </CardHeader>
         <CardContent className="gap-4 flex flex-col">
@@ -433,10 +394,9 @@ export function SessionsPage(): React.JSX.Element {
               </AlertDescription>
             </Alert>
           ) : null}
-
           {versionsQuery.isError ? (
             <Alert variant="destructive">
-              <AlertTitle>Could not load profile versions</AlertTitle>
+              <AlertTitle>Could not resolve sandbox profile version</AlertTitle>
               <AlertDescription>
                 {resolveApiErrorMessage({
                   error: versionsQuery.error,
@@ -483,40 +443,6 @@ export function SessionsPage(): React.JSX.Element {
             </FieldContent>
           </Field>
 
-          <Field>
-            <FieldLabel htmlFor="session-start-version">Version</FieldLabel>
-            <FieldContent>
-              <Select
-                disabled={
-                  selectedProfileId === null ||
-                  versionsQuery.isPending ||
-                  (versionsQuery.data?.versions.length ?? 0) === 0
-                }
-                onValueChange={(value) => {
-                  if (value === null || value.length === 0) {
-                    setSelectedVersion(null);
-                    return;
-                  }
-                  setSelectedVersion(Number(value));
-                }}
-                value={selectedVersionSelectValue}
-              >
-                <SelectTrigger aria-label="Sandbox profile version" id="session-start-version">
-                  <SelectValue placeholder="Select profile version">
-                    {selectedVersionDisplayText}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {sortedVersions.map((version) => (
-                    <SelectItem key={version.version} value={String(version.version)}>
-                      {formatSandboxProfileVersionLabel(version.version)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FieldContent>
-          </Field>
-
           <div className="gap-2 flex flex-wrap">
             <Button
               disabled={!canStartSession}
@@ -555,8 +481,7 @@ export function SessionsPage(): React.JSX.Element {
                 {connectedSession.sandboxInstanceId}
               </p>
               <p className="text-sm">
-                <span className="font-medium">Profile:</span> {connectedSession.profileId} (
-                {formatSandboxProfileVersionLabel(connectedSession.profileVersion)})
+                <span className="font-medium">Profile:</span> {connectedSession.profileId}
               </p>
               <p className="text-sm">
                 <span className="font-medium">Workflow run:</span> {connectedSession.workflowRunId}

@@ -11,7 +11,7 @@ export function SandboxProfileTitleEditor(input: {
   onCommit: () => void;
   onCancel: () => void;
 }): React.JSX.Element {
-  const titleContainerClassName = "relative h-11 w-full max-w-2xl";
+  const titleContainerClassName = "relative w-full max-w-2xl";
 
   if (input.isEditing) {
     return (
@@ -41,8 +41,8 @@ export function SandboxProfileTitleEditor(input: {
 
   return (
     <div className={titleContainerClassName}>
-      <div className="inline-flex h-11 items-center gap-1 rounded-md border border-transparent px-3">
-        <h1 className="text-xl font-semibold leading-none">{input.title}</h1>
+      <div className="inline-flex items-center gap-1">
+        <h1 className="text-xl font-semibold">{input.title}</h1>
         <Button
           aria-label="Edit profile name"
           disabled={input.saveDisabled}

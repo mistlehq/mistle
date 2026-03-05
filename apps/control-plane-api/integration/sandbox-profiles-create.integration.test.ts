@@ -56,9 +56,9 @@ describe("sandbox profiles create integration", () => {
     expect(initialVersion.version).toBe(1);
   });
 
-  it("creates a sandbox profile with explicit status", async ({ fixture }) => {
+  it("rejects creation when status is provided", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
-      email: "integration-sandbox-profiles-create-inactive@example.com",
+      email: "integration-sandbox-profiles-create-status-not-allowed@example.com",
     });
 
     const response = await fixture.request("/v1/sandbox/profiles", {
@@ -68,16 +68,15 @@ describe("sandbox profiles create integration", () => {
         cookie: authenticatedSession.cookie,
       },
       body: JSON.stringify({
-        displayName: "Created Inactive Profile",
+        displayName: "Created Profile",
         status: SandboxProfileStatuses.INACTIVE,
       }),
     });
-    expect(response.status).toBe(201);
+    expect(response.status).toBe(400);
 
-    const body = SandboxProfileSchema.parse(await response.json());
-    expect(body.organizationId).toBe(authenticatedSession.organizationId);
-    expect(body.displayName).toBe("Created Inactive Profile");
-    expect(body.status).toBe(SandboxProfileStatuses.INACTIVE);
+    const body = ValidationErrorResponseSchema.parse(await response.json());
+    expect(body.success).toBe(false);
+    expect(body.error.name).toBe("ZodError");
   });
 
   it("rejects creation without an authenticated session", async ({ fixture }) => {

@@ -5,7 +5,6 @@ import { z } from "zod";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
-import { formatSandboxProfileVersionLabel } from "../sandbox-profiles/format-sandbox-profile-version-label.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
 import {
   sandboxProfileVersionIntegrationBindingsQueryKey,
@@ -96,18 +95,23 @@ function mapBindingsToEditorRows(
   }));
 }
 
-function resolveSelectedVersionDisplayName(
-  selectedVersion: number | null,
-  versions: readonly SandboxProfileVersion[],
-): string | undefined {
-  if (selectedVersion === null) {
-    return undefined;
+function resolveLatestVersion(versions: readonly SandboxProfileVersion[]): number | null {
+  if (versions.length === 0) {
+    return null;
   }
-  const version = versions.find((currentVersion) => currentVersion.version === selectedVersion);
-  if (version === undefined) {
-    return undefined;
+
+  let latestVersion = versions[0]?.version;
+  if (latestVersion === undefined) {
+    return null;
   }
-  return formatSandboxProfileVersionLabel(version.version);
+
+  for (const candidate of versions) {
+    if (candidate.version > latestVersion) {
+      latestVersion = candidate.version;
+    }
+  }
+
+  return latestVersion;
 }
 
 type UseSandboxProfileIntegrationsStateInput = {
@@ -120,15 +124,6 @@ export function useSandboxProfileIntegrationsState(
   input: UseSandboxProfileIntegrationsStateInput,
 ): {
   canEditIntegrations: boolean;
-  profileVersionsQuery: {
-    isError: boolean;
-    error: unknown;
-    isPending: boolean;
-    data: { versions: SandboxProfileVersion[] } | undefined;
-  };
-  resolvedSelectedVersion: number | null;
-  selectedVersionDisplayName: string | undefined;
-  onSelectedVersionChange: (nextValue: string | null) => void;
   integrationBindingsQuery: {
     isError: boolean;
     error: unknown;
@@ -144,24 +139,46 @@ export function useSandboxProfileIntegrationsState(
   integrationRowErrorsByClientId: Readonly<Record<string, string>>;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
-  onAddIntegrationBindingRow: () => void;
+  onAddIntegrationBindingRow: (input: {
+    kind: SandboxIntegrationBindingKind;
+    connectionId: string;
+    config: Record<string, unknown>;
+  }) => Promise<boolean>;
   onRemoveIntegrationBindingRow: (clientId: string) => void;
   onIntegrationBindingRowChange: (
     clientId: string,
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
-  onSaveIntegrationBindings: () => void;
   resolveSelectedConnectionDisplayName: (row: SandboxProfileBindingEditorRow) => string | undefined;
   integrationSaveSuccess: boolean;
   isSavingIntegrationBindings: boolean;
 } {
-  const [explicitSelectedVersion, setExplicitSelectedVersion] = useState<number | null>(null);
   const [integrationRows, setIntegrationRows] = useState<SandboxProfileBindingEditorRow[]>([]);
   const [integrationSaveError, setIntegrationSaveError] = useState<string | null>(null);
   const [integrationRowErrorsByClientId, setIntegrationRowErrorsByClientId] = useState<
     Record<string, string>
   >({});
   const [integrationSaveSuccess, setIntegrationSaveSuccess] = useState(false);
+
+  const profileVersionsQuery = useQuery({
+    queryKey:
+      input.mode === "edit" && input.profileId !== undefined
+        ? sandboxProfileVersionsQueryKey(input.profileId)
+        : sandboxProfileVersionsQueryKey("missing-profile-id"),
+    queryFn: async ({ signal }) => {
+      if (input.profileId === undefined) {
+        throw new Error("profileId is required.");
+      }
+      return listSandboxProfileVersions({
+        profileId: input.profileId,
+        signal,
+      });
+    },
+    enabled: input.mode === "edit" && input.profileId !== undefined,
+    retry: false,
+  });
+
+  const resolvedProfileVersion = resolveLatestVersion(profileVersionsQuery.data?.versions ?? []);
 
   function clearIntegrationRowError(clientId: string): void {
     setIntegrationRowErrorsByClientId((currentErrors) => {
@@ -193,55 +210,32 @@ export function useSandboxProfileIntegrationsState(
     setIntegrationSaveSuccess(false);
   }
 
-  const profileVersionsQuery = useQuery({
-    queryKey:
-      input.mode === "edit" && input.profileId !== undefined
-        ? sandboxProfileVersionsQueryKey(input.profileId)
-        : sandboxProfileVersionsQueryKey("missing-profile-id"),
-    queryFn: async ({ signal }) => {
-      if (input.profileId === undefined) {
-        throw new Error("profileId is required.");
-      }
-      return listSandboxProfileVersions({
-        profileId: input.profileId,
-        signal,
-      });
-    },
-    enabled: input.mode === "edit",
-    retry: false,
-  });
-
-  const availableProfileVersions: readonly SandboxProfileVersion[] =
-    profileVersionsQuery.data?.versions ?? [];
-  const resolvedSelectedVersion =
-    explicitSelectedVersion !== null &&
-    availableProfileVersions.some((version) => version.version === explicitSelectedVersion)
-      ? explicitSelectedVersion
-      : (availableProfileVersions[0]?.version ?? null);
-
   const integrationBindingsQuery = useQuery({
     queryKey:
-      input.mode === "edit" && input.profileId !== undefined && resolvedSelectedVersion !== null
+      input.mode === "edit" && input.profileId !== undefined && resolvedProfileVersion !== null
         ? sandboxProfileVersionIntegrationBindingsQueryKey({
             profileId: input.profileId,
-            version: resolvedSelectedVersion,
+            version: resolvedProfileVersion,
           })
         : sandboxProfileVersionIntegrationBindingsQueryKey({
             profileId: "missing-profile-id",
             version: 0,
           }),
     queryFn: async ({ signal }) => {
-      if (input.profileId === undefined || resolvedSelectedVersion === null) {
-        throw new Error("profileId and selectedVersion are required.");
+      if (input.profileId === undefined || resolvedProfileVersion === null) {
+        throw new Error("profileId and version are required.");
       }
       return getSandboxProfileVersionIntegrationBindings({
         profileId: input.profileId,
-        version: resolvedSelectedVersion,
+        version: resolvedProfileVersion,
         signal,
       });
     },
     enabled:
-      input.mode === "edit" && input.profileId !== undefined && resolvedSelectedVersion !== null,
+      input.mode === "edit" &&
+      input.profileId !== undefined &&
+      resolvedProfileVersion !== null &&
+      !profileVersionsQuery.isPending,
     retry: false,
   });
 
@@ -268,16 +262,16 @@ export function useSandboxProfileIntegrationsState(
         version: mutationInput.version,
         bindings: mutationInput.bindings,
       }),
-    onSuccess: async (updatedBindings) => {
+    onSuccess: async (updatedBindings, mutationInput) => {
       setIntegrationRows(mapBindingsToEditorRows(updatedBindings.bindings));
       setIntegrationSaveError(null);
       setIntegrationRowErrorsByClientId({});
       setIntegrationSaveSuccess(true);
 
-      if (input.profileId !== undefined && resolvedSelectedVersion !== null) {
+      if (input.profileId !== undefined) {
         await input.invalidateVersionBindings({
           profileId: input.profileId,
-          version: resolvedSelectedVersion,
+          version: mutationInput.version,
         });
       }
     },
@@ -328,62 +322,25 @@ export function useSandboxProfileIntegrationsState(
   const availableTargets: readonly IntegrationTargetSummary[] =
     integrationDirectoryQuery.data?.targets ?? [];
 
-  function onSelectedVersionChange(nextValue: string | null): void {
-    if (nextValue === null) {
-      throw new Error("Sandbox profile version must not be null.");
-    }
-    const parsed = Number(nextValue);
-    if (!Number.isInteger(parsed) || parsed < 1) {
-      throw new Error(`Unsupported sandbox profile version: ${nextValue}`);
-    }
-    setExplicitSelectedVersion(parsed);
-    markIntegrationDirty();
+  function setNeutralSaveState(): void {
+    setIntegrationSaveError(null);
+    setIntegrationRowErrorsByClientId({});
+    setIntegrationSaveSuccess(false);
   }
 
-  function onAddIntegrationBindingRow(): void {
-    setIntegrationRows((currentRows) => [
-      ...currentRows,
-      {
-        clientId: createIntegrationBindingClientId(),
-        connectionId: "",
-        kind: "agent",
-        config: {},
-      },
-    ]);
-    markIntegrationDirty();
-  }
-
-  function onRemoveIntegrationBindingRow(clientId: string): void {
-    setIntegrationRows((currentRows) => currentRows.filter((row) => row.clientId !== clientId));
-    markIntegrationDirty({ clientId });
-  }
-
-  function onIntegrationBindingRowChange(
-    clientId: string,
-    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
-  ): void {
-    setIntegrationRows((currentRows) =>
-      currentRows.map((row) => {
-        if (row.clientId !== clientId) {
-          return row;
-        }
-        return {
-          ...row,
-          ...changes,
-        };
-      }),
-    );
-    markIntegrationDirty({ clientId });
-  }
-
-  function onSaveIntegrationBindings(): void {
+  async function persistIntegrationRows(
+    rowsToPersist: readonly SandboxProfileBindingEditorRow[],
+  ): Promise<boolean> {
     if (
       input.mode !== "edit" ||
       input.profileId === undefined ||
-      resolvedSelectedVersion === null ||
       putIntegrationBindingsMutation.isPending
     ) {
-      return;
+      return false;
+    }
+    if (resolvedProfileVersion === null) {
+      setIntegrationSaveFailure("No sandbox profile version is available for this profile.");
+      return false;
     }
 
     const parsedBindings: Array<{
@@ -394,11 +351,11 @@ export function useSandboxProfileIntegrationsState(
       config: Record<string, unknown>;
     }> = [];
 
-    for (const row of integrationRows) {
+    for (const row of rowsToPersist) {
       const normalizedConnectionId = row.connectionId.trim();
       if (normalizedConnectionId.length === 0) {
         setIntegrationSaveFailure("Each integration binding must select a connection.");
-        return;
+        return false;
       }
 
       const configUiModel = resolveBindingConfigUiModel({
@@ -408,11 +365,11 @@ export function useSandboxProfileIntegrationsState(
       });
       if (configUiModel.mode === "missing-connection") {
         setIntegrationSaveFailure("Each integration binding must select a connection.");
-        return;
+        return false;
       }
       if (configUiModel.mode === "unsupported") {
         setIntegrationSaveFailure(configUiModel.message);
-        return;
+        return false;
       }
 
       parsedBindings.push({
@@ -424,11 +381,62 @@ export function useSandboxProfileIntegrationsState(
       });
     }
 
-    putIntegrationBindingsMutation.mutate({
-      profileId: input.profileId,
-      version: resolvedSelectedVersion,
-      bindings: parsedBindings,
+    setNeutralSaveState();
+
+    try {
+      await putIntegrationBindingsMutation.mutateAsync({
+        profileId: input.profileId,
+        version: resolvedProfileVersion,
+        bindings: parsedBindings,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function onAddIntegrationBindingRow(inputValue: {
+    kind: SandboxIntegrationBindingKind;
+    connectionId: string;
+    config: Record<string, unknown>;
+  }): Promise<boolean> {
+    const nextRows = [
+      ...integrationRows,
+      {
+        clientId: createIntegrationBindingClientId(),
+        connectionId: inputValue.connectionId,
+        kind: inputValue.kind,
+        config: inputValue.config,
+      },
+    ];
+    setIntegrationRows(nextRows);
+    markIntegrationDirty();
+    return persistIntegrationRows(nextRows);
+  }
+
+  function onRemoveIntegrationBindingRow(clientId: string): void {
+    const nextRows = integrationRows.filter((row) => row.clientId !== clientId);
+    setIntegrationRows(nextRows);
+    markIntegrationDirty({ clientId });
+    void persistIntegrationRows(nextRows);
+  }
+
+  function onIntegrationBindingRowChange(
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ): void {
+    const nextRows = integrationRows.map((row) => {
+      if (row.clientId !== clientId) {
+        return row;
+      }
+      return {
+        ...row,
+        ...changes,
+      };
     });
+    setIntegrationRows(nextRows);
+    markIntegrationDirty({ clientId });
+    void persistIntegrationRows(nextRows);
   }
 
   function resolveSelectedConnectionDisplayName(
@@ -451,22 +459,17 @@ export function useSandboxProfileIntegrationsState(
 
   return {
     canEditIntegrations: input.mode === "edit" && input.profileId !== undefined,
-    profileVersionsQuery: {
-      isError: profileVersionsQuery.isError,
-      error: profileVersionsQuery.error,
-      isPending: profileVersionsQuery.isPending,
-      data: profileVersionsQuery.data,
-    },
-    resolvedSelectedVersion,
-    selectedVersionDisplayName: resolveSelectedVersionDisplayName(
-      resolvedSelectedVersion,
-      availableProfileVersions,
-    ),
-    onSelectedVersionChange,
     integrationBindingsQuery: {
-      isError: integrationBindingsQuery.isError,
-      error: integrationBindingsQuery.error,
-      isPending: integrationBindingsQuery.isPending,
+      isError:
+        profileVersionsQuery.isError ||
+        (!profileVersionsQuery.isPending && resolvedProfileVersion === null) ||
+        integrationBindingsQuery.isError,
+      error:
+        profileVersionsQuery.error ??
+        (!profileVersionsQuery.isPending && resolvedProfileVersion === null
+          ? new Error("No sandbox profile version is available for this profile.")
+          : integrationBindingsQuery.error),
+      isPending: profileVersionsQuery.isPending || integrationBindingsQuery.isPending,
     },
     integrationDirectoryQuery: {
       isError: integrationDirectoryQuery.isError,
@@ -481,7 +484,6 @@ export function useSandboxProfileIntegrationsState(
     onAddIntegrationBindingRow,
     onRemoveIntegrationBindingRow,
     onIntegrationBindingRowChange,
-    onSaveIntegrationBindings,
     resolveSelectedConnectionDisplayName,
     integrationSaveSuccess,
     isSavingIntegrationBindings: putIntegrationBindingsMutation.isPending,

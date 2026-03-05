@@ -80,17 +80,15 @@ export const GetSandboxProfileVersionIntegrationBindingsResponseSchema =
 export const CreateSandboxProfileBodySchema = z
   .object({
     displayName: z.string().min(1),
-    status: SandboxProfileStatusSchema.optional(),
   })
   .strict();
 
 export const UpdateSandboxProfileBodySchema = z
   .object({
     displayName: z.string().min(1).optional(),
-    status: SandboxProfileStatusSchema.optional(),
   })
   .strict()
-  .refine((value) => value.displayName !== undefined || value.status !== undefined, {
+  .refine((value) => value.displayName !== undefined, {
     message: "At least one field must be provided.",
   });
 
