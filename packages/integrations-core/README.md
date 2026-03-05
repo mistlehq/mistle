@@ -98,7 +98,6 @@ Key fields and what they drive:
 | `credentialResolvers` (optional)             | Dynamic credential generation/lookup                        | Internal credential resolution endpoint   |
 | `authHandlers.oauth` (optional)              | OAuth start/complete behavior                               | OAuth connection flows                    |
 | `webhookHandler` (optional)                  | Verify + parse inbound webhooks                             | Webhook ingest                            |
-| `userSecretSlots` (optional)                 | User-supplied connection secret slots                       | Connection create/complete validation     |
 | `validateBindingWriteContext(...)`           | Contextual target/connection/binding validation             | Binding write and compile parity checks   |
 | `projectTargetUi(...)` (optional)            | Projects validated target config to UI-safe data            | Target discovery projection               |
 | `targetUiProjectionSchema` (optional)        | Validates projected UI payload shape                        | Target discovery projection               |
@@ -210,9 +209,9 @@ This is the recommended workflow.
 - If OAuth is needed, implement `authHandlers.oauth.start/complete`.
 - If credential material is dynamic, implement `credentialResolvers`.
 
-5. Define user slots.
+5. Define target secrets.
 
-- `userSecretSlots` for connection secrets (for example webhook secrets).
+- Put operator-managed provider secrets in `targetSecretSchema` (for example webhook signing secrets and app private keys).
 
 6. Implement `compileBinding`.
 

@@ -49,7 +49,9 @@ function createGitHubCloudTargetConfig() {
     familyId: "github",
     variantId: "github-cloud",
     enabled: true,
-    secrets: {},
+    secrets: {
+      webhookSecret: "whsec_123",
+    },
     config: {
       apiBaseUrl: "https://api.github.com/",
       webBaseUrl: "https://github.com/",
@@ -202,9 +204,7 @@ describe("GitHubWebhookHandler", () => {
       target: createGitHubCloudTargetConfig(),
       event: createParsedEvent(),
       connection: createConnection(),
-      connectionSecrets: {
-        webhook_secret: "whsec_123",
-      },
+      connectionSecrets: {},
       headers: {
         "x-hub-signature-256": signature,
       },
@@ -219,7 +219,10 @@ describe("GitHubWebhookHandler", () => {
   it("fails verification when webhook secret is missing", async () => {
     const verificationResult = await GitHubWebhookHandler.verify({
       targetKey: "github_cloud",
-      target: createGitHubCloudTargetConfig(),
+      target: {
+        ...createGitHubCloudTargetConfig(),
+        secrets: {},
+      },
       event: createParsedEvent(),
       connection: createConnection(),
       connectionSecrets: {},
@@ -232,7 +235,7 @@ describe("GitHubWebhookHandler", () => {
     expect(verificationResult).toEqual({
       ok: false,
       code: "invalid-body",
-      message: "GitHub webhook connection secrets are missing webhook_secret.",
+      message: "GitHub target secrets are missing webhook_secret.",
     });
   });
 
@@ -242,9 +245,7 @@ describe("GitHubWebhookHandler", () => {
       target: createGitHubCloudTargetConfig(),
       event: createParsedEvent(),
       connection: createConnection(),
-      connectionSecrets: {
-        webhook_secret: "whsec_123",
-      },
+      connectionSecrets: {},
       headers: {},
       rawBody: encodePayload(IssueCommentCreatedPayload),
     });

@@ -119,45 +119,6 @@ describe("integration registry", () => {
     ]);
   });
 
-  it("fails when user secret slots have duplicate keys", () => {
-    const registry = new IntegrationRegistry();
-
-    expect(() =>
-      registry.register({
-        familyId: "github",
-        variantId: "github-cloud",
-        kind: "git",
-        displayName: "GitHub",
-        logoKey: "github",
-        targetConfigSchema: ConfigSchema,
-        targetSecretSchema: EmptySecretsSchema,
-        bindingConfigSchema: ConfigSchema,
-        supportedAuthSchemes: ["oauth"],
-        userSecretSlots: [
-          {
-            key: "webhook_secret",
-            label: "Webhook secret",
-            valueSchema: {
-              parse: (input: unknown) => z.string().min(1).parse(input),
-            },
-          },
-          {
-            key: "webhook_secret",
-            label: "Webhook secret duplicate",
-            valueSchema: {
-              parse: (input: unknown) => z.string().min(1).parse(input),
-            },
-          },
-        ],
-        compileBinding: () => ({
-          egressRoutes: [],
-          artifacts: [],
-          runtimeClients: [],
-        }),
-      }),
-    ).toThrowError(IntegrationDefinitionRegistryError);
-  });
-
   it("registers definitions with custom credential resolver contracts", () => {
     const registry = new IntegrationRegistry();
 

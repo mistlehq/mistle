@@ -8,7 +8,6 @@ import { verify } from "@octokit/webhooks-methods";
 import { GitHubFamilyId } from "./constants.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
 import type { GitHubTargetSecrets } from "./target-secret-schema.js";
-import type { GitHubUserSecrets } from "./user-secret-slots.js";
 
 const GitHubWebhookEventHeaderName = "x-github-event";
 const GitHubWebhookDeliveryHeaderName = "x-github-delivery";
@@ -149,7 +148,7 @@ async function verifyGitHubSignature(input: {
 export const GitHubWebhookHandler: IntegrationWebhookHandler<
   GitHubTargetConfig,
   GitHubTargetSecrets,
-  GitHubUserSecrets
+  Record<string, string>
 > = {
   resolveConnection(input): IntegrationWebhookResolveConnectionResult {
     const installationId = resolveInstallationId(input.event.payload);
@@ -188,12 +187,12 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
     };
   },
   async verify(input) {
-    const webhookSecret = input.connectionSecrets.webhook_secret;
+    const webhookSecret = input.target.secrets.webhookSecret;
     if (webhookSecret === undefined || webhookSecret.length === 0) {
       return {
         ok: false,
         code: "invalid-body",
-        message: "GitHub webhook connection secrets are missing webhook_secret.",
+        message: "GitHub target secrets are missing webhook_secret.",
       };
     }
 

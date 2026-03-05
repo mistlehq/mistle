@@ -19,11 +19,13 @@ describe("GitHubTargetSecretSchema", () => {
     expect(parsed).toEqual({});
   });
 
-  it("fails for unknown fields", () => {
-    expect(() =>
-      GitHubTargetSecretSchema.parse({
-        webhook_secret: "secret",
-      }),
-    ).toThrowError();
+  it("parses optional webhook secret", () => {
+    const parsed = GitHubTargetSecretSchema.parse({
+      webhook_secret: "whsec_123",
+    });
+
+    expect(parsed).toEqual({
+      webhookSecret: "whsec_123",
+    });
   });
 });

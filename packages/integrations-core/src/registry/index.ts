@@ -6,7 +6,6 @@ import type {
   IntegrationDefinition,
   IntegrationDefinitionLocator,
   IntegrationDefinitionResolver,
-  IntegrationUserSecretSlot,
 } from "../types/index.js";
 
 function createDefinitionKey(input: IntegrationDefinitionLocator): string {
@@ -40,47 +39,6 @@ function validateDefinition(input: IntegrationDefinition): void {
       DefinitionRegistryErrorCodes.INVALID_DEFINITION,
       "Integration definition logoKey must be non-empty.",
     );
-  }
-
-  validateUserSecretSlots(input.userSecretSlots);
-}
-
-function validateUserSecretSlotCommon(input: IntegrationUserSecretSlot): void {
-  if (input.key.trim().length === 0) {
-    throw new IntegrationDefinitionRegistryError(
-      DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-      "Integration definition userSecretSlots keys must be non-empty.",
-    );
-  }
-
-  if (input.label.trim().length === 0) {
-    throw new IntegrationDefinitionRegistryError(
-      DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-      `Integration definition userSecretSlots '${input.key}' label must be non-empty.`,
-    );
-  }
-}
-
-function validateUserSecretSlots(
-  input: ReadonlyArray<IntegrationUserSecretSlot> | undefined,
-): void {
-  if (input === undefined) {
-    return;
-  }
-
-  const seenKeys = new Set<string>();
-
-  for (const userSecretSlot of input) {
-    validateUserSecretSlotCommon(userSecretSlot);
-
-    if (seenKeys.has(userSecretSlot.key)) {
-      throw new IntegrationDefinitionRegistryError(
-        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
-        `Integration definition userSecretSlots contains duplicate key '${userSecretSlot.key}'.`,
-      );
-    }
-
-    seenKeys.add(userSecretSlot.key);
   }
 }
 
