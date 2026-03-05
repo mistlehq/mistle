@@ -238,6 +238,8 @@ export async function startFullSystemEnvironment(
         MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT: String(sharedInfraLease.infra.mailpit.smtpPort),
         MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE: "false",
         MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
+        MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL:
+          CONTROL_PLANE_API_CONTAINER_BASE_URL,
       },
     });
     cleanupTasks.unshift(async () => {

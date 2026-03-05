@@ -184,6 +184,8 @@ export const it = vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture 
             },
           },
           sandbox: {
+            defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
             connect: {
               tokenSecret: "integration-connect-token-secret",
               tokenIssuer: "integration-control-plane-api",

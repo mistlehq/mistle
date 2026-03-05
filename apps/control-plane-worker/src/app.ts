@@ -10,6 +10,7 @@ export function createApp(runtimeConfig: ControlPlaneWorkerRuntimeConfig): Contr
   const app = new Hono<AppContextBindings>();
   app.use("*", async (ctx, next) => {
     ctx.set("config", runtimeConfig.app);
+    ctx.set("sandboxConfig", runtimeConfig.sandbox);
     ctx.set("internalAuthServiceToken", runtimeConfig.internalAuthServiceToken);
     await next();
   });

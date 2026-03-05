@@ -31,6 +31,10 @@ describe("runtime lifecycle integration", () => {
         port,
       }),
       internalAuthServiceToken: fixture.internalAuthServiceToken,
+      sandbox: {
+        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      },
     });
 
     try {
@@ -64,6 +68,10 @@ describe("runtime lifecycle integration", () => {
         port,
       }),
       internalAuthServiceToken: fixture.internalAuthServiceToken,
+      sandbox: {
+        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      },
     });
     const healthURL = `http://${host}:${String(port)}/__healthz`;
 

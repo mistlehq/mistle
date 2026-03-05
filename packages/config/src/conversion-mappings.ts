@@ -206,6 +206,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL",
   },
   {
+    configPath: ["apps", "control_plane_worker", "controlPlaneApi", "baseUrl"],
+    tomlPath: ["apps", "control_plane_worker", "control_plane_api", "base_url"],
+    envVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL",
+  },
+  {
     configPath: ["apps", "data_plane_api", "server", "host"],
     tomlPath: ["apps", "data_plane_api", "server", "host"],
     envVar: "MISTLE_APPS_DATA_PLANE_API_HOST",

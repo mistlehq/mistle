@@ -10,9 +10,14 @@ export type ControlPlaneWorkerConfig = LoadControlPlaneWorkerConfigResult["app"]
 export type ControlPlaneWorkerGlobalConfig = NonNullable<
   LoadControlPlaneWorkerConfigResult["global"]
 >;
+export type ControlPlaneWorkerSandboxRuntimeConfig = {
+  defaultBaseImage: ControlPlaneWorkerGlobalConfig["sandbox"]["defaultBaseImage"];
+  gatewayWsUrl: ControlPlaneWorkerGlobalConfig["sandbox"]["gatewayWsUrl"];
+};
 export type ControlPlaneWorkerRuntimeConfig = {
   app: ControlPlaneWorkerConfig;
   internalAuthServiceToken: ControlPlaneWorkerGlobalConfig["internalAuth"]["serviceToken"];
+  sandbox: ControlPlaneWorkerSandboxRuntimeConfig;
 };
 
 export type AppContextBindings = {
@@ -21,6 +26,7 @@ export type AppContextBindings = {
 
 export type AppContextVariables = {
   config: ControlPlaneWorkerConfig;
+  sandboxConfig: ControlPlaneWorkerSandboxRuntimeConfig;
   internalAuthServiceToken: string;
 };
 

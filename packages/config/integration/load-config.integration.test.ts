@@ -136,6 +136,9 @@ const controlPlaneWorkerEnvConfig = {
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5002",
   },
+  controlPlaneApi: {
+    baseUrl: "http://127.0.0.1:5000",
+  },
 } as const;
 
 const controlPlaneWorkerFixtureConfig = {
@@ -151,6 +154,9 @@ const controlPlaneWorkerFixtureConfig = {
   },
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5300",
+  },
+  controlPlaneApi: {
+    baseUrl: "http://127.0.0.1:5100",
   },
 } as const;
 
