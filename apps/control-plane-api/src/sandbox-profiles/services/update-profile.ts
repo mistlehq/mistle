@@ -1,4 +1,4 @@
-import type { SandboxProfile, SandboxProfileStatus } from "@mistle/db/control-plane";
+import type { SandboxProfile } from "@mistle/db/control-plane";
 import { sandboxProfiles } from "@mistle/db/control-plane";
 import { and, eq, sql, type SQL } from "drizzle-orm";
 
@@ -9,7 +9,6 @@ type UpdateProfileInput = {
   organizationId: string;
   profileId: string;
   displayName?: string | undefined;
-  status?: SandboxProfileStatus | undefined;
 };
 
 export async function updateProfile(
@@ -18,16 +17,12 @@ export async function updateProfile(
 ): Promise<SandboxProfile> {
   const updateValues: {
     displayName?: string;
-    status?: SandboxProfileStatus;
     updatedAt: SQL;
   } = {
     updatedAt: sql`now()`,
   };
   if (serviceInput.displayName !== undefined) {
     updateValues.displayName = serviceInput.displayName;
-  }
-  if (serviceInput.status !== undefined) {
-    updateValues.status = serviceInput.status;
   }
 
   const [updatedProfile] = await db

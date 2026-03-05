@@ -43,7 +43,6 @@ import {
 } from "./sandbox-profile-binding-config-editor.js";
 import { useSandboxProfileIntegrationsState } from "./sandbox-profile-integrations-state.js";
 import { useSandboxProfileMetaState } from "./sandbox-profile-meta-state.js";
-import { SandboxProfileStatusSelect } from "./sandbox-profile-status-select.js";
 import { SandboxProfileTitleEditor } from "./sandbox-profile-title-editor.js";
 
 type SandboxProfileEditorPageProps = {
@@ -425,15 +424,6 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
             title={metaState.pageTitle}
           />
         )}
-
-        <div className="inline-flex h-11 items-center gap-2.5">
-          <span className="text-muted-foreground text-sm font-medium">Status</span>
-          <SandboxProfileStatusSelect
-            disabled={metaState.isCreating || metaState.isUpdating}
-            onValueChange={metaState.onStatusSelectChange}
-            value={metaState.formState.status}
-          />
-        </div>
       </div>
       {metaState.saveError ? (
         <Alert variant="destructive">

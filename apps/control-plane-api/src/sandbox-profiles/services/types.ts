@@ -2,7 +2,6 @@ import type {
   ControlPlaneDatabase,
   IntegrationBindingKind,
   SandboxProfile,
-  SandboxProfileStatus,
   SandboxProfileVersion,
   SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
@@ -45,14 +44,12 @@ export type SandboxProfilesService = {
   createProfile: (input: {
     organizationId: string;
     displayName: string;
-    status?: SandboxProfileStatus | undefined;
   }) => Promise<SandboxProfile>;
   getProfile: (input: { organizationId: string; profileId: string }) => Promise<SandboxProfile>;
   updateProfile: (input: {
     organizationId: string;
     profileId: string;
     displayName?: string | undefined;
-    status?: SandboxProfileStatus | undefined;
   }) => Promise<SandboxProfile>;
   requestDeleteProfile: (input: { organizationId: string; profileId: string }) => Promise<{
     profileId: string;

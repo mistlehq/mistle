@@ -2,7 +2,6 @@ import {
   Alert,
   AlertDescription,
   AlertTitle,
-  Badge,
   Button,
   Card,
   CardContent,
@@ -18,11 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import {
-  formatSandboxProfileStatus,
-  formatSandboxProfileUpdatedAt,
-  getSandboxProfileStatusBadgeUi,
-} from "../sandbox-profiles/sandbox-profiles-formatters.js";
+import { formatSandboxProfileUpdatedAt } from "../sandbox-profiles/sandbox-profiles-formatters.js";
 import { sandboxProfilesListQueryKey } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { listSandboxProfiles } from "../sandbox-profiles/sandbox-profiles-service.js";
 
@@ -174,38 +169,28 @@ export function SandboxProfilesPage(): React.JSX.Element {
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead>
-                <TableHead>Status</TableHead>
                 <TableHead>Updated</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {items.map((profile) => {
-                const statusBadgeUi = getSandboxProfileStatusBadgeUi(profile.status);
-
-                return (
-                  <TableRow key={profile.id}>
-                    <TableCell>
-                      <button
-                        className="text-left font-medium underline-offset-4 hover:underline"
-                        onClick={() => {
-                          navigateToProfileDetail(profile.id);
-                        }}
-                        type="button"
-                      >
-                        {profile.displayName}
-                      </button>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={statusBadgeUi.className} variant={statusBadgeUi.variant}>
-                        {formatSandboxProfileStatus(profile.status)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground text-sm">
-                      {formatSandboxProfileUpdatedAt(profile.updatedAt)}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
+              {items.map((profile) => (
+                <TableRow key={profile.id}>
+                  <TableCell>
+                    <button
+                      className="text-left font-medium underline-offset-4 hover:underline"
+                      onClick={() => {
+                        navigateToProfileDetail(profile.id);
+                      }}
+                      type="button"
+                    >
+                      {profile.displayName}
+                    </button>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {formatSandboxProfileUpdatedAt(profile.updatedAt)}
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
 
