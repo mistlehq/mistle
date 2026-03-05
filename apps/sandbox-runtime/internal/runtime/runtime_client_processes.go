@@ -302,11 +302,7 @@ func waitForRuntimeClientProcessWSReadiness(
 		if err != nil {
 			return err
 		}
-		defer connection.CloseNow()
-
-		if err := connection.Close(websocket.StatusNormalClosure, "readiness probe complete"); err != nil {
-			return err
-		}
+		connection.CloseNow()
 
 		return nil
 	}

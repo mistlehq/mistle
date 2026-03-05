@@ -37,6 +37,9 @@ function renderCodexConfig(input: { model: string; reasoningEffort: string }): s
     `model = "${input.model}"`,
     `model_reasoning_effort = "${input.reasoningEffort}"`,
     "",
+    `[projects."/"]`,
+    `trust_level = "trusted"`,
+    "",
   ].join("\n");
 }
 
@@ -110,7 +113,7 @@ export function compileOpenAiApiKeyBinding(
           files: [
             {
               fileId: "codex_config",
-              path: "/workspace/.codex/config.toml",
+              path: "/home/sandbox/.codex/config.toml",
               mode: 384,
               content: renderCodexConfig({
                 model: input.binding.config.defaultModel,
