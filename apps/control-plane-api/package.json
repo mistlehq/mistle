@@ -19,6 +19,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@better-auth/drizzle-adapter": "1.5.3",
     "@hono/node-server": "^1.19.4",
     "@hono/zod-openapi": "^1.2.2",
     "@mistle/automations": "workspace:*",
@@ -34,7 +35,7 @@
     "@mistle/sandbox-runtime-plan-compiler": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/workflows": "workspace:*",
-    "better-auth": "1.5.2",
+    "better-auth": "1.5.3",
     "drizzle-orm": "^0.45.1",
     "drizzle-zod": "^0.8.3",
     "hono": "^4.12.3",
