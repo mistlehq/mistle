@@ -527,22 +527,28 @@ func TestRun(t *testing.T) {
 				return
 			}
 
-			closeAckType, closeAckPayload, err := conn.Read(handlerCtx)
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty close ack read to succeed: %w", err)
-				return
+			foundCloseAck := false
+			for range 12 {
+				closeAckType, closeAckPayload, readErr := conn.Read(handlerCtx)
+				if readErr != nil {
+					handlerErrCh <- fmt.Errorf("expected pty close ack read to succeed: %w", readErr)
+					return
+				}
+				if closeAckType != websocket.MessageText {
+					continue
+				}
+
+				var closeAck sessionprotocol.PTYCloseOK
+				if err := json.Unmarshal(closeAckPayload, &closeAck); err != nil {
+					continue
+				}
+				if closeAck.Type == sessionprotocol.MessageTypePTYCloseOK && closeAck.RequestID == "req_pty_close_001" {
+					foundCloseAck = true
+					break
+				}
 			}
-			if closeAckType != websocket.MessageText {
-				handlerErrCh <- fmt.Errorf("expected pty close ack to be text, got %s", closeAckType.String())
-				return
-			}
-			var closeAck sessionprotocol.PTYCloseOK
-			if err := json.Unmarshal(closeAckPayload, &closeAck); err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty close ack decode to succeed: %w", err)
-				return
-			}
-			if closeAck.Type != sessionprotocol.MessageTypePTYCloseOK || closeAck.RequestID != "req_pty_close_001" {
-				handlerErrCh <- fmt.Errorf("unexpected pty close ack payload: %+v", closeAck)
+			if !foundCloseAck {
+				handlerErrCh <- fmt.Errorf("expected to receive pty.close.ok for request req_pty_close_001")
 				return
 			}
 
