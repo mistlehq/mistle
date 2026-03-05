@@ -106,7 +106,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(updateCommand?.timeoutMs).toBe(120_000);
 
     expect(runtimePlan.artifacts[0]?.lifecycle.remove).toEqual([
-      { args: ["rm", "-f", "/usr/local/bin/codex"] },
+      { args: ["rm", "-f", "/workspace/.mistle/bin/codex"] },
     ]);
 
     const installScript = installCommand?.args[2];
@@ -115,7 +115,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(installScript).toContain("releases/latest/download/$asset_name");
     expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
-    expect(installScript).toContain("/usr/local/bin/codex");
+    expect(installScript).toContain("/workspace/.mistle/bin/codex");
     expect(runtimePlan.runtimeClients).toEqual([
       {
         clientId: "codex-cli",
@@ -140,7 +140,12 @@ model_reasoning_effort = "medium"
           {
             processKey: "codex-app-server",
             command: {
-              args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
+              args: [
+                "/workspace/.mistle/bin/codex",
+                "app-server",
+                "--listen",
+                "ws://127.0.0.1:4500",
+              ],
             },
             readiness: {
               type: "ws",

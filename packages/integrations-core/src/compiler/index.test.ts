@@ -70,7 +70,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
                     binaryPath: "codex-aarch64-unknown-linux-musl",
                   },
                 },
-                installPath: "/usr/local/bin/codex",
+                installPath: input.refs.artifactBinPath("codex"),
                 timeoutMs: 120_000,
               }),
               refs.command.exec({
@@ -79,7 +79,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
             ],
             remove: ({ refs }) => [
               refs.command.exec({
-                args: ["rm", "-f", "/usr/local/bin/codex"],
+                args: ["rm", "-f", refs.artifactBinPath("codex")],
               }),
             ],
           },
@@ -106,7 +106,12 @@ function createOpenAiDefinition(): IntegrationDefinition<
             {
               processKey: "codex-app-server",
               command: {
-                args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
+                args: [
+                  input.refs.artifactBinPath("codex"),
+                  "app-server",
+                  "--listen",
+                  "ws://127.0.0.1:4747",
+                ],
               },
               readiness: {
                 type: "tcp",
@@ -173,13 +178,13 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
                     binaryPath: "codex-aarch64-unknown-linux-musl",
                   },
                 },
-                installPath: "/usr/local/bin/codex",
+                installPath: "/workspace/.mistle/bin/codex",
                 timeoutMs: 120_000,
               }),
             ],
             remove: ({ refs }) => [
               refs.command.exec({
-                args: ["rm", "-f", "/usr/local/bin/codex"],
+                args: ["rm", "-f", "/workspace/.mistle/bin/codex"],
               }),
             ],
           },
@@ -285,7 +290,7 @@ describe("compileRuntimePlan", () => {
       {
         processKey: "codex-app-server",
         command: {
-          args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
+          args: ["/workspace/.mistle/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4747"],
         },
         readiness: {
           type: "tcp",
@@ -362,7 +367,7 @@ describe("compileRuntimePlan", () => {
     expect(installScript).toContain("openai/codex");
     expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
-    expect(installScript).toContain("/usr/local/bin/codex");
+    expect(installScript).toContain("/workspace/.mistle/bin/codex");
   });
 
   it("fails when target is disabled", () => {
@@ -531,7 +536,7 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.artifactRemovals).toEqual([
       {
         artifactKey: "codex-cli",
-        commands: [{ args: ["rm", "-f", "/usr/local/bin/codex"] }],
+        commands: [{ args: ["rm", "-f", "/workspace/.mistle/bin/codex"] }],
       },
     ]);
   });

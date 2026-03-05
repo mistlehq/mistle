@@ -11,6 +11,11 @@ import { createOpenAiRawBindingCapabilities } from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 
 const OpenAiApiKeyAuthScheme: IntegrationSupportedAuthScheme = "api-key";
+const RuntimeArtifactBinDirectory = "/workspace/.mistle/bin";
+
+function artifactBinPath(name: string): string {
+  return `${RuntimeArtifactBinDirectory}/${name}`;
+}
 
 function createOpenAiTargetConfig(apiBaseUrl: string) {
   return OpenAiApiKeyTargetConfigSchema.parse({
@@ -31,6 +36,7 @@ function createRuntimeArtifactRefs(): RuntimeArtifactRefs {
     command: {
       exec,
     },
+    artifactBinPath,
     mise: {
       install: (input) =>
         exec({
@@ -104,6 +110,7 @@ describe("compileOpenAiApiKeyBinding", () => {
           kind: "egress_url",
           routeId: "route_ibd_123",
         },
+        artifactBinPath,
       },
       runtimeContext: {
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
@@ -145,7 +152,7 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(installCommands?.[0]?.args[1]).toContain(
       '"fileName":"codex-aarch64-unknown-linux-musl.tar.gz"',
     );
-    expect(installCommands?.[0]?.args[1]).toContain('"installPath":"/usr/local/bin/codex"');
+    expect(installCommands?.[0]?.args[1]).toContain('"installPath":"/workspace/.mistle/bin/codex"');
     expect(installCommands?.[0]?.timeoutMs).toBe(120_000);
 
     const updateCommands = resolveArtifactLifecycleHook(codexArtifact?.lifecycle.update);
@@ -153,7 +160,7 @@ describe("compileOpenAiApiKeyBinding", () => {
 
     expect(resolveArtifactLifecycleHook(codexArtifact?.lifecycle.remove)).toEqual([
       {
-        args: ["rm", "-f", "/usr/local/bin/codex"],
+        args: ["rm", "-f", "/workspace/.mistle/bin/codex"],
       },
     ]);
 
@@ -176,7 +183,7 @@ describe("compileOpenAiApiKeyBinding", () => {
       {
         processKey: "codex-app-server",
         command: {
-          args: ["/usr/local/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
+          args: ["/workspace/.mistle/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
         },
         readiness: {
           type: "ws",
@@ -237,6 +244,7 @@ describe("compileOpenAiApiKeyBinding", () => {
           kind: "egress_url",
           routeId: "route_ibd_123",
         },
+        artifactBinPath,
       },
       runtimeContext: {
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress/",
@@ -287,6 +295,7 @@ describe("compileOpenAiApiKeyBinding", () => {
           kind: "egress_url",
           routeId: "route_ibd_123",
         },
+        artifactBinPath,
       },
       runtimeContext: {
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
@@ -329,6 +338,7 @@ describe("compileOpenAiApiKeyBinding", () => {
             kind: "egress_url",
             routeId: "route_ibd_123",
           },
+          artifactBinPath,
         },
         runtimeContext: {
           sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",

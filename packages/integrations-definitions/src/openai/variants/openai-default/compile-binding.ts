@@ -14,7 +14,6 @@ export type OpenAiApiKeyCompileBindingInput = CompileBindingInput<
 >;
 
 const CodexCliArtifactKey = "codex-cli";
-const CodexCliInstallPath = "/usr/local/bin/codex";
 const CodexAppServerProcessKey = "codex-app-server";
 const CodexAppServerListenUrl = "ws://127.0.0.1:4500";
 const CodexGitHubRepository = "openai/codex";
@@ -47,6 +46,7 @@ export function compileOpenAiApiKeyBinding(
   const routeHost = new URL(input.target.config.apiBaseUrl).host;
   const routePathPrefix = resolveRoutePathPrefixFromBaseUrl(input.target.config.apiBaseUrl);
   const credentialSecretType = resolveOpenAiCredentialSecretType(input.connection.config);
+  const codexCliInstallPath = input.refs.artifactBinPath("codex");
 
   return {
     egressRoutes: [
@@ -78,7 +78,7 @@ export function compileOpenAiApiKeyBinding(
             refs.githubReleases.installLatestBinary({
               repository: CodexGitHubRepository,
               assets: CodexGitHubAssets,
-              installPath: CodexCliInstallPath,
+              installPath: refs.artifactBinPath("codex"),
               timeoutMs: ArtifactCommandTimeoutMs,
             }),
           ],
@@ -86,13 +86,13 @@ export function compileOpenAiApiKeyBinding(
             refs.githubReleases.installLatestBinary({
               repository: CodexGitHubRepository,
               assets: CodexGitHubAssets,
-              installPath: CodexCliInstallPath,
+              installPath: refs.artifactBinPath("codex"),
               timeoutMs: ArtifactCommandTimeoutMs,
             }),
           ],
           remove: ({ refs }) => [
             refs.command.exec({
-              args: ["rm", "-f", CodexCliInstallPath],
+              args: ["rm", "-f", refs.artifactBinPath("codex")],
             }),
           ],
         },
@@ -123,7 +123,7 @@ export function compileOpenAiApiKeyBinding(
           {
             processKey: CodexAppServerProcessKey,
             command: {
-              args: [CodexCliInstallPath, "app-server", "--listen", CodexAppServerListenUrl],
+              args: [codexCliInstallPath, "app-server", "--listen", CodexAppServerListenUrl],
             },
             readiness: {
               type: "ws",

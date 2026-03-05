@@ -29,7 +29,7 @@ RUN apt-get update \
 
 RUN groupadd --gid "${SANDBOX_GID}" "${SANDBOX_USER}" \
   && useradd --uid "${SANDBOX_UID}" --gid "${SANDBOX_GID}" --create-home --shell /bin/sh "${SANDBOX_USER}" \
-  && mkdir -p /workspace \
+  && mkdir -p /workspace/.mistle/bin \
   && chown -R "${SANDBOX_UID}:${SANDBOX_GID}" /workspace
 
 RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PATH="/usr/local/bin/mise" sh
@@ -40,7 +40,7 @@ RUN chmod +x \
   /usr/local/bin/mise \
   /usr/local/bin/sandboxd
 
-ENV PATH="/home/${SANDBOX_USER}/.local/share/mise/shims:/usr/local/bin:${PATH}"
+ENV PATH="/workspace/.mistle/bin:/home/${SANDBOX_USER}/.local/share/mise/shims:/usr/local/bin:${PATH}"
 
 WORKDIR /workspace
 USER ${SANDBOX_USER}

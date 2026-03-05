@@ -20,6 +20,12 @@ import {
 } from "../types/index.js";
 import { validateCompiledBindingResults } from "../validation/index.js";
 
+const RuntimeArtifactBinDirectory = "/workspace/.mistle/bin";
+
+function artifactBinPath(name: string): string {
+  return `${RuntimeArtifactBinDirectory}/${name}`;
+}
+
 function resolveRouteId(input: { bindingId: string; routeIndex: number }): string {
   if (input.routeIndex === 0) {
     return `route_${input.bindingId}`;
@@ -100,6 +106,7 @@ function createRuntimeArtifactRefs(input: {
     command: {
       exec,
     },
+    artifactBinPath,
     mise: {
       install: (installInput) =>
         exec({
@@ -348,6 +355,7 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
       },
       refs: {
         egressUrl: egressUrlRef(`route_${bindingInput.binding.id}`),
+        artifactBinPath,
       },
       runtimeContext: input.runtimeContext,
     });
