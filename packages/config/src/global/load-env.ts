@@ -60,6 +60,10 @@ const loadSandboxEnv = createEnvLoader<typeof PartialGlobalSandboxConfigSchema>(
     key: "gatewayWsUrl",
     envVar: "MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL",
   },
+  {
+    key: "internalGatewayWsUrl",
+    envVar: "MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL",
+  },
 ]);
 
 export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigInput {

@@ -12,6 +12,7 @@ export const GlobalSandboxConfigSchema = z
   .object({
     defaultBaseImage: z.string().trim().min(1),
     gatewayWsUrl: z.string().trim().min(1),
+    internalGatewayWsUrl: z.string().trim().min(1),
     connect: GlobalSandboxTokenConfigSchema,
     bootstrap: GlobalSandboxTokenConfigSchema,
   })
@@ -21,6 +22,7 @@ export const PartialGlobalSandboxConfigSchema = z
   .object({
     defaultBaseImage: z.string().trim().min(1).optional(),
     gatewayWsUrl: z.string().trim().min(1).optional(),
+    internalGatewayWsUrl: z.string().trim().min(1).optional(),
     connect: GlobalSandboxTokenConfigSchema.partial().optional(),
     bootstrap: GlobalSandboxTokenConfigSchema.partial().optional(),
   })

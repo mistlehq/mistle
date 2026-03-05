@@ -132,6 +132,44 @@ func TestStartRuntimeClientProcesses(t *testing.T) {
 		}
 	})
 
+	t.Run("starts process and waits for ws readiness when server skips close handshake", func(t *testing.T) {
+		freePort, err := reserveTCPPort()
+		if err != nil {
+			t.Fatalf("expected free port reservation to succeed, got %v", err)
+		}
+
+		processes := []startup.RuntimeClientProcessSpec{
+			{
+				ProcessKey: "process_codex_ws_close_now",
+				Command: helperProcessCommand(
+					"ws-listen-close-now",
+					map[string]string{
+						runtimeClientProcessHelperPortEnv: strconv.Itoa(freePort),
+					},
+				),
+				Readiness: startup.RuntimeClientProcessReadiness{
+					Type:      "ws",
+					URL:       fmt.Sprintf("ws://127.0.0.1:%d", freePort),
+					TimeoutMs: 2000,
+				},
+				Stop: startup.RuntimeClientProcessStopPolicy{
+					Signal:        "sigterm",
+					TimeoutMs:     2000,
+					GracePeriodMs: 100,
+				},
+			},
+		}
+
+		manager, err := startRuntimeClientProcesses(processes)
+		if err != nil {
+			t.Fatalf("expected runtime client process startup to succeed, got %v", err)
+		}
+
+		if err := manager.Stop(); err != nil {
+			t.Fatalf("expected runtime client process stop to succeed, got %v", err)
+		}
+	})
+
 	t.Run("reports unexpected process exits", func(t *testing.T) {
 		processes := []startup.RuntimeClientProcessSpec{
 			{
@@ -249,6 +287,36 @@ func TestRuntimeClientProcessHelper(t *testing.T) {
 			defer connection.CloseNow()
 
 			_ = connection.Close(websocket.StatusNormalClosure, "ready")
+		})
+
+		httpServer := &http.Server{
+			Handler: mux,
+		}
+		if err := httpServer.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			_, _ = fmt.Fprintf(os.Stderr, "helper websocket server failed: %v\n", err)
+			os.Exit(2)
+		}
+	case "ws-listen-close-now":
+		port := os.Getenv(runtimeClientProcessHelperPortEnv)
+		if strings.TrimSpace(port) == "" {
+			_, _ = fmt.Fprintln(os.Stderr, "missing helper websocket listen port")
+			os.Exit(2)
+		}
+		listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", port))
+		if err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "failed to listen on helper websocket port: %v\n", err)
+			os.Exit(2)
+		}
+		defer listener.Close()
+
+		mux := http.NewServeMux()
+		mux.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+			connection, err := websocket.Accept(writer, request, nil)
+			if err != nil {
+				return
+			}
+
+			connection.CloseNow()
 		})
 
 		httpServer := &http.Server{

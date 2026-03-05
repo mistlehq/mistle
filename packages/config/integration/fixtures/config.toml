@@ -17,6 +17,7 @@ token_audience = "data-plane-gateway"
 [global.sandbox]
 default_base_image = "127.0.0.1:5001/mistle/sandbox-base:dev"
 gateway_ws_url = "ws://127.0.0.1:5003/tunnel/sandbox"
+internal_gateway_ws_url = "ws://127.0.0.1:5003/tunnel/sandbox"
 
 [apps.control_plane_api.server]
 host = "0.0.0.0"

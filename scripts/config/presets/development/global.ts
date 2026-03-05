@@ -9,6 +9,7 @@ export const globalDevelopmentPreset = {
       sandbox: {
         default_base_image: "localhost:5001/mistle/sandbox-base:dev",
         gateway_ws_url: "ws://localhost:5202/tunnel/sandbox",
+        internal_gateway_ws_url: "ws://host.docker.internal:5202/tunnel/sandbox",
         connect: {
           token_issuer: "control-plane-api",
           token_audience: "data-plane-gateway",

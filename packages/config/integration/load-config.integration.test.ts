@@ -26,6 +26,7 @@ const globalDevelopmentConfig = {
   sandbox: {
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+    internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     connect: {
       tokenSecret: sandboxConnectTokenSecret,
       tokenIssuer: sandboxConnectTokenIssuer,
@@ -47,6 +48,7 @@ const globalProductionConfig = {
   sandbox: {
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+    internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     connect: {
       tokenSecret: sandboxConnectTokenSecret,
       tokenIssuer: sandboxConnectTokenIssuer,
@@ -57,6 +59,14 @@ const globalProductionConfig = {
       tokenIssuer: sandboxBootstrapTokenIssuer,
       tokenAudience: sandboxBootstrapTokenAudience,
     },
+  },
+} as const;
+
+const globalDevelopmentDockerConfig = {
+  ...globalDevelopmentConfig,
+  sandbox: {
+    ...globalDevelopmentConfig.sandbox,
+    internalGatewayWsUrl: "ws://host.docker.internal:5003/tunnel/sandbox",
   },
 } as const;
 
@@ -629,7 +639,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: globalDevelopmentConfig,
+      global: globalDevelopmentDockerConfig,
       app: dataPlaneWorkerDockerFixtureConfig,
     });
   });

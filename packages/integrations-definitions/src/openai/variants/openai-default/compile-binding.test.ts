@@ -173,8 +173,19 @@ describe("compileOpenAiApiKeyBinding", () => {
       OPENAI_MODEL: "gpt-5.3-codex",
       OPENAI_REASONING_EFFORT: "medium",
     });
-    expect(compiled.runtimeClients[0]?.setup.files[0]?.fileId).toBe("codex_config");
-    expect(compiled.runtimeClients[0]?.setup.files[0]?.path).toBe("/workspace/.codex/config.toml");
+    expect(compiled.runtimeClients[0]?.setup.files).toEqual([
+      {
+        fileId: "codex_config",
+        path: "/home/sandbox/.codex/config.toml",
+        mode: 384,
+        content: `model = "gpt-5.3-codex"
+model_reasoning_effort = "medium"
+
+[projects."/"]
+trust_level = "trusted"
+`,
+      },
+    ]);
     expect(compiled.runtimeClients[0]?.setup.files[0]?.content).not.toContain("base_url =");
     expect(compiled.runtimeClients[0]?.setup.files[0]?.content).not.toContain(
       "[model_providers.openai]",
