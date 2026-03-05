@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { compileGitHubEnterpriseServerBinding } from "./compile-binding.js";
 
+function artifactBinPath(name: string): string {
+  return `/workspace/.mistle/bin/${name}`;
+}
+
 describe("compileGitHubEnterpriseServerBinding", () => {
   it("builds expected repo-scoped egress route for enterprise API paths", () => {
     const compiled = compileGitHubEnterpriseServerBinding({
@@ -38,6 +42,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
           kind: "egress_url",
           routeId: "route_ibd_123",
         },
+        artifactBinPath,
       },
       runtimeContext: {
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
@@ -104,6 +109,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
           kind: "egress_url",
           routeId: "route_ibd_123",
         },
+        artifactBinPath,
       },
       runtimeContext: {
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
@@ -152,6 +158,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
           kind: "egress_url",
           routeId: "route_ibd_123",
         },
+        artifactBinPath,
       },
       runtimeContext: {
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
@@ -200,6 +207,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
             kind: "egress_url",
             routeId: "route_ibd_123",
           },
+          artifactBinPath,
         },
         runtimeContext: {
           sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",

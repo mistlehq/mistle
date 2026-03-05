@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import { compileGitHubCloudBinding } from "./compile-binding.js";
 
+function artifactBinPath(name: string): string {
+  return `/workspace/.mistle/bin/${name}`;
+}
+
 describe("compileGitHubCloudBinding", () => {
   it("builds expected repo-scoped egress route", () => {
     const compiled = compileGitHubCloudBinding({
@@ -38,6 +42,7 @@ describe("compileGitHubCloudBinding", () => {
           kind: "egress_url",
           routeId: "route_ibd_123",
         },
+        artifactBinPath,
       },
       runtimeContext: {
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
@@ -104,6 +109,7 @@ describe("compileGitHubCloudBinding", () => {
           kind: "egress_url",
           routeId: "route_ibd_123",
         },
+        artifactBinPath,
       },
       runtimeContext: {
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
@@ -151,6 +157,7 @@ describe("compileGitHubCloudBinding", () => {
           kind: "egress_url",
           routeId: "route_ibd_123",
         },
+        artifactBinPath,
       },
       runtimeContext: {
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
@@ -196,6 +203,7 @@ describe("compileGitHubCloudBinding", () => {
           kind: "egress_url",
           routeId: "route_ibd_123",
         },
+        artifactBinPath,
       },
       runtimeContext: {
         sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
@@ -242,6 +250,7 @@ describe("compileGitHubCloudBinding", () => {
             kind: "egress_url",
             routeId: "route_ibd_123",
           },
+          artifactBinPath,
         },
         runtimeContext: {
           sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",

@@ -183,6 +183,7 @@ export type IntegrationBindingAgentCapability = {
 
 export type CompileBindingRefs = {
   egressUrl: EgressUrlRef;
+  artifactBinPath(name: string): string;
 };
 
 export type CompileBindingInput<
@@ -443,6 +444,7 @@ export type RuntimeArtifactRefs = {
   command: {
     exec(input: RuntimeArtifactCommand): RuntimeArtifactCommand;
   };
+  artifactBinPath(name: string): string;
   mise: {
     install(input: {
       tools: ReadonlyArray<string>;
