@@ -234,10 +234,21 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": {
-              code: string;
-              message: string;
-            };
+            "application/json":
+              | {
+                  code: string;
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
           };
         };
         /** @description Internal service authentication failed. */
@@ -345,10 +356,21 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": {
-              code: string;
-              message: string;
-            };
+            "application/json":
+              | {
+                  code: string;
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
           };
         };
         /** @description Internal service authentication failed. */
