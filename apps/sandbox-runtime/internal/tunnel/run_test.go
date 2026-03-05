@@ -91,7 +91,7 @@ func TestRun(t *testing.T) {
 			if queryToken != "sandbox-bootstrap-token" {
 				t.Fatalf("expected bootstrap token query to match, got %s", queryToken)
 			}
-		default:
+		case <-time.After(2 * time.Second):
 			t.Fatal("expected token query to be recorded")
 		}
 
@@ -100,7 +100,7 @@ func TestRun(t *testing.T) {
 			if requestPath != "/tunnel/sandbox/sbi_tunnel_test_001" {
 				t.Fatalf("expected request path to match, got %s", requestPath)
 			}
-		default:
+		case <-time.After(2 * time.Second):
 			t.Fatal("expected request path to be recorded")
 		}
 	})
@@ -262,7 +262,7 @@ func TestRun(t *testing.T) {
 			if requestPayload != expectedPayload {
 				t.Fatalf("expected forwarded gateway payload %q, got %q", expectedPayload, requestPayload)
 			}
-		default:
+		case <-time.After(2 * time.Second):
 			t.Fatal("expected agent endpoint to receive forwarded payload")
 		}
 
@@ -272,7 +272,7 @@ func TestRun(t *testing.T) {
 			if responsePayload != expectedPayload {
 				t.Fatalf("expected forwarded agent payload %q, got %q", expectedPayload, responsePayload)
 			}
-		default:
+		case <-time.After(2 * time.Second):
 			t.Fatal("expected gateway to receive forwarded payload from agent")
 		}
 
