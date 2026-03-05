@@ -71,7 +71,6 @@ export function loadDataPlaneWorkerFromToml(
       concurrency: workflow.concurrency,
     },
     tunnel: {
-      gatewayWsUrl: tunnel.gateway_ws_url,
       bootstrapTokenTtlSeconds: tunnel.bootstrap_token_ttl_seconds,
     },
     sandbox: sandboxConfig,

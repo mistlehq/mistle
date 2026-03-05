@@ -104,7 +104,6 @@ run_migrations = true
 concurrency = 2
 
 [apps.data_plane_worker.tunnel]
-gateway_ws_url = "ws://127.0.0.1:5302/tunnel/sandbox"
 bootstrap_token_ttl_seconds = 120
 
 [apps.data_plane_worker.sandbox]

@@ -286,11 +286,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY",
   },
   {
-    configPath: ["apps", "data_plane_worker", "tunnel", "gatewayWsUrl"],
-    tomlPath: ["apps", "data_plane_worker", "tunnel", "gateway_ws_url"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_GATEWAY_WS_URL",
-  },
-  {
     configPath: ["apps", "data_plane_worker", "tunnel", "bootstrapTokenTtlSeconds"],
     tomlPath: ["apps", "data_plane_worker", "tunnel", "bootstrap_token_ttl_seconds"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS",

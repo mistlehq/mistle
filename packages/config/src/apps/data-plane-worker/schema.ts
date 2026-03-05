@@ -24,7 +24,6 @@ export const DataPlaneWorkerWorkflowConfigSchema = z
 
 export const DataPlaneWorkerTunnelConfigSchema = z
   .object({
-    gatewayWsUrl: z.string().min(1),
     bootstrapTokenTtlSeconds: z.number().int().min(1),
   })
   .strict();

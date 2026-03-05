@@ -14,8 +14,8 @@ export const controlPlaneApiDevelopmentPreset = {
           url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_dev",
         },
         auth: {
-          base_url: "http://127.0.0.1:5100",
-          invitation_accept_base_url: "http://127.0.0.1:5173/invitations/accept",
+          base_url: "http://localhost:5100",
+          invitation_accept_base_url: "http://localhost:5173/invitations/accept",
           trusted_origins: [
             "http://127.0.0.1:3000",
             "http://localhost:3000",
@@ -40,11 +40,7 @@ export const controlPlaneApiDevelopmentPreset = {
           namespace_id: "development",
         },
         data_plane_api: {
-          base_url: "http://127.0.0.1:5300",
-        },
-        sandbox: {
-          default_base_image: "127.0.0.1:5001/mistle/sandbox-base:dev",
-          gateway_ws_url: "ws://127.0.0.1:5202/tunnel/sandbox",
+          base_url: "http://localhost:5200",
         },
         integrations: {
           active_master_encryption_key_version: 1,
