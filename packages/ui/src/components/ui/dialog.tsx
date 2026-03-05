@@ -68,9 +68,23 @@ function DialogContent({
   );
 }
 
-function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
+type DialogHeaderProps = React.ComponentProps<"div"> & {
+  variant?: "default" | "sectioned";
+};
+
+function DialogHeader({ className, variant = "default", ...props }: DialogHeaderProps) {
   return (
-    <div data-slot="dialog-header" className={cn("gap-2 flex flex-col", className)} {...props} />
+    <div
+      data-slot="dialog-header"
+      className={cn(
+        "gap-2 flex flex-col",
+        variant === "sectioned"
+          ? "pb-4 border-b [&_[data-slot=dialog-title]]:text-lg [&_[data-slot=dialog-title]]:leading-tight [&_[data-slot=dialog-title]]:font-semibold"
+          : null,
+        className,
+      )}
+      {...props}
+    />
   );
 }
 

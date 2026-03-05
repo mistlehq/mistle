@@ -68,8 +68,8 @@ export function MemberInviteDialog(input: {
       open={input.open}
     >
       <DialogContent showCloseButton={!form.isSubmitting}>
-        <DialogHeader className="pb-4 border-b">
-          <DialogTitle className="text-lg leading-tight font-semibold">Invite members</DialogTitle>
+        <DialogHeader variant="sectioned">
+          <DialogTitle>Invite members</DialogTitle>
         </DialogHeader>
 
         {form.phase === "compose" ? (
