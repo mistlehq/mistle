@@ -12,6 +12,7 @@ export type HandleAutomationRunTransitionResult = {
 
 export type PreparedAutomationRun = {
   automationRunId: string;
+  automationRunCreatedAt: string;
   automationId: string;
   automationTargetId: string;
   organizationId: string;
@@ -38,6 +39,13 @@ export type EnsuredAutomationSandbox = {
   startupWorkflowRunId: string;
 };
 
+export type AcquiredAutomationConnection = {
+  instanceId: string;
+  url: string;
+  token: string;
+  expiresAt: string;
+};
+
 export type AcquireAutomationConnectionInput = {
   preparedAutomationRun: PreparedAutomationRun;
   ensuredAutomationSandbox: EnsuredAutomationSandbox;
@@ -46,6 +54,7 @@ export type AcquireAutomationConnectionInput = {
 export type DeliverAutomationPayloadInput = {
   preparedAutomationRun: PreparedAutomationRun;
   ensuredAutomationSandbox: EnsuredAutomationSandbox;
+  acquiredAutomationConnection: AcquiredAutomationConnection;
 };
 
 export type HandleAutomationRunFailure = {
@@ -67,7 +76,9 @@ export type CreateHandleAutomationRunWorkflowInput = {
   ensureAutomationSandbox: (
     input: EnsureAutomationSandboxInput,
   ) => Promise<EnsuredAutomationSandbox>;
-  acquireAutomationConnection: (input: AcquireAutomationConnectionInput) => Promise<void>;
+  acquireAutomationConnection: (
+    input: AcquireAutomationConnectionInput,
+  ) => Promise<AcquiredAutomationConnection>;
   deliverAutomationPayload: (input: DeliverAutomationPayloadInput) => Promise<void>;
   markAutomationRunCompleted: (input: HandleAutomationRunWorkflowInput) => Promise<void>;
   markAutomationRunFailed: (input: MarkAutomationRunFailedInput) => Promise<void>;
@@ -105,17 +116,20 @@ export function createHandleAutomationRunWorkflow(
           }),
       );
 
-      await step.run({ name: "acquire-automation-connection" }, async () =>
-        ctx.acquireAutomationConnection({
-          preparedAutomationRun,
-          ensuredAutomationSandbox,
-        }),
+      const acquiredAutomationConnection = await step.run(
+        { name: "acquire-automation-connection" },
+        async () =>
+          ctx.acquireAutomationConnection({
+            preparedAutomationRun,
+            ensuredAutomationSandbox,
+          }),
       );
 
       await step.run({ name: "deliver-automation-payload" }, async () =>
         ctx.deliverAutomationPayload({
           preparedAutomationRun,
           ensuredAutomationSandbox,
+          acquiredAutomationConnection,
         }),
       );
 

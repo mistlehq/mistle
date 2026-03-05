@@ -10,6 +10,7 @@ export {
   SendVerificationOTPWorkflowSpec,
 } from "./workflows/index.js";
 export {
+  type AcquiredAutomationConnection,
   type AcquireAutomationConnectionInput,
   createHandleAutomationRunWorkflow,
   type CreateHandleAutomationRunWorkflowInput,

@@ -3,10 +3,11 @@ import type { OpenWorkflow, Worker } from "openworkflow";
 
 import { createHandleAutomationRunWorkflow } from "./workflows/handle-automation-run/index.js";
 import type {
+  AcquiredAutomationConnection,
   AcquireAutomationConnectionInput,
   DeliverAutomationPayloadInput,
-  EnsuredAutomationSandbox,
   EnsureAutomationSandboxInput,
+  EnsuredAutomationSandbox,
   HandleAutomationRunWorkflowInput,
   PreparedAutomationRun,
 } from "./workflows/handle-automation-run/index.js";
@@ -43,7 +44,9 @@ export type ControlPlaneWorkerServices = {
     ensureAutomationSandbox: (
       input: EnsureAutomationSandboxInput,
     ) => Promise<EnsuredAutomationSandbox>;
-    acquireAutomationConnection: (input: AcquireAutomationConnectionInput) => Promise<void>;
+    acquireAutomationConnection: (
+      input: AcquireAutomationConnectionInput,
+    ) => Promise<AcquiredAutomationConnection>;
     deliverAutomationPayload: (input: DeliverAutomationPayloadInput) => Promise<void>;
     markAutomationRunCompleted: (input: HandleAutomationRunWorkflowInput) => Promise<void>;
     markAutomationRunFailed: (input: {

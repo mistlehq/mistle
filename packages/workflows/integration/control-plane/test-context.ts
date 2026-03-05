@@ -94,6 +94,7 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
             ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
             ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
             ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE,
+            ControlPlaneWorkerWorkflowIds.START_SANDBOX_PROFILE_INSTANCE,
           ],
           services: {
             automationRuns: {
@@ -102,6 +103,7 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
               }),
               prepareAutomationRun: async (input) => ({
                 automationRunId: input.automationRunId,
+                automationRunCreatedAt: "2026-01-01T00:00:00.000Z",
                 automationId: "atm_test",
                 automationTargetId: "atg_test",
                 organizationId: "org_test",
@@ -120,9 +122,14 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
               ensureAutomationSandbox: async () => ({
                 sandboxInstanceId: "sbi_test",
                 providerSandboxId: "provider_test",
-                startupWorkflowRunId: "run_test",
+                startupWorkflowRunId: "wf_start_sandbox_test",
               }),
-              acquireAutomationConnection: async () => {},
+              acquireAutomationConnection: async () => ({
+                instanceId: "sbi_test",
+                url: "ws://gateway.example/sbi_test?connect_token=token_test",
+                token: "token_test",
+                expiresAt: "2026-01-01T00:00:30.000Z",
+              }),
               deliverAutomationPayload: async () => {},
               markAutomationRunCompleted: async () => {},
               markAutomationRunFailed: async () => {},
@@ -159,6 +166,13 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
                   where id = ${input.profileId} and organization_id = ${input.organizationId}
                 `;
               },
+            },
+            sandboxInstances: {
+              startSandboxProfileInstance: async () => ({
+                workflowRunId: "wf_start_sandbox_test",
+                sandboxInstanceId: "sbi_test",
+                providerSandboxId: "provider_test",
+              }),
             },
           },
         });

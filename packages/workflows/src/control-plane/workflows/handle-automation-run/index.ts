@@ -4,6 +4,7 @@ export {
   type HandleAutomationRunWorkflowOutput,
 } from "./spec.js";
 export {
+  type AcquiredAutomationConnection,
   type AcquireAutomationConnectionInput,
   createHandleAutomationRunWorkflow,
   type CreateHandleAutomationRunWorkflowInput,
