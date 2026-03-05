@@ -34,6 +34,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL",
   },
   {
+    configPath: ["global", "sandbox", "internalGatewayWsUrl"],
+    tomlPath: ["global", "sandbox", "internal_gateway_ws_url"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL",
+  },
+  {
     configPath: ["global", "sandbox", "connect", "tokenIssuer"],
     tomlPath: ["global", "sandbox", "connect", "token_issuer"],
     envVar: "MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER",

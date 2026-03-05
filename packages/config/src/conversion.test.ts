@@ -24,6 +24,7 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_API_PORT: "5000",
       MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: "ws://127.0.0.1:5302/tunnel/sandbox",
       MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "3",
       MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON:
         '{"3":"integration-master-key"}',
@@ -43,6 +44,7 @@ describe("convertEnvToTomlRecord", () => {
         env: "development",
         sandbox: {
           default_base_image: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          internal_gateway_ws_url: "ws://127.0.0.1:5302/tunnel/sandbox",
           bootstrap: {
             token_secret: "fixture-bootstrap-secret",
             token_issuer: "data-plane-worker",
@@ -107,6 +109,7 @@ describe("convertTomlToEnvRecord", () => {
         env: "production",
         sandbox: {
           default_base_image: "registry.example.com/mistle/sandbox-base:prod",
+          internal_gateway_ws_url: "ws://data-plane-gateway:8084/tunnel/sandbox",
           bootstrap: {
             token_secret: "prod-bootstrap-secret",
             token_issuer: "data-plane-worker",
@@ -163,6 +166,7 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER: "control-plane-api",
       MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE: "data-plane-gateway",
       MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: "registry.example.com/mistle/sandbox-base:prod",
+      MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: "ws://data-plane-gateway:8084/tunnel/sandbox",
       MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: "https://a.example,https://b.example",
       MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION: "9",

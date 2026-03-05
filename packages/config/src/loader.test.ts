@@ -14,6 +14,7 @@ describe("parseConfigRecord", () => {
         sandbox: {
           defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+          internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           connect: {
             tokenSecret: "test-connection-token-secret",
             tokenIssuer: "control-plane-api",
@@ -161,6 +162,7 @@ describe("parseConfigRecord", () => {
         sandbox: {
           defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+          internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           connect: {
             tokenSecret: "test-connection-token-secret",
             tokenIssuer: "control-plane-api",

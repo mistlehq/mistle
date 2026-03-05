@@ -19,12 +19,14 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
       : {}),
     ...(typeof sandbox.default_base_image === "string" ||
     typeof sandbox.gateway_ws_url === "string" ||
+    typeof sandbox.internal_gateway_ws_url === "string" ||
     typeof sandboxBootstrap.token_secret === "string" ||
     typeof sandboxConnect.token_secret === "string"
       ? {
           sandbox: {
             defaultBaseImage: sandbox.default_base_image,
             gatewayWsUrl: sandbox.gateway_ws_url,
+            internalGatewayWsUrl: sandbox.internal_gateway_ws_url,
             bootstrap: {
               tokenSecret: sandboxBootstrap.token_secret,
               tokenIssuer: sandboxBootstrap.token_issuer,
