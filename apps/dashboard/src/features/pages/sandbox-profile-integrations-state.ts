@@ -139,13 +139,16 @@ export function useSandboxProfileIntegrationsState(
   integrationRowErrorsByClientId: Readonly<Record<string, string>>;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
-  onAddIntegrationBindingRow: () => void;
+  onAddIntegrationBindingRow: (input: {
+    kind: SandboxIntegrationBindingKind;
+    connectionId: string;
+    config: Record<string, unknown>;
+  }) => Promise<boolean>;
   onRemoveIntegrationBindingRow: (clientId: string) => void;
   onIntegrationBindingRowChange: (
     clientId: string,
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
-  onSaveIntegrationBindings: () => void;
   resolveSelectedConnectionDisplayName: (row: SandboxProfileBindingEditorRow) => string | undefined;
   integrationSaveSuccess: boolean;
   isSavingIntegrationBindings: boolean;
@@ -319,53 +322,25 @@ export function useSandboxProfileIntegrationsState(
   const availableTargets: readonly IntegrationTargetSummary[] =
     integrationDirectoryQuery.data?.targets ?? [];
 
-  function onAddIntegrationBindingRow(): void {
-    setIntegrationRows((currentRows) => [
-      ...currentRows,
-      {
-        clientId: createIntegrationBindingClientId(),
-        connectionId: "",
-        kind: "agent",
-        config: {},
-      },
-    ]);
-    markIntegrationDirty();
+  function setNeutralSaveState(): void {
+    setIntegrationSaveError(null);
+    setIntegrationRowErrorsByClientId({});
+    setIntegrationSaveSuccess(false);
   }
 
-  function onRemoveIntegrationBindingRow(clientId: string): void {
-    setIntegrationRows((currentRows) => currentRows.filter((row) => row.clientId !== clientId));
-    markIntegrationDirty({ clientId });
-  }
-
-  function onIntegrationBindingRowChange(
-    clientId: string,
-    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
-  ): void {
-    setIntegrationRows((currentRows) =>
-      currentRows.map((row) => {
-        if (row.clientId !== clientId) {
-          return row;
-        }
-        return {
-          ...row,
-          ...changes,
-        };
-      }),
-    );
-    markIntegrationDirty({ clientId });
-  }
-
-  function onSaveIntegrationBindings(): void {
+  async function persistIntegrationRows(
+    rowsToPersist: readonly SandboxProfileBindingEditorRow[],
+  ): Promise<boolean> {
     if (
       input.mode !== "edit" ||
       input.profileId === undefined ||
       putIntegrationBindingsMutation.isPending
     ) {
-      return;
+      return false;
     }
     if (resolvedProfileVersion === null) {
       setIntegrationSaveFailure("No sandbox profile version is available for this profile.");
-      return;
+      return false;
     }
 
     const parsedBindings: Array<{
@@ -376,11 +351,11 @@ export function useSandboxProfileIntegrationsState(
       config: Record<string, unknown>;
     }> = [];
 
-    for (const row of integrationRows) {
+    for (const row of rowsToPersist) {
       const normalizedConnectionId = row.connectionId.trim();
       if (normalizedConnectionId.length === 0) {
         setIntegrationSaveFailure("Each integration binding must select a connection.");
-        return;
+        return false;
       }
 
       const configUiModel = resolveBindingConfigUiModel({
@@ -390,11 +365,11 @@ export function useSandboxProfileIntegrationsState(
       });
       if (configUiModel.mode === "missing-connection") {
         setIntegrationSaveFailure("Each integration binding must select a connection.");
-        return;
+        return false;
       }
       if (configUiModel.mode === "unsupported") {
         setIntegrationSaveFailure(configUiModel.message);
-        return;
+        return false;
       }
 
       parsedBindings.push({
@@ -406,11 +381,62 @@ export function useSandboxProfileIntegrationsState(
       });
     }
 
-    putIntegrationBindingsMutation.mutate({
-      profileId: input.profileId,
-      version: resolvedProfileVersion,
-      bindings: parsedBindings,
+    setNeutralSaveState();
+
+    try {
+      await putIntegrationBindingsMutation.mutateAsync({
+        profileId: input.profileId,
+        version: resolvedProfileVersion,
+        bindings: parsedBindings,
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  async function onAddIntegrationBindingRow(inputValue: {
+    kind: SandboxIntegrationBindingKind;
+    connectionId: string;
+    config: Record<string, unknown>;
+  }): Promise<boolean> {
+    const nextRows = [
+      ...integrationRows,
+      {
+        clientId: createIntegrationBindingClientId(),
+        connectionId: inputValue.connectionId,
+        kind: inputValue.kind,
+        config: inputValue.config,
+      },
+    ];
+    setIntegrationRows(nextRows);
+    markIntegrationDirty();
+    return persistIntegrationRows(nextRows);
+  }
+
+  function onRemoveIntegrationBindingRow(clientId: string): void {
+    const nextRows = integrationRows.filter((row) => row.clientId !== clientId);
+    setIntegrationRows(nextRows);
+    markIntegrationDirty({ clientId });
+    void persistIntegrationRows(nextRows);
+  }
+
+  function onIntegrationBindingRowChange(
+    clientId: string,
+    changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
+  ): void {
+    const nextRows = integrationRows.map((row) => {
+      if (row.clientId !== clientId) {
+        return row;
+      }
+      return {
+        ...row,
+        ...changes,
+      };
     });
+    setIntegrationRows(nextRows);
+    markIntegrationDirty({ clientId });
+    void persistIntegrationRows(nextRows);
   }
 
   function resolveSelectedConnectionDisplayName(
@@ -458,7 +484,6 @@ export function useSandboxProfileIntegrationsState(
     onAddIntegrationBindingRow,
     onRemoveIntegrationBindingRow,
     onIntegrationBindingRowChange,
-    onSaveIntegrationBindings,
     resolveSelectedConnectionDisplayName,
     integrationSaveSuccess,
     isSavingIntegrationBindings: putIntegrationBindingsMutation.isPending,

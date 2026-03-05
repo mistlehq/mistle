@@ -5,6 +5,11 @@ import {
   Button,
   Card,
   CardContent,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Field,
   FieldContent,
   FieldLabel,
@@ -17,7 +22,9 @@ import {
   SelectValue,
   Skeleton,
 } from "@mistle/ui";
+import { PlusIcon } from "@phosphor-icons/react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -77,13 +84,151 @@ type IntegrationsEditorSectionProps = {
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ) => void;
   resolveSelectedConnectionDisplayName: (row: SandboxProfileBindingEditorRow) => string | undefined;
-  onAddIntegrationBindingRow: () => void;
-  onSaveIntegrationBindings: () => void;
+  onAddIntegrationBindingRow: (input: {
+    kind: SandboxIntegrationBindingKind;
+    connectionId: string;
+    config: Record<string, unknown>;
+  }) => Promise<boolean>;
   isSavingIntegrationBindings: boolean;
   integrationSaveSuccess: boolean;
 };
 
-function IntegrationsEditorSection(props: IntegrationsEditorSectionProps): React.JSX.Element {
+type IntegrationAddDialogState = {
+  kind: SandboxIntegrationBindingKind;
+  connectionId: string;
+  error: string | null;
+};
+
+const BindingSectionKinds: readonly SandboxIntegrationBindingKind[] = ["agent", "git", "connector"];
+
+function formatBindingSectionTitle(kind: SandboxIntegrationBindingKind): string {
+  if (kind === "agent") {
+    return "Agent Bindings";
+  }
+  if (kind === "git") {
+    return "Git Bindings";
+  }
+  return "Connector Bindings";
+}
+
+export function IntegrationsEditorSection(
+  props: IntegrationsEditorSectionProps,
+): React.JSX.Element {
+  const [addDialogState, setAddDialogState] = useState<IntegrationAddDialogState | null>(null);
+
+  const availableConnectionsByKind = useMemo(() => {
+    const grouped: Record<SandboxIntegrationBindingKind, IntegrationConnectionSummary[]> = {
+      agent: [],
+      git: [],
+      connector: [],
+    };
+
+    for (const connection of props.availableConnections) {
+      const target = props.availableTargets.find(
+        (candidate) => candidate.targetKey === connection.targetKey,
+      );
+      const kind = resolveBindingKindFromTarget(target);
+      if (kind === undefined) {
+        continue;
+      }
+      grouped[kind].push(connection);
+    }
+
+    return grouped;
+  }, [props.availableConnections, props.availableTargets]);
+
+  const integrationRowsByKind = useMemo(() => {
+    const grouped: Record<SandboxIntegrationBindingKind, SandboxProfileBindingEditorRow[]> = {
+      agent: [],
+      git: [],
+      connector: [],
+    };
+
+    for (const row of props.integrationRows) {
+      grouped[row.kind].push(row);
+    }
+
+    return grouped;
+  }, [props.integrationRows]);
+
+  function closeAddDialog(): void {
+    setAddDialogState(null);
+  }
+
+  function openAddDialog(kind: SandboxIntegrationBindingKind): void {
+    const firstConnectionId = availableConnectionsByKind[kind][0]?.id ?? "";
+    setAddDialogState({
+      kind,
+      connectionId: firstConnectionId,
+      error: null,
+    });
+  }
+
+  function updateAddDialogConnectionId(nextConnectionId: string): void {
+    if (addDialogState === null) {
+      return;
+    }
+    setAddDialogState({
+      ...addDialogState,
+      connectionId: nextConnectionId,
+      error: null,
+    });
+  }
+
+  function addBindingFromDialog(): void {
+    if (addDialogState === null) {
+      return;
+    }
+
+    if (addDialogState.connectionId.trim().length === 0) {
+      setAddDialogState({
+        ...addDialogState,
+        error: "Select a connection to add this binding.",
+      });
+      return;
+    }
+
+    const selectedConnection = availableConnectionsByKind[addDialogState.kind].find(
+      (connection) => connection.id === addDialogState.connectionId,
+    );
+    if (selectedConnection === undefined) {
+      setAddDialogState({
+        ...addDialogState,
+        error: "Selected connection is no longer available.",
+      });
+      return;
+    }
+
+    const selectedTarget = props.availableTargets.find(
+      (target) => target.targetKey === selectedConnection.targetKey,
+    );
+
+    void props
+      .onAddIntegrationBindingRow({
+        kind: addDialogState.kind,
+        connectionId: selectedConnection.id,
+        config: createDefaultBindingConfig({
+          connection: selectedConnection,
+          ...(selectedTarget === undefined ? {} : { target: selectedTarget }),
+        }),
+      })
+      .then((didSave) => {
+        if (didSave) {
+          closeAddDialog();
+          return;
+        }
+        setAddDialogState((currentState) => {
+          if (currentState === null) {
+            return currentState;
+          }
+          return {
+            ...currentState,
+            error: "Could not add binding.",
+          };
+        });
+      });
+  }
+
   return (
     <Card>
       <CardContent className="gap-4 flex flex-col pt-4">
@@ -124,116 +269,189 @@ function IntegrationsEditorSection(props: IntegrationsEditorSectionProps): React
           </Alert>
         ) : null}
 
-        {props.integrationRows.map((row, rowIndex) => (
-          <div className="gap-3 rounded-md border p-3 flex flex-col" key={row.clientId}>
-            <div className="flex items-center justify-between">
-              <Label>Binding {rowIndex + 1}</Label>
+        {BindingSectionKinds.map((kind) => (
+          <div className="gap-3 flex flex-col" key={kind}>
+            <div className="items-center gap-3 flex">
+              <h3 className="text-sm font-semibold tracking-wide uppercase">
+                {formatBindingSectionTitle(kind)}
+              </h3>
+              <div className="bg-border h-px flex-1" />
               <Button
+                disabled={
+                  props.integrationDirectoryQuery.isPending ||
+                  availableConnectionsByKind[kind].length === 0
+                }
                 onClick={() => {
-                  props.onRemoveIntegrationBindingRow(row.clientId);
+                  openAddDialog(kind);
                 }}
                 type="button"
                 variant="outline"
               >
-                Remove
+                <PlusIcon />
+                Add
               </Button>
             </div>
 
-            <Field>
-              <FieldLabel>Kind</FieldLabel>
-              <FieldContent>
-                <p className="text-muted-foreground text-sm">{formatBindingKind(row.kind)}</p>
-              </FieldContent>
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor={`binding-connection-${row.clientId}`}>Connection</FieldLabel>
-              <FieldContent>
-                <Select
-                  onValueChange={(nextValue) => {
-                    if (nextValue === null || nextValue.length === 0) {
-                      throw new Error("Binding connection must not be null.");
-                    }
-                    const selectedConnection = props.availableConnections.find(
-                      (connection) => connection.id === nextValue,
-                    );
-                    const selectedTarget =
-                      selectedConnection === undefined
-                        ? undefined
-                        : props.availableTargets.find(
-                            (target) => target.targetKey === selectedConnection.targetKey,
-                          );
-                    const resolvedKind = resolveBindingKindFromTarget(selectedTarget);
-                    props.onIntegrationBindingRowChange(row.clientId, {
-                      connectionId: nextValue,
-                      ...(resolvedKind === undefined ? {} : { kind: resolvedKind }),
-                      config: createDefaultBindingConfig({
-                        ...(selectedConnection === undefined
-                          ? {}
-                          : { connection: selectedConnection }),
-                        ...(selectedTarget === undefined ? {} : { target: selectedTarget }),
-                      }),
-                    });
-                  }}
-                  value={row.connectionId}
-                >
-                  <SelectTrigger
-                    aria-label="Binding connection"
-                    id={`binding-connection-${row.clientId}`}
-                  >
-                    <SelectValue placeholder="Select integration connection">
-                      {props.resolveSelectedConnectionDisplayName(row)}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {props.availableConnections.map((connection) => (
-                      <SelectItem key={connection.id} value={connection.id}>
-                        {formatConnectionDisplayName({
-                          connection,
-                          targets: props.availableTargets,
-                        })}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FieldContent>
-            </Field>
-
-            <Field>
-              <FieldLabel>Config</FieldLabel>
-              <FieldContent>
-                <SandboxProfileBindingConfigEditor
-                  availableConnections={props.availableConnections}
-                  availableTargets={props.availableTargets}
-                  onIntegrationBindingRowChange={props.onIntegrationBindingRowChange}
-                  row={row}
-                />
-              </FieldContent>
-            </Field>
-
-            {props.integrationRowErrorsByClientId[row.clientId] !== undefined ? (
-              <p className="text-destructive text-sm">
-                {props.integrationRowErrorsByClientId[row.clientId]}
-              </p>
+            {integrationRowsByKind[kind].length === 0 ? (
+              <p className="text-muted-foreground text-sm">No bindings configured.</p>
             ) : null}
+
+            {integrationRowsByKind[kind].map((row, rowIndex) => (
+              <div className="gap-3 rounded-md border p-3 flex flex-col" key={row.clientId}>
+                <div className="flex items-center justify-between">
+                  <Label>
+                    {formatBindingKind(kind)} Binding {rowIndex + 1}
+                  </Label>
+                  <Button
+                    onClick={() => {
+                      props.onRemoveIntegrationBindingRow(row.clientId);
+                    }}
+                    type="button"
+                    variant="outline"
+                  >
+                    Remove
+                  </Button>
+                </div>
+
+                <Field>
+                  <FieldLabel htmlFor={`binding-connection-${row.clientId}`}>Connection</FieldLabel>
+                  <FieldContent>
+                    <Select
+                      onValueChange={(nextValue) => {
+                        if (nextValue === null || nextValue.length === 0) {
+                          throw new Error("Binding connection must not be null.");
+                        }
+                        const selectedConnection = availableConnectionsByKind[row.kind].find(
+                          (connection) => connection.id === nextValue,
+                        );
+                        const selectedTarget =
+                          selectedConnection === undefined
+                            ? undefined
+                            : props.availableTargets.find(
+                                (target) => target.targetKey === selectedConnection.targetKey,
+                              );
+
+                        props.onIntegrationBindingRowChange(row.clientId, {
+                          connectionId: nextValue,
+                          config: createDefaultBindingConfig({
+                            ...(selectedConnection === undefined
+                              ? {}
+                              : { connection: selectedConnection }),
+                            ...(selectedTarget === undefined ? {} : { target: selectedTarget }),
+                          }),
+                        });
+                      }}
+                      value={row.connectionId}
+                    >
+                      <SelectTrigger
+                        aria-label="Binding connection"
+                        id={`binding-connection-${row.clientId}`}
+                      >
+                        <SelectValue placeholder="Select integration connection">
+                          {props.resolveSelectedConnectionDisplayName(row)}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableConnectionsByKind[row.kind].map((connection) => (
+                          <SelectItem key={connection.id} value={connection.id}>
+                            {formatConnectionDisplayName({
+                              connection,
+                              targets: props.availableTargets,
+                            })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FieldContent>
+                </Field>
+
+                <Field>
+                  <FieldLabel>Config</FieldLabel>
+                  <FieldContent>
+                    <SandboxProfileBindingConfigEditor
+                      availableConnections={props.availableConnections}
+                      availableTargets={props.availableTargets}
+                      onIntegrationBindingRowChange={props.onIntegrationBindingRowChange}
+                      row={row}
+                    />
+                  </FieldContent>
+                </Field>
+
+                {props.integrationRowErrorsByClientId[row.clientId] !== undefined ? (
+                  <p className="text-destructive text-sm">
+                    {props.integrationRowErrorsByClientId[row.clientId]}
+                  </p>
+                ) : null}
+              </div>
+            ))}
           </div>
         ))}
 
-        <div className="gap-2 flex">
-          <Button onClick={props.onAddIntegrationBindingRow} type="button" variant="outline">
-            Add binding
-          </Button>
-          <Button
-            disabled={
-              props.integrationBindingsQuery.isPending ||
-              props.integrationDirectoryQuery.isPending ||
-              props.isSavingIntegrationBindings
+        <Dialog
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) {
+              closeAddDialog();
             }
-            onClick={props.onSaveIntegrationBindings}
-            type="button"
-          >
-            {props.isSavingIntegrationBindings ? "Saving..." : "Save integrations"}
-          </Button>
+          }}
+          open={addDialogState !== null}
+        >
+          {addDialogState ? (
+            <DialogContent>
+              <DialogHeader variant="sectioned">
+                <DialogTitle>Add {formatBindingKind(addDialogState.kind)} binding</DialogTitle>
+              </DialogHeader>
+              <Field>
+                <FieldLabel htmlFor="add-binding-connection">Connection</FieldLabel>
+                <FieldContent>
+                  <Select
+                    onValueChange={(nextValue) => {
+                      if (nextValue === null) {
+                        throw new Error("Binding connection must not be null.");
+                      }
+                      updateAddDialogConnectionId(nextValue);
+                    }}
+                    value={addDialogState.connectionId}
+                  >
+                    <SelectTrigger aria-label="Add binding connection" id="add-binding-connection">
+                      <SelectValue placeholder="Select integration connection" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableConnectionsByKind[addDialogState.kind].map((connection) => (
+                        <SelectItem key={connection.id} value={connection.id}>
+                          {formatConnectionDisplayName({
+                            connection,
+                            targets: props.availableTargets,
+                          })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </FieldContent>
+              </Field>
+              {addDialogState.error ? (
+                <p className="text-destructive text-sm">{addDialogState.error}</p>
+              ) : null}
+              <DialogFooter>
+                <Button onClick={closeAddDialog} type="button" variant="outline">
+                  Cancel
+                </Button>
+                <Button
+                  disabled={availableConnectionsByKind[addDialogState.kind].length === 0}
+                  onClick={addBindingFromDialog}
+                  type="button"
+                >
+                  <PlusIcon />
+                  Add binding
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          ) : null}
+        </Dialog>
+
+        <div className="gap-2 flex">
+          {props.isSavingIntegrationBindings ? (
+            <p className="text-muted-foreground text-sm self-center">Saving...</p>
+          ) : null}
           {props.integrationSaveSuccess ? (
             <p className="text-muted-foreground text-sm self-center">Saved.</p>
           ) : null}
@@ -430,7 +648,6 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
           onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}
           onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
           onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
-          onSaveIntegrationBindings={integrationsState.onSaveIntegrationBindings}
           resolveSelectedConnectionDisplayName={
             integrationsState.resolveSelectedConnectionDisplayName
           }
