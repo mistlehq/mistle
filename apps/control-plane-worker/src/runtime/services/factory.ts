@@ -1,5 +1,6 @@
 import { HandleAutomationRunWorkflowSpec } from "@mistle/workflows/control-plane";
 
+import { ControlPlaneInternalSandboxRuntimeClient } from "./control-plane-internal-sandbox-runtime-client.js";
 import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 import {
@@ -23,6 +24,10 @@ export function createControlPlaneWorkerServices(
   input: CreateControlPlaneWorkerServicesInput,
 ): ControlPlaneWorkerRuntimeServices {
   const emailSender = createEmailSender(input.config);
+  const internalSandboxRuntimeClient = new ControlPlaneInternalSandboxRuntimeClient({
+    baseUrl: input.config.controlPlaneApi.baseUrl,
+    internalAuthServiceToken: input.internalAuthServiceToken,
+  });
 
   return {
     automationRuns: {
@@ -46,12 +51,20 @@ export function createControlPlaneWorkerServices(
         return ensureAutomationSandbox(
           {
             db: input.db,
+            startSandboxProfileInstance: (startInput) =>
+              internalSandboxRuntimeClient.startProfileInstance(startInput),
           },
           workflowInput,
         );
       },
       acquireAutomationConnection: async (workflowInput) => {
-        await acquireAutomationConnection(workflowInput);
+        return acquireAutomationConnection(
+          {
+            mintSandboxConnectionToken: (mintInput) =>
+              internalSandboxRuntimeClient.mintConnectionToken(mintInput),
+          },
+          workflowInput,
+        );
       },
       deliverAutomationPayload: async (workflowInput) => {
         await deliverAutomationPayload(workflowInput);

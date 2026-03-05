@@ -31,6 +31,7 @@ export function createRuntimeWorker(ctx: {
     ],
     services: createControlPlaneWorkerServices({
       config: ctx.config,
+      internalAuthServiceToken: ctx.internalAuthServiceToken,
       db: ctx.resources.db,
       openWorkflow: ctx.resources.openWorkflow,
       dataPlaneSandboxInstancesClient,

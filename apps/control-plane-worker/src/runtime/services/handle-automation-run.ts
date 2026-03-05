@@ -9,13 +9,13 @@ import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control
 import { and, eq, sql } from "drizzle-orm";
 
 import type {
+  AcquireAutomationConnectionServiceOutput,
   AcquireAutomationConnectionServiceInput,
   DeliverAutomationPayloadServiceInput,
   EnsureAutomationSandboxServiceOutput,
   EnsureAutomationSandboxServiceInput,
   PrepareAutomationRunServiceOutput,
 } from "./types.js";
-import { verifySandboxProfileVersionExists } from "./verify-sandbox-profile-version-exists.js";
 
 export type HandleAutomationRunDependencies = {
   db: ControlPlaneDatabase;
@@ -23,6 +23,29 @@ export type HandleAutomationRunDependencies = {
 
 export type EnsureAutomationSandboxDependencies = {
   db: ControlPlaneDatabase;
+  startSandboxProfileInstance: (input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+    startedBy: {
+      kind: "user" | "system";
+      id: string;
+    };
+    source: "dashboard" | "webhook";
+  }) => Promise<{
+    workflowRunId: string;
+    sandboxInstanceId: string;
+    providerSandboxId: string;
+  }>;
+};
+
+export type AcquireAutomationConnectionDependencies = {
+  mintSandboxConnectionToken: (input: { organizationId: string; instanceId: string }) => Promise<{
+    instanceId: string;
+    url: string;
+    token: string;
+    expiresAt: string;
+  }>;
 };
 
 export type TransitionAutomationRunToRunningOutput = {
@@ -335,6 +358,7 @@ export async function prepareAutomationRun(
 
   return {
     automationRunId: automationRun.id,
+    automationRunCreatedAt: automationRun.createdAt,
     automationId: automationRun.automationId,
     automationTargetId: automationTarget.id,
     organizationId: automation.organizationId,
@@ -374,28 +398,46 @@ export async function ensureAutomationSandbox(
     });
   }
 
-  await verifySandboxProfileVersionExists({
-    db: deps.db,
+  const startedSandbox = await deps.startSandboxProfileInstance({
     organizationId: input.preparedAutomationRun.organizationId,
-    sandboxProfileId: input.preparedAutomationRun.sandboxProfileId,
-    sandboxProfileVersion: input.preparedAutomationRun.sandboxProfileVersion,
+    profileId: input.preparedAutomationRun.sandboxProfileId,
+    profileVersion: input.preparedAutomationRun.sandboxProfileVersion,
+    startedBy: {
+      kind: "system",
+      id: input.preparedAutomationRun.automationRunId,
+    },
+    source: "webhook",
   });
 
-  throw new AutomationRunExecutionError({
-    code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
-    message: `ensureAutomationSandbox is not implemented for automation run '${automationRun.id}'.`,
-  });
+  return {
+    sandboxInstanceId: startedSandbox.sandboxInstanceId,
+    providerSandboxId: startedSandbox.providerSandboxId,
+    startupWorkflowRunId: startedSandbox.workflowRunId,
+  };
 }
 
 export async function acquireAutomationConnection(
+  deps: AcquireAutomationConnectionDependencies,
   input: AcquireAutomationConnectionServiceInput,
-): Promise<void> {
+): Promise<AcquireAutomationConnectionServiceOutput> {
   if (input.preparedAutomationRun.renderedConversationKey.trim().length === 0) {
     throw new AutomationRunExecutionError({
       code: AutomationRunFailureCodes.TEMPLATE_RENDER_FAILED,
       message: "Rendered automation conversation key template must not be empty.",
     });
   }
+
+  const connection = await deps.mintSandboxConnectionToken({
+    organizationId: input.preparedAutomationRun.organizationId,
+    instanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+  });
+
+  return {
+    instanceId: connection.instanceId,
+    url: connection.url,
+    token: connection.token,
+    expiresAt: connection.expiresAt,
+  };
 }
 
 export async function deliverAutomationPayload(
@@ -405,6 +447,13 @@ export async function deliverAutomationPayload(
     throw new AutomationRunExecutionError({
       code: AutomationRunFailureCodes.TEMPLATE_RENDER_FAILED,
       message: "Rendered automation input template must not be empty.",
+    });
+  }
+
+  if (input.acquiredAutomationConnection.token.trim().length === 0) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+      message: "Acquired automation connection token must not be empty.",
     });
   }
 }

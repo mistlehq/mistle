@@ -1,6 +1,7 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type {
+  AcquiredAutomationConnection,
   AcquireAutomationConnectionInput,
   ControlPlaneWorkerServices,
   DeliverAutomationPayloadInput,
@@ -19,6 +20,7 @@ import type { ControlPlaneWorkerConfig } from "../../types.js";
 
 export type CreateControlPlaneWorkerServicesInput = {
   config: ControlPlaneWorkerConfig;
+  internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
   dataPlaneSandboxInstancesClient: DataPlaneSandboxInstancesClient;
@@ -34,7 +36,26 @@ export type StartSandboxProfileInstanceServiceOutput = StartSandboxProfileInstan
 
 export type HandleAutomationRunServiceDependencies = {
   db: ControlPlaneDatabase;
-  dataPlaneSandboxInstancesClient: Pick<DataPlaneSandboxInstancesClient, "startSandboxInstance">;
+  startSandboxProfileInstance: (input: {
+    organizationId: string;
+    profileId: string;
+    profileVersion: number;
+    startedBy: {
+      kind: "user" | "system";
+      id: string;
+    };
+    source: "dashboard" | "webhook";
+  }) => Promise<{
+    workflowRunId: string;
+    sandboxInstanceId: string;
+    providerSandboxId: string;
+  }>;
+  mintSandboxConnectionToken: (input: { organizationId: string; instanceId: string }) => Promise<{
+    instanceId: string;
+    url: string;
+    token: string;
+    expiresAt: string;
+  }>;
 };
 
 export type HandleAutomationRunServiceInput = HandleAutomationRunWorkflowInput;
@@ -43,6 +64,7 @@ export type PrepareAutomationRunServiceOutput = PreparedAutomationRun;
 export type EnsureAutomationSandboxServiceInput = EnsureAutomationSandboxInput;
 export type EnsureAutomationSandboxServiceOutput = EnsuredAutomationSandbox;
 export type AcquireAutomationConnectionServiceInput = AcquireAutomationConnectionInput;
+export type AcquireAutomationConnectionServiceOutput = AcquiredAutomationConnection;
 export type DeliverAutomationPayloadServiceInput = DeliverAutomationPayloadInput;
 export type HandleAutomationRunMarkFailedServiceInput = {
   automationRunId: string;
