@@ -29,6 +29,7 @@ type CompleteOAuthConnectionInput = {
 type CompletedConnection = {
   id: string;
   targetKey: string;
+  displayName: string;
   status: "active" | "error" | "revoked";
   externalSubjectId?: string;
   config?: Record<string, unknown>;
@@ -57,6 +58,21 @@ function resolveOAuthStateOrThrow(params: URLSearchParams): string {
   }
 
   return state;
+}
+
+function resolveOAuthDisplayName(state: string): string | undefined {
+  const separatorIndex = state.indexOf(".");
+  if (separatorIndex < 0 || separatorIndex === state.length - 1) {
+    return undefined;
+  }
+
+  const encodedDisplayName = state.slice(separatorIndex + 1);
+  const displayName = Buffer.from(encodedDisplayName, "base64url").toString("utf8").trim();
+  if (displayName.length === 0) {
+    return undefined;
+  }
+
+  return displayName;
 }
 
 function resolveCredentialSecretKind(secretType: string) {
@@ -99,6 +115,8 @@ export async function completeOAuthConnection(
       "OAuth state is invalid.",
     );
   }
+
+  const requestedDisplayName = resolveOAuthDisplayName(oauthSession.state);
 
   if (oauthSession.usedAt !== null) {
     throw new IntegrationConnectionsBadRequestError(
@@ -156,6 +174,8 @@ export async function completeOAuthConnection(
       .values({
         organizationId: input.organizationId,
         targetKey: input.targetKey,
+        displayName:
+          requestedDisplayName ?? completedOAuthConnection.externalSubjectId ?? input.targetKey,
         status: IntegrationConnectionStatuses.ACTIVE,
         ...(completedOAuthConnection.externalSubjectId === undefined
           ? {}
@@ -228,6 +248,7 @@ export async function completeOAuthConnection(
     return {
       id: createdConnection.id,
       targetKey: createdConnection.targetKey,
+      displayName: createdConnection.displayName,
       status: createdConnection.status,
       ...(createdConnection.externalSubjectId === null
         ? {}

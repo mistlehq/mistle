@@ -8,11 +8,13 @@ import { ViewConnectionsDialog } from "./view-connections-dialog.js";
 
 function createConnection(input: {
   id: string;
+  displayName: string;
   status: IntegrationConnection["status"];
   authScheme?: "api-key" | "oauth";
 }): IntegrationConnection {
   return {
     id: input.id,
+    displayName: input.displayName,
     targetKey: "openai-default",
     status: input.status,
     ...(input.authScheme === undefined ? {} : { config: { auth_scheme: input.authScheme } }),
@@ -26,34 +28,52 @@ describe("ViewConnectionsDialog", () => {
     cleanup();
   });
 
-  it("shows an update API-key action only for API-key connections", () => {
+  it("opens edit actions with the current auth method", () => {
     let selectedConnectionId: string | null = null;
+    let selectedConnectionDisplayName: string | null = null;
+    let selectedConnectionMethodId: "api-key" | "oauth" | null = null;
 
     render(
       <ViewConnectionsDialog
         connections={[
-          createConnection({ id: "icn_api_key", status: "active", authScheme: "api-key" }),
-          createConnection({ id: "icn_oauth", status: "active", authScheme: "oauth" }),
+          createConnection({
+            id: "icn_api_key",
+            displayName: "API key connection",
+            status: "active",
+            authScheme: "api-key",
+          }),
+          createConnection({
+            id: "icn_oauth",
+            displayName: "OAuth connection",
+            status: "active",
+            authScheme: "oauth",
+          }),
         ]}
         dialog={{ targetKey: "openai-default", displayName: "OpenAI" }}
         onClose={() => {}}
-        onOpenUpdateApiKeyDialog={(connectionId) => {
-          selectedConnectionId = connectionId;
+        onOpenEditConnectionDialog={(input) => {
+          selectedConnectionId = input.connectionId;
+          selectedConnectionDisplayName = input.connectionDisplayName;
+          selectedConnectionMethodId = input.connectionMethodId;
         }}
       />,
     );
 
     const updateButtons = screen.getAllByRole("button", {
-      name: "Update API key",
+      name: "Edit connection",
     });
-    expect(updateButtons).toHaveLength(1);
+    expect(updateButtons).toHaveLength(2);
+    expect(screen.getByText("Auth method: API key")).toBeTruthy();
+    expect(screen.getByText("Auth method: OAuth")).toBeTruthy();
 
     const firstUpdateButton = updateButtons[0];
     if (firstUpdateButton === undefined) {
-      throw new Error("Expected Update API key button.");
+      throw new Error("Expected Edit connection button.");
     }
 
     fireEvent.click(firstUpdateButton);
     expect(selectedConnectionId).toBe("icn_api_key");
+    expect(selectedConnectionDisplayName).toBe("API key connection");
+    expect(selectedConnectionMethodId).toBe("api-key");
   });
 });

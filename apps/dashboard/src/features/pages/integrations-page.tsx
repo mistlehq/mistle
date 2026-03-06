@@ -60,6 +60,7 @@ export function IntegrationsPage() {
   const integrationsQuery = useQuery({
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
     queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
+    retry: false,
   });
 
   const cards = useMemo(() => {
@@ -181,7 +182,7 @@ export function IntegrationsPage() {
               onAction={() => {
                 connectionDialogState.openDialog({
                   targetKey: card.target.targetKey,
-                  displayName: card.displayName,
+                  targetDisplayName: card.displayName,
                   methods,
                   mode: "create",
                 });
@@ -194,10 +195,16 @@ export function IntegrationsPage() {
 
       <IntegrationConnectionDialog
         apiKeyValue={connectionDialogState.apiKeyValue}
+        connectionDisplayNamePlaceholder={connectionDialogState.connectionDisplayNamePlaceholder}
+        connectionDisplayNameValue={connectionDialogState.connectionDisplayNameValue}
         connectError={connectionDialogState.error}
         connectMethodId={connectionDialogState.methodId}
         dialog={connectionDialogState.dialog}
+        hasChanges={connectionDialogState.hasChanges}
+        isApiKeyChanged={connectionDialogState.isApiKeyChanged}
+        isConnectionDisplayNameChanged={connectionDialogState.isConnectionDisplayNameChanged}
         onApiKeyChange={connectionDialogState.onApiKeyChange}
+        onConnectionDisplayNameChange={connectionDialogState.onConnectionDisplayNameChange}
         onClose={connectionDialogState.closeDialog}
         onMethodChange={connectionDialogState.onMethodChange}
         onSubmit={connectionDialogState.submitDialog}
@@ -210,18 +217,26 @@ export function IntegrationsPage() {
         onClose={() => {
           setViewDialog(null);
         }}
-        onOpenUpdateApiKeyDialog={(connectionId) => {
+        onOpenEditConnectionDialog={({
+          connectionId,
+          connectionDisplayName,
+          connectionMethodId,
+        }) => {
           if (viewDialog === null) {
-            throw new Error("View dialog state is required to open update API-key dialog.");
+            throw new Error("View dialog state is required to open edit connection dialog.");
           }
 
           setViewDialog(null);
           connectionDialogState.openDialog({
             targetKey: viewDialog.targetKey,
-            displayName: viewDialog.displayName,
-            methods: [IntegrationConnectionMethodIds.API_KEY],
+            targetDisplayName: viewDialog.displayName,
             mode: "update",
             connectionId,
+            connectionDisplayName,
+            currentMethodId:
+              connectionMethodId === null
+                ? IntegrationConnectionMethodIds.API_KEY
+                : connectionMethodId,
           });
         }}
       />

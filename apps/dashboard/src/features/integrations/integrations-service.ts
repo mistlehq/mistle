@@ -38,6 +38,7 @@ const IntegrationConnectionSchema = z
   .object({
     id: z.string().min(1),
     targetKey: z.string().min(1),
+    displayName: z.string().min(1),
     status: z.enum(["active", "error", "revoked"]),
     externalSubjectId: z.string().min(1).optional(),
     config: z.record(z.string(), z.unknown()).optional(),
@@ -225,6 +226,7 @@ export async function listIntegrationDirectory(input: { signal?: AbortSignal }):
 
 export async function createApiKeyIntegrationConnection(input: {
   targetKey: string;
+  displayName: string;
   apiKey: string;
 }): Promise<CreatedIntegrationConnection> {
   try {
@@ -233,6 +235,7 @@ export async function createApiKeyIntegrationConnection(input: {
       method: "POST",
       pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/api-key`,
       body: {
+        displayName: input.displayName,
         apiKey: input.apiKey,
       },
       fallbackMessage: "Could not create integration connection.",
@@ -254,32 +257,34 @@ export async function createApiKeyIntegrationConnection(input: {
   }
 }
 
-export async function updateApiKeyIntegrationConnection(input: {
+export async function updateIntegrationConnection(input: {
   connectionId: string;
-  apiKey: string;
+  displayName: string;
+  apiKey?: string;
 }): Promise<CreatedIntegrationConnection> {
   try {
     const response = await requestControlPlane({
-      operation: "updateApiKeyIntegrationConnection",
+      operation: "updateIntegrationConnection",
       method: "PUT",
-      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/api-key`,
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}`,
       body: {
-        apiKey: input.apiKey,
+        displayName: input.displayName,
+        ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
       },
-      fallbackMessage: "Could not update integration connection API key.",
+      fallbackMessage: "Could not update integration connection.",
     });
 
     return readJsonWithSchema({
       response,
       schema: IntegrationConnectionSchema,
-      operation: "updateApiKeyIntegrationConnection",
+      operation: "updateIntegrationConnection",
     });
   } catch (error) {
     throw new IntegrationsApiError(
       normalizeHttpApiError({
-        operation: "updateApiKeyIntegrationConnection",
+        operation: "updateIntegrationConnection",
         error,
-        fallbackMessage: "Could not update integration connection API key.",
+        fallbackMessage: "Could not update integration connection.",
       }),
     );
   }
@@ -287,12 +292,14 @@ export async function updateApiKeyIntegrationConnection(input: {
 
 export async function startOAuthIntegrationConnection(input: {
   targetKey: string;
+  displayName?: string;
 }): Promise<StartedOAuthConnection> {
   try {
     const response = await requestControlPlane({
       operation: "startOAuthIntegrationConnection",
       method: "POST",
       pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth/start`,
+      ...(input.displayName === undefined ? {} : { body: { displayName: input.displayName } }),
       fallbackMessage: "Could not start OAuth connection.",
     });
 

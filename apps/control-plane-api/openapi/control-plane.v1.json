@@ -68,6 +68,10 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "displayName": {
+                            "type": "string",
+                            "minLength": 1
+                          },
                           "status": {
                             "type": "string",
                             "enum": ["active", "error", "revoked"]
@@ -93,7 +97,14 @@
                             "minLength": 1
                           }
                         },
-                        "required": ["id", "targetKey", "status", "createdAt", "updatedAt"],
+                        "required": [
+                          "id",
+                          "targetKey",
+                          "displayName",
+                          "status",
+                          "createdAt",
+                          "updatedAt"
+                        ],
                         "additionalProperties": false
                       }
                     },
@@ -281,12 +292,16 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
                   "apiKey": {
                     "type": "string",
                     "minLength": 1
                   }
                 },
-                "required": ["apiKey"],
+                "required": ["displayName", "apiKey"],
                 "additionalProperties": false
               }
             }
@@ -305,6 +320,10 @@
                       "minLength": 1
                     },
                     "targetKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "displayName": {
                       "type": "string",
                       "minLength": 1
                     },
@@ -333,7 +352,14 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["id", "targetKey", "status", "createdAt", "updatedAt"],
+                  "required": [
+                    "id",
+                    "targetKey",
+                    "displayName",
+                    "status",
+                    "createdAt",
+                    "updatedAt"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -485,7 +511,7 @@
         }
       }
     },
-    "/v1/integration/connections/:connectionId/api-key": {
+    "/v1/integration/connections/:connectionId": {
       "put": {
         "tags": ["Integrations"],
         "parameters": [
@@ -506,12 +532,16 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1
+                  },
                   "apiKey": {
                     "type": "string",
                     "minLength": 1
                   }
                 },
-                "required": ["apiKey"],
+                "required": ["displayName"],
                 "additionalProperties": false
               }
             }
@@ -519,7 +549,7 @@
         },
         "responses": {
           "200": {
-            "description": "Update the API key for an existing API-key integration connection.",
+            "description": "Update an existing integration connection.",
             "content": {
               "application/json": {
                 "schema": {
@@ -530,6 +560,10 @@
                       "minLength": 1
                     },
                     "targetKey": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "displayName": {
                       "type": "string",
                       "minLength": 1
                     },
@@ -558,7 +592,14 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["id", "targetKey", "status", "createdAt", "updatedAt"],
+                  "required": [
+                    "id",
+                    "targetKey",
+                    "displayName",
+                    "status",
+                    "createdAt",
+                    "updatedAt"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -724,6 +765,23 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "displayName": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Create an OAuth authorization URL for an integration target.",
@@ -939,6 +997,10 @@
                       "type": "string",
                       "minLength": 1
                     },
+                    "displayName": {
+                      "type": "string",
+                      "minLength": 1
+                    },
                     "status": {
                       "type": "string",
                       "enum": ["active", "error", "revoked"]
@@ -964,7 +1026,14 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["id", "targetKey", "status", "createdAt", "updatedAt"],
+                  "required": [
+                    "id",
+                    "targetKey",
+                    "displayName",
+                    "status",
+                    "createdAt",
+                    "updatedAt"
+                  ],
                   "additionalProperties": false
                 }
               }

@@ -36,6 +36,7 @@ export interface paths {
                   [key: string]: unknown;
                 };
                 createdAt: string;
+                displayName: string;
                 externalSubjectId?: string;
                 id: string;
                 /** @enum {string} */
@@ -140,7 +141,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/integration/connections/:connectionId/api-key": {
+  "/v1/integration/connections/:connectionId": {
     parameters: {
       query?: never;
       header?: never;
@@ -160,12 +161,13 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
-            apiKey: string;
+            apiKey?: string;
+            displayName: string;
           };
         };
       };
       responses: {
-        /** @description Update the API key for an existing API-key integration connection. */
+        /** @description Update an existing integration connection. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -176,6 +178,7 @@ export interface paths {
                 [key: string]: unknown;
               };
               createdAt: string;
+              displayName: string;
               externalSubjectId?: string;
               id: string;
               /** @enum {string} */
@@ -304,6 +307,7 @@ export interface paths {
         content: {
           "application/json": {
             apiKey: string;
+            displayName: string;
           };
         };
       };
@@ -319,6 +323,7 @@ export interface paths {
                 [key: string]: unknown;
               };
               createdAt: string;
+              displayName: string;
               externalSubjectId?: string;
               id: string;
               /** @enum {string} */
@@ -463,6 +468,7 @@ export interface paths {
                 [key: string]: unknown;
               };
               createdAt: string;
+              displayName: string;
               externalSubjectId?: string;
               id: string;
               /** @enum {string} */
@@ -586,7 +592,13 @@ export interface paths {
         };
         cookie?: never;
       };
-      requestBody?: never;
+      requestBody?: {
+        content: {
+          "application/json": {
+            displayName?: string;
+          };
+        };
+      };
       responses: {
         /** @description Create an OAuth authorization URL for an integration target. */
         200: {

@@ -4,6 +4,7 @@ import {
   integrationTargets,
 } from "@mistle/db/control-plane";
 import { IntegrationSupportedAuthSchemes } from "@mistle/integrations-core";
+import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import {
@@ -11,7 +12,7 @@ import {
   IntegrationConnectionSchema,
   IntegrationConnectionsBadRequestResponseSchema,
   IntegrationConnectionsNotFoundResponseSchema,
-  UpdateApiKeyConnectionBodySchema,
+  UpdateIntegrationConnectionBodySchema,
 } from "../src/integration-connections/contracts.js";
 import {
   decryptCredentialUtf8,
@@ -52,6 +53,7 @@ describe("integration connections update api key integration", () => {
     });
 
     const createBody = CreateApiKeyConnectionBodySchema.parse({
+      displayName: "OpenAI primary",
       apiKey: "sk-test-original-api-key",
     });
 
@@ -80,12 +82,13 @@ describe("integration connections update api key integration", () => {
       throw new Error("Expected an existing API-key credential link.");
     }
 
-    const updateBody = UpdateApiKeyConnectionBodySchema.parse({
+    const updateBody = UpdateIntegrationConnectionBodySchema.parse({
+      displayName: "OpenAI rotated",
       apiKey: "sk-test-rotated-api-key",
     });
 
     const updateResponse = await fixture.request(
-      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/api-key`,
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}`,
       {
         method: "PUT",
         headers: {
@@ -100,6 +103,7 @@ describe("integration connections update api key integration", () => {
     const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
     expect(updatedConnection.id).toBe(createdConnection.id);
     expect(updatedConnection.targetKey).toBe(createdConnection.targetKey);
+    expect(updatedConnection.displayName).toBe("OpenAI rotated");
     expect(updatedConnection.status).toBe("active");
 
     const updatedLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
@@ -159,13 +163,14 @@ describe("integration connections update api key integration", () => {
       email: "integration-connections-update-api-key-missing@example.com",
     });
 
-    const response = await fixture.request("/v1/integration/connections/icn_missing/api-key", {
+    const response = await fixture.request("/v1/integration/connections/icn_missing", {
       method: "PUT",
       headers: {
         "content-type": "application/json",
         cookie: authenticatedSession.cookie,
       },
       body: JSON.stringify({
+        displayName: "Missing connection",
         apiKey: "sk-test-rotated-api-key",
       }),
     });
@@ -211,6 +216,7 @@ describe("integration connections update api key integration", () => {
       .values({
         organizationId: authenticatedSession.organizationId,
         targetKey: "openai-default",
+        displayName: "OAuth-only connection",
         status: "active",
         config: {
           auth_scheme: IntegrationSupportedAuthSchemes.OAUTH,
@@ -228,7 +234,7 @@ describe("integration connections update api key integration", () => {
     }
 
     const response = await fixture.request(
-      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/api-key`,
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}`,
       {
         method: "PUT",
         headers: {
@@ -236,6 +242,7 @@ describe("integration connections update api key integration", () => {
           cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify({
+          displayName: "OAuth-only connection",
           apiKey: "sk-test-rotated-api-key",
         }),
       },
@@ -254,6 +261,164 @@ describe("integration connections update api key integration", () => {
       where: (table, { eq }) => eq(table.connectionId, createdConnection.id),
     });
     expect(credentialLinks).toHaveLength(0);
+  });
+
+  it("updates only the display name when no API key is provided", async ({ fixture }) => {
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "openai-default",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com",
+        },
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com",
+          },
+        },
+      });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-update-name-only@example.com",
+    });
+
+    const createResponse = await fixture.request(
+      "/v1/integration/connections/openai-default/api-key",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "OpenAI primary",
+          apiKey: "sk-test-original-api-key",
+        }),
+      },
+    );
+
+    expect(createResponse.status).toBe(201);
+    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+
+    const previousLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.connectionId, createdConnection.id), eq(table.purpose, "api_key")),
+    });
+    expect(previousLink).toBeDefined();
+
+    if (previousLink === undefined) {
+      throw new Error("Expected existing API-key credential link.");
+    }
+
+    const updateResponse = await fixture.request(
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "OpenAI renamed",
+        }),
+      },
+    );
+
+    expect(updateResponse.status).toBe(200);
+    const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
+    expect(updatedConnection.displayName).toBe("OpenAI renamed");
+
+    const updatedLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.connectionId, createdConnection.id), eq(table.purpose, "api_key")),
+    });
+    expect(updatedLink).toBeDefined();
+
+    if (updatedLink === undefined) {
+      throw new Error("Expected API-key credential link to remain.");
+    }
+
+    expect(updatedLink.credentialId).toBe(previousLink.credentialId);
+  });
+
+  it("updates only the display name even when the target row has been removed", async ({
+    fixture,
+  }) => {
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "openai-default",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com",
+        },
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com",
+          },
+        },
+      });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-update-name-only-missing-target@example.com",
+    });
+
+    const createResponse = await fixture.request(
+      "/v1/integration/connections/openai-default/api-key",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "OpenAI primary",
+          apiKey: "sk-test-original-api-key",
+        }),
+      },
+    );
+
+    expect(createResponse.status).toBe(201);
+    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+
+    await fixture.db
+      .delete(integrationTargets)
+      .where(eq(integrationTargets.targetKey, "openai-default"));
+
+    const updateResponse = await fixture.request(
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "OpenAI renamed after target removal",
+        }),
+      },
+    );
+
+    expect(updateResponse.status).toBe(200);
+    const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
+    expect(updatedConnection.displayName).toBe("OpenAI renamed after target removal");
   });
 });
 

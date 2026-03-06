@@ -30,12 +30,14 @@ const registry = createIntegrationRegistry();
 export type CreateApiKeyConnectionInput = {
   organizationId: string;
   targetKey: string;
+  displayName: string;
   apiKey: string;
 };
 
 type CreatedConnection = {
   id: string;
   targetKey: string;
+  displayName: string;
   status: "active" | "error" | "revoked";
   externalSubjectId?: string;
   config?: Record<string, unknown>;
@@ -120,6 +122,7 @@ export async function createApiKeyConnection(
         .values({
           organizationId: input.organizationId,
           targetKey: input.targetKey,
+          displayName: input.displayName,
           status: IntegrationConnectionStatuses.ACTIVE,
           config: {
             auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
@@ -159,6 +162,7 @@ export async function createApiKeyConnection(
       return {
         id: createdConnection.id,
         targetKey: createdConnection.targetKey,
+        displayName: createdConnection.displayName,
         status: createdConnection.status,
         ...(createdConnection.externalSubjectId === null
           ? {}

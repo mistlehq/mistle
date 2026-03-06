@@ -166,6 +166,7 @@ describe("integration connections oauth integration", () => {
     const completeBody = IntegrationConnectionSchema.parse(await completeResponse.json());
 
     expect(completeBody.targetKey).toBe("github-cloud");
+    expect(completeBody.displayName).toBe("12345");
     expect(completeBody.status).toBe("active");
     expect(completeBody.externalSubjectId).toBe("12345");
     expect(completeBody.config).toEqual({
@@ -215,6 +216,61 @@ describe("integration connections oauth integration", () => {
       .from(integrationConnectionCredentials)
       .where(eq(integrationConnectionCredentials.connectionId, completeBody.id));
     expect(linkedCredentials).toHaveLength(0);
+  });
+
+  it("preserves the requested display name when completing oauth connection creation", async ({
+    fixture,
+  }) => {
+    await ensureGithubCloudTarget(fixture);
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-oauth-display-name@example.com",
+    });
+
+    const startResponse = await fixture.request(
+      "/v1/integration/connections/github-cloud/oauth/start",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "GitHub Prod",
+        }),
+      },
+    );
+    expect(startResponse.status).toBe(200);
+    const startBody = StartOAuthConnectionResponseSchema.parse(await startResponse.json());
+    const startUrl = new URL(startBody.authorizationUrl);
+    const state = startUrl.searchParams.get("state");
+
+    if (state === null || state.length === 0) {
+      throw new Error("Expected oauth state in authorization URL.");
+    }
+
+    const completeResponse = await fixture.request(
+      "/v1/integration/connections/github-cloud/oauth/complete",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          query: {
+            state,
+            installation_id: "12345",
+            setup_action: "install",
+          },
+        }),
+      },
+    );
+
+    expect(completeResponse.status).toBe(201);
+    const completeBody = IntegrationConnectionSchema.parse(await completeResponse.json());
+    expect(completeBody.displayName).toBe("GitHub Prod");
+    expect(completeBody.externalSubjectId).toBe("12345");
   });
 
   it("returns 400 when oauth completion state is missing", async ({ fixture }) => {

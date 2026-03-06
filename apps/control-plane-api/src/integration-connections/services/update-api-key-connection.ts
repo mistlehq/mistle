@@ -31,6 +31,7 @@ const registry = createIntegrationRegistry();
 type UpdatedConnection = {
   id: string;
   targetKey: string;
+  displayName: string;
   status: "active" | "error" | "revoked";
   externalSubjectId?: string;
   config?: Record<string, unknown>;
@@ -42,7 +43,8 @@ type UpdatedConnection = {
 export type UpdateApiKeyConnectionInput = {
   organizationId: string;
   connectionId: string;
-  apiKey: string;
+  displayName: string;
+  apiKey?: string;
 };
 
 function resolveConnectionAuthScheme(
@@ -60,7 +62,7 @@ function resolveConnectionAuthScheme(
   return IntegrationSupportedAuthSchemes.API_KEY;
 }
 
-export async function updateApiKeyConnection(
+export async function updateIntegrationConnection(
   db: AppContext["var"]["db"],
   integrationsConfig: AppContext["var"]["config"]["integrations"],
   input: UpdateApiKeyConnectionInput,
@@ -77,14 +79,39 @@ export async function updateApiKeyConnection(
     );
   }
 
-  if (
-    resolveConnectionAuthScheme(existingConnection.config) !==
-    IntegrationSupportedAuthSchemes.API_KEY
-  ) {
-    throw new IntegrationConnectionsBadRequestError(
-      IntegrationConnectionsBadRequestCodes.API_KEY_CONNECTION_REQUIRED,
-      `Integration connection '${input.connectionId}' is not an API-key connection.`,
-    );
+  const existingAuthScheme = resolveConnectionAuthScheme(existingConnection.config);
+  const normalizedApiKey = input.apiKey?.trim();
+  const shouldRotateApiKey = normalizedApiKey !== undefined && normalizedApiKey.length > 0;
+
+  if (!shouldRotateApiKey) {
+    const [updatedConnection] = await db
+      .update(integrationConnections)
+      .set({
+        displayName: input.displayName,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(integrationConnections.id, existingConnection.id))
+      .returning();
+
+    if (updatedConnection === undefined) {
+      throw new Error("Failed to update integration connection.");
+    }
+
+    return {
+      id: updatedConnection.id,
+      targetKey: updatedConnection.targetKey,
+      displayName: updatedConnection.displayName,
+      status: updatedConnection.status,
+      ...(updatedConnection.externalSubjectId === null
+        ? {}
+        : { externalSubjectId: updatedConnection.externalSubjectId }),
+      ...(updatedConnection.config === null ? {} : { config: updatedConnection.config }),
+      ...(updatedConnection.targetSnapshotConfig === null
+        ? {}
+        : { targetSnapshotConfig: updatedConnection.targetSnapshotConfig }),
+      createdAt: updatedConnection.createdAt,
+      updatedAt: updatedConnection.updatedAt,
+    };
   }
 
   const target = await db.query.integrationTargets.findFirst({
@@ -107,6 +134,13 @@ export async function updateApiKeyConnection(
     throw new IntegrationConnectionsBadRequestError(
       IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
       `Integration definition '${target.familyId}/${target.variantId}' is not registered.`,
+    );
+  }
+
+  if (existingAuthScheme !== IntegrationSupportedAuthSchemes.API_KEY) {
+    throw new IntegrationConnectionsBadRequestError(
+      IntegrationConnectionsBadRequestCodes.API_KEY_CONNECTION_REQUIRED,
+      `Integration connection '${input.connectionId}' is not an API-key connection.`,
     );
   }
 
@@ -136,7 +170,7 @@ export async function updateApiKeyConnection(
 
   try {
     const encryptedApiKey = encryptCredentialUtf8({
-      plaintext: input.apiKey,
+      plaintext: normalizedApiKey,
       organizationCredentialKey: unwrappedOrganizationCredentialKey,
     });
 
@@ -179,6 +213,7 @@ export async function updateApiKeyConnection(
       const [updatedConnection] = await tx
         .update(integrationConnections)
         .set({
+          displayName: input.displayName,
           updatedAt: sql`now()`,
         })
         .where(eq(integrationConnections.id, existingConnection.id))
@@ -191,6 +226,7 @@ export async function updateApiKeyConnection(
       return {
         id: updatedConnection.id,
         targetKey: updatedConnection.targetKey,
+        displayName: updatedConnection.displayName,
         status: updatedConnection.status,
         ...(updatedConnection.externalSubjectId === null
           ? {}

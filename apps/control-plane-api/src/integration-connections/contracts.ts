@@ -20,6 +20,7 @@ export const IntegrationConnectionSchema = z
   .object({
     id: z.string().min(1),
     targetKey: z.string().min(1),
+    displayName: z.string().min(1),
     status: IntegrationConnectionStatusSchema,
     externalSubjectId: z.string().min(1).optional(),
     config: z.record(z.string(), z.unknown()).optional(),
@@ -113,6 +114,7 @@ export const CreateApiKeyConnectionParamsSchema = z
 
 export const CreateApiKeyConnectionBodySchema = z
   .object({
+    displayName: z.string().min(1),
     apiKey: z.string().min(1),
   })
   .strict();
@@ -123,15 +125,22 @@ export const StartOAuthConnectionParamsSchema = z
   })
   .strict();
 
+export const StartOAuthConnectionBodySchema = z
+  .object({
+    displayName: z.string().min(1).optional(),
+  })
+  .strict();
+
 export const UpdateApiKeyConnectionParamsSchema = z
   .object({
     connectionId: z.string().min(1),
   })
   .strict();
 
-export const UpdateApiKeyConnectionBodySchema = z
+export const UpdateIntegrationConnectionBodySchema = z
   .object({
-    apiKey: z.string().min(1),
+    displayName: z.string().min(1),
+    apiKey: z.string().min(1).optional(),
   })
   .strict();
 
@@ -271,9 +280,9 @@ export const createApiKeyConnectionRoute = createRoute({
   },
 });
 
-export const updateApiKeyConnectionRoute = createRoute({
+export const updateIntegrationConnectionRoute = createRoute({
   method: "put",
-  path: "/:connectionId/api-key",
+  path: "/:connectionId",
   tags: ["Integrations"],
   request: {
     params: UpdateApiKeyConnectionParamsSchema,
@@ -281,14 +290,14 @@ export const updateApiKeyConnectionRoute = createRoute({
       required: true,
       content: {
         "application/json": {
-          schema: UpdateApiKeyConnectionBodySchema,
+          schema: UpdateIntegrationConnectionBodySchema,
         },
       },
     },
   },
   responses: {
     200: {
-      description: "Update the API key for an existing API-key integration connection.",
+      description: "Update an existing integration connection.",
       content: {
         "application/json": {
           schema: IntegrationConnectionSchema,
@@ -344,6 +353,14 @@ export const startOAuthConnectionRoute = createRoute({
   tags: ["Integrations"],
   request: {
     params: StartOAuthConnectionParamsSchema,
+    body: {
+      required: false,
+      content: {
+        "application/json": {
+          schema: StartOAuthConnectionBodySchema,
+        },
+      },
+    },
   },
   responses: {
     200: {

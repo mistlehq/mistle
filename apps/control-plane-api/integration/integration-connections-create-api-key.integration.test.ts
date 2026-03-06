@@ -54,6 +54,7 @@ describe("integration connections create api key integration", () => {
     });
 
     const requestBody = CreateApiKeyConnectionBodySchema.parse({
+      displayName: "Primary OpenAI key",
       apiKey: "sk-test-connection-api-key",
     });
 
@@ -70,6 +71,7 @@ describe("integration connections create api key integration", () => {
     const responseBody = IntegrationConnectionSchema.parse(await response.json());
 
     expect(responseBody.targetKey).toBe("openai-default");
+    expect(responseBody.displayName).toBe("Primary OpenAI key");
     expect(responseBody.status).toBe("active");
     expect(responseBody.config).toEqual({
       auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
@@ -93,6 +95,7 @@ describe("integration connections create api key integration", () => {
     expect(createdConnection.config).toEqual({
       auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
     });
+    expect(createdConnection.displayName).toBe("Primary OpenAI key");
 
     const createdConnectionCredential =
       await fixture.db.query.integrationConnectionCredentials.findFirst({
@@ -158,6 +161,7 @@ describe("integration connections create api key integration", () => {
         cookie: authenticatedSession.cookie,
       },
       body: JSON.stringify({
+        displayName: "Missing target",
         apiKey: "sk-test-missing-target",
       }),
     });
@@ -192,6 +196,7 @@ describe("integration connections create api key integration", () => {
         cookie: authenticatedSession.cookie,
       },
       body: JSON.stringify({
+        displayName: "Disabled target",
         apiKey: "sk-test-disabled-target",
       }),
     });
@@ -236,6 +241,7 @@ describe("integration connections create api key integration", () => {
         cookie: authenticatedSession.cookie,
       },
       body: JSON.stringify({
+        displayName: "",
         apiKey: "",
       }),
     });
@@ -253,6 +259,7 @@ describe("integration connections create api key integration", () => {
         "content-type": "application/json",
       },
       body: JSON.stringify({
+        displayName: "Unauthenticated",
         apiKey: "sk-test-unauthenticated",
       }),
     });

@@ -43,6 +43,7 @@ describe("sandbox profile version put integration bindings integration", () => {
           id: "icn_put_bindings_route_001",
           organizationId: authenticatedSession.organizationId,
           targetKey: "openai-default-put-bindings-route",
+          displayName: "Route Connection A",
           config: {
             auth_scheme: "api-key",
           },
@@ -51,6 +52,7 @@ describe("sandbox profile version put integration bindings integration", () => {
           id: "icn_put_bindings_route_002",
           organizationId: authenticatedSession.organizationId,
           targetKey: "openai-default-put-bindings-route",
+          displayName: "Route Connection B",
           config: {
             auth_scheme: "api-key",
           },
@@ -273,6 +275,7 @@ describe("sandbox profile version put integration bindings integration", () => {
         id: "icn_put_bindings_route_invalid_binding_id_001",
         organizationId: authenticatedSession.organizationId,
         targetKey: "openai-default-put-bindings-route-invalid-binding-id",
+        displayName: "Invalid Binding Connection",
         config: {
           auth_scheme: "api-key",
         },
@@ -393,6 +396,7 @@ describe("sandbox profile version put integration bindings integration", () => {
         id: "icn_put_bindings_invalid_reasoning_001",
         organizationId: authenticatedSession.organizationId,
         targetKey: "openai-default-put-bindings-invalid-reasoning",
+        displayName: "Invalid Reasoning Connection",
         config: {
           auth_scheme: "api-key",
         },

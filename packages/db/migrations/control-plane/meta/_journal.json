@@ -85,6 +85,13 @@
       "when": 1772596345814,
       "tag": "0011_add-automations",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1772772287486,
+      "tag": "0012_add-integration-connection-display-name",
+      "breakpoints": true
     }
   ]
 }

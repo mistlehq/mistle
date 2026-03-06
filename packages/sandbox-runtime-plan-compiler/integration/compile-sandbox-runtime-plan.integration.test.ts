@@ -77,6 +77,7 @@ describe("compileSandboxRuntimePlan integration", () => {
       id: "icn_srpc_compile_success",
       organizationId: "org_srpc_compile_success",
       targetKey: "openai-default-srpc-success",
+      displayName: "SRPC Compile Success Connection",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
         auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
@@ -206,6 +207,7 @@ describe("compileSandboxRuntimePlan integration", () => {
       id: "icn_srpc_foreign_connection",
       organizationId: "org_srpc_binding_scope_foreign",
       targetKey: "openai-default-srpc-missing-connection",
+      displayName: "SRPC Foreign Connection",
       status: IntegrationConnectionStatuses.ACTIVE,
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
@@ -273,6 +275,7 @@ describe("compileSandboxRuntimePlan integration", () => {
       id: "icn_srpc_missing_target_secrets_entry",
       organizationId: "org_srpc_missing_target_secrets_entry",
       targetKey: "openai-default-srpc-missing-target-secrets-entry",
+      displayName: "SRPC Missing Secrets Connection",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
         auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,

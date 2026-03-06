@@ -46,6 +46,7 @@ export type ListIntegrationConnectionsInput = {
 type IntegrationConnectionListItem = {
   id: string;
   targetKey: string;
+  displayName: string;
   status: IntegrationConnectionStatus;
   externalSubjectId?: string;
   config?: Record<string, unknown>;
@@ -140,6 +141,7 @@ export async function listIntegrationConnections(
       items: result.items.map((connection) => ({
         id: connection.id,
         targetKey: connection.targetKey,
+        displayName: connection.displayName,
         status: connection.status,
         ...(connection.externalSubjectId === null
           ? {}
