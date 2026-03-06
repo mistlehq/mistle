@@ -76,7 +76,8 @@
         "client_id": "Iv1.yourclientid"
       },
       "secrets": {
-        "app_private_key_pem": "-----BEGIN PRIVATE KEY-----\\n<replace-with-real-key>\\n-----END PRIVATE KEY-----"
+        "app_private_key_pem": "-----BEGIN PRIVATE KEY-----\\n<replace-with-real-key>\\n-----END PRIVATE KEY-----",
+        "webhook_secret": "<replace-with-random-webhook-secret>"
       }
     },
     {
@@ -90,7 +91,8 @@
         "client_id": "Iv1.yourgheclientid"
       },
       "secrets": {
-        "app_private_key_pem": "-----BEGIN PRIVATE KEY-----\\n<replace-with-real-key>\\n-----END PRIVATE KEY-----"
+        "app_private_key_pem": "-----BEGIN PRIVATE KEY-----\\n<replace-with-real-key>\\n-----END PRIVATE KEY-----",
+        "webhook_secret": "<replace-with-random-webhook-secret>"
       }
     }
   ]
