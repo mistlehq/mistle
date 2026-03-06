@@ -118,18 +118,40 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
                 renderedInput: "hello",
                 renderedConversationKey: "conversation-key",
                 renderedIdempotencyKey: null,
+                providerFamily: "codex",
+                providerModel: "gpt-5.3-codex",
               }),
-              ensureAutomationSandbox: async () => ({
+              claimAutomationConversation: async () => ({
+                conversationId: "cnv_test",
+                providerFamily: "codex",
+              }),
+              ensureAutomationConversationSandbox: async () => ({
                 sandboxInstanceId: "sbi_test",
-                startupWorkflowRunId: "wf_start_sandbox_test",
+                startupWorkflowRunId: null,
+                routeId: "cvr_test",
+                providerConversationId: "thread_test",
+                providerExecutionId: "turn_test",
               }),
-              acquireAutomationConnection: async () => ({
-                instanceId: "sbi_test",
-                url: "ws://gateway.example/sbi_test?connect_token=token_test",
-                token: "token_test",
-                expiresAt: "2026-01-01T00:00:30.000Z",
+              ensureAutomationConversationRoute: async (input) => ({
+                routeId: input.ensuredAutomationConversationSandbox.routeId ?? "cvr_test",
+                sandboxInstanceId: input.ensuredAutomationConversationSandbox.sandboxInstanceId,
+                providerConversationId:
+                  input.ensuredAutomationConversationSandbox.providerConversationId,
+                providerExecutionId: input.ensuredAutomationConversationSandbox.providerExecutionId,
               }),
-              deliverAutomationPayload: async () => {},
+              ensureAutomationConversationBinding: async (input) => ({
+                routeId: input.routedAutomationConversation.routeId,
+                sandboxInstanceId: input.routedAutomationConversation.sandboxInstanceId,
+                providerConversationId:
+                  input.routedAutomationConversation.providerConversationId ?? "thread_test",
+                providerExecutionId: input.routedAutomationConversation.providerExecutionId,
+                providerStatus: "active",
+                resumeRequired: false,
+              }),
+              executeAutomationConversation: async () => ({
+                providerExecutionId: "turn_test_2",
+              }),
+              persistAutomationConversationExecution: async () => {},
               markAutomationRunCompleted: async () => {},
               markAutomationRunFailed: async () => {},
               resolveAutomationRunFailure: ({ error }) => {

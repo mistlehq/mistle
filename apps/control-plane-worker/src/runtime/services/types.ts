@@ -1,14 +1,20 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type {
-  AcquiredAutomationConnection,
-  AcquireAutomationConnectionInput,
+  BoundAutomationConversation,
+  ClaimAutomationConversationInput,
+  ClaimedAutomationConversation,
   ControlPlaneWorkerServices,
-  DeliverAutomationPayloadInput,
-  EnsuredAutomationSandbox,
-  EnsureAutomationSandboxInput,
+  EnsureAutomationConversationBindingInput,
+  EnsureAutomationConversationRouteInput,
+  EnsureAutomationConversationSandboxInput,
+  EnsuredAutomationConversationSandbox,
+  ExecuteAutomationConversationInput,
+  ExecutedAutomationConversation,
   HandleAutomationRunWorkflowInput,
+  PersistAutomationConversationExecutionInput,
   PreparedAutomationRun,
+  RoutedAutomationConversation,
   HandleIntegrationWebhookEventWorkflowInput,
   HandleIntegrationWebhookEventWorkflowOutput,
   StartSandboxProfileInstanceWorkflowInput,
@@ -66,11 +72,20 @@ export type HandleAutomationRunServiceDependencies = {
 export type HandleAutomationRunServiceInput = HandleAutomationRunWorkflowInput;
 export type HandleAutomationRunTransitionServiceOutput = { shouldProcess: boolean };
 export type PrepareAutomationRunServiceOutput = PreparedAutomationRun;
-export type EnsureAutomationSandboxServiceInput = EnsureAutomationSandboxInput;
-export type EnsureAutomationSandboxServiceOutput = EnsuredAutomationSandbox;
-export type AcquireAutomationConnectionServiceInput = AcquireAutomationConnectionInput;
-export type AcquireAutomationConnectionServiceOutput = AcquiredAutomationConnection;
-export type DeliverAutomationPayloadServiceInput = DeliverAutomationPayloadInput;
+export type ClaimAutomationConversationServiceInput = ClaimAutomationConversationInput;
+export type ClaimAutomationConversationServiceOutput = ClaimedAutomationConversation;
+export type EnsureAutomationConversationSandboxServiceInput =
+  EnsureAutomationConversationSandboxInput;
+export type EnsureAutomationConversationSandboxServiceOutput = EnsuredAutomationConversationSandbox;
+export type EnsureAutomationConversationRouteServiceInput = EnsureAutomationConversationRouteInput;
+export type EnsureAutomationConversationRouteServiceOutput = RoutedAutomationConversation;
+export type EnsureAutomationConversationBindingServiceInput =
+  EnsureAutomationConversationBindingInput;
+export type EnsureAutomationConversationBindingServiceOutput = BoundAutomationConversation;
+export type ExecuteAutomationConversationServiceInput = ExecuteAutomationConversationInput;
+export type ExecuteAutomationConversationServiceOutput = ExecutedAutomationConversation;
+export type PersistAutomationConversationExecutionServiceInput =
+  PersistAutomationConversationExecutionInput;
 export type HandleAutomationRunMarkFailedServiceInput = {
   automationRunId: string;
   failureCode: string;

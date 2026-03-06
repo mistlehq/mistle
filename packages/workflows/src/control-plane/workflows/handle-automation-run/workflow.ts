@@ -27,33 +27,74 @@ export type PreparedAutomationRun = {
   renderedInput: string;
   renderedConversationKey: string;
   renderedIdempotencyKey: string | null;
+  providerFamily: string;
+  providerModel: string;
 };
 
-export type EnsureAutomationSandboxInput = {
+export type ClaimAutomationConversationInput = {
   preparedAutomationRun: PreparedAutomationRun;
 };
 
-export type EnsuredAutomationSandbox = {
+export type ClaimedAutomationConversation = {
+  conversationId: string;
+  providerFamily: string;
+};
+
+export type EnsureAutomationConversationSandboxInput = {
+  preparedAutomationRun: PreparedAutomationRun;
+  claimedAutomationConversation: ClaimedAutomationConversation;
+};
+
+export type EnsuredAutomationConversationSandbox = {
   sandboxInstanceId: string;
-  startupWorkflowRunId: string;
+  startupWorkflowRunId: string | null;
+  routeId: string | null;
+  providerConversationId: string | null;
+  providerExecutionId: string | null;
 };
 
-export type AcquiredAutomationConnection = {
-  instanceId: string;
-  url: string;
-  token: string;
-  expiresAt: string;
-};
-
-export type AcquireAutomationConnectionInput = {
+export type EnsureAutomationConversationRouteInput = {
   preparedAutomationRun: PreparedAutomationRun;
-  ensuredAutomationSandbox: EnsuredAutomationSandbox;
+  claimedAutomationConversation: ClaimedAutomationConversation;
+  ensuredAutomationConversationSandbox: EnsuredAutomationConversationSandbox;
 };
 
-export type DeliverAutomationPayloadInput = {
+export type RoutedAutomationConversation = {
+  routeId: string;
+  sandboxInstanceId: string;
+  providerConversationId: string | null;
+  providerExecutionId: string | null;
+};
+
+export type EnsureAutomationConversationBindingInput = {
   preparedAutomationRun: PreparedAutomationRun;
-  ensuredAutomationSandbox: EnsuredAutomationSandbox;
-  acquiredAutomationConnection: AcquiredAutomationConnection;
+  claimedAutomationConversation: ClaimedAutomationConversation;
+  routedAutomationConversation: RoutedAutomationConversation;
+};
+
+export type BoundAutomationConversation = {
+  routeId: string;
+  sandboxInstanceId: string;
+  providerConversationId: string;
+  providerExecutionId: string | null;
+  providerStatus: "idle" | "active";
+  resumeRequired: boolean;
+};
+
+export type ExecuteAutomationConversationInput = {
+  preparedAutomationRun: PreparedAutomationRun;
+  boundAutomationConversation: BoundAutomationConversation;
+};
+
+export type ExecutedAutomationConversation = {
+  providerExecutionId: string | null;
+  providerState?: unknown;
+};
+
+export type PersistAutomationConversationExecutionInput = {
+  preparedAutomationRun: PreparedAutomationRun;
+  boundAutomationConversation: BoundAutomationConversation;
+  executedAutomationConversation: ExecutedAutomationConversation;
 };
 
 export type HandleAutomationRunFailure = {
@@ -72,13 +113,24 @@ export type CreateHandleAutomationRunWorkflowInput = {
     input: HandleAutomationRunWorkflowInput,
   ) => Promise<HandleAutomationRunTransitionResult>;
   prepareAutomationRun: (input: HandleAutomationRunWorkflowInput) => Promise<PreparedAutomationRun>;
-  ensureAutomationSandbox: (
-    input: EnsureAutomationSandboxInput,
-  ) => Promise<EnsuredAutomationSandbox>;
-  acquireAutomationConnection: (
-    input: AcquireAutomationConnectionInput,
-  ) => Promise<AcquiredAutomationConnection>;
-  deliverAutomationPayload: (input: DeliverAutomationPayloadInput) => Promise<void>;
+  claimAutomationConversation: (
+    input: ClaimAutomationConversationInput,
+  ) => Promise<ClaimedAutomationConversation>;
+  ensureAutomationConversationSandbox: (
+    input: EnsureAutomationConversationSandboxInput,
+  ) => Promise<EnsuredAutomationConversationSandbox>;
+  ensureAutomationConversationRoute: (
+    input: EnsureAutomationConversationRouteInput,
+  ) => Promise<RoutedAutomationConversation>;
+  ensureAutomationConversationBinding: (
+    input: EnsureAutomationConversationBindingInput,
+  ) => Promise<BoundAutomationConversation>;
+  executeAutomationConversation: (
+    input: ExecuteAutomationConversationInput,
+  ) => Promise<ExecutedAutomationConversation>;
+  persistAutomationConversationExecution: (
+    input: PersistAutomationConversationExecutionInput,
+  ) => Promise<void>;
   markAutomationRunCompleted: (input: HandleAutomationRunWorkflowInput) => Promise<void>;
   markAutomationRunFailed: (input: MarkAutomationRunFailedInput) => Promise<void>;
   resolveAutomationRunFailure: (input: { error: unknown }) => HandleAutomationRunFailure;
@@ -107,28 +159,57 @@ export function createHandleAutomationRunWorkflow(
         ctx.prepareAutomationRun(workflowInput),
       );
 
-      const ensuredAutomationSandbox = await step.run(
-        { name: "ensure-automation-sandbox" },
+      const claimedAutomationConversation = await step.run(
+        { name: "claim-automation-conversation" },
         async () =>
-          ctx.ensureAutomationSandbox({
+          ctx.claimAutomationConversation({
             preparedAutomationRun,
           }),
       );
 
-      const acquiredAutomationConnection = await step.run(
-        { name: "acquire-automation-connection" },
+      const ensuredAutomationConversationSandbox = await step.run(
+        { name: "ensure-automation-conversation-sandbox" },
         async () =>
-          ctx.acquireAutomationConnection({
+          ctx.ensureAutomationConversationSandbox({
             preparedAutomationRun,
-            ensuredAutomationSandbox,
+            claimedAutomationConversation,
           }),
       );
 
-      await step.run({ name: "deliver-automation-payload" }, async () =>
-        ctx.deliverAutomationPayload({
+      const routedAutomationConversation = await step.run(
+        { name: "ensure-automation-conversation-route" },
+        async () =>
+          ctx.ensureAutomationConversationRoute({
+            preparedAutomationRun,
+            claimedAutomationConversation,
+            ensuredAutomationConversationSandbox,
+          }),
+      );
+
+      const boundAutomationConversation = await step.run(
+        { name: "ensure-automation-conversation-binding" },
+        async () =>
+          ctx.ensureAutomationConversationBinding({
+            preparedAutomationRun,
+            claimedAutomationConversation,
+            routedAutomationConversation,
+          }),
+      );
+
+      const executedAutomationConversation = await step.run(
+        { name: "execute-automation-conversation" },
+        async () =>
+          ctx.executeAutomationConversation({
+            preparedAutomationRun,
+            boundAutomationConversation,
+          }),
+      );
+
+      await step.run({ name: "persist-automation-conversation-execution" }, async () =>
+        ctx.persistAutomationConversationExecution({
           preparedAutomationRun,
-          ensuredAutomationSandbox,
-          acquiredAutomationConnection,
+          boundAutomationConversation,
+          executedAutomationConversation,
         }),
       );
 

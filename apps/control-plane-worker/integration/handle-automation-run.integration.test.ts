@@ -10,8 +10,11 @@ import {
   integrationTargets,
   integrationWebhookEvents,
   IntegrationWebhookEventStatuses,
+  IntegrationBindingKinds,
   organizations,
   sandboxProfiles,
+  sandboxProfileVersionIntegrationBindings,
+  sandboxProfileVersions,
   CONTROL_PLANE_SCHEMA_NAME,
   webhookAutomations,
 } from "@mistle/db/control-plane";
@@ -116,6 +119,39 @@ describe("handleAutomationRun integration", () => {
           displayName: "Automation Prepare Profile",
           status: "active",
         });
+        await database.db.insert(sandboxProfileVersions).values({
+          sandboxProfileId,
+          version: 7,
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey: "openai-default-worker-automation-prepare",
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com",
+            web_base_url: "https://platform.openai.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: "icn_worker_automation_prepare_agent",
+          organizationId,
+          targetKey: "openai-default-worker-automation-prepare",
+          displayName: "Worker automation agent connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "987654",
+          config: {},
+        });
+        await database.db.insert(sandboxProfileVersionIntegrationBindings).values({
+          id: "ibd_worker_automation_prepare_agent",
+          sandboxProfileId,
+          sandboxProfileVersion: 7,
+          connectionId: "icn_worker_automation_prepare_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {
+            defaultModel: "gpt-5.3-codex",
+          },
+        });
         await database.db.insert(integrationTargets).values({
           targetKey,
           familyId: "github",
@@ -208,6 +244,8 @@ describe("handleAutomationRun integration", () => {
           renderedInput: "Handle @mistlebot prepare",
           renderedConversationKey: "issue-777",
           renderedIdempotencyKey: "delivery_prepare",
+          providerFamily: "codex",
+          providerModel: "gpt-5.3-codex",
         });
         expect(preparedRun.webhookPayload).toEqual({
           issue: {
@@ -251,6 +289,39 @@ describe("handleAutomationRun integration", () => {
           organizationId,
           displayName: "Automation Run Complete Profile",
           status: "active",
+        });
+        await database.db.insert(sandboxProfileVersions).values({
+          sandboxProfileId,
+          version: 1,
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey: "openai-default-worker-automation-run-complete",
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com",
+            web_base_url: "https://platform.openai.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: "icn_worker_automation_run_complete_agent",
+          organizationId,
+          targetKey: "openai-default-worker-automation-run-complete",
+          displayName: "Worker automation run complete agent connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "987655",
+          config: {},
+        });
+        await database.db.insert(sandboxProfileVersionIntegrationBindings).values({
+          id: "ibd_worker_automation_run_complete_agent",
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+          connectionId: "icn_worker_automation_run_complete_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {
+            defaultModel: "gpt-5.3-codex",
+          },
         });
         await database.db.insert(integrationTargets).values({
           targetKey,
@@ -372,6 +443,39 @@ describe("handleAutomationRun integration", () => {
           displayName: "Automation Run Running Profile",
           status: "active",
         });
+        await database.db.insert(sandboxProfileVersions).values({
+          sandboxProfileId,
+          version: 1,
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey: "openai-default-worker-automation-run-running",
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com",
+            web_base_url: "https://platform.openai.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: "icn_worker_automation_run_running_agent",
+          organizationId,
+          targetKey: "openai-default-worker-automation-run-running",
+          displayName: "Worker automation run running agent connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "987656",
+          config: {},
+        });
+        await database.db.insert(sandboxProfileVersionIntegrationBindings).values({
+          id: "ibd_worker_automation_run_running_agent",
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+          connectionId: "icn_worker_automation_run_running_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {
+            defaultModel: "gpt-5.3-codex",
+          },
+        });
         await database.db.insert(integrationTargets).values({
           targetKey,
           familyId: "github",
@@ -490,6 +594,39 @@ describe("handleAutomationRun integration", () => {
           organizationId,
           displayName: "Automation Run Fail Profile",
           status: "active",
+        });
+        await database.db.insert(sandboxProfileVersions).values({
+          sandboxProfileId,
+          version: 1,
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey: "openai-default-worker-automation-run-fail",
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com",
+            web_base_url: "https://platform.openai.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: "icn_worker_automation_run_fail_agent",
+          organizationId,
+          targetKey: "openai-default-worker-automation-run-fail",
+          displayName: "Worker automation run fail agent connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "987657",
+          config: {},
+        });
+        await database.db.insert(sandboxProfileVersionIntegrationBindings).values({
+          id: "ibd_worker_automation_run_fail_agent",
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+          connectionId: "icn_worker_automation_run_fail_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {
+            defaultModel: "gpt-5.3-codex",
+          },
         });
         await database.db.insert(integrationTargets).values({
           targetKey,

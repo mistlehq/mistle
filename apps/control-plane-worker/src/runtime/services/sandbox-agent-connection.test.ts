@@ -2,12 +2,10 @@ import { systemSleeper } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
-import { deliverAutomationPayload } from "./handle-automation-run.js";
 import {
   connectSandboxAgentConnection,
   sendSandboxAgentMessage,
 } from "./sandbox-agent-connection.js";
-import type { DeliverAutomationPayloadServiceInput } from "./types.js";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -200,54 +198,18 @@ async function startAgentTestServer(mode: AgentTestServerMode): Promise<AgentTes
   };
 }
 
-function createDeliverInput(connectionUrl: string): DeliverAutomationPayloadServiceInput {
-  return {
-    preparedAutomationRun: {
-      automationRunId: "aru_test_001",
-      automationRunCreatedAt: "2026-03-05T00:00:00.000Z",
-      automationId: "atm_test_001",
-      automationTargetId: "atg_test_001",
-      organizationId: "org_test_001",
-      sandboxProfileId: "sbp_test_001",
-      sandboxProfileVersion: 1,
-      webhookEventId: "iwe_test_001",
-      webhookEventType: "github.issue_comment.created",
-      webhookProviderEventType: "issue_comment",
-      webhookExternalEventId: "evt_test_001",
-      webhookExternalDeliveryId: "delivery_test_001",
-      webhookPayload: {
-        comment: {
-          body: "@mistlebot run this",
-        },
-        issue: {
-          number: 42,
-        },
-      },
-      renderedInput: "Handle @mistlebot run this",
-      renderedConversationKey: "issue-42",
-      renderedIdempotencyKey: "delivery_test_001",
-    },
-    ensuredAutomationSandbox: {
-      sandboxInstanceId: "sbi_test_001",
-      startupWorkflowRunId: "wfr_start_001",
-    },
-    acquiredAutomationConnection: {
-      instanceId: "sbi_test_001",
-      url: connectionUrl,
-      token: "connect_token_001",
-      expiresAt: "2026-03-05T01:00:00.000Z",
-    },
-  };
-}
-
 describe("sandbox agent websocket delivery", () => {
   it("delivers the rendered automation input and closes the socket by default", async () => {
     const server = await startAgentTestServer("accept");
 
     try {
-      const deliverInput = createDeliverInput(server.url);
-
-      await deliverAutomationPayload(deliverInput);
+      const connection = await connectSandboxAgentConnection({
+        connectionUrl: server.url,
+      });
+      await sendSandboxAgentMessage({
+        connection,
+        message: "Handle @mistlebot run this",
+      });
 
       const connectRequest = await server.connectRequest;
       const payloadText = await server.payload;
@@ -265,7 +227,11 @@ describe("sandbox agent websocket delivery", () => {
     const server = await startAgentTestServer("reject");
 
     try {
-      await expect(deliverAutomationPayload(createDeliverInput(server.url))).rejects.toThrow(
+      await expect(
+        connectSandboxAgentConnection({
+          connectionUrl: server.url,
+        }),
+      ).rejects.toThrow(
         "Sandbox agent connect request was rejected (agent_endpoint_unavailable): agent endpoint unavailable",
       );
     } finally {
