@@ -264,7 +264,9 @@ process.once("SIGTERM", () => {
 function start(): void {
   loadDevelopmentEnvFile();
 
-  console.log("Starting local infra dependencies (Postgres 18, PgBouncer, Mailpit, Registry)...");
+  console.log(
+    "Starting local infra dependencies (Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM)...",
+  );
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const dataPlaneApiLocalPort = readDataPlaneApiLocalPort(DEV_CONFIG_PATH);
   const cloudflareTunnelToken = readRequiredEnv("CLOUDFLARE_TUNNEL_TOKEN");
@@ -302,6 +304,7 @@ function start(): void {
       "pgbouncer",
       "mailpit",
       "registry",
+      "otel-lgtm",
     ],
     env: sharedDevEnv,
   });
@@ -370,6 +373,7 @@ function start(): void {
   console.log(`- data-plane-api: ${dataPlaneApiPublicUrl}`);
   console.log(`- data-plane tunnel route: ${dataPlaneApiPublicUrl}/tunnel`);
   console.log("- mailpit ui: http://127.0.0.1:8025");
+  console.log("- grafana (otel-lgtm): http://127.0.0.1:3000");
   console.log(`- local registry: http://${LOCAL_REGISTRY_HOST}`);
   console.log("");
 

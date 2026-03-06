@@ -3,6 +3,10 @@ import { type PartialGlobalConfigInput, PartialGlobalConfigSchema } from "./sche
 
 export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGlobalConfigInput {
   const global = asObjectRecord(tomlRoot.global);
+  const telemetry = asObjectRecord(global.telemetry);
+  const telemetryTraces = asObjectRecord(telemetry.traces);
+  const telemetryLogs = asObjectRecord(telemetry.logs);
+  const telemetryMetrics = asObjectRecord(telemetry.metrics);
   const internalAuth = asObjectRecord(global.internal_auth);
   const sandbox = asObjectRecord(global.sandbox);
   const sandboxBootstrap = asObjectRecord(sandbox.bootstrap);
@@ -10,6 +14,41 @@ export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGl
 
   return PartialGlobalConfigSchema.parse({
     env: global.env,
+    ...(typeof telemetry.enabled === "boolean" ||
+    typeof telemetry.debug === "boolean" ||
+    typeof telemetryTraces.endpoint === "string" ||
+    typeof telemetryLogs.endpoint === "string" ||
+    typeof telemetryMetrics.endpoint === "string" ||
+    typeof telemetry.resource_attributes === "string"
+      ? {
+          telemetry: {
+            enabled: telemetry.enabled,
+            debug: telemetry.debug,
+            ...(typeof telemetryTraces.endpoint === "string"
+              ? {
+                  traces: {
+                    endpoint: telemetryTraces.endpoint,
+                  },
+                }
+              : {}),
+            ...(typeof telemetryLogs.endpoint === "string"
+              ? {
+                  logs: {
+                    endpoint: telemetryLogs.endpoint,
+                  },
+                }
+              : {}),
+            ...(typeof telemetryMetrics.endpoint === "string"
+              ? {
+                  metrics: {
+                    endpoint: telemetryMetrics.endpoint,
+                  },
+                }
+              : {}),
+            resourceAttributes: telemetry.resource_attributes,
+          },
+        }
+      : {}),
     ...(typeof internalAuth.service_token === "string"
       ? {
           internalAuth: {

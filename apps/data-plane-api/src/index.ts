@@ -1,19 +1,13 @@
-import { AppIds, loadConfig } from "@mistle/config";
+import { shutdownTelemetry } from "@mistle/telemetry";
 
+import { appConfig, globalConfig } from "./instrument.js";
 import { logger } from "./logger.js";
 import { createDataPlaneApiRuntime } from "./runtime/index.js";
 
 async function startDataPlaneApi(): Promise<void> {
-  const loadedConfig = loadConfig({
-    app: AppIds.DATA_PLANE_API,
-    env: process.env,
-  });
-  if (loadedConfig.global === undefined) {
-    throw new Error("Expected global config to be loaded for data-plane-api.");
-  }
   const runtime = await createDataPlaneApiRuntime({
-    app: loadedConfig.app,
-    internalAuthServiceToken: loadedConfig.global.internalAuth.serviceToken,
+    app: appConfig,
+    internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
   });
 
   await runtime.start();
@@ -23,6 +17,7 @@ async function startDataPlaneApi(): Promise<void> {
   async function stopRuntimeAndExit(signal: NodeJS.Signals): Promise<void> {
     try {
       await runtime.stop();
+      await shutdownTelemetry();
       process.exit(0);
     } catch (error) {
       logger.error(
@@ -32,6 +27,7 @@ async function startDataPlaneApi(): Promise<void> {
         },
         "Failed to gracefully shutdown data-plane-api",
       );
+      await shutdownTelemetry();
       process.exit(1);
     }
   }
@@ -57,14 +53,15 @@ async function startDataPlaneApi(): Promise<void> {
 
   logger.info(
     {
-      host: loadedConfig.app.server.host,
-      port: loadedConfig.app.server.port,
+      host: appConfig.server.host,
+      port: appConfig.server.port,
     },
     "data-plane-api listening",
   );
 }
 
-void startDataPlaneApi().catch((error) => {
+void startDataPlaneApi().catch(async (error) => {
   logger.error({ err: error }, "Failed to start data-plane-api");
+  await shutdownTelemetry();
   process.exit(1);
 });

@@ -1,19 +1,12 @@
-import { AppIds, loadConfig } from "@mistle/config";
+import { shutdownTelemetry } from "@mistle/telemetry";
 
+import { appConfig, globalConfig } from "./instrument.js";
 import { logger } from "./logger.js";
 import { createDataPlaneGatewayRuntime } from "./runtime/index.js";
 
-const loadedConfig = loadConfig({
-  app: AppIds.DATA_PLANE_GATEWAY,
-  env: process.env,
-});
-if (loadedConfig.global === undefined) {
-  throw new Error("Expected global sandbox config to be loaded for data-plane-gateway.");
-}
-
 const runtime = createDataPlaneGatewayRuntime({
-  app: loadedConfig.app,
-  sandbox: loadedConfig.global.sandbox,
+  app: appConfig,
+  sandbox: globalConfig.sandbox,
 });
 
 await runtime.start();
@@ -23,6 +16,7 @@ let shutdownPromise: Promise<void> | undefined;
 async function stopRuntimeAndExit(signal: NodeJS.Signals): Promise<void> {
   try {
     await runtime.stop();
+    await shutdownTelemetry();
     process.exit(0);
   } catch (error) {
     logger.error(
@@ -32,6 +26,7 @@ async function stopRuntimeAndExit(signal: NodeJS.Signals): Promise<void> {
       },
       "Failed to gracefully shutdown data-plane-gateway",
     );
+    await shutdownTelemetry();
     process.exit(1);
   }
 }
@@ -57,8 +52,8 @@ process.once("SIGTERM", () => {
 
 logger.info(
   {
-    host: loadedConfig.app.server.host,
-    port: loadedConfig.app.server.port,
+    host: appConfig.server.host,
+    port: appConfig.server.port,
   },
   "data-plane-gateway listening",
 );

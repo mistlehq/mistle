@@ -14,6 +14,12 @@ describe("convertEnvToTomlRecord", () => {
     const tomlRecord = convertEnvToTomlRecord({
       IGNORED_VALUE: "ignored",
       NODE_ENV: "test",
+      MISTLE_GLOBAL_TELEMETRY_ENABLED: "true",
+      MISTLE_GLOBAL_TELEMETRY_DEBUG: "false",
+      MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT: "http://127.0.0.1:4318/v1/traces",
+      MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT: "http://127.0.0.1:4318/v1/logs",
+      MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT: "http://127.0.0.1:4318/v1/metrics",
+      MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES: "deployment.environment=test",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: "fixture-bootstrap-secret",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: "data-plane-worker",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE: "data-plane-gateway",
@@ -42,6 +48,20 @@ describe("convertEnvToTomlRecord", () => {
     expect(tomlRecord).toEqual({
       global: {
         env: "development",
+        telemetry: {
+          enabled: true,
+          debug: false,
+          traces: {
+            endpoint: "http://127.0.0.1:4318/v1/traces",
+          },
+          logs: {
+            endpoint: "http://127.0.0.1:4318/v1/logs",
+          },
+          metrics: {
+            endpoint: "http://127.0.0.1:4318/v1/metrics",
+          },
+          resource_attributes: "deployment.environment=test",
+        },
         sandbox: {
           default_base_image: "127.0.0.1:5001/mistle/sandbox-base:dev",
           internal_gateway_ws_url: "ws://127.0.0.1:5302/tunnel/sandbox",
@@ -107,6 +127,20 @@ describe("convertTomlToEnvRecord", () => {
     const envRecord = convertTomlToEnvRecord({
       global: {
         env: "production",
+        telemetry: {
+          enabled: true,
+          debug: false,
+          traces: {
+            endpoint: "http://otel-collector:4318/v1/traces",
+          },
+          logs: {
+            endpoint: "http://otel-collector:4318/v1/logs",
+          },
+          metrics: {
+            endpoint: "http://otel-collector:4318/v1/metrics",
+          },
+          resource_attributes: "deployment.environment=production",
+        },
         sandbox: {
           default_base_image: "registry.example.com/mistle/sandbox-base:prod",
           internal_gateway_ws_url: "ws://data-plane-gateway:8084/tunnel/sandbox",
@@ -159,6 +193,12 @@ describe("convertTomlToEnvRecord", () => {
 
     expect(envRecord).toEqual({
       NODE_ENV: "production",
+      MISTLE_GLOBAL_TELEMETRY_ENABLED: "true",
+      MISTLE_GLOBAL_TELEMETRY_DEBUG: "false",
+      MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT: "http://otel-collector:4318/v1/traces",
+      MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT: "http://otel-collector:4318/v1/logs",
+      MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT: "http://otel-collector:4318/v1/metrics",
+      MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES: "deployment.environment=production",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET: "prod-bootstrap-secret",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER: "data-plane-worker",
       MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE: "data-plane-gateway",

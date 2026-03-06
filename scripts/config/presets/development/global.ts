@@ -6,6 +6,20 @@ export const globalDevelopmentPreset = {
   defaults: {
     global: {
       env: "development",
+      telemetry: {
+        enabled: true,
+        debug: false,
+        traces: {
+          endpoint: "http://127.0.0.1:4318/v1/traces",
+        },
+        logs: {
+          endpoint: "http://127.0.0.1:4318/v1/logs",
+        },
+        metrics: {
+          endpoint: "http://127.0.0.1:4318/v1/metrics",
+        },
+        resource_attributes: "deployment.environment=development",
+      },
       sandbox: {
         default_base_image: "localhost:5001/mistle/sandbox-base:dev",
         gateway_ws_url: "ws://localhost:5202/tunnel/sandbox",

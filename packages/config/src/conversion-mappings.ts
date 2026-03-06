@@ -14,6 +14,36 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "NODE_ENV",
   },
   {
+    configPath: ["global", "telemetry", "enabled"],
+    tomlPath: ["global", "telemetry", "enabled"],
+    envVar: "MISTLE_GLOBAL_TELEMETRY_ENABLED",
+  },
+  {
+    configPath: ["global", "telemetry", "debug"],
+    tomlPath: ["global", "telemetry", "debug"],
+    envVar: "MISTLE_GLOBAL_TELEMETRY_DEBUG",
+  },
+  {
+    configPath: ["global", "telemetry", "traces", "endpoint"],
+    tomlPath: ["global", "telemetry", "traces", "endpoint"],
+    envVar: "MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT",
+  },
+  {
+    configPath: ["global", "telemetry", "logs", "endpoint"],
+    tomlPath: ["global", "telemetry", "logs", "endpoint"],
+    envVar: "MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT",
+  },
+  {
+    configPath: ["global", "telemetry", "metrics", "endpoint"],
+    tomlPath: ["global", "telemetry", "metrics", "endpoint"],
+    envVar: "MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT",
+  },
+  {
+    configPath: ["global", "telemetry", "resourceAttributes"],
+    tomlPath: ["global", "telemetry", "resource_attributes"],
+    envVar: "MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES",
+  },
+  {
     configPath: ["global", "internalAuth", "serviceToken"],
     tomlPath: ["global", "internal_auth", "service_token"],
     envVar: "MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN",

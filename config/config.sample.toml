@@ -4,6 +4,20 @@
 [global]
 env = "production"
 
+[global.telemetry]
+enabled = true
+debug = false
+resource_attributes = "deployment.environment=production"
+
+[global.telemetry.traces]
+endpoint = "http://otel-collector:4318/v1/traces"
+
+[global.telemetry.logs]
+endpoint = "http://otel-collector:4318/v1/logs"
+
+[global.telemetry.metrics]
+endpoint = "http://otel-collector:4318/v1/metrics"
+
 [global.internal_auth]
 service_token = "replace-with-internal-service-token"
 
