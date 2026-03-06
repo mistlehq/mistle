@@ -17,6 +17,10 @@ describe("integrations-definitions index", () => {
       familyId: "github",
       variantId: "github-enterprise-server",
     });
+    const linearDefinition = registry.getDefinition({
+      familyId: "linear",
+      variantId: "linear-default",
+    });
 
     expect(openAiDefinition?.displayName).toBe("OpenAI");
     expect(openAiDefinition?.kind).toBe("agent");
@@ -42,17 +46,26 @@ describe("integrations-definitions index", () => {
     expect(
       githubEnterpriseServerDefinition?.credentialResolvers?.custom?.github_app_installation_token,
     ).toBeDefined();
+    expect(linearDefinition).toMatchObject({
+      familyId: "linear",
+      variantId: "linear-default",
+      kind: "connector",
+      displayName: "Linear",
+      supportedAuthSchemes: ["api-key"],
+    });
+    expect(linearDefinition?.mcp).toBeDefined();
   });
 
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(3);
+    expect(definitions).toHaveLength(4);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
       "github::github-cloud",
       "github::github-enterprise-server",
+      "linear::linear-default",
       "openai::openai-default",
     ]);
   });

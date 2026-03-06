@@ -1,4 +1,8 @@
-import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
+import {
+  IntegrationKinds,
+  IntegrationMcpConfigFormats,
+  type IntegrationDefinition,
+} from "@mistle/integrations-core";
 import { z } from "zod";
 
 import { OpenAiApiKeySupportedAuthSchemes, OpenAiConnectionConfigSchema } from "./auth.js";
@@ -35,5 +39,11 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   connectionConfigForm: OpenAiConnectionConfigForm,
   supportedAuthSchemes: OpenAiApiKeySupportedAuthSchemes,
   validateBindingWriteContext: validateOpenAiBindingWriteContext,
+  mcpConfig: {
+    clientId: "codex-cli",
+    fileId: "codex_config",
+    format: IntegrationMcpConfigFormats.TOML,
+    path: ["mcp_servers"],
+  },
   compileBinding: compileOpenAiApiKeyBinding,
 };

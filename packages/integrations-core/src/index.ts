@@ -3,6 +3,8 @@ export * from "./errors/index.js";
 export * from "./registry/index.js";
 export * from "./triggers/index.js";
 export * from "./egress/index.js";
+export * from "./egress-url/index.js";
+export * from "./mcp-config/index.js";
 export * from "./validation/index.js";
 export * from "./binding-validation/index.js";
 export * from "./runtime-plan/index.js";

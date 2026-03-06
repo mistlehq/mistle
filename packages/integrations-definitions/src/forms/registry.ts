@@ -9,6 +9,10 @@ import { GitHubCloudBindingConfigSchema } from "../github/variants/github-cloud/
 import { GitHubCloudTargetConfigSchema } from "../github/variants/github-cloud/target-config-schema.js";
 import { GitHubEnterpriseServerBindingConfigSchema } from "../github/variants/github-enterprise-server/binding-config-schema.js";
 import { GitHubEnterpriseServerTargetConfigSchema } from "../github/variants/github-enterprise-server/target-config-schema.js";
+import { LinearConnectionConfigSchema } from "../linear/variants/linear-default/auth.js";
+import { LinearBindingConfigSchema } from "../linear/variants/linear-default/binding-config-schema.js";
+import { LinearConnectionConfigForm } from "../linear/variants/linear-default/connection-config-form.js";
+import { LinearTargetConfigSchema } from "../linear/variants/linear-default/target-config-schema.js";
 import { OpenAiConnectionConfigSchema } from "../openai/variants/openai-default/auth.js";
 import {
   OpenAiConnectionConfigForm,
@@ -64,6 +68,15 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
     bindingConfigForm: resolveOpenAiBindingConfigForm,
     connectionConfigSchema: OpenAiConnectionConfigSchema,
     connectionConfigForm: OpenAiConnectionConfigForm,
+  },
+  {
+    familyId: "linear",
+    variantId: "linear-default",
+    kind: "connector",
+    targetConfigSchema: LinearTargetConfigSchema,
+    bindingConfigSchema: LinearBindingConfigSchema,
+    connectionConfigSchema: LinearConnectionConfigSchema,
+    connectionConfigForm: LinearConnectionConfigForm,
   },
 ];
 

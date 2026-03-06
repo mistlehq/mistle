@@ -1,3 +1,4 @@
+import { EgressUrlRefErrorCodes, resolveEgressUrlRef } from "../egress-url/index.js";
 import { orderRoutesForMatching } from "../egress/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import type {
@@ -6,7 +7,6 @@ import type {
   CompiledRuntimeArtifactRemovalSpec,
   CompiledRuntimeClient,
   CompiledRuntimePlan,
-  EgressUrlRef,
   RuntimeArtifactCommand,
   RuntimeClient,
   RuntimeClientEndpointSpec,
@@ -48,40 +48,6 @@ function flattenRuntimeClients(
   return runtimeClients;
 }
 
-function createEgressRouteBaseUrl(input: { egressBaseUrl: string; routeId: string }): string {
-  const parsedEgressBaseUrl = new URL(input.egressBaseUrl);
-  const normalizedBasePath =
-    parsedEgressBaseUrl.pathname.endsWith("/") && parsedEgressBaseUrl.pathname !== "/"
-      ? parsedEgressBaseUrl.pathname.slice(0, -1)
-      : parsedEgressBaseUrl.pathname === "/"
-        ? ""
-        : parsedEgressBaseUrl.pathname;
-
-  parsedEgressBaseUrl.pathname = `${normalizedBasePath}/routes/${encodeURIComponent(input.routeId)}`;
-  parsedEgressBaseUrl.search = "";
-  parsedEgressBaseUrl.hash = "";
-
-  return parsedEgressBaseUrl.toString();
-}
-
-function resolveEgressUrlRef(input: {
-  value: EgressUrlRef;
-  routeIds: ReadonlySet<string>;
-  egressBaseUrl: string;
-}): string {
-  if (!input.routeIds.has(input.value.routeId)) {
-    throw new IntegrationCompilerError(
-      CompilerErrorCodes.RUNTIME_CLIENT_SETUP_INVALID_REF,
-      `Runtime client setup referenced unknown egress route '${input.value.routeId}'.`,
-    );
-  }
-
-  return createEgressRouteBaseUrl({
-    egressBaseUrl: input.egressBaseUrl,
-    routeId: input.value.routeId,
-  });
-}
-
 function resolveRuntimeClients(input: {
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
   routeIds: ReadonlySet<string>;
@@ -102,6 +68,8 @@ function resolveRuntimeClients(input: {
         value,
         routeIds: input.routeIds,
         egressBaseUrl: input.egressBaseUrl,
+        invalidRefCode: EgressUrlRefErrorCodes.RUNTIME_CLIENT_SETUP_INVALID_REF,
+        refOwner: "Runtime client setup",
       });
     }
 

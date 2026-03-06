@@ -12,14 +12,6 @@ export const IntegrationKinds: {
   CONNECTOR: "connector",
 };
 
-export type AgentCapabilityKind = "mcp";
-
-export const AgentCapabilityKinds: {
-  MCP: AgentCapabilityKind;
-} = {
-  MCP: "mcp",
-};
-
 export type IntegrationSupportedAuthScheme = "oauth" | "api-key";
 
 export const IntegrationSupportedAuthSchemes: {
@@ -180,38 +172,33 @@ export function egressUrlRef(routeId: string): EgressUrlRef {
   };
 }
 
-export type AgentCapabilityRefValue = string | EgressUrlRef;
+export type IntegrationMcpValue = string | EgressUrlRef;
 
-export type AgentMcpCapabilityTransport = "streamable-http" | "sse" | "stdio";
+export type IntegrationMcpTransport = "streamable-http" | "sse" | "stdio";
 
-export const AgentMcpCapabilityTransports: {
-  STREAMABLE_HTTP: AgentMcpCapabilityTransport;
-  SSE: AgentMcpCapabilityTransport;
-  STDIO: AgentMcpCapabilityTransport;
+export const IntegrationMcpTransports: {
+  STREAMABLE_HTTP: IntegrationMcpTransport;
+  SSE: IntegrationMcpTransport;
+  STDIO: IntegrationMcpTransport;
 } = {
   STREAMABLE_HTTP: "streamable-http",
   SSE: "sse",
   STDIO: "stdio",
 };
 
-type AgentCapabilityBase = {
-  kind: AgentCapabilityKind;
-  capabilityId: string;
-  displayName?: string;
-  description?: string;
-};
-
-export type AgentMcpCapability = AgentCapabilityBase & {
-  kind: "mcp";
+export type IntegrationMcpServer = {
+  serverId: string;
   serverName: string;
-  transport: AgentMcpCapabilityTransport;
-  endpoint: AgentCapabilityRefValue;
-  headers?: Readonly<Record<string, AgentCapabilityRefValue>>;
+  transport: IntegrationMcpTransport;
+  description?: string;
+  url?: IntegrationMcpValue;
+  command?: string;
+  args?: ReadonlyArray<string>;
+  env?: Readonly<Record<string, IntegrationMcpValue>>;
+  httpHeaders?: Readonly<Record<string, IntegrationMcpValue>>;
 };
 
-export type AgentCapability = AgentMcpCapability;
-
-export type IntegrationBindingAgentCapabilitySource = {
+export type IntegrationBindingMcpServerSource = {
   bindingId: string;
   connectionId: string;
   targetKey: string;
@@ -219,9 +206,18 @@ export type IntegrationBindingAgentCapabilitySource = {
   variantId: string;
 };
 
-export type IntegrationBindingAgentCapability = {
-  source: IntegrationBindingAgentCapabilitySource;
-  capability: AgentCapability;
+export type IntegrationBindingMcpServer = {
+  source: IntegrationBindingMcpServerSource;
+  server: IntegrationMcpServer;
+};
+
+export type ResolvedIntegrationMcpServer = {
+  source: IntegrationBindingMcpServerSource;
+  server: Omit<IntegrationMcpServer, "url" | "env" | "httpHeaders"> & {
+    url?: string;
+    env?: Readonly<Record<string, string>>;
+    httpHeaders?: Readonly<Record<string, string>>;
+  };
 };
 
 export type CompileBindingRefs = {
@@ -241,7 +237,6 @@ export type CompileBindingInput<
   target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
   connection: IntegrationConnection;
   binding: Pick<IntegrationBinding, "id" | "kind"> & { config: TBindingConfig };
-  agentCapabilities?: ReadonlyArray<IntegrationBindingAgentCapability>;
   refs: CompileBindingRefs;
   runtimeContext: {
     sandboxdEgressBaseUrl: string;
@@ -612,19 +607,51 @@ export type CompileBindingResult = {
   egressRoutes: ReadonlyArray<CompileBindingEgressRoute>;
   artifacts: ReadonlyArray<RuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
-  agentCapabilities?: ReadonlyArray<AgentCapability>;
 };
 
 export type CompiledBindingResult = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
-  agentCapabilities?: ReadonlyArray<IntegrationBindingAgentCapability>;
 };
 
-export type IntegrationDefinitionAgentCapabilities = {
-  advertises?: ReadonlyArray<AgentCapabilityKind>;
-  consumes?: ReadonlyArray<AgentCapabilityKind>;
+export type IntegrationMcpDefinitionValue =
+  | IntegrationMcpServer
+  | ReadonlyArray<IntegrationMcpServer>;
+
+export type ResolveIntegrationMcpFn<
+  TTargetConfig = Record<string, unknown>,
+  TBindingConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
+  bivarianceHack(
+    input: CompileBindingInput<TTargetConfig, TBindingConfig, TTargetSecrets>,
+  ): IntegrationMcpDefinitionValue;
+}["bivarianceHack"];
+
+export type IntegrationMcpDefinition<
+  TTargetConfig = Record<string, unknown>,
+  TBindingConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> =
+  | IntegrationMcpDefinitionValue
+  | ResolveIntegrationMcpFn<TTargetConfig, TBindingConfig, TTargetSecrets>;
+
+export type IntegrationMcpConfigFormat = "toml" | "json";
+
+export const IntegrationMcpConfigFormats: {
+  TOML: IntegrationMcpConfigFormat;
+  JSON: IntegrationMcpConfigFormat;
+} = {
+  TOML: "toml",
+  JSON: "json",
+};
+
+export type IntegrationMcpConfig = {
+  clientId: string;
+  fileId: string;
+  format: IntegrationMcpConfigFormat;
+  path: ReadonlyArray<string>;
 };
 
 export type IntegrationDefinition<
@@ -687,7 +714,12 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetSecretsSchema>,
     Record<string, string>
   >;
-  agentCapabilities?: IntegrationDefinitionAgentCapabilities;
+  mcp?: IntegrationMcpDefinition<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TBindingConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>
+  >;
+  mcpConfig?: IntegrationMcpConfig;
   validateBindingWriteContext?(
     input: BindingWriteValidationContext<
       ParsedSchemaOutput<TTargetConfigSchema>,
