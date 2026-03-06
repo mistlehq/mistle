@@ -31,6 +31,12 @@ function createOpenAiDefinition(): IntegrationDefinition<
     targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
+    mcpConfig: {
+      clientId: "codex-cli",
+      fileId: "codex_config",
+      format: "toml",
+      path: ["mcp_servers"],
+    },
     compileBinding: (input) => ({
       egressRoutes: [
         {
@@ -139,6 +145,132 @@ function createOpenAiDefinition(): IntegrationDefinition<
           ],
         },
       ],
+    }),
+  };
+}
+
+function createJsonAgentDefinition(): IntegrationDefinition<
+  typeof OpenAiTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
+  typeof OpenAiBindingConfigSchema
+> {
+  return {
+    familyId: "anthropic",
+    variantId: "claude-code-default",
+    kind: "agent",
+    displayName: "Claude Code",
+    logoKey: "anthropic",
+    targetConfigSchema: OpenAiTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
+    bindingConfigSchema: OpenAiBindingConfigSchema,
+    supportedAuthSchemes: ["api-key"],
+    mcpConfig: {
+      clientId: "claude-code",
+      fileId: "claude_config",
+      format: "json",
+      path: ["mcpServers"],
+    },
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [],
+      runtimeClients: [
+        {
+          clientId: "claude-code",
+          setup: {
+            env: {},
+            files: [
+              {
+                fileId: "claude_config",
+                path: "/workspace/.claude/settings.json",
+                mode: 384,
+                content: `{
+  "theme": "dark"
+}
+`,
+              },
+            ],
+          },
+          processes: [],
+          endpoints: [],
+        },
+      ],
+    }),
+  };
+}
+
+function createLinearMcpDefinition(): IntegrationDefinition<
+  typeof OpenAiTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
+  typeof OpenAiBindingConfigSchema
+> {
+  return {
+    familyId: "linear",
+    variantId: "linear-default",
+    kind: "connector",
+    displayName: "Linear",
+    logoKey: "linear",
+    targetConfigSchema: OpenAiTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
+    bindingConfigSchema: OpenAiBindingConfigSchema,
+    supportedAuthSchemes: ["api-key"],
+    mcp: (input) => ({
+      serverId: "linear-default",
+      serverName: "linear",
+      transport: "streamable-http",
+      url: input.refs.egressUrl,
+    }),
+    compileBinding: (input) => ({
+      egressRoutes: [
+        {
+          match: {
+            hosts: ["linear.app"],
+            methods: ["POST"],
+            pathPrefixes: ["/mcp"],
+          },
+          upstream: {
+            baseUrl: "https://linear.app",
+          },
+          authInjection: {
+            type: "bearer",
+            target: "authorization",
+          },
+          credentialResolver: {
+            connectionId: input.connection.id,
+            secretType: "api_key",
+          },
+        },
+      ],
+      artifacts: [],
+      runtimeClients: [],
+    }),
+  };
+}
+
+function createLinearDuplicateNameMcpDefinition(): IntegrationDefinition<
+  typeof OpenAiTargetConfigSchema,
+  typeof EmptyTargetSecretsSchema,
+  typeof OpenAiBindingConfigSchema
+> {
+  return {
+    familyId: "linear",
+    variantId: "linear-duplicate-name",
+    kind: "connector",
+    displayName: "Linear Duplicate",
+    logoKey: "linear",
+    targetConfigSchema: OpenAiTargetConfigSchema,
+    targetSecretSchema: EmptyTargetSecretsSchema,
+    bindingConfigSchema: OpenAiBindingConfigSchema,
+    supportedAuthSchemes: ["api-key"],
+    mcp: {
+      serverId: "linear-duplicate-name",
+      serverName: "linear",
+      transport: "streamable-http",
+      url: "https://duplicate.example.com/mcp",
+    },
+    compileBinding: () => ({
+      egressRoutes: [],
+      artifacts: [],
+      runtimeClients: [],
     }),
   };
 }
@@ -368,6 +500,362 @@ describe("compileRuntimePlan", () => {
     expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("/workspace/.mistle/bin/codex");
+  });
+
+  it("collects MCP servers from connectors and maps them into agent runtime files", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createOpenAiDefinition());
+    registry.register(createLinearMcpDefinition());
+
+    const runtimePlan = compileRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 12,
+      image: {
+        source: "base",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      },
+      runtimeContext: {
+        sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
+      },
+      registry,
+      bindings: [
+        {
+          targetKey: "openai-default",
+          target: {
+            familyId: "openai",
+            variantId: "openai-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://api.openai.com",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_openai_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_openai_agent",
+            kind: "agent",
+            connectionId: "conn_openai_org_123",
+            config: {
+              defaultModel: "gpt-5.3-codex",
+            },
+          },
+        },
+        {
+          targetKey: "linear-default",
+          target: {
+            familyId: "linear",
+            variantId: "linear-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://linear.app",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_linear_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_linear_connector",
+            kind: "connector",
+            connectionId: "conn_linear_org_123",
+            config: {
+              defaultModel: "unused",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      "[mcp_servers.linear]",
+    );
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      'url = "http://127.0.0.1:8090/egress/routes/route_bind_linear_connector"',
+    );
+  });
+
+  it("maps MCP servers into json agent config files using the configured path", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createJsonAgentDefinition());
+    registry.register(createLinearMcpDefinition());
+
+    const runtimePlan = compileRuntimePlan({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 12,
+      image: {
+        source: "base",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      },
+      runtimeContext: {
+        sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
+      },
+      registry,
+      bindings: [
+        {
+          targetKey: "claude-code-default",
+          target: {
+            familyId: "anthropic",
+            variantId: "claude-code-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://api.anthropic.com",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_claude_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_claude_agent",
+            kind: "agent",
+            connectionId: "conn_claude_org_123",
+            config: {
+              defaultModel: "claude-sonnet",
+            },
+          },
+        },
+        {
+          targetKey: "linear-default",
+          target: {
+            familyId: "linear",
+            variantId: "linear-default",
+            enabled: true,
+            config: {
+              apiBaseUrl: "https://linear.app",
+            },
+            secrets: {},
+          },
+          connection: {
+            id: "conn_linear_org_123",
+            status: "active",
+            config: {},
+          },
+          binding: {
+            id: "bind_linear_connector",
+            kind: "connector",
+            connectionId: "conn_linear_org_123",
+            config: {
+              defaultModel: "unused",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain('"theme": "dark"');
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain('"mcpServers"');
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain('"linear"');
+    expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      '"url": "http://127.0.0.1:8090/egress/routes/route_bind_linear_connector"',
+    );
+  });
+
+  it("fails when multiple bindings declare the same MCP server name", () => {
+    const registry = new IntegrationRegistry();
+    registry.register(createOpenAiDefinition());
+    registry.register(createLinearMcpDefinition());
+    registry.register(createLinearDuplicateNameMcpDefinition());
+
+    expect(() =>
+      compileRuntimePlan({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 12,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        runtimeContext: {
+          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
+        },
+        registry,
+        bindings: [
+          {
+            targetKey: "openai-default",
+            target: {
+              familyId: "openai",
+              variantId: "openai-default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://api.openai.com",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_openai_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_openai_agent",
+              kind: "agent",
+              connectionId: "conn_openai_org_123",
+              config: {
+                defaultModel: "gpt-5.3-codex",
+              },
+            },
+          },
+          {
+            targetKey: "linear-default",
+            target: {
+              familyId: "linear",
+              variantId: "linear-default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://linear.app",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_linear_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_linear_connector",
+              kind: "connector",
+              connectionId: "conn_linear_org_123",
+              config: {
+                defaultModel: "unused",
+              },
+            },
+          },
+          {
+            targetKey: "linear-duplicate-name",
+            target: {
+              familyId: "linear",
+              variantId: "linear-duplicate-name",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://duplicate.example.com",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_linear_duplicate_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_linear_connector_duplicate",
+              kind: "connector",
+              connectionId: "conn_linear_duplicate_org_123",
+              config: {
+                defaultModel: "unused",
+              },
+            },
+          },
+        ],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+
+    try {
+      compileRuntimePlan({
+        organizationId: "org_123",
+        sandboxProfileId: "sbp_123",
+        version: 12,
+        image: {
+          source: "base",
+          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        },
+        runtimeContext: {
+          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
+        },
+        registry,
+        bindings: [
+          {
+            targetKey: "openai-default",
+            target: {
+              familyId: "openai",
+              variantId: "openai-default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://api.openai.com",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_openai_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_openai_agent",
+              kind: "agent",
+              connectionId: "conn_openai_org_123",
+              config: {
+                defaultModel: "gpt-5.3-codex",
+              },
+            },
+          },
+          {
+            targetKey: "linear-default",
+            target: {
+              familyId: "linear",
+              variantId: "linear-default",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://linear.app",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_linear_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_linear_connector",
+              kind: "connector",
+              connectionId: "conn_linear_org_123",
+              config: {
+                defaultModel: "unused",
+              },
+            },
+          },
+          {
+            targetKey: "linear-duplicate-name",
+            target: {
+              familyId: "linear",
+              variantId: "linear-duplicate-name",
+              enabled: true,
+              config: {
+                apiBaseUrl: "https://duplicate.example.com",
+              },
+              secrets: {},
+            },
+            connection: {
+              id: "conn_linear_duplicate_org_123",
+              status: "active",
+              config: {},
+            },
+            binding: {
+              id: "bind_linear_connector_duplicate",
+              kind: "connector",
+              connectionId: "conn_linear_duplicate_org_123",
+              config: {
+                defaultModel: "unused",
+              },
+            },
+          },
+        ],
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(IntegrationCompilerError);
+      if (error instanceof IntegrationCompilerError) {
+        expect(error.code).toBe(CompilerErrorCodes.MCP_CONFLICT);
+      }
+    }
   });
 
   it("fails when target is disabled", () => {

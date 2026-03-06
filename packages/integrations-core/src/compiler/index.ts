@@ -1,16 +1,26 @@
 import { quote } from "shell-quote";
 
 import { runDefinitionBindingWriteValidation } from "../binding-validation/index.js";
+import { EgressUrlRefErrorCodes, resolveEgressUrlRef } from "../egress-url/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
+import { applyMcpConfigToRuntimeClients } from "../mcp-config/index.js";
 import { assembleCompiledRuntimePlan } from "../runtime-plan/index.js";
 import {
+  type AnyIntegrationDefinition,
+  type CompileBindingInput,
   egressUrlRef,
   IntegrationConnectionStatuses,
+  IntegrationMcpTransports,
   type CompileRuntimePlanBindingInput,
   type CompileBindingResult,
   type CompileRuntimePlanInput,
   type CompiledBindingResult,
   type CompiledRuntimeArtifactSpec,
+  type IntegrationBindingMcpServer,
+  type IntegrationMcpDefinitionValue,
+  type IntegrationMcpServer,
+  type IntegrationMcpValue,
+  type ResolvedIntegrationMcpServer,
   type CompiledRuntimePlan,
   type RuntimeArtifactCommand,
   type RuntimeArtifactGithubReleaseInstallInput,
@@ -228,6 +238,257 @@ function resolveRuntimeArtifacts(input: {
   });
 }
 
+function resolveMcpValue(input: {
+  value: IntegrationMcpValue;
+  routeIds: ReadonlySet<string>;
+  egressBaseUrl: string;
+}): string {
+  if (typeof input.value === "string") {
+    return input.value;
+  }
+
+  return resolveEgressUrlRef({
+    value: input.value,
+    routeIds: input.routeIds,
+    egressBaseUrl: input.egressBaseUrl,
+    invalidRefCode: EgressUrlRefErrorCodes.MCP_INVALID_REF,
+    refOwner: "MCP server",
+  });
+}
+
+function resolveMcpRecord(input: {
+  value: Readonly<Record<string, IntegrationMcpValue>> | undefined;
+  routeIds: ReadonlySet<string>;
+  egressBaseUrl: string;
+}): Readonly<Record<string, string>> | undefined {
+  if (input.value === undefined) {
+    return undefined;
+  }
+
+  const resolved: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(input.value)) {
+    resolved[key] = resolveMcpValue({
+      value,
+      routeIds: input.routeIds,
+      egressBaseUrl: input.egressBaseUrl,
+    });
+  }
+
+  return resolved;
+}
+
+function normalizeMcpDefinitionValue(
+  input: IntegrationMcpDefinitionValue,
+): ReadonlyArray<IntegrationMcpServer> {
+  if (isIntegrationMcpServerArray(input)) {
+    return [...input];
+  }
+
+  return [input];
+}
+
+function isIntegrationMcpServerArray(
+  input: IntegrationMcpDefinitionValue,
+): input is ReadonlyArray<IntegrationMcpServer> {
+  return Array.isArray(input);
+}
+
+function validateMcpServerShape(input: { server: IntegrationBindingMcpServer }): void {
+  const { source, server } = input.server;
+
+  if (server.serverId.trim().length === 0) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.MCP_CONFLICT,
+      `Binding '${source.bindingId}' declared an MCP server with an empty serverId.`,
+    );
+  }
+
+  if (server.serverName.trim().length === 0) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.MCP_CONFLICT,
+      `Binding '${source.bindingId}' declared an MCP server with an empty serverName.`,
+    );
+  }
+
+  if (server.transport === IntegrationMcpTransports.STDIO) {
+    if (server.command === undefined || server.command.trim().length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.MCP_CONFLICT,
+        `MCP server '${server.serverName}' on binding '${source.bindingId}' must define a command for stdio transport.`,
+      );
+    }
+
+    return;
+  }
+
+  if (
+    server.url === undefined ||
+    (typeof server.url === "string" && server.url.trim().length === 0)
+  ) {
+    throw new IntegrationCompilerError(
+      CompilerErrorCodes.MCP_CONFLICT,
+      `MCP server '${server.serverName}' on binding '${source.bindingId}' must define a url for '${server.transport}' transport.`,
+    );
+  }
+}
+
+type PreparedBindingContext = {
+  definition: AnyIntegrationDefinition;
+  compileBindingInput: CompileBindingInput<unknown, unknown, unknown>;
+  compiledBindingResult: CompiledBindingResult;
+};
+
+function collectResolvedMcpServers(input: {
+  preparedBindings: ReadonlyArray<PreparedBindingContext>;
+  egressBaseUrl: string;
+}): ReadonlyArray<ResolvedIntegrationMcpServer> {
+  const routeIds = new Set<string>();
+
+  for (const preparedBinding of input.preparedBindings) {
+    for (const route of preparedBinding.compiledBindingResult.egressRoutes) {
+      routeIds.add(route.routeId);
+    }
+  }
+
+  const serverIds = new Set<string>();
+  const serverNames = new Set<string>();
+  const resolvedServers: ResolvedIntegrationMcpServer[] = [];
+
+  for (const preparedBinding of input.preparedBindings) {
+    const mcpDefinition = preparedBinding.definition.mcp;
+    if (mcpDefinition === undefined) {
+      continue;
+    }
+
+    const rawServers = normalizeMcpDefinitionValue(
+      typeof mcpDefinition === "function"
+        ? mcpDefinition(preparedBinding.compileBindingInput)
+        : mcpDefinition,
+    );
+
+    for (const server of rawServers) {
+      const source = {
+        bindingId: preparedBinding.compileBindingInput.binding.id,
+        connectionId: preparedBinding.compileBindingInput.connection.id,
+        targetKey: preparedBinding.compileBindingInput.targetKey,
+        familyId: preparedBinding.compileBindingInput.target.familyId,
+        variantId: preparedBinding.compileBindingInput.target.variantId,
+      };
+      const integrationBindingMcpServer: IntegrationBindingMcpServer = {
+        source,
+        server,
+      };
+      const serverKey = `${source.bindingId}:${server.serverId}`;
+
+      if (serverIds.has(serverKey)) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.MCP_CONFLICT,
+          `Binding '${source.bindingId}' declared duplicate MCP server id '${server.serverId}'.`,
+        );
+      }
+      serverIds.add(serverKey);
+
+      if (serverNames.has(server.serverName)) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.MCP_CONFLICT,
+          `Duplicate MCP server name '${server.serverName}' detected across sandbox profile bindings.`,
+        );
+      }
+      serverNames.add(server.serverName);
+
+      validateMcpServerShape({
+        server: integrationBindingMcpServer,
+      });
+
+      const resolvedServer: ResolvedIntegrationMcpServer["server"] = {
+        serverId: server.serverId,
+        serverName: server.serverName,
+        transport: server.transport,
+      };
+
+      if (server.description !== undefined) {
+        resolvedServer.description = server.description;
+      }
+
+      if (server.url !== undefined) {
+        resolvedServer.url = resolveMcpValue({
+          value: server.url,
+          routeIds,
+          egressBaseUrl: input.egressBaseUrl,
+        });
+      }
+
+      if (server.command !== undefined) {
+        resolvedServer.command = server.command;
+      }
+
+      if (server.args !== undefined) {
+        resolvedServer.args = server.args;
+      }
+
+      if (server.env !== undefined) {
+        const resolvedEnv = resolveMcpRecord({
+          value: server.env,
+          routeIds,
+          egressBaseUrl: input.egressBaseUrl,
+        });
+
+        if (resolvedEnv !== undefined) {
+          resolvedServer.env = resolvedEnv;
+        }
+      }
+
+      if (server.httpHeaders !== undefined) {
+        const resolvedHttpHeaders = resolveMcpRecord({
+          value: server.httpHeaders,
+          routeIds,
+          egressBaseUrl: input.egressBaseUrl,
+        });
+
+        if (resolvedHttpHeaders !== undefined) {
+          resolvedServer.httpHeaders = resolvedHttpHeaders;
+        }
+      }
+
+      resolvedServers.push({
+        source,
+        server: resolvedServer,
+      });
+    }
+  }
+
+  return [...resolvedServers].sort((left, right) => {
+    if (left.source.bindingId !== right.source.bindingId) {
+      return left.source.bindingId.localeCompare(right.source.bindingId);
+    }
+
+    return left.server.serverId.localeCompare(right.server.serverId);
+  });
+}
+
+function applyMcpMappings(input: {
+  preparedBindings: ReadonlyArray<PreparedBindingContext>;
+  mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
+}): ReadonlyArray<CompiledBindingResult> {
+  return input.preparedBindings.map((preparedBinding) => {
+    const mcpConfig = preparedBinding.definition.mcpConfig;
+
+    if (mcpConfig === undefined) {
+      return preparedBinding.compiledBindingResult;
+    }
+
+    return {
+      ...preparedBinding.compiledBindingResult,
+      runtimeClients: applyMcpConfigToRuntimeClients({
+        runtimeClients: preparedBinding.compiledBindingResult.runtimeClients,
+        mcpConfig,
+        mcpServers: input.mcpServers,
+      }),
+    };
+  });
+}
+
 type CompileBindingsInput = {
   organizationId: string;
   sandboxProfileId: string;
@@ -241,7 +502,7 @@ type CompileBindingsInput = {
 };
 
 function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBindingResult> {
-  const compiledBindingResults: CompiledBindingResult[] = [];
+  const preparedBindings: PreparedBindingContext[] = [];
 
   for (const bindingInput of input.bindings) {
     if (bindingInput.connection.id !== bindingInput.binding.connectionId) {
@@ -337,7 +598,7 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
       throw new IntegrationCompilerError(CompilerErrorCodes.INVALID_BINDING_CONFIG, message);
     }
 
-    const compileBindingResult: CompileBindingResult = definition.compileBinding({
+    const compileBindingInput: CompileBindingInput<unknown, unknown, unknown> = {
       organizationId: input.organizationId,
       sandboxProfileId: input.sandboxProfileId,
       version: input.version,
@@ -358,7 +619,10 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         artifactBinPath,
       },
       runtimeContext: input.runtimeContext,
-    });
+    };
+
+    const compileBindingResult: CompileBindingResult =
+      definition.compileBinding(compileBindingInput);
 
     const compiledBindingResult: CompiledBindingResult = {
       egressRoutes: compileBindingResult.egressRoutes.map((route, routeIndex) => ({
@@ -380,10 +644,22 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
       runtimeClients: compileBindingResult.runtimeClients,
     };
 
-    compiledBindingResults.push(compiledBindingResult);
+    preparedBindings.push({
+      definition,
+      compileBindingInput,
+      compiledBindingResult,
+    });
   }
 
-  return compiledBindingResults;
+  const resolvedMcpServers = collectResolvedMcpServers({
+    preparedBindings,
+    egressBaseUrl: input.runtimeContext.sandboxdEgressBaseUrl,
+  });
+
+  return applyMcpMappings({
+    preparedBindings,
+    mcpServers: resolvedMcpServers,
+  });
 }
 
 export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRuntimePlan {

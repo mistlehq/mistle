@@ -24,6 +24,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "linear-default",
+        familyId: "linear",
+        variantId: "linear-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "openai-default",
         familyId: "openai",
         variantId: "openai-default",

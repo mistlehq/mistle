@@ -102,6 +102,8 @@ Key fields and what they drive:
 | `credentialResolvers` (optional)        | Dynamic credential generation/lookup             | Internal credential resolution endpoint   |
 | `authHandlers.oauth` (optional)         | OAuth start/complete behavior                    | OAuth connection flows                    |
 | `webhookHandler` (optional)             | Verify + parse inbound webhooks                  | Webhook ingest                            |
+| `mcp` (optional)                        | Declare one or more MCP servers for this binding | MCP collection during compile             |
+| `mcpConfig` (optional)                  | Declarative MCP config target for an agent       | Post-compile MCP file update              |
 | `validateBindingWriteContext(...)`      | Contextual target/connection/binding validation  | Binding write and compile parity checks   |
 | `compileBinding(...)`                   | Generate egress/artifacts/runtime clients        | Runtime plan compiler                     |
 
@@ -157,6 +159,11 @@ flowchart TD
 - `artifacts` (install/update/remove runtime tools)
 - `runtimeClients` (files/env/processes/endpoints)
 
+- `integrations-core` then runs an MCP pass across the whole sandbox profile version:
+- connector, git, or agent bindings may expose MCP servers through `mcp`
+- egress URL refs inside MCP definitions are resolved to concrete sandbox egress URLs
+- agent bindings with `mcpConfig` have the configured file path updated in-place (`toml` or `json`) before runtime-plan assembly
+
 - `integrations-core` validates cross-binding conflicts and assembles a deterministic `CompiledRuntimePlan`.
 
 ### 5) Runtime execution and egress
@@ -178,6 +185,7 @@ Current registry includes:
 - `openai::openai-default` (`kind: agent`)
 - `github::github-cloud` (`kind: git`)
 - `github::github-enterprise-server` (`kind: git`)
+- `linear::linear-default` (`kind: connector`)
 
 ## Creating A New Integration
 
@@ -218,26 +226,41 @@ This is the recommended workflow.
 - Emit minimal scoped egress routes.
 - Set correct `credentialResolver` secret type/purpose/resolver key.
 - Add runtime artifacts and runtime clients only when required.
+- If the integration exposes its own MCP endpoint, define `mcp` with either a single server or an array of servers.
+- Prefer `EgressUrlRef` values inside MCP definitions when the final route URL is only known after compile.
 
-7. Add webhook support if provider emits events.
+7. If this is an agent integration and MCP should be auto-configured, define `mcpConfig`.
+
+- `mcpConfig` is declarative:
+- `clientId`
+- `fileId`
+- `format` (`toml` or `json`)
+- `path` (for example `["mcp_servers"]` for Codex TOML or `["mcpServers"]` for JSON-based agents)
+- The core compiler owns parsing, replacing that path, and serializing the file content.
+
+8. Add webhook support if provider emits events.
 
 - Implement `webhookHandler.parse`, `webhookHandler.resolveConnection`, and `webhookHandler.verify`.
 - Keep connection resolution explicit and deterministic from parsed event payload + candidate connections.
 
-8. Register the definition.
+9. Register the definition.
 
 - Export from provider index and root `packages/integrations-definitions/src/index.ts`.
 
-9. Make the target available.
+10. Make the target available.
 
 - Register the definition in `packages/integrations-definitions/src/index.ts`.
 - Control-plane target sync scripts will insert/update the `integration_targets` row from registry definitions.
 - Provide operator-owned config/secrets through `integration-targets.provision.json`.
 
-10. Add tests.
+11. Add tests.
 
 - Schema tests for target/binding/secret parsing.
 - Compile tests for egress/artifacts/runtime clients.
+- MCP compile tests when applicable:
+- producer tests for declared MCP server shape
+- compiler tests for MCP ref resolution and duplicate detection
+- agent tests for TOML/JSON file updates when `mcpConfig` is present
 - OAuth/webhook handler tests (if implemented).
 - Control-plane integration tests for connection and compile flows.
 - Form resolution tests: ensure schema-backed form helpers produce the expected resolved JSON Schema and UI metadata.
@@ -274,6 +297,8 @@ Useful entrypoints when reading the code:
 
 - `packages/integrations-core/src/types/index.ts`
 - `packages/integrations-core/src/compiler/index.ts`
+- `packages/integrations-core/src/mcp-config/index.ts`
+- `packages/integrations-core/src/egress-url/index.ts`
 - `packages/integrations-core/src/validation/index.ts`
 - `packages/integrations-core/src/binding-validation/index.ts`
 - `packages/integrations-core/src/webhooks/index.ts`
