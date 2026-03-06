@@ -1031,6 +1031,302 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/sandbox/conversations/{conversationId}/sessions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          conversationId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          "application/json": Record<string, never>;
+        };
+      };
+      responses: {
+        /** @description Continue a previously created conversation session by conversation id. */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationId: string;
+              routeId: string;
+              sandboxInstanceId: string;
+              /** @enum {string} */
+              status: "accepted";
+              workflowRunId: string | null;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INTEGRATION_BINDING_PROFILE_MISMATCH"
+                    | "INTEGRATION_BINDING_INVALID"
+                    | "CONVERSATION_OWNER_UNSUPPORTED"
+                    | "AUTOMATION_TARGET_PROFILE_VERSION_MISSING";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Conversation, route, or restore snapshot was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code:
+                | "PROFILE_NOT_FOUND"
+                | "PROFILE_VERSION_NOT_FOUND"
+                | "INTEGRATION_BINDING_NOT_FOUND"
+                | "AUTOMATION_TARGET_NOT_FOUND"
+                | "CONVERSATION_NOT_FOUND"
+                | "CONVERSATION_ROUTE_NOT_FOUND"
+                | "conversation_snapshot_missing";
+              message: string;
+            };
+          };
+        };
+        /** @description Conversation session could not continue due to state conflict. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code:
+                | "conversation_closed"
+                | "conversation_route_closed"
+                | "conversation_recovery_failed";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/sandbox/conversations/sessions": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            integrationBindingId: string;
+            profileId: string;
+            profileVersion: number;
+          };
+        };
+      };
+      responses: {
+        /** @description Start a new dashboard conversation session from a profile version. */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationId: string;
+              routeId: string;
+              sandboxInstanceId: string;
+              /** @enum {string} */
+              status: "accepted";
+              workflowRunId: string | null;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INTEGRATION_BINDING_PROFILE_MISMATCH"
+                    | "INTEGRATION_BINDING_INVALID"
+                    | "CONVERSATION_OWNER_UNSUPPORTED"
+                    | "AUTOMATION_TARGET_PROFILE_VERSION_MISSING";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Required profile or binding resource was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code:
+                | "PROFILE_NOT_FOUND"
+                | "PROFILE_VERSION_NOT_FOUND"
+                | "INTEGRATION_BINDING_NOT_FOUND"
+                | "AUTOMATION_TARGET_NOT_FOUND"
+                | "CONVERSATION_NOT_FOUND"
+                | "CONVERSATION_ROUTE_NOT_FOUND"
+                | "conversation_snapshot_missing";
+              message: string;
+            };
+          };
+        };
+        /** @description Conversation session could not be started due to state conflict. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code:
+                | "conversation_closed"
+                | "conversation_route_closed"
+                | "conversation_recovery_failed";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/instances/{instanceId}": {
     parameters: {
       query?: never;

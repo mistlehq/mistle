@@ -42,10 +42,12 @@
     "hono": "^4.12.5",
     "pg": "^8.19.0",
     "typeid-js": "^1.2.0",
+    "ws": "^8.18.3",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
-    "@types/pg": "^8.18.0"
+    "@types/pg": "^8.18.0",
+    "@types/ws": "^8.18.1"
   }
 }

@@ -12,6 +12,7 @@ import {
   Field,
   FieldContent,
   FieldLabel,
+  Input,
   Select,
   SelectContent,
   SelectItem,
@@ -28,13 +29,15 @@ import {
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
+  getSandboxProfileVersionIntegrationBindings,
   listSandboxProfiles,
   listSandboxProfileVersions,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import {
+  continueSandboxConversationSession,
   getSandboxInstanceStatus,
   mintSandboxInstanceConnectionToken,
-  startSandboxInstanceFromProfileVersion,
+  startSandboxConversationSession,
 } from "../sessions/sessions-service.js";
 
 const SANDBOX_PROFILE_LIST_LIMIT = 100;
@@ -63,9 +66,11 @@ type ConnectControlMessage = ConnectOK | ConnectError;
 type StartSessionStep = "idle" | "starting" | "securing" | "connecting" | "connected";
 
 type ConnectedSession = {
-  profileId: string;
+  profileId: string | null;
+  conversationId: string;
+  routeId: string;
   sandboxInstanceId: string;
-  workflowRunId: string;
+  workflowRunId: string | null;
   connectionUrl: string;
   connectedAtIso: string;
   expiresAtIso: string;
@@ -253,9 +258,14 @@ export function SessionsPage(): React.JSX.Element {
   const manualDisconnectRef = useRef(false);
 
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
+  const [selectedIntegrationBindingId, setSelectedIntegrationBindingId] = useState<string | null>(
+    null,
+  );
+  const [continueConversationId, setContinueConversationId] = useState("");
   const [step, setStep] = useState<StartSessionStep>("idle");
   const [startErrorMessage, setStartErrorMessage] = useState<string | null>(null);
   const [connectedSession, setConnectedSession] = useState<ConnectedSession | null>(null);
+  const trimmedContinueConversationId = continueConversationId.trim();
 
   const profilesQuery = useQuery({
     queryKey: sandboxProfilesListQueryKey({
@@ -292,6 +302,33 @@ export function SessionsPage(): React.JSX.Element {
     () => resolveLatestVersion(versionsQuery.data?.versions ?? []),
     [versionsQuery.data?.versions],
   );
+  const bindingsQuery = useQuery({
+    queryKey:
+      selectedProfileId === null || selectedProfileVersion === null
+        ? sandboxProfileVersionsQueryKey("none-bindings")
+        : sandboxProfileVersionsQueryKey(
+            `${selectedProfileId}-${String(selectedProfileVersion)}-bindings`,
+          ),
+    queryFn: async ({ signal }) => {
+      if (selectedProfileId === null || selectedProfileVersion === null) {
+        return { bindings: [] };
+      }
+      return getSandboxProfileVersionIntegrationBindings({
+        profileId: selectedProfileId,
+        version: selectedProfileVersion,
+        signal,
+      });
+    },
+    enabled:
+      selectedProfileId !== null &&
+      selectedProfileVersion !== null &&
+      trimmedContinueConversationId.length === 0,
+    retry: false,
+  });
+  const agentBindings = useMemo(
+    () => (bindingsQuery.data?.bindings ?? []).filter((binding) => binding.kind === "agent"),
+    [bindingsQuery.data?.bindings],
+  );
 
   useEffect(() => {
     return () => {
@@ -299,6 +336,24 @@ export function SessionsPage(): React.JSX.Element {
       websocketRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    setSelectedIntegrationBindingId(null);
+  }, [selectedProfileId, selectedProfileVersion, trimmedContinueConversationId]);
+
+  useEffect(() => {
+    if (selectedIntegrationBindingId !== null) {
+      return;
+    }
+
+    const bindings = agentBindings;
+    if (bindings.length === 1) {
+      const binding = bindings[0];
+      if (binding !== undefined) {
+        setSelectedIntegrationBindingId(binding.id);
+      }
+    }
+  }, [agentBindings, selectedIntegrationBindingId]);
 
   function disconnectSession(): void {
     manualDisconnectRef.current = true;
@@ -334,28 +389,39 @@ export function SessionsPage(): React.JSX.Element {
   const startSessionMutation = useMutation({
     mutationFn: async () => {
       if (selectedProfileId === null) {
-        throw new Error("Select a sandbox profile before starting a session.");
+        if (trimmedContinueConversationId.length === 0) {
+          throw new Error("Select a sandbox profile before starting a session.");
+        }
       }
-      if (selectedProfileVersion === null) {
+      if (selectedProfileVersion === null && trimmedContinueConversationId.length === 0) {
         throw new Error("No sandbox profile version is available for the selected profile.");
+      }
+      if (selectedIntegrationBindingId === null && trimmedContinueConversationId.length === 0) {
+        throw new Error("Select an integration binding before starting a new conversation.");
       }
 
       disconnectSession();
       setStartErrorMessage(null);
       setStep("starting");
 
-      const startedInstance = await startSandboxInstanceFromProfileVersion({
-        profileId: selectedProfileId,
-        profileVersion: selectedProfileVersion,
-      });
+      const startedConversationSession =
+        trimmedContinueConversationId.length > 0
+          ? await continueSandboxConversationSession({
+              conversationId: trimmedContinueConversationId,
+            })
+          : await startSandboxConversationSession({
+              profileId: selectedProfileId ?? "",
+              profileVersion: selectedProfileVersion ?? 0,
+              integrationBindingId: selectedIntegrationBindingId ?? "",
+            });
 
       await waitForSandboxInstanceToRun({
-        instanceId: startedInstance.sandboxInstanceId,
+        instanceId: startedConversationSession.sandboxInstanceId,
       });
 
       setStep("securing");
       const mintedConnection = await mintSandboxInstanceConnectionToken({
-        instanceId: startedInstance.sandboxInstanceId,
+        instanceId: startedConversationSession.sandboxInstanceId,
       });
 
       setStep("connecting");
@@ -364,9 +430,8 @@ export function SessionsPage(): React.JSX.Element {
       });
 
       return {
-        selectedProfileId,
-        selectedProfileVersion,
-        startedInstance,
+        selectedProfileId: trimmedContinueConversationId.length > 0 ? null : selectedProfileId,
+        startedConversationSession,
         mintedConnection,
         websocket,
       };
@@ -377,8 +442,10 @@ export function SessionsPage(): React.JSX.Element {
       result.websocket.addEventListener("close", handleSocketClose);
       setConnectedSession({
         profileId: result.selectedProfileId,
-        sandboxInstanceId: result.startedInstance.sandboxInstanceId,
-        workflowRunId: result.startedInstance.workflowRunId,
+        conversationId: result.startedConversationSession.conversationId,
+        routeId: result.startedConversationSession.routeId,
+        sandboxInstanceId: result.startedConversationSession.sandboxInstanceId,
+        workflowRunId: result.startedConversationSession.workflowRunId,
         connectionUrl: result.mintedConnection.connectionUrl,
         connectedAtIso: new Date().toISOString(),
         expiresAtIso: result.mintedConnection.connectionExpiresAt,
@@ -403,12 +470,17 @@ export function SessionsPage(): React.JSX.Element {
       : (profilesQuery.data?.items.find((profile) => profile.id === selectedProfileId)
           ?.displayName ?? "Select sandbox profile");
   const selectedProfileSelectValue = selectedProfileId ?? "";
-
-  const canStartSession =
+  const isContinueSessionFlow = trimmedContinueConversationId.length > 0;
+  const isNewSessionSelectionComplete =
     selectedProfileId !== null &&
     selectedProfileVersion !== null &&
-    !profilesQuery.isPending &&
-    !versionsQuery.isPending &&
+    selectedIntegrationBindingId !== null;
+
+  const canStartSession =
+    (isContinueSessionFlow || isNewSessionSelectionComplete) &&
+    !(profilesQuery.isPending && !isContinueSessionFlow) &&
+    !(versionsQuery.isPending && !isContinueSessionFlow) &&
+    !(bindingsQuery.isPending && !isContinueSessionFlow) &&
     !startSessionMutation.isPending;
 
   return (
@@ -443,6 +515,17 @@ export function SessionsPage(): React.JSX.Element {
               </AlertDescription>
             </Alert>
           ) : null}
+          {bindingsQuery.isError ? (
+            <Alert variant="destructive">
+              <AlertTitle>Could not load integration bindings</AlertTitle>
+              <AlertDescription>
+                {resolveApiErrorMessage({
+                  error: bindingsQuery.error,
+                  fallbackMessage: "Could not load sandbox profile integration bindings.",
+                })}
+              </AlertDescription>
+            </Alert>
+          ) : null}
 
           {startErrorMessage !== null ? (
             <Alert variant="destructive">
@@ -452,10 +535,30 @@ export function SessionsPage(): React.JSX.Element {
           ) : null}
 
           <Field>
+            <FieldLabel htmlFor="session-continue-conversation-id">
+              Continue conversation (optional)
+            </FieldLabel>
+            <FieldContent>
+              <Input
+                id="session-continue-conversation-id"
+                onChange={(event) => {
+                  setContinueConversationId(event.currentTarget.value);
+                }}
+                placeholder="cnv_..."
+                value={continueConversationId}
+              />
+            </FieldContent>
+          </Field>
+
+          <Field>
             <FieldLabel htmlFor="session-start-profile">Sandbox profile</FieldLabel>
             <FieldContent>
               <Select
-                disabled={profilesQuery.isPending || (profilesQuery.data?.items.length ?? 0) === 0}
+                disabled={
+                  trimmedContinueConversationId.length > 0 ||
+                  profilesQuery.isPending ||
+                  (profilesQuery.data?.items.length ?? 0) === 0
+                }
                 onValueChange={(value) => {
                   if (value === null || value.length === 0) {
                     setSelectedProfileId(null);
@@ -474,6 +577,40 @@ export function SessionsPage(): React.JSX.Element {
                   {(profilesQuery.data?.items ?? []).map((profile) => (
                     <SelectItem key={profile.id} value={profile.id}>
                       {profile.displayName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FieldContent>
+          </Field>
+
+          <Field>
+            <FieldLabel htmlFor="session-start-binding">Integration binding</FieldLabel>
+            <FieldContent>
+              <Select
+                disabled={
+                  trimmedContinueConversationId.length > 0 ||
+                  selectedProfileId === null ||
+                  selectedProfileVersion === null ||
+                  bindingsQuery.isPending ||
+                  agentBindings.length === 0
+                }
+                onValueChange={(value) => {
+                  if (value === null || value.length === 0) {
+                    setSelectedIntegrationBindingId(null);
+                    return;
+                  }
+                  setSelectedIntegrationBindingId(value);
+                }}
+                value={selectedIntegrationBindingId ?? ""}
+              >
+                <SelectTrigger aria-label="Integration binding" id="session-start-binding">
+                  <SelectValue placeholder="Select integration binding" />
+                </SelectTrigger>
+                <SelectContent>
+                  {agentBindings.map((binding) => (
+                    <SelectItem key={binding.id} value={binding.id}>
+                      {binding.id}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -518,11 +655,20 @@ export function SessionsPage(): React.JSX.Element {
                 <span className="font-medium">Sandbox instance:</span>{" "}
                 {connectedSession.sandboxInstanceId}
               </p>
+              {connectedSession.profileId === null ? null : (
+                <p className="text-sm">
+                  <span className="font-medium">Profile:</span> {connectedSession.profileId}
+                </p>
+              )}
               <p className="text-sm">
-                <span className="font-medium">Profile:</span> {connectedSession.profileId}
+                <span className="font-medium">Conversation:</span> {connectedSession.conversationId}
               </p>
               <p className="text-sm">
-                <span className="font-medium">Workflow run:</span> {connectedSession.workflowRunId}
+                <span className="font-medium">Route:</span> {connectedSession.routeId}
+              </p>
+              <p className="text-sm">
+                <span className="font-medium">Workflow run:</span>{" "}
+                {connectedSession.workflowRunId ?? "Not started"}
               </p>
               <p className="text-sm">
                 <span className="font-medium">Connected at:</span>{" "}

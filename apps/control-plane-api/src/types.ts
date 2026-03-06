@@ -7,6 +7,7 @@ import type { HandleIntegrationWebhookEventWorkflowInput } from "@mistle/workflo
 import type { Context, Hono } from "hono";
 
 import type { ControlPlaneAuth } from "./auth/index.js";
+import type { SandboxConversationsService } from "./sandbox-conversations/services/factory.js";
 import type { SandboxInstancesService } from "./sandbox-instances/services/factory.js";
 import type { SandboxProfilesService } from "./sandbox-profiles/services/factory.js";
 
@@ -46,6 +47,7 @@ export type AppServices = {
   integrationWebhooks: {
     receiveWebhookEvent: (input: HandleIntegrationWebhookEventWorkflowInput) => Promise<void>;
   };
+  sandboxConversations: SandboxConversationsService;
   sandboxInstances: SandboxInstancesService;
   sandboxProfiles: SandboxProfilesService;
 };

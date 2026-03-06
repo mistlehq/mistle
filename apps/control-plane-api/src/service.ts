@@ -3,6 +3,7 @@ import { HandleIntegrationWebhookEventWorkflowSpec } from "@mistle/workflows/con
 
 import { createControlPlaneAuth } from "./auth/index.js";
 import type { AppRuntimeResources } from "./runtime/resources.js";
+import { createSandboxConversationsService } from "./sandbox-conversations/index.js";
 import { SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS } from "./sandbox-instances/constants.js";
 import { createSandboxInstancesService } from "./sandbox-instances/index.js";
 import { createSandboxProfilesService } from "./sandbox-profiles/index.js";
@@ -39,6 +40,17 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
     integrationsConfig: config.integrations,
     dataPlaneClient,
   });
+  const sandboxConversationsService = createSandboxConversationsService({
+    db: resources.db,
+    defaultBaseImage: runtimeConfig.sandbox.defaultBaseImage,
+    sandboxProfiles: {
+      startProfileInstance: sandboxProfilesService.startProfileInstance,
+    },
+    sandboxInstances: {
+      getInstance: sandboxInstancesService.getInstance,
+      mintConnectionToken: sandboxInstancesService.mintConnectionTokenForInstance,
+    },
+  });
 
   return {
     auth: createControlPlaneAuth({
@@ -67,6 +79,7 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
         );
       },
     },
+    sandboxConversations: sandboxConversationsService,
     sandboxProfiles: sandboxProfilesService,
     sandboxInstances: sandboxInstancesService,
   };

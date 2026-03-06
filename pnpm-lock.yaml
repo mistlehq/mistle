@@ -149,6 +149,9 @@ importers:
       typeid-js:
         specifier: ^1.2.0
         version: 1.2.0
+      ws:
+        specifier: ^8.18.3
+        version: 8.19.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -159,6 +162,9 @@ importers:
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
 
   apps/control-plane-worker:
     dependencies:

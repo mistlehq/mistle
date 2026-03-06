@@ -12,6 +12,7 @@ import { createCorsMiddleware } from "../middleware/cors.js";
 import { withAuthSession } from "../middleware/with-auth-session.js";
 import { CONTROL_PLANE_OPENAPI_INFO, CONTROL_PLANE_OPENAPI_PATH } from "../openapi/constants.js";
 import { createOrganizationMembershipCapabilitiesApp } from "../organization-membership-capabilities/index.js";
+import { createSandboxConversationsApp } from "../sandbox-conversations/index.js";
 import { createSandboxInstancesApp } from "../sandbox-instances/index.js";
 import { createSandboxProfilesApp } from "../sandbox-profiles/index.js";
 import type {
@@ -69,6 +70,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const organizationMembershipCapabilitiesApp = withAuthSession(
     createOrganizationMembershipCapabilitiesApp(),
   );
+  const sandboxConversationsApp = withAuthSession(createSandboxConversationsApp());
   const sandboxInstancesApp = withAuthSession(createSandboxInstancesApp());
   const sandboxProfilesApp = withAuthSession(createSandboxProfilesApp());
   app.route(authApp.basePath, authApp.routes);
@@ -79,6 +81,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
     organizationMembershipCapabilitiesApp.basePath,
     organizationMembershipCapabilitiesApp.routes,
   );
+  app.route(sandboxConversationsApp.basePath, sandboxConversationsApp.routes);
   app.route(sandboxInstancesApp.basePath, sandboxInstancesApp.routes);
   app.route(sandboxProfilesApp.basePath, sandboxProfilesApp.routes);
 }
