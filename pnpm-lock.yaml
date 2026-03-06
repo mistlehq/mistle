@@ -339,8 +339,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/workflows
       '@trpc/server':
-        specifier: ^11.11.0
-        version: 11.11.0(typescript@5.9.3)
+        specifier: ^11.12.0
+        version: 11.12.0(typescript@5.9.3)
       hono:
         specifier: ^4.12.5
         version: 4.12.5
@@ -362,7 +362,7 @@ importers:
         version: link:../../packages/time
       '@trpc/client':
         specifier: ^11.11.0
-        version: 11.11.0(@trpc/server@11.11.0(typescript@5.9.3))(typescript@5.9.3)
+        version: 11.11.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
@@ -539,10 +539,10 @@ importers:
         version: link:../workflows
       '@trpc/client':
         specifier: ^11.11.0
-        version: 11.11.0(@trpc/server@11.11.0(typescript@5.9.3))(typescript@5.9.3)
+        version: 11.11.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)
       '@trpc/server':
-        specifier: ^11.11.0
-        version: 11.11.0(typescript@5.9.3)
+        specifier: ^11.12.0
+        version: 11.12.0(typescript@5.9.3)
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -4061,8 +4061,8 @@ packages:
       '@trpc/server': 11.11.0
       typescript: '>=5.7.2'
 
-  '@trpc/server@11.11.0':
-    resolution: {integrity: sha512-5CBK5Oit8qv2k2zgIHrUsa12tnCIVpZIJLvMa4n2tejuWz/d7Qb1B1v9zZioapr7y8sEvnk8zPcNnxcT2LlQxg==}
+  '@trpc/server@11.12.0':
+    resolution: {integrity: sha512-rpZnf5FUjNndE/AjGIy+FvEHR52iBd0u0wySqWCwXj67wraj3qCuBr5Opcf0Te/g67C/YztqceFkLoG0r4mp4Q==}
     peerDependencies:
       typescript: '>=5.7.2'
 
@@ -10954,12 +10954,12 @@ snapshots:
       '@types/react': 19.2.14
       '@types/react-dom': 19.2.3(@types/react@19.2.14)
 
-  '@trpc/client@11.11.0(@trpc/server@11.11.0(typescript@5.9.3))(typescript@5.9.3)':
+  '@trpc/client@11.11.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)':
     dependencies:
-      '@trpc/server': 11.11.0(typescript@5.9.3)
+      '@trpc/server': 11.12.0(typescript@5.9.3)
       typescript: 5.9.3
 
-  '@trpc/server@11.11.0(typescript@5.9.3)':
+  '@trpc/server@11.12.0(typescript@5.9.3)':
     dependencies:
       typescript: 5.9.3
 
