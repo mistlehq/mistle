@@ -98,6 +98,40 @@ describe("integration forms helpers", () => {
     });
   });
 
+  it("preserves generic ui schema options for downstream widgets", () => {
+    const resolved = resolveIntegrationForm({
+      schema: z
+        .object({
+          model: z.enum(["gpt-5-mini", "gpt-5"]),
+        })
+        .strict(),
+      form: {
+        uiSchema: {
+          model: {
+            "ui:widget": "SelectWidget",
+            "ui:options": {
+              fitContent: true,
+            },
+          },
+        },
+      },
+      context: {
+        familyId: "openai",
+        variantId: "openai-default",
+        kind: "agent",
+      },
+    });
+
+    expect(resolved.uiSchema).toEqual({
+      model: {
+        "ui:widget": "SelectWidget",
+        "ui:options": {
+          fitContent: true,
+        },
+      },
+    });
+  });
+
   it("reapplies defaults when a oneOf-backed current value is no longer valid", () => {
     const nextFormData = applySchemaDefaultsToFormData({
       schema: {

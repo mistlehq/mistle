@@ -3,34 +3,25 @@ import { describe, expect, it } from "vitest";
 import { formatConnectionDisplayName } from "./format-connection-display-name.js";
 
 describe("formatConnectionDisplayName", () => {
-  it("returns the integration target display name for a connection", () => {
+  it("returns the integration connection display name", () => {
     expect(
       formatConnectionDisplayName({
         connection: {
           id: "icn_01",
-          targetKey: "openai-default",
+          displayName: "Primary OpenAI Workspace",
         },
-        targets: [
-          {
-            targetKey: "openai-default",
-            displayName: "OpenAI",
-          },
-        ],
       }),
-    ).toBe("OpenAI");
+    ).toBe("Primary OpenAI Workspace");
   });
 
-  it("throws when the target metadata for the connection is missing", () => {
+  it("throws when the connection display name is blank", () => {
     expect(() =>
       formatConnectionDisplayName({
         connection: {
           id: "icn_01",
-          targetKey: "openai-default",
+          displayName: "   ",
         },
-        targets: [],
       }),
-    ).toThrow(
-      "Integration target metadata is missing for connection 'icn_01' with target key 'openai-default'.",
-    );
+    ).toThrow("Integration connection 'icn_01' is missing a display name.");
   });
 });

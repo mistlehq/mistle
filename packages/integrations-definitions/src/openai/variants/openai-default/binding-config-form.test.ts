@@ -75,6 +75,9 @@ describe("openai binding config forms", () => {
     expect(resolvedForm.uiSchema).toEqual({
       defaultModel: {
         "ui:widget": "SelectWidget",
+        "ui:options": {
+          fitContent: true,
+        },
       },
       reasoningEffort: {
         "ui:widget": "SelectWidget",

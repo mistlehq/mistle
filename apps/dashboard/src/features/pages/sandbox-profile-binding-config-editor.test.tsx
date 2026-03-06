@@ -43,6 +43,7 @@ describe("SandboxProfileBindingConfigEditor", () => {
     };
     const connection: IntegrationConnectionSummary = {
       id: "connection-openai",
+      displayName: "Primary OpenAI Workspace",
       targetKey: target.targetKey,
       status: "active",
       config: {
@@ -86,6 +87,7 @@ describe("SandboxProfileBindingConfigEditor", () => {
     };
     const connection: IntegrationConnectionSummary = {
       id: "connection-github",
+      displayName: "GitHub Production",
       targetKey: target.targetKey,
       status: "active",
       config: {

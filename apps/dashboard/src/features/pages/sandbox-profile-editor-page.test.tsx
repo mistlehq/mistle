@@ -2,7 +2,7 @@
 
 import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it } from "vitest";
 
@@ -68,16 +68,19 @@ function Harness(): React.JSX.Element {
   const connections: readonly IntegrationConnectionSummary[] = [
     {
       id: "conn-agent",
+      displayName: "Primary OpenAI Workspace",
       targetKey: "target-agent",
       status: "active",
     },
     {
       id: "conn-agent-2",
+      displayName: "Backup OpenAI Workspace",
       targetKey: "target-agent-2",
       status: "active",
     },
     {
       id: "conn-git",
+      displayName: "GitHub Production",
       targetKey: "target-git",
       status: "active",
     },
@@ -153,6 +156,26 @@ describe("IntegrationsEditorSection", () => {
 
     expect(await screen.findByRole("button", { name: "Edit binding" })).toBeDefined();
     expect(await screen.findByText("target-agent")).toBeDefined();
+    expect(await screen.findByText("Primary OpenAI Workspace")).toBeDefined();
+  });
+
+  it("lists distinct connection display names for duplicate provider connections", async () => {
+    const queryClient = createQueryClient();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Harness />
+      </QueryClientProvider>,
+    );
+
+    const addButtons = screen.getAllByRole("button", { name: "Add" });
+    fireEvent.click(addButtons[0]!);
+    fireEvent.click(screen.getByRole("combobox", { name: "Add binding connection" }));
+
+    const listbox = await screen.findByRole("listbox");
+
+    expect(within(listbox).getByText("Primary OpenAI Workspace")).toBeDefined();
+    expect(within(listbox).getByText("Backup OpenAI Workspace")).toBeDefined();
   });
 
   it("preserves edited row identity when changing connection", () => {

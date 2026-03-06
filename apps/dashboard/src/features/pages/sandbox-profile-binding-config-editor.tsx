@@ -26,6 +26,7 @@ export type SandboxProfileBindingEditorRow = {
 
 export type IntegrationConnectionSummary = {
   id: string;
+  displayName: string;
   targetKey: string;
   status: "active" | "error" | "revoked";
   config?: Record<string, unknown> | undefined;
@@ -415,6 +416,7 @@ export function SandboxProfileBindingConfigEditor(input: {
   row: SandboxProfileBindingEditorRow;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
+  layout?: "vertical" | "horizontal";
   onIntegrationBindingRowChange: (
     clientId: string,
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
@@ -467,9 +469,10 @@ export function SandboxProfileBindingConfigEditor(input: {
   }
 
   return (
-    <Form<JsonObject, RJSFSchema>
+    <Form<JsonObject, RJSFSchema, { layout?: "vertical" | "horizontal" }>
       children={<></>}
       formData={configUiModel.value}
+      formContext={{ layout: input.layout ?? "vertical" }}
       noHtml5Validate
       onChange={(event: IChangeEvent<JsonObject, RJSFSchema>) => {
         const nextFormData = resolveRecord(event.formData);
