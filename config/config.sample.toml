@@ -32,6 +32,7 @@ token_issuer = "data-plane-worker"
 token_audience = "data-plane-gateway"
 
 [global.sandbox]
+provider = "modal"
 default_base_image = "registry.example.com/mistle/sandbox-base:prod"
 gateway_ws_url = "wss://gateway.mistle.example/tunnel/sandbox"
 internal_gateway_ws_url = "ws://data-plane-gateway:8084/tunnel/sandbox"
@@ -125,7 +126,6 @@ concurrency = 4
 bootstrap_token_ttl_seconds = 120
 
 [apps.data_plane_worker.sandbox]
-provider = "modal"
 tokenizer_proxy_egress_base_url = "https://api.mistle.example/tokenizer-proxy/egress"
 
 [apps.data_plane_worker.sandbox.modal]
@@ -134,7 +134,7 @@ token_secret = "replace-with-modal-token-secret"
 app_name = "mistle-sandbox"
 environment_name = "production"
 
-# For docker provider, set `provider = "docker"` above and configure:
+# For the global docker provider, set `[global.sandbox].provider = "docker"` above and configure:
 #
 # [apps.data_plane_worker.sandbox.docker]
 # socket_path = "/var/run/docker.sock"

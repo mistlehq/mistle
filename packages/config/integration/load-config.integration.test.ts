@@ -263,7 +263,6 @@ const dataPlaneWorkerEnvConfig = {
     bootstrapTokenTtlSeconds: 120,
   },
   sandbox: {
-    provider: "modal",
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
     modal: {
       tokenId: "fixture-modal-token-id",
@@ -305,7 +304,6 @@ const dataPlaneWorkerDockerFixtureConfig = {
     bootstrapTokenTtlSeconds: 120,
   },
   sandbox: {
-    provider: "docker",
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
     docker: {
       socketPath: "/var/run/docker.sock",
@@ -643,7 +641,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_WORKER,
       env: createIntegrationEnv({
         NODE_ENV: "production",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_PROVIDER: "docker",
+        MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY:
           "localhost:5001/mistle/snapshots",

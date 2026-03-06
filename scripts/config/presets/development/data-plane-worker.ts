@@ -21,7 +21,6 @@ export const dataPlaneWorkerDevelopmentPreset = {
           bootstrap_token_ttl_seconds: 120,
         },
         sandbox: {
-          provider: "docker",
           tokenizer_proxy_egress_base_url: "http://localhost:5205/tokenizer-proxy/egress",
           docker: {
             socket_path: "/var/run/docker.sock",

@@ -10,7 +10,7 @@ const SandboxRuntimeTelemetryTracesEndpointEnv = "SANDBOX_RUNTIME_TELEMETRY_TRAC
 const SandboxRuntimeSandboxInstanceIDEnv = "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID";
 
 type ResolveSandboxRuntimeTracesEndpointInput = {
-  sandboxProvider: DataPlaneWorkerRuntimeConfig["app"]["sandbox"]["provider"];
+  sandboxProvider: DataPlaneWorkerRuntimeConfig["sandbox"]["provider"];
   telemetryConfig: DataPlaneWorkerRuntimeConfig["telemetry"];
 };
 
@@ -42,14 +42,14 @@ export async function startSandbox(
   input: StartSandboxInput,
 ): Promise<StartSandboxOutput> {
   const sandboxRuntimeTracesEndpoint = resolveSandboxRuntimeTracesEndpoint({
-    sandboxProvider: deps.config.app.sandbox.provider,
+    sandboxProvider: deps.config.sandbox.provider,
     telemetryConfig: deps.config.telemetry,
   });
 
   const startedSandbox = await deps.sandboxAdapter.start({
     image: {
       ...input.image,
-      provider: deps.config.app.sandbox.provider,
+      provider: deps.config.sandbox.provider,
     },
     env: {
       [SandboxRuntimeTokenizerProxyEgressBaseURLEnv]:
@@ -63,7 +63,7 @@ export async function startSandbox(
     },
   });
 
-  if (startedSandbox.provider !== deps.config.app.sandbox.provider) {
+  if (startedSandbox.provider !== deps.config.sandbox.provider) {
     throw new Error("Sandbox adapter returned sandbox handle with unexpected provider.");
   }
 

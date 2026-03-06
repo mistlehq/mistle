@@ -21,6 +21,7 @@ export const globalDevelopmentPreset = {
         resource_attributes: "deployment.environment=development",
       },
       sandbox: {
+        provider: "docker",
         default_base_image: "localhost:5001/mistle/sandbox-base:dev",
         gateway_ws_url: "ws://localhost:5202/tunnel/sandbox",
         internal_gateway_ws_url: "ws://host.docker.internal:5202/tunnel/sandbox",

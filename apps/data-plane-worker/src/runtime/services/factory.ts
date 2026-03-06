@@ -67,7 +67,7 @@ export function createDataPlaneWorkerServices(
           return ensureSandboxInstance(
             {
               db: input.db,
-              provider: input.config.app.sandbox.provider,
+              provider: input.config.sandbox.provider,
             },
             workflowInput,
           );

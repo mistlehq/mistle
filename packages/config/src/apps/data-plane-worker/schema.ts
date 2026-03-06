@@ -28,11 +28,6 @@ export const DataPlaneWorkerTunnelConfigSchema = z
   })
   .strict();
 
-export const DataPlaneWorkerSandboxProviders = {
-  MODAL: "modal",
-  DOCKER: "docker",
-} as const;
-
 export const DataPlaneWorkerSandboxModalConfigSchema = z
   .object({
     tokenId: z.string().min(1),
@@ -54,31 +49,19 @@ const DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema = z.url().refine((value) 
   return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
 }, "sandbox.tokenizerProxyEgressBaseUrl must use http or https.");
 
-export const DataPlaneWorkerSandboxConfigSchema = z.discriminatedUnion("provider", [
-  z
-    .object({
-      provider: z.literal(DataPlaneWorkerSandboxProviders.MODAL),
-      tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema,
-      modal: DataPlaneWorkerSandboxModalConfigSchema,
-    })
-    .strict(),
-  z
-    .object({
-      provider: z.literal(DataPlaneWorkerSandboxProviders.DOCKER),
-      tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema,
-      docker: DataPlaneWorkerSandboxDockerConfigSchema,
-    })
-    .strict(),
-]);
+export const DataPlaneWorkerSandboxConfigSchema = z
+  .object({
+    tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema,
+    modal: DataPlaneWorkerSandboxModalConfigSchema.optional(),
+    docker: DataPlaneWorkerSandboxDockerConfigSchema.optional(),
+  })
+  .strict();
 
 export const PartialDataPlaneWorkerSandboxConfigSchema = z
   .object({
-    provider: z
-      .enum([DataPlaneWorkerSandboxProviders.MODAL, DataPlaneWorkerSandboxProviders.DOCKER])
-      .optional(),
     tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema.optional(),
-    modal: DataPlaneWorkerSandboxModalConfigSchema.partial().optional(),
-    docker: DataPlaneWorkerSandboxDockerConfigSchema.partial().optional(),
+    modal: DataPlaneWorkerSandboxModalConfigSchema.optional(),
+    docker: DataPlaneWorkerSandboxDockerConfigSchema.optional(),
   })
   .strict();
 

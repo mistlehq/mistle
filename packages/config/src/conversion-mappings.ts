@@ -331,11 +331,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS",
   },
   {
-    configPath: ["apps", "data_plane_worker", "sandbox", "provider"],
-    tomlPath: ["apps", "data_plane_worker", "sandbox", "provider"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_PROVIDER",
-  },
-  {
     configPath: ["apps", "data_plane_worker", "sandbox", "tokenizerProxyEgressBaseUrl"],
     tomlPath: ["apps", "data_plane_worker", "sandbox", "tokenizer_proxy_egress_base_url"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL",

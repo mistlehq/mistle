@@ -1,7 +1,6 @@
 import { hasEntries } from "../../core/load-env.js";
 import { asObjectRecord } from "../../core/record.js";
 import {
-  DataPlaneWorkerSandboxProviders,
   type PartialDataPlaneWorkerConfigInput,
   PartialDataPlaneWorkerConfigSchema,
 } from "./schema.js";
@@ -20,40 +19,22 @@ export function loadDataPlaneWorkerFromToml(
   const sandboxDocker = asObjectRecord(sandbox.docker);
 
   const sandboxConfig: Record<string, unknown> = {
-    provider: sandbox.provider,
     tokenizerProxyEgressBaseUrl: sandbox.tokenizer_proxy_egress_base_url,
   };
 
-  if (sandbox.provider === DataPlaneWorkerSandboxProviders.MODAL && hasEntries(sandboxModal)) {
+  if (hasEntries(sandboxModal)) {
     sandboxConfig.modal = {
       tokenId: sandboxModal.token_id,
       tokenSecret: sandboxModal.token_secret,
       appName: sandboxModal.app_name,
       environmentName: sandboxModal.environment_name,
     };
-  } else if (
-    sandbox.provider === DataPlaneWorkerSandboxProviders.DOCKER &&
-    hasEntries(sandboxDocker)
-  ) {
+  }
+  if (hasEntries(sandboxDocker)) {
     sandboxConfig.docker = {
       socketPath: sandboxDocker.socket_path,
       snapshotRepository: sandboxDocker.snapshot_repository,
     };
-  } else if (sandbox.provider === undefined) {
-    if (hasEntries(sandboxModal)) {
-      sandboxConfig.modal = {
-        tokenId: sandboxModal.token_id,
-        tokenSecret: sandboxModal.token_secret,
-        appName: sandboxModal.app_name,
-        environmentName: sandboxModal.environment_name,
-      };
-    }
-    if (hasEntries(sandboxDocker)) {
-      sandboxConfig.docker = {
-        socketPath: sandboxDocker.socket_path,
-        snapshotRepository: sandboxDocker.snapshot_repository,
-      };
-    }
   }
 
   return PartialDataPlaneWorkerConfigSchema.parse({

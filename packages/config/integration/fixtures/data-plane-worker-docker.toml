@@ -51,7 +51,6 @@ concurrency = 3
 bootstrap_token_ttl_seconds = 120
 
 [apps.data_plane_worker.sandbox]
-provider = "docker"
 tokenizer_proxy_egress_base_url = "http://127.0.0.1:5004/tokenizer-proxy/egress"
 
 [apps.data_plane_worker.sandbox.docker]
