@@ -8,3 +8,4 @@ export * from "./binding-validation/index.js";
 export * from "./runtime-plan/index.js";
 export * from "./compiler/index.js";
 export * from "./webhooks/index.js";
+export * from "./forms/index.js";

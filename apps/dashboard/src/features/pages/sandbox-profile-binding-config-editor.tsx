@@ -1,8 +1,5 @@
-import {
-  applySchemaDefaultsToFormData,
-  createIntegrationFormRegistry,
-  resolveIntegrationForm,
-} from "@mistle/integrations-definitions/forms";
+import { applySchemaDefaultsToFormData, resolveIntegrationForm } from "@mistle/integrations-core";
+import { createIntegrationFormRegistry } from "@mistle/integrations-definitions/forms";
 import {
   Alert,
   AlertDescription,

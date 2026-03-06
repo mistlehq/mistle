@@ -44,7 +44,7 @@ Practical consequence: provider targets are the capability boundary. Users canno
 - `@mistle/integrations-definitions`
 - Registers concrete provider definitions (currently OpenAI and GitHub variants).
 - Each definition provides schemas and behavior for compile/auth/webhook handling.
-- Owns provider default target catalog construction (`buildDefaultSeedIntegrationTargets`) and shared browser-safe form helpers consumed by dashboard.
+- Owns provider default target catalog construction (`buildDefaultSeedIntegrationTargets`) and shared browser-safe form registries consumed by dashboard.
 
 - `apps/control-plane-api`
 - Hosts public Integrations HTTP endpoints.
@@ -85,25 +85,25 @@ Kinds are used on bindings and definitions to enforce compatibility (`binding.ki
 
 Key fields and what they drive:
 
-| Field                                        | Purpose                                                     | Where it is used                          |
-| -------------------------------------------- | ----------------------------------------------------------- | ----------------------------------------- |
-| `familyId`, `variantId`                      | Global identity of a provider variant                       | Registry lookup, target records           |
-| `kind`                                       | Integration kind (`agent` / `git` / `connector`)            | Binding validation during compile         |
-| `displayName`, `description`, `logoKey`      | UI metadata                                                 | Target discovery responses                |
-| `targetConfigSchema`                         | Parse/validate target config                                | target list/use, OAuth, compile, webhooks |
-| `targetConfigForm` (optional)                | Rendering metadata for target config                        | Operator-facing target config forms       |
-| `targetSecretSchema`                         | Parse/validate decrypted target secrets                     | OAuth, compile, webhooks                  |
-| `targetSecretForm` (optional)                | Rendering metadata for target secrets                       | Operator-facing target secret forms       |
-| `bindingConfigSchema`                        | Parse/validate per-binding config                           | Runtime plan compile                      |
-| `bindingConfigForm` (optional)               | Rendering metadata for per-binding config                   | Dashboard binding editor                  |
-| `connectionConfigSchema`                     | Parse/validate per-connection config                        | Binding write validation, compile         |
-| `connectionConfigForm` (optional)            | Rendering metadata for per-connection config                | Connection-related forms                  |
-| `supportedAuthSchemes`                       | Declares allowed auth methods                               | Connection creation and OAuth gating      |
-| `credentialResolvers` (optional)             | Dynamic credential generation/lookup                        | Internal credential resolution endpoint   |
-| `authHandlers.oauth` (optional)              | OAuth start/complete behavior                               | OAuth connection flows                    |
-| `webhookHandler` (optional)                  | Verify + parse inbound webhooks                             | Webhook ingest                            |
-| `validateBindingWriteContext(...)`           | Contextual target/connection/binding validation             | Binding write and compile parity checks   |
-| `compileBinding(...)`                        | Generate egress/artifacts/runtime clients                   | Runtime plan compiler                     |
+| Field                                   | Purpose                                          | Where it is used                          |
+| --------------------------------------- | ------------------------------------------------ | ----------------------------------------- |
+| `familyId`, `variantId`                 | Global identity of a provider variant            | Registry lookup, target records           |
+| `kind`                                  | Integration kind (`agent` / `git` / `connector`) | Binding validation during compile         |
+| `displayName`, `description`, `logoKey` | UI metadata                                      | Target discovery responses                |
+| `targetConfigSchema`                    | Parse/validate target config                     | target list/use, OAuth, compile, webhooks |
+| `targetConfigForm` (optional)           | Rendering metadata for target config             | Operator-facing target config forms       |
+| `targetSecretSchema`                    | Parse/validate decrypted target secrets          | OAuth, compile, webhooks                  |
+| `targetSecretForm` (optional)           | Rendering metadata for target secrets            | Operator-facing target secret forms       |
+| `bindingConfigSchema`                   | Parse/validate per-binding config                | Runtime plan compile                      |
+| `bindingConfigForm` (optional)          | Rendering metadata for per-binding config        | Dashboard binding editor                  |
+| `connectionConfigSchema`                | Parse/validate per-connection config             | Binding write validation, compile         |
+| `connectionConfigForm` (optional)       | Rendering metadata for per-connection config     | Connection-related forms                  |
+| `supportedAuthSchemes`                  | Declares allowed auth methods                    | Connection creation and OAuth gating      |
+| `credentialResolvers` (optional)        | Dynamic credential generation/lookup             | Internal credential resolution endpoint   |
+| `authHandlers.oauth` (optional)         | OAuth start/complete behavior                    | OAuth connection flows                    |
+| `webhookHandler` (optional)             | Verify + parse inbound webhooks                  | Webhook ingest                            |
+| `validateBindingWriteContext(...)`      | Contextual target/connection/binding validation  | Binding write and compile parity checks   |
+| `compileBinding(...)`                   | Generate egress/artifacts/runtime clients        | Runtime plan compiler                     |
 
 ## Lifecycle End-To-End
 
@@ -132,7 +132,8 @@ flowchart TD
 - Discovery resolves metadata from definitions (`displayName`, `description`) with optional DB overrides.
 - Control-plane target discovery also returns definition-owned capability metadata (`logoKey`, `supportedAuthSchemes`) and config health metadata (`targetHealth`).
 - UI consumers may use raw target and connection config together with definition-owned schema/form metadata to resolve form rendering client-side.
-- For browser clients, definitions expose browser-safe schema/form helpers through `@mistle/integrations-definitions/forms` so dashboard code does not duplicate provider logic.
+- `@mistle/integrations-core` owns the renderer-agnostic schema/form contract and generic form resolution helpers.
+- For browser clients, definitions expose browser-safe integration registries through `@mistle/integrations-definitions/forms` so dashboard code does not duplicate provider-specific wiring.
 
 ### 2) Connection creation
 
@@ -241,6 +242,7 @@ This is the recommended workflow.
 - Control-plane integration tests for connection and compile flows.
 - Form resolution tests: ensure schema-backed form helpers produce the expected resolved JSON Schema and UI metadata.
 - Context-aware form tests: ensure target/connection/current-value context narrows or specializes rendering as intended.
+- Generic form helper tests belong in `@mistle/integrations-core`; provider-specific context-aware form tests should live next to the `*-form.ts` module.
 
 ## Design Principles
 
@@ -275,6 +277,7 @@ Useful entrypoints when reading the code:
 - `packages/integrations-core/src/validation/index.ts`
 - `packages/integrations-core/src/binding-validation/index.ts`
 - `packages/integrations-core/src/webhooks/index.ts`
+- `packages/integrations-core/src/forms/*`
 - `packages/integrations-definitions/src/index.ts`
 - `packages/integrations-definitions/src/forms/*`
 - `apps/control-plane-api/src/integration-targets/*`

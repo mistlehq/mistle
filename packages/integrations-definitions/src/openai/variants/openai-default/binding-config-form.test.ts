@@ -1,6 +1,6 @@
+import { resolveIntegrationForm } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { resolveIntegrationForm } from "../../../forms/index.js";
 import { OpenAiConnectionConfigSchema } from "./auth.js";
 import {
   OpenAiConnectionConfigForm,
