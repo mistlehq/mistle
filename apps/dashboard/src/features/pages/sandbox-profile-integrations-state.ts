@@ -471,7 +471,6 @@ export function useSandboxProfileIntegrationsState(
     }
     return formatConnectionDisplayName({
       connection: selectedConnection,
-      targets: availableTargets,
     });
   }
 

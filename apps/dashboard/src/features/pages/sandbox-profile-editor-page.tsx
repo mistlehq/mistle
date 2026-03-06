@@ -232,18 +232,27 @@ function resolveBindingSummaryItems(input: {
   return items;
 }
 
-function resolveRowTarget(input: {
+function resolveRowBindingMetadata(input: {
   row: SandboxProfileBindingEditorRow;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
-}): IntegrationTargetSummary | undefined {
+}): {
+  connection: IntegrationConnectionSummary;
+  target: IntegrationTargetSummary | undefined;
+} | null {
   const connection = input.availableConnections.find(
     (candidate) => candidate.id === input.row.connectionId,
   );
   if (connection === undefined) {
-    return undefined;
+    return null;
   }
-  return input.availableTargets.find((candidate) => candidate.targetKey === connection.targetKey);
+
+  return {
+    connection,
+    target: input.availableTargets.find(
+      (candidate) => candidate.targetKey === connection.targetKey,
+    ),
+  };
 }
 
 export function preserveDialogRowIdentity(input: {
@@ -495,16 +504,23 @@ export function IntegrationsEditorSection(
           ) : null}
 
           {integrationRowsByKind[kind].map((row) => {
-            const target = resolveRowTarget({
+            const rowMetadata = resolveRowBindingMetadata({
               row,
               availableConnections: props.availableConnections,
               availableTargets: props.availableTargets,
             });
+            const target = rowMetadata?.target;
             const summaryItems = resolveBindingSummaryItems({
               row,
               availableConnections: props.availableConnections,
               availableTargets: props.availableTargets,
             });
+            const connectionDisplayName =
+              rowMetadata === null
+                ? undefined
+                : formatConnectionDisplayName({
+                    connection: rowMetadata.connection,
+                  });
 
             return (
               <div className="gap-4 rounded-md border p-4 flex flex-col" key={row.clientId}>
@@ -521,9 +537,16 @@ export function IntegrationsEditorSection(
                         {(target?.displayName ?? "I").slice(0, 1).toUpperCase()}
                       </span>
                     )}
-                    <p className="truncate text-sm font-medium">
-                      {target?.displayName ?? "Integration"}
-                    </p>
+                    <div className="min-w-0 gap-0.5 flex flex-col">
+                      <p className="truncate text-sm font-medium">
+                        {target?.displayName ?? "Integration"}
+                      </p>
+                      {connectionDisplayName === undefined ? null : (
+                        <p className="text-muted-foreground truncate text-xs">
+                          {connectionDisplayName}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="gap-2 flex">
                     <Button
@@ -617,10 +640,7 @@ export function IntegrationsEditorSection(
                       {availableConnectionsByKind[integrationDialogState.row.kind].map(
                         (connection) => (
                           <SelectItem key={connection.id} value={connection.id}>
-                            {formatConnectionDisplayName({
-                              connection,
-                              targets: props.availableTargets,
-                            })}
+                            {formatConnectionDisplayName({ connection })}
                           </SelectItem>
                         ),
                       )}

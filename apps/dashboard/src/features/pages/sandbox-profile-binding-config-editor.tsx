@@ -26,6 +26,7 @@ export type SandboxProfileBindingEditorRow = {
 
 export type IntegrationConnectionSummary = {
   id: string;
+  displayName: string;
   targetKey: string;
   status: "active" | "error" | "revoked";
   config?: Record<string, unknown> | undefined;
