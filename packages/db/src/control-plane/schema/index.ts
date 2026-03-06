@@ -31,10 +31,25 @@ export {
   type IntegrationConnectionStatus,
 } from "./integration-connections.js";
 export {
-  integrationConversationRoutes,
-  type InsertIntegrationConversationRoute,
-  type IntegrationConversationRoute,
-} from "./integration-conversation-routes.js";
+  conversations,
+  ConversationCreatedByKinds,
+  ConversationOwnerKinds,
+  ConversationProviderFamilies,
+  ConversationStatuses,
+  type Conversation,
+  type ConversationCreatedByKind,
+  type ConversationOwnerKind,
+  type ConversationProviderFamily,
+  type ConversationStatus,
+  type InsertConversation,
+} from "./conversations.js";
+export {
+  conversationRoutes,
+  ConversationRouteStatuses,
+  type ConversationRoute,
+  type ConversationRouteStatus,
+  type InsertConversationRoute,
+} from "./conversation-routes.js";
 export {
   integrationCredentials,
   IntegrationCredentialSecretKinds,
