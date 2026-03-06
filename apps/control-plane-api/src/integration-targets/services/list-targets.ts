@@ -203,9 +203,6 @@ export async function listIntegrationTargets(
             ? {}
             : { supportedAuthSchemes: resolvedMetadata.supportedAuthSchemes }),
           targetHealth: projectedTargetUi.targetHealth,
-          ...(projectedTargetUi.resolvedBindingEditorUi === undefined
-            ? {}
-            : { resolvedBindingEditorUi: projectedTargetUi.resolvedBindingEditorUi }),
           ...(target.displayNameOverride === null
             ? {}
             : { displayNameOverride: target.displayNameOverride }),

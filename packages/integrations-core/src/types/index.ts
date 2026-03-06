@@ -1,3 +1,5 @@
+import type { z } from "zod";
+
 export type IntegrationKind = "agent" | "git" | "connector";
 
 export const IntegrationKinds: {
@@ -62,12 +64,13 @@ export type IntegrationBinding = {
   config: Record<string, unknown>;
 };
 
-export type IntegrationConfigSchema<TOutput> = {
-  parse: (input: unknown) => TOutput;
-};
+export type IntegrationConfigSchema<TOutput> = z.ZodType<TOutput>;
 
 type ParsedSchemaOutput<TSchema extends IntegrationConfigSchema<unknown>> =
   TSchema extends IntegrationConfigSchema<infer TOutput> ? TOutput : never;
+
+type ParsedOptionalSchemaOutput<TSchema extends IntegrationConfigSchema<unknown> | undefined> =
+  TSchema extends IntegrationConfigSchema<infer TOutput> ? TOutput : Record<string, unknown>;
 
 export type BindingWriteValidationContext<
   TTargetConfig = Record<string, unknown>,
@@ -104,8 +107,56 @@ export type BindingWriteValidationResult =
       issues: readonly BindingWriteValidationIssue[];
     };
 
-export type IntegrationTargetUiProjection = Record<string, unknown>;
-export type IntegrationBindingEditorUiProjection = Record<string, unknown>;
+export type IntegrationFormJsonSchema = Record<string, unknown>;
+export type IntegrationFormUiSchema = Record<string, unknown>;
+
+export type ResolvedIntegrationForm = {
+  schema?: IntegrationFormJsonSchema;
+  uiSchema?: IntegrationFormUiSchema;
+};
+
+export type IntegrationFormContext<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TBindingConfig = Record<string, unknown>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  familyId: string;
+  variantId: string;
+  kind: IntegrationKind;
+  target?: {
+    rawConfig: Record<string, unknown>;
+    config: TTargetConfig;
+    rawSecrets?: Record<string, string>;
+    secrets?: TTargetSecrets;
+  };
+  connection?: {
+    rawConfig: Record<string, unknown>;
+    config: TConnectionConfig;
+  };
+  currentValue?: Record<string, unknown>;
+  parsedCurrentValue?: TBindingConfig;
+};
+
+type IntegrationFormResolver<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TBindingConfig = Record<string, unknown>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  bivarianceHack(
+    input: IntegrationFormContext<TTargetConfig, TTargetSecrets, TBindingConfig, TConnectionConfig>,
+  ): ResolvedIntegrationForm;
+}["bivarianceHack"];
+
+export type IntegrationFormDefinition<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TBindingConfig = Record<string, unknown>,
+  TConnectionConfig = Record<string, unknown>,
+> =
+  | ResolvedIntegrationForm
+  | IntegrationFormResolver<TTargetConfig, TTargetSecrets, TBindingConfig, TConnectionConfig>;
 
 export type IntegrationResolvedTarget<
   TTargetConfig = Record<string, unknown>,
@@ -586,6 +637,8 @@ export type IntegrationDefinition<
   TBindingConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
     Record<string, unknown>
   >,
+  TConnectionConfigSchema extends IntegrationConfigSchema<Record<string, unknown>> | undefined =
+    undefined,
 > = {
   familyId: string;
   variantId: string;
@@ -594,9 +647,33 @@ export type IntegrationDefinition<
   description?: string;
   logoKey: string;
   targetConfigSchema: TTargetConfigSchema;
+  targetConfigForm?: IntegrationFormDefinition<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    ParsedSchemaOutput<TBindingConfigSchema>,
+    ParsedOptionalSchemaOutput<TConnectionConfigSchema>
+  >;
   targetSecretSchema: TTargetSecretsSchema;
+  targetSecretForm?: IntegrationFormDefinition<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    ParsedSchemaOutput<TBindingConfigSchema>,
+    ParsedOptionalSchemaOutput<TConnectionConfigSchema>
+  >;
   bindingConfigSchema: TBindingConfigSchema;
-  connectionConfigSchema?: IntegrationConfigSchema<Record<string, unknown>>;
+  bindingConfigForm?: IntegrationFormDefinition<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    ParsedSchemaOutput<TBindingConfigSchema>,
+    ParsedOptionalSchemaOutput<TConnectionConfigSchema>
+  >;
+  connectionConfigSchema?: TConnectionConfigSchema;
+  connectionConfigForm?: IntegrationFormDefinition<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    ParsedSchemaOutput<TBindingConfigSchema>,
+    ParsedOptionalSchemaOutput<TConnectionConfigSchema>
+  >;
   supportedAuthSchemes: ReadonlyArray<IntegrationSupportedAuthScheme>;
   credentialResolvers?: IntegrationCredentialResolvers;
   authHandlers?: {
@@ -615,23 +692,9 @@ export type IntegrationDefinition<
     input: BindingWriteValidationContext<
       ParsedSchemaOutput<TTargetConfigSchema>,
       ParsedSchemaOutput<TBindingConfigSchema>,
-      Record<string, unknown>
+      ParsedOptionalSchemaOutput<TConnectionConfigSchema>
     >,
   ): BindingWriteValidationResult;
-  projectTargetUi?(input: {
-    familyId: string;
-    variantId: string;
-    kind: IntegrationKind;
-    targetConfig: ParsedSchemaOutput<TTargetConfigSchema>;
-  }): IntegrationTargetUiProjection;
-  targetUiProjectionSchema?: IntegrationConfigSchema<IntegrationTargetUiProjection>;
-  projectBindingEditorUi?(input: {
-    familyId: string;
-    variantId: string;
-    kind: IntegrationKind;
-    targetConfig: ParsedSchemaOutput<TTargetConfigSchema>;
-  }): IntegrationBindingEditorUiProjection;
-  bindingEditorUiProjectionSchema?: IntegrationConfigSchema<IntegrationBindingEditorUiProjection>;
   compileBinding(
     input: CompileBindingInput<
       ParsedSchemaOutput<TTargetConfigSchema>,
@@ -640,6 +703,13 @@ export type IntegrationDefinition<
     >,
   ): CompileBindingResult;
 };
+
+export type AnyIntegrationDefinition = IntegrationDefinition<
+  IntegrationConfigSchema<unknown>,
+  IntegrationConfigSchema<unknown>,
+  IntegrationConfigSchema<unknown>,
+  IntegrationConfigSchema<Record<string, unknown>> | undefined
+>;
 
 export type TriggerFilter =
   | { op: "all"; filters: ReadonlyArray<TriggerFilter> }
@@ -700,11 +770,11 @@ export type IntegrationDefinitionLocator = {
 };
 
 export interface IntegrationDefinitionReader {
-  getDefinition(input: IntegrationDefinitionLocator): IntegrationDefinition | undefined;
+  getDefinition(input: IntegrationDefinitionLocator): AnyIntegrationDefinition | undefined;
 }
 
 export interface IntegrationDefinitionResolver extends IntegrationDefinitionReader {
-  getDefinitionOrThrow(input: IntegrationDefinitionLocator): IntegrationDefinition;
+  getDefinitionOrThrow(input: IntegrationDefinitionLocator): AnyIntegrationDefinition;
 }
 
 export type CompileRuntimePlanBindingInput = {

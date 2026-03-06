@@ -1,33 +1,23 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
-import { IntegrationBindingEditorUiProjectionSchema } from "../../../ui/binding-editor-ui-contract.js";
+import { GitHubBindingConfigForm } from "../../shared/binding-config-form.js";
 import { GitHubFamilyId } from "../../shared/constants.js";
 import {
   GitHubAppInstallationCredentialResolver,
   GitHubCredentialResolverKeys,
 } from "../../shared/credential-resolver.js";
 import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
-import { projectGitHubBindingEditorUi } from "../../shared/project-binding-editor-ui.js";
-import {
-  GitHubTargetSecretSchema,
-  type GitHubTargetSecrets,
-} from "../../shared/target-secret-schema.js";
+import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
 import { GitHubCloudSupportedAuthSchemes } from "./auth.js";
-import {
-  GitHubCloudBindingConfigSchema,
-  type GitHubCloudBindingConfig,
-} from "./binding-config-schema.js";
+import { GitHubCloudBindingConfigSchema } from "./binding-config-schema.js";
 import { compileGitHubCloudBinding } from "./compile-binding.js";
-import {
-  GitHubCloudTargetConfigSchema,
-  type GitHubCloudTargetConfig,
-} from "./target-config-schema.js";
+import { GitHubCloudTargetConfigSchema } from "./target-config-schema.js";
 import { GitHubCloudWebhookHandler } from "./webhook.js";
 
 type GitHubCloudIntegrationDefinition = IntegrationDefinition<
-  { parse: (input: unknown) => GitHubCloudTargetConfig },
-  { parse: (input: unknown) => GitHubTargetSecrets },
-  { parse: (input: unknown) => GitHubCloudBindingConfig }
+  typeof GitHubCloudTargetConfigSchema,
+  typeof GitHubTargetSecretSchema,
+  typeof GitHubCloudBindingConfigSchema
 >;
 
 export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
@@ -40,6 +30,7 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
   targetConfigSchema: GitHubCloudTargetConfigSchema,
   targetSecretSchema: GitHubTargetSecretSchema,
   bindingConfigSchema: GitHubCloudBindingConfigSchema,
+  bindingConfigForm: GitHubBindingConfigForm,
   supportedAuthSchemes: GitHubCloudSupportedAuthSchemes,
   credentialResolvers: {
     custom: {
@@ -51,7 +42,5 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
     oauth: GitHubAppOAuthHandler,
   },
   webhookHandler: GitHubCloudWebhookHandler,
-  projectBindingEditorUi: () => projectGitHubBindingEditorUi(),
-  bindingEditorUiProjectionSchema: IntegrationBindingEditorUiProjectionSchema,
   compileBinding: compileGitHubCloudBinding,
 };

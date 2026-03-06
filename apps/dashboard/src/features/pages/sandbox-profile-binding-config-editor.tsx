@@ -1,21 +1,13 @@
 import {
-  buildBindingEditorRenderableFields,
-  createDefaultConfigFromBindingEditorVariant,
-  parseConfigAgainstBindingEditorVariant,
-  parseIntegrationBindingEditorUiProjection,
-  resolveBindingEditorVariant,
-  type BindingEditorRenderableField,
-  type BindingEditorVariant,
-  updateBindingEditorConfigByField,
-} from "@mistle/integrations-definitions/ui";
+  applySchemaDefaultsToFormData,
+  createIntegrationFormRegistry,
+  resolveIntegrationForm,
+} from "@mistle/integrations-definitions/forms";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
   Button,
-  Field,
-  FieldContent,
-  FieldLabel,
   Input,
   Select,
   SelectContent,
@@ -23,8 +15,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@mistle/ui";
+import Form, { type IChangeEvent } from "@rjsf/core";
+import type { RJSFSchema, UiSchema, WidgetProps } from "@rjsf/utils";
+import validator from "@rjsf/validator-ajv8";
 
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
+
+const IntegrationRegistry = createIntegrationFormRegistry();
+
+type JsonObject = Record<string, unknown>;
+type IntegrationDefinition = NonNullable<ReturnType<typeof IntegrationRegistry.getDefinition>>;
 
 export type SandboxProfileBindingEditorRow = {
   clientId: string;
@@ -47,10 +47,10 @@ export type IntegrationTargetSummary = {
   logoKey?: string | undefined;
   familyId: string;
   variantId: string;
+  config: Record<string, unknown>;
   targetHealth: {
     configStatus: "valid" | "invalid";
   };
-  resolvedBindingEditorUi?: Record<string, unknown> | undefined;
 };
 
 type BindingConfigUiModel =
@@ -58,13 +58,14 @@ type BindingConfigUiModel =
       mode: "missing-connection";
     }
   | {
-      mode: "editor";
-      variant: BindingEditorVariant;
-      value: Record<string, unknown>;
-      fields: readonly BindingEditorRenderableField[];
+      mode: "no-config";
     }
   | {
-      mode: "connector";
+      mode: "form";
+      schema: RJSFSchema;
+      uiSchema: UiSchema<JsonObject, RJSFSchema>;
+      value: Record<string, unknown>;
+      visiblePropertyKeys: readonly string[];
     }
   | {
       mode: "unsupported";
@@ -72,14 +73,364 @@ type BindingConfigUiModel =
       defaultConfig?: Record<string, unknown> | undefined;
     };
 
+type ResolvedBindingEditorContext = {
+  definition: IntegrationDefinition;
+  connection: IntegrationConnectionSummary;
+  target: IntegrationTargetSummary;
+  parsedTargetConfig: Record<string, unknown>;
+  parsedConnectionConfig: Record<string, unknown>;
+};
+
+function isRecord(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function resolveRecord(value: unknown): Record<string, unknown> {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return value;
+}
+
+function readUiWidget(
+  uiSchema: UiSchema<JsonObject, RJSFSchema>,
+  propertyKey: string,
+): string | undefined {
+  const propertyUiSchema = uiSchema[propertyKey];
+  if (!isRecord(propertyUiSchema)) {
+    return undefined;
+  }
+
+  const widget = propertyUiSchema["ui:widget"];
+  return typeof widget === "string" ? widget : undefined;
+}
+
+function resolveSchemaProperties(schema: RJSFSchema): Record<string, unknown> {
+  const properties = schema.properties;
+  return isRecord(properties) ? properties : {};
+}
+
+function resolveVisiblePropertyKeys(input: {
+  schema: RJSFSchema;
+  uiSchema: UiSchema<JsonObject, RJSFSchema>;
+}): readonly string[] {
+  return Object.keys(resolveSchemaProperties(input.schema)).filter(
+    (propertyKey) => readUiWidget(input.uiSchema, propertyKey) !== "hidden",
+  );
+}
+
+function hasUnsupportedConfigKeys(input: {
+  schema: RJSFSchema;
+  formData: Record<string, unknown>;
+}): boolean {
+  const supportedKeys = new Set<string>(Object.keys(resolveSchemaProperties(input.schema)));
+
+  return Object.keys(input.formData).some((key) => !supportedKeys.has(key));
+}
+
+function createDefaultConfigFromSchema(schema: RJSFSchema): Record<string, unknown> {
+  return applySchemaDefaultsToFormData({
+    schema: resolveRecord(schema),
+    formData: {},
+  });
+}
+
+function resolveBindingDefinitionContext(input: {
+  row: SandboxProfileBindingEditorRow;
+  connections: readonly IntegrationConnectionSummary[];
+  targets: readonly IntegrationTargetSummary[];
+}):
+  | {
+      ok: true;
+      value: ResolvedBindingEditorContext;
+    }
+  | {
+      ok: false;
+      model: BindingConfigUiModel;
+    } {
+  const connection = input.connections.find((candidate) => candidate.id === input.row.connectionId);
+  if (connection === undefined) {
+    return {
+      ok: false,
+      model: {
+        mode: "missing-connection",
+      },
+    };
+  }
+
+  const target = input.targets.find((candidate) => candidate.targetKey === connection.targetKey);
+  if (target === undefined) {
+    return {
+      ok: false,
+      model: {
+        mode: "unsupported",
+        message: `Connection '${connection.id}' references unknown target '${connection.targetKey}'.`,
+      },
+    };
+  }
+
+  const definition = IntegrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+  if (definition === undefined) {
+    return {
+      ok: false,
+      model: {
+        mode: "unsupported",
+        message: `Missing integration definition for target '${target.familyId}/${target.variantId}'.`,
+      },
+    };
+  }
+
+  if (definition.kind !== input.row.kind) {
+    return {
+      ok: false,
+      model: {
+        mode: "unsupported",
+        message: `Binding kind '${input.row.kind}' is not compatible with target '${target.familyId}/${target.variantId}'.`,
+      },
+    };
+  }
+
+  const targetConfigResult = definition.targetConfigSchema.safeParse(target.config);
+  if (!targetConfigResult.success) {
+    return {
+      ok: false,
+      model: {
+        mode: "unsupported",
+        message: `Target '${target.familyId}/${target.variantId}' has invalid config.`,
+      },
+    };
+  }
+
+  const rawConnectionConfig = connection.config ?? {};
+  let parsedConnectionConfig: Record<string, unknown>;
+  if (definition.connectionConfigSchema === undefined) {
+    parsedConnectionConfig = rawConnectionConfig;
+  } else {
+    const parsedConnectionConfigResult =
+      definition.connectionConfigSchema.safeParse(rawConnectionConfig);
+    if (!parsedConnectionConfigResult.success) {
+      return {
+        ok: false,
+        model: {
+          mode: "unsupported",
+          message: `Connection '${connection.id}' has invalid config for target '${target.familyId}/${target.variantId}'. Reconnect this integration connection.`,
+        },
+      };
+    }
+
+    parsedConnectionConfig = parsedConnectionConfigResult.data;
+  }
+
+  return {
+    ok: true,
+    value: {
+      definition,
+      connection,
+      target,
+      parsedTargetConfig: targetConfigResult.data,
+      parsedConnectionConfig,
+    },
+  };
+}
+
+function resolveFormModelFromContext(input: {
+  row: SandboxProfileBindingEditorRow;
+  context: ResolvedBindingEditorContext;
+}): BindingConfigUiModel {
+  try {
+    const parsedCurrentValue = input.context.definition.bindingConfigSchema.safeParse(
+      input.row.config,
+    );
+    const resolvedForm = resolveIntegrationForm({
+      schema: input.context.definition.bindingConfigSchema,
+      form: input.context.definition.bindingConfigForm,
+      context: {
+        familyId: input.context.target.familyId,
+        variantId: input.context.target.variantId,
+        kind: input.context.definition.kind,
+        target: {
+          rawConfig: input.context.target.config,
+          config: input.context.parsedTargetConfig,
+        },
+        connection: {
+          rawConfig: input.context.connection.config ?? {},
+          config: input.context.parsedConnectionConfig,
+        },
+        currentValue: input.row.config,
+        ...(parsedCurrentValue.success ? { parsedCurrentValue: parsedCurrentValue.data } : {}),
+      },
+    });
+
+    const schema: RJSFSchema = resolvedForm.schema ?? {};
+    const uiSchema: UiSchema<JsonObject, RJSFSchema> = resolvedForm.uiSchema ?? {};
+    const defaultConfig = createDefaultConfigFromSchema(schema);
+    const normalizedValue = applySchemaDefaultsToFormData({
+      schema: resolveRecord(schema),
+      formData: resolveRecord(input.row.config),
+    });
+
+    if (hasUnsupportedConfigKeys({ schema, formData: input.row.config })) {
+      return {
+        mode: "unsupported",
+        message: "Binding config contains unsupported fields for the selected target/connection.",
+        defaultConfig,
+      };
+    }
+
+    const visiblePropertyKeys = resolveVisiblePropertyKeys({
+      schema,
+      uiSchema,
+    });
+    if (visiblePropertyKeys.length === 0) {
+      return {
+        mode: "no-config",
+      };
+    }
+
+    return {
+      mode: "form",
+      schema,
+      uiSchema,
+      value: normalizedValue,
+      visiblePropertyKeys,
+    };
+  } catch (error) {
+    return {
+      mode: "unsupported",
+      message: error instanceof Error ? error.message : "Could not resolve binding form.",
+    };
+  }
+}
+
+function resolveNextConfigFromChange(input: {
+  row: SandboxProfileBindingEditorRow;
+  nextFormData: Record<string, unknown>;
+  connections: readonly IntegrationConnectionSummary[];
+  targets: readonly IntegrationTargetSummary[];
+}): Record<string, unknown> {
+  const contextResult = resolveBindingDefinitionContext({
+    row: {
+      ...input.row,
+      config: input.nextFormData,
+    },
+    connections: input.connections,
+    targets: input.targets,
+  });
+
+  if (!contextResult.ok) {
+    return input.nextFormData;
+  }
+
+  const nextModel = resolveFormModelFromContext({
+    row: {
+      ...input.row,
+      config: input.nextFormData,
+    },
+    context: contextResult.value,
+  });
+
+  if (nextModel.mode !== "form") {
+    return input.nextFormData;
+  }
+
+  return nextModel.value;
+}
+
+function resolveCommaSeparatedOptions(options: WidgetProps<JsonObject, RJSFSchema>["options"]): {
+  delimiter: string;
+  placeholder: string | undefined;
+} {
+  const delimiter = typeof options.delimiter === "string" ? options.delimiter : ",";
+  const placeholder = typeof options.placeholder === "string" ? options.placeholder : undefined;
+
+  return {
+    delimiter,
+    placeholder,
+  };
+}
+
+function CommaSeparatedStringArrayWidget(
+  props: WidgetProps<JsonObject, RJSFSchema>,
+): React.JSX.Element {
+  const { delimiter, placeholder } = resolveCommaSeparatedOptions(props.options);
+  const value = Array.isArray(props.value)
+    ? props.value.filter((entry): entry is string => typeof entry === "string")
+    : [];
+
+  return (
+    <Input
+      aria-label={props.label}
+      className="w-full max-w-80"
+      id={props.id}
+      onBlur={() => {
+        props.onBlur(props.id, value);
+      }}
+      onChange={(event) => {
+        const nextValue = event.currentTarget.value
+          .split(delimiter)
+          .map((entry) => entry.trim())
+          .filter((entry) => entry.length > 0);
+        props.onChange(nextValue);
+      }}
+      onFocus={() => {
+        props.onFocus(props.id, value);
+      }}
+      placeholder={placeholder}
+      value={value.join(`${delimiter} `)}
+    />
+  );
+}
+
+function SelectWidget(props: WidgetProps<JsonObject, RJSFSchema>): React.JSX.Element {
+  const enumOptions = props.options.enumOptions ?? [];
+  const selectedValue = typeof props.value === "string" ? props.value : undefined;
+
+  return (
+    <Select
+      onValueChange={(nextValue) => {
+        props.onChange(nextValue);
+      }}
+      value={selectedValue}
+    >
+      <SelectTrigger aria-label={props.label} className="w-full max-w-80" id={props.id}>
+        <SelectValue placeholder={props.placeholder ?? `Select ${props.label.toLowerCase()}`} />
+      </SelectTrigger>
+      <SelectContent>
+        {enumOptions.map((option) => {
+          const optionValue = String(option.value);
+          return (
+            <SelectItem key={optionValue} value={optionValue}>
+              {option.label}
+            </SelectItem>
+          );
+        })}
+      </SelectContent>
+    </Select>
+  );
+}
+
+const BindingConfigWidgets = {
+  SelectWidget,
+  "comma-separated-string-array": CommaSeparatedStringArrayWidget,
+};
+
 export function resolveBindingKindFromTarget(
   target: IntegrationTargetSummary | undefined,
 ): SandboxIntegrationBindingKind | undefined {
   if (target === undefined) {
     return undefined;
   }
-  const projection = parseIntegrationBindingEditorUiProjection(target.resolvedBindingEditorUi);
-  return projection?.bindingEditor.kind;
+
+  const definition = IntegrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+
+  return definition?.kind;
 }
 
 export function createDefaultBindingConfig(input: {
@@ -89,22 +440,41 @@ export function createDefaultBindingConfig(input: {
   if (input.target === undefined || input.connection === undefined) {
     return {};
   }
-  const projection = parseIntegrationBindingEditorUiProjection(
-    input.target.resolvedBindingEditorUi,
-  );
-  if (projection === undefined) {
+
+  const resolvedKind = resolveBindingKindFromTarget(input.target);
+  if (resolvedKind === undefined) {
     return {};
   }
-  const resolvedVariant = resolveBindingEditorVariant({
-    projection,
-    ...(input.connection.config === undefined ? {} : { connectionConfig: input.connection.config }),
+
+  const contextResult = resolveBindingDefinitionContext({
+    row: {
+      clientId: "default-binding-config",
+      connectionId: input.connection.id,
+      kind: resolvedKind,
+      config: {},
+    },
+    connections: [input.connection],
+    targets: [input.target],
   });
-  if (!resolvedVariant.ok) {
+  if (!contextResult.ok) {
     return {};
   }
-  return createDefaultConfigFromBindingEditorVariant({
-    variant: resolvedVariant.variant,
+
+  const resolvedModel = resolveFormModelFromContext({
+    row: {
+      clientId: "default-binding-config",
+      connectionId: input.connection.id,
+      kind: contextResult.value.definition.kind,
+      config: {},
+    },
+    context: contextResult.value,
   });
+
+  if (resolvedModel.mode !== "form") {
+    return {};
+  }
+
+  return resolvedModel.value;
 }
 
 export function resolveBindingConfigUiModel(input: {
@@ -112,71 +482,15 @@ export function resolveBindingConfigUiModel(input: {
   connections: readonly IntegrationConnectionSummary[];
   targets: readonly IntegrationTargetSummary[];
 }): BindingConfigUiModel {
-  const connection = input.connections.find((candidate) => candidate.id === input.row.connectionId);
-  if (connection === undefined) {
-    return {
-      mode: "missing-connection",
-    };
+  const contextResult = resolveBindingDefinitionContext(input);
+  if (!contextResult.ok) {
+    return contextResult.model;
   }
 
-  const target = input.targets.find((candidate) => candidate.targetKey === connection.targetKey);
-  if (target === undefined) {
-    return {
-      mode: "unsupported",
-      message: `Connection '${connection.id}' references unknown target '${connection.targetKey}'.`,
-    };
-  }
-
-  const projection = parseIntegrationBindingEditorUiProjection(target.resolvedBindingEditorUi);
-  if (projection === undefined) {
-    return {
-      mode: "unsupported",
-      message: `Target '${target.familyId}/${target.variantId}' does not define binding editor UI metadata.`,
-    };
-  }
-
-  if (projection.bindingEditor.kind !== input.row.kind) {
-    return {
-      mode: "unsupported",
-      message: `Binding kind '${input.row.kind}' is not compatible with target '${target.familyId}/${target.variantId}'.`,
-    };
-  }
-
-  const resolvedVariant = resolveBindingEditorVariant({
-    projection,
-    ...(connection.config === undefined ? {} : { connectionConfig: connection.config }),
+  return resolveFormModelFromContext({
+    row: input.row,
+    context: contextResult.value,
   });
-  if (!resolvedVariant.ok) {
-    return {
-      mode: "unsupported",
-      message: resolvedVariant.message,
-    };
-  }
-
-  const defaultConfig = createDefaultConfigFromBindingEditorVariant({
-    variant: resolvedVariant.variant,
-  });
-  const parsedConfig = parseConfigAgainstBindingEditorVariant({
-    config: input.row.config,
-    variant: resolvedVariant.variant,
-  });
-  if (!parsedConfig.ok) {
-    return {
-      mode: "unsupported",
-      message: parsedConfig.message,
-      defaultConfig,
-    };
-  }
-
-  return {
-    mode: "editor",
-    variant: resolvedVariant.variant,
-    value: parsedConfig.value,
-    fields: buildBindingEditorRenderableFields({
-      variant: resolvedVariant.variant,
-      value: parsedConfig.value,
-    }),
-  };
 }
 
 export function SandboxProfileBindingConfigEditor(input: {
@@ -203,16 +517,6 @@ export function SandboxProfileBindingConfigEditor(input: {
   }
 
   if (configUiModel.mode === "unsupported") {
-    const selectedConnection = input.availableConnections.find(
-      (connection) => connection.id === input.row.connectionId,
-    );
-    const selectedTarget =
-      selectedConnection === undefined
-        ? undefined
-        : input.availableTargets.find(
-            (target) => target.targetKey === selectedConnection.targetKey,
-          );
-
     return (
       <div className="gap-2 flex flex-col">
         <Alert variant="destructive">
@@ -222,16 +526,8 @@ export function SandboxProfileBindingConfigEditor(input: {
         <div>
           <Button
             onClick={() => {
-              const resolvedKind = resolveBindingKindFromTarget(selectedTarget);
-              const resetConfig =
-                configUiModel.defaultConfig ??
-                createDefaultBindingConfig({
-                  ...(selectedConnection === undefined ? {} : { connection: selectedConnection }),
-                  ...(selectedTarget === undefined ? {} : { target: selectedTarget }),
-                });
               input.onIntegrationBindingRowChange(input.row.clientId, {
-                ...(resolvedKind === undefined ? {} : { kind: resolvedKind }),
-                config: resetConfig,
+                config: configUiModel.defaultConfig ?? {},
               });
             }}
             type="button"
@@ -244,117 +540,37 @@ export function SandboxProfileBindingConfigEditor(input: {
     );
   }
 
-  if (configUiModel.mode === "connector") {
+  if (configUiModel.mode === "no-config") {
     return (
       <p className="text-muted-foreground text-sm">
-        Connector bindings currently do not require additional config.
+        No additional config required for this binding.
       </p>
     );
   }
 
-  if (configUiModel.mode !== "editor") {
-    throw new Error("Unsupported binding config ui mode.");
-  }
-
   return (
-    <div className="gap-3 flex flex-col">
-      {configUiModel.fields.map((field) => {
-        if (field.type === "select") {
-          const selectedOption = field.options.find((option) => option.value === field.value);
-          if (selectedOption === undefined) {
-            throw new Error(
-              `Selected binding config value '${field.value}' is not present in options for '${field.key}'.`,
-            );
-          }
+    <Form<JsonObject, RJSFSchema>
+      children={<></>}
+      formData={configUiModel.value}
+      noHtml5Validate
+      onChange={(event: IChangeEvent<JsonObject, RJSFSchema>) => {
+        const nextFormData = resolveRecord(event.formData);
+        const nextConfig = resolveNextConfigFromChange({
+          row: input.row,
+          nextFormData,
+          connections: input.availableConnections,
+          targets: input.availableTargets,
+        });
 
-          return (
-            <Field
-              className="items-start gap-4 [&>[data-slot=field-label]]:w-40 [&>[data-slot=field-label]]:pt-2"
-              key={field.key}
-              orientation="horizontal"
-            >
-              <FieldLabel htmlFor={`binding-field-${field.key}-${input.row.clientId}`}>
-                {field.label}
-              </FieldLabel>
-              <FieldContent>
-                <Select
-                  onValueChange={(nextValue) => {
-                    if (nextValue === null) {
-                      throw new Error(`Binding config value for '${field.key}' must not be null.`);
-                    }
-                    if (!field.options.some((option) => option.value === nextValue)) {
-                      throw new Error(
-                        `Unsupported binding config value '${nextValue}' for field '${field.key}'.`,
-                      );
-                    }
-                    const nextConfig = updateBindingEditorConfigByField({
-                      variant: configUiModel.variant,
-                      currentConfig: configUiModel.value,
-                      fieldKey: field.key,
-                      nextValue,
-                    });
-                    input.onIntegrationBindingRowChange(input.row.clientId, {
-                      config: nextConfig,
-                    });
-                  }}
-                  value={field.value}
-                >
-                  <SelectTrigger
-                    aria-label={field.label}
-                    className="w-full max-w-64"
-                    id={`binding-field-${field.key}-${input.row.clientId}`}
-                  >
-                    <SelectValue placeholder={`Select ${field.label.toLowerCase()}`}>
-                      {selectedOption.label}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {field.options.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </FieldContent>
-            </Field>
-          );
-        }
-
-        return (
-          <Field
-            className="items-start gap-4 [&>[data-slot=field-label]]:w-40 [&>[data-slot=field-label]]:pt-2"
-            key={field.key}
-            orientation="horizontal"
-          >
-            <FieldLabel htmlFor={`binding-field-${field.key}-${input.row.clientId}`}>
-              {field.label}
-            </FieldLabel>
-            <FieldContent>
-              <Input
-                className="w-full max-w-64"
-                id={`binding-field-${field.key}-${input.row.clientId}`}
-                onChange={(event) => {
-                  const values = event.currentTarget.value
-                    .split(field.delimiter)
-                    .map((entry) => entry.trim())
-                    .filter((entry) => entry.length > 0);
-                  const nextConfig = updateBindingEditorConfigByField({
-                    variant: configUiModel.variant,
-                    currentConfig: configUiModel.value,
-                    fieldKey: field.key,
-                    nextValue: values,
-                  });
-                  input.onIntegrationBindingRowChange(input.row.clientId, {
-                    config: nextConfig,
-                  });
-                }}
-                value={field.value.join(`${field.delimiter} `)}
-              />
-            </FieldContent>
-          </Field>
-        );
-      })}
-    </div>
+        input.onIntegrationBindingRowChange(input.row.clientId, {
+          config: nextConfig,
+        });
+      }}
+      schema={configUiModel.schema}
+      showErrorList={false}
+      uiSchema={configUiModel.uiSchema}
+      validator={validator}
+      widgets={BindingConfigWidgets}
+    />
   );
 }

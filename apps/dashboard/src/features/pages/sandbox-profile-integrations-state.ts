@@ -95,6 +95,14 @@ function mapBindingsToEditorRows(
   }));
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function resolveRecord(value: unknown): Record<string, unknown> {
+  return isRecord(value) ? value : {};
+}
+
 function resolveLatestVersion(versions: readonly SandboxProfileVersion[]): number | null {
   if (versions.length === 0) {
     return null;
@@ -318,9 +326,19 @@ export function useSandboxProfileIntegrationsState(
   }, [integrationBindingsQuery.data]);
 
   const availableConnections: readonly IntegrationConnectionSummary[] =
-    integrationDirectoryQuery.data?.connections ?? [];
+    integrationDirectoryQuery.data?.connections.map((connection) => ({
+      ...connection,
+      ...(connection.config === undefined
+        ? {}
+        : {
+            config: resolveRecord(connection.config),
+          }),
+    })) ?? [];
   const availableTargets: readonly IntegrationTargetSummary[] =
-    integrationDirectoryQuery.data?.targets ?? [];
+    integrationDirectoryQuery.data?.targets.map((target) => ({
+      ...target,
+      config: resolveRecord(target.config),
+    })) ?? [];
 
   function setNeutralSaveState(): void {
     setIntegrationSaveError(null);
@@ -377,7 +395,7 @@ export function useSandboxProfileIntegrationsState(
         clientRef: row.clientId,
         connectionId: normalizedConnectionId,
         kind: row.kind,
-        config: configUiModel.mode === "editor" ? configUiModel.value : {},
+        config: configUiModel.mode === "form" ? configUiModel.value : {},
       });
     }
 

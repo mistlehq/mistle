@@ -17,6 +17,36 @@ import {
 
 const registry = createIntegrationRegistry();
 
+function toUnknownRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+
+  const record: Record<string, unknown> = {};
+  for (const [key, entryValue] of Object.entries(value)) {
+    record[key] = entryValue;
+  }
+
+  return record;
+}
+
+function toStringRecord(value: unknown): Record<string, string> | null {
+  const record = toUnknownRecord(value);
+  if (record === null) {
+    return null;
+  }
+
+  const stringRecord: Record<string, string> = {};
+  for (const [key, entryValue] of Object.entries(record)) {
+    if (typeof entryValue !== "string") {
+      return null;
+    }
+    stringRecord[key] = entryValue;
+  }
+
+  return stringRecord;
+}
+
 export type ResolvedOauthHandlerTarget = {
   target: {
     targetKey: string;
@@ -95,7 +125,12 @@ export async function resolveOauthHandlerTargetOrThrow(
 
   let parsedConfig: Record<string, unknown>;
   try {
-    parsedConfig = definition.targetConfigSchema.parse(target.config);
+    const parsedConfigCandidate = definition.targetConfigSchema.parse(target.config);
+    const targetConfigRecord = toUnknownRecord(parsedConfigCandidate);
+    if (targetConfigRecord === null) {
+      throw new Error("Target config must be an object.");
+    }
+    parsedConfig = targetConfigRecord;
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new IntegrationConnectionsBadRequestError(
@@ -109,7 +144,12 @@ export async function resolveOauthHandlerTargetOrThrow(
 
   let parsedSecrets: Record<string, string>;
   try {
-    parsedSecrets = definition.targetSecretSchema.parse(targetSecrets);
+    const parsedSecretsCandidate = definition.targetSecretSchema.parse(targetSecrets);
+    const targetSecretsRecord = toStringRecord(parsedSecretsCandidate);
+    if (targetSecretsRecord === null) {
+      throw new Error("Target secrets must be a string record.");
+    }
+    parsedSecrets = targetSecretsRecord;
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new IntegrationConnectionsBadRequestError(

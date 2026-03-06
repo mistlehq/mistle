@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
@@ -29,24 +30,33 @@ function createTarget(
   targetKey: string,
   kind: "agent" | "git" | "connector",
 ): IntegrationTargetSummary {
+  if (kind === "agent") {
+    return {
+      targetKey,
+      displayName: targetKey,
+      familyId: "openai",
+      variantId: "openai-default",
+      config: {
+        api_base_url: "https://api.openai.com",
+        binding_capabilities: createOpenAiRawBindingCapabilities(),
+      },
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+  }
+
   return {
     targetKey,
     displayName: targetKey,
-    familyId: "test-family",
-    variantId: "test-variant",
+    familyId: "github",
+    variantId: "github-cloud",
+    config: {
+      api_base_url: "https://api.github.com",
+      web_base_url: "https://github.com",
+    },
     targetHealth: {
       configStatus: "valid",
-    },
-    resolvedBindingEditorUi: {
-      bindingEditor: {
-        kind,
-        config: {
-          mode: "static",
-          variant: {
-            fields: [],
-          },
-        },
-      },
     },
   };
 }

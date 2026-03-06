@@ -12,7 +12,7 @@ export { GitHubBindingConfigSchema, type GitHubBindingConfig } from "./binding-c
 export { GitHubTargetConfigSchema, type GitHubTargetConfig } from "./target-config-schema.js";
 export { GitHubTargetSecretSchema, type GitHubTargetSecrets } from "./target-secret-schema.js";
 export { compileGitHubBinding, type GitHubCompileBindingInput } from "./compile-binding.js";
-export { projectGitHubBindingEditorUi } from "./project-binding-editor-ui.js";
+export { GitHubBindingConfigForm } from "./binding-config-form.js";
 export { GitHubAppOAuthHandler } from "./oauth-handler.js";
 export {
   GitHubAppInstallationCredentialResolver,
