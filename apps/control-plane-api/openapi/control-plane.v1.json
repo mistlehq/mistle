@@ -1479,23 +1479,12 @@
                                   "valid",
                                   "invalid"
                                 ]
-                              },
-                              "reason": {
-                                "type": "string",
-                                "enum": [
-                                  "invalid-config",
-                                  "invalid-projection"
-                                ]
                               }
                             },
                             "required": [
                               "configStatus"
                             ],
                             "additionalProperties": false
-                          },
-                          "resolvedBindingEditorUi": {
-                            "type": "object",
-                            "additionalProperties": {}
                           }
                         },
                         "required": [
