@@ -1,6 +1,14 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "globalPassThroughEnv": ["MISTLE_CONFIG_PATH"],
+  "globalPassThroughEnv": [
+    "MISTLE_CONFIG_PATH",
+    "MISTLE_GLOBAL_TELEMETRY_ENABLED",
+    "MISTLE_GLOBAL_TELEMETRY_DEBUG",
+    "MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT",
+    "MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT",
+    "MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT",
+    "MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES"
+  ],
   "tasks": {
     "dev": {
       "dependsOn": ["^build"],

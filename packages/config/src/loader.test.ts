@@ -8,6 +8,20 @@ describe("parseConfigRecord", () => {
     const configRecord = {
       global: {
         env: "development",
+        telemetry: {
+          enabled: true,
+          debug: false,
+          traces: {
+            endpoint: "http://127.0.0.1:4318/v1/traces",
+          },
+          logs: {
+            endpoint: "http://127.0.0.1:4318/v1/logs",
+          },
+          metrics: {
+            endpoint: "http://127.0.0.1:4318/v1/metrics",
+          },
+          resourceAttributes: "deployment.environment=test",
+        },
         internalAuth: {
           serviceToken: "test-service-token",
         },
@@ -156,6 +170,20 @@ describe("parseConfigRecord", () => {
     const configRecord = {
       global: {
         env: "development",
+        telemetry: {
+          enabled: true,
+          debug: false,
+          traces: {
+            endpoint: "http://127.0.0.1:4318/v1/traces",
+          },
+          logs: {
+            endpoint: "http://127.0.0.1:4318/v1/logs",
+          },
+          metrics: {
+            endpoint: "http://127.0.0.1:4318/v1/metrics",
+          },
+          resourceAttributes: "deployment.environment=test",
+        },
         internalAuth: {
           serviceToken: "test-service-token",
         },

@@ -1,21 +1,14 @@
-import { AppIds, loadConfig } from "@mistle/config";
+import { shutdownTelemetry } from "@mistle/telemetry";
 
+import { appConfig, globalConfig } from "./instrument.js";
 import { logger } from "./logger.js";
 import { createControlPlaneWorkerRuntime } from "./runtime/index.js";
-
-const loadedConfig = loadConfig({
-  app: AppIds.CONTROL_PLANE_WORKER,
-  env: process.env,
-});
-if (loadedConfig.global === undefined) {
-  throw new Error("Expected global config to be loaded for control-plane-worker.");
-}
 const runtime = await createControlPlaneWorkerRuntime({
-  app: loadedConfig.app,
-  internalAuthServiceToken: loadedConfig.global.internalAuth.serviceToken,
+  app: appConfig,
+  internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
   sandbox: {
-    defaultBaseImage: loadedConfig.global.sandbox.defaultBaseImage,
-    gatewayWsUrl: loadedConfig.global.sandbox.gatewayWsUrl,
+    defaultBaseImage: globalConfig.sandbox.defaultBaseImage,
+    gatewayWsUrl: globalConfig.sandbox.gatewayWsUrl,
   },
 });
 
@@ -26,6 +19,7 @@ let shutdownPromise: Promise<void> | undefined;
 async function stopRuntimeAndExit(signal: NodeJS.Signals): Promise<void> {
   try {
     await runtime.stop();
+    await shutdownTelemetry();
     process.exit(0);
   } catch (error) {
     logger.error(
@@ -35,6 +29,7 @@ async function stopRuntimeAndExit(signal: NodeJS.Signals): Promise<void> {
       },
       "Failed to gracefully shutdown control-plane-worker",
     );
+    await shutdownTelemetry();
     process.exit(1);
   }
 }
@@ -60,8 +55,8 @@ process.once("SIGTERM", () => {
 
 logger.info(
   {
-    host: loadedConfig.app.server.host,
-    port: loadedConfig.app.server.port,
+    host: appConfig.server.host,
+    port: appConfig.server.port,
   },
   "control-plane-worker listening",
 );

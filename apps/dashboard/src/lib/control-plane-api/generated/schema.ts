@@ -160,9 +160,6 @@ export interface paths {
         content: {
           "application/json": {
             apiKey: string;
-            secrets?: {
-              [key: string]: string;
-            };
           };
         };
       };
@@ -303,9 +300,6 @@ export interface paths {
         content: {
           "application/json": {
             query: {
-              [key: string]: string;
-            };
-            secrets?: {
               [key: string]: string;
             };
           };

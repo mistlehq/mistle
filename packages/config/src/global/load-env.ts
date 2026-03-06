@@ -1,5 +1,6 @@
-import { createEnvLoader, hasEntries } from "../core/load-env.js";
+import { createEnvLoader, hasEntries, parseBooleanEnv } from "../core/load-env.js";
 import {
+  PartialGlobalTelemetryConfigSchema,
   PartialGlobalConfigSchema,
   PartialGlobalSandboxConfigSchema,
   GlobalSandboxTokenConfigSchema,
@@ -18,6 +19,44 @@ const loadGlobalEnv = createEnvLoader<typeof PartialGlobalConfigSchema>([
     parse: (value) => ({
       serviceToken: value,
     }),
+  },
+]);
+
+const loadTelemetryEnv = createEnvLoader<typeof PartialGlobalTelemetryConfigSchema>([
+  {
+    key: "enabled",
+    envVar: "MISTLE_GLOBAL_TELEMETRY_ENABLED",
+    parse: (value) => parseBooleanEnv(value, "MISTLE_GLOBAL_TELEMETRY_ENABLED"),
+  },
+  {
+    key: "debug",
+    envVar: "MISTLE_GLOBAL_TELEMETRY_DEBUG",
+    parse: (value) => parseBooleanEnv(value, "MISTLE_GLOBAL_TELEMETRY_DEBUG"),
+  },
+  {
+    key: "traces",
+    envVar: "MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT",
+    parse: (value) => ({
+      endpoint: value,
+    }),
+  },
+  {
+    key: "logs",
+    envVar: "MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT",
+    parse: (value) => ({
+      endpoint: value,
+    }),
+  },
+  {
+    key: "metrics",
+    envVar: "MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT",
+    parse: (value) => ({
+      endpoint: value,
+    }),
+  },
+  {
+    key: "resourceAttributes",
+    envVar: "MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES",
   },
 ]);
 
@@ -68,9 +107,14 @@ const loadSandboxEnv = createEnvLoader<typeof PartialGlobalSandboxConfigSchema>(
 
 export function loadGlobalFromEnv(env: NodeJS.ProcessEnv): PartialGlobalConfigInput {
   const partialGlobal = loadGlobalEnv(env);
+  const partialTelemetry = loadTelemetryEnv(env);
   const partialSandbox = loadSandboxEnv(env);
   const partialSandboxBootstrapToken = loadSandboxBootstrapTokenEnv(env);
   const partialSandboxConnectToken = loadSandboxConnectTokenEnv(env);
+
+  if (hasEntries(partialTelemetry)) {
+    partialGlobal.telemetry = partialTelemetry;
+  }
 
   if (
     hasEntries(partialSandbox) ||

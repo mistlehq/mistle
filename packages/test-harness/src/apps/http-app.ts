@@ -12,6 +12,12 @@ import {
 
 const HOST_HEALTHCHECK_POLL_INTERVAL_MS = 100;
 const HOST_HEALTHCHECK_REQUEST_TIMEOUT_MS = 2_000;
+const DEFAULT_DOCKER_TEST_OTLP_TRACES_ENDPOINT =
+  "http://host.testcontainers.internal:4318/v1/traces";
+const DEFAULT_DOCKER_TEST_OTLP_LOGS_ENDPOINT = "http://host.testcontainers.internal:4318/v1/logs";
+const DEFAULT_DOCKER_TEST_OTLP_METRICS_ENDPOINT =
+  "http://host.testcontainers.internal:4318/v1/metrics";
+const DEFAULT_DOCKER_TEST_RESOURCE_ATTRIBUTES = "deployment.environment=test";
 const TRACE_HTTP_APP_STARTUP = process.env.MISTLE_TEST_HARNESS_TRACE === "1";
 
 export type StartDockerHttpAppInput = {
@@ -46,6 +52,24 @@ function traceHttpAppStartup(message: string): void {
   }
 
   console.info(`[test-harness:http-app] ${message}`);
+}
+
+function createDefaultTelemetryEnvironment(): Record<string, string> {
+  return {
+    MISTLE_GLOBAL_TELEMETRY_ENABLED: process.env.MISTLE_GLOBAL_TELEMETRY_ENABLED ?? "true",
+    MISTLE_GLOBAL_TELEMETRY_DEBUG: process.env.MISTLE_GLOBAL_TELEMETRY_DEBUG ?? "false",
+    MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT:
+      process.env.MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT ??
+      DEFAULT_DOCKER_TEST_OTLP_TRACES_ENDPOINT,
+    MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT:
+      process.env.MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT ?? DEFAULT_DOCKER_TEST_OTLP_LOGS_ENDPOINT,
+    MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT:
+      process.env.MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT ??
+      DEFAULT_DOCKER_TEST_OTLP_METRICS_ENDPOINT,
+    MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES:
+      process.env.MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES ??
+      DEFAULT_DOCKER_TEST_RESOURCE_ATTRIBUTES,
+  };
 }
 
 async function fetchHealthcheckStatus(url: string): Promise<number | undefined> {
@@ -147,6 +171,7 @@ export async function startDockerHttpApp(
       command: `wget -q -T 2 -O /dev/null http://127.0.0.1:${String(definition.containerPort)}${definition.healthPath}`,
     },
     environment: {
+      ...createDefaultTelemetryEnvironment(),
       ...input.environment,
       MISTLE_CONFIG_PATH: input.configPathInContainer,
       [definition.hostEnvVar]: "0.0.0.0",

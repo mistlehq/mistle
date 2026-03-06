@@ -9,9 +9,14 @@ import (
 	"github.com/coder/websocket"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/sessionprotocol"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const bootstrapTokenQueryParam = "bootstrap_token"
+const tunnelTracerName = "@mistle/sandbox-runtime"
 
 type RunInput struct {
 	Context        context.Context
@@ -46,14 +51,26 @@ func Run(input RunInput) error {
 	if input.Context == nil {
 		return fmt.Errorf("sandbox tunnel context is required")
 	}
+	tracer := otel.Tracer(tunnelTracerName)
+
+	runContext, runSpan := tracer.Start(input.Context, "sandbox.tunnel.loop")
+	defer runSpan.End()
 
 	parsedGatewayURL, err := parseGatewayURL(input.GatewayWSURL)
 	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
 		return err
 	}
+	runSpan.SetAttributes(
+		attribute.String("server.address", parsedGatewayURL.Host),
+		attribute.String("url.path", parsedGatewayURL.Path),
+	)
 
 	bootstrapToken, err := normalizeBootstrapToken(input.BootstrapToken)
 	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
 		return err
 	}
 
@@ -61,10 +78,18 @@ func Run(input RunInput) error {
 	query.Set(bootstrapTokenQueryParam, bootstrapToken)
 	parsedGatewayURL.RawQuery = query.Encode()
 
-	conn, _, err := websocket.Dial(input.Context, parsedGatewayURL.String(), nil)
+	connectContext, connectSpan := tracer.Start(runContext, "sandbox.tunnel.connect")
+	conn, _, err := websocket.Dial(connectContext, parsedGatewayURL.String(), nil)
 	if err != nil {
+		connectSpan.RecordError(err)
+		connectSpan.SetStatus(codes.Error, err.Error())
+		connectSpan.End()
+
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("failed to dial sandbox tunnel websocket: %w", err)
 	}
+	connectSpan.End()
 	defer conn.CloseNow()
 
 	var activePTYSession *ptySession
@@ -77,51 +102,72 @@ func Run(input RunInput) error {
 	}()
 
 	for {
-		connectRequest, err := readConnectRequest(input.Context, conn)
+		connectRequest, err := readConnectRequest(runContext, conn)
 		if err != nil {
-			if input.Context.Err() != nil {
+			if runContext.Err() != nil {
 				return nil
 			}
+			runSpan.RecordError(err)
+			runSpan.SetStatus(codes.Error, err.Error())
 			return fmt.Errorf("sandbox tunnel websocket read failed: %w", err)
 		}
+
+		requestContext, requestSpan := tracer.Start(
+			runContext,
+			"sandbox.tunnel.connect_request",
+			trace.WithAttributes(attribute.String("mistle.channel.kind", connectRequest.ChannelKind)),
+		)
 
 		switch connectRequest.ChannelKind {
 		case sessionprotocol.ChannelKindAgent:
 			err := handleAgentConnectRequest(
-				input.Context,
+				requestContext,
 				conn,
 				connectRequest,
 				input.RuntimeClients,
 			)
 			if err != nil {
-				if input.Context.Err() != nil {
+				requestSpan.RecordError(err)
+				requestSpan.SetStatus(codes.Error, err.Error())
+				requestSpan.End()
+
+				if runContext.Err() != nil {
 					return nil
 				}
 				return err
 			}
 		case sessionprotocol.ChannelKindPTY:
 			updatedPTYSession, err := handlePTYConnectRequest(
-				input.Context,
+				requestContext,
 				conn,
 				connectRequest,
 				activePTYSession,
 			)
 			if err != nil {
-				if input.Context.Err() != nil {
+				requestSpan.RecordError(err)
+				requestSpan.SetStatus(codes.Error, err.Error())
+				requestSpan.End()
+
+				if runContext.Err() != nil {
 					return nil
 				}
 				return err
 			}
 			activePTYSession = updatedPTYSession
 		default:
-			if err := writeConnectError(input.Context, conn, sessionprotocol.ConnectError{
+			if err := writeConnectError(requestContext, conn, sessionprotocol.ConnectError{
 				Type:      sessionprotocol.MessageTypeConnectError,
 				RequestID: connectRequest.RequestID,
 				Code:      connectErrorCodeUnsupportedChannel,
 				Message:   fmt.Sprintf("channel kind '%s' is not supported", connectRequest.ChannelKind),
 			}); err != nil {
+				requestSpan.RecordError(err)
+				requestSpan.SetStatus(codes.Error, err.Error())
+				requestSpan.End()
 				return fmt.Errorf("failed to write sandbox tunnel connect error: %w", err)
 			}
 		}
+
+		requestSpan.End()
 	}
 }

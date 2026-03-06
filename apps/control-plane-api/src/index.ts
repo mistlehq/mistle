@@ -1,27 +1,21 @@
-import { AppIds, loadConfig } from "@mistle/config";
+import { shutdownTelemetry } from "@mistle/telemetry";
 
+import { appConfig, globalConfig } from "./instrument.js";
 import { logger } from "./logger.js";
 import { createControlPlaneApiRuntime } from "./runtime/index.js";
 
 async function startControlPlaneApi(): Promise<void> {
-  const loadedConfig = loadConfig({
-    app: AppIds.CONTROL_PLANE_API,
-    env: process.env,
-  });
-  if (loadedConfig.global === undefined) {
-    throw new Error("Expected global config to be loaded for control-plane-api.");
-  }
   const runtime = await createControlPlaneApiRuntime({
-    app: loadedConfig.app,
-    internalAuthServiceToken: loadedConfig.global.internalAuth.serviceToken,
+    app: appConfig,
+    internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
     connectionToken: {
-      secret: loadedConfig.global.sandbox.connect.tokenSecret,
-      issuer: loadedConfig.global.sandbox.connect.tokenIssuer,
-      audience: loadedConfig.global.sandbox.connect.tokenAudience,
+      secret: globalConfig.sandbox.connect.tokenSecret,
+      issuer: globalConfig.sandbox.connect.tokenIssuer,
+      audience: globalConfig.sandbox.connect.tokenAudience,
     },
     sandbox: {
-      defaultBaseImage: loadedConfig.global.sandbox.defaultBaseImage,
-      gatewayWsUrl: loadedConfig.global.sandbox.gatewayWsUrl,
+      defaultBaseImage: globalConfig.sandbox.defaultBaseImage,
+      gatewayWsUrl: globalConfig.sandbox.gatewayWsUrl,
     },
   });
 
@@ -32,6 +26,7 @@ async function startControlPlaneApi(): Promise<void> {
   async function stopRuntimeAndExit(signal: NodeJS.Signals): Promise<void> {
     try {
       await runtime.stop();
+      await shutdownTelemetry();
       process.exit(0);
     } catch (error) {
       logger.error(
@@ -41,6 +36,7 @@ async function startControlPlaneApi(): Promise<void> {
         },
         "Failed to gracefully shutdown control-plane-api",
       );
+      await shutdownTelemetry();
       process.exit(1);
     }
   }
@@ -66,15 +62,16 @@ async function startControlPlaneApi(): Promise<void> {
 
   logger.info(
     {
-      authBaseUrl: loadedConfig.app.auth.baseUrl,
-      host: loadedConfig.app.server.host,
-      port: loadedConfig.app.server.port,
+      authBaseUrl: appConfig.auth.baseUrl,
+      host: appConfig.server.host,
+      port: appConfig.server.port,
     },
     "control-plane-api listening",
   );
 }
 
-void startControlPlaneApi().catch((error) => {
+void startControlPlaneApi().catch(async (error) => {
   logger.error({ err: error }, "Failed to start control-plane-api");
+  await shutdownTelemetry();
   process.exit(1);
 });
