@@ -51,7 +51,7 @@
     "lint-staged": "^16.3.2",
     "oxfmt": "^0.36.0",
     "oxlint": "^1.51.0",
-    "oxlint-tsgolint": "^0.15.0",
+    "oxlint-tsgolint": "^0.16.0",
     "smol-toml": "^1.6.0",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.20.6",
