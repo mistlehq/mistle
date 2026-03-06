@@ -92,6 +92,14 @@ const globalProductionConfig = {
   },
 } as const;
 
+const globalProductionDockerConfig = {
+  ...globalProductionConfig,
+  sandbox: {
+    ...globalProductionConfig.sandbox,
+    provider: "docker",
+  },
+} as const;
+
 const globalDevelopmentDockerConfig = {
   ...globalDevelopmentConfig,
   sandbox: {
@@ -653,7 +661,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: globalProductionConfig,
+      global: globalProductionDockerConfig,
       app: {
         ...dataPlaneWorkerEnvConfig,
         sandbox: dataPlaneWorkerDockerFixtureConfig.sandbox,
@@ -692,6 +700,49 @@ describe("loadConfig integrations", () => {
         },
       },
     });
+  });
+
+  it("merges partial docker sandbox overrides across config file and env", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_WORKER,
+      configPath: dataPlaneWorkerDockerConfigFixturePath,
+      env: {
+        MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/tmp/docker.sock",
+      },
+    });
+
+    expect(config).toEqual({
+      global: globalDevelopmentDockerConfig,
+      app: {
+        ...dataPlaneWorkerDockerFixtureConfig,
+        sandbox: {
+          ...dataPlaneWorkerDockerFixtureConfig.sandbox,
+          docker: {
+            ...dataPlaneWorkerDockerFixtureConfig.sandbox.docker,
+            socketPath: "/tmp/docker.sock",
+          },
+        },
+      },
+    });
+  });
+
+  it("rejects data-plane-worker config when the selected sandbox provider is missing worker settings", () => {
+    expect(() =>
+      loadConfig({
+        app: AppIds.DATA_PLANE_WORKER,
+        env: createIntegrationEnv({
+          NODE_ENV: "production",
+          MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID: undefined,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET: undefined,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_APP_NAME: undefined,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME: undefined,
+        }),
+      }),
+    ).toThrowError(
+      /apps\.data_plane_worker\.sandbox\.docker is required when global\.sandbox\.provider is 'docker'/,
+    );
   });
 
   it("returns only data-plane-worker app config when includeGlobal is false", () => {

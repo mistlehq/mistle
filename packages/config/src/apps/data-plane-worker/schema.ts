@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const SandboxProviders = ["modal", "docker"] as const;
+
 export const DataPlaneWorkerServerConfigSchema = z
   .object({
     host: z.string().min(1),
@@ -60,8 +62,8 @@ export const DataPlaneWorkerSandboxConfigSchema = z
 export const PartialDataPlaneWorkerSandboxConfigSchema = z
   .object({
     tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema.optional(),
-    modal: DataPlaneWorkerSandboxModalConfigSchema.optional(),
-    docker: DataPlaneWorkerSandboxDockerConfigSchema.optional(),
+    modal: DataPlaneWorkerSandboxModalConfigSchema.partial().optional(),
+    docker: DataPlaneWorkerSandboxDockerConfigSchema.partial().optional(),
   })
   .strict();
 
@@ -84,6 +86,37 @@ export const PartialDataPlaneWorkerConfigSchema = z
     sandbox: PartialDataPlaneWorkerSandboxConfigSchema.optional(),
   })
   .strict();
+
+const DataPlaneWorkerProviderRequirementMessages = {
+  MODAL:
+    "apps.data_plane_worker.sandbox.modal is required when global.sandbox.provider is 'modal'.",
+  DOCKER:
+    "apps.data_plane_worker.sandbox.docker is required when global.sandbox.provider is 'docker'.",
+} as const;
+
+export function getDataPlaneWorkerSandboxProviderValidationIssue(input: {
+  globalSandboxProvider: (typeof SandboxProviders)[number];
+  appSandbox: DataPlaneWorkerConfig["sandbox"];
+}): {
+  path: readonly ["sandbox", "modal"] | readonly ["sandbox", "docker"];
+  message: string;
+} | null {
+  if (input.globalSandboxProvider === "modal" && input.appSandbox.modal === undefined) {
+    return {
+      path: ["sandbox", "modal"],
+      message: DataPlaneWorkerProviderRequirementMessages.MODAL,
+    };
+  }
+
+  if (input.globalSandboxProvider === "docker" && input.appSandbox.docker === undefined) {
+    return {
+      path: ["sandbox", "docker"],
+      message: DataPlaneWorkerProviderRequirementMessages.DOCKER,
+    };
+  }
+
+  return null;
+}
 
 export type DataPlaneWorkerConfig = z.infer<typeof DataPlaneWorkerConfigSchema>;
 export type PartialDataPlaneWorkerConfigInput = z.input<typeof PartialDataPlaneWorkerConfigSchema>;
