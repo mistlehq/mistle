@@ -27,6 +27,11 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import {
+  IntegrationHorizontalFieldGroupClassName,
+  IntegrationHorizontalFieldLayoutClassName,
+  IntegrationSelectContentClassName,
+} from "../forms/integration-form-theme.js";
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
@@ -611,11 +616,8 @@ export function IntegrationsEditorSection(
                 {integrationDialogState.mode === "add" ? "Add binding" : "Edit binding"}
               </DialogTitle>
             </DialogHeader>
-            <div className="gap-4 flex flex-col">
-              <Field
-                className="items-start gap-4 [&>[data-slot=field-label]]:w-40 [&>[data-slot=field-label]]:pt-2"
-                orientation="horizontal"
-              >
+            <div className={IntegrationHorizontalFieldGroupClassName}>
+              <Field className={IntegrationHorizontalFieldLayoutClassName} orientation="horizontal">
                 <FieldLabel htmlFor="add-binding-connection">Connection</FieldLabel>
                 <FieldContent>
                   <Select
@@ -629,14 +631,14 @@ export function IntegrationsEditorSection(
                   >
                     <SelectTrigger
                       aria-label="Add binding connection"
-                      className="w-full max-w-64"
+                      className="w-full"
                       id="add-binding-connection"
                     >
                       <SelectValue placeholder="Select integration connection">
                         {props.resolveSelectedConnectionDisplayName(integrationDialogState.row)}
                       </SelectValue>
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className={IntegrationSelectContentClassName}>
                       {availableConnectionsByKind[integrationDialogState.row.kind].map(
                         (connection) => (
                           <SelectItem key={connection.id} value={connection.id}>
@@ -651,6 +653,7 @@ export function IntegrationsEditorSection(
               <SandboxProfileBindingConfigEditor
                 availableConnections={props.availableConnections}
                 availableTargets={props.availableTargets}
+                layout="horizontal"
                 onIntegrationBindingRowChange={updateDialogRow}
                 row={integrationDialogState.row}
               />

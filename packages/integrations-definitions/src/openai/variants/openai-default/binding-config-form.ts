@@ -113,6 +113,9 @@ export function resolveOpenAiBindingConfigForm(
       },
       defaultModel: {
         "ui:widget": "SelectWidget",
+        "ui:options": {
+          fitContent: true,
+        },
       },
       reasoningEffort: {
         "ui:widget": "SelectWidget",
