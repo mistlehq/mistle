@@ -25,20 +25,6 @@ export {
 export function createSandboxProfilesService(
   input: CreateSandboxProfilesServiceInput,
 ): SandboxProfilesService {
-  const startProfileInstanceDependencies =
-    input.mintSandboxInstanceConnectionToken === undefined
-      ? {
-          db: input.db,
-          openWorkflow: input.openWorkflow,
-          integrationsConfig: input.integrationsConfig,
-        }
-      : {
-          db: input.db,
-          openWorkflow: input.openWorkflow,
-          integrationsConfig: input.integrationsConfig,
-          mintSandboxInstanceConnectionToken: input.mintSandboxInstanceConnectionToken,
-        };
-
   const sandboxProfilesService = {
     listProfiles: (serviceInput) => listProfiles({ db: input.db }, serviceInput),
     createProfile: (serviceInput) => createProfile({ db: input.db }, serviceInput),
@@ -68,7 +54,14 @@ export function createSandboxProfilesService(
         serviceInput,
       ),
     startProfileInstance: (serviceInput) =>
-      startProfileInstance(startProfileInstanceDependencies, serviceInput),
+      startProfileInstance(
+        {
+          db: input.db,
+          integrationsConfig: input.integrationsConfig,
+          dataPlaneClient: input.dataPlaneClient,
+        },
+        serviceInput,
+      ),
     compileProfileVersionRuntimePlan: (serviceInput) =>
       compileProfileVersionRuntimePlan(
         {

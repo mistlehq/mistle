@@ -60,6 +60,8 @@ export function createControlPlaneWorkerServices(
       acquireAutomationConnection: async (workflowInput) => {
         return acquireAutomationConnection(
           {
+            getSandboxInstance: (sandboxInput) =>
+              controlPlaneInternalClient.getSandboxInstance(sandboxInput),
             mintSandboxConnectionToken: (mintInput) =>
               controlPlaneInternalClient.mintSandboxConnectionToken(mintInput),
           },

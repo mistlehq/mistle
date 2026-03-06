@@ -8,6 +8,7 @@ import { controlPlaneWorkerConfigModule } from "./apps/control-plane-worker/inde
 import { dataPlaneApiConfigModule } from "./apps/data-plane-api/index.js";
 import { dataPlaneGatewayConfigModule } from "./apps/data-plane-gateway/index.js";
 import { dataPlaneWorkerConfigModule } from "./apps/data-plane-worker/index.js";
+import { getDataPlaneWorkerSandboxProviderValidationIssue } from "./apps/data-plane-worker/schema.js";
 import { tokenizerProxyConfigModule } from "./apps/tokenizer-proxy/index.js";
 import { mergeConfigRoots } from "./core/merge.js";
 import { type ConfigModule } from "./core/module.js";
@@ -161,9 +162,22 @@ export function loadConfig<TApp extends AppConfigModuleKey>(
   }
 
   const validatedRoot = loadValidatedRoot([globalConfigModule, appModule], options);
+  const globalConfig = parseModuleValue(globalConfigModule, validatedRoot);
   const appConfig = parseAppConfig(options.app, validatedRoot);
+
+  if (options.app === AppIds.DATA_PLANE_WORKER) {
+    const issue = getDataPlaneWorkerSandboxProviderValidationIssue({
+      globalSandboxProvider: globalConfig.sandbox.provider,
+      appSandbox: parseModuleValue(dataPlaneWorkerConfigModule, validatedRoot).sandbox,
+    });
+
+    if (issue !== null) {
+      throw new Error(issue.message);
+    }
+  }
+
   return {
-    global: parseModuleValue(globalConfigModule, validatedRoot),
+    global: globalConfig,
     app: appConfig,
   };
 }

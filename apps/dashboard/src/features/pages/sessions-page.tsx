@@ -32,12 +32,15 @@ import {
   listSandboxProfileVersions,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
 import {
+  getSandboxInstanceStatus,
   mintSandboxInstanceConnectionToken,
   startSandboxInstanceFromProfileVersion,
 } from "../sessions/sessions-service.js";
 
 const SANDBOX_PROFILE_LIST_LIMIT = 100;
 const SESSION_CONNECT_TIMEOUT_MS = 15_000;
+const SANDBOX_START_TIMEOUT_MS = 5 * 60 * 1000;
+const SANDBOX_START_POLL_INTERVAL_MS = 1_000;
 
 const ConnectOkSchema = z
   .object({
@@ -126,6 +129,37 @@ function parseConnectControlMessage(payload: string): ConnectControlMessage | nu
   }
 
   return null;
+}
+
+async function waitForSandboxInstanceToRun(input: {
+  instanceId: string;
+  signal?: AbortSignal;
+}): Promise<void> {
+  const deadline = Date.now() + SANDBOX_START_TIMEOUT_MS;
+
+  while (Date.now() < deadline) {
+    const status = await getSandboxInstanceStatus({
+      instanceId: input.instanceId,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    });
+
+    if (status.status === "running") {
+      return;
+    }
+
+    if (status.status === "failed" || status.status === "stopped") {
+      throw new Error(
+        status.failureMessage ??
+          `Sandbox instance entered terminal status '${status.status}' before becoming ready.`,
+      );
+    }
+
+    await new Promise<void>((resolve) => {
+      window.setTimeout(resolve, SANDBOX_START_POLL_INTERVAL_MS);
+    });
+  }
+
+  throw new Error("Sandbox instance did not become ready before the start timeout elapsed.");
 }
 
 async function connectSandboxPtySession(input: { connectionUrl: string }): Promise<WebSocket> {
@@ -313,6 +347,10 @@ export function SessionsPage(): React.JSX.Element {
       const startedInstance = await startSandboxInstanceFromProfileVersion({
         profileId: selectedProfileId,
         profileVersion: selectedProfileVersion,
+      });
+
+      await waitForSandboxInstanceToRun({
+        instanceId: startedInstance.sandboxInstanceId,
       });
 
       setStep("securing");

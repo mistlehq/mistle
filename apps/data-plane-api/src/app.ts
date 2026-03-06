@@ -12,6 +12,7 @@ export async function createApp(runtimeConfig: DataPlaneApiRuntimeConfig): Promi
   app.use("*", async (ctx, next) => {
     ctx.set("config", runtimeConfig.app);
     ctx.set("internalAuthServiceToken", runtimeConfig.internalAuthServiceToken);
+    ctx.set("sandboxProvider", runtimeConfig.sandboxProvider);
     await next();
   });
   app.all(`${DATA_PLANE_TRPC_PATH}/*`, (c) => {
@@ -20,6 +21,7 @@ export async function createApp(runtimeConfig: DataPlaneApiRuntimeConfig): Promi
         return createDataPlaneTrpcContext({
           config: runtimeConfig.app,
           internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
+          sandboxProvider: runtimeConfig.sandboxProvider,
           requestHeaders: req.headers,
           resources,
         });

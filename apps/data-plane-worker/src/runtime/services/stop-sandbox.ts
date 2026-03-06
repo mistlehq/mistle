@@ -10,7 +10,7 @@ export async function stopSandbox(
   },
   input: StopSandboxInput,
 ): Promise<void> {
-  if (input.provider !== deps.config.app.sandbox.provider) {
+  if (input.provider !== deps.config.sandbox.provider) {
     throw new Error(
       "Attempted to stop sandbox using provider different from configured runtime sandbox provider.",
     );

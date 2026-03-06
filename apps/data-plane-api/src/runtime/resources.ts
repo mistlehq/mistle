@@ -7,6 +7,7 @@ import type { DataPlaneApiConfig, DataPlaneApp } from "../types.js";
 export type AppRuntimeResources = {
   db: DataPlaneDatabase;
   dbPool: Pool;
+  workflowDbPool: Pool;
   workflowBackend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
   openWorkflow: ReturnType<typeof createDataPlaneOpenWorkflow>;
 };
@@ -27,6 +28,9 @@ export async function createAppResources(config: DataPlaneApiConfig): Promise<Ap
   const dbPool = new Pool({
     connectionString: config.database.url,
   });
+  const workflowDbPool = new Pool({
+    connectionString: config.workflow.databaseUrl,
+  });
   const db = createDataPlaneDatabase(dbPool);
 
   let workflowBackend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
@@ -38,6 +42,7 @@ export async function createAppResources(config: DataPlaneApiConfig): Promise<Ap
       runMigrations: false,
     });
   } catch (error) {
+    await workflowDbPool.end();
     await dbPool.end();
     throw error;
   }
@@ -45,6 +50,7 @@ export async function createAppResources(config: DataPlaneApiConfig): Promise<Ap
   return {
     db,
     dbPool,
+    workflowDbPool,
     workflowBackend,
     openWorkflow: createDataPlaneOpenWorkflow({ backend: workflowBackend }),
   };
@@ -58,5 +64,9 @@ export async function stopAppResources(app: DataPlaneApp): Promise<void> {
   const appResources = getAppResources(app);
 
   AppResourcesByInstance.delete(app);
-  await Promise.all([appResources.dbPool.end(), appResources.workflowBackend.stop()]);
+  await Promise.all([
+    appResources.dbPool.end(),
+    appResources.workflowDbPool.end(),
+    appResources.workflowBackend.stop(),
+  ]);
 }

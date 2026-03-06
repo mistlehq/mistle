@@ -12,6 +12,7 @@
   "devDependencies": {
     "@mistle/db": "workspace:*",
     "@mistle/test-harness": "workspace:*",
+    "@mistle/time": "workspace:*",
     "@types/pg": "^8.18.0",
     "openapi-fetch": "^0.17.0",
     "pg": "^8.19.0",

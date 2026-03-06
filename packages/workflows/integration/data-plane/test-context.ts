@@ -11,7 +11,6 @@ import { runCleanupTasks } from "@mistle/test-harness";
 import type { Worker } from "openworkflow";
 import type { BackendPostgres } from "openworkflow/postgres";
 import postgres from "postgres";
-import { typeid } from "typeid-js";
 
 import {
   DataPlaneWorkerWorkflowIds,
@@ -129,13 +128,12 @@ export const it = baseIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                     },
                   });
                   const bootstrapTokenJti = randomUUID();
-                  const sandboxInstanceId = typeid("sbi").toString();
 
                   startedSandboxIds.push(startedSandbox.sandboxId);
                   startedBootstrapTokenJtis.push(bootstrapTokenJti);
 
                   return {
-                    sandboxInstanceId,
+                    sandboxInstanceId: workflowInput.sandboxInstanceId,
                     provider: startedSandbox.provider,
                     providerSandboxId: startedSandbox.sandboxId,
                     bootstrapTokenJti,
@@ -148,7 +146,7 @@ export const it = baseIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                 },
               },
               sandboxInstances: {
-                createSandboxInstance: async (workflowInput) => {
+                ensureSandboxInstance: async (workflowInput) => {
                   let insertedRows: Array<{ id: string }>;
                   try {
                     insertedRows = await sql<{ id: string }[]>`
@@ -169,14 +167,40 @@ export const it = baseIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                         ${workflowInput.organizationId},
                         ${workflowInput.sandboxProfileId},
                         ${workflowInput.sandboxProfileVersion},
-                        ${workflowInput.provider},
-                        ${workflowInput.providerSandboxId},
+                        ${SandboxProvider.DOCKER},
+                        ${null},
                         ${SandboxInstanceStatuses.STARTING},
                         ${workflowInput.startedBy.kind},
                         ${workflowInput.startedBy.id},
                         ${workflowInput.source}
                       )
+                      on conflict (id) do nothing
                       returning id
+                    `;
+                  } catch (error) {
+                    const rawErrorMessage =
+                      error instanceof Error
+                        ? `${error.name}: ${error.message}`
+                        : `unknown error: ${String(error)}`;
+                    throw new Error(
+                      `Failed to ensure sandbox instance row in integration fixture. ${rawErrorMessage}`,
+                    );
+                  }
+
+                  return {
+                    sandboxInstanceId: insertedRows[0]?.id ?? workflowInput.sandboxInstanceId,
+                  };
+                },
+                persistSandboxInstanceProvisioning: async (workflowInput) => {
+                  try {
+                    await sql`
+                      update data_plane.sandbox_instances
+                      set
+                        provider_sandbox_id = ${workflowInput.providerSandboxId},
+                        updated_at = now()
+                      where
+                        id = ${workflowInput.sandboxInstanceId}
+                        and status = ${SandboxInstanceStatuses.STARTING}
                     `;
 
                     await sql`
@@ -196,6 +220,7 @@ export const it = baseIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                         ${workflowInput.sandboxProfileId},
                         ${workflowInput.sandboxProfileVersion}
                       )
+                      on conflict (sandbox_instance_id, revision) do nothing
                     `;
                   } catch (error) {
                     const rawErrorMessage =
@@ -203,20 +228,9 @@ export const it = baseIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
                         ? `${error.name}: ${error.message}`
                         : `unknown error: ${String(error)}`;
                     throw new Error(
-                      `Failed to insert sandbox instance row in integration fixture. ${rawErrorMessage}`,
+                      `Failed to persist sandbox provisioning metadata in integration fixture. ${rawErrorMessage}`,
                     );
                   }
-
-                  const insertedRow = insertedRows[0];
-                  if (insertedRow === undefined) {
-                    throw new Error(
-                      "Failed to insert sandbox instance row in integration fixture.",
-                    );
-                  }
-
-                  return {
-                    sandboxInstanceId: insertedRow.id,
-                  };
                 },
                 markSandboxInstanceRunning: async (workflowInput) => {
                   const updatedRows = await sql<{ id: string }[]>`

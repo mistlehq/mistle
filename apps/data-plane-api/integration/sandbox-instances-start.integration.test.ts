@@ -1,9 +1,11 @@
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import { DATA_PLANE_INTERNAL_AUTH_HEADER } from "@mistle/data-plane-trpc/constants";
 import type { StartSandboxInstanceInput } from "@mistle/data-plane-trpc/contracts";
+import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { systemSleeper } from "@mistle/time";
 import { httpBatchLink } from "@trpc/client";
 import { describe, expect } from "vitest";
+import { z } from "zod";
 
 import { it } from "./test-context.js";
 
@@ -12,9 +14,17 @@ type WorkflowRunRow = {
   namespace_id: string;
   workflow_name: string;
   status: string;
-  input: StartSandboxInstanceInput;
+  input: unknown;
   output: null;
 };
+
+const WorkflowRunInputSchema = z
+  .object({
+    sandboxInstanceId: z.string().min(1),
+    organizationId: z.string().min(1),
+    sandboxProfileId: z.string().min(1),
+  })
+  .loose();
 
 const WorkflowName = "data-plane.sandbox-instances.start";
 const WorkflowQueuePollIntervalMs = 100;
@@ -118,7 +128,7 @@ async function waitForWorkflowRuns(input: {
 }
 
 describe("sandboxInstances.start integration", () => {
-  it("queues a start workflow run without synchronous completion", async ({ fixture }) => {
+  it("returns an accepted start response and queues a workflow run", async ({ fixture }) => {
     const client = createSandboxInstancesClient(
       fixture.baseUrl,
       fixture.internalAuthServiceToken,
@@ -145,8 +155,11 @@ describe("sandboxInstances.start integration", () => {
       },
     };
 
-    const startRequestPromise = client.startSandboxInstance(workflowInput);
-    void startRequestPromise.catch(() => undefined);
+    const startedSandbox = await client.startSandboxInstance(workflowInput);
+
+    expect(startedSandbox.status).toBe("accepted");
+    expect(startedSandbox.sandboxInstanceId).toMatch(/^sbi_[a-zA-Z0-9_-]+$/);
+    expect(startedSandbox.workflowRunId).not.toBe("");
 
     const workflowRuns = await waitForWorkflowRuns({
       runQuery: async (organizationId, profileId) => {
@@ -174,25 +187,19 @@ describe("sandboxInstances.start integration", () => {
     if (queuedRun === undefined) {
       throw new Error("Expected queued workflow run row to exist.");
     }
+    expect(queuedRun.id).toBe(startedSandbox.workflowRunId);
     expect(queuedRun.namespace_id).toBe(fixture.config.workflow.namespaceId);
     expect(queuedRun.workflow_name).toBe(WorkflowName);
     expect(queuedRun.status).toBe("pending");
-    expect(queuedRun.input).toEqual(workflowInput);
     expect(queuedRun.output).toBeNull();
 
-    const settledWithinShortWindow = await Promise.race([
-      startRequestPromise.then(
-        () => true,
-        () => true,
-      ),
-      systemSleeper.sleep(500).then(() => false),
-    ]);
-    expect(settledWithinShortWindow).toBe(false);
+    const parsedWorkflowInput = WorkflowRunInputSchema.parse(queuedRun.input);
+    expect(parsedWorkflowInput.organizationId).toBe(workflowInput.organizationId);
+    expect(parsedWorkflowInput.sandboxProfileId).toBe(workflowInput.sandboxProfileId);
+    expect(parsedWorkflowInput.sandboxInstanceId).toBe(startedSandbox.sandboxInstanceId);
   }, 60_000);
 
-  it("deduplicates duplicate start requests by idempotency key while queued", async ({
-    fixture,
-  }) => {
+  it("deduplicates duplicate start requests by idempotency key", async ({ fixture }) => {
     const client = createSandboxInstancesClient(
       fixture.baseUrl,
       fixture.internalAuthServiceToken,
@@ -219,10 +226,10 @@ describe("sandboxInstances.start integration", () => {
       },
     };
 
-    const firstStartRequestPromise = client.startSandboxInstance(workflowInput);
-    const secondStartRequestPromise = client.startSandboxInstance(workflowInput);
-    void firstStartRequestPromise.catch(() => undefined);
-    void secondStartRequestPromise.catch(() => undefined);
+    const firstStartedSandbox = await client.startSandboxInstance(workflowInput);
+    const secondStartedSandbox = await client.startSandboxInstance(workflowInput);
+
+    expect(secondStartedSandbox).toEqual(firstStartedSandbox);
 
     const queuedWorkflowRuns = await waitForWorkflowRuns({
       runQuery: async (organizationId, profileId) => {
@@ -246,18 +253,20 @@ describe("sandboxInstances.start integration", () => {
     });
 
     expect(queuedWorkflowRuns).toHaveLength(1);
-    expect(queuedWorkflowRuns[0]?.status).toBe("pending");
+    expect(queuedWorkflowRuns[0]?.id).toBe(firstStartedSandbox.workflowRunId);
   }, 60_000);
 
-  it("does not insert sandbox instance rows before workflow execution", async ({ fixture }) => {
+  it("creates a starting sandbox instance row immediately after start is accepted", async ({
+    fixture,
+  }) => {
     const client = createSandboxInstancesClient(
       fixture.baseUrl,
       fixture.internalAuthServiceToken,
       1_000,
     );
-    const sandboxProfileId = "sbp_dp_api_no_sync_insert";
+    const sandboxProfileId = "sbp_dp_api_sync_insert";
     const workflowInput: StartSandboxInstanceInput = {
-      organizationId: "org_dp_api_no_sync_insert",
+      organizationId: "org_dp_api_sync_insert",
       sandboxProfileId,
       sandboxProfileVersion: 1,
       runtimePlan: createRuntimePlan({
@@ -266,57 +275,44 @@ describe("sandboxInstances.start integration", () => {
       }),
       startedBy: {
         kind: "user",
-        id: "usr_dp_api_no_sync_insert",
+        id: "usr_dp_api_sync_insert",
       },
       source: "dashboard",
       image: {
-        imageId: "im_dp_api_no_sync_insert",
+        imageId: "im_dp_api_sync_insert",
         kind: "base",
         createdAt: "2026-02-27T00:00:00.000Z",
       },
     };
 
-    const startRequestPromise = client.startSandboxInstance(workflowInput);
-    void startRequestPromise.catch(() => undefined);
+    const startedSandbox = await client.startSandboxInstance(workflowInput);
 
-    await waitForWorkflowRuns({
-      runQuery: async (organizationId, profileId) => {
-        const result = await fixture.dbPool.query<WorkflowRunRow>(
-          `
-            select id, namespace_id, workflow_name, status, input, output
-            from data_plane_openworkflow.workflow_runs
-            where
-              namespace_id = $1
-              and workflow_name = $2
-              and input->>'organizationId' = $3
-              and input->>'sandboxProfileId' = $4
-            order by created_at asc
-          `,
-          [fixture.config.workflow.namespaceId, WorkflowName, organizationId, profileId],
-        );
-        return result.rows;
-      },
-      organizationId: workflowInput.organizationId,
-      sandboxProfileId: workflowInput.sandboxProfileId,
-    });
-
-    const persistedSandboxInstances = await fixture.db.query.sandboxInstances.findMany({
+    const persistedSandboxInstance = await fixture.db.query.sandboxInstances.findFirst({
       columns: {
         id: true,
+        organizationId: true,
+        sandboxProfileId: true,
+        sandboxProfileVersion: true,
+        providerSandboxId: true,
+        status: true,
       },
-      where: (table, { and, eq }) =>
-        and(
-          eq(table.organizationId, workflowInput.organizationId),
-          eq(table.sandboxProfileId, workflowInput.sandboxProfileId),
-        ),
+      where: (table, { eq }) => eq(table.id, startedSandbox.sandboxInstanceId),
     });
-    expect(persistedSandboxInstances).toHaveLength(0);
+
+    expect(persistedSandboxInstance).toEqual({
+      id: startedSandbox.sandboxInstanceId,
+      organizationId: workflowInput.organizationId,
+      sandboxProfileId: workflowInput.sandboxProfileId,
+      sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+      providerSandboxId: null,
+      status: SandboxInstanceStatuses.STARTING,
+    });
 
     const persistedRuntimePlans = await fixture.db.query.sandboxInstanceRuntimePlans.findMany({
       columns: {
         id: true,
       },
-      where: (table, { eq }) => eq(table.compiledFromProfileId, workflowInput.sandboxProfileId),
+      where: (table, { eq }) => eq(table.sandboxInstanceId, startedSandbox.sandboxInstanceId),
     });
     expect(persistedRuntimePlans).toHaveLength(0);
   }, 60_000);

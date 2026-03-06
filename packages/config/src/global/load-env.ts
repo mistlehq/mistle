@@ -92,6 +92,10 @@ const loadSandboxConnectTokenEnv = createEnvLoader<typeof GlobalSandboxTokenConf
 
 const loadSandboxEnv = createEnvLoader<typeof PartialGlobalSandboxConfigSchema>([
   {
+    key: "provider",
+    envVar: "MISTLE_GLOBAL_SANDBOX_PROVIDER",
+  },
+  {
     key: "defaultBaseImage",
     envVar: "MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE",
   },

@@ -1,5 +1,4 @@
 import type { SandboxAdapter } from "@mistle/sandbox";
-import { typeid } from "typeid-js";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
 import type { StartSandboxInput, StartSandboxOutput } from "./types.js";
@@ -11,7 +10,7 @@ const SandboxRuntimeTelemetryTracesEndpointEnv = "SANDBOX_RUNTIME_TELEMETRY_TRAC
 const SandboxRuntimeSandboxInstanceIDEnv = "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID";
 
 type ResolveSandboxRuntimeTracesEndpointInput = {
-  sandboxProvider: DataPlaneWorkerRuntimeConfig["app"]["sandbox"]["provider"];
+  sandboxProvider: DataPlaneWorkerRuntimeConfig["sandbox"]["provider"];
   telemetryConfig: DataPlaneWorkerRuntimeConfig["telemetry"];
 };
 
@@ -35,10 +34,6 @@ export function resolveSandboxRuntimeTracesEndpoint(
   return parsedURL.toString();
 }
 
-function createSandboxInstanceId(): string {
-  return typeid("sbi").toString();
-}
-
 export async function startSandbox(
   deps: {
     config: DataPlaneWorkerRuntimeConfig;
@@ -46,21 +41,20 @@ export async function startSandbox(
   },
   input: StartSandboxInput,
 ): Promise<StartSandboxOutput> {
-  const sandboxInstanceId = createSandboxInstanceId();
   const sandboxRuntimeTracesEndpoint = resolveSandboxRuntimeTracesEndpoint({
-    sandboxProvider: deps.config.app.sandbox.provider,
+    sandboxProvider: deps.config.sandbox.provider,
     telemetryConfig: deps.config.telemetry,
   });
 
   const startedSandbox = await deps.sandboxAdapter.start({
     image: {
       ...input.image,
-      provider: deps.config.app.sandbox.provider,
+      provider: deps.config.sandbox.provider,
     },
     env: {
       [SandboxRuntimeTokenizerProxyEgressBaseURLEnv]:
         deps.config.app.sandbox.tokenizerProxyEgressBaseUrl,
-      [SandboxRuntimeSandboxInstanceIDEnv]: sandboxInstanceId,
+      [SandboxRuntimeSandboxInstanceIDEnv]: input.sandboxInstanceId,
       ...(sandboxRuntimeTracesEndpoint === undefined
         ? {}
         : {
@@ -69,20 +63,20 @@ export async function startSandbox(
     },
   });
 
-  if (startedSandbox.provider !== deps.config.app.sandbox.provider) {
+  if (startedSandbox.provider !== deps.config.sandbox.provider) {
     throw new Error("Sandbox adapter returned sandbox handle with unexpected provider.");
   }
 
   const bootstrapTokenJti = await writeSandboxStartupInput({
     config: deps.config,
     sandboxAdapter: deps.sandboxAdapter,
-    sandboxInstanceId,
+    sandboxInstanceId: input.sandboxInstanceId,
     runtimePlan: input.runtimePlan,
     sandbox: startedSandbox,
   });
 
   return {
-    sandboxInstanceId,
+    sandboxInstanceId: input.sandboxInstanceId,
     provider: startedSandbox.provider,
     providerSandboxId: startedSandbox.sandboxId,
     bootstrapTokenJti,

@@ -54,6 +54,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET",
   },
   {
+    configPath: ["global", "sandbox", "provider"],
+    tomlPath: ["global", "sandbox", "provider"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_PROVIDER",
+  },
+  {
     configPath: ["global", "sandbox", "defaultBaseImage"],
     tomlPath: ["global", "sandbox", "default_base_image"],
     envVar: "MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE",
@@ -324,11 +329,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     configPath: ["apps", "data_plane_worker", "tunnel", "bootstrapTokenTtlSeconds"],
     tomlPath: ["apps", "data_plane_worker", "tunnel", "bootstrap_token_ttl_seconds"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS",
-  },
-  {
-    configPath: ["apps", "data_plane_worker", "sandbox", "provider"],
-    tomlPath: ["apps", "data_plane_worker", "sandbox", "provider"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_PROVIDER",
   },
   {
     configPath: ["apps", "data_plane_worker", "sandbox", "tokenizerProxyEgressBaseUrl"],

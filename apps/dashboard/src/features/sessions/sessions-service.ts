@@ -6,10 +6,18 @@ import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-ap
 
 const StartSandboxProfileInstanceResponseSchema = z
   .object({
-    status: z.literal("completed"),
+    status: z.literal("accepted"),
     workflowRunId: z.string().min(1),
     sandboxInstanceId: z.string().min(1),
-    providerSandboxId: z.string().min(1),
+  })
+  .strict();
+
+const SandboxInstanceStatusResponseSchema = z
+  .object({
+    id: z.string().min(1),
+    status: z.enum(["starting", "running", "stopped", "failed"]),
+    failureCode: z.string().min(1).nullable(),
+    failureMessage: z.string().min(1).nullable(),
   })
   .strict();
 
@@ -25,7 +33,13 @@ const SandboxInstanceConnectionTokenSchema = z
 export type StartSandboxInstanceResult = {
   workflowRunId: string;
   sandboxInstanceId: string;
-  providerSandboxId: string;
+};
+
+export type SandboxInstanceStatusResult = {
+  id: string;
+  status: "starting" | "running" | "stopped" | "failed";
+  failureCode: string | null;
+  failureMessage: string | null;
 };
 
 export type MintSandboxConnectionTokenResult = {
@@ -45,9 +59,7 @@ export async function startSandboxInstanceFromProfileVersion(input: {
       operation: "startSandboxInstanceFromProfileVersion",
       method: "POST",
       pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(input.profileVersion)}/instances`,
-      body: {
-        issueConnectionToken: false,
-      },
+      body: {},
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not start sandbox session.",
     });
@@ -66,7 +78,6 @@ export async function startSandboxInstanceFromProfileVersion(input: {
     return {
       workflowRunId: parsedResponse.data.workflowRunId,
       sandboxInstanceId: parsedResponse.data.sandboxInstanceId,
-      providerSandboxId: parsedResponse.data.providerSandboxId,
     };
   } catch (error) {
     throw new SandboxProfilesApiError(
@@ -74,6 +85,42 @@ export async function startSandboxInstanceFromProfileVersion(input: {
         operation: "startSandboxInstanceFromProfileVersion",
         error,
         fallbackMessage: "Could not start sandbox session.",
+      }),
+    );
+  }
+}
+
+export async function getSandboxInstanceStatus(input: {
+  instanceId: string;
+  signal?: AbortSignal;
+}): Promise<SandboxInstanceStatusResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "getSandboxInstanceStatus",
+      method: "GET",
+      pathname: `/v1/sandbox/instances/${encodeURIComponent(input.instanceId)}`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not check sandbox session status.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxInstanceStatusResponseSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "getSandboxInstanceStatus",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox instance status response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "getSandboxInstanceStatus",
+        error,
+        fallbackMessage: "Could not check sandbox session status.",
       }),
     );
   }

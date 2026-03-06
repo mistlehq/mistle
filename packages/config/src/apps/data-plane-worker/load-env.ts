@@ -2,14 +2,13 @@ import { createEnvLoader, hasEntries, parseBooleanEnv } from "../../core/load-en
 import {
   type PartialDataPlaneWorkerConfigInput,
   DataPlaneWorkerDatabaseConfigSchema,
-  DataPlaneWorkerSandboxConfigSchema,
   DataPlaneWorkerSandboxDockerConfigSchema,
   DataPlaneWorkerSandboxModalConfigSchema,
-  DataPlaneWorkerSandboxProviders,
   DataPlaneWorkerServerConfigSchema,
   DataPlaneWorkerTunnelConfigSchema,
   DataPlaneWorkerWorkflowConfigSchema,
   PartialDataPlaneWorkerConfigSchema,
+  PartialDataPlaneWorkerSandboxConfigSchema,
 } from "./schema.js";
 
 const loadServerEnv = createEnvLoader<typeof DataPlaneWorkerServerConfigSchema>([
@@ -91,11 +90,7 @@ const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneWorkerSandboxDocker
   },
 ]);
 
-const loadSandboxEnv = createEnvLoader<typeof DataPlaneWorkerSandboxConfigSchema>([
-  {
-    key: "provider",
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_PROVIDER",
-  },
+const loadSandboxEnv = createEnvLoader<typeof PartialDataPlaneWorkerSandboxConfigSchema>([
   {
     key: "tokenizerProxyEgressBaseUrl",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL",
@@ -132,24 +127,15 @@ export function loadDataPlaneWorkerFromEnv(
   const sandboxDocker = loadSandboxDockerEnv(env);
 
   if (hasEntries(sandbox) || hasEntries(sandboxModal) || hasEntries(sandboxDocker)) {
-    const sandboxConfig: PartialDataPlaneWorkerConfigInput["sandbox"] = {
+    const sandboxConfig: Record<string, unknown> = {
       ...sandbox,
     };
 
-    if (sandbox.provider === DataPlaneWorkerSandboxProviders.MODAL && hasEntries(sandboxModal)) {
+    if (hasEntries(sandboxModal)) {
       sandboxConfig.modal = sandboxModal;
-    } else if (
-      sandbox.provider === DataPlaneWorkerSandboxProviders.DOCKER &&
-      hasEntries(sandboxDocker)
-    ) {
+    }
+    if (hasEntries(sandboxDocker)) {
       sandboxConfig.docker = sandboxDocker;
-    } else if (sandbox.provider === undefined) {
-      if (hasEntries(sandboxModal)) {
-        sandboxConfig.modal = sandboxModal;
-      }
-      if (hasEntries(sandboxDocker)) {
-        sandboxConfig.docker = sandboxDocker;
-      }
     }
 
     partialConfig.sandbox = sandboxConfig;

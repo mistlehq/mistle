@@ -20,10 +20,25 @@ const sandboxBootstrapTokenAudience = "data-plane-gateway";
 
 const globalDevelopmentConfig = {
   env: "development",
+  telemetry: {
+    enabled: true,
+    debug: false,
+    traces: {
+      endpoint: "http://127.0.0.1:4318/v1/traces",
+    },
+    logs: {
+      endpoint: "http://127.0.0.1:4318/v1/logs",
+    },
+    metrics: {
+      endpoint: "http://127.0.0.1:4318/v1/metrics",
+    },
+    resourceAttributes: "deployment.environment=test",
+  },
   internalAuth: {
     serviceToken,
   },
   sandbox: {
+    provider: "modal",
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -42,10 +57,25 @@ const globalDevelopmentConfig = {
 
 const globalProductionConfig = {
   env: "production",
+  telemetry: {
+    enabled: true,
+    debug: false,
+    traces: {
+      endpoint: "http://127.0.0.1:4318/v1/traces",
+    },
+    logs: {
+      endpoint: "http://127.0.0.1:4318/v1/logs",
+    },
+    metrics: {
+      endpoint: "http://127.0.0.1:4318/v1/metrics",
+    },
+    resourceAttributes: "deployment.environment=test",
+  },
   internalAuth: {
     serviceToken,
   },
   sandbox: {
+    provider: "modal",
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -62,10 +92,19 @@ const globalProductionConfig = {
   },
 } as const;
 
+const globalProductionDockerConfig = {
+  ...globalProductionConfig,
+  sandbox: {
+    ...globalProductionConfig.sandbox,
+    provider: "docker",
+  },
+} as const;
+
 const globalDevelopmentDockerConfig = {
   ...globalDevelopmentConfig,
   sandbox: {
     ...globalDevelopmentConfig.sandbox,
+    provider: "docker",
     internalGatewayWsUrl: "ws://host.docker.internal:5003/tunnel/sandbox",
   },
 } as const;
@@ -232,7 +271,6 @@ const dataPlaneWorkerEnvConfig = {
     bootstrapTokenTtlSeconds: 120,
   },
   sandbox: {
-    provider: "modal",
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
     modal: {
       tokenId: "fixture-modal-token-id",
@@ -274,7 +312,6 @@ const dataPlaneWorkerDockerFixtureConfig = {
     bootstrapTokenTtlSeconds: 120,
   },
   sandbox: {
-    provider: "docker",
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
     docker: {
       socketPath: "/var/run/docker.sock",
@@ -612,7 +649,7 @@ describe("loadConfig integrations", () => {
       app: AppIds.DATA_PLANE_WORKER,
       env: createIntegrationEnv({
         NODE_ENV: "production",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_PROVIDER: "docker",
+        MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY:
           "localhost:5001/mistle/snapshots",
@@ -624,7 +661,7 @@ describe("loadConfig integrations", () => {
     });
 
     expect(config).toEqual({
-      global: globalProductionConfig,
+      global: globalProductionDockerConfig,
       app: {
         ...dataPlaneWorkerEnvConfig,
         sandbox: dataPlaneWorkerDockerFixtureConfig.sandbox,
@@ -663,6 +700,49 @@ describe("loadConfig integrations", () => {
         },
       },
     });
+  });
+
+  it("merges partial docker sandbox overrides across config file and env", () => {
+    const config = loadConfig({
+      app: AppIds.DATA_PLANE_WORKER,
+      configPath: dataPlaneWorkerDockerConfigFixturePath,
+      env: {
+        MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/tmp/docker.sock",
+      },
+    });
+
+    expect(config).toEqual({
+      global: globalDevelopmentDockerConfig,
+      app: {
+        ...dataPlaneWorkerDockerFixtureConfig,
+        sandbox: {
+          ...dataPlaneWorkerDockerFixtureConfig.sandbox,
+          docker: {
+            ...dataPlaneWorkerDockerFixtureConfig.sandbox.docker,
+            socketPath: "/tmp/docker.sock",
+          },
+        },
+      },
+    });
+  });
+
+  it("rejects data-plane-worker config when the selected sandbox provider is missing worker settings", () => {
+    expect(() =>
+      loadConfig({
+        app: AppIds.DATA_PLANE_WORKER,
+        env: createIntegrationEnv({
+          NODE_ENV: "production",
+          MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID: undefined,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET: undefined,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_APP_NAME: undefined,
+          MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME: undefined,
+        }),
+      }),
+    ).toThrowError(
+      /apps\.data_plane_worker\.sandbox\.docker is required when global\.sandbox\.provider is 'docker'/,
+    );
   });
 
   it("returns only data-plane-worker app config when includeGlobal is false", () => {

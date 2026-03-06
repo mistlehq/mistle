@@ -26,6 +26,7 @@ describe("parseConfigRecord", () => {
           serviceToken: "test-service-token",
         },
         sandbox: {
+          provider: "modal",
           defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -131,7 +132,6 @@ describe("parseConfigRecord", () => {
             bootstrapTokenTtlSeconds: 120,
           },
           sandbox: {
-            provider: "modal",
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
             modal: {
               tokenId: "fixture-modal-token-id",
@@ -188,6 +188,7 @@ describe("parseConfigRecord", () => {
           serviceToken: "test-service-token",
         },
         sandbox: {
+          provider: "docker",
           defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -293,7 +294,6 @@ describe("parseConfigRecord", () => {
             bootstrapTokenTtlSeconds: 120,
           },
           sandbox: {
-            provider: "docker",
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
             docker: {
               socketPath: "/var/run/docker.sock",
@@ -324,6 +324,163 @@ describe("parseConfigRecord", () => {
     const config = parseConfigRecord(configRecord);
 
     expect(config).toEqual(configRecord);
+  });
+
+  it("rejects a config record when the selected sandbox provider is missing worker settings", () => {
+    const configRecord = {
+      global: {
+        env: "development",
+        telemetry: {
+          enabled: true,
+          debug: false,
+          traces: {
+            endpoint: "http://127.0.0.1:4318/v1/traces",
+          },
+          logs: {
+            endpoint: "http://127.0.0.1:4318/v1/logs",
+          },
+          metrics: {
+            endpoint: "http://127.0.0.1:4318/v1/metrics",
+          },
+          resourceAttributes: "deployment.environment=test",
+        },
+        internalAuth: {
+          serviceToken: "test-service-token",
+        },
+        sandbox: {
+          provider: "docker",
+          defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+          gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+          internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+          connect: {
+            tokenSecret: "test-connection-token-secret",
+            tokenIssuer: "control-plane-api",
+            tokenAudience: "data-plane-gateway",
+          },
+          bootstrap: {
+            tokenSecret: "test-bootstrap-token-secret",
+            tokenIssuer: "data-plane-worker",
+            tokenAudience: "data-plane-gateway",
+          },
+        },
+      },
+      apps: {
+        control_plane_api: {
+          server: {
+            host: "127.0.0.1",
+            port: 5000,
+          },
+          database: {
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+          },
+          auth: {
+            baseUrl: "http://127.0.0.1:5000",
+            invitationAcceptBaseUrl: "http://127.0.0.1:5173/invitations/accept",
+            secret: "test-secret",
+            trustedOrigins: ["http://127.0.0.1:3000"],
+            otpLength: 6,
+            otpExpiresInSeconds: 300,
+            otpAllowedAttempts: 3,
+          },
+          workflow: {
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+            namespaceId: "development",
+          },
+          dataPlaneApi: {
+            baseUrl: "http://127.0.0.1:5200",
+          },
+          integrations: {
+            activeMasterEncryptionKeyVersion: 1,
+            masterEncryptionKeys: {
+              "1": "integration-master-key-test",
+            },
+          },
+        },
+        control_plane_worker: {
+          server: {
+            host: "127.0.0.1",
+            port: 5100,
+          },
+          workflow: {
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+            namespaceId: "development",
+            runMigrations: true,
+            concurrency: 1,
+          },
+          email: {
+            fromAddress: "no-reply@mistle.local",
+            fromName: "Mistle Local",
+            smtpHost: "127.0.0.1",
+            smtpPort: 1025,
+            smtpSecure: false,
+            smtpUsername: "mailpit",
+            smtpPassword: "mailpit",
+          },
+          dataPlaneApi: {
+            baseUrl: "http://127.0.0.1:5200",
+          },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5000",
+          },
+        },
+        data_plane_api: {
+          server: {
+            host: "127.0.0.1",
+            port: 5200,
+          },
+          database: {
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+          },
+          workflow: {
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+            namespaceId: "development",
+          },
+        },
+        data_plane_worker: {
+          server: {
+            host: "127.0.0.1",
+            port: 5201,
+          },
+          database: {
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+          },
+          workflow: {
+            databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
+            namespaceId: "development",
+            runMigrations: true,
+            concurrency: 1,
+          },
+          tunnel: {
+            bootstrapTokenTtlSeconds: 120,
+          },
+          sandbox: {
+            tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
+          },
+        },
+        data_plane_gateway: {
+          server: {
+            host: "127.0.0.1",
+            port: 5202,
+          },
+          database: {
+            url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+          },
+        },
+        tokenizer_proxy: {
+          server: {
+            host: "127.0.0.1",
+            port: 5205,
+          },
+          controlPlaneApi: {
+            baseUrl: "http://127.0.0.1:5100",
+          },
+        },
+      },
+    };
+
+    expect(() => parseConfigRecord(configRecord)).toThrowError(
+      /apps\.data_plane_worker\.sandbox\.docker is required when global\.sandbox\.provider is 'docker'/,
+    );
   });
 });
 

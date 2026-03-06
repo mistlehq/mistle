@@ -73,7 +73,6 @@ describe("start sandbox profile instance workflow integration", () => {
             return {
               workflowRunId: `wf-${input.organizationId}`,
               sandboxInstanceId: `sbi-${input.startedBy.id}`,
-              providerSandboxId: `${input.source}-${input.image.imageId}`,
             };
           },
         });
@@ -94,7 +93,6 @@ describe("start sandbox profile instance workflow integration", () => {
         expect(result).toEqual({
           workflowRunId: `wf-${workflowInput.organizationId}`,
           sandboxInstanceId: `sbi-${workflowInput.startedBy.id}`,
-          providerSandboxId: `${workflowInput.source}-${workflowInput.image.imageId}`,
         });
       } finally {
         await runCleanupTasks({

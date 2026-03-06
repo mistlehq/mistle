@@ -558,6 +558,7 @@ export async function startDockerTargetApp(
   }
 
   let container: StartedTestContainer | undefined;
+  let imageName: string | undefined;
 
   const { network, createdNetwork } = await resolveNetwork(input.network);
   const startupStartedAt = Date.now();
@@ -570,7 +571,7 @@ export async function startDockerTargetApp(
     });
 
     const resolveImageStartedAt = Date.now();
-    const imageName = await resolveDockerTargetImageName({
+    imageName = await resolveDockerTargetImageName({
       buildContextHostPath: input.buildContextHostPath,
       dockerfileRelativePath: input.dockerfileRelativePath,
       dockerTarget: input.dockerTarget,
@@ -615,6 +616,7 @@ export async function startDockerTargetApp(
     traceTestHarness(
       `Docker target app ${input.dockerTarget} startup complete in ${String(Date.now() - startupStartedAt)}ms`,
     );
+    const startedImageName = imageName;
 
     return createStartedWorkspaceApp({
       container,
@@ -623,7 +625,7 @@ export async function startDockerTargetApp(
       containerPort: input.containerPort,
       createdNetwork,
       postStopCleanupTask: async () => {
-        await releaseDockerTargetImage(imageName);
+        await releaseDockerTargetImage(startedImageName);
       },
     });
   } catch (startupError) {

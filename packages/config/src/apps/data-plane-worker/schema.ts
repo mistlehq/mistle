@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+const SandboxProviders = ["modal", "docker"] as const;
+
 export const DataPlaneWorkerServerConfigSchema = z
   .object({
     host: z.string().min(1),
@@ -28,11 +30,6 @@ export const DataPlaneWorkerTunnelConfigSchema = z
   })
   .strict();
 
-export const DataPlaneWorkerSandboxProviders = {
-  MODAL: "modal",
-  DOCKER: "docker",
-} as const;
-
 export const DataPlaneWorkerSandboxModalConfigSchema = z
   .object({
     tokenId: z.string().min(1),
@@ -54,28 +51,16 @@ const DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema = z.url().refine((value) 
   return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
 }, "sandbox.tokenizerProxyEgressBaseUrl must use http or https.");
 
-export const DataPlaneWorkerSandboxConfigSchema = z.discriminatedUnion("provider", [
-  z
-    .object({
-      provider: z.literal(DataPlaneWorkerSandboxProviders.MODAL),
-      tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema,
-      modal: DataPlaneWorkerSandboxModalConfigSchema,
-    })
-    .strict(),
-  z
-    .object({
-      provider: z.literal(DataPlaneWorkerSandboxProviders.DOCKER),
-      tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema,
-      docker: DataPlaneWorkerSandboxDockerConfigSchema,
-    })
-    .strict(),
-]);
+export const DataPlaneWorkerSandboxConfigSchema = z
+  .object({
+    tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema,
+    modal: DataPlaneWorkerSandboxModalConfigSchema.optional(),
+    docker: DataPlaneWorkerSandboxDockerConfigSchema.optional(),
+  })
+  .strict();
 
 export const PartialDataPlaneWorkerSandboxConfigSchema = z
   .object({
-    provider: z
-      .enum([DataPlaneWorkerSandboxProviders.MODAL, DataPlaneWorkerSandboxProviders.DOCKER])
-      .optional(),
     tokenizerProxyEgressBaseUrl: DataPlaneWorkerTokenizerProxyEgressBaseUrlSchema.optional(),
     modal: DataPlaneWorkerSandboxModalConfigSchema.partial().optional(),
     docker: DataPlaneWorkerSandboxDockerConfigSchema.partial().optional(),
@@ -101,6 +86,37 @@ export const PartialDataPlaneWorkerConfigSchema = z
     sandbox: PartialDataPlaneWorkerSandboxConfigSchema.optional(),
   })
   .strict();
+
+const DataPlaneWorkerProviderRequirementMessages = {
+  MODAL:
+    "apps.data_plane_worker.sandbox.modal is required when global.sandbox.provider is 'modal'.",
+  DOCKER:
+    "apps.data_plane_worker.sandbox.docker is required when global.sandbox.provider is 'docker'.",
+} as const;
+
+export function getDataPlaneWorkerSandboxProviderValidationIssue(input: {
+  globalSandboxProvider: (typeof SandboxProviders)[number];
+  appSandbox: DataPlaneWorkerConfig["sandbox"];
+}): {
+  path: readonly ["sandbox", "modal"] | readonly ["sandbox", "docker"];
+  message: string;
+} | null {
+  if (input.globalSandboxProvider === "modal" && input.appSandbox.modal === undefined) {
+    return {
+      path: ["sandbox", "modal"],
+      message: DataPlaneWorkerProviderRequirementMessages.MODAL,
+    };
+  }
+
+  if (input.globalSandboxProvider === "docker" && input.appSandbox.docker === undefined) {
+    return {
+      path: ["sandbox", "docker"],
+      message: DataPlaneWorkerProviderRequirementMessages.DOCKER,
+    };
+  }
+
+  return null;
+}
 
 export type DataPlaneWorkerConfig = z.infer<typeof DataPlaneWorkerConfigSchema>;
 export type PartialDataPlaneWorkerConfigInput = z.input<typeof PartialDataPlaneWorkerConfigSchema>;

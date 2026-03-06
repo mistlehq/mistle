@@ -1,9 +1,10 @@
 import type { AppRuntimeResources } from "../runtime/resources.js";
-import type { DataPlaneApiConfig } from "../types.js";
+import type { DataPlaneApiConfig, DataPlaneApiGlobalConfig } from "../types.js";
 
 export interface DataPlaneTrpcContext {
   config: DataPlaneApiConfig;
   internalAuthServiceToken: string;
+  sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
   requestHeaders: Headers;
   resources: AppRuntimeResources;
 }

@@ -33,6 +33,10 @@ export type StartSandboxProfileInstanceInput =
   paths["/internal/sandbox-runtime/start-profile-instance"]["post"]["requestBody"]["content"]["application/json"];
 export type StartSandboxProfileInstanceOutput =
   paths["/internal/sandbox-runtime/start-profile-instance"]["post"]["responses"]["200"]["content"]["application/json"];
+export type GetSandboxInstanceInput =
+  paths["/internal/sandbox-runtime/get-sandbox-instance"]["post"]["requestBody"]["content"]["application/json"];
+export type GetSandboxInstanceOutput =
+  paths["/internal/sandbox-runtime/get-sandbox-instance"]["post"]["responses"]["200"]["content"]["application/json"];
 
 export type MintSandboxConnectionTokenInput =
   paths["/internal/sandbox-runtime/mint-connection-token"]["post"]["requestBody"]["content"]["application/json"];
@@ -135,6 +139,21 @@ export class ControlPlaneInternalClient {
 
     throw new Error(
       `Control-plane internal sandbox connection mint failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+    );
+  }
+
+  async getSandboxInstance(input: GetSandboxInstanceInput): Promise<GetSandboxInstanceOutput> {
+    const result = await this.#client.POST("/internal/sandbox-runtime/get-sandbox-instance", {
+      body: input,
+      signal: AbortSignal.timeout(this.#requestTimeoutMs),
+    });
+
+    if (result.response.status === 200 && result.data !== undefined) {
+      return result.data;
+    }
+
+    throw new Error(
+      `Control-plane internal sandbox read failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
     );
   }
 }

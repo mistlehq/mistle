@@ -6,6 +6,7 @@ import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 
+import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
@@ -86,6 +87,23 @@ const TurnStartResultSchema = z.looseObject({
     id: z.string().min(1),
   }),
 });
+
+const StartSandboxInstanceResponseSchema = z
+  .object({
+    status: z.literal("accepted"),
+    workflowRunId: z.string().min(1),
+    sandboxInstanceId: z.string().min(1),
+  })
+  .strict();
+
+const SandboxInstanceStatusResponseSchema = z
+  .object({
+    id: z.string().min(1),
+    status: z.enum(["starting", "running", "stopped", "failed"]),
+    failureCode: z.string().min(1).nullable(),
+    failureMessage: z.string().min(1).nullable(),
+  })
+  .strict();
 
 type JsonRpcId = z.infer<typeof JsonRpcIdSchema>;
 
@@ -686,29 +704,6 @@ function formatWebSocketTrace(entries: WebSocketTraceEntry[]): string {
     .join("\n");
 }
 
-async function collectSandboxContainerDiagnostics(providerSandboxId: string): Promise<string> {
-  const inspectOutput = await runDiagnosticCommand({
-    command: "docker",
-    args: ["inspect", providerSandboxId],
-    timeoutMs: DOCKER_DIAGNOSTIC_TIMEOUT_MS,
-  });
-  const logsOutput = await runDiagnosticCommand({
-    command: "docker",
-    args: ["logs", "--timestamps", "--tail", "300", providerSandboxId],
-    timeoutMs: DOCKER_DIAGNOSTIC_TIMEOUT_MS,
-  });
-
-  return [
-    `providerSandboxId=${providerSandboxId}`,
-    "",
-    "docker inspect:",
-    truncateForDiagnostics(inspectOutput, DIAGNOSTIC_OUTPUT_MAX_CHARS),
-    "",
-    "docker logs:",
-    truncateForDiagnostics(logsOutput, DIAGNOSTIC_OUTPUT_MAX_CHARS),
-  ].join("\n");
-}
-
 async function collectSandboxContainerListDiagnostics(): Promise<string> {
   const output = await runDiagnosticCommand({
     command: "docker",
@@ -991,6 +986,56 @@ async function waitForTurnCompletion(input: {
   }
 }
 
+async function waitForSandboxInstanceRunning(input: {
+  request: (path: string, init?: RequestInit) => Promise<Response>;
+  cookie: string;
+  sandboxInstanceId: string;
+  timeoutMs: number;
+}): Promise<z.infer<typeof SandboxInstanceStatusResponseSchema>> {
+  const deadline = Date.now() + input.timeoutMs;
+
+  while (true) {
+    const response = await requestWithTimeout({
+      request: input.request,
+      path: `/v1/sandbox/instances/${encodeURIComponent(input.sandboxInstanceId)}`,
+      timeoutMs: remainingTimeMs(deadline),
+      description: "sandbox instance status lookup",
+      init: {
+        headers: {
+          cookie: input.cookie,
+        },
+      },
+    });
+    const payload = await expectStatusJson({
+      response,
+      status: 200,
+      description: "sandbox instance status lookup",
+    });
+    const parsedPayload = SandboxInstanceStatusResponseSchema.safeParse(payload);
+    if (!parsedPayload.success) {
+      throw new Error("Expected sandbox instance status response to match the API schema.");
+    }
+
+    if (parsedPayload.data.status === "running") {
+      return parsedPayload.data;
+    }
+
+    if (parsedPayload.data.status === "failed") {
+      throw new Error(
+        `Sandbox instance failed to provision (${parsedPayload.data.failureCode ?? "unknown"}): ${
+          parsedPayload.data.failureMessage ?? "no message"
+        }`,
+      );
+    }
+
+    if (remainingTimeMs(deadline) === 0) {
+      throw new Error("Timed out waiting for sandbox instance to reach running state.");
+    }
+
+    await systemSleeper.sleep(1_000);
+  }
+}
+
 describe("system sandbox openai codex app-server websocket tunnel", () => {
   it(
     "connects to an agent endpoint and exchanges Codex app-server JSON-RPC messages",
@@ -998,10 +1043,10 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
       const stepTrace: StepTraceEntry[] = [];
       const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
       const dataPlaneGatewayBaseUrl = requireEnv(DATA_PLANE_GATEWAY_BASE_URL_ENV_NAME);
+      const connectionDisplayName = `System OpenAI Connection ${randomUUID()}`;
       let websocketForCleanup: WebSocket | null = null;
       let detachWebSocketTrace: (() => void) | null = null;
       const websocketTraceEntries: WebSocketTraceEntry[] = [];
-      let providerSandboxIdForDiagnostics: string | null = null;
 
       try {
         const authenticatedSession = await runStep({
@@ -1028,6 +1073,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
                   cookie: authenticatedSession.cookie,
                 },
                 body: JSON.stringify({
+                  displayName: connectionDisplayName,
                   apiKey: openAiApiKey,
                 }),
               },
@@ -1138,17 +1184,25 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
           status: 201,
           description: "sandbox profile start instance",
         });
-        if (!isRecord(startInstancePayload)) {
-          throw new Error("Expected sandbox instance start response to be an object.");
+        const parsedStartInstancePayload =
+          StartSandboxInstanceResponseSchema.safeParse(startInstancePayload);
+        if (!parsedStartInstancePayload.success) {
+          throw new Error("Expected sandbox instance start response to match the API schema.");
         }
-        const sandboxInstanceId = readNonEmptyStringField(
-          startInstancePayload,
-          "sandboxInstanceId",
-        );
-        providerSandboxIdForDiagnostics = readOptionalStringField(
-          startInstancePayload,
-          "providerSandboxId",
-        );
+        const sandboxInstanceId = parsedStartInstancePayload.data.sandboxInstanceId;
+
+        await runStep({
+          stepTrace,
+          stepName: "wait for sandbox instance to reach running",
+          action: async () => {
+            await waitForSandboxInstanceRunning({
+              request: fixture.request,
+              cookie: authenticatedSession.cookie,
+              sandboxInstanceId,
+              timeoutMs: START_INSTANCE_TIMEOUT_MS,
+            });
+          },
+        });
 
         const mintConnectionTokenResponse = await runStep({
           stepTrace,
@@ -1349,15 +1403,8 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
         expect(combinedAgentText).toContain(TEST_RESPONSE_MARKER);
       } catch (error) {
         let diagnostics = `Websocket trace (tail):\n${formatWebSocketTrace(websocketTraceEntries)}`;
-        if (providerSandboxIdForDiagnostics !== null) {
-          const sandboxDiagnostics = await collectSandboxContainerDiagnostics(
-            providerSandboxIdForDiagnostics,
-          );
-          diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\n${sandboxDiagnostics}`;
-        } else {
-          const sandboxListDiagnostics = await collectSandboxContainerListDiagnostics();
-          diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\nproviderSandboxId unavailable\n\nKnown sandbox containers:\n${sandboxListDiagnostics}`;
-        }
+        const sandboxListDiagnostics = await collectSandboxContainerListDiagnostics();
+        diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\nproviderSandboxId unavailable\n\nKnown sandbox containers:\n${sandboxListDiagnostics}`;
 
         throw new Error(
           `System test failed. Step trace: ${formatStepTrace(stepTrace)}. Cause: ${describeUnknownError(error)}\n\nDiagnostics:\n${diagnostics}`,

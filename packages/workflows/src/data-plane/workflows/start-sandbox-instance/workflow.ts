@@ -8,6 +8,8 @@ import {
 } from "./spec.js";
 
 const StartSandboxFailureCodes = {
+  SANDBOX_START_FAILED: "sandbox_start_failed",
+  PERSIST_PROVISIONING_METADATA_FAILED: "persist_provisioning_metadata_failed",
   TUNNEL_CONNECT_ACK_TIMEOUT: "tunnel_connect_ack_timeout",
   TUNNEL_CONNECT_ACK_WAIT_FAILED: "tunnel_connect_ack_wait_failed",
   STATUS_TRANSITION_TO_RUNNING_FAILED: "status_transition_to_running_failed",
@@ -16,6 +18,7 @@ const StartSandboxFailureCodes = {
 export type StartSandboxInstanceWorkflowServices = {
   sandboxLifecycle: {
     startSandbox: (input: {
+      sandboxInstanceId: string;
       image: StartSandboxInstanceWorkflowInput["image"];
       runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
     }) => Promise<{
@@ -27,19 +30,23 @@ export type StartSandboxInstanceWorkflowServices = {
     stopSandbox: (input: { provider: SandboxProvider; providerSandboxId: string }) => Promise<void>;
   };
   sandboxInstances: {
-    createSandboxInstance: (input: {
+    ensureSandboxInstance: (input: {
       sandboxInstanceId: string;
       organizationId: string;
       sandboxProfileId: string;
       sandboxProfileVersion: number;
-      runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
-      provider: SandboxProvider;
-      providerSandboxId: string;
       startedBy: StartSandboxInstanceWorkflowInput["startedBy"];
       source: StartSandboxInstanceWorkflowInput["source"];
     }) => Promise<{
       sandboxInstanceId: string;
     }>;
+    persistSandboxInstanceProvisioning: (input: {
+      sandboxInstanceId: string;
+      runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+      sandboxProfileId: string;
+      sandboxProfileVersion: number;
+      providerSandboxId: string;
+    }) => Promise<void>;
     markSandboxInstanceRunning: (input: { sandboxInstanceId: string }) => Promise<void>;
     markSandboxInstanceFailed: (input: {
       sandboxInstanceId: string;
@@ -62,33 +69,45 @@ export function createStartSandboxInstanceWorkflow(
   return defineWorkflow(
     StartSandboxInstanceWorkflowSpec,
     async ({ input: workflowInput, step }) => {
+      async function markSandboxInstanceFailed(input: {
+        sandboxInstanceId: string;
+        failureCode: string;
+        failureMessage: string;
+      }): Promise<void> {
+        await step.run({ name: "mark-sandbox-instance-failed" }, async () => {
+          await services.sandboxInstances.markSandboxInstanceFailed(input);
+        });
+      }
+
       async function handleFailedStartup(input: {
         sandboxInstanceId: string;
-        provider: SandboxProvider;
-        providerSandboxId: string;
+        provider?: SandboxProvider;
+        providerSandboxId?: string;
         failureCode: string;
         failureMessage: string;
       }): Promise<void> {
         let stopSandboxError: unknown;
-        try {
-          await step.run({ name: "stop-sandbox-after-start-failure" }, async () => {
-            await services.sandboxLifecycle.stopSandbox({
-              provider: input.provider,
-              providerSandboxId: input.providerSandboxId,
+        if (input.provider !== undefined && input.providerSandboxId !== undefined) {
+          const provider = input.provider;
+          const providerSandboxId = input.providerSandboxId;
+          try {
+            await step.run({ name: "stop-sandbox-after-start-failure" }, async () => {
+              await services.sandboxLifecycle.stopSandbox({
+                provider,
+                providerSandboxId,
+              });
             });
-          });
-        } catch (error) {
-          stopSandboxError = error;
+          } catch (error) {
+            stopSandboxError = error;
+          }
         }
 
         let updateFailedStatusError: unknown;
         try {
-          await step.run({ name: "mark-sandbox-instance-failed" }, async () => {
-            await services.sandboxInstances.markSandboxInstanceFailed({
-              sandboxInstanceId: input.sandboxInstanceId,
-              failureCode: input.failureCode,
-              failureMessage: input.failureMessage,
-            });
+          await markSandboxInstanceFailed({
+            sandboxInstanceId: input.sandboxInstanceId,
+            failureCode: input.failureCode,
+            failureMessage: input.failureMessage,
           });
         } catch (error) {
           updateFailedStatusError = error;
@@ -119,49 +138,89 @@ export function createStartSandboxInstanceWorkflow(
         }
       }
 
-      const startedSandbox = await step.run({ name: "start-sandbox" }, async () => {
-        return services.sandboxLifecycle.startSandbox({
-          image: workflowInput.image,
-          runtimePlan: workflowInput.runtimePlan,
-        });
-      });
-
-      let persistedSandboxInstance: {
-        sandboxInstanceId: string;
-      };
-      try {
-        persistedSandboxInstance = await step.run({ name: "insert-sandbox-instance" }, async () => {
-          const persisted = await services.sandboxInstances.createSandboxInstance({
-            sandboxInstanceId: startedSandbox.sandboxInstanceId,
+      const ensuredSandboxInstance = await step.run(
+        { name: "ensure-sandbox-instance" },
+        async () => {
+          const persisted = await services.sandboxInstances.ensureSandboxInstance({
+            sandboxInstanceId: workflowInput.sandboxInstanceId,
             organizationId: workflowInput.organizationId,
             sandboxProfileId: workflowInput.sandboxProfileId,
             sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-            runtimePlan: workflowInput.runtimePlan,
-            provider: startedSandbox.provider,
-            providerSandboxId: startedSandbox.providerSandboxId,
             startedBy: workflowInput.startedBy,
             source: workflowInput.source,
           });
 
-          if (persisted.sandboxInstanceId !== startedSandbox.sandboxInstanceId) {
-            throw new Error(
-              "Sandbox instance persistence returned an unexpected sandboxInstanceId.",
-            );
+          if (persisted.sandboxInstanceId !== workflowInput.sandboxInstanceId) {
+            throw new Error("Sandbox instance store returned an unexpected sandboxInstanceId.");
           }
 
           return persisted;
+        },
+      );
+
+      let startedSandbox: {
+        sandboxInstanceId: string;
+        provider: SandboxProvider;
+        providerSandboxId: string;
+        bootstrapTokenJti: string;
+      };
+      try {
+        startedSandbox = await step.run({ name: "start-sandbox" }, async () => {
+          return services.sandboxLifecycle.startSandbox({
+            sandboxInstanceId: workflowInput.sandboxInstanceId,
+            image: workflowInput.image,
+            runtimePlan: workflowInput.runtimePlan,
+          });
         });
       } catch (error) {
-        await step.run({ name: "rollback-stop-sandbox" }, async () => {
-          await services.sandboxLifecycle.stopSandbox({
-            provider: startedSandbox.provider,
+        await markSandboxInstanceFailed({
+          sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+          failureCode: StartSandboxFailureCodes.SANDBOX_START_FAILED,
+          failureMessage: "Sandbox provider start failed before runtime provisioning completed.",
+        });
+        throw error;
+      }
+
+      if (startedSandbox.sandboxInstanceId !== workflowInput.sandboxInstanceId) {
+        throw new Error("Sandbox lifecycle start returned an unexpected sandboxInstanceId.");
+      }
+
+      try {
+        await step.run({ name: "persist-sandbox-provisioning-metadata" }, async () => {
+          await services.sandboxInstances.persistSandboxInstanceProvisioning({
+            sandboxInstanceId: startedSandbox.sandboxInstanceId,
+            runtimePlan: workflowInput.runtimePlan,
+            sandboxProfileId: workflowInput.sandboxProfileId,
+            sandboxProfileVersion: workflowInput.sandboxProfileVersion,
             providerSandboxId: startedSandbox.providerSandboxId,
           });
         });
+      } catch (error) {
+        try {
+          await handleFailedStartup({
+            sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+            provider: startedSandbox.provider,
+            providerSandboxId: startedSandbox.providerSandboxId,
+            failureCode: StartSandboxFailureCodes.PERSIST_PROVISIONING_METADATA_FAILED,
+            failureMessage: "Failed to persist sandbox runtime plan and provider sandbox metadata.",
+          });
+        } catch (cleanupError) {
+          throw new Error(
+            "Failed to persist sandbox provisioning metadata and failed cleanup after startup failure.",
+            {
+              cause: {
+                persistProvisioningError: error,
+                cleanupError,
+              },
+            },
+          );
+        }
 
         throw new Error(
-          "Failed to persist sandbox instance after provider sandbox start. Provider sandbox was stopped.",
-          { cause: error },
+          "Failed to persist sandbox provisioning metadata. Sandbox was stopped and sandbox instance was marked as failed.",
+          {
+            cause: error,
+          },
         );
       }
 
@@ -178,7 +237,7 @@ export function createStartSandboxInstanceWorkflow(
       } catch (error) {
         try {
           await handleFailedStartup({
-            sandboxInstanceId: persistedSandboxInstance.sandboxInstanceId,
+            sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
             provider: startedSandbox.provider,
             providerSandboxId: startedSandbox.providerSandboxId,
             failureCode: StartSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
@@ -207,7 +266,7 @@ export function createStartSandboxInstanceWorkflow(
       if (!didSandboxConnectToTunnel) {
         try {
           await handleFailedStartup({
-            sandboxInstanceId: persistedSandboxInstance.sandboxInstanceId,
+            sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
             provider: startedSandbox.provider,
             providerSandboxId: startedSandbox.providerSandboxId,
             failureCode: StartSandboxFailureCodes.TUNNEL_CONNECT_ACK_TIMEOUT,
@@ -230,13 +289,13 @@ export function createStartSandboxInstanceWorkflow(
       try {
         await step.run({ name: "mark-sandbox-instance-running" }, async () => {
           await services.sandboxInstances.markSandboxInstanceRunning({
-            sandboxInstanceId: persistedSandboxInstance.sandboxInstanceId,
+            sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
           });
         });
       } catch (error) {
         try {
           await handleFailedStartup({
-            sandboxInstanceId: persistedSandboxInstance.sandboxInstanceId,
+            sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
             provider: startedSandbox.provider,
             providerSandboxId: startedSandbox.providerSandboxId,
             failureCode: StartSandboxFailureCodes.STATUS_TRANSITION_TO_RUNNING_FAILED,
@@ -264,7 +323,7 @@ export function createStartSandboxInstanceWorkflow(
       }
 
       return {
-        sandboxInstanceId: persistedSandboxInstance.sandboxInstanceId,
+        sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
         providerSandboxId: startedSandbox.providerSandboxId,
       };
     },

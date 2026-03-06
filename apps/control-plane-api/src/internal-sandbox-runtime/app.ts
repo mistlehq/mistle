@@ -15,8 +15,10 @@ import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 import { INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH } from "./constants.js";
 import {
   InternalSandboxRuntimeErrorResponseSchema,
+  internalSandboxRuntimeGetSandboxInstanceRoute,
   internalSandboxRuntimeMintConnectionTokenRoute,
   internalSandboxRuntimeStartProfileInstanceRoute,
+  InternalSandboxRuntimeGetSandboxInstanceResponseSchema,
   InternalSandboxRuntimeMintConnectionResponseSchema,
   InternalSandboxRuntimeStartProfileInstanceResponseSchema,
 } from "./contracts.js";
@@ -50,7 +52,6 @@ export function createInternalSandboxRuntimeApp(): AppRoutes<
           profileVersion: body.profileVersion,
           startedBy: body.startedBy,
           source: body.source,
-          issueConnectionToken: false,
           image: {
             imageId: ctx.get("sandboxConfig").defaultBaseImage,
             kind: "base",
@@ -63,11 +64,27 @@ export function createInternalSandboxRuntimeApp(): AppRoutes<
           status: startedSandboxInstance.status,
           workflowRunId: startedSandboxInstance.workflowRunId,
           sandboxInstanceId: startedSandboxInstance.sandboxInstanceId,
-          providerSandboxId: startedSandboxInstance.providerSandboxId,
         };
       return ctx.json(responseBody, 200);
     } catch (error) {
       return handleStartProfileInstanceError(ctx, error);
+    }
+  });
+
+  routes.openapi(internalSandboxRuntimeGetSandboxInstanceRoute, async (ctx) => {
+    const body = ctx.req.valid("json");
+
+    try {
+      const sandboxInstance = await ctx.get("services").sandboxInstances.getInstance({
+        organizationId: body.organizationId,
+        instanceId: body.instanceId,
+      });
+
+      const responseBody: z.infer<typeof InternalSandboxRuntimeGetSandboxInstanceResponseSchema> =
+        sandboxInstance;
+      return ctx.json(responseBody, 200);
+    } catch (error) {
+      return handleSandboxInstanceReadError(ctx, error);
     }
   });
 
@@ -106,6 +123,18 @@ function handleStartProfileInstanceError(ctx: AppContext, error: unknown) {
   }
 
   if (error instanceof SandboxProfilesNotFoundError) {
+    const responseBody: z.infer<typeof InternalSandboxRuntimeErrorResponseSchema> = {
+      code: error.code,
+      message: error.message,
+    };
+    return ctx.json(responseBody, 404);
+  }
+
+  throw error;
+}
+
+function handleSandboxInstanceReadError(ctx: AppContext, error: unknown) {
+  if (error instanceof SandboxInstancesNotFoundError) {
     const responseBody: z.infer<typeof InternalSandboxRuntimeErrorResponseSchema> = {
       code: error.code,
       message: error.message,

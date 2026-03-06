@@ -48,7 +48,12 @@ export type HandleAutomationRunServiceDependencies = {
   }) => Promise<{
     workflowRunId: string;
     sandboxInstanceId: string;
-    providerSandboxId: string;
+  }>;
+  getSandboxInstance: (input: { organizationId: string; instanceId: string }) => Promise<{
+    id: string;
+    status: "starting" | "running" | "stopped" | "failed";
+    failureCode: string | null;
+    failureMessage: string | null;
   }>;
   mintSandboxConnectionToken: (input: { organizationId: string; instanceId: string }) => Promise<{
     instanceId: string;
