@@ -29,10 +29,8 @@ const IntegrationTargetSchema = z
     targetHealth: z
       .object({
         configStatus: z.enum(["valid", "invalid"]),
-        reason: z.enum(["invalid-config", "invalid-projection"]).optional(),
       })
       .strict(),
-    resolvedBindingEditorUi: z.record(z.string().min(1), z.unknown()).optional(),
   })
   .strict();
 

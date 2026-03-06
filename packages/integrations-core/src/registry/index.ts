@@ -3,7 +3,7 @@ import {
   IntegrationDefinitionRegistryError,
 } from "../errors/index.js";
 import type {
-  IntegrationDefinition,
+  AnyIntegrationDefinition,
   IntegrationDefinitionLocator,
   IntegrationDefinitionResolver,
 } from "../types/index.js";
@@ -12,7 +12,7 @@ function createDefinitionKey(input: IntegrationDefinitionLocator): string {
   return `${input.familyId}::${input.variantId}`;
 }
 
-function validateDefinition(input: IntegrationDefinition): void {
+function validateDefinition(input: AnyIntegrationDefinition): void {
   if (input.familyId.trim().length === 0) {
     throw new IntegrationDefinitionRegistryError(
       DefinitionRegistryErrorCodes.INVALID_DEFINITION,
@@ -43,9 +43,9 @@ function validateDefinition(input: IntegrationDefinition): void {
 }
 
 export class IntegrationRegistry implements IntegrationDefinitionResolver {
-  readonly #definitionsByKey = new Map<string, IntegrationDefinition>();
+  readonly #definitionsByKey = new Map<string, AnyIntegrationDefinition>();
 
-  register(input: IntegrationDefinition): void {
+  register(input: AnyIntegrationDefinition): void {
     validateDefinition(input);
 
     const key = createDefinitionKey({
@@ -63,17 +63,17 @@ export class IntegrationRegistry implements IntegrationDefinitionResolver {
     this.#definitionsByKey.set(key, input);
   }
 
-  registerMany(input: ReadonlyArray<IntegrationDefinition>): void {
+  registerMany(input: ReadonlyArray<AnyIntegrationDefinition>): void {
     for (const definition of input) {
       this.register(definition);
     }
   }
 
-  getDefinition(input: IntegrationDefinitionLocator): IntegrationDefinition | undefined {
+  getDefinition(input: IntegrationDefinitionLocator): AnyIntegrationDefinition | undefined {
     return this.#definitionsByKey.get(createDefinitionKey(input));
   }
 
-  getDefinitionOrThrow(input: IntegrationDefinitionLocator): IntegrationDefinition {
+  getDefinitionOrThrow(input: IntegrationDefinitionLocator): AnyIntegrationDefinition {
     const definition = this.getDefinition(input);
 
     if (definition === undefined) {
@@ -86,7 +86,7 @@ export class IntegrationRegistry implements IntegrationDefinitionResolver {
     return definition;
   }
 
-  listDefinitions(): ReadonlyArray<IntegrationDefinition> {
+  listDefinitions(): ReadonlyArray<AnyIntegrationDefinition> {
     return [...this.#definitionsByKey.values()].sort((left, right) => {
       const familyComparison = left.familyId.localeCompare(right.familyId);
       if (familyComparison !== 0) {

@@ -9,11 +9,11 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./ui": {
-      "types": "./src/ui/index.ts",
-      "node": "./dist/ui/index.js",
-      "import": "./src/ui/index.ts",
-      "default": "./src/ui/index.ts"
+    "./forms": {
+      "types": "./src/forms/index.ts",
+      "node": "./dist/forms/index.js",
+      "import": "./src/forms/index.ts",
+      "default": "./src/forms/index.ts"
     },
     "./*.js": {
       "types": "./src/*.ts",

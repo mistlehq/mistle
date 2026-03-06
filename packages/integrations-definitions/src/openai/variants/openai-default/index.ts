@@ -10,6 +10,10 @@ export {
   type OpenAiApiKeyBindingConfig,
 } from "./binding-config-schema.js";
 export {
+  OpenAiConnectionConfigForm,
+  resolveOpenAiBindingConfigForm,
+} from "./binding-config-form.js";
+export {
   createOpenAiRawBindingCapabilities,
   OpenAiCapabilitiesByAuthScheme,
   OpenAiCapabilitiesByAuthSchemeSchema,
@@ -22,17 +26,3 @@ export {
 } from "./model-capabilities.js";
 export { compileOpenAiApiKeyBinding } from "./compile-binding.js";
 export { OpenAiApiKeyCredentialSecretTypes, OpenAiApiKeySupportedAuthSchemes } from "./auth.js";
-export { projectOpenAiTargetUi } from "./project-target-ui.js";
-export {
-  createDefaultOpenAiBindingConfig,
-  parseOpenAiAgentBindingConfig,
-  OpenAiTargetUiProjectionSchema,
-  readOpenAiAuthScheme,
-  resolveOpenAiCapabilitySet,
-  type OpenAiAgentBindingConfig,
-  type OpenAiAuthScheme,
-  type OpenAiCapabilitySet,
-  type OpenAiReasoningEffort,
-  parseOpenAiTargetUiProjection,
-  type OpenAiTargetUiProjection,
-} from "./ui-contract.js";

@@ -4,10 +4,7 @@ const IntegrationRegistry = createIntegrationRegistry();
 
 export type ProjectedTargetHealth = {
   configStatus: "valid" | "invalid";
-  reason?: "invalid-config" | "invalid-projection";
 };
-
-export type ProjectedBindingEditorUi = Record<string, unknown>;
 
 export function projectTargetUi(input: {
   familyId: string;
@@ -15,7 +12,6 @@ export function projectTargetUi(input: {
   config: Record<string, unknown>;
 }): {
   targetHealth: ProjectedTargetHealth;
-  resolvedBindingEditorUi?: ProjectedBindingEditorUi;
 } {
   const definition = IntegrationRegistry.getDefinition({
     familyId: input.familyId,
@@ -29,55 +25,19 @@ export function projectTargetUi(input: {
     };
   }
 
-  let parsedTargetConfig: Record<string, unknown>;
   try {
-    parsedTargetConfig = definition.targetConfigSchema.parse(input.config);
+    definition.targetConfigSchema.parse(input.config);
   } catch {
     return {
       targetHealth: {
         configStatus: "invalid",
-        reason: "invalid-config",
       },
     };
   }
 
-  try {
-    const projectedBindingEditorUi =
-      definition.projectBindingEditorUi === undefined
-        ? undefined
-        : definition.projectBindingEditorUi({
-            familyId: input.familyId,
-            variantId: input.variantId,
-            kind: definition.kind,
-            targetConfig: parsedTargetConfig,
-          });
-    const resolvedBindingEditorUi =
-      projectedBindingEditorUi === undefined
-        ? undefined
-        : definition.bindingEditorUiProjectionSchema === undefined
-          ? projectedBindingEditorUi
-          : definition.bindingEditorUiProjectionSchema.parse(projectedBindingEditorUi);
-
-    if (resolvedBindingEditorUi !== undefined) {
-      return {
-        targetHealth: {
-          configStatus: "valid",
-        },
-        ...(resolvedBindingEditorUi === undefined ? {} : { resolvedBindingEditorUi }),
-      };
-    }
-
-    return {
-      targetHealth: {
-        configStatus: "valid",
-      },
-    };
-  } catch {
-    return {
-      targetHealth: {
-        configStatus: "invalid",
-        reason: "invalid-projection",
-      },
-    };
-  }
+  return {
+    targetHealth: {
+      configStatus: "valid",
+    },
+  };
 }

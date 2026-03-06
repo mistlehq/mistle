@@ -103,11 +103,69 @@ function formatBindingSectionTitle(kind: SandboxIntegrationBindingKind): string 
   return "Connector Bindings";
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function resolvePropertyTitle(input: {
+  schema: Record<string, unknown>;
+  uiSchema: Record<string, unknown>;
+  propertyKey: string;
+}): string {
+  const propertyUiSchema = input.uiSchema[input.propertyKey];
+  if (isRecord(propertyUiSchema)) {
+    const uiTitle = propertyUiSchema["ui:title"];
+    if (typeof uiTitle === "string" && uiTitle.length > 0) {
+      return uiTitle;
+    }
+  }
+
+  const properties = input.schema.properties;
+  if (isRecord(properties)) {
+    const propertySchema = properties[input.propertyKey];
+    if (isRecord(propertySchema)) {
+      const title = propertySchema.title;
+      if (typeof title === "string" && title.length > 0) {
+        return title;
+      }
+    }
+  }
+
+  return input.propertyKey;
+}
+
+function resolveScalarSummaryValue(input: {
+  schema: Record<string, unknown>;
+  propertyKey: string;
+  value: string | number | boolean;
+}): string {
+  const properties = input.schema.properties;
+  if (!isRecord(properties)) {
+    return String(input.value);
+  }
+
+  const propertySchema = properties[input.propertyKey];
+  if (!isRecord(propertySchema) || !Array.isArray(propertySchema.oneOf)) {
+    return String(input.value);
+  }
+
+  for (const option of propertySchema.oneOf) {
+    if (!isRecord(option)) {
+      continue;
+    }
+
+    if (option.const === input.value && typeof option.title === "string") {
+      return option.title;
+    }
+  }
+
+  return String(input.value);
+}
+
 function resolveBindingSummaryItems(input: {
   row: SandboxProfileBindingEditorRow;
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
-  resolveSelectedConnectionDisplayName: (row: SandboxProfileBindingEditorRow) => string | undefined;
 }): Array<{ label: string; value: string }> {
   const items: Array<{ label: string; value: string }> = [];
 
@@ -117,28 +175,41 @@ function resolveBindingSummaryItems(input: {
     targets: input.availableTargets,
   });
 
-  if (configUiModel.mode === "editor") {
-    const keyFields = configUiModel.fields.slice(0, 2);
-    for (const field of keyFields) {
-      if (field.type === "select") {
-        const optionLabel =
-          field.options.find((option) => option.value === field.value)?.label ?? field.value;
+  if (configUiModel.mode === "form") {
+    for (const propertyKey of configUiModel.visiblePropertyKeys.slice(0, 2)) {
+      const value = configUiModel.value[propertyKey];
+      const label = resolvePropertyTitle({
+        schema: configUiModel.schema,
+        uiSchema: configUiModel.uiSchema,
+        propertyKey,
+      });
+
+      if (Array.isArray(value)) {
         items.push({
-          label: field.label,
-          value: optionLabel,
+          label,
+          value:
+            value.length === 0
+              ? "None"
+              : value.filter((entry): entry is string => typeof entry === "string").join(", "),
         });
         continue;
       }
 
-      items.push({
-        label: field.label,
-        value: field.value.length === 0 ? "None" : field.value.join(", "),
-      });
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+        items.push({
+          label,
+          value: resolveScalarSummaryValue({
+            schema: configUiModel.schema,
+            propertyKey,
+            value,
+          }),
+        });
+      }
     }
     return items;
   }
 
-  if (configUiModel.mode === "connector") {
+  if (configUiModel.mode === "no-config") {
     items.push({
       label: "Config",
       value: "No additional config required.",
@@ -433,7 +504,6 @@ export function IntegrationsEditorSection(
               row,
               availableConnections: props.availableConnections,
               availableTargets: props.availableTargets,
-              resolveSelectedConnectionDisplayName: props.resolveSelectedConnectionDisplayName,
             });
 
             return (

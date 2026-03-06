@@ -1,6 +1,5 @@
 import { integrationTargets } from "@mistle/db/control-plane";
 import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
-import { parseIntegrationBindingEditorUiProjection } from "@mistle/integrations-definitions/ui";
 import { describe, expect } from "vitest";
 
 import {
@@ -149,7 +148,6 @@ describe("integration targets discovery integration", () => {
       descriptionOverride: "GitHub Cloud target",
       targetHealth: {
         configStatus: "invalid",
-        reason: "invalid-config",
       },
     });
 
@@ -240,9 +238,7 @@ describe("integration targets discovery integration", () => {
     });
   });
 
-  it("returns OpenAI binding editor projection payload when target config is valid", async ({
-    fixture,
-  }) => {
+  it("returns OpenAI target metadata when target config is valid", async ({ fixture }) => {
     await fixture.db
       .insert(integrationTargets)
       .values({
@@ -284,9 +280,6 @@ describe("integration targets discovery integration", () => {
     expect(openAiTarget).toBeDefined();
     expect(openAiTarget?.targetHealth.configStatus).toBe("valid");
     expect(openAiTarget?.supportedAuthSchemes).toEqual(["api-key", "oauth"]);
-    const bindingEditorProjection = parseIntegrationBindingEditorUiProjection(
-      openAiTarget?.resolvedBindingEditorUi,
-    );
-    expect(bindingEditorProjection?.bindingEditor.config.mode).toBe("connection-config-key");
+    expect("resolvedBindingEditorUi" in (openAiTarget ?? {})).toBe(false);
   }, 60_000);
 });

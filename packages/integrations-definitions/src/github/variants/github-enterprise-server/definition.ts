@@ -1,33 +1,23 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
-import { IntegrationBindingEditorUiProjectionSchema } from "../../../ui/binding-editor-ui-contract.js";
+import { GitHubBindingConfigForm } from "../../shared/binding-config-form.js";
 import { GitHubFamilyId } from "../../shared/constants.js";
 import {
   GitHubAppInstallationCredentialResolver,
   GitHubCredentialResolverKeys,
 } from "../../shared/credential-resolver.js";
 import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
-import { projectGitHubBindingEditorUi } from "../../shared/project-binding-editor-ui.js";
-import {
-  GitHubTargetSecretSchema,
-  type GitHubTargetSecrets,
-} from "../../shared/target-secret-schema.js";
+import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
 import { GitHubEnterpriseServerSupportedAuthSchemes } from "./auth.js";
-import {
-  GitHubEnterpriseServerBindingConfigSchema,
-  type GitHubEnterpriseServerBindingConfig,
-} from "./binding-config-schema.js";
+import { GitHubEnterpriseServerBindingConfigSchema } from "./binding-config-schema.js";
 import { compileGitHubEnterpriseServerBinding } from "./compile-binding.js";
-import {
-  GitHubEnterpriseServerTargetConfigSchema,
-  type GitHubEnterpriseServerTargetConfig,
-} from "./target-config-schema.js";
+import { GitHubEnterpriseServerTargetConfigSchema } from "./target-config-schema.js";
 import { GitHubEnterpriseServerWebhookHandler } from "./webhook.js";
 
 type GitHubEnterpriseServerIntegrationDefinition = IntegrationDefinition<
-  { parse: (input: unknown) => GitHubEnterpriseServerTargetConfig },
-  { parse: (input: unknown) => GitHubTargetSecrets },
-  { parse: (input: unknown) => GitHubEnterpriseServerBindingConfig }
+  typeof GitHubEnterpriseServerTargetConfigSchema,
+  typeof GitHubTargetSecretSchema,
+  typeof GitHubEnterpriseServerBindingConfigSchema
 >;
 
 export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegrationDefinition = {
@@ -40,6 +30,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   targetConfigSchema: GitHubEnterpriseServerTargetConfigSchema,
   targetSecretSchema: GitHubTargetSecretSchema,
   bindingConfigSchema: GitHubEnterpriseServerBindingConfigSchema,
+  bindingConfigForm: GitHubBindingConfigForm,
   supportedAuthSchemes: GitHubEnterpriseServerSupportedAuthSchemes,
   credentialResolvers: {
     custom: {
@@ -51,7 +42,5 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
     oauth: GitHubAppOAuthHandler,
   },
   webhookHandler: GitHubEnterpriseServerWebhookHandler,
-  projectBindingEditorUi: () => projectGitHubBindingEditorUi(),
-  bindingEditorUiProjectionSchema: IntegrationBindingEditorUiProjectionSchema,
   compileBinding: compileGitHubEnterpriseServerBinding,
 };

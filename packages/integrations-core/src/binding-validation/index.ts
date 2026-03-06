@@ -3,6 +3,7 @@ import type {
   BindingWriteValidationIssue,
   BindingWriteValidationResult,
   IntegrationConnection,
+  IntegrationConfigSchema,
   IntegrationDefinition,
   IntegrationTarget,
 } from "../types/index.js";
@@ -27,7 +28,12 @@ function sanitizeSchemaFailureMessage(input: {
 }
 
 export function runDefinitionBindingWriteValidation(input: {
-  definition: IntegrationDefinition;
+  definition: IntegrationDefinition<
+    IntegrationConfigSchema<unknown>,
+    IntegrationConfigSchema<unknown>,
+    IntegrationConfigSchema<unknown>,
+    IntegrationConfigSchema<Record<string, unknown>> | undefined
+  >;
   targetKey: string;
   target: Pick<IntegrationTarget, "familyId" | "variantId" | "config">;
   connection: Pick<IntegrationConnection, "id" | "config">;
