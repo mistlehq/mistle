@@ -1,21 +1,14 @@
 import { applySchemaDefaultsToFormData, resolveIntegrationForm } from "@mistle/integrations-core";
 import { createIntegrationFormRegistry } from "@mistle/integrations-definitions/forms";
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  Button,
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@mistle/ui";
+import { Alert, AlertDescription, AlertTitle, Button } from "@mistle/ui";
 import Form, { type IChangeEvent } from "@rjsf/core";
-import type { RJSFSchema, UiSchema, WidgetProps } from "@rjsf/utils";
+import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 
+import {
+  IntegrationFormTemplates,
+  IntegrationFormWidgets,
+} from "../forms/integration-form-theme.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 
 const IntegrationRegistry = createIntegrationFormRegistry();
@@ -106,6 +99,12 @@ function readUiWidget(
 function resolveSchemaProperties(schema: RJSFSchema): Record<string, unknown> {
   const properties = schema.properties;
   return isRecord(properties) ? properties : {};
+}
+
+function normalizeRjsfSchema(schema: RJSFSchema): RJSFSchema {
+  const schemaRecord = resolveRecord(schema);
+  const { $schema: _ignoredSchema, ...normalizedSchema } = schemaRecord;
+  return normalizedSchema;
 }
 
 function resolveVisiblePropertyKeys(input: {
@@ -262,7 +261,7 @@ function resolveFormModelFromContext(input: {
       },
     });
 
-    const schema: RJSFSchema = resolvedForm.schema ?? {};
+    const schema = normalizeRjsfSchema(resolvedForm.schema ?? {});
     const uiSchema: UiSchema<JsonObject, RJSFSchema> = resolvedForm.uiSchema ?? {};
     const defaultConfig = createDefaultConfigFromSchema(schema);
     const normalizedValue = applySchemaDefaultsToFormData({
@@ -336,84 +335,6 @@ function resolveNextConfigFromChange(input: {
 
   return nextModel.value;
 }
-
-function resolveCommaSeparatedOptions(options: WidgetProps<JsonObject, RJSFSchema>["options"]): {
-  delimiter: string;
-  placeholder: string | undefined;
-} {
-  const delimiter = typeof options.delimiter === "string" ? options.delimiter : ",";
-  const placeholder = typeof options.placeholder === "string" ? options.placeholder : undefined;
-
-  return {
-    delimiter,
-    placeholder,
-  };
-}
-
-function CommaSeparatedStringArrayWidget(
-  props: WidgetProps<JsonObject, RJSFSchema>,
-): React.JSX.Element {
-  const { delimiter, placeholder } = resolveCommaSeparatedOptions(props.options);
-  const value = Array.isArray(props.value)
-    ? props.value.filter((entry): entry is string => typeof entry === "string")
-    : [];
-
-  return (
-    <Input
-      aria-label={props.label}
-      className="w-full max-w-80"
-      id={props.id}
-      onBlur={() => {
-        props.onBlur(props.id, value);
-      }}
-      onChange={(event) => {
-        const nextValue = event.currentTarget.value
-          .split(delimiter)
-          .map((entry) => entry.trim())
-          .filter((entry) => entry.length > 0);
-        props.onChange(nextValue);
-      }}
-      onFocus={() => {
-        props.onFocus(props.id, value);
-      }}
-      placeholder={placeholder}
-      value={value.join(`${delimiter} `)}
-    />
-  );
-}
-
-function SelectWidget(props: WidgetProps<JsonObject, RJSFSchema>): React.JSX.Element {
-  const enumOptions = props.options.enumOptions ?? [];
-  const selectedValue = typeof props.value === "string" ? props.value : undefined;
-
-  return (
-    <Select
-      onValueChange={(nextValue) => {
-        props.onChange(nextValue);
-      }}
-      value={selectedValue}
-    >
-      <SelectTrigger aria-label={props.label} className="w-full max-w-80" id={props.id}>
-        <SelectValue placeholder={props.placeholder ?? `Select ${props.label.toLowerCase()}`} />
-      </SelectTrigger>
-      <SelectContent>
-        {enumOptions.map((option) => {
-          const optionValue = String(option.value);
-          return (
-            <SelectItem key={optionValue} value={optionValue}>
-              {option.label}
-            </SelectItem>
-          );
-        })}
-      </SelectContent>
-    </Select>
-  );
-}
-
-const BindingConfigWidgets = {
-  SelectWidget,
-  "comma-separated-string-array": CommaSeparatedStringArrayWidget,
-};
 
 export function resolveBindingKindFromTarget(
   target: IntegrationTargetSummary | undefined,
@@ -567,7 +488,8 @@ export function SandboxProfileBindingConfigEditor(input: {
       showErrorList={false}
       uiSchema={configUiModel.uiSchema}
       validator={validator}
-      widgets={BindingConfigWidgets}
+      templates={IntegrationFormTemplates}
+      widgets={IntegrationFormWidgets}
     />
   );
 }
