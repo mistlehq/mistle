@@ -109,5 +109,9 @@ describe("IntegrationConnectionDialog", () => {
 
     expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Continue with OAuth" })).toBeNull();
+    expect(screen.getByText("Save to update this connection name.")).toBeTruthy();
+    expect(
+      screen.queryByText("Continue to generate an OAuth authorization URL and redirect."),
+    ).toBeNull();
   });
 });

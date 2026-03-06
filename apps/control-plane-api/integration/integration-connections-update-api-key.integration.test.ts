@@ -13,6 +13,7 @@ import {
   IntegrationConnectionsBadRequestResponseSchema,
   IntegrationConnectionsNotFoundResponseSchema,
   UpdateIntegrationConnectionBodySchema,
+  ValidationErrorResponseSchema,
 } from "../src/integration-connections/contracts.js";
 import {
   decryptCredentialUtf8,
@@ -336,6 +337,95 @@ describe("integration connections update api key integration", () => {
     expect(updateResponse.status).toBe(200);
     const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
     expect(updatedConnection.displayName).toBe("OpenAI renamed");
+
+    const updatedLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.connectionId, createdConnection.id), eq(table.purpose, "api_key")),
+    });
+    expect(updatedLink).toBeDefined();
+
+    if (updatedLink === undefined) {
+      throw new Error("Expected API-key credential link to remain.");
+    }
+
+    expect(updatedLink.credentialId).toBe(previousLink.credentialId);
+  });
+
+  it("returns 400 when apiKey is provided as only whitespace", async ({ fixture }) => {
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "openai-default",
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.openai.com",
+        },
+      })
+      .onConflictDoUpdate({
+        target: integrationTargets.targetKey,
+        set: {
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com",
+          },
+        },
+      });
+
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-connections-update-whitespace-api-key@example.com",
+    });
+
+    const createResponse = await fixture.request(
+      "/v1/integration/connections/openai-default/api-key",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "OpenAI primary",
+          apiKey: "sk-test-original-api-key",
+        }),
+      },
+    );
+
+    expect(createResponse.status).toBe(201);
+    const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
+
+    const previousLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
+      where: (table, { and, eq }) =>
+        and(eq(table.connectionId, createdConnection.id), eq(table.purpose, "api_key")),
+    });
+    expect(previousLink).toBeDefined();
+
+    if (previousLink === undefined) {
+      throw new Error("Expected existing API-key credential link.");
+    }
+
+    const updateResponse = await fixture.request(
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}`,
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          displayName: "OpenAI renamed",
+          apiKey: "   ",
+        }),
+      },
+    );
+
+    expect(updateResponse.status).toBe(400);
+    const responseBody = ValidationErrorResponseSchema.parse(await updateResponse.json());
+    expect(responseBody.success).toBe(false);
+    expect(responseBody.error.message).toContain("apiKey");
 
     const updatedLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
       where: (table, { and, eq }) =>

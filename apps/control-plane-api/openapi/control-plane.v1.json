@@ -11,7 +11,9 @@
   "paths": {
     "/v1/integration/connections": {
       "get": {
-        "tags": ["Integrations"],
+        "tags": [
+          "Integrations"
+        ],
         "parameters": [
           {
             "schema": {
@@ -74,7 +76,11 @@
                           },
                           "status": {
                             "type": "string",
-                            "enum": ["active", "error", "revoked"]
+                            "enum": [
+                              "active",
+                              "error",
+                              "revoked"
+                            ]
                           },
                           "externalSubjectId": {
                             "type": "string",
@@ -109,7 +115,10 @@
                       }
                     },
                     "nextPage": {
-                      "type": ["object", "null"],
+                      "type": [
+                        "object",
+                        "null"
+                      ],
                       "properties": {
                         "after": {
                           "type": "string",
@@ -121,11 +130,17 @@
                           "maximum": 100
                         }
                       },
-                      "required": ["after", "limit"],
+                      "required": [
+                        "after",
+                        "limit"
+                      ],
                       "additionalProperties": false
                     },
                     "previousPage": {
-                      "type": ["object", "null"],
+                      "type": [
+                        "object",
+                        "null"
+                      ],
                       "properties": {
                         "before": {
                           "type": "string",
@@ -137,11 +152,19 @@
                           "maximum": 100
                         }
                       },
-                      "required": ["before", "limit"],
+                      "required": [
+                        "before",
+                        "limit"
+                      ],
                       "additionalProperties": false
                     }
                   },
-                  "required": ["totalResults", "items", "nextPage", "previousPage"],
+                  "required": [
+                    "totalResults",
+                    "items",
+                    "nextPage",
+                    "previousPage"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -179,7 +202,10 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"],
+                      "required": [
+                        "code",
+                        "message"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -187,7 +213,9 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -201,11 +229,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -222,14 +256,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -244,14 +283,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -273,7 +317,9 @@
     },
     "/v1/integration/connections/:targetKey/api-key": {
       "post": {
-        "tags": ["Integrations"],
+        "tags": [
+          "Integrations"
+        ],
         "parameters": [
           {
             "schema": {
@@ -301,7 +347,10 @@
                     "minLength": 1
                   }
                 },
-                "required": ["displayName", "apiKey"],
+                "required": [
+                  "displayName",
+                  "apiKey"
+                ],
                 "additionalProperties": false
               }
             }
@@ -329,7 +378,11 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["active", "error", "revoked"]
+                      "enum": [
+                        "active",
+                        "error",
+                        "revoked"
+                      ]
                     },
                     "externalSubjectId": {
                       "type": "string",
@@ -397,7 +450,10 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"],
+                      "required": [
+                        "code",
+                        "message"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -405,7 +461,9 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -419,11 +477,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -440,14 +504,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -462,14 +531,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -484,14 +558,20 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": [
+                        "TARGET_NOT_FOUND",
+                        "CONNECTION_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -513,7 +593,9 @@
     },
     "/v1/integration/connections/:connectionId": {
       "put": {
-        "tags": ["Integrations"],
+        "tags": [
+          "Integrations"
+        ],
         "parameters": [
           {
             "schema": {
@@ -538,10 +620,13 @@
                   },
                   "apiKey": {
                     "type": "string",
-                    "minLength": 1
+                    "minLength": 1,
+                    "pattern": "\\S"
                   }
                 },
-                "required": ["displayName"],
+                "required": [
+                  "displayName"
+                ],
                 "additionalProperties": false
               }
             }
@@ -569,7 +654,11 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["active", "error", "revoked"]
+                      "enum": [
+                        "active",
+                        "error",
+                        "revoked"
+                      ]
                     },
                     "externalSubjectId": {
                       "type": "string",
@@ -637,7 +726,10 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"],
+                      "required": [
+                        "code",
+                        "message"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -645,7 +737,9 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -659,11 +753,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -680,14 +780,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -702,14 +807,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -724,14 +834,20 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": [
+                        "TARGET_NOT_FOUND",
+                        "CONNECTION_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -753,7 +869,9 @@
     },
     "/v1/integration/connections/:targetKey/oauth/start": {
       "post": {
-        "tags": ["Integrations"],
+        "tags": [
+          "Integrations"
+        ],
         "parameters": [
           {
             "schema": {
@@ -795,7 +913,9 @@
                       "format": "uri"
                     }
                   },
-                  "required": ["authorizationUrl"],
+                  "required": [
+                    "authorizationUrl"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -833,7 +953,10 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"],
+                      "required": [
+                        "code",
+                        "message"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -841,7 +964,9 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -855,11 +980,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -876,14 +1007,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -898,14 +1034,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -920,14 +1061,20 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": [
+                        "TARGET_NOT_FOUND",
+                        "CONNECTION_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -949,7 +1096,9 @@
     },
     "/v1/integration/connections/:targetKey/oauth/complete": {
       "post": {
-        "tags": ["Integrations"],
+        "tags": [
+          "Integrations"
+        ],
         "parameters": [
           {
             "schema": {
@@ -975,7 +1124,9 @@
                     }
                   }
                 },
-                "required": ["query"],
+                "required": [
+                  "query"
+                ],
                 "additionalProperties": false
               }
             }
@@ -1003,7 +1154,11 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["active", "error", "revoked"]
+                      "enum": [
+                        "active",
+                        "error",
+                        "revoked"
+                      ]
                     },
                     "externalSubjectId": {
                       "type": "string",
@@ -1071,7 +1226,10 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"],
+                      "required": [
+                        "code",
+                        "message"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -1079,7 +1237,9 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -1093,11 +1253,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -1114,14 +1280,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1136,14 +1307,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1158,14 +1334,20 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": [
+                        "TARGET_NOT_FOUND",
+                        "CONNECTION_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1187,7 +1369,9 @@
     },
     "/v1/integration/targets": {
       "get": {
-        "tags": ["Integrations"],
+        "tags": [
+          "Integrations"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1271,7 +1455,10 @@
                             "type": "array",
                             "items": {
                               "type": "string",
-                              "enum": ["oauth", "api-key"]
+                              "enum": [
+                                "oauth",
+                                "api-key"
+                              ]
                             },
                             "minItems": 1
                           },
@@ -1288,11 +1475,27 @@
                             "properties": {
                               "configStatus": {
                                 "type": "string",
-                                "enum": ["valid", "invalid"]
+                                "enum": [
+                                  "valid",
+                                  "invalid"
+                                ]
+                              },
+                              "reason": {
+                                "type": "string",
+                                "enum": [
+                                  "invalid-config",
+                                  "invalid-projection"
+                                ]
                               }
                             },
-                            "required": ["configStatus"],
+                            "required": [
+                              "configStatus"
+                            ],
                             "additionalProperties": false
+                          },
+                          "resolvedBindingEditorUi": {
+                            "type": "object",
+                            "additionalProperties": {}
                           }
                         },
                         "required": [
@@ -1309,7 +1512,10 @@
                       }
                     },
                     "nextPage": {
-                      "type": ["object", "null"],
+                      "type": [
+                        "object",
+                        "null"
+                      ],
                       "properties": {
                         "after": {
                           "type": "string",
@@ -1321,11 +1527,17 @@
                           "maximum": 100
                         }
                       },
-                      "required": ["after", "limit"],
+                      "required": [
+                        "after",
+                        "limit"
+                      ],
                       "additionalProperties": false
                     },
                     "previousPage": {
-                      "type": ["object", "null"],
+                      "type": [
+                        "object",
+                        "null"
+                      ],
                       "properties": {
                         "before": {
                           "type": "string",
@@ -1337,11 +1549,19 @@
                           "maximum": 100
                         }
                       },
-                      "required": ["before", "limit"],
+                      "required": [
+                        "before",
+                        "limit"
+                      ],
                       "additionalProperties": false
                     }
                   },
-                  "required": ["totalResults", "items", "nextPage", "previousPage"],
+                  "required": [
+                    "totalResults",
+                    "items",
+                    "nextPage",
+                    "previousPage"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1358,14 +1578,20 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["INVALID_LIST_TARGETS_INPUT", "INVALID_PAGINATION_CURSOR"]
+                          "enum": [
+                            "INVALID_LIST_TARGETS_INPUT",
+                            "INVALID_PAGINATION_CURSOR"
+                          ]
                         },
                         "message": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"],
+                      "required": [
+                        "code",
+                        "message"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -1373,7 +1599,9 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -1387,11 +1615,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -1408,14 +1642,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1430,14 +1669,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1459,7 +1703,9 @@
     },
     "/v1/integration/webhooks/:targetKey": {
       "post": {
-        "tags": ["Integrations"],
+        "tags": [
+          "Integrations"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1481,10 +1727,15 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": ["received", "duplicate"]
+                      "enum": [
+                        "received",
+                        "duplicate"
+                      ]
                     }
                   },
-                  "required": ["status"],
+                  "required": [
+                    "status"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1499,14 +1750,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["INVALID_WEBHOOK_REQUEST"]
+                      "enum": [
+                        "INVALID_WEBHOOK_REQUEST"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1521,14 +1777,20 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": [
+                        "TARGET_NOT_FOUND",
+                        "CONNECTION_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1550,7 +1812,9 @@
     },
     "/v1/organizations/{organizationId}/membership-capabilities": {
       "get": {
-        "tags": ["Organizations"],
+        "tags": [
+          "Organizations"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1572,7 +1836,9 @@
                   "properties": {
                     "ok": {
                       "type": "boolean",
-                      "enum": [true]
+                      "enum": [
+                        true
+                      ]
                     },
                     "data": {
                       "type": "object",
@@ -1583,7 +1849,11 @@
                         },
                         "actorRole": {
                           "type": "string",
-                          "enum": ["owner", "admin", "member"]
+                          "enum": [
+                            "owner",
+                            "admin",
+                            "member"
+                          ]
                         },
                         "invite": {
                           "type": "object",
@@ -1595,11 +1865,18 @@
                               "type": "array",
                               "items": {
                                 "type": "string",
-                                "enum": ["owner", "admin", "member"]
+                                "enum": [
+                                  "owner",
+                                  "admin",
+                                  "member"
+                                ]
                               }
                             }
                           },
-                          "required": ["canExecute", "assignableRoles"],
+                          "required": [
+                            "canExecute",
+                            "assignableRoles"
+                          ],
                           "additionalProperties": false
                         },
                         "memberRoleUpdate": {
@@ -1615,38 +1892,62 @@
                                   "type": "array",
                                   "items": {
                                     "type": "string",
-                                    "enum": ["owner", "admin", "member"]
+                                    "enum": [
+                                      "owner",
+                                      "admin",
+                                      "member"
+                                    ]
                                   }
                                 },
                                 "admin": {
                                   "type": "array",
                                   "items": {
                                     "type": "string",
-                                    "enum": ["owner", "admin", "member"]
+                                    "enum": [
+                                      "owner",
+                                      "admin",
+                                      "member"
+                                    ]
                                   }
                                 },
                                 "member": {
                                   "type": "array",
                                   "items": {
                                     "type": "string",
-                                    "enum": ["owner", "admin", "member"]
+                                    "enum": [
+                                      "owner",
+                                      "admin",
+                                      "member"
+                                    ]
                                   }
                                 }
                               }
                             }
                           },
-                          "required": ["canExecute", "roleTransitionMatrix"],
+                          "required": [
+                            "canExecute",
+                            "roleTransitionMatrix"
+                          ],
                           "additionalProperties": false
                         }
                       },
-                      "required": ["organizationId", "actorRole", "invite", "memberRoleUpdate"],
+                      "required": [
+                        "organizationId",
+                        "actorRole",
+                        "invite",
+                        "memberRoleUpdate"
+                      ],
                       "additionalProperties": false
                     },
                     "error": {
                       "type": "null"
                     }
                   },
-                  "required": ["ok", "data", "error"],
+                  "required": [
+                    "ok",
+                    "data",
+                    "error"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1661,14 +1962,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1685,14 +1991,19 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                          "enum": [
+                            "ACTIVE_ORGANIZATION_REQUIRED"
+                          ]
                         },
                         "message": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"],
+                      "required": [
+                        "code",
+                        "message"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -1700,7 +2011,9 @@
                       "properties": {
                         "ok": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "data": {
                           "type": "null"
@@ -1710,7 +2023,10 @@
                           "properties": {
                             "code": {
                               "type": "string",
-                              "enum": ["FORBIDDEN", "NOT_FOUND"]
+                              "enum": [
+                                "FORBIDDEN",
+                                "NOT_FOUND"
+                              ]
                             },
                             "message": {
                               "type": "string",
@@ -1720,11 +2036,19 @@
                               "type": "boolean"
                             }
                           },
-                          "required": ["code", "message", "retryable"],
+                          "required": [
+                            "code",
+                            "message",
+                            "retryable"
+                          ],
                           "additionalProperties": false
                         }
                       },
-                      "required": ["ok", "data", "error"],
+                      "required": [
+                        "ok",
+                        "data",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -1741,7 +2065,9 @@
                   "properties": {
                     "ok": {
                       "type": "boolean",
-                      "enum": [false]
+                      "enum": [
+                        false
+                      ]
                     },
                     "data": {
                       "type": "null"
@@ -1751,7 +2077,10 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["FORBIDDEN", "NOT_FOUND"]
+                          "enum": [
+                            "FORBIDDEN",
+                            "NOT_FOUND"
+                          ]
                         },
                         "message": {
                           "type": "string",
@@ -1761,11 +2090,19 @@
                           "type": "boolean"
                         }
                       },
-                      "required": ["code", "message", "retryable"],
+                      "required": [
+                        "code",
+                        "message",
+                        "retryable"
+                      ],
                       "additionalProperties": false
                     }
                   },
-                  "required": ["ok", "data", "error"],
+                  "required": [
+                    "ok",
+                    "data",
+                    "error"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1787,7 +2124,9 @@
     },
     "/v1/sandbox/instances/{instanceId}/connection-tokens": {
       "post": {
-        "tags": ["Sandbox Instances"],
+        "tags": [
+          "Sandbox Instances"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1837,7 +2176,12 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["instanceId", "url", "token", "expiresAt"],
+                  "required": [
+                    "instanceId",
+                    "url",
+                    "token",
+                    "expiresAt"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1854,14 +2198,19 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["INVALID_INSTANCE_ID"]
+                          "enum": [
+                            "INVALID_INSTANCE_ID"
+                          ]
                         },
                         "message": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"],
+                      "required": [
+                        "code",
+                        "message"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -1869,7 +2218,9 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -1883,11 +2234,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -1904,14 +2261,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1926,14 +2288,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1948,14 +2315,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["INSTANCE_NOT_FOUND"]
+                      "enum": [
+                        "INSTANCE_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1970,14 +2342,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["INSTANCE_NOT_RUNNING"]
+                      "enum": [
+                        "INSTANCE_NOT_RUNNING"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -1999,7 +2376,9 @@
     },
     "/v1/sandbox/profiles": {
       "get": {
-        "tags": ["Sandbox Profiles"],
+        "tags": [
+          "Sandbox Profiles"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2059,7 +2438,10 @@
                           },
                           "status": {
                             "type": "string",
-                            "enum": ["active", "inactive"]
+                            "enum": [
+                              "active",
+                              "inactive"
+                            ]
                           },
                           "createdAt": {
                             "type": "string",
@@ -2082,7 +2464,10 @@
                       }
                     },
                     "nextPage": {
-                      "type": ["object", "null"],
+                      "type": [
+                        "object",
+                        "null"
+                      ],
                       "properties": {
                         "after": {
                           "type": "string",
@@ -2094,11 +2479,17 @@
                           "maximum": 100
                         }
                       },
-                      "required": ["after", "limit"],
+                      "required": [
+                        "after",
+                        "limit"
+                      ],
                       "additionalProperties": false
                     },
                     "previousPage": {
-                      "type": ["object", "null"],
+                      "type": [
+                        "object",
+                        "null"
+                      ],
                       "properties": {
                         "before": {
                           "type": "string",
@@ -2110,11 +2501,19 @@
                           "maximum": 100
                         }
                       },
-                      "required": ["before", "limit"],
+                      "required": [
+                        "before",
+                        "limit"
+                      ],
                       "additionalProperties": false
                     }
                   },
-                  "required": ["totalResults", "items", "nextPage", "previousPage"],
+                  "required": [
+                    "totalResults",
+                    "items",
+                    "nextPage",
+                    "previousPage"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2131,14 +2530,20 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["INVALID_LIST_PROFILES_INPUT", "INVALID_PAGINATION_CURSOR"]
+                          "enum": [
+                            "INVALID_LIST_PROFILES_INPUT",
+                            "INVALID_PAGINATION_CURSOR"
+                          ]
                         },
                         "message": {
                           "type": "string",
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"],
+                      "required": [
+                        "code",
+                        "message"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -2146,7 +2551,9 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -2160,11 +2567,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -2181,14 +2594,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2203,14 +2621,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2230,7 +2653,9 @@
         }
       },
       "post": {
-        "tags": ["Sandbox Profiles"],
+        "tags": [
+          "Sandbox Profiles"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2243,7 +2668,9 @@
                     "minLength": 1
                   }
                 },
-                "required": ["displayName"],
+                "required": [
+                  "displayName"
+                ],
                 "additionalProperties": false
               }
             }
@@ -2268,7 +2695,10 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["active", "inactive"]
+                      "enum": [
+                        "active",
+                        "inactive"
+                      ]
                     },
                     "createdAt": {
                       "type": "string",
@@ -2301,7 +2731,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [false]
+                      "enum": [
+                        false
+                      ]
                     },
                     "error": {
                       "type": "object",
@@ -2315,11 +2747,17 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["name", "message"],
+                      "required": [
+                        "name",
+                        "message"
+                      ],
                       "additionalProperties": {}
                     }
                   },
-                  "required": ["success", "error"],
+                  "required": [
+                    "success",
+                    "error"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2334,14 +2772,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2356,14 +2799,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2385,7 +2833,9 @@
     },
     "/v1/sandbox/profiles/{profileId}": {
       "get": {
-        "tags": ["Sandbox Profiles"],
+        "tags": [
+          "Sandbox Profiles"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2417,7 +2867,10 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["active", "inactive"]
+                      "enum": [
+                        "active",
+                        "inactive"
+                      ]
                     },
                     "createdAt": {
                       "type": "string",
@@ -2450,7 +2903,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [false]
+                      "enum": [
+                        false
+                      ]
                     },
                     "error": {
                       "type": "object",
@@ -2464,11 +2919,17 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["name", "message"],
+                      "required": [
+                        "name",
+                        "message"
+                      ],
                       "additionalProperties": {}
                     }
                   },
-                  "required": ["success", "error"],
+                  "required": [
+                    "success",
+                    "error"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2483,14 +2944,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2505,14 +2971,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2527,14 +2998,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["PROFILE_NOT_FOUND"]
+                      "enum": [
+                        "PROFILE_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2554,7 +3030,9 @@
         }
       },
       "patch": {
-        "tags": ["Sandbox Profiles"],
+        "tags": [
+          "Sandbox Profiles"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2603,7 +3081,10 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["active", "inactive"]
+                      "enum": [
+                        "active",
+                        "inactive"
+                      ]
                     },
                     "createdAt": {
                       "type": "string",
@@ -2636,7 +3117,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [false]
+                      "enum": [
+                        false
+                      ]
                     },
                     "error": {
                       "type": "object",
@@ -2650,11 +3133,17 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["name", "message"],
+                      "required": [
+                        "name",
+                        "message"
+                      ],
                       "additionalProperties": {}
                     }
                   },
-                  "required": ["success", "error"],
+                  "required": [
+                    "success",
+                    "error"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2669,14 +3158,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2691,14 +3185,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2713,14 +3212,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["PROFILE_NOT_FOUND"]
+                      "enum": [
+                        "PROFILE_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2740,7 +3244,9 @@
         }
       },
       "delete": {
-        "tags": ["Sandbox Profiles"],
+        "tags": [
+          "Sandbox Profiles"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2763,14 +3269,19 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": ["accepted"]
+                      "enum": [
+                        "accepted"
+                      ]
                     },
                     "profileId": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["status", "profileId"],
+                  "required": [
+                    "status",
+                    "profileId"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2785,7 +3296,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [false]
+                      "enum": [
+                        false
+                      ]
                     },
                     "error": {
                       "type": "object",
@@ -2799,11 +3312,17 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["name", "message"],
+                      "required": [
+                        "name",
+                        "message"
+                      ],
                       "additionalProperties": {}
                     }
                   },
-                  "required": ["success", "error"],
+                  "required": [
+                    "success",
+                    "error"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2818,14 +3337,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2840,14 +3364,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2862,14 +3391,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["PROFILE_NOT_FOUND"]
+                      "enum": [
+                        "PROFILE_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2891,7 +3425,9 @@
     },
     "/v1/sandbox/profiles/{profileId}/versions": {
       "get": {
-        "tags": ["Sandbox Profiles"],
+        "tags": [
+          "Sandbox Profiles"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2925,12 +3461,17 @@
                             "minimum": 1
                           }
                         },
-                        "required": ["sandboxProfileId", "version"],
+                        "required": [
+                          "sandboxProfileId",
+                          "version"
+                        ],
                         "additionalProperties": false
                       }
                     }
                   },
-                  "required": ["versions"],
+                  "required": [
+                    "versions"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2945,7 +3486,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [false]
+                      "enum": [
+                        false
+                      ]
                     },
                     "error": {
                       "type": "object",
@@ -2959,11 +3502,17 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["name", "message"],
+                      "required": [
+                        "name",
+                        "message"
+                      ],
                       "additionalProperties": {}
                     }
                   },
-                  "required": ["success", "error"],
+                  "required": [
+                    "success",
+                    "error"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -2978,14 +3527,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3000,14 +3554,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3022,14 +3581,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["PROFILE_NOT_FOUND"]
+                      "enum": [
+                        "PROFILE_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3051,7 +3615,9 @@
     },
     "/v1/sandbox/profiles/{profileId}/versions/{version}/integration-bindings": {
       "get": {
-        "tags": ["Sandbox Profiles"],
+        "tags": [
+          "Sandbox Profiles"
+        ],
         "parameters": [
           {
             "schema": {
@@ -3102,7 +3668,11 @@
                           },
                           "kind": {
                             "type": "string",
-                            "enum": ["agent", "git", "connector"]
+                            "enum": [
+                              "agent",
+                              "git",
+                              "connector"
+                            ]
                           },
                           "config": {
                             "type": "object",
@@ -3131,7 +3701,9 @@
                       }
                     }
                   },
-                  "required": ["bindings"],
+                  "required": [
+                    "bindings"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3146,7 +3718,9 @@
                   "properties": {
                     "success": {
                       "type": "boolean",
-                      "enum": [false]
+                      "enum": [
+                        false
+                      ]
                     },
                     "error": {
                       "type": "object",
@@ -3160,11 +3734,17 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["name", "message"],
+                      "required": [
+                        "name",
+                        "message"
+                      ],
                       "additionalProperties": {}
                     }
                   },
-                  "required": ["success", "error"],
+                  "required": [
+                    "success",
+                    "error"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3179,14 +3759,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3201,14 +3786,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3223,14 +3813,20 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                      "enum": [
+                        "PROFILE_NOT_FOUND",
+                        "PROFILE_VERSION_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3250,7 +3846,9 @@
         }
       },
       "put": {
-        "tags": ["Sandbox Profiles"],
+        "tags": [
+          "Sandbox Profiles"
+        ],
         "parameters": [
           {
             "schema": {
@@ -3298,19 +3896,29 @@
                         },
                         "kind": {
                           "type": "string",
-                          "enum": ["agent", "git", "connector"]
+                          "enum": [
+                            "agent",
+                            "git",
+                            "connector"
+                          ]
                         },
                         "config": {
                           "type": "object",
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["connectionId", "kind", "config"],
+                      "required": [
+                        "connectionId",
+                        "kind",
+                        "config"
+                      ],
                       "additionalProperties": false
                     }
                   }
                 },
-                "required": ["bindings"],
+                "required": [
+                  "bindings"
+                ],
                 "additionalProperties": false
               }
             }
@@ -3345,7 +3953,11 @@
                           },
                           "kind": {
                             "type": "string",
-                            "enum": ["agent", "git", "connector"]
+                            "enum": [
+                              "agent",
+                              "git",
+                              "connector"
+                            ]
                           },
                           "config": {
                             "type": "object",
@@ -3374,7 +3986,9 @@
                       }
                     }
                   },
-                  "required": ["bindings"],
+                  "required": [
+                    "bindings"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3393,11 +4007,15 @@
                           "anyOf": [
                             {
                               "type": "string",
-                              "enum": ["INVALID_BINDING_REFERENCE"]
+                              "enum": [
+                                "INVALID_BINDING_REFERENCE"
+                              ]
                             },
                             {
                               "type": "string",
-                              "enum": ["INVALID_BINDING_CONNECTION_REFERENCE"]
+                              "enum": [
+                                "INVALID_BINDING_CONNECTION_REFERENCE"
+                              ]
                             }
                           ]
                         },
@@ -3406,7 +4024,10 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"],
+                      "required": [
+                        "code",
+                        "message"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -3414,7 +4035,9 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["INVALID_BINDING_CONFIG_REFERENCE"]
+                          "enum": [
+                            "INVALID_BINDING_CONFIG_REFERENCE"
+                          ]
                         },
                         "message": {
                           "type": "string",
@@ -3460,11 +4083,17 @@
                               "minItems": 1
                             }
                           },
-                          "required": ["issues"],
+                          "required": [
+                            "issues"
+                          ],
                           "additionalProperties": false
                         }
                       },
-                      "required": ["code", "message", "details"],
+                      "required": [
+                        "code",
+                        "message",
+                        "details"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -3472,7 +4101,9 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -3486,11 +4117,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -3507,14 +4144,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3529,14 +4171,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3551,14 +4198,20 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                      "enum": [
+                        "PROFILE_NOT_FOUND",
+                        "PROFILE_VERSION_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3580,7 +4233,9 @@
     },
     "/v1/sandbox/profiles/{profileId}/versions/{version}/instances": {
       "post": {
-        "tags": ["Sandbox Profiles"],
+        "tags": [
+          "Sandbox Profiles"
+        ],
         "parameters": [
           {
             "schema": {
@@ -3628,7 +4283,9 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": ["completed"]
+                      "enum": [
+                        "completed"
+                      ]
                     },
                     "workflowRunId": {
                       "type": "string",
@@ -3658,11 +4315,20 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["url", "token", "expiresAt"],
+                      "required": [
+                        "url",
+                        "token",
+                        "expiresAt"
+                      ],
                       "additionalProperties": false
                     }
                   },
-                  "required": ["status", "workflowRunId", "sandboxInstanceId", "providerSandboxId"],
+                  "required": [
+                    "status",
+                    "workflowRunId",
+                    "sandboxInstanceId",
+                    "providerSandboxId"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3700,7 +4366,10 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"],
+                      "required": [
+                        "code",
+                        "message"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -3708,7 +4377,9 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -3722,11 +4393,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -3743,14 +4420,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3765,14 +4447,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": [
+                        "ACTIVE_ORGANIZATION_REQUIRED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -3787,14 +4474,20 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                      "enum": [
+                        "PROFILE_NOT_FOUND",
+                        "PROFILE_VERSION_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }

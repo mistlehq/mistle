@@ -156,7 +156,9 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
             </div>
           ) : (
             <p className="text-muted-foreground text-sm">
-              Continue to generate an OAuth authorization URL and redirect.
+              {isUpdateMode
+                ? "Save to update this connection name."
+                : "Continue to generate an OAuth authorization URL and redirect."}
             </p>
           )}
 

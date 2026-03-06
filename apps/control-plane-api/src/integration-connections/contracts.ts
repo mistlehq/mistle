@@ -140,7 +140,11 @@ export const UpdateApiKeyConnectionParamsSchema = z
 export const UpdateIntegrationConnectionBodySchema = z
   .object({
     displayName: z.string().min(1),
-    apiKey: z.string().min(1).optional(),
+    apiKey: z
+      .string()
+      .min(1)
+      .regex(/\S/, "`apiKey` must contain at least one non-whitespace character when provided.")
+      .optional(),
   })
   .strict();
 

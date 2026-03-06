@@ -80,8 +80,16 @@ export async function updateIntegrationConnection(
   }
 
   const existingAuthScheme = resolveConnectionAuthScheme(existingConnection.config);
-  const normalizedApiKey = input.apiKey?.trim();
-  const shouldRotateApiKey = normalizedApiKey !== undefined && normalizedApiKey.length > 0;
+  const normalizedApiKey = input.apiKey?.trim() ?? "";
+  const isApiKeyProvided = input.apiKey !== undefined;
+  const shouldRotateApiKey = isApiKeyProvided && normalizedApiKey.length > 0;
+
+  if (isApiKeyProvided && normalizedApiKey.length === 0) {
+    throw new IntegrationConnectionsBadRequestError(
+      IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
+      "`apiKey` must contain at least one non-whitespace character when provided.",
+    );
+  }
 
   if (!shouldRotateApiKey) {
     const [updatedConnection] = await db
