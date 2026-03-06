@@ -10,16 +10,22 @@ export {
   SendVerificationOTPWorkflowSpec,
 } from "./workflows/index.js";
 export {
-  type AcquiredAutomationConnection,
-  type AcquireAutomationConnectionInput,
+  type BoundAutomationConversation,
+  type ClaimAutomationConversationInput,
+  type ClaimedAutomationConversation,
   createHandleAutomationRunWorkflow,
   type CreateHandleAutomationRunWorkflowInput,
-  type DeliverAutomationPayloadInput,
-  type EnsuredAutomationSandbox,
-  type EnsureAutomationSandboxInput,
+  type EnsureAutomationConversationBindingInput,
+  type EnsureAutomationConversationRouteInput,
+  type EnsuredAutomationConversationSandbox,
+  type EnsureAutomationConversationSandboxInput,
+  type ExecuteAutomationConversationInput,
+  type ExecutedAutomationConversation,
   type HandleAutomationRunWorkflowInput,
   type HandleAutomationRunWorkflowOutput,
+  type PersistAutomationConversationExecutionInput,
   type PreparedAutomationRun,
+  type RoutedAutomationConversation,
 } from "./workflows/handle-automation-run/index.js";
 export {
   createHandleIntegrationWebhookEventWorkflow,

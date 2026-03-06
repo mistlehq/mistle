@@ -21,9 +21,12 @@ Reference catalog of control-plane workflows in `@mistle/workflows`.
 - `services.automationRuns`:
   - `transitionAutomationRunToRunning`
   - `prepareAutomationRun`
-  - `ensureAutomationSandbox`
-  - `acquireAutomationConnection`
-  - `deliverAutomationPayload`
+  - `claimAutomationConversation`
+  - `ensureAutomationConversationSandbox`
+  - `ensureAutomationConversationRoute`
+  - `ensureAutomationConversationBinding`
+  - `executeAutomationConversation`
+  - `persistAutomationConversationExecution`
   - `markAutomationRunCompleted`
   - `markAutomationRunFailed`
   - `resolveAutomationRunFailure`

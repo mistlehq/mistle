@@ -8,8 +8,11 @@ import {
   integrationTargets,
   integrationWebhookEvents,
   IntegrationWebhookEventStatuses,
+  IntegrationBindingKinds,
   organizations,
   sandboxProfiles,
+  sandboxProfileVersionIntegrationBindings,
+  sandboxProfileVersions,
   CONTROL_PLANE_SCHEMA_NAME,
   webhookAutomations,
 } from "@mistle/db/control-plane";
@@ -132,6 +135,39 @@ describe("handleIntegrationWebhookEvent integration", () => {
           organizationId,
           displayName: "Worker Queue Profile",
           status: "active",
+        });
+        await database.db.insert(sandboxProfileVersions).values({
+          sandboxProfileId,
+          version: 2,
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey: "openai-default-worker-webhook-queue",
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.openai.com",
+            web_base_url: "https://platform.openai.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: "icn_worker_webhook_queue_agent",
+          organizationId,
+          targetKey: "openai-default-worker-webhook-queue",
+          displayName: "Worker queue agent connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "999001",
+          config: {},
+        });
+        await database.db.insert(sandboxProfileVersionIntegrationBindings).values({
+          id: "ibd_worker_webhook_queue_agent",
+          sandboxProfileId,
+          sandboxProfileVersion: 2,
+          connectionId: "icn_worker_webhook_queue_agent",
+          kind: IntegrationBindingKinds.AGENT,
+          config: {
+            defaultModel: "gpt-5.3-codex",
+          },
         });
         await database.db.insert(automations).values({
           id: automationId,

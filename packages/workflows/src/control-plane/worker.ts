@@ -3,13 +3,19 @@ import type { OpenWorkflow, Worker } from "openworkflow";
 
 import { createHandleAutomationRunWorkflow } from "./workflows/handle-automation-run/index.js";
 import type {
-  AcquiredAutomationConnection,
-  AcquireAutomationConnectionInput,
-  DeliverAutomationPayloadInput,
-  EnsureAutomationSandboxInput,
-  EnsuredAutomationSandbox,
+  BoundAutomationConversation,
+  ClaimAutomationConversationInput,
+  ClaimedAutomationConversation,
+  EnsureAutomationConversationBindingInput,
+  EnsureAutomationConversationRouteInput,
+  EnsureAutomationConversationSandboxInput,
+  EnsuredAutomationConversationSandbox,
+  ExecuteAutomationConversationInput,
+  ExecutedAutomationConversation,
   HandleAutomationRunWorkflowInput,
+  PersistAutomationConversationExecutionInput,
   PreparedAutomationRun,
+  RoutedAutomationConversation,
 } from "./workflows/handle-automation-run/index.js";
 import { createHandleIntegrationWebhookEventWorkflow } from "./workflows/handle-integration-webhook-event/index.js";
 import type {
@@ -41,13 +47,24 @@ export type ControlPlaneWorkerServices = {
     prepareAutomationRun: (
       input: HandleAutomationRunWorkflowInput,
     ) => Promise<PreparedAutomationRun>;
-    ensureAutomationSandbox: (
-      input: EnsureAutomationSandboxInput,
-    ) => Promise<EnsuredAutomationSandbox>;
-    acquireAutomationConnection: (
-      input: AcquireAutomationConnectionInput,
-    ) => Promise<AcquiredAutomationConnection>;
-    deliverAutomationPayload: (input: DeliverAutomationPayloadInput) => Promise<void>;
+    claimAutomationConversation: (
+      input: ClaimAutomationConversationInput,
+    ) => Promise<ClaimedAutomationConversation>;
+    ensureAutomationConversationSandbox: (
+      input: EnsureAutomationConversationSandboxInput,
+    ) => Promise<EnsuredAutomationConversationSandbox>;
+    ensureAutomationConversationRoute: (
+      input: EnsureAutomationConversationRouteInput,
+    ) => Promise<RoutedAutomationConversation>;
+    ensureAutomationConversationBinding: (
+      input: EnsureAutomationConversationBindingInput,
+    ) => Promise<BoundAutomationConversation>;
+    executeAutomationConversation: (
+      input: ExecuteAutomationConversationInput,
+    ) => Promise<ExecutedAutomationConversation>;
+    persistAutomationConversationExecution: (
+      input: PersistAutomationConversationExecutionInput,
+    ) => Promise<void>;
     markAutomationRunCompleted: (input: HandleAutomationRunWorkflowInput) => Promise<void>;
     markAutomationRunFailed: (input: {
       automationRunId: string;
@@ -110,9 +127,16 @@ export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): 
         transitionAutomationRunToRunning:
           input.services.automationRuns.transitionAutomationRunToRunning,
         prepareAutomationRun: input.services.automationRuns.prepareAutomationRun,
-        ensureAutomationSandbox: input.services.automationRuns.ensureAutomationSandbox,
-        acquireAutomationConnection: input.services.automationRuns.acquireAutomationConnection,
-        deliverAutomationPayload: input.services.automationRuns.deliverAutomationPayload,
+        claimAutomationConversation: input.services.automationRuns.claimAutomationConversation,
+        ensureAutomationConversationSandbox:
+          input.services.automationRuns.ensureAutomationConversationSandbox,
+        ensureAutomationConversationRoute:
+          input.services.automationRuns.ensureAutomationConversationRoute,
+        ensureAutomationConversationBinding:
+          input.services.automationRuns.ensureAutomationConversationBinding,
+        executeAutomationConversation: input.services.automationRuns.executeAutomationConversation,
+        persistAutomationConversationExecution:
+          input.services.automationRuns.persistAutomationConversationExecution,
         markAutomationRunCompleted: input.services.automationRuns.markAutomationRunCompleted,
         markAutomationRunFailed: input.services.automationRuns.markAutomationRunFailed,
         resolveAutomationRunFailure: input.services.automationRuns.resolveAutomationRunFailure,
