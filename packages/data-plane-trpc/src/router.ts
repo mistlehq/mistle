@@ -6,6 +6,10 @@ import {
 } from "@trpc/server";
 
 import {
+  GetLatestSandboxInstanceSnapshotInputSchema,
+  GetLatestSandboxInstanceSnapshotResponseSchema,
+  type GetLatestSandboxInstanceSnapshotInput,
+  type GetLatestSandboxInstanceSnapshotResponse,
   GetSandboxInstanceInputSchema,
   GetSandboxInstanceResponseSchema,
   type GetSandboxInstanceInput,
@@ -26,22 +30,36 @@ type StartSandboxProcedureSchemas = {
   outputSchema: typeof StartSandboxInstanceAcceptedResponseSchema;
 };
 
+type GetLatestSnapshotProcedureSchemas = {
+  inputSchema: typeof GetLatestSandboxInstanceSnapshotInputSchema;
+  outputSchema: typeof GetLatestSandboxInstanceSnapshotResponseSchema;
+};
+
 export function createDataPlaneSandboxInstancesTrpcRouter<
   TGetProcedure extends AnyQueryProcedure,
+  TGetLatestSnapshotProcedure extends AnyQueryProcedure,
   TStartProcedure extends AnyMutationProcedure,
   TSandboxInstancesRouter extends AnyRouter,
 >(input: {
   createRouter: (routerInput: {
     get: TGetProcedure;
+    getLatestSnapshot: TGetLatestSnapshotProcedure;
     start: TStartProcedure;
   }) => TSandboxInstancesRouter;
   createGetProcedure: (schemas: GetSandboxProcedureSchemas) => TGetProcedure;
+  createGetLatestSnapshotProcedure: (
+    schemas: GetLatestSnapshotProcedureSchemas,
+  ) => TGetLatestSnapshotProcedure;
   createStartProcedure: (schemas: StartSandboxProcedureSchemas) => TStartProcedure;
 }): TSandboxInstancesRouter {
   return input.createRouter({
     get: input.createGetProcedure({
       inputSchema: GetSandboxInstanceInputSchema,
       outputSchema: GetSandboxInstanceResponseSchema,
+    }),
+    getLatestSnapshot: input.createGetLatestSnapshotProcedure({
+      inputSchema: GetLatestSandboxInstanceSnapshotInputSchema,
+      outputSchema: GetLatestSandboxInstanceSnapshotResponseSchema,
     }),
     start: input.createStartProcedure({
       inputSchema: StartSandboxInstanceInputSchema,
@@ -76,6 +94,12 @@ function createTypeOnlyGetSandboxInstanceResponse(
   throw new Error("Data plane tRPC contract router is type-only and should not execute.");
 }
 
+function createTypeOnlyGetLatestSandboxInstanceSnapshotResponse(
+  _input: GetLatestSandboxInstanceSnapshotInput,
+): Promise<GetLatestSandboxInstanceSnapshotResponse> {
+  throw new Error("Data plane tRPC contract router is type-only and should not execute.");
+}
+
 const sandboxInstancesTrpcRouterContract = createDataPlaneSandboxInstancesTrpcRouter({
   createRouter: t.router,
   createGetProcedure: (schemas) =>
@@ -84,6 +108,13 @@ const sandboxInstancesTrpcRouterContract = createDataPlaneSandboxInstancesTrpcRo
       .output(schemas.outputSchema)
       .query(({ input }) => {
         return createTypeOnlyGetSandboxInstanceResponse(input);
+      }),
+  createGetLatestSnapshotProcedure: (schemas) =>
+    t.procedure
+      .input(schemas.inputSchema)
+      .output(schemas.outputSchema)
+      .query(({ input }) => {
+        return createTypeOnlyGetLatestSandboxInstanceSnapshotResponse(input);
       }),
   createStartProcedure: (schemas) =>
     t.procedure

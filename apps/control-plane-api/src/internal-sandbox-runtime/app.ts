@@ -52,6 +52,16 @@ export function createInternalSandboxRuntimeApp(): AppRoutes<
           profileVersion: body.profileVersion,
           startedBy: body.startedBy,
           source: body.source,
+          ...(body.restoreFromSourceInstanceId === undefined
+            ? {}
+            : {
+                restoreFromSourceInstanceId: body.restoreFromSourceInstanceId,
+              }),
+          ...(body.sandboxInstanceId === undefined
+            ? {}
+            : {
+                sandboxInstanceId: body.sandboxInstanceId,
+              }),
           image: {
             imageId: ctx.get("sandboxConfig").defaultBaseImage,
             kind: "base",

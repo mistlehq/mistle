@@ -41,11 +41,62 @@ export async function ensureSandboxInstance(
       id: sandboxInstances.id,
     });
 
-  const ensuredSandboxInstanceId = insertedRows[0]?.id ?? input.sandboxInstanceId;
+  const insertedSandbox = insertedRows[0];
+  if (insertedSandbox !== undefined) {
+    return {
+      sandboxInstanceId: insertedSandbox.id,
+    };
+  }
 
-  return {
-    sandboxInstanceId: ensuredSandboxInstanceId,
-  };
+  const restartedStoppedRows = await deps.db
+    .update(sandboxInstances)
+    .set({
+      providerSandboxId: null,
+      status: SandboxInstanceStatuses.STARTING,
+      startedAt: null,
+      stoppedAt: null,
+      failedAt: null,
+      failureCode: null,
+      failureMessage: null,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(sandboxInstances.id, input.sandboxInstanceId),
+        eq(sandboxInstances.status, SandboxInstanceStatuses.STOPPED),
+      ),
+    )
+    .returning({
+      id: sandboxInstances.id,
+    });
+
+  const restartedStoppedSandbox = restartedStoppedRows[0];
+  if (restartedStoppedSandbox !== undefined) {
+    return {
+      sandboxInstanceId: restartedStoppedSandbox.id,
+    };
+  }
+
+  const existingStartingSandbox = await deps.db.query.sandboxInstances.findFirst({
+    columns: {
+      id: true,
+    },
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.id, input.sandboxInstanceId),
+        whereEq(table.status, SandboxInstanceStatuses.STARTING),
+      ),
+  });
+
+  if (existingStartingSandbox !== undefined) {
+    return {
+      sandboxInstanceId: existingStartingSandbox.id,
+    };
+  }
+
+  throw new Error(
+    `Sandbox instance '${input.sandboxInstanceId}' could not transition to starting from its current status.`,
+  );
 }
 
 export async function persistSandboxInstanceProvisioning(

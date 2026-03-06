@@ -126,6 +126,11 @@ const SandboxProfileVersionNotFoundCodeSchema = z.enum([
   SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
   SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
 ]);
+const StartSandboxProfileInstanceNotFoundCodeSchema = z.enum([
+  SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND,
+  SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
+  SandboxProfilesNotFoundCodes.SNAPSHOT_NOT_FOUND,
+]);
 const StartSandboxProfileInstanceBadRequestCodeSchema = z.enum([
   SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONNECTION_REFERENCE,
   SandboxProfilesCompileErrorCodes.INVALID_CONNECTION_TARGET_REFERENCE,
@@ -174,8 +179,12 @@ export const SandboxProfileVersionNotFoundResponseSchema = z
     message: z.string().min(1),
   })
   .strict();
-export const StartSandboxProfileInstanceNotFoundResponseSchema =
-  SandboxProfileVersionNotFoundResponseSchema;
+export const StartSandboxProfileInstanceNotFoundResponseSchema = z
+  .object({
+    code: StartSandboxProfileInstanceNotFoundCodeSchema,
+    message: z.string().min(1),
+  })
+  .strict();
 export const StartSandboxProfileInstanceBadRequestResponseSchema = z.union([
   z
     .object({

@@ -430,6 +430,8 @@ export interface paths {
             organizationId: string;
             profileId: string;
             profileVersion: number;
+            restoreFromSourceInstanceId?: string;
+            sandboxInstanceId?: string;
             source: "dashboard" | "webhook";
             startedBy: {
               id: string;

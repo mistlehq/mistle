@@ -1,3 +1,4 @@
+import { ControlPlaneInternalClientError } from "@mistle/control-plane-internal-client";
 import {
   automationRuns,
   AutomationRunStatuses,
@@ -422,6 +423,8 @@ async function executeAutomationConversationRun(input: {
       id: string;
     };
     source: "dashboard" | "webhook";
+    restoreFromSourceInstanceId?: string;
+    sandboxInstanceId?: string;
   }) => Promise<{
     workflowRunId: string;
     sandboxInstanceId: string;
@@ -902,6 +905,18 @@ describe("handleAutomationRun conversation routing integration", () => {
       });
 
       let sandboxStartCount = 0;
+      const sandboxStartRequests: Array<{
+        organizationId: string;
+        profileId: string;
+        profileVersion: number;
+        startedBy: {
+          kind: "user" | "system";
+          id: string;
+        };
+        source: "dashboard" | "webhook";
+        restoreFromSourceInstanceId?: string;
+        sandboxInstanceId?: string;
+      }> = [];
 
       try {
         const seeded = await seedAutomationScenario({
@@ -912,11 +927,13 @@ describe("handleAutomationRun conversation routing integration", () => {
         await executeAutomationConversationRun({
           db: database.db,
           automationRunId: seeded.runId,
-          startSandboxProfileInstance: async () => {
+          startSandboxProfileInstance: async (payload) => {
             sandboxStartCount += 1;
+            sandboxStartRequests.push(payload);
             return {
               workflowRunId: `wfr_stopped_${String(sandboxStartCount)}`,
-              sandboxInstanceId: `sbi_stopped_${String(sandboxStartCount)}`,
+              sandboxInstanceId:
+                payload.sandboxInstanceId ?? `sbi_stopped_${String(sandboxStartCount)}`,
             };
           },
           getSandboxInstance: async ({ instanceId }) => ({
@@ -947,11 +964,13 @@ describe("handleAutomationRun conversation routing integration", () => {
         await executeAutomationConversationRun({
           db: database.db,
           automationRunId: followup.runId,
-          startSandboxProfileInstance: async () => {
+          startSandboxProfileInstance: async (payload) => {
             sandboxStartCount += 1;
+            sandboxStartRequests.push(payload);
             return {
               workflowRunId: `wfr_stopped_${String(sandboxStartCount)}`,
-              sandboxInstanceId: `sbi_stopped_${String(sandboxStartCount)}`,
+              sandboxInstanceId:
+                payload.sandboxInstanceId ?? `sbi_stopped_${String(sandboxStartCount)}`,
             };
           },
           getSandboxInstance: async ({ instanceId }) => {
@@ -980,7 +999,11 @@ describe("handleAutomationRun conversation routing integration", () => {
           }),
         });
 
-        expect(sandboxStartCount).toBe(1);
+        expect(sandboxStartCount).toBe(2);
+        expect(sandboxStartRequests[1]).toMatchObject({
+          restoreFromSourceInstanceId: "sbi_stopped_1",
+          sandboxInstanceId: "sbi_stopped_1",
+        });
 
         const persistedConversation = await database.db.query.conversations.findFirst({
           where: (table, { eq }) => eq(table.organizationId, seeded.organizationId),
@@ -1005,6 +1028,285 @@ describe("handleAutomationRun conversation routing integration", () => {
         ]);
       } finally {
         await rpcServer.close();
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "restores a new sandbox from latest snapshot when the bound route sandbox is missing",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      let turnStartCount = 0;
+
+      const rpcServer = await startCodexTestServer((request) => {
+        if (request.method === "thread/start") {
+          return {
+            result: {
+              thread: {
+                id: "thread_destroyed_001",
+              },
+            },
+          };
+        }
+
+        if (request.method === "turn/start") {
+          turnStartCount += 1;
+          return {
+            result: {
+              turn: {
+                id: `turn_destroyed_00${String(turnStartCount)}`,
+              },
+            },
+          };
+        }
+
+        if (request.method === "thread/read") {
+          return {
+            result: {
+              thread: {
+                id: "thread_destroyed_001",
+                status: {
+                  type: "idle",
+                },
+              },
+            },
+          };
+        }
+
+        if (request.method === "thread/resume") {
+          return {
+            result: {
+              ok: true,
+            },
+          };
+        }
+
+        return {
+          error: {
+            code: -32601,
+            message: `Unsupported method '${request.method}'.`,
+          },
+        };
+      });
+
+      let sandboxStartCount = 0;
+      const sandboxStartRequests: Array<{
+        organizationId: string;
+        profileId: string;
+        profileVersion: number;
+        startedBy: {
+          kind: "user" | "system";
+          id: string;
+        };
+        source: "dashboard" | "webhook";
+        restoreFromSourceInstanceId?: string;
+        sandboxInstanceId?: string;
+      }> = [];
+
+      try {
+        const seeded = await seedAutomationScenario({
+          db: database.db,
+          suffix: "destroyed-restore",
+        });
+
+        await executeAutomationConversationRun({
+          db: database.db,
+          automationRunId: seeded.runId,
+          startSandboxProfileInstance: async (payload) => {
+            sandboxStartCount += 1;
+            sandboxStartRequests.push(payload);
+            return {
+              workflowRunId: `wfr_destroyed_${String(sandboxStartCount)}`,
+              sandboxInstanceId:
+                payload.sandboxInstanceId ?? `sbi_destroyed_${String(sandboxStartCount)}`,
+            };
+          },
+          getSandboxInstance: async ({ instanceId }) => ({
+            id: instanceId,
+            status: "running",
+            failureCode: null,
+            failureMessage: null,
+          }),
+          mintSandboxConnectionToken: async ({ instanceId }) => ({
+            instanceId,
+            url: rpcServer.url,
+            token: "token_destroyed",
+            expiresAt: "2026-03-07T01:00:00.000Z",
+          }),
+        });
+
+        const followup = await seedFollowupAutomationRun({
+          db: database.db,
+          suffix: "destroyed-restore",
+          automationId: seeded.automationId,
+          automationTargetId: seeded.automationTargetId,
+          organizationId: seeded.organizationId,
+          sourceConnectionId: seeded.sourceConnectionId,
+        });
+
+        await executeAutomationConversationRun({
+          db: database.db,
+          automationRunId: followup.runId,
+          startSandboxProfileInstance: async (payload) => {
+            sandboxStartCount += 1;
+            sandboxStartRequests.push(payload);
+            return {
+              workflowRunId: `wfr_destroyed_${String(sandboxStartCount)}`,
+              sandboxInstanceId:
+                payload.sandboxInstanceId ?? `sbi_destroyed_${String(sandboxStartCount)}`,
+            };
+          },
+          getSandboxInstance: async ({ instanceId }) => {
+            if (instanceId === "sbi_destroyed_1") {
+              throw new Error(
+                "Control-plane internal sandbox read failed with status 404: not found",
+              );
+            }
+
+            return {
+              id: instanceId,
+              status: "running",
+              failureCode: null,
+              failureMessage: null,
+            };
+          },
+          mintSandboxConnectionToken: async ({ instanceId }) => ({
+            instanceId,
+            url: rpcServer.url,
+            token: "token_destroyed",
+            expiresAt: "2026-03-07T01:00:00.000Z",
+          }),
+        });
+
+        expect(sandboxStartCount).toBe(2);
+        expect(sandboxStartRequests[1]).toMatchObject({
+          restoreFromSourceInstanceId: "sbi_destroyed_1",
+        });
+        expect(sandboxStartRequests[1]?.sandboxInstanceId).toBeUndefined();
+
+        const persistedConversation = await database.db.query.conversations.findFirst({
+          where: (table, { eq }) => eq(table.organizationId, seeded.organizationId),
+        });
+        if (persistedConversation === undefined) {
+          throw new Error("Expected conversation row.");
+        }
+
+        const persistedRoute = await database.db.query.conversationRoutes.findFirst({
+          where: (table, { eq }) => eq(table.conversationId, persistedConversation.id),
+        });
+        expect(persistedRoute?.sandboxInstanceId).toBe("sbi_destroyed_2");
+        expect(persistedRoute?.providerConversationId).toBe("thread_destroyed_001");
+        expect(persistedRoute?.providerExecutionId).toBe("turn_destroyed_002");
+
+        const methodNames = rpcServer.requests.map((request) => request.method);
+        expect(methodNames).toEqual([
+          "thread/start",
+          "turn/start",
+          "thread/read",
+          "thread/resume",
+          "turn/start",
+        ]);
+      } finally {
+        await rpcServer.close();
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "fails explicitly with conversation_snapshot_missing when restore snapshot is unavailable",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const seeded = await seedAutomationScenario({
+          db: database.db,
+          suffix: "snapshot-missing",
+        });
+
+        const prepared = await prepareAutomationRun(
+          {
+            db: database.db,
+          },
+          {
+            automationRunId: seeded.runId,
+          },
+        );
+        const claimed = await claimAutomationConversation(
+          {
+            db: database.db,
+          },
+          {
+            preparedAutomationRun: prepared,
+          },
+        );
+
+        await database.db.insert(conversationRoutes).values({
+          conversationId: claimed.conversationId,
+          sandboxInstanceId: "sbi_snapshot_missing",
+          providerConversationId: "thread_snapshot_missing",
+          providerExecutionId: "turn_snapshot_missing",
+          providerState: null,
+          status: "active",
+        });
+
+        await expect(
+          executeAutomationConversationRun({
+            db: database.db,
+            automationRunId: seeded.runId,
+            startSandboxProfileInstance: async (payload) => {
+              if (payload.restoreFromSourceInstanceId !== undefined) {
+                throw new ControlPlaneInternalClientError({
+                  statusCode: 404,
+                  code: "SNAPSHOT_NOT_FOUND",
+                  message: "Sandbox snapshot was not found.",
+                });
+              }
+
+              return {
+                workflowRunId: "wfr_snapshot_missing",
+                sandboxInstanceId: "sbi_snapshot_missing_unexpected",
+              };
+            },
+            getSandboxInstance: async ({ instanceId }) => {
+              if (instanceId === "sbi_snapshot_missing") {
+                throw new Error(
+                  "Control-plane internal sandbox read failed with status 404: instance missing",
+                );
+              }
+
+              return {
+                id: instanceId,
+                status: "running",
+                failureCode: null,
+                failureMessage: null,
+              };
+            },
+            mintSandboxConnectionToken: async ({ instanceId }) => ({
+              instanceId,
+              url: "ws://127.0.0.1:65535",
+              token: "token_snapshot_missing",
+              expiresAt: "2026-03-07T01:00:00.000Z",
+            }),
+          }),
+        ).rejects.toMatchObject({
+          code: "conversation_snapshot_missing",
+        });
+
+        const persistedRun = await database.db.query.automationRuns.findFirst({
+          where: (table, { eq }) => eq(table.id, seeded.runId),
+        });
+        expect(persistedRun?.status).toBe(AutomationRunStatuses.FAILED);
+        expect(persistedRun?.failureCode).toBe("conversation_snapshot_missing");
+      } finally {
         await database.stop();
       }
     },

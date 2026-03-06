@@ -3,10 +3,14 @@ import type { AnyRouter } from "@trpc/server";
 
 import { DATA_PLANE_INTERNAL_AUTH_HEADER, DATA_PLANE_TRPC_PATH } from "./constants.js";
 import {
+  GetLatestSandboxInstanceSnapshotInputSchema,
+  GetLatestSandboxInstanceSnapshotResponseSchema,
   GetSandboxInstanceInputSchema,
   GetSandboxInstanceResponseSchema,
   StartSandboxInstanceAcceptedResponseSchema,
   StartSandboxInstanceInputSchema,
+  type GetLatestSandboxInstanceSnapshotInput,
+  type GetLatestSandboxInstanceSnapshotResponse,
   type GetSandboxInstanceInput,
   type GetSandboxInstanceResponse,
   type StartSandboxInstanceAcceptedResponse,
@@ -35,6 +39,9 @@ export type DataPlaneSandboxInstancesClient = {
     input: StartSandboxInstanceInput,
   ) => Promise<StartSandboxInstanceAcceptedResponse>;
   getSandboxInstance: (input: GetSandboxInstanceInput) => Promise<GetSandboxInstanceResponse>;
+  getLatestSandboxInstanceSnapshot: (
+    input: GetLatestSandboxInstanceSnapshotInput,
+  ) => Promise<GetLatestSandboxInstanceSnapshotResponse>;
 };
 
 export type CreateDataPlaneSandboxInstancesClientInput = {
@@ -69,6 +76,13 @@ export function createDataPlaneSandboxInstancesClient(
       const response = await trpcClient.sandboxInstances.get.query(parsedGetInput);
 
       return GetSandboxInstanceResponseSchema.parse(response);
+    },
+    getLatestSandboxInstanceSnapshot: async (snapshotInput) => {
+      const parsedSnapshotInput = GetLatestSandboxInstanceSnapshotInputSchema.parse(snapshotInput);
+      const response =
+        await trpcClient.sandboxInstances.getLatestSnapshot.query(parsedSnapshotInput);
+
+      return GetLatestSandboxInstanceSnapshotResponseSchema.parse(response);
     },
   };
 }

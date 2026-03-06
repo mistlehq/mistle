@@ -9,6 +9,7 @@ const DefaultRequestTimeoutMs = 3000;
 
 const InternalErrorSchema = z
   .object({
+    code: z.string().optional(),
     message: z.string().optional(),
   })
   .catchall(z.unknown());
@@ -43,18 +44,58 @@ export type MintSandboxConnectionTokenInput =
 export type MintSandboxConnectionTokenOutput =
   paths["/internal/sandbox-runtime/mint-connection-token"]["post"]["responses"]["200"]["content"]["application/json"];
 
-function extractErrorMessage(input: unknown): string {
+type InternalErrorDetails = {
+  code: string | null;
+  message: string;
+};
+
+function extractErrorDetails(input: unknown): InternalErrorDetails {
   const parsedError = InternalErrorSchema.safeParse(input);
   if (!parsedError.success) {
-    return "Unknown control-plane internal API error.";
+    return {
+      code: null,
+      message: "Unknown control-plane internal API error.",
+    };
   }
 
+  const code = parsedError.data.code;
   const message = parsedError.data.message;
   if (typeof message !== "string" || message.length === 0) {
-    return "Unknown control-plane internal API error.";
+    return {
+      code: typeof code === "string" && code.length > 0 ? code : null,
+      message: "Unknown control-plane internal API error.",
+    };
   }
 
-  return message;
+  return {
+    code: typeof code === "string" && code.length > 0 ? code : null,
+    message,
+  };
+}
+
+export class ControlPlaneInternalClientError extends Error {
+  readonly statusCode: number;
+  readonly code: string | null;
+
+  constructor(input: { message: string; statusCode: number; code: string | null }) {
+    super(input.message);
+    this.name = "ControlPlaneInternalClientError";
+    this.statusCode = input.statusCode;
+    this.code = input.code;
+  }
+}
+
+function throwControlPlaneInternalClientError(input: {
+  operation: string;
+  statusCode: number;
+  error: unknown;
+}): never {
+  const errorDetails = extractErrorDetails(input.error);
+  throw new ControlPlaneInternalClientError({
+    statusCode: input.statusCode,
+    code: errorDetails.code,
+    message: `${input.operation} failed with status ${String(input.statusCode)}: ${errorDetails.message}`,
+  });
 }
 
 export class ControlPlaneInternalClient {
@@ -83,9 +124,11 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
-    throw new Error(
-      `Control-plane internal credential resolution failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
-    );
+    throwControlPlaneInternalClientError({
+      operation: "Control-plane internal credential resolution",
+      statusCode: result.response.status,
+      error: result.error,
+    });
   }
 
   async resolveIntegrationTargetSecrets(
@@ -103,9 +146,11 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
-    throw new Error(
-      `Control-plane internal target secret resolution failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
-    );
+    throwControlPlaneInternalClientError({
+      operation: "Control-plane internal target secret resolution",
+      statusCode: result.response.status,
+      error: result.error,
+    });
   }
 
   async startSandboxProfileInstance(
@@ -120,9 +165,11 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
-    throw new Error(
-      `Control-plane internal sandbox start failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
-    );
+    throwControlPlaneInternalClientError({
+      operation: "Control-plane internal sandbox start",
+      statusCode: result.response.status,
+      error: result.error,
+    });
   }
 
   async mintSandboxConnectionToken(
@@ -137,9 +184,11 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
-    throw new Error(
-      `Control-plane internal sandbox connection mint failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
-    );
+    throwControlPlaneInternalClientError({
+      operation: "Control-plane internal sandbox connection mint",
+      statusCode: result.response.status,
+      error: result.error,
+    });
   }
 
   async getSandboxInstance(input: GetSandboxInstanceInput): Promise<GetSandboxInstanceOutput> {
@@ -152,8 +201,10 @@ export class ControlPlaneInternalClient {
       return result.data;
     }
 
-    throw new Error(
-      `Control-plane internal sandbox read failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
-    );
+    throwControlPlaneInternalClientError({
+      operation: "Control-plane internal sandbox read",
+      statusCode: result.response.status,
+      error: result.error,
+    });
   }
 }

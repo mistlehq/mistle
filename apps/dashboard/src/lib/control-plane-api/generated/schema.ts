@@ -2002,7 +2002,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND";
+              code: "PROFILE_NOT_FOUND" | "PROFILE_VERSION_NOT_FOUND" | "SNAPSHOT_NOT_FOUND";
               message: string;
             };
           };

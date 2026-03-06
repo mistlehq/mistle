@@ -1,4 +1,5 @@
 import { renderTemplateString } from "@mistle/automations";
+import { ControlPlaneInternalClientError } from "@mistle/control-plane-internal-client";
 import {
   automationRuns,
   AutomationRunStatuses,
@@ -508,7 +509,6 @@ async function waitForSandboxInstanceRunning(
     organizationId: string;
     sandboxInstanceId: string;
     timeoutMs?: number;
-    treatStoppedAsRecovering?: boolean;
   },
 ): Promise<void> {
   const timeoutMs = input.timeoutMs ?? SandboxStartTimeoutMs;
@@ -552,14 +552,12 @@ async function waitForSandboxInstanceRunning(
     }
 
     if (sandboxInstance.status === "stopped") {
-      if (!input.treatStoppedAsRecovering) {
-        throw new AutomationRunExecutionError({
-          code: AutomationRunFailureCodes.CONVERSATION_RECOVERY_FAILED,
-          message:
-            sandboxInstance.failureMessage ??
-            `Sandbox instance '${sandboxInstance.id}' entered terminal status '${sandboxInstance.status}'.`,
-        });
-      }
+      throw new AutomationRunExecutionError({
+        code: AutomationRunFailureCodes.CONVERSATION_RECOVERY_FAILED,
+        message:
+          sandboxInstance.failureMessage ??
+          `Sandbox instance '${sandboxInstance.id}' entered terminal status '${sandboxInstance.status}'.`,
+      });
     }
 
     await systemSleeper.sleep(SandboxStartPollIntervalMs);
@@ -581,6 +579,8 @@ async function startAndWaitForSandbox(
     sandboxProfileId: string;
     sandboxProfileVersion: number;
     automationRunId: string;
+    restoreFromSourceInstanceId?: string;
+    sandboxInstanceId?: string;
   },
 ): Promise<{
   sandboxInstanceId: string;
@@ -601,8 +601,29 @@ async function startAndWaitForSandbox(
         id: input.automationRunId,
       },
       source: "webhook",
+      ...(input.restoreFromSourceInstanceId === undefined
+        ? {}
+        : {
+            restoreFromSourceInstanceId: input.restoreFromSourceInstanceId,
+          }),
+      ...(input.sandboxInstanceId === undefined
+        ? {}
+        : {
+            sandboxInstanceId: input.sandboxInstanceId,
+          }),
     });
   } catch (error) {
+    if (error instanceof ControlPlaneInternalClientError && error.code === "SNAPSHOT_NOT_FOUND") {
+      throw new AutomationRunExecutionError({
+        code: AutomationRunFailureCodes.CONVERSATION_SNAPSHOT_MISSING,
+        message:
+          input.restoreFromSourceInstanceId === undefined
+            ? "Sandbox snapshot required for conversation recovery was not found."
+            : `Sandbox snapshot for source instance '${input.restoreFromSourceInstanceId}' was not found.`,
+        cause: error,
+      });
+    }
+
     throw new AutomationRunExecutionError({
       code: AutomationRunFailureCodes.CONVERSATION_RECOVERY_FAILED,
       message:
@@ -812,23 +833,68 @@ export async function ensureAutomationConversationSandbox(
   }
 
   if (routeSandboxStatus === "stopped") {
-    await waitForSandboxInstanceRunning(
+    const resumedSandbox = await startAndWaitForSandbox(
       {
+        startSandboxProfileInstance: deps.startSandboxProfileInstance,
         getSandboxInstance: deps.getSandboxInstance,
       },
       {
         organizationId: input.preparedAutomationRun.organizationId,
+        sandboxProfileId: input.preparedAutomationRun.sandboxProfileId,
+        sandboxProfileVersion: input.preparedAutomationRun.sandboxProfileVersion,
+        automationRunId: input.preparedAutomationRun.automationRunId,
+        restoreFromSourceInstanceId: existingRoute.sandboxInstanceId,
         sandboxInstanceId: existingRoute.sandboxInstanceId,
-        treatStoppedAsRecovering: true,
+      },
+    );
+
+    if (resumedSandbox.sandboxInstanceId !== existingRoute.sandboxInstanceId) {
+      throw new AutomationRunExecutionError({
+        code: AutomationRunFailureCodes.CONVERSATION_RECOVERY_FAILED,
+        message: `Stopped sandbox '${existingRoute.sandboxInstanceId}' resumed as unexpected instance '${resumedSandbox.sandboxInstanceId}'.`,
+      });
+    }
+
+    return {
+      sandboxInstanceId: existingRoute.sandboxInstanceId,
+      startupWorkflowRunId: resumedSandbox.workflowRunId,
+      routeId: existingRoute.id,
+      providerConversationId: existingRoute.providerConversationId,
+      providerExecutionId: existingRoute.providerExecutionId,
+    };
+  }
+
+  if (routeSandboxStatus === "missing" || routeSandboxStatus === "failed") {
+    const restoredSandbox = await startAndWaitForSandbox(
+      {
+        startSandboxProfileInstance: deps.startSandboxProfileInstance,
+        getSandboxInstance: deps.getSandboxInstance,
+      },
+      {
+        organizationId: input.preparedAutomationRun.organizationId,
+        sandboxProfileId: input.preparedAutomationRun.sandboxProfileId,
+        sandboxProfileVersion: input.preparedAutomationRun.sandboxProfileVersion,
+        automationRunId: input.preparedAutomationRun.automationRunId,
+        restoreFromSourceInstanceId: existingRoute.sandboxInstanceId,
+      },
+    );
+
+    const reboundRoute = await rebindConversationSandbox(
+      {
+        db: deps.db,
+      },
+      {
+        routeId: existingRoute.id,
+        sandboxInstanceId: restoredSandbox.sandboxInstanceId,
       },
     );
 
     return {
-      sandboxInstanceId: existingRoute.sandboxInstanceId,
-      startupWorkflowRunId: null,
-      routeId: existingRoute.id,
-      providerConversationId: existingRoute.providerConversationId,
-      providerExecutionId: existingRoute.providerExecutionId,
+      sandboxInstanceId: reboundRoute.sandboxInstanceId,
+      startupWorkflowRunId: restoredSandbox.workflowRunId,
+      routeId: reboundRoute.id,
+      providerConversationId: reboundRoute.providerConversationId,
+      providerExecutionId: reboundRoute.providerExecutionId,
     };
   }
 

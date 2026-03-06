@@ -226,6 +226,7 @@ const CompiledRuntimePlanSchema = z
 
 const StartSandboxInstanceInputValidationSchema = z
   .object({
+    sandboxInstanceId: z.string().min(1).optional(),
     organizationId: z.string().min(1),
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
@@ -273,12 +274,37 @@ export const GetSandboxInstanceResponseSchema = z
   .strict()
   .nullable();
 
+export const GetLatestSandboxInstanceSnapshotInputSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    sourceInstanceId: z.string().min(1),
+  })
+  .strict();
+
+export const GetLatestSandboxInstanceSnapshotResponseSchema = z
+  .object({
+    snapshotId: z.string().min(1),
+    sourceInstanceId: z.string().min(1),
+    createdAt: z.string().min(1),
+    image: StartSandboxInstanceImageSchema,
+  })
+  .strict()
+  .nullable();
+
 export type StartSandboxInstanceInput = Omit<
   StartSandboxInstanceWorkflowInput,
   "sandboxInstanceId"
->;
+> & {
+  sandboxInstanceId?: string;
+};
 export type StartSandboxInstanceAcceptedResponse = z.infer<
   typeof StartSandboxInstanceAcceptedResponseSchema
 >;
 export type GetSandboxInstanceInput = z.infer<typeof GetSandboxInstanceInputSchema>;
 export type GetSandboxInstanceResponse = z.infer<typeof GetSandboxInstanceResponseSchema>;
+export type GetLatestSandboxInstanceSnapshotInput = z.infer<
+  typeof GetLatestSandboxInstanceSnapshotInputSchema
+>;
+export type GetLatestSandboxInstanceSnapshotResponse = z.infer<
+  typeof GetLatestSandboxInstanceSnapshotResponseSchema
+>;

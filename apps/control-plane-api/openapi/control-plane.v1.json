@@ -3939,7 +3939,11 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["PROFILE_NOT_FOUND", "PROFILE_VERSION_NOT_FOUND"]
+                      "enum": [
+                        "PROFILE_NOT_FOUND",
+                        "PROFILE_VERSION_NOT_FOUND",
+                        "SNAPSHOT_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",

@@ -1,6 +1,7 @@
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 
 import { compileProfileVersionRuntimePlan } from "./compile-profile-version-runtime-plan.js";
+import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "./errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 export const SandboxdEgressBaseUrl = "http://127.0.0.1:8090/egress";
@@ -14,6 +15,8 @@ type StartProfileInstanceInput = {
     id: string;
   };
   source: SandboxInstanceSource;
+  restoreFromSourceInstanceId?: string;
+  sandboxInstanceId?: string;
   image: {
     imageId: string;
     kind: "base" | "snapshot";
@@ -35,6 +38,43 @@ export async function startProfileInstance(
   }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig" | "dataPlaneClient">,
   serviceInput: StartProfileInstanceInput,
 ): Promise<StartProfileInstanceOutput> {
+  let runtimePlanImage:
+    | {
+        source: "base";
+        imageRef: string;
+      }
+    | {
+        source: "snapshot";
+        imageRef: string;
+        instanceId: string;
+      };
+  let startImage = serviceInput.image;
+
+  if (serviceInput.restoreFromSourceInstanceId === undefined) {
+    runtimePlanImage = {
+      source: "base",
+      imageRef: serviceInput.image.imageId,
+    };
+  } else {
+    const latestSnapshot = await dataPlaneClient.getLatestSandboxInstanceSnapshot({
+      organizationId: serviceInput.organizationId,
+      sourceInstanceId: serviceInput.restoreFromSourceInstanceId,
+    });
+    if (latestSnapshot === null) {
+      throw new SandboxProfilesNotFoundError(
+        SandboxProfilesNotFoundCodes.SNAPSHOT_NOT_FOUND,
+        `Sandbox snapshot for source instance '${serviceInput.restoreFromSourceInstanceId}' was not found.`,
+      );
+    }
+
+    runtimePlanImage = {
+      source: "snapshot",
+      imageRef: latestSnapshot.image.imageId,
+      instanceId: serviceInput.restoreFromSourceInstanceId,
+    };
+    startImage = latestSnapshot.image;
+  }
+
   const runtimePlan = await compileProfileVersionRuntimePlan(
     {
       db,
@@ -44,10 +84,7 @@ export async function startProfileInstance(
       organizationId: serviceInput.organizationId,
       profileId: serviceInput.profileId,
       profileVersion: serviceInput.profileVersion,
-      image: {
-        source: "base",
-        imageRef: serviceInput.image.imageId,
-      },
+      image: runtimePlanImage,
       runtimeContext: {
         sandboxdEgressBaseUrl: SandboxdEgressBaseUrl,
       },
@@ -61,7 +98,12 @@ export async function startProfileInstance(
     runtimePlan,
     startedBy: serviceInput.startedBy,
     source: serviceInput.source,
-    image: serviceInput.image,
+    ...(serviceInput.sandboxInstanceId === undefined
+      ? {}
+      : {
+          sandboxInstanceId: serviceInput.sandboxInstanceId,
+        }),
+    image: startImage,
   });
 
   return {

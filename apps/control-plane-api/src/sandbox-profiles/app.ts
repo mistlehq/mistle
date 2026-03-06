@@ -301,6 +301,13 @@ function handleStartInstanceError(ctx: AppContext, error: unknown) {
 
 function handleSandboxProfileVersionNotFoundError(ctx: AppContext, error: unknown) {
   if (error instanceof SandboxProfilesNotFoundError) {
+    if (
+      error.code !== SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND &&
+      error.code !== SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND
+    ) {
+      throw error;
+    }
+
     const responseBody: z.infer<typeof SandboxProfileVersionNotFoundResponseSchema> = {
       code: error.code,
       message: error.message,
@@ -349,6 +356,13 @@ function handlePutIntegrationBindingsError(ctx: AppContext, error: unknown) {
   }
 
   if (error instanceof SandboxProfilesNotFoundError) {
+    if (
+      error.code !== SandboxProfilesNotFoundCodes.PROFILE_NOT_FOUND &&
+      error.code !== SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND
+    ) {
+      throw error;
+    }
+
     const responseBody: z.infer<typeof SandboxProfileVersionNotFoundResponseSchema> = {
       code: error.code,
       message: error.message,

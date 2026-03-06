@@ -51,6 +51,8 @@ export type HandleAutomationRunServiceDependencies = {
       id: string;
     };
     source: "dashboard" | "webhook";
+    restoreFromSourceInstanceId?: string;
+    sandboxInstanceId?: string;
   }) => Promise<{
     workflowRunId: string;
     sandboxInstanceId: string;

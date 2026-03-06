@@ -344,6 +344,14 @@
                         "enum": ["webhook"]
                       }
                     ]
+                  },
+                  "restoreFromSourceInstanceId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "sandboxInstanceId": {
+                    "type": "string",
+                    "minLength": 1
                   }
                 },
                 "required": ["organizationId", "profileId", "profileVersion", "startedBy", "source"]

@@ -1,7 +1,7 @@
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import { DATA_PLANE_INTERNAL_AUTH_HEADER } from "@mistle/data-plane-trpc/constants";
 import type { StartSandboxInstanceInput } from "@mistle/data-plane-trpc/contracts";
-import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
+import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
 import { systemSleeper } from "@mistle/time";
 import { httpBatchLink } from "@trpc/client";
 import { describe, expect } from "vitest";
@@ -199,6 +199,64 @@ describe("sandboxInstances.start integration", () => {
     expect(parsedWorkflowInput.sandboxInstanceId).toBe(startedSandbox.sandboxInstanceId);
   }, 60_000);
 
+  it("uses caller-specified sandboxInstanceId when provided", async ({ fixture }) => {
+    const client = createSandboxInstancesClient(
+      fixture.baseUrl,
+      fixture.internalAuthServiceToken,
+      1_000,
+    );
+    const sandboxProfileId = "sbp_dp_api_integration_explicit_id";
+    const workflowInput: StartSandboxInstanceInput = {
+      sandboxInstanceId: "sbi_dp_api_integration_explicit_id",
+      organizationId: "org_dp_api_integration_explicit_id",
+      sandboxProfileId,
+      sandboxProfileVersion: 5,
+      runtimePlan: createRuntimePlan({
+        sandboxProfileId,
+        version: 5,
+      }),
+      startedBy: {
+        kind: "system",
+        id: "aru_dp_api_integration_explicit_id",
+      },
+      source: "webhook",
+      image: {
+        imageId: "im_dp_api_integration_explicit_id",
+        kind: "base",
+        createdAt: "2026-03-07T00:00:00.000Z",
+      },
+    };
+
+    const startedSandbox = await client.startSandboxInstance(workflowInput);
+    expect(startedSandbox.status).toBe("accepted");
+    expect(startedSandbox.sandboxInstanceId).toBe("sbi_dp_api_integration_explicit_id");
+
+    const queuedWorkflowRuns = await waitForWorkflowRuns({
+      runQuery: async (organizationId, profileId) => {
+        const result = await fixture.dbPool.query<WorkflowRunRow>(
+          `
+            select id, namespace_id, workflow_name, status, input, output
+            from data_plane_openworkflow.workflow_runs
+            where
+              namespace_id = $1
+              and workflow_name = $2
+              and input->>'organizationId' = $3
+              and input->>'sandboxProfileId' = $4
+            order by created_at asc
+          `,
+          [fixture.config.workflow.namespaceId, WorkflowName, organizationId, profileId],
+        );
+        return result.rows;
+      },
+      organizationId: workflowInput.organizationId,
+      sandboxProfileId: workflowInput.sandboxProfileId,
+    });
+
+    expect(queuedWorkflowRuns).toHaveLength(1);
+    const queuedWorkflowInput = WorkflowRunInputSchema.parse(queuedWorkflowRuns[0]?.input);
+    expect(queuedWorkflowInput.sandboxInstanceId).toBe("sbi_dp_api_integration_explicit_id");
+  }, 60_000);
+
   it("deduplicates duplicate start requests by idempotency key", async ({ fixture }) => {
     const client = createSandboxInstancesClient(
       fixture.baseUrl,
@@ -315,5 +373,81 @@ describe("sandboxInstances.start integration", () => {
       where: (table, { eq }) => eq(table.sandboxInstanceId, startedSandbox.sandboxInstanceId),
     });
     expect(persistedRuntimePlans).toHaveLength(0);
+  }, 60_000);
+
+  it("promotes a stopped sandbox instance to starting immediately for explicit restart", async ({
+    fixture,
+  }) => {
+    const client = createSandboxInstancesClient(
+      fixture.baseUrl,
+      fixture.internalAuthServiceToken,
+      1_000,
+    );
+    const sandboxInstanceId = "sbi_dp_api_sync_restart";
+    const workflowInput: StartSandboxInstanceInput = {
+      sandboxInstanceId,
+      organizationId: "org_dp_api_sync_restart",
+      sandboxProfileId: "sbp_dp_api_sync_restart",
+      sandboxProfileVersion: 4,
+      runtimePlan: createRuntimePlan({
+        sandboxProfileId: "sbp_dp_api_sync_restart",
+        version: 4,
+      }),
+      startedBy: {
+        kind: "system",
+        id: "aru_dp_api_sync_restart",
+      },
+      source: "webhook",
+      image: {
+        imageId: "im_dp_api_sync_restart",
+        kind: "base",
+        createdAt: "2026-03-07T00:00:00.000Z",
+      },
+    };
+
+    await fixture.db.insert(sandboxInstances).values({
+      id: sandboxInstanceId,
+      organizationId: workflowInput.organizationId,
+      sandboxProfileId: workflowInput.sandboxProfileId,
+      sandboxProfileVersion: workflowInput.sandboxProfileVersion,
+      provider: "docker",
+      providerSandboxId: "provider_sandbox_old",
+      status: SandboxInstanceStatuses.STOPPED,
+      startedByKind: "system",
+      startedById: "aru_dp_api_sync_restart_previous",
+      source: "webhook",
+      startedAt: "2026-03-06T23:00:00.000Z",
+      stoppedAt: "2026-03-07T00:00:00.000Z",
+      failedAt: null,
+      failureCode: null,
+      failureMessage: null,
+    });
+
+    const startedSandbox = await client.startSandboxInstance(workflowInput);
+    expect(startedSandbox.status).toBe("accepted");
+    expect(startedSandbox.sandboxInstanceId).toBe(sandboxInstanceId);
+
+    const persistedSandboxInstance = await fixture.db.query.sandboxInstances.findFirst({
+      columns: {
+        id: true,
+        status: true,
+        providerSandboxId: true,
+        stoppedAt: true,
+        failedAt: true,
+        failureCode: true,
+        failureMessage: true,
+      },
+      where: (table, { eq }) => eq(table.id, sandboxInstanceId),
+    });
+
+    expect(persistedSandboxInstance).toEqual({
+      id: sandboxInstanceId,
+      status: SandboxInstanceStatuses.STARTING,
+      providerSandboxId: null,
+      stoppedAt: null,
+      failedAt: null,
+      failureCode: null,
+      failureMessage: null,
+    });
   }, 60_000);
 });

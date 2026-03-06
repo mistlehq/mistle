@@ -22,7 +22,10 @@ export type CreateSandboxProfilesServiceInput = {
     activeMasterEncryptionKeyVersion: number;
     masterEncryptionKeys: Record<string, string>;
   };
-  dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "startSandboxInstance">;
+  dataPlaneClient: Pick<
+    DataPlaneSandboxInstancesClient,
+    "getLatestSandboxInstanceSnapshot" | "startSandboxInstance"
+  >;
 };
 
 export type SandboxProfilesService = {
@@ -72,6 +75,8 @@ export type SandboxProfilesService = {
       id: string;
     };
     source: SandboxInstanceSource;
+    restoreFromSourceInstanceId?: string;
+    sandboxInstanceId?: string;
     image: {
       imageId: string;
       kind: "base" | "snapshot";
