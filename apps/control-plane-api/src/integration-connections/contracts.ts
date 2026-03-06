@@ -20,6 +20,7 @@ export const IntegrationConnectionSchema = z
   .object({
     id: z.string().min(1),
     targetKey: z.string().min(1),
+    displayName: z.string().min(1),
     status: IntegrationConnectionStatusSchema,
     externalSubjectId: z.string().min(1).optional(),
     config: z.record(z.string(), z.unknown()).optional(),
@@ -43,7 +44,9 @@ const BadRequestCodeSchema = z.enum([
   IntegrationConnectionsBadRequestCodes.INVALID_LIST_CONNECTIONS_INPUT,
   IntegrationConnectionsBadRequestCodes.INVALID_PAGINATION_CURSOR,
   IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
+  IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
   IntegrationConnectionsBadRequestCodes.API_KEY_NOT_SUPPORTED,
+  IntegrationConnectionsBadRequestCodes.API_KEY_CONNECTION_REQUIRED,
   IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_START_INPUT,
   IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_COMPLETE_INPUT,
   IntegrationConnectionsBadRequestCodes.OAUTH_NOT_SUPPORTED,
@@ -65,7 +68,10 @@ export const ListIntegrationConnectionsBadRequestResponseSchema = z.union([
   ValidationErrorResponseSchema,
 ]);
 
-const NotFoundCodeSchema = z.enum([IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND]);
+const NotFoundCodeSchema = z.enum([
+  IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND,
+  IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,
+]);
 
 export const IntegrationConnectionsNotFoundResponseSchema = z
   .object({
@@ -108,6 +114,7 @@ export const CreateApiKeyConnectionParamsSchema = z
 
 export const CreateApiKeyConnectionBodySchema = z
   .object({
+    displayName: z.string().min(1),
     apiKey: z.string().min(1),
   })
   .strict();
@@ -115,6 +122,29 @@ export const CreateApiKeyConnectionBodySchema = z
 export const StartOAuthConnectionParamsSchema = z
   .object({
     targetKey: z.string().min(1),
+  })
+  .strict();
+
+export const StartOAuthConnectionBodySchema = z
+  .object({
+    displayName: z.string().min(1).optional(),
+  })
+  .strict();
+
+export const UpdateApiKeyConnectionParamsSchema = z
+  .object({
+    connectionId: z.string().min(1),
+  })
+  .strict();
+
+export const UpdateIntegrationConnectionBodySchema = z
+  .object({
+    displayName: z.string().min(1),
+    apiKey: z
+      .string()
+      .min(1)
+      .regex(/\S/, "`apiKey` must contain at least one non-whitespace character when provided.")
+      .optional(),
   })
   .strict();
 
@@ -254,12 +284,87 @@ export const createApiKeyConnectionRoute = createRoute({
   },
 });
 
+export const updateIntegrationConnectionRoute = createRoute({
+  method: "put",
+  path: "/:connectionId",
+  tags: ["Integrations"],
+  request: {
+    params: UpdateApiKeyConnectionParamsSchema,
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: UpdateIntegrationConnectionBodySchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Update an existing integration connection.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ListIntegrationConnectionsBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsUnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsForbiddenResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Integration target or connection was not found.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsNotFoundResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
 export const startOAuthConnectionRoute = createRoute({
   method: "post",
   path: "/:targetKey/oauth/start",
   tags: ["Integrations"],
   request: {
     params: StartOAuthConnectionParamsSchema,
+    body: {
+      required: false,
+      content: {
+        "application/json": {
+          schema: StartOAuthConnectionBodySchema,
+        },
+      },
+    },
   },
   responses: {
     200: {

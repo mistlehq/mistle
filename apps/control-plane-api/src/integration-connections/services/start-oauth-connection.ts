@@ -12,6 +12,7 @@ const OAUTH_SESSION_TTL_MS = 10 * 60 * 1000;
 export type StartOauthConnectionInput = {
   organizationId: string;
   targetKey: string;
+  displayName?: string;
 };
 
 type StartedOauthConnection = {
@@ -53,6 +54,14 @@ async function persistOAuthSession(input: {
   }
 }
 
+function encodeOAuthStateMetadata(input: { state: string; displayName?: string }): string {
+  if (input.displayName === undefined) {
+    return input.state;
+  }
+
+  return `${input.state}.${Buffer.from(input.displayName, "utf8").toString("base64url")}`;
+}
+
 export async function startOAuthConnection(
   db: AppContext["var"]["db"],
   integrationsConfig: AppContext["var"]["config"]["integrations"],
@@ -63,7 +72,10 @@ export async function startOAuthConnection(
     invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_START_INPUT,
   });
 
-  const state = createOAuthState();
+  const state = encodeOAuthStateMetadata({
+    state: createOAuthState(),
+    ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
+  });
   const startedOauthConnection = await resolved.oauthHandler.start({
     organizationId: input.organizationId,
     targetKey: input.targetKey,

@@ -1,10 +1,5 @@
-import { dateFromEpochMs } from "@mistle/time";
-
 import type { OrganizationRole, SettingsMember } from "./members-api.js";
-
-const DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium",
-});
+export { formatDate } from "../../shared/date-formatters.js";
 
 const ROLE_LABELS: Record<OrganizationRole, string> = {
   owner: "Owner",
@@ -100,13 +95,4 @@ export function invitationStatusLabel(
   }
 
   return `${roleLabel} (${displayStatus.rawStatus})`;
-}
-
-export function formatDate(isoDateTime: string): string {
-  const epochMs = Date.parse(isoDateTime);
-  if (!Number.isFinite(epochMs)) {
-    return "Unknown";
-  }
-
-  return DATE_FORMATTER.format(dateFromEpochMs(epochMs));
 }

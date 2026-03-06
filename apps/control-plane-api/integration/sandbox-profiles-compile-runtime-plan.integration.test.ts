@@ -53,6 +53,7 @@ describe("sandbox profile compile runtime plan integration", () => {
       id: "icn_compile_success",
       organizationId: authenticatedSession.organizationId,
       targetKey: "openai-default",
+      displayName: "Compile Success Connection",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
         auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
@@ -288,6 +289,7 @@ trust_level = "trusted"
       id: "icn_missing",
       organizationId: inaccessibleConnectionSession.organizationId,
       targetKey: "openai-default-missing-connection",
+      displayName: "Foreign Compile Connection",
       status: IntegrationConnectionStatuses.ACTIVE,
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
@@ -370,6 +372,7 @@ trust_level = "trusted"
       id: "icn_compile_invalid_target_secrets",
       organizationId: authenticatedSession.organizationId,
       targetKey: "openai-default-invalid-target-secrets",
+      displayName: "Invalid Secrets Connection",
       status: IntegrationConnectionStatuses.ACTIVE,
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({

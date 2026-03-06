@@ -10,6 +10,7 @@ import {
   IntegrationConnectionsNotFoundResponseSchema,
   listIntegrationConnectionsRoute,
   startOAuthConnectionRoute,
+  updateIntegrationConnectionRoute,
 } from "./contracts.js";
 import { completeOAuthConnection } from "./services/complete-oauth-connection.js";
 import { createApiKeyConnection } from "./services/create-api-key-connection.js";
@@ -19,6 +20,7 @@ import {
 } from "./services/errors.js";
 import { listIntegrationConnections } from "./services/list-connections.js";
 import { startOAuthConnection } from "./services/start-oauth-connection.js";
+import { updateIntegrationConnection } from "./services/update-api-key-connection.js";
 
 export function createIntegrationConnectionsApp(): AppRoutes<
   typeof INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH
@@ -59,6 +61,7 @@ export function createIntegrationConnectionsApp(): AppRoutes<
         {
           organizationId: session.session.activeOrganizationId,
           targetKey: params.targetKey,
+          displayName: body.displayName,
           apiKey: body.apiKey,
         },
       );
@@ -69,9 +72,36 @@ export function createIntegrationConnectionsApp(): AppRoutes<
     }
   });
 
+  routes.openapi(updateIntegrationConnectionRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const body = ctx.req.valid("json");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+
+      const updatedConnection = await updateIntegrationConnection(
+        ctx.get("db"),
+        ctx.get("config").integrations,
+        {
+          organizationId: session.session.activeOrganizationId,
+          connectionId: params.connectionId,
+          displayName: body.displayName,
+          ...(body.apiKey === undefined ? {} : { apiKey: body.apiKey }),
+        },
+      );
+
+      return ctx.json(updatedConnection, 200);
+    } catch (error) {
+      return handleIntegrationConnectionMutationError(ctx, error);
+    }
+  });
+
   routes.openapi(startOAuthConnectionRoute, async (ctx) => {
     try {
       const params = ctx.req.valid("param");
+      const body = ctx.req.valid("json");
       const session = ctx.get("session");
       if (session === null) {
         throw new Error("Expected authenticated session to be available.");
@@ -83,6 +113,7 @@ export function createIntegrationConnectionsApp(): AppRoutes<
         {
           organizationId: session.session.activeOrganizationId,
           targetKey: params.targetKey,
+          ...(body.displayName === undefined ? {} : { displayName: body.displayName }),
         },
       );
 

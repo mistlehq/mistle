@@ -10,29 +10,25 @@ import {
   CardTitle,
   Skeleton,
 } from "@mistle/ui";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import {
-  type ConnectDialogState,
-  ConnectMethodIds,
-  ConnectIntegrationDialog,
-  type ConnectMethodId,
-} from "../integrations/connect-integration-dialog.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import { formatConnectionCount } from "../integrations/format-connection-count.js";
+import {
+  IntegrationConnectionDialog,
+  IntegrationConnectionMethodIds,
+  type IntegrationConnectionMethodId,
+} from "../integrations/integration-connection-dialog.js";
 import { IntegrationSection } from "../integrations/integration-section.js";
 import { IntegrationTile } from "../integrations/integration-tile.js";
-import {
-  createApiKeyIntegrationConnection,
-  listIntegrationDirectory,
-  startOAuthIntegrationConnection,
-} from "../integrations/integrations-service.js";
+import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import {
   type ViewDialogState,
   ViewConnectionsDialog,
 } from "../integrations/view-connections-dialog.js";
+import { useIntegrationConnectionDialogState } from "./use-integration-connection-dialog-state.js";
 
 const SETTINGS_INTEGRATIONS_QUERY_KEY: readonly ["settings", "integrations", "directory"] = [
   "settings",
@@ -40,37 +36,31 @@ const SETTINGS_INTEGRATIONS_QUERY_KEY: readonly ["settings", "integrations", "di
   "directory",
 ];
 
-function toConnectMethods(
+function toConnectionMethods(
   supportedAuthSchemes: readonly ("oauth" | "api-key")[] | undefined,
-): readonly ConnectMethodId[] {
+): readonly IntegrationConnectionMethodId[] {
   if (supportedAuthSchemes === undefined) {
     return [];
   }
+
   return supportedAuthSchemes.map((scheme) =>
-    scheme === "api-key" ? ConnectMethodIds.API_KEY : ConnectMethodIds.OAUTH,
+    scheme === "api-key"
+      ? IntegrationConnectionMethodIds.API_KEY
+      : IntegrationConnectionMethodIds.OAUTH,
   );
 }
 
 export function IntegrationsPage() {
-  const queryClient = useQueryClient();
-  const [connectDialog, setConnectDialog] = useState<ConnectDialogState | null>(null);
   const [viewDialog, setViewDialog] = useState<ViewDialogState | null>(null);
-  const [connectMethodId, setConnectMethodId] = useState<ConnectMethodId>(ConnectMethodIds.API_KEY);
-  const [apiKeyValue, setApiKeyValue] = useState("");
-  const [connectError, setConnectError] = useState<string | null>(null);
+
+  const connectionDialogState = useIntegrationConnectionDialogState({
+    queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
+  });
 
   const integrationsQuery = useQuery({
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
     queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
-  });
-
-  const createApiKeyMutation = useMutation({
-    mutationFn: async (input: { targetKey: string; apiKey: string }) =>
-      createApiKeyIntegrationConnection(input),
-  });
-
-  const startOAuthMutation = useMutation({
-    mutationFn: async (input: { targetKey: string }) => startOAuthIntegrationConnection(input),
+    retry: false,
   });
 
   const cards = useMemo(() => {
@@ -91,7 +81,7 @@ export function IntegrationsPage() {
       throw new Error(`Integration card was not found for target '${viewDialog.targetKey}'.`);
     }
 
-    return selectedCard.connections;
+    return selectedCard.connections.filter((connection) => connection.status === "active");
   }, [cards, viewDialog]);
 
   const activeIntegrationCards = useMemo(
@@ -99,91 +89,6 @@ export function IntegrationsPage() {
       cards.filter((card) => card.connections.some((connection) => connection.status === "active")),
     [cards],
   );
-
-  const connectMutationPending = createApiKeyMutation.isPending || startOAuthMutation.isPending;
-
-  function resetConnectDialogState(): void {
-    setConnectDialog(null);
-    setConnectMethodId(ConnectMethodIds.API_KEY);
-    setApiKeyValue("");
-    setConnectError(null);
-  }
-
-  function openConnectDialog(input: {
-    targetKey: string;
-    displayName: string;
-    methods: readonly ConnectMethodId[];
-  }): void {
-    setConnectDialog({
-      targetKey: input.targetKey,
-      displayName: input.displayName,
-      methods: input.methods,
-    });
-    const defaultMethod = input.methods[0];
-    if (defaultMethod === undefined) {
-      throw new Error(
-        `Integration target '${input.targetKey}' does not declare any supported auth scheme.`,
-      );
-    }
-    setConnectMethodId(defaultMethod);
-    setApiKeyValue("");
-    setConnectError(null);
-  }
-
-  function openViewDialog(input: { targetKey: string; displayName: string }): void {
-    setViewDialog({
-      targetKey: input.targetKey,
-      displayName: input.displayName,
-    });
-  }
-
-  async function runConnectAction(): Promise<void> {
-    if (connectDialog === null) {
-      throw new Error("Connect dialog is required to run a connect action.");
-    }
-    if (!connectDialog.methods.includes(connectMethodId)) {
-      throw new Error(
-        `Connect method '${connectMethodId}' is not supported for target '${connectDialog.targetKey}'.`,
-      );
-    }
-
-    if (connectMethodId === ConnectMethodIds.API_KEY) {
-      const normalizedApiKey = apiKeyValue.trim();
-      if (normalizedApiKey.length === 0) {
-        setConnectError("API key is required.");
-        return;
-      }
-
-      await createApiKeyMutation.mutateAsync({
-        targetKey: connectDialog.targetKey,
-        apiKey: normalizedApiKey,
-      });
-
-      await queryClient.invalidateQueries({
-        queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
-      });
-
-      resetConnectDialogState();
-      return;
-    }
-
-    const started = await startOAuthMutation.mutateAsync({
-      targetKey: connectDialog.targetKey,
-    });
-    globalThis.location.assign(started.authorizationUrl);
-  }
-
-  function handleRunConnectAction(): void {
-    setConnectError(null);
-    void runConnectAction().catch((error: unknown) => {
-      setConnectError(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not start integration connection.",
-        }),
-      );
-    });
-  }
 
   if (integrationsQuery.isPending) {
     return (
@@ -249,12 +154,12 @@ export function IntegrationsPage() {
               displayName={card.displayName}
               {...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey })}
               {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
-              onAction={() =>
-                openViewDialog({
+              onAction={() => {
+                setViewDialog({
                   targetKey: card.target.targetKey,
                   displayName: card.displayName,
-                })
-              }
+                });
+              }}
             />
           );
         }}
@@ -264,7 +169,7 @@ export function IntegrationsPage() {
       <IntegrationSection
         cards={cards}
         renderTile={(card) => {
-          const methods = toConnectMethods(card.target.supportedAuthSchemes);
+          const methods = toConnectionMethods(card.target.supportedAuthSchemes);
 
           return (
             <IntegrationTile
@@ -274,35 +179,36 @@ export function IntegrationsPage() {
               displayName={card.displayName}
               {...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey })}
               {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
-              onAction={() =>
-                openConnectDialog({
+              onAction={() => {
+                connectionDialogState.openDialog({
                   targetKey: card.target.targetKey,
-                  displayName: card.displayName,
+                  targetDisplayName: card.displayName,
                   methods,
-                })
-              }
+                  mode: "create",
+                });
+              }}
             />
           );
         }}
         title="Available Integrations"
       />
 
-      <ConnectIntegrationDialog
-        apiKeyValue={apiKeyValue}
-        connectError={connectError}
-        connectMethodId={connectMethodId}
-        dialog={connectDialog}
-        onApiKeyChange={(value) => {
-          setApiKeyValue(value);
-          setConnectError(null);
-        }}
-        onClose={resetConnectDialogState}
-        onMethodChange={(methodId) => {
-          setConnectMethodId(methodId);
-          setConnectError(null);
-        }}
-        onSubmit={handleRunConnectAction}
-        pending={connectMutationPending}
+      <IntegrationConnectionDialog
+        apiKeyValue={connectionDialogState.apiKeyValue}
+        connectionDisplayNamePlaceholder={connectionDialogState.connectionDisplayNamePlaceholder}
+        connectionDisplayNameValue={connectionDialogState.connectionDisplayNameValue}
+        connectError={connectionDialogState.error}
+        connectMethodId={connectionDialogState.methodId}
+        dialog={connectionDialogState.dialog}
+        hasChanges={connectionDialogState.hasChanges}
+        isApiKeyChanged={connectionDialogState.isApiKeyChanged}
+        isConnectionDisplayNameChanged={connectionDialogState.isConnectionDisplayNameChanged}
+        onApiKeyChange={connectionDialogState.onApiKeyChange}
+        onConnectionDisplayNameChange={connectionDialogState.onConnectionDisplayNameChange}
+        onClose={connectionDialogState.closeDialog}
+        onMethodChange={connectionDialogState.onMethodChange}
+        onSubmit={connectionDialogState.submitDialog}
+        pending={connectionDialogState.pending}
       />
 
       <ViewConnectionsDialog
@@ -310,6 +216,28 @@ export function IntegrationsPage() {
         dialog={viewDialog}
         onClose={() => {
           setViewDialog(null);
+        }}
+        onOpenEditConnectionDialog={({
+          connectionId,
+          connectionDisplayName,
+          connectionMethodId,
+        }) => {
+          if (viewDialog === null) {
+            throw new Error("View dialog state is required to open edit connection dialog.");
+          }
+
+          setViewDialog(null);
+          connectionDialogState.openDialog({
+            targetKey: viewDialog.targetKey,
+            targetDisplayName: viewDialog.displayName,
+            mode: "update",
+            connectionId,
+            connectionDisplayName,
+            currentMethodId:
+              connectionMethodId === null
+                ? IntegrationConnectionMethodIds.API_KEY
+                : connectionMethodId,
+          });
         }}
       />
     </div>

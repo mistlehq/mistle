@@ -55,6 +55,7 @@ describe("integration connections list integration", () => {
         id: "icn_001",
         organizationId: firstOrgSession.organizationId,
         targetKey: "github_cloud",
+        displayName: "GitHub Main",
         status: IntegrationConnectionStatuses.ACTIVE,
         externalSubjectId: "github-user-1",
         config: {
@@ -70,6 +71,7 @@ describe("integration connections list integration", () => {
         id: "icn_002",
         organizationId: firstOrgSession.organizationId,
         targetKey: "openai-default",
+        displayName: "OpenAI Backup",
         status: IntegrationConnectionStatuses.ERROR,
         createdAt: secondConnectionCreatedAt.toISOString(),
         updatedAt: secondConnectionCreatedAt.toISOString(),
@@ -78,6 +80,7 @@ describe("integration connections list integration", () => {
         id: "icn_003",
         organizationId: firstOrgSession.organizationId,
         targetKey: "github_cloud",
+        displayName: "GitHub Revoked",
         status: IntegrationConnectionStatuses.REVOKED,
         createdAt: thirdConnectionCreatedAt.toISOString(),
         updatedAt: thirdConnectionCreatedAt.toISOString(),
@@ -86,6 +89,7 @@ describe("integration connections list integration", () => {
         id: "icn_004",
         organizationId: secondOrgSession.organizationId,
         targetKey: "github_cloud",
+        displayName: "Other Org",
         status: IntegrationConnectionStatuses.ACTIVE,
         createdAt: thirdConnectionCreatedAt.toISOString(),
         updatedAt: thirdConnectionCreatedAt.toISOString(),
@@ -112,6 +116,7 @@ describe("integration connections list integration", () => {
       {
         id: "icn_001",
         targetKey: "github_cloud",
+        displayName: "GitHub Main",
         status: IntegrationConnectionStatuses.ACTIVE,
         externalSubjectId: "github-user-1",
         config: {
@@ -126,6 +131,7 @@ describe("integration connections list integration", () => {
       {
         id: "icn_002",
         targetKey: "openai-default",
+        displayName: "OpenAI Backup",
         status: IntegrationConnectionStatuses.ERROR,
         createdAt: secondConnectionCreatedAt.toISOString(),
         updatedAt: secondConnectionCreatedAt.toISOString(),
@@ -161,6 +167,7 @@ describe("integration connections list integration", () => {
       {
         id: "icn_003",
         targetKey: "github_cloud",
+        displayName: "GitHub Revoked",
         status: IntegrationConnectionStatuses.REVOKED,
         createdAt: thirdConnectionCreatedAt.toISOString(),
         updatedAt: thirdConnectionCreatedAt.toISOString(),

@@ -36,6 +36,7 @@ describe("sandbox profile version integration bindings get integration", () => {
         id: "icn_bindings_get_001",
         organizationId: authenticatedSession.organizationId,
         targetKey: "openai-default-bindings-get",
+        displayName: "Bindings Get Connection",
       })
       .returning();
 

@@ -1,12 +1,14 @@
 import {
-  Badge,
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@mistle/ui";
+import { PencilSimpleIcon } from "@phosphor-icons/react";
 
+import { formatDate } from "../shared/date-formatters.js";
 import type { IntegrationConnection } from "./integrations-service.js";
 
 export type ViewDialogState = {
@@ -18,6 +20,11 @@ type ViewConnectionsDialogProps = {
   connections: readonly IntegrationConnection[];
   dialog: ViewDialogState | null;
   onClose: () => void;
+  onOpenEditConnectionDialog: (input: {
+    connectionId: string;
+    connectionDisplayName: string;
+    connectionMethodId: "api-key" | "oauth" | null;
+  }) => void;
 };
 
 export function ViewConnectionsDialog(props: ViewConnectionsDialogProps) {
@@ -38,19 +45,43 @@ export function ViewConnectionsDialog(props: ViewConnectionsDialogProps) {
           </DialogHeader>
           <div className="gap-2 flex flex-col">
             {props.connections.map((connection) => {
-              const statusUi = resolveConnectionStatusVariant(connection.status);
+              const connectionAuthScheme = resolveConnectionAuthScheme(connection.config ?? null);
+              const connectionAuthMethodLabel =
+                connectionAuthScheme === null
+                  ? null
+                  : formatConnectionAuthMethodLabel(connectionAuthScheme);
               return (
-                <div className="border rounded-md p-3" key={connection.id}>
-                  <div className="items-center justify-between gap-2 flex">
-                    <p className="text-sm font-medium">{connection.id}</p>
-                    <Badge className={statusUi.className} variant={statusUi.variant}>
-                      {resolveConnectionStatusLabel(connection.status)}
-                    </Badge>
+                <div className="relative border rounded-md p-3" key={connection.id}>
+                  <Button
+                    aria-label="Edit connection"
+                    className="absolute top-3 right-3"
+                    onClick={() => {
+                      props.onOpenEditConnectionDialog({
+                        connectionId: connection.id,
+                        connectionDisplayName: connection.displayName,
+                        connectionMethodId: connectionAuthScheme,
+                      });
+                    }}
+                    size="icon-sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <PencilSimpleIcon aria-hidden className="size-4" />
+                  </Button>
+                  <div className="pr-10">
+                    <p className="text-sm font-medium">{connection.displayName}</p>
                   </div>
+                  {connectionAuthMethodLabel ? (
+                    <p className="text-muted-foreground mt-1 text-xs">
+                      Auth method: {connectionAuthMethodLabel}
+                    </p>
+                  ) : null}
                   <p className="text-muted-foreground mt-1 text-xs">
-                    Created: {connection.createdAt}
+                    Created: {formatDate(connection.createdAt)}
                   </p>
-                  <p className="text-muted-foreground text-xs">Updated: {connection.updatedAt}</p>
+                  <p className="text-muted-foreground text-xs">
+                    Updated: {formatDate(connection.updatedAt)}
+                  </p>
                 </div>
               );
             })}
@@ -61,35 +92,26 @@ export function ViewConnectionsDialog(props: ViewConnectionsDialogProps) {
   );
 }
 
-function resolveConnectionStatusLabel(status: IntegrationConnection["status"]): string {
-  if (status === "active") {
-    return "Connected";
-  }
-  if (status === "error") {
-    return "Error";
+function resolveConnectionAuthScheme(
+  config: Record<string, unknown> | null,
+): "api-key" | "oauth" | null {
+  if (config === null) {
+    return null;
   }
 
-  return "Revoked";
+  const authScheme = config["auth_scheme"];
+  if (authScheme === "api-key") {
+    return "api-key";
+  }
+  if (authScheme === "oauth") {
+    return "oauth";
+  }
+  return null;
 }
 
-function resolveConnectionStatusVariant(status: IntegrationConnection["status"]): {
-  className?: string;
-  variant: "secondary" | "destructive" | "outline";
-} {
-  if (status === "active") {
-    return {
-      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
-      variant: "secondary",
-    };
+function formatConnectionAuthMethodLabel(authScheme: "api-key" | "oauth"): string {
+  if (authScheme === "api-key") {
+    return "API key";
   }
-
-  if (status === "error") {
-    return {
-      variant: "destructive",
-    };
-  }
-
-  return {
-    variant: "outline",
-  };
+  return "OAuth";
 }

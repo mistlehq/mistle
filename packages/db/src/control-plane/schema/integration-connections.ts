@@ -32,6 +32,7 @@ export const integrationConnections = controlPlaneSchema.table(
     targetKey: text("target_key")
       .notNull()
       .references(() => integrationTargets.targetKey, { onDelete: "restrict" }),
+    displayName: text("display_name").notNull(),
     status: text("status")
       .notNull()
       .$type<IntegrationConnectionStatus>()

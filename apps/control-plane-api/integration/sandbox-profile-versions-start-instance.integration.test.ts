@@ -75,6 +75,7 @@ describe("sandbox profile version start instance integration", () => {
       id: "icn_missing_connection",
       organizationId: otherOrganizationSession.organizationId,
       targetKey,
+      displayName: "Foreign connection",
       status: IntegrationConnectionStatuses.ACTIVE,
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
