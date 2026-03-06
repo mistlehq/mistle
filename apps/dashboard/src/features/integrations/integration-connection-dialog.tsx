@@ -2,7 +2,6 @@ import {
   Button,
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -20,21 +19,39 @@ export const IntegrationConnectionMethodIds: {
   OAUTH: "oauth",
 };
 
-export type IntegrationConnectionDialogState = {
+type CreateIntegrationConnectionDialogState = {
   displayName: string;
   targetKey: string;
   methods: readonly IntegrationConnectionMethodId[];
-  mode: "create" | "update";
-  connectionId?: string;
+  mode: "create";
 };
+
+type UpdateIntegrationConnectionDialogState = {
+  connectionId: string;
+  currentMethodId: IntegrationConnectionMethodId;
+  displayName: string;
+  initialConnectionDisplayName?: string;
+  mode: "update";
+  targetKey: string;
+};
+
+export type IntegrationConnectionDialogState =
+  | CreateIntegrationConnectionDialogState
+  | UpdateIntegrationConnectionDialogState;
 
 type IntegrationConnectionDialogProps = {
   apiKeyValue: string;
+  connectionDisplayNamePlaceholder: string;
+  connectionDisplayNameValue: string;
   connectError: string | null;
   connectMethodId: IntegrationConnectionMethodId;
   dialog: IntegrationConnectionDialogState | null;
+  hasChanges: boolean;
+  isApiKeyChanged: boolean;
+  isConnectionDisplayNameChanged: boolean;
   pending: boolean;
   onApiKeyChange: (value: string) => void;
+  onConnectionDisplayNameChange: (value: string) => void;
   onClose: () => void;
   onMethodChange: (methodId: IntegrationConnectionMethodId) => void;
   onSubmit: () => void;
@@ -50,7 +67,7 @@ function formatIntegrationConnectionMethodLabel(methodId: IntegrationConnectionM
 export function IntegrationConnectionDialog(props: IntegrationConnectionDialogProps) {
   const dialog = props.dialog;
   const isUpdateMode = dialog?.mode === "update";
-  const supportsSingleMethod = dialog?.methods.length === 1;
+  const showMethodPicker = dialog?.mode === "create" && dialog.methods.length > 1;
 
   return (
     <Dialog
@@ -63,62 +80,76 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
     >
       {dialog ? (
         <DialogContent showCloseButton={false}>
-          <DialogHeader>
+          <DialogHeader variant="sectioned">
             <DialogTitle>
-              {isUpdateMode ? "Update API key" : `Connect ${dialog.displayName}?`}
+              {isUpdateMode ? "Edit Connection" : `Add ${dialog.displayName} Connection`}
             </DialogTitle>
-            {isUpdateMode ? (
-              <DialogDescription>
-                Set a new API key for connection {dialog.connectionId} in {dialog.displayName}.
-              </DialogDescription>
-            ) : (
-              <DialogDescription>
-                Choose an authentication method to create the integration connection.
-              </DialogDescription>
-            )}
           </DialogHeader>
 
-          {supportsSingleMethod ? null : (
-            <RadioGroup
-              className="gap-2"
-              name={`connect-auth-method-${dialog.targetKey}`}
-              onValueChange={(nextValue) => {
-                if (
-                  nextValue === IntegrationConnectionMethodIds.API_KEY ||
-                  nextValue === IntegrationConnectionMethodIds.OAUTH
-                ) {
-                  props.onMethodChange(nextValue);
-                }
+          <div className="gap-2 flex flex-col">
+            <p className="text-sm font-medium">Name</p>
+            <Input
+              autoComplete="off"
+              onChange={(event) => {
+                props.onConnectionDisplayNameChange(event.currentTarget.value);
               }}
-              value={props.connectMethodId}
-            >
-              {dialog.methods.map((methodId) => (
-                <label
-                  className="inline-flex items-center gap-2 text-sm"
-                  htmlFor={`connect-auth-method-${dialog.targetKey}-${methodId}`}
-                  key={methodId}
-                >
-                  <RadioGroupItem
-                    aria-label={formatIntegrationConnectionMethodLabel(methodId)}
-                    id={`connect-auth-method-${dialog.targetKey}-${methodId}`}
-                    value={methodId}
-                  />
-                  <span>{formatIntegrationConnectionMethodLabel(methodId)}</span>
-                </label>
-              ))}
-            </RadioGroup>
-          )}
+              placeholder={props.connectionDisplayNamePlaceholder}
+              type="text"
+              value={props.connectionDisplayNameValue}
+            />
+          </div>
+
+          {showMethodPicker ? (
+            <div className="gap-2 flex flex-col">
+              <p className="text-sm font-medium">Authentication method</p>
+              <RadioGroup
+                className="gap-2"
+                name={`connect-auth-method-${dialog.targetKey}`}
+                onValueChange={(nextValue) => {
+                  if (
+                    nextValue === IntegrationConnectionMethodIds.API_KEY ||
+                    nextValue === IntegrationConnectionMethodIds.OAUTH
+                  ) {
+                    props.onMethodChange(nextValue);
+                  }
+                }}
+                value={props.connectMethodId}
+              >
+                {dialog.methods.map((methodId) => (
+                  <label
+                    className="inline-flex items-center gap-2 text-sm"
+                    htmlFor={`connect-auth-method-${dialog.targetKey}-${methodId}`}
+                    key={methodId}
+                  >
+                    <RadioGroupItem
+                      aria-label={formatIntegrationConnectionMethodLabel(methodId)}
+                      id={`connect-auth-method-${dialog.targetKey}-${methodId}`}
+                      value={methodId}
+                    />
+                    <span>{formatIntegrationConnectionMethodLabel(methodId)}</span>
+                  </label>
+                ))}
+              </RadioGroup>
+            </div>
+          ) : null}
 
           {props.connectMethodId === IntegrationConnectionMethodIds.API_KEY ? (
             <div className="gap-2 flex flex-col">
-              <p className="text-sm font-medium">API key</p>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">API key</p>
+                {isUpdateMode && props.isApiKeyChanged ? (
+                  <span className="text-muted-foreground text-xs">Will update</span>
+                ) : null}
+              </div>
               <Input
                 autoComplete="off"
                 data-1p-ignore="true"
                 onChange={(event) => {
                   props.onApiKeyChange(event.currentTarget.value);
                 }}
-                placeholder="Enter API key"
+                placeholder={
+                  isUpdateMode ? "Leave blank to keep existing API key" : "Enter API key"
+                }
                 type="password"
                 value={props.apiKeyValue}
               />
@@ -137,12 +168,16 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
             <Button onClick={props.onClose} type="button" variant="outline">
               Cancel
             </Button>
-            <Button disabled={props.pending} onClick={props.onSubmit} type="button">
-              {props.connectMethodId === IntegrationConnectionMethodIds.API_KEY
-                ? isUpdateMode
-                  ? "Update API key"
-                  : "Create connection"
-                : "Continue with OAuth"}
+            <Button
+              disabled={props.pending || (isUpdateMode && !props.hasChanges)}
+              onClick={props.onSubmit}
+              type="button"
+            >
+              {isUpdateMode
+                ? "Save"
+                : props.connectMethodId === IntegrationConnectionMethodIds.API_KEY
+                  ? "Create connection"
+                  : "Continue with OAuth"}
             </Button>
           </DialogFooter>
         </DialogContent>
