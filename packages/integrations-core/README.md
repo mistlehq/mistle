@@ -44,7 +44,7 @@ Practical consequence: provider targets are the capability boundary. Users canno
 - `@mistle/integrations-definitions`
 - Registers concrete provider definitions (currently OpenAI and GitHub variants).
 - Each definition provides schemas and behavior for compile/auth/webhook handling.
-- Owns provider default target catalog construction (`buildDefaultSeedIntegrationTargets`) and shared browser-safe UI contracts/helpers consumed by dashboard.
+- Owns provider default target catalog construction (`buildDefaultSeedIntegrationTargets`) and shared browser-safe form helpers consumed by dashboard.
 
 - `apps/control-plane-api`
 - Hosts public Integrations HTTP endpoints.
@@ -91,18 +91,18 @@ Key fields and what they drive:
 | `kind`                                       | Integration kind (`agent` / `git` / `connector`)            | Binding validation during compile         |
 | `displayName`, `description`, `logoKey`      | UI metadata                                                 | Target discovery responses                |
 | `targetConfigSchema`                         | Parse/validate target config                                | target list/use, OAuth, compile, webhooks |
+| `targetConfigForm` (optional)                | Rendering metadata for target config                        | Operator-facing target config forms       |
 | `targetSecretSchema`                         | Parse/validate decrypted target secrets                     | OAuth, compile, webhooks                  |
+| `targetSecretForm` (optional)                | Rendering metadata for target secrets                       | Operator-facing target secret forms       |
 | `bindingConfigSchema`                        | Parse/validate per-binding config                           | Runtime plan compile                      |
+| `bindingConfigForm` (optional)               | Rendering metadata for per-binding config                   | Dashboard binding editor                  |
 | `connectionConfigSchema`                     | Parse/validate per-connection config                        | Binding write validation, compile         |
+| `connectionConfigForm` (optional)            | Rendering metadata for per-connection config                | Connection-related forms                  |
 | `supportedAuthSchemes`                       | Declares allowed auth methods                               | Connection creation and OAuth gating      |
 | `credentialResolvers` (optional)             | Dynamic credential generation/lookup                        | Internal credential resolution endpoint   |
 | `authHandlers.oauth` (optional)              | OAuth start/complete behavior                               | OAuth connection flows                    |
 | `webhookHandler` (optional)                  | Verify + parse inbound webhooks                             | Webhook ingest                            |
 | `validateBindingWriteContext(...)`           | Contextual target/connection/binding validation             | Binding write and compile parity checks   |
-| `projectTargetUi(...)` (optional)            | Projects validated target config to UI-safe data            | Target discovery projection               |
-| `targetUiProjectionSchema` (optional)        | Validates projected UI payload shape                        | Target discovery projection               |
-| `projectBindingEditorUi(...)` (optional)     | Projects validated target config to binding editor metadata | Target discovery projection               |
-| `bindingEditorUiProjectionSchema` (optional) | Validates projected binding editor payload shape            | Target discovery projection               |
 | `compileBinding(...)`                        | Generate egress/artifacts/runtime clients                   | Runtime plan compiler                     |
 
 ## Lifecycle End-To-End
@@ -130,14 +130,13 @@ flowchart TD
 
 - Targets are operator-managed records persisted in control-plane DB.
 - Discovery resolves metadata from definitions (`displayName`, `description`) with optional DB overrides.
-- Control-plane target discovery also returns definition-owned capability metadata (`logoKey`, `supportedAuthSchemes`) and projected UI-safe metadata derived from validated target config (`targetHealth`, `resolvedBindingEditorUi`).
-- UI consumers should prefer projection fields for behavior and rendering instead of parsing raw target config payloads directly.
-- Provider projection logic and projection schema are definition-owned. Control-plane only orchestrates parse/project/validate and returns generic projection envelopes.
-- For browser clients, definitions expose browser-safe contracts/parsers/helpers through `@mistle/integrations-definitions/ui` so dashboard code does not duplicate provider or contract logic.
+- Control-plane target discovery also returns definition-owned capability metadata (`logoKey`, `supportedAuthSchemes`) and config health metadata (`targetHealth`).
+- UI consumers may use raw target and connection config together with definition-owned schema/form metadata to resolve form rendering client-side.
+- For browser clients, definitions expose browser-safe schema/form helpers through `@mistle/integrations-definitions/forms` so dashboard code does not duplicate provider logic.
 
 ### 2) Connection creation
 
-- API key flow: validates target + auth support + user secret slots; stores encrypted credentials and connection config.
+- API key flow: validates target + auth support; stores encrypted credentials and connection config.
 - OAuth flow: uses `authHandlers.oauth.start` and `authHandlers.oauth.complete`; stores connection config and any returned credential materials.
 
 ### 3) Binding to sandbox profile version
@@ -198,10 +197,10 @@ This is the recommended workflow.
 - `target-secret-schema.ts` (if needed)
 - `binding-config-schema.ts`
 - `connection-config-schema.ts` (if connection config has integration-specific shape)
-- `ui-contract.ts` (provider-specific, optional): browser-safe provider projection schema/parser helpers when needed.
-- `projectBindingEditorUi(...)` + `bindingEditorUiProjectionSchema` (recommended): provider-owned binding editor projection and schema for `resolvedBindingEditorUi`.
+- `target-config-form.ts` / `target-secret-form.ts` / `binding-config-form.ts` / `connection-config-form.ts` (optional): provider-owned rendering metadata for the corresponding schema.
 - Keep schemas strict and normalized (for example URL normalization).
 - If binding semantics depend on cross-object context (target + connection + binding), implement `validateBindingWriteContext(...)` in the definition.
+- Keep schema fields as the source of truth for shape and validation. Form fields should only describe rendering behavior (widgets, ordering, labels, context-aware choice narrowing).
 
 4. Define auth behavior.
 
@@ -240,8 +239,8 @@ This is the recommended workflow.
 - Compile tests for egress/artifacts/runtime clients.
 - OAuth/webhook handler tests (if implemented).
 - Control-plane integration tests for connection and compile flows.
-- Projection contract tests: ensure `projectTargetUi(...)` output validates against `targetUiProjectionSchema`.
-- Browser-safe contract tests: ensure `ui-contract.ts` parser accepts valid projections and rejects invalid payloads.
+- Form resolution tests: ensure schema-backed form helpers produce the expected resolved JSON Schema and UI metadata.
+- Context-aware form tests: ensure target/connection/current-value context narrows or specializes rendering as intended.
 
 ## Design Principles
 
@@ -277,6 +276,7 @@ Useful entrypoints when reading the code:
 - `packages/integrations-core/src/binding-validation/index.ts`
 - `packages/integrations-core/src/webhooks/index.ts`
 - `packages/integrations-definitions/src/index.ts`
+- `packages/integrations-definitions/src/forms/*`
 - `apps/control-plane-api/src/integration-targets/*`
 - `apps/control-plane-api/src/integration-connections/*`
 - `apps/control-plane-api/src/integration-webhooks/*`
