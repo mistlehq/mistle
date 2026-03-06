@@ -282,12 +282,6 @@
                   "apiKey": {
                     "type": "string",
                     "minLength": 1
-                  },
-                  "secrets": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    }
                   }
                 },
                 "required": ["apiKey"],
@@ -686,12 +680,6 @@
                 "type": "object",
                 "properties": {
                   "query": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    }
-                  },
-                  "secrets": {
                     "type": "object",
                     "additionalProperties": {
                       "type": "string"

@@ -115,14 +115,6 @@ export type IntegrationResolvedTarget<
   secrets: TTargetSecrets;
 };
 
-export type IntegrationUserSecretSlot = {
-  key: string;
-  label: string;
-  description?: string;
-  required?: boolean;
-  valueSchema: IntegrationConfigSchema<string>;
-};
-
 type MaybePromise<TValue> = TValue | Promise<TValue>;
 
 export type EgressUrlRef = {
@@ -619,7 +611,6 @@ export type IntegrationDefinition<
     Record<string, string>
   >;
   agentCapabilities?: IntegrationDefinitionAgentCapabilities;
-  userSecretSlots?: ReadonlyArray<IntegrationUserSecretSlot>;
   validateBindingWriteContext?(
     input: BindingWriteValidationContext<
       ParsedSchemaOutput<TTargetConfigSchema>,

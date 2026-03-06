@@ -109,7 +109,6 @@ export const CreateApiKeyConnectionParamsSchema = z
 export const CreateApiKeyConnectionBodySchema = z
   .object({
     apiKey: z.string().min(1),
-    secrets: z.record(z.string(), z.string()).optional(),
   })
   .strict();
 
@@ -134,7 +133,6 @@ export const CompleteOAuthConnectionParamsSchema = z
 export const CompleteOAuthConnectionBodySchema = z
   .object({
     query: z.record(z.string(), z.string()),
-    secrets: z.record(z.string(), z.string()).optional(),
   })
   .strict();
 

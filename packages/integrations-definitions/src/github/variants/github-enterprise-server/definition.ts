@@ -12,7 +12,6 @@ import {
   GitHubTargetSecretSchema,
   type GitHubTargetSecrets,
 } from "../../shared/target-secret-schema.js";
-import { GitHubUserSecretSlots } from "../../shared/user-secret-slots.js";
 import { GitHubEnterpriseServerSupportedAuthSchemes } from "./auth.js";
 import {
   GitHubEnterpriseServerBindingConfigSchema,
@@ -54,6 +53,5 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   webhookHandler: GitHubEnterpriseServerWebhookHandler,
   projectBindingEditorUi: () => projectGitHubBindingEditorUi(),
   bindingEditorUiProjectionSchema: IntegrationBindingEditorUiProjectionSchema,
-  userSecretSlots: GitHubUserSecretSlots,
   compileBinding: compileGitHubEnterpriseServerBinding,
 };

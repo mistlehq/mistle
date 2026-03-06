@@ -60,7 +60,6 @@ export function createIntegrationConnectionsApp(): AppRoutes<
           organizationId: session.session.activeOrganizationId,
           targetKey: params.targetKey,
           apiKey: body.apiKey,
-          connectionSecrets: body.secrets ?? {},
         },
       );
 
@@ -109,7 +108,6 @@ export function createIntegrationConnectionsApp(): AppRoutes<
           organizationId: session.session.activeOrganizationId,
           targetKey: params.targetKey,
           query: body.query,
-          connectionSecrets: body.secrets ?? {},
         },
       );
 

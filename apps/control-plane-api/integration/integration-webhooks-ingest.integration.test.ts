@@ -10,7 +10,7 @@ import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
 import {
-  encryptIntegrationConnectionSecrets,
+  encryptIntegrationTargetSecrets,
   resolveMasterEncryptionKeyMaterial,
 } from "../src/integration-credentials/crypto.js";
 import {
@@ -109,6 +109,17 @@ describe("integration webhooks ingest integration", () => {
       email: "integration-webhooks-ingest-success@example.com",
     });
 
+    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    const encryptedTargetSecrets = encryptIntegrationTargetSecrets({
+      secrets: {
+        webhook_secret: webhookSecret,
+      },
+      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
+      masterEncryptionKeyMaterial,
+    });
     await fixture.db.insert(integrationTargets).values({
       targetKey,
       familyId: "github",
@@ -118,19 +129,9 @@ describe("integration webhooks ingest integration", () => {
         api_base_url: "https://api.github.com",
         web_base_url: "https://github.com",
       },
+      secrets: encryptedTargetSecrets,
     });
 
-    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const encryptedConnectionSecrets = encryptIntegrationConnectionSecrets({
-      secrets: {
-        webhook_secret: webhookSecret,
-      },
-      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-      masterEncryptionKeyMaterial,
-    });
     await fixture.db.insert(integrationConnections).values({
       id: connectionId,
       organizationId: authenticatedSession.organizationId,
@@ -138,7 +139,6 @@ describe("integration webhooks ingest integration", () => {
       status: IntegrationConnectionStatuses.ACTIVE,
       externalSubjectId: InstallationId,
       config: {},
-      secrets: encryptedConnectionSecrets,
     });
 
     const payloadObject = createGitHubWebhookPayload();
@@ -201,6 +201,17 @@ describe("integration webhooks ingest integration", () => {
       email: "integration-webhooks-ingest-invalid-signature@example.com",
     });
 
+    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    const encryptedTargetSecrets = encryptIntegrationTargetSecrets({
+      secrets: {
+        webhook_secret: webhookSecret,
+      },
+      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
+      masterEncryptionKeyMaterial,
+    });
     await fixture.db.insert(integrationTargets).values({
       targetKey,
       familyId: "github",
@@ -210,19 +221,9 @@ describe("integration webhooks ingest integration", () => {
         api_base_url: "https://api.github.com",
         web_base_url: "https://github.com",
       },
+      secrets: encryptedTargetSecrets,
     });
 
-    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const encryptedConnectionSecrets = encryptIntegrationConnectionSecrets({
-      secrets: {
-        webhook_secret: webhookSecret,
-      },
-      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-      masterEncryptionKeyMaterial,
-    });
     await fixture.db.insert(integrationConnections).values({
       id: "icn_webhook_ingest_invalid_signature",
       organizationId: authenticatedSession.organizationId,
@@ -230,7 +231,6 @@ describe("integration webhooks ingest integration", () => {
       status: IntegrationConnectionStatuses.ACTIVE,
       externalSubjectId: InstallationId,
       config: {},
-      secrets: encryptedConnectionSecrets,
     });
 
     const payloadObject = createGitHubWebhookPayload();
@@ -275,6 +275,16 @@ describe("integration webhooks ingest integration", () => {
         api_base_url: "https://api.github.com",
         web_base_url: "https://github.com",
       },
+      secrets: encryptIntegrationTargetSecrets({
+        secrets: {
+          webhook_secret: "whsec_missing_connection",
+        },
+        masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
+        masterEncryptionKeyMaterial: resolveMasterEncryptionKeyMaterial({
+          masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
+          masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+        }),
+      }),
     });
 
     const payload = JSON.stringify(createGitHubWebhookPayload());
@@ -307,6 +317,17 @@ describe("integration webhooks ingest integration", () => {
       email: "integration-webhooks-ingest-duplicate@example.com",
     });
 
+    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    const encryptedTargetSecrets = encryptIntegrationTargetSecrets({
+      secrets: {
+        webhook_secret: webhookSecret,
+      },
+      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
+      masterEncryptionKeyMaterial,
+    });
     await fixture.db.insert(integrationTargets).values({
       targetKey,
       familyId: "github",
@@ -316,19 +337,9 @@ describe("integration webhooks ingest integration", () => {
         api_base_url: "https://api.github.com",
         web_base_url: "https://github.com",
       },
+      secrets: encryptedTargetSecrets,
     });
 
-    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
-      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
-    });
-    const encryptedConnectionSecrets = encryptIntegrationConnectionSecrets({
-      secrets: {
-        webhook_secret: webhookSecret,
-      },
-      masterKeyVersion: fixture.config.integrations.activeMasterEncryptionKeyVersion,
-      masterEncryptionKeyMaterial,
-    });
     await fixture.db.insert(integrationConnections).values({
       id: "icn_webhook_ingest_duplicate",
       organizationId: authenticatedSession.organizationId,
@@ -336,7 +347,6 @@ describe("integration webhooks ingest integration", () => {
       status: IntegrationConnectionStatuses.ACTIVE,
       externalSubjectId: InstallationId,
       config: {},
-      secrets: encryptedConnectionSecrets,
     });
 
     const payload = JSON.stringify(createGitHubWebhookPayload());
