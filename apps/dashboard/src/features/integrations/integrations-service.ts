@@ -254,6 +254,37 @@ export async function createApiKeyIntegrationConnection(input: {
   }
 }
 
+export async function updateApiKeyIntegrationConnection(input: {
+  connectionId: string;
+  apiKey: string;
+}): Promise<CreatedIntegrationConnection> {
+  try {
+    const response = await requestControlPlane({
+      operation: "updateApiKeyIntegrationConnection",
+      method: "PUT",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/api-key`,
+      body: {
+        apiKey: input.apiKey,
+      },
+      fallbackMessage: "Could not update integration connection API key.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: IntegrationConnectionSchema,
+      operation: "updateApiKeyIntegrationConnection",
+    });
+  } catch (error) {
+    throw new IntegrationsApiError(
+      normalizeHttpApiError({
+        operation: "updateApiKeyIntegrationConnection",
+        error,
+        fallbackMessage: "Could not update integration connection API key.",
+      }),
+    );
+  }
+}
+
 export async function startOAuthIntegrationConnection(input: {
   targetKey: string;
 }): Promise<StartedOAuthConnection> {

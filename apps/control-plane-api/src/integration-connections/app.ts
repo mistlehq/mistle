@@ -10,6 +10,7 @@ import {
   IntegrationConnectionsNotFoundResponseSchema,
   listIntegrationConnectionsRoute,
   startOAuthConnectionRoute,
+  updateApiKeyConnectionRoute,
 } from "./contracts.js";
 import { completeOAuthConnection } from "./services/complete-oauth-connection.js";
 import { createApiKeyConnection } from "./services/create-api-key-connection.js";
@@ -19,6 +20,7 @@ import {
 } from "./services/errors.js";
 import { listIntegrationConnections } from "./services/list-connections.js";
 import { startOAuthConnection } from "./services/start-oauth-connection.js";
+import { updateApiKeyConnection } from "./services/update-api-key-connection.js";
 
 export function createIntegrationConnectionsApp(): AppRoutes<
   typeof INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH
@@ -64,6 +66,31 @@ export function createIntegrationConnectionsApp(): AppRoutes<
       );
 
       return ctx.json(createdConnection, 201);
+    } catch (error) {
+      return handleIntegrationConnectionMutationError(ctx, error);
+    }
+  });
+
+  routes.openapi(updateApiKeyConnectionRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const body = ctx.req.valid("json");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+
+      const updatedConnection = await updateApiKeyConnection(
+        ctx.get("db"),
+        ctx.get("config").integrations,
+        {
+          organizationId: session.session.activeOrganizationId,
+          connectionId: params.connectionId,
+          apiKey: body.apiKey,
+        },
+      );
+
+      return ctx.json(updatedConnection, 200);
     } catch (error) {
       return handleIntegrationConnectionMutationError(ctx, error);
     }

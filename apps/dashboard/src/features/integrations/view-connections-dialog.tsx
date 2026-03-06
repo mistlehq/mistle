@@ -1,5 +1,5 @@
 import {
-  Badge,
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -7,6 +7,7 @@ import {
   DialogTitle,
 } from "@mistle/ui";
 
+import { formatDate } from "../shared/date-formatters.js";
 import type { IntegrationConnection } from "./integrations-service.js";
 
 export type ViewDialogState = {
@@ -18,6 +19,7 @@ type ViewConnectionsDialogProps = {
   connections: readonly IntegrationConnection[];
   dialog: ViewDialogState | null;
   onClose: () => void;
+  onOpenUpdateApiKeyDialog: (connectionId: string) => void;
 };
 
 export function ViewConnectionsDialog(props: ViewConnectionsDialogProps) {
@@ -38,19 +40,33 @@ export function ViewConnectionsDialog(props: ViewConnectionsDialogProps) {
           </DialogHeader>
           <div className="gap-2 flex flex-col">
             {props.connections.map((connection) => {
-              const statusUi = resolveConnectionStatusVariant(connection.status);
+              const isApiKeyConnection =
+                resolveConnectionAuthScheme(connection.config ?? null) === "api-key";
               return (
                 <div className="border rounded-md p-3" key={connection.id}>
                   <div className="items-center justify-between gap-2 flex">
                     <p className="text-sm font-medium">{connection.id}</p>
-                    <Badge className={statusUi.className} variant={statusUi.variant}>
-                      {resolveConnectionStatusLabel(connection.status)}
-                    </Badge>
                   </div>
+                  {isApiKeyConnection ? (
+                    <div className="mt-2 flex justify-end">
+                      <Button
+                        onClick={() => {
+                          props.onOpenUpdateApiKeyDialog(connection.id);
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        Update API key
+                      </Button>
+                    </div>
+                  ) : null}
                   <p className="text-muted-foreground mt-1 text-xs">
-                    Created: {connection.createdAt}
+                    Created: {formatDate(connection.createdAt)}
                   </p>
-                  <p className="text-muted-foreground text-xs">Updated: {connection.updatedAt}</p>
+                  <p className="text-muted-foreground text-xs">
+                    Updated: {formatDate(connection.updatedAt)}
+                  </p>
                 </div>
               );
             })}
@@ -61,35 +77,19 @@ export function ViewConnectionsDialog(props: ViewConnectionsDialogProps) {
   );
 }
 
-function resolveConnectionStatusLabel(status: IntegrationConnection["status"]): string {
-  if (status === "active") {
-    return "Connected";
-  }
-  if (status === "error") {
-    return "Error";
-  }
-
-  return "Revoked";
-}
-
-function resolveConnectionStatusVariant(status: IntegrationConnection["status"]): {
-  className?: string;
-  variant: "secondary" | "destructive" | "outline";
-} {
-  if (status === "active") {
-    return {
-      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
-      variant: "secondary",
-    };
+function resolveConnectionAuthScheme(
+  config: Record<string, unknown> | null,
+): "api-key" | "oauth" | null {
+  if (config === null) {
+    return null;
   }
 
-  if (status === "error") {
-    return {
-      variant: "destructive",
-    };
+  const authScheme = config["auth_scheme"];
+  if (authScheme === "api-key") {
+    return "api-key";
   }
-
-  return {
-    variant: "outline",
-  };
+  if (authScheme === "oauth") {
+    return "oauth";
+  }
+  return null;
 }

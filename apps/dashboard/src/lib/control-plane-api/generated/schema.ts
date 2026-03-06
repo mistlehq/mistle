@@ -71,7 +71,9 @@ export interface paths {
                     | "INVALID_LIST_CONNECTIONS_INPUT"
                     | "INVALID_PAGINATION_CURSOR"
                     | "INVALID_CREATE_CONNECTION_INPUT"
+                    | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
+                    | "API_KEY_CONNECTION_REQUIRED"
                     | "INVALID_OAUTH_START_INPUT"
                     | "INVALID_OAUTH_COMPLETE_INPUT"
                     | "OAUTH_NOT_SUPPORTED"
@@ -131,6 +133,148 @@ export interface paths {
       };
     };
     put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integration/connections/:connectionId/api-key": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          connectionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            apiKey: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Update the API key for an existing API-key integration connection. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              config?: {
+                [key: string]: unknown;
+              };
+              createdAt: string;
+              externalSubjectId?: string;
+              id: string;
+              /** @enum {string} */
+              status: "active" | "error" | "revoked";
+              targetKey: string;
+              targetSnapshotConfig?: {
+                [key: string]: unknown;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_LIST_CONNECTIONS_INPUT"
+                    | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_CREATE_CONNECTION_INPUT"
+                    | "INVALID_UPDATE_CONNECTION_INPUT"
+                    | "API_KEY_NOT_SUPPORTED"
+                    | "API_KEY_CONNECTION_REQUIRED"
+                    | "INVALID_OAUTH_START_INPUT"
+                    | "INVALID_OAUTH_COMPLETE_INPUT"
+                    | "OAUTH_NOT_SUPPORTED"
+                    | "OAUTH_HANDLER_NOT_CONFIGURED"
+                    | "OAUTH_STATE_INVALID"
+                    | "OAUTH_STATE_EXPIRED"
+                    | "OAUTH_STATE_ALREADY_USED";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration target or connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
     post?: never;
     delete?: never;
     options?: never;
@@ -200,7 +344,9 @@ export interface paths {
                     | "INVALID_LIST_CONNECTIONS_INPUT"
                     | "INVALID_PAGINATION_CURSOR"
                     | "INVALID_CREATE_CONNECTION_INPUT"
+                    | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
+                    | "API_KEY_CONNECTION_REQUIRED"
                     | "INVALID_OAUTH_START_INPUT"
                     | "INVALID_OAUTH_COMPLETE_INPUT"
                     | "OAUTH_NOT_SUPPORTED"
@@ -256,7 +402,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "TARGET_NOT_FOUND";
+              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND";
               message: string;
             };
           };
@@ -342,7 +488,9 @@ export interface paths {
                     | "INVALID_LIST_CONNECTIONS_INPUT"
                     | "INVALID_PAGINATION_CURSOR"
                     | "INVALID_CREATE_CONNECTION_INPUT"
+                    | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
+                    | "API_KEY_CONNECTION_REQUIRED"
                     | "INVALID_OAUTH_START_INPUT"
                     | "INVALID_OAUTH_COMPLETE_INPUT"
                     | "OAUTH_NOT_SUPPORTED"
@@ -398,7 +546,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "TARGET_NOT_FOUND";
+              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND";
               message: string;
             };
           };
@@ -465,7 +613,9 @@ export interface paths {
                     | "INVALID_LIST_CONNECTIONS_INPUT"
                     | "INVALID_PAGINATION_CURSOR"
                     | "INVALID_CREATE_CONNECTION_INPUT"
+                    | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
+                    | "API_KEY_CONNECTION_REQUIRED"
                     | "INVALID_OAUTH_START_INPUT"
                     | "INVALID_OAUTH_COMPLETE_INPUT"
                     | "OAUTH_NOT_SUPPORTED"
@@ -521,7 +671,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "TARGET_NOT_FOUND";
+              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND";
               message: string;
             };
           };
