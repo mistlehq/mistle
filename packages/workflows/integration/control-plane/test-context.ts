@@ -121,7 +121,6 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
               }),
               ensureAutomationSandbox: async () => ({
                 sandboxInstanceId: "sbi_test",
-                providerSandboxId: "provider_test",
                 startupWorkflowRunId: "wf_start_sandbox_test",
               }),
               acquireAutomationConnection: async () => ({
@@ -171,7 +170,6 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
               startSandboxProfileInstance: async () => ({
                 workflowRunId: "wf_start_sandbox_test",
                 sandboxInstanceId: "sbi_test",
-                providerSandboxId: "provider_test",
               }),
             },
           },

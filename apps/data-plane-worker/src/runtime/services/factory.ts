@@ -1,5 +1,8 @@
 import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
-import { insertSandboxInstance } from "./insert-sandbox-instance.js";
+import {
+  ensureSandboxInstance,
+  persistSandboxInstanceProvisioning,
+} from "./insert-sandbox-instance.js";
 import { startSandbox } from "./start-sandbox.js";
 import { stopSandbox } from "./stop-sandbox.js";
 import type {
@@ -60,8 +63,17 @@ export function createDataPlaneWorkerServices(
         },
       },
       sandboxInstances: {
-        createSandboxInstance: async (workflowInput) => {
-          return insertSandboxInstance(
+        ensureSandboxInstance: async (workflowInput) => {
+          return ensureSandboxInstance(
+            {
+              db: input.db,
+              provider: input.config.app.sandbox.provider,
+            },
+            workflowInput,
+          );
+        },
+        persistSandboxInstanceProvisioning: async (workflowInput) => {
+          await persistSandboxInstanceProvisioning(
             {
               db: input.db,
             },

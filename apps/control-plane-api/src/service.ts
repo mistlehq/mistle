@@ -37,7 +37,7 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
     db: resources.db,
     openWorkflow: resources.openWorkflow,
     integrationsConfig: config.integrations,
-    mintSandboxInstanceConnectionToken: sandboxInstancesService.mintConnectionToken,
+    dataPlaneClient,
   });
 
   return {

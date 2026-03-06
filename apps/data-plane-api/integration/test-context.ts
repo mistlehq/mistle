@@ -187,6 +187,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneApiIntegrationFixture }>({
         const runtime = await createDataPlaneApiRuntime({
           app: config,
           internalAuthServiceToken: sharedInfraConfig.internalAuthServiceToken,
+          sandboxProvider: "docker",
         });
         await runtime.start();
         cleanupTasks.unshift(async () => {

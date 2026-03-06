@@ -87,6 +87,8 @@ describe("tRPC internal service auth integration", () => {
       instanceId: sandboxInstanceId,
     });
     expect(response).toEqual({
+      failureCode: null,
+      failureMessage: null,
       id: sandboxInstanceId,
       status: "running",
     });

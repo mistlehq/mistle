@@ -35,7 +35,6 @@ export type EnsureAutomationSandboxInput = {
 
 export type EnsuredAutomationSandbox = {
   sandboxInstanceId: string;
-  providerSandboxId: string;
   startupWorkflowRunId: string;
 };
 

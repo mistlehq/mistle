@@ -9,6 +9,7 @@ export type StartSandboxInstanceWorkflowImageInput = Pick<
 >;
 
 export type StartSandboxInstanceWorkflowInput = {
+  sandboxInstanceId: string;
   organizationId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number;

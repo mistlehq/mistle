@@ -54,6 +54,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET",
   },
   {
+    configPath: ["global", "sandbox", "provider"],
+    tomlPath: ["global", "sandbox", "provider"],
+    envVar: "MISTLE_GLOBAL_SANDBOX_PROVIDER",
+  },
+  {
     configPath: ["global", "sandbox", "defaultBaseImage"],
     tomlPath: ["global", "sandbox", "default_base_image"],
     envVar: "MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE",

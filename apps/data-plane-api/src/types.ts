@@ -9,6 +9,7 @@ export type DataPlaneApiGlobalConfig = NonNullable<LoadDataPlaneApiConfigResult[
 export type DataPlaneApiRuntimeConfig = {
   app: DataPlaneApiConfig;
   internalAuthServiceToken: DataPlaneApiGlobalConfig["internalAuth"]["serviceToken"];
+  sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
 };
 
 export type AppContextBindings = {
@@ -18,6 +19,7 @@ export type AppContextBindings = {
 export type AppContextVariables = {
   config: DataPlaneApiConfig;
   internalAuthServiceToken: string;
+  sandboxProvider: DataPlaneApiGlobalConfig["sandbox"]["provider"];
 };
 
 export type AppContext = Context<AppContextBindings>;

@@ -20,12 +20,15 @@ export type TunnelConnectAckService = StartSandboxInstanceWorkflowServices["tunn
 export type StartSandboxInput = Parameters<SandboxLifecycleService["startSandbox"]>[0];
 export type StartSandboxOutput = Awaited<ReturnType<SandboxLifecycleService["startSandbox"]>>;
 export type StopSandboxInput = Parameters<SandboxLifecycleService["stopSandbox"]>[0];
-export type CreateSandboxInstanceInput = Parameters<
-  SandboxInstanceStoreService["createSandboxInstance"]
+export type EnsureSandboxInstanceInput = Parameters<
+  SandboxInstanceStoreService["ensureSandboxInstance"]
 >[0];
-export type CreateSandboxInstanceOutput = Awaited<
-  ReturnType<SandboxInstanceStoreService["createSandboxInstance"]>
+export type EnsureSandboxInstanceOutput = Awaited<
+  ReturnType<SandboxInstanceStoreService["ensureSandboxInstance"]>
 >;
+export type PersistSandboxInstanceProvisioningInput = Parameters<
+  SandboxInstanceStoreService["persistSandboxInstanceProvisioning"]
+>[0];
 export type MarkSandboxInstanceRunningInput = Parameters<
   SandboxInstanceStoreService["markSandboxInstanceRunning"]
 >[0];

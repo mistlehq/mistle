@@ -26,6 +26,7 @@ describe("parseConfigRecord", () => {
           serviceToken: "test-service-token",
         },
         sandbox: {
+          provider: "modal",
           defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
@@ -188,6 +189,7 @@ describe("parseConfigRecord", () => {
           serviceToken: "test-service-token",
         },
         sandbox: {
+          provider: "docker",
           defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
           gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
           internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",

@@ -1,5 +1,4 @@
 import type { SandboxAdapter } from "@mistle/sandbox";
-import { typeid } from "typeid-js";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
 import type { StartSandboxInput, StartSandboxOutput } from "./types.js";
@@ -35,10 +34,6 @@ export function resolveSandboxRuntimeTracesEndpoint(
   return parsedURL.toString();
 }
 
-function createSandboxInstanceId(): string {
-  return typeid("sbi").toString();
-}
-
 export async function startSandbox(
   deps: {
     config: DataPlaneWorkerRuntimeConfig;
@@ -46,7 +41,6 @@ export async function startSandbox(
   },
   input: StartSandboxInput,
 ): Promise<StartSandboxOutput> {
-  const sandboxInstanceId = createSandboxInstanceId();
   const sandboxRuntimeTracesEndpoint = resolveSandboxRuntimeTracesEndpoint({
     sandboxProvider: deps.config.app.sandbox.provider,
     telemetryConfig: deps.config.telemetry,
@@ -60,7 +54,7 @@ export async function startSandbox(
     env: {
       [SandboxRuntimeTokenizerProxyEgressBaseURLEnv]:
         deps.config.app.sandbox.tokenizerProxyEgressBaseUrl,
-      [SandboxRuntimeSandboxInstanceIDEnv]: sandboxInstanceId,
+      [SandboxRuntimeSandboxInstanceIDEnv]: input.sandboxInstanceId,
       ...(sandboxRuntimeTracesEndpoint === undefined
         ? {}
         : {
@@ -76,13 +70,13 @@ export async function startSandbox(
   const bootstrapTokenJti = await writeSandboxStartupInput({
     config: deps.config,
     sandboxAdapter: deps.sandboxAdapter,
-    sandboxInstanceId,
+    sandboxInstanceId: input.sandboxInstanceId,
     runtimePlan: input.runtimePlan,
     sandbox: startedSandbox,
   });
 
   return {
-    sandboxInstanceId,
+    sandboxInstanceId: input.sandboxInstanceId,
     provider: startedSandbox.provider,
     providerSandboxId: startedSandbox.sandboxId,
     bootstrapTokenJti,

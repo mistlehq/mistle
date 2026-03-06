@@ -115,11 +115,7 @@ export const SandboxProfileVersionParamsSchema = z
   })
   .strict();
 
-export const StartSandboxProfileInstanceBodySchema = z
-  .object({
-    issueConnectionToken: z.boolean().optional(),
-  })
-  .strict();
+export const StartSandboxProfileInstanceBodySchema = z.object({}).strict();
 
 const BadRequestCodeSchema = z.enum([
   SandboxProfilesBadRequestCodes.INVALID_LIST_PROFILES_INPUT,
@@ -249,20 +245,11 @@ export const SandboxProfileDeletionAcceptedResponseSchema = z
     profileId: z.string().min(1),
   })
   .strict();
-export const SandboxInstanceConnectionSchema = z
-  .object({
-    url: z.url(),
-    token: z.string().min(1),
-    expiresAt: z.string().min(1),
-  })
-  .strict();
 export const StartSandboxProfileInstanceResponseSchema = z
   .object({
-    status: z.literal("completed"),
+    status: z.literal("accepted"),
     workflowRunId: z.string().min(1),
     sandboxInstanceId: z.string().min(1),
-    providerSandboxId: z.string().min(1),
-    connection: SandboxInstanceConnectionSchema.optional(),
   })
   .strict();
 

@@ -229,7 +229,6 @@ function createDeliverInput(connectionUrl: string): DeliverAutomationPayloadServ
     },
     ensuredAutomationSandbox: {
       sandboxInstanceId: "sbi_test_001",
-      providerSandboxId: "provider_sandbox_001",
       startupWorkflowRunId: "wfr_start_001",
     },
     acquiredAutomationConnection: {

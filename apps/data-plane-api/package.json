@@ -25,7 +25,8 @@
     "@mistle/workflows": "workspace:*",
     "@trpc/server": "^11.11.0",
     "hono": "^4.12.5",
-    "pg": "^8.19.0"
+    "pg": "^8.19.0",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",

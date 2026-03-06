@@ -1,3 +1,4 @@
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import type {
   ControlPlaneDatabase,
   IntegrationBindingKind,
@@ -6,13 +7,9 @@ import type {
   SandboxProfileVersionIntegrationBinding,
 } from "@mistle/db/control-plane";
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
-import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
-import type {
-  StartSandboxProfileInstanceWorkflowInput,
-  createControlPlaneOpenWorkflow,
-} from "@mistle/workflows/control-plane";
+import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 
 import type { ListProfilesInput } from "./list-profiles.js";
 
@@ -25,18 +22,7 @@ export type CreateSandboxProfilesServiceInput = {
     activeMasterEncryptionKeyVersion: number;
     masterEncryptionKeys: Record<string, string>;
   };
-  mintSandboxInstanceConnectionToken?: (input: {
-    organizationId: string;
-    instanceId: string;
-    gatewayWebsocketUrl: string;
-    tokenTtlSeconds: number;
-    tokenConfig: ConnectionTokenConfig;
-  }) => Promise<{
-    instanceId: string;
-    url: string;
-    token: string;
-    expiresAt: string;
-  }>;
+  dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "startSandboxInstance">;
 };
 
 export type SandboxProfilesService = {
@@ -81,28 +67,20 @@ export type SandboxProfilesService = {
     organizationId: string;
     profileId: string;
     profileVersion: number;
-    issueConnectionToken?: boolean;
-    connectionToken?: {
-      gatewayWebsocketUrl: string;
-      tokenTtlSeconds: number;
-      tokenConfig: ConnectionTokenConfig;
-    };
     startedBy: {
       kind: SandboxInstanceStarterKind;
       id: string;
     };
     source: SandboxInstanceSource;
-    image: StartSandboxProfileInstanceWorkflowInput["image"];
+    image: {
+      imageId: string;
+      kind: "base" | "snapshot";
+      createdAt: string;
+    };
   }) => Promise<{
-    status: "completed";
+    status: "accepted";
     workflowRunId: string;
     sandboxInstanceId: string;
-    providerSandboxId: string;
-    connection?: {
-      url: string;
-      token: string;
-      expiresAt: string;
-    };
   }>;
   compileProfileVersionRuntimePlan: (input: {
     organizationId: string;

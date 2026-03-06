@@ -1031,6 +1031,121 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/sandbox/instances/{instanceId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          instanceId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get sandbox instance provisioning/runtime status. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              failureCode: string | null;
+              failureMessage: string | null;
+              id: string;
+              /** @enum {string} */
+              status: "starting" | "running" | "stopped" | "failed";
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_INSTANCE_ID";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Sandbox instance was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "INSTANCE_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/instances/{instanceId}/connection-tokens": {
     parameters: {
       query?: never;
@@ -1798,9 +1913,7 @@ export interface paths {
       };
       requestBody?: {
         content: {
-          "application/json": {
-            issueConnectionToken?: boolean;
-          };
+          "application/json": Record<string, never>;
         };
       };
       responses: {
@@ -1811,16 +1924,9 @@ export interface paths {
           };
           content: {
             "application/json": {
-              connection?: {
-                expiresAt: string;
-                token: string;
-                /** Format: uri */
-                url: string;
-              };
-              providerSandboxId: string;
               sandboxInstanceId: string;
               /** @enum {string} */
-              status: "completed";
+              status: "accepted";
               workflowRunId: string;
             };
           };

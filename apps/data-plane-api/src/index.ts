@@ -8,6 +8,7 @@ async function startDataPlaneApi(): Promise<void> {
   const runtime = await createDataPlaneApiRuntime({
     app: appConfig,
     internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
+    sandboxProvider: globalConfig.sandbox.provider,
   });
 
   await runtime.start();

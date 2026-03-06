@@ -10,8 +10,8 @@ import {
   GetSandboxInstanceResponseSchema,
   type GetSandboxInstanceInput,
   type GetSandboxInstanceResponse,
-  StartSandboxInstanceCompletedResponseSchema,
-  type StartSandboxInstanceCompletedResponse,
+  StartSandboxInstanceAcceptedResponseSchema,
+  type StartSandboxInstanceAcceptedResponse,
   StartSandboxInstanceInputSchema,
   type StartSandboxInstanceInput,
 } from "./contracts/index.js";
@@ -23,7 +23,7 @@ type GetSandboxProcedureSchemas = {
 
 type StartSandboxProcedureSchemas = {
   inputSchema: typeof StartSandboxInstanceInputSchema;
-  outputSchema: typeof StartSandboxInstanceCompletedResponseSchema;
+  outputSchema: typeof StartSandboxInstanceAcceptedResponseSchema;
 };
 
 export function createDataPlaneSandboxInstancesTrpcRouter<
@@ -45,7 +45,7 @@ export function createDataPlaneSandboxInstancesTrpcRouter<
     }),
     start: input.createStartProcedure({
       inputSchema: StartSandboxInstanceInputSchema,
-      outputSchema: StartSandboxInstanceCompletedResponseSchema,
+      outputSchema: StartSandboxInstanceAcceptedResponseSchema,
     }),
   });
 }
@@ -64,9 +64,9 @@ export function createDataPlaneTrpcRouter<
 
 const t = initTRPC.create();
 
-function createTypeOnlyStartSandboxInstanceCompletedResponse(
+function createTypeOnlyStartSandboxInstanceAcceptedResponse(
   _input: StartSandboxInstanceInput,
-): Promise<StartSandboxInstanceCompletedResponse> {
+): Promise<StartSandboxInstanceAcceptedResponse> {
   throw new Error("Data plane tRPC contract router is type-only and should not execute.");
 }
 
@@ -90,7 +90,7 @@ const sandboxInstancesTrpcRouterContract = createDataPlaneSandboxInstancesTrpcRo
       .input(schemas.inputSchema)
       .output(schemas.outputSchema)
       .mutation(({ input }) => {
-        return createTypeOnlyStartSandboxInstanceCompletedResponse(input);
+        return createTypeOnlyStartSandboxInstanceAcceptedResponse(input);
       }),
 });
 

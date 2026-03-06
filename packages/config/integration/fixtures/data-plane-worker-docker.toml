@@ -1,6 +1,20 @@
 [global]
 env = "development"
 
+[global.telemetry]
+enabled = true
+debug = false
+resource_attributes = "deployment.environment=test"
+
+[global.telemetry.traces]
+endpoint = "http://127.0.0.1:4318/v1/traces"
+
+[global.telemetry.logs]
+endpoint = "http://127.0.0.1:4318/v1/logs"
+
+[global.telemetry.metrics]
+endpoint = "http://127.0.0.1:4318/v1/metrics"
+
 [global.internal_auth]
 service_token = "fixture-service-token"
 
@@ -15,6 +29,7 @@ token_issuer = "data-plane-worker"
 token_audience = "data-plane-gateway"
 
 [global.sandbox]
+provider = "docker"
 default_base_image = "127.0.0.1:5001/mistle/sandbox-base:dev"
 gateway_ws_url = "ws://127.0.0.1:5003/tunnel/sandbox"
 internal_gateway_ws_url = "ws://host.docker.internal:5003/tunnel/sandbox"

@@ -20,10 +20,25 @@ const sandboxBootstrapTokenAudience = "data-plane-gateway";
 
 const globalDevelopmentConfig = {
   env: "development",
+  telemetry: {
+    enabled: true,
+    debug: false,
+    traces: {
+      endpoint: "http://127.0.0.1:4318/v1/traces",
+    },
+    logs: {
+      endpoint: "http://127.0.0.1:4318/v1/logs",
+    },
+    metrics: {
+      endpoint: "http://127.0.0.1:4318/v1/metrics",
+    },
+    resourceAttributes: "deployment.environment=test",
+  },
   internalAuth: {
     serviceToken,
   },
   sandbox: {
+    provider: "modal",
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -42,10 +57,25 @@ const globalDevelopmentConfig = {
 
 const globalProductionConfig = {
   env: "production",
+  telemetry: {
+    enabled: true,
+    debug: false,
+    traces: {
+      endpoint: "http://127.0.0.1:4318/v1/traces",
+    },
+    logs: {
+      endpoint: "http://127.0.0.1:4318/v1/logs",
+    },
+    metrics: {
+      endpoint: "http://127.0.0.1:4318/v1/metrics",
+    },
+    resourceAttributes: "deployment.environment=test",
+  },
   internalAuth: {
     serviceToken,
   },
   sandbox: {
+    provider: "modal",
     defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
     gatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
     internalGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
@@ -66,6 +96,7 @@ const globalDevelopmentDockerConfig = {
   ...globalDevelopmentConfig,
   sandbox: {
     ...globalDevelopmentConfig.sandbox,
+    provider: "docker",
     internalGatewayWsUrl: "ws://host.docker.internal:5003/tunnel/sandbox",
   },
 } as const;

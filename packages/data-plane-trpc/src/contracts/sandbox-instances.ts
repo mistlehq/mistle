@@ -241,18 +241,17 @@ const StartSandboxInstanceInputValidationSchema = z
   })
   .strict();
 
-export const StartSandboxInstanceInputSchema = z.custom<StartSandboxInstanceWorkflowInput>(
+export const StartSandboxInstanceInputSchema = z.custom<StartSandboxInstanceInput>(
   (value) => StartSandboxInstanceInputValidationSchema.safeParse(value).success,
   {
     message: "Invalid start sandbox instance input.",
   },
 );
 
-export const StartSandboxInstanceCompletedResponseSchema = z
+export const StartSandboxInstanceAcceptedResponseSchema = z
   .object({
-    status: z.literal("completed"),
+    status: z.literal("accepted"),
     sandboxInstanceId: z.string().min(1),
-    providerSandboxId: z.string().min(1),
     workflowRunId: z.string().min(1),
   })
   .strict();
@@ -268,13 +267,18 @@ export const GetSandboxInstanceResponseSchema = z
   .object({
     id: z.string().min(1),
     status: z.enum(DataPlaneSandboxInstanceStatuses),
+    failureCode: z.string().min(1).nullable(),
+    failureMessage: z.string().min(1).nullable(),
   })
   .strict()
   .nullable();
 
-export type StartSandboxInstanceInput = StartSandboxInstanceWorkflowInput;
-export type StartSandboxInstanceCompletedResponse = z.infer<
-  typeof StartSandboxInstanceCompletedResponseSchema
+export type StartSandboxInstanceInput = Omit<
+  StartSandboxInstanceWorkflowInput,
+  "sandboxInstanceId"
+>;
+export type StartSandboxInstanceAcceptedResponse = z.infer<
+  typeof StartSandboxInstanceAcceptedResponseSchema
 >;
 export type GetSandboxInstanceInput = z.infer<typeof GetSandboxInstanceInputSchema>;
 export type GetSandboxInstanceResponse = z.infer<typeof GetSandboxInstanceResponseSchema>;

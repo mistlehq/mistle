@@ -32,10 +32,21 @@ export const InternalSandboxRuntimeStartProfileInstanceRequestSchema = z.object(
 });
 
 export const InternalSandboxRuntimeStartProfileInstanceResponseSchema = z.object({
-  status: z.literal("completed"),
+  status: z.literal("accepted"),
   workflowRunId: z.string().min(1),
   sandboxInstanceId: z.string().min(1),
-  providerSandboxId: z.string().min(1),
+});
+
+export const InternalSandboxRuntimeGetSandboxInstanceRequestSchema = z.object({
+  organizationId: z.string().min(1),
+  instanceId: z.string().min(1),
+});
+
+export const InternalSandboxRuntimeGetSandboxInstanceResponseSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(["starting", "running", "stopped", "failed"]),
+  failureCode: z.string().min(1).nullable(),
+  failureMessage: z.string().min(1).nullable(),
 });
 
 export const InternalSandboxRuntimeMintConnectionRequestSchema = z.object({
@@ -66,7 +77,7 @@ export const internalSandboxRuntimeStartProfileInstanceRoute = createRoute({
   },
   responses: {
     200: {
-      description: "Start a sandbox profile instance for internal callers.",
+      description: "Start sandbox profile instance provisioning for internal callers.",
       content: {
         "application/json": {
           schema: InternalSandboxRuntimeStartProfileInstanceResponseSchema,
@@ -91,6 +102,64 @@ export const internalSandboxRuntimeStartProfileInstanceRoute = createRoute({
     },
     404: {
       description: "Referenced sandbox profile version was not found.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeErrorResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
+export const internalSandboxRuntimeGetSandboxInstanceRoute = createRoute({
+  method: "post",
+  path: "/get-sandbox-instance",
+  tags: ["Internal"],
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeGetSandboxInstanceRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Get sandbox instance status for internal callers.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeGetSandboxInstanceResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request body.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Internal service authentication failed.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxRuntimeErrorResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Referenced sandbox instance was not found.",
       content: {
         "application/json": {
           schema: InternalSandboxRuntimeErrorResponseSchema,

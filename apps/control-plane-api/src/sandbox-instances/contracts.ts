@@ -1,5 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 
+const SandboxInstanceStatusSchema = z.enum(["starting", "running", "stopped", "failed"]);
+
 export const SandboxInstanceIdParamsSchema = z
   .object({
     instanceId: z
@@ -19,6 +21,15 @@ export const SandboxInstanceConnectionTokenSchema = z
     url: z.url(),
     token: z.string().min(1),
     expiresAt: z.string().min(1),
+  })
+  .strict();
+
+export const SandboxInstanceStatusResponseSchema = z
+  .object({
+    id: z.string().min(1),
+    status: SandboxInstanceStatusSchema,
+    failureCode: z.string().min(1).nullable(),
+    failureMessage: z.string().min(1).nullable(),
   })
   .strict();
 
@@ -73,6 +84,65 @@ export const SandboxInstancesForbiddenResponseSchema = z
     message: z.string().min(1),
   })
   .strict();
+
+export const getSandboxInstanceRoute = createRoute({
+  method: "get",
+  path: "/{instanceId}",
+  tags: ["Sandbox Instances"],
+  request: {
+    params: SandboxInstanceIdParamsSchema,
+  },
+  responses: {
+    200: {
+      description: "Get sandbox instance provisioning/runtime status.",
+      content: {
+        "application/json": {
+          schema: SandboxInstanceStatusResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesUnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesForbiddenResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Sandbox instance was not found.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesNotFoundResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
 
 export const createSandboxInstanceConnectionTokenRoute = createRoute({
   method: "post",

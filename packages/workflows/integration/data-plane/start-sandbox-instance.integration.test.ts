@@ -13,8 +13,7 @@ const describeDockerWorkflowIntegration = dockerStartSandboxWorkflowIntegrationE
   ? describe
   : describe.skip;
 
-const FORBIDDEN_ORGANIZATION_ID = "org-workflow-forbidden";
-const FORBIDDEN_ORGANIZATION_CONSTRAINT = "sandbox_instances_forbidden_organization_check";
+const FORBIDDEN_PROFILE_CONSTRAINT = "sandbox_runtime_plans_forbidden_profile_check";
 const StartedBootstrapTokenJtiWaitTimeoutMs = 10_000;
 const StartedBootstrapTokenJtiPollIntervalMs = 100;
 
@@ -50,6 +49,7 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
     const sandboxProfileId = `sbp-${randomUUID()}`;
 
     const handle = await fixture.openWorkflow.runWorkflow(StartSandboxInstanceWorkflowSpec, {
+      sandboxInstanceId: `sbi_${randomUUID()}`,
       organizationId: `org-${randomUUID()}`,
       sandboxProfileId,
       sandboxProfileVersion: 1,
@@ -169,6 +169,7 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
     const startedSandboxCountBefore = fixture.startedSandboxIds.length;
 
     const handle = await fixture.openWorkflow.runWorkflow(StartSandboxInstanceWorkflowSpec, {
+      sandboxInstanceId: `sbi_${randomUUID()}`,
       organizationId,
       sandboxProfileId,
       sandboxProfileVersion: 1,
@@ -236,16 +237,17 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
   }, 120_000);
 
   it("rolls back docker sandbox creation when persistence fails", async ({ fixture }) => {
+    const startedSandboxCountBefore = fixture.startedSandboxIds.length;
+    const sandboxProfileId = `sbp-${randomUUID()}`;
+
     await fixture.sql.unsafe(
-      `alter table data_plane.sandbox_instances add constraint ${FORBIDDEN_ORGANIZATION_CONSTRAINT} check (organization_id <> '${FORBIDDEN_ORGANIZATION_ID}')`,
+      `alter table data_plane.sandbox_instance_runtime_plans add constraint ${FORBIDDEN_PROFILE_CONSTRAINT} check (compiled_from_profile_id <> '${sandboxProfileId}')`,
     );
 
-    const startedSandboxCountBefore = fixture.startedSandboxIds.length;
-
     try {
-      const sandboxProfileId = `sbp-${randomUUID()}`;
       const handle = await fixture.openWorkflow.runWorkflow(StartSandboxInstanceWorkflowSpec, {
-        organizationId: FORBIDDEN_ORGANIZATION_ID,
+        sandboxInstanceId: `sbi_${randomUUID()}`,
+        organizationId: `org-${randomUUID()}`,
         sandboxProfileId,
         sandboxProfileVersion: 1,
         runtimePlan: createRuntimePlan({
@@ -261,7 +263,7 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
       });
 
       await expect(handle.result({ timeoutMs: 45_000 })).rejects.toThrow(
-        "Failed to persist sandbox instance after provider sandbox start. Provider sandbox was stopped.",
+        "Failed to persist sandbox provisioning metadata. Sandbox was stopped and sandbox instance was marked as failed.",
       );
 
       const startedSandboxId = fixture.startedSandboxIds[startedSandboxCountBefore];
@@ -274,14 +276,20 @@ describeDockerWorkflowIntegration("start sandbox instance workflow integration",
       );
 
       const persistedRows = await fixture.sql`
-        select id
+        select status, failure_code, failure_message, provider_sandbox_id
         from data_plane.sandbox_instances
-        where organization_id = ${FORBIDDEN_ORGANIZATION_ID}
+        where sandbox_profile_id = ${sandboxProfileId}
       `;
-      expect(persistedRows).toHaveLength(0);
+      expect(persistedRows).toHaveLength(1);
+      expect(persistedRows[0]).toMatchObject({
+        status: "failed",
+        failure_code: "persist_provisioning_metadata_failed",
+        failure_message: "Failed to persist sandbox runtime plan and provider sandbox metadata.",
+        provider_sandbox_id: startedSandboxId,
+      });
     } finally {
       await fixture.sql.unsafe(
-        `alter table data_plane.sandbox_instances drop constraint if exists ${FORBIDDEN_ORGANIZATION_CONSTRAINT}`,
+        `alter table data_plane.sandbox_instance_runtime_plans drop constraint if exists ${FORBIDDEN_PROFILE_CONSTRAINT}`,
       );
     }
   }, 120_000);

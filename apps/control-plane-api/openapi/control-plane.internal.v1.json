@@ -353,7 +353,7 @@
         },
         "responses": {
           "200": {
-            "description": "Start a sandbox profile instance for internal callers.",
+            "description": "Start sandbox profile instance provisioning for internal callers.",
             "content": {
               "application/json": {
                 "schema": {
@@ -361,7 +361,7 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": ["completed"]
+                      "enum": ["accepted"]
                     },
                     "workflowRunId": {
                       "type": "string",
@@ -370,13 +370,9 @@
                     "sandboxInstanceId": {
                       "type": "string",
                       "minLength": 1
-                    },
-                    "providerSandboxId": {
-                      "type": "string",
-                      "minLength": 1
                     }
                   },
-                  "required": ["status", "workflowRunId", "sandboxInstanceId", "providerSandboxId"]
+                  "required": ["status", "workflowRunId", "sandboxInstanceId"]
                 }
               }
             }
@@ -455,6 +451,167 @@
           },
           "404": {
             "description": "Referenced sandbox profile version was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox-runtime/get-sandbox-instance": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "instanceId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["organizationId", "instanceId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Get sandbox instance status for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["starting", "running", "stopped", "failed"]
+                    },
+                    "failureCode": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "failureMessage": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["id", "status", "failureCode", "failureMessage"]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [false]
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["name", "message"],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": ["success", "error"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Referenced sandbox instance was not found.",
             "content": {
               "application/json": {
                 "schema": {

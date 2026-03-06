@@ -187,6 +187,110 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/internal/sandbox-runtime/get-sandbox-instance": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            instanceId: string;
+            organizationId: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Get sandbox instance status for internal callers. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              failureCode: string | null;
+              failureMessage: string | null;
+              id: string;
+              /** @enum {string} */
+              status: "starting" | "running" | "stopped" | "failed";
+            };
+          };
+        };
+        /** @description Invalid request body. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  code: string;
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Internal service authentication failed. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              code: string;
+              message: string;
+            };
+          };
+        };
+        /** @description Referenced sandbox instance was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              code: string;
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/internal/sandbox-runtime/mint-connection-token": {
     parameters: {
       query?: never;
@@ -335,17 +439,16 @@ export interface paths {
         };
       };
       responses: {
-        /** @description Start a sandbox profile instance for internal callers. */
+        /** @description Start sandbox profile instance provisioning for internal callers. */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
             "application/json": {
-              providerSandboxId: string;
               sandboxInstanceId: string;
               /** @enum {string} */
-              status: "completed";
+              status: "accepted";
               workflowRunId: string;
             };
           };
