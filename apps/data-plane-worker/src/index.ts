@@ -7,6 +7,7 @@ import { createDataPlaneWorkerRuntime } from "./runtime/index.js";
 const runtime = await createDataPlaneWorkerRuntime({
   app: appConfig,
   sandbox: globalConfig.sandbox,
+  telemetry: globalConfig.telemetry,
 });
 
 await runtime.start();

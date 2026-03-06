@@ -11,6 +11,7 @@ export type DataPlaneWorkerGlobalConfig = NonNullable<LoadDataPlaneWorkerConfigR
 export type DataPlaneWorkerRuntimeConfig = {
   app: DataPlaneWorkerConfig;
   sandbox: DataPlaneWorkerGlobalConfig["sandbox"];
+  telemetry: DataPlaneWorkerGlobalConfig["telemetry"];
 };
 
 export type AppContextBindings = {
