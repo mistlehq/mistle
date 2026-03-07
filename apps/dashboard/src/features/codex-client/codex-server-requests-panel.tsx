@@ -1,6 +1,7 @@
 import { Button, Input, Textarea } from "@mistle/ui";
 import { useMemo, useState } from "react";
 
+import { ApprovalDecisionButtons } from "./approval-decision-buttons.js";
 import type { CodexServerRequestEntry } from "./codex-server-requests-state.js";
 
 type CodexServerRequestsPanelProps = {
@@ -73,23 +74,13 @@ export function CodexServerRequestsPanel({
                   {entry.networkPort === null ? null : `:${entry.networkPort}`}
                 </p>
               )}
-              <div className="flex flex-wrap gap-2">
-                {entry.availableDecisions.map((decision) => (
-                  <Button
-                    disabled={isRespondingToServerRequest}
-                    key={decision}
-                    onClick={() => {
-                      onRespondToServerRequest(entry.requestId, {
-                        decision,
-                      });
-                    }}
-                    type="button"
-                    variant={decision.startsWith("accept") ? "default" : "outline"}
-                  >
-                    {decision}
-                  </Button>
-                ))}
-              </div>
+              <ApprovalDecisionButtons
+                appearance="panel"
+                availableDecisions={entry.availableDecisions}
+                disabled={isRespondingToServerRequest}
+                onRespondToServerRequest={onRespondToServerRequest}
+                requestId={entry.requestId}
+              />
               {entry.responseErrorMessage === null ? null : (
                 <p className="text-destructive text-sm">{entry.responseErrorMessage}</p>
               )}
@@ -110,23 +101,13 @@ export function CodexServerRequestsPanel({
               {entry.grantRoot === null ? null : (
                 <p className="text-muted-foreground text-xs">grant root: {entry.grantRoot}</p>
               )}
-              <div className="flex flex-wrap gap-2">
-                {entry.availableDecisions.map((decision) => (
-                  <Button
-                    disabled={isRespondingToServerRequest}
-                    key={decision}
-                    onClick={() => {
-                      onRespondToServerRequest(entry.requestId, {
-                        decision,
-                      });
-                    }}
-                    type="button"
-                    variant={decision.startsWith("accept") ? "default" : "outline"}
-                  >
-                    {decision}
-                  </Button>
-                ))}
-              </div>
+              <ApprovalDecisionButtons
+                appearance="panel"
+                availableDecisions={entry.availableDecisions}
+                disabled={isRespondingToServerRequest}
+                onRespondToServerRequest={onRespondToServerRequest}
+                requestId={entry.requestId}
+              />
               {entry.responseErrorMessage === null ? null : (
                 <p className="text-destructive text-sm">{entry.responseErrorMessage}</p>
               )}
