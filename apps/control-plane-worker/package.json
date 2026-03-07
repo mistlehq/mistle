@@ -11,6 +11,7 @@
     "test": "vitest run -c vitest.config.ts --passWithNoTests",
     "test:integration": "vitest run -c vitest.integration.config.ts",
     "test:property": "vitest run --passWithNoTests",
+    "codex:app-server:generate": "tsx scripts/generate-codex-app-server-types.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },
