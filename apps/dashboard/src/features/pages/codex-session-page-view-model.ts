@@ -1,0 +1,134 @@
+import type { CodexSessionConnectionState } from "@mistle/codex-app-server-client";
+
+import type { StartSessionStep } from "../codex-client/codex-session-types.js";
+
+export type SessionHeaderStatusUi = {
+  label: string;
+  variant: "secondary" | "outline" | "destructive";
+  className?: string;
+};
+
+export function resolveSessionHeaderStatusUi(input: {
+  sandboxStatus: string;
+  agentConnectionState: CodexSessionConnectionState;
+  step: StartSessionStep;
+  hasConnectionError: boolean;
+}): SessionHeaderStatusUi {
+  if (input.sandboxStatus === "failed") {
+    return {
+      label: "Sandbox failed",
+      variant: "destructive",
+    };
+  }
+
+  if (input.sandboxStatus === "stopped") {
+    return {
+      label: "Sandbox stopped",
+      variant: "outline",
+    };
+  }
+
+  if (input.sandboxStatus !== "running") {
+    return {
+      label: "Starting sandbox",
+      variant: "outline",
+    };
+  }
+
+  if (input.hasConnectionError || input.agentConnectionState === "error") {
+    return {
+      label: "Connection failed",
+      variant: "destructive",
+    };
+  }
+
+  if (input.agentConnectionState === "ready") {
+    return {
+      label: "Connected",
+      variant: "secondary",
+      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+    };
+  }
+
+  if (input.agentConnectionState === "handshaking_agent") {
+    return {
+      label: "Connecting",
+      variant: "outline",
+    };
+  }
+
+  if (input.agentConnectionState === "initializing") {
+    return {
+      label: "Initializing",
+      variant: "outline",
+    };
+  }
+
+  if (
+    input.agentConnectionState === "connecting_socket" ||
+    input.agentConnectionState === "connected_socket" ||
+    input.step === "securing" ||
+    input.step === "connecting"
+  ) {
+    return {
+      label: "Connecting",
+      variant: "outline",
+    };
+  }
+
+  return {
+    label: "Session idle",
+    variant: "outline",
+  };
+}
+
+export function hasSessionTopAlert(input: {
+  hasSandboxStatusError: boolean;
+  startErrorMessage: string | null;
+  sandboxFailureMessage: string | null;
+}): boolean {
+  return (
+    input.hasSandboxStatusError ||
+    input.startErrorMessage !== null ||
+    input.sandboxFailureMessage !== null
+  );
+}
+
+export type ChatComposerAction =
+  | {
+      type: "interrupt_turn";
+      shouldClearComposer: false;
+    }
+  | {
+      type: "start_turn" | "steer_turn";
+      prompt: string;
+      shouldClearComposer: true;
+    };
+
+export function resolveChatComposerAction(input: {
+  composerText: string;
+  hasActiveTurn: boolean;
+}): ChatComposerAction {
+  const trimmedComposerText = input.composerText.trim();
+
+  if (!input.hasActiveTurn) {
+    return {
+      type: "start_turn",
+      prompt: trimmedComposerText,
+      shouldClearComposer: true,
+    };
+  }
+
+  if (trimmedComposerText.length === 0) {
+    return {
+      type: "interrupt_turn",
+      shouldClearComposer: false,
+    };
+  }
+
+  return {
+    type: "steer_turn",
+    prompt: trimmedComposerText,
+    shouldClearComposer: true,
+  };
+}
