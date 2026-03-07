@@ -12,6 +12,10 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.dashboard.description).toBe("");
     expect(ROUTE_HANDLES.sessions.title).toBe("Sessions");
     expect(ROUTE_HANDLES.sessions.description).toBe("");
+    expect(ROUTE_HANDLES.sessionsDetail.title).toBe("Session");
+    expect(ROUTE_HANDLES.sessionsDetail.description).toBe(
+      "Interact with one sandbox-backed Codex session.",
+    );
 
     expect(ROUTE_HANDLES.sandboxProfiles.title).toBe("Sandbox Profiles");
     expect(ROUTE_HANDLES.sandboxProfiles.description).toBe("Manage sandbox profile configuration.");
@@ -84,5 +88,17 @@ describe("route handles", () => {
 
     expect(detailBreadcrumb({ params: { profileId: "sbp_123" } })).toBe("sbp_123");
     expect(detailBreadcrumb({ params: {} })).toBe("Profile");
+  });
+
+  it("resolves session detail breadcrumb with sandbox instance id fallback", () => {
+    const detailBreadcrumb = ROUTE_HANDLES.sessionsDetail.breadcrumb;
+    expect(typeof detailBreadcrumb).toBe("function");
+
+    if (typeof detailBreadcrumb !== "function") {
+      throw new Error("sessionsDetail breadcrumb must be a function");
+    }
+
+    expect(detailBreadcrumb({ params: { sandboxInstanceId: "sbox_123" } })).toBe("sbox_123");
+    expect(detailBreadcrumb({ params: {} })).toBe("Session");
   });
 });
