@@ -440,13 +440,13 @@ describe("integration connections update api key integration", () => {
     expect(updatedLink.credentialId).toBe(previousLink.credentialId);
   });
 
-  it("updates only the display name even when the target row has been removed", async ({
-    fixture,
-  }) => {
+  it("updates only the display name even when the target is disabled", async ({ fixture }) => {
+    const targetKey = "openai-default-update-disabled-target";
+
     await fixture.db
       .insert(integrationTargets)
       .values({
-        targetKey: "openai-default",
+        targetKey,
         familyId: "openai",
         variantId: "openai-default",
         enabled: true,
@@ -467,7 +467,7 @@ describe("integration connections update api key integration", () => {
       });
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-update-name-only-missing-target@example.com",
+      email: "integration-connections-update-name-only-disabled-target@example.com",
     });
 
     const createResponse = await fixture.request(
@@ -489,8 +489,11 @@ describe("integration connections update api key integration", () => {
     const createdConnection = IntegrationConnectionSchema.parse(await createResponse.json());
 
     await fixture.db
-      .delete(integrationTargets)
-      .where(eq(integrationTargets.targetKey, "openai-default"));
+      .update(integrationTargets)
+      .set({
+        enabled: false,
+      })
+      .where(eq(integrationTargets.targetKey, targetKey));
 
     const updateResponse = await fixture.request(
       `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}`,
@@ -501,14 +504,14 @@ describe("integration connections update api key integration", () => {
           cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify({
-          displayName: "OpenAI renamed after target removal",
+          displayName: "OpenAI renamed after target disable",
         }),
       },
     );
 
     expect(updateResponse.status).toBe(200);
     const updatedConnection = IntegrationConnectionSchema.parse(await updateResponse.json());
-    expect(updatedConnection.displayName).toBe("OpenAI renamed after target removal");
+    expect(updatedConnection.displayName).toBe("OpenAI renamed after target disable");
   });
 });
 
