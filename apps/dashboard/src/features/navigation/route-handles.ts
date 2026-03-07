@@ -42,6 +42,15 @@ function resolveIntegrationCallbackBreadcrumb(input: RouteTextResolverInput): st
   return `${normalizeIntegrationBreadcrumbLabel(targetKey)} callback`;
 }
 
+function resolveSessionDetailBreadcrumb(input: RouteTextResolverInput): string {
+  const sandboxInstanceId = input.params["sandboxInstanceId"];
+  if (sandboxInstanceId === undefined || sandboxInstanceId.trim().length === 0) {
+    return "Session";
+  }
+
+  return sandboxInstanceId;
+}
+
 function resolveSandboxProfileDetailBreadcrumb(input: RouteTextResolverInput): string {
   const parsedData = SandboxProfileRouteDataSchema.safeParse(input.data);
   if (parsedData.success) {
@@ -66,6 +75,11 @@ export const ROUTE_HANDLES = {
     breadcrumb: "Sessions",
     title: "Sessions",
     description: "",
+  },
+  sessionsDetail: {
+    breadcrumb: resolveSessionDetailBreadcrumb,
+    title: "Session",
+    description: "Interact with one sandbox-backed Codex session.",
   },
   experimentalTerminal: {
     breadcrumb: "Experimental terminal",
