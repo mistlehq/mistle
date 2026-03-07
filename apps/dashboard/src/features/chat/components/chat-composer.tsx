@@ -168,7 +168,7 @@ export function ChatComposer({
           className="rounded-full bg-transparent text-primary hover:bg-transparent"
           disabled={isComposerActionDisabled}
           onClick={onSubmit}
-          size="icon"
+          size="icon-fill"
           title={composerActionLabel}
           type="button"
           variant="ghost"
