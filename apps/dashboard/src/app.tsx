@@ -9,6 +9,7 @@ import {
 
 import { AuthScreen } from "./features/auth/auth-screen.js";
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
+import { CodexSessionPage } from "./features/pages/codex-session-page.js";
 import { HomePage } from "./features/pages/home-page.js";
 import { IntegrationsCallbackResultPage } from "./features/pages/integrations-callback-result-page.js";
 import { InvitationAcceptPage } from "./features/pages/invitation-accept-page.js";
@@ -57,7 +58,14 @@ export const APP_ROUTES = createRoutesFromElements(
             path=":profileId"
           />
         </Route>
-        <Route element={<SessionsPage />} handle={ROUTE_HANDLES.sessions} path="sessions" />
+        <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.sessions} path="sessions">
+          <Route element={<SessionsPage />} index />
+          <Route
+            element={<CodexSessionPage />}
+            handle={ROUTE_HANDLES.sessionsDetail}
+            path=":sandboxInstanceId"
+          />
+        </Route>
         {createSettingsRoutes({
           settingsRoot: <SettingsLayout />,
           personal: <ProfileSettingsPage />,
