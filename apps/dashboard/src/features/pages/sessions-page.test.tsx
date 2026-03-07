@@ -5,19 +5,10 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { SessionsPage, shouldHandleSocketClose } from "./sessions-page.js";
+import { SessionsPage } from "./sessions-page.js";
 
 describe("SessionsPage", () => {
-  it("handles close events only for the active socket", () => {
-    const activeSocket = { id: "active" };
-    const staleSocket = { id: "stale" };
-
-    expect(shouldHandleSocketClose(activeSocket, activeSocket)).toBe(true);
-    expect(shouldHandleSocketClose(activeSocket, staleSocket)).toBe(false);
-    expect(shouldHandleSocketClose(null, staleSocket)).toBe(false);
-  });
-
-  it("renders start-session controls and connection status", () => {
+  it("renders sandbox launcher controls", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -34,8 +25,10 @@ describe("SessionsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Start New Session")).toBeDefined();
+    expect(screen.getByText("Start a new session")).toBeDefined();
+    expect(screen.getByRole("combobox", { name: "Sandbox profile" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Start session" })).toBeDefined();
-    expect(screen.getByText("Connection Status")).toBeDefined();
+    expect(screen.queryByText("Recent Sessions")).toBeNull();
+    expect(screen.queryByText("No launched sessions yet.")).toBeNull();
   });
 });
