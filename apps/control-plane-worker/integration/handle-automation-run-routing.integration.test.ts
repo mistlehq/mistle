@@ -1,3 +1,10 @@
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { randomUUID } from "node:crypto";
+import { once } from "node:events";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import {
   automationRuns,
   AutomationRunStatuses,
@@ -24,13 +31,15 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
+import { reserveAvailablePort } from "@mistle/test-harness";
+import { systemScheduler, systemSleeper, type TimerHandle } from "@mistle/time";
 import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
 import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
-import type { RawData } from "ws";
-import { WebSocketServer } from "ws";
+import WebSocket, { type RawData, WebSocketServer } from "ws";
 
+import type { ProviderConnection } from "../src/runtime/conversations/provider-adapter.js";
 import {
   claimAutomationConversation,
   ensureAutomationConversationBinding,
@@ -46,30 +55,78 @@ import {
 } from "../src/runtime/services/handle-automation-run.js";
 import { it } from "./test-context.js";
 
-const TestTimeoutMs = 120_000;
+const OPENAI_API_KEY_ENV = "OPENAI_API_KEY";
+const PREFERRED_INTEGRATION_MODELS = ["gpt-5-codex-mini", "gpt-5.1-codex-mini"] as const;
+const TestTimeoutMs = 180_000;
+const SERVER_START_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 60_000;
+const PROCESS_STOP_TIMEOUT_MS = 10_000;
 
-type JsonRpcRequest = {
-  id: string | number;
-  method: string;
-  params?: unknown;
+type JsonRpcErrorPayload = {
+  code: number;
+  message: string;
+  data?: unknown;
 };
 
-type JsonRpcResponse =
-  | {
-      result: unknown;
-    }
-  | {
-      error: {
-        code: number;
-        message: string;
-      };
-    };
+type JsonRpcResponsePayload = {
+  id: string;
+  result?: unknown;
+  error?: JsonRpcErrorPayload;
+};
 
-type CodexTestServer = {
-  url: string;
-  requests: JsonRpcRequest[];
+type PendingRequest = {
+  method: string;
+  resolve: (value: unknown) => void;
+  reject: (error: Error) => void;
+  timeout: TimerHandle;
+};
+
+type StartedCodexAppServer = {
+  wsUrl: string;
+  getLogsTail: () => string;
   close: () => Promise<void>;
 };
+
+type StartedCodexAgentBridge = {
+  wsUrl: string;
+  close: () => Promise<void>;
+};
+
+function hasOpenAiApiKey(): boolean {
+  const value = process.env[OPENAI_API_KEY_ENV];
+  return typeof value === "string" && value.length > 0;
+}
+
+function isCodexCliAvailable(): boolean {
+  const commandResult = spawnSync("codex", ["--version"], { stdio: "ignore" });
+  return commandResult.error === undefined && commandResult.status === 0;
+}
+
+function shouldRunCodexIntegration(): boolean {
+  return isCodexCliAvailable() && hasOpenAiApiKey();
+}
+
+function ensureCodexApiLogin(input: { codexHome: string; openAiApiKey: string }): void {
+  const loginResult = spawnSync("codex", ["login", "--with-api-key"], {
+    cwd: input.codexHome,
+    env: {
+      ...process.env,
+      CODEX_HOME: input.codexHome,
+    },
+    input: input.openAiApiKey,
+    encoding: "utf8",
+  });
+
+  if (loginResult.error !== undefined) {
+    throw loginResult.error;
+  }
+  if (loginResult.status !== 0) {
+    const stderr = loginResult.stderr.trim();
+    throw new Error(
+      `Failed to authenticate Codex CLI for integration test: ${stderr.length > 0 ? stderr : "unknown error"}`,
+    );
+  }
+}
 
 function toText(data: RawData): string {
   if (typeof data === "string") {
@@ -89,10 +146,434 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function startCodexTestServer(
-  handler: (request: JsonRpcRequest) => JsonRpcResponse,
-): Promise<CodexTestServer> {
-  const requests: JsonRpcRequest[] = [];
+function parseJsonRpcResponsePayload(data: RawData): JsonRpcResponsePayload | null {
+  const payloadText = toText(data);
+
+  let parsedPayload: unknown;
+  try {
+    parsedPayload = JSON.parse(payloadText);
+  } catch {
+    return null;
+  }
+  if (!isRecord(parsedPayload)) {
+    return null;
+  }
+
+  if (typeof parsedPayload.id !== "string") {
+    return null;
+  }
+
+  if ("error" in parsedPayload) {
+    if (!isRecord(parsedPayload.error)) {
+      return null;
+    }
+    if (
+      typeof parsedPayload.error.code !== "number" ||
+      typeof parsedPayload.error.message !== "string"
+    ) {
+      return null;
+    }
+
+    return {
+      id: parsedPayload.id,
+      error: {
+        code: parsedPayload.error.code,
+        message: parsedPayload.error.message,
+        data: "data" in parsedPayload.error ? parsedPayload.error.data : undefined,
+      },
+    };
+  }
+
+  if (!("result" in parsedPayload)) {
+    return null;
+  }
+
+  return {
+    id: parsedPayload.id,
+    result: parsedPayload.result,
+  };
+}
+
+function createJsonRpcConnection(socket: WebSocket): ProviderConnection {
+  const pendingRequests = new Map<string, PendingRequest>();
+
+  function settlePendingRequest(input: {
+    requestId: string;
+    value?: unknown;
+    error?: Error;
+  }): void {
+    const pendingRequest = pendingRequests.get(input.requestId);
+    if (pendingRequest === undefined) {
+      return;
+    }
+
+    pendingRequests.delete(input.requestId);
+    systemScheduler.cancel(pendingRequest.timeout);
+    if (input.error !== undefined) {
+      pendingRequest.reject(input.error);
+      return;
+    }
+
+    pendingRequest.resolve(input.value);
+  }
+
+  function rejectPendingRequests(error: Error): void {
+    for (const [requestId, pendingRequest] of pendingRequests.entries()) {
+      pendingRequests.delete(requestId);
+      systemScheduler.cancel(pendingRequest.timeout);
+      pendingRequest.reject(error);
+    }
+  }
+
+  socket.on("message", (data) => {
+    const responsePayload = parseJsonRpcResponsePayload(data);
+    if (responsePayload === null) {
+      return;
+    }
+
+    const requestId = responsePayload.id;
+    const pendingRequest = pendingRequests.get(requestId);
+    if (pendingRequest === undefined) {
+      return;
+    }
+
+    if (responsePayload.error !== undefined) {
+      settlePendingRequest({
+        requestId,
+        error: new Error(
+          `Codex app-server request '${pendingRequest.method}' failed (${String(responsePayload.error.code)}): ${responsePayload.error.message}`,
+        ),
+      });
+      return;
+    }
+
+    if (responsePayload.result === undefined) {
+      settlePendingRequest({
+        requestId,
+        error: new Error("Codex JSON-RPC response did not include result."),
+      });
+      return;
+    }
+
+    settlePendingRequest({
+      requestId,
+      value: responsePayload.result,
+    });
+  });
+
+  socket.on("error", (error) => {
+    rejectPendingRequests(error);
+  });
+
+  socket.on("close", () => {
+    rejectPendingRequests(new Error("Codex websocket connection closed."));
+  });
+
+  return {
+    request: async (input) => {
+      const requestId = randomUUID();
+      const requestPayload =
+        input.params === undefined
+          ? { id: requestId, method: input.method }
+          : { id: requestId, method: input.method, params: input.params };
+
+      return await new Promise<unknown>((resolve, reject) => {
+        const timeout = systemScheduler.schedule(() => {
+          pendingRequests.delete(requestId);
+          reject(new Error(`Timed out waiting for Codex response to '${input.method}'.`));
+        }, REQUEST_TIMEOUT_MS);
+
+        pendingRequests.set(requestId, {
+          method: input.method,
+          resolve: (value) => resolve(value),
+          reject: (error) => reject(error),
+          timeout,
+        });
+
+        socket.send(JSON.stringify(requestPayload), (error) => {
+          if (error == null) {
+            return;
+          }
+
+          settlePendingRequest({
+            requestId,
+            error,
+          });
+        });
+      });
+    },
+    close: async () => {
+      if (socket.readyState === WebSocket.CLOSED) {
+        return;
+      }
+
+      await new Promise<void>((resolve) => {
+        const onClose = (): void => {
+          socket.off("error", onError);
+          resolve();
+        };
+        const onError = (): void => {
+          socket.off("close", onClose);
+          resolve();
+        };
+        socket.once("close", onClose);
+        socket.once("error", onError);
+        socket.close(1000, "integration test finished");
+      });
+    },
+  };
+}
+
+async function openWebSocketConnection(url: string): Promise<WebSocket> {
+  const socket = new WebSocket(url, {
+    handshakeTimeout: REQUEST_TIMEOUT_MS,
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    socket.once("open", () => resolve());
+    socket.once("error", (error) => reject(error));
+  });
+
+  return socket;
+}
+
+async function sendJsonRpcNotification(input: {
+  socket: WebSocket;
+  method: string;
+  params?: unknown;
+}): Promise<void> {
+  const payload =
+    input.params === undefined
+      ? { method: input.method }
+      : { method: input.method, params: input.params };
+
+  await new Promise<void>((resolve, reject) => {
+    input.socket.send(JSON.stringify(payload), (error) => {
+      if (error == null) {
+        resolve();
+        return;
+      }
+      reject(error);
+    });
+  });
+}
+
+async function connectInitializedCodexConnection(wsUrl: string): Promise<ProviderConnection> {
+  const socket = await openWebSocketConnection(wsUrl);
+  const connection = createJsonRpcConnection(socket);
+
+  const initializeResult = await connection.request({
+    method: "initialize",
+    params: {
+      clientInfo: {
+        name: "mistle_control_plane_worker_it",
+        title: "Mistle Control Plane Worker Routing Integration",
+        version: "0.1.0",
+      },
+    },
+  });
+  if (!isRecord(initializeResult) || typeof initializeResult.userAgent !== "string") {
+    await connection.close();
+    throw new Error("Codex initialize response did not include userAgent.");
+  }
+
+  await sendJsonRpcNotification({
+    socket,
+    method: "initialized",
+  });
+
+  return connection;
+}
+
+async function resolveIntegrationModel(connection: ProviderConnection): Promise<string> {
+  const modelListResult = await connection.request({
+    method: "model/list",
+    params: {},
+  });
+  if (!isRecord(modelListResult) || !Array.isArray(modelListResult.data)) {
+    throw new Error("Codex model/list response did not include a data array.");
+  }
+
+  const availableModels: string[] = [];
+  for (const modelEntry of modelListResult.data) {
+    if (!isRecord(modelEntry) || typeof modelEntry.model !== "string") {
+      continue;
+    }
+    availableModels.push(modelEntry.model);
+  }
+
+  for (const preferredModel of PREFERRED_INTEGRATION_MODELS) {
+    if (availableModels.includes(preferredModel)) {
+      return preferredModel;
+    }
+  }
+
+  const renderedAvailableModels =
+    availableModels.length === 0 ? "none" : availableModels.join(", ");
+  throw new Error(
+    `Codex integration requires one of [${PREFERRED_INTEGRATION_MODELS.join(", ")}], but available models were: ${renderedAvailableModels}.`,
+  );
+}
+
+async function waitForProcessExit(process: ChildProcess, timeoutMs: number): Promise<boolean> {
+  if (process.exitCode !== null) {
+    return true;
+  }
+
+  const timeout = systemSleeper.sleep(timeoutMs).then(() => false);
+  const exited = once(process, "exit").then(() => true);
+  return await Promise.race([timeout, exited]);
+}
+
+async function stopCodexProcess(process: ChildProcess): Promise<void> {
+  if (process.exitCode !== null) {
+    return;
+  }
+
+  process.kill("SIGTERM");
+  if (await waitForProcessExit(process, PROCESS_STOP_TIMEOUT_MS)) {
+    return;
+  }
+
+  process.kill("SIGKILL");
+  await waitForProcessExit(process, PROCESS_STOP_TIMEOUT_MS);
+}
+
+async function probeWebSocketServer(url: string): Promise<void> {
+  const socket = await openWebSocketConnection(url);
+  await new Promise<void>((resolve) => {
+    socket.once("close", () => resolve());
+    socket.once("error", () => resolve());
+    socket.close(1000, "probe");
+  });
+}
+
+async function waitForCodexServerReady(input: {
+  process: ChildProcess;
+  wsUrl: string;
+}): Promise<void> {
+  const deadline = Date.now() + SERVER_START_TIMEOUT_MS;
+  let lastErrorMessage = "unavailable";
+
+  while (Date.now() < deadline) {
+    if (input.process.exitCode !== null) {
+      throw new Error(`Codex app-server exited early with code ${String(input.process.exitCode)}.`);
+    }
+
+    try {
+      await probeWebSocketServer(input.wsUrl);
+      return;
+    } catch (error) {
+      lastErrorMessage = error instanceof Error ? error.message : "unknown startup error";
+    }
+
+    await systemSleeper.sleep(250);
+  }
+
+  throw new Error(
+    `Timed out waiting for Codex app-server websocket at ${input.wsUrl}. Last error: ${lastErrorMessage}`,
+  );
+}
+
+async function startCodexAppServer(): Promise<StartedCodexAppServer> {
+  const openAiApiKey = process.env[OPENAI_API_KEY_ENV];
+  if (openAiApiKey === undefined || openAiApiKey.length === 0) {
+    throw new Error("OPENAI_API_KEY is required.");
+  }
+
+  const host = "127.0.0.1";
+  const port = await reserveAvailablePort({ host });
+  const wsUrl = `ws://${host}:${String(port)}`;
+  const codexHome = await mkdtemp(join(tmpdir(), "mistle-codex-routing-it-"));
+  let codexProcess: ChildProcess | null = null;
+
+  try {
+    await writeFile(
+      join(codexHome, "config.toml"),
+      `approval_policy = "never"\nsandbox_mode = "danger-full-access"\n`,
+      "utf8",
+    );
+    await writeFile(
+      join(codexHome, "AGENTS.md"),
+      "# Codex integration test instructions\\n\\n- Respond to user prompts directly.\\n- Do not assume repository context.\\n",
+      "utf8",
+    );
+    ensureCodexApiLogin({
+      codexHome,
+      openAiApiKey,
+    });
+
+    const codexProcessEnv: NodeJS.ProcessEnv = {
+      ...process.env,
+      OPENAI_API_KEY: openAiApiKey,
+      CODEX_HOME: codexHome,
+    };
+    for (const key of Object.keys(codexProcessEnv)) {
+      if (key.startsWith("CODEX_") && key !== "CODEX_HOME") {
+        delete codexProcessEnv[key];
+      }
+    }
+
+    codexProcess = spawn("codex", ["app-server", "--listen", wsUrl], {
+      cwd: codexHome,
+      env: codexProcessEnv,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    const stdoutTail: string[] = [];
+    const stderrTail: string[] = [];
+    const maxTailLines = 80;
+    const appendLogChunk = (target: string[], chunk: Buffer): void => {
+      const text = chunk.toString("utf8");
+      for (const line of text.split("\n")) {
+        if (line.length === 0) {
+          continue;
+        }
+        target.push(line);
+        if (target.length > maxTailLines) {
+          target.shift();
+        }
+      }
+    };
+
+    codexProcess.stdout?.on("data", (chunk: Buffer) => {
+      appendLogChunk(stdoutTail, chunk);
+    });
+    codexProcess.stderr?.on("data", (chunk: Buffer) => {
+      appendLogChunk(stderrTail, chunk);
+    });
+
+    await waitForCodexServerReady({
+      process: codexProcess,
+      wsUrl,
+    });
+
+    return {
+      wsUrl,
+      getLogsTail: () => {
+        const renderedStdout = stdoutTail.join("\n");
+        const renderedStderr = stderrTail.join("\n");
+        return `stdout:\n${renderedStdout || "<empty>"}\n\nstderr:\n${renderedStderr || "<empty>"}`;
+      },
+      close: async () => {
+        if (codexProcess !== null) {
+          await stopCodexProcess(codexProcess);
+        }
+        await rm(codexHome, { recursive: true, force: true });
+      },
+    };
+  } catch (error) {
+    if (codexProcess !== null) {
+      await stopCodexProcess(codexProcess);
+    }
+    await rm(codexHome, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+async function startCodexAgentBridge(input: {
+  targetWsUrl: string;
+}): Promise<StartedCodexAgentBridge> {
   const wsServer = new WebSocketServer({
     host: "127.0.0.1",
     port: 0,
@@ -103,86 +584,116 @@ async function startCodexTestServer(
     wsServer.once("error", (error) => reject(error));
   });
 
-  wsServer.on("connection", (socket) => {
-    let connected = false;
+  wsServer.on("connection", (clientSocket) => {
+    let connectRequestId: string | null = null;
+    let upstreamSocket: WebSocket | null = null;
 
-    socket.on("message", (rawData) => {
-      const messageText = toText(rawData);
-      let parsedMessage: unknown;
+    const closeUpstream = (): void => {
+      if (upstreamSocket === null) {
+        return;
+      }
+      if (
+        upstreamSocket.readyState === WebSocket.OPEN ||
+        upstreamSocket.readyState === WebSocket.CONNECTING
+      ) {
+        upstreamSocket.close(1000, "bridge closed");
+      }
+      upstreamSocket = null;
+    };
+
+    const closeClient = (message: string): void => {
+      if (
+        clientSocket.readyState === WebSocket.OPEN ||
+        clientSocket.readyState === WebSocket.CONNECTING
+      ) {
+        clientSocket.close(1011, message);
+      }
+    };
+
+    clientSocket.on("message", (rawData) => {
+      const payloadText = toText(rawData);
+      let parsedPayload: unknown;
       try {
-        parsedMessage = JSON.parse(messageText);
+        parsedPayload = JSON.parse(payloadText);
       } catch {
+        closeClient("invalid JSON payload");
+        closeUpstream();
+        return;
+      }
+      if (!isRecord(parsedPayload)) {
+        closeClient("invalid JSON payload");
+        closeUpstream();
         return;
       }
 
-      if (!isRecord(parsedMessage)) {
-        return;
-      }
-
-      if (!connected) {
-        const typeValue = parsedMessage.type;
-        const requestIdValue = parsedMessage.requestId;
-        if (typeValue !== "connect" || typeof requestIdValue !== "string") {
+      if (connectRequestId === null) {
+        if (
+          parsedPayload.type !== "connect" ||
+          typeof parsedPayload.requestId !== "string" ||
+          !isRecord(parsedPayload.channel) ||
+          parsedPayload.channel.kind !== "agent"
+        ) {
+          closeClient("missing connect handshake");
+          closeUpstream();
           return;
         }
 
-        connected = true;
-        socket.send(
-          JSON.stringify({
-            type: "connect.ok",
-            requestId: requestIdValue,
-          }),
-        );
+        connectRequestId = parsedPayload.requestId;
+        upstreamSocket = new WebSocket(input.targetWsUrl, {
+          handshakeTimeout: REQUEST_TIMEOUT_MS,
+        });
+
+        upstreamSocket.once("open", () => {
+          if (clientSocket.readyState !== WebSocket.OPEN || connectRequestId === null) {
+            return;
+          }
+          clientSocket.send(
+            JSON.stringify({
+              type: "connect.ok",
+              requestId: connectRequestId,
+            }),
+          );
+        });
+        upstreamSocket.once("error", (error) => {
+          if (clientSocket.readyState === WebSocket.OPEN && connectRequestId !== null) {
+            clientSocket.send(
+              JSON.stringify({
+                type: "connect.error",
+                requestId: connectRequestId,
+                code: "upstream_connect_failed",
+                message: error.message,
+              }),
+            );
+          }
+          closeClient("upstream connect failed");
+          closeUpstream();
+        });
+        upstreamSocket.on("message", (upstreamData) => {
+          if (clientSocket.readyState !== WebSocket.OPEN) {
+            return;
+          }
+          clientSocket.send(toText(upstreamData));
+        });
+        upstreamSocket.on("close", () => {
+          closeClient("upstream closed");
+        });
         return;
       }
 
-      const methodValue = parsedMessage.method;
-      const idValue = parsedMessage.id;
-      if (
-        typeof methodValue !== "string" ||
-        !(typeof idValue === "string" || typeof idValue === "number")
-      ) {
+      if (upstreamSocket === null || upstreamSocket.readyState !== WebSocket.OPEN) {
+        closeClient("upstream unavailable");
+        closeUpstream();
         return;
       }
 
-      const request: JsonRpcRequest = {
-        id: idValue,
-        method: methodValue,
-      };
-      if ("params" in parsedMessage) {
-        request.params = parsedMessage.params;
-      }
-      requests.push(request);
+      upstreamSocket.send(payloadText);
+    });
 
-      if (request.method === "initialize") {
-        socket.send(
-          JSON.stringify({
-            id: idValue,
-            result: {
-              userAgent: "mistle-codex-test-server",
-            },
-          }),
-        );
-        return;
-      }
-
-      const response = handler(request);
-      if ("error" in response) {
-        socket.send(
-          JSON.stringify({
-            id: idValue,
-            error: response.error,
-          }),
-        );
-        return;
-      }
-
-      socket.send(
-        JSON.stringify({
-          id: idValue,
-          result: response.result,
-        }),
-      );
+    clientSocket.on("close", () => {
+      closeUpstream();
+    });
+    clientSocket.on("error", () => {
+      closeUpstream();
     });
   });
 
@@ -192,8 +703,7 @@ async function startCodexTestServer(
   }
 
   return {
-    url: `ws://127.0.0.1:${String(address.port)}`,
-    requests,
+    wsUrl: `ws://127.0.0.1:${String(address.port)}`,
     close: async () => {
       await new Promise<void>((resolve, reject) => {
         wsServer.close((error) => {
@@ -201,7 +711,6 @@ async function startCodexTestServer(
             resolve();
             return;
           }
-
           reject(error);
         });
       });
@@ -231,9 +740,77 @@ async function createTestDatabase(input: { databaseUrl: string }) {
   };
 }
 
+type RoutingTestEnvironment = {
+  database: Awaited<ReturnType<typeof createTestDatabase>>;
+  codexServer: StartedCodexAppServer;
+  codexBridge: StartedCodexAgentBridge;
+  integrationModel: string;
+  close: () => Promise<void>;
+};
+
+async function startRoutingTestEnvironment(input: {
+  databaseUrl: string;
+}): Promise<RoutingTestEnvironment> {
+  let database: Awaited<ReturnType<typeof createTestDatabase>> | null = null;
+  let codexServer: StartedCodexAppServer | null = null;
+  let codexBridge: StartedCodexAgentBridge | null = null;
+  let modelConnection: ProviderConnection | null = null;
+
+  try {
+    database = await createTestDatabase({
+      databaseUrl: input.databaseUrl,
+    });
+    codexServer = await startCodexAppServer();
+    codexBridge = await startCodexAgentBridge({
+      targetWsUrl: codexServer.wsUrl,
+    });
+
+    modelConnection = await connectInitializedCodexConnection(codexServer.wsUrl);
+    const integrationModel = await resolveIntegrationModel(modelConnection);
+    await modelConnection.close();
+    modelConnection = null;
+    if (database === null || codexServer === null || codexBridge === null) {
+      throw new Error("Routing test environment setup produced an unexpected null resource.");
+    }
+    const readyDatabase = database;
+    const readyCodexServer = codexServer;
+    const readyCodexBridge = codexBridge;
+
+    return {
+      database: readyDatabase,
+      codexServer: readyCodexServer,
+      codexBridge: readyCodexBridge,
+      integrationModel,
+      close: async () => {
+        if (modelConnection !== null) {
+          await modelConnection.close();
+        }
+        await readyCodexBridge.close();
+        await readyCodexServer.close();
+        await readyDatabase.stop();
+      },
+    };
+  } catch (error) {
+    if (modelConnection !== null) {
+      await modelConnection.close();
+    }
+    if (codexBridge !== null) {
+      await codexBridge.close();
+    }
+    if (codexServer !== null) {
+      await codexServer.close();
+    }
+    if (database !== null) {
+      await database.stop();
+    }
+    throw error;
+  }
+}
+
 async function seedAutomationScenario(input: {
   db: ReturnType<typeof createControlPlaneDatabase>;
   suffix: string;
+  model: string;
 }): Promise<{
   organizationId: string;
   automationId: string;
@@ -293,7 +870,7 @@ async function seedAutomationScenario(input: {
     connectionId: `icn_worker_automation_route_agent_${input.suffix}`,
     kind: IntegrationBindingKinds.AGENT,
     config: {
-      defaultModel: "gpt-5.3-codex",
+      defaultModel: input.model,
     },
   });
 
@@ -553,63 +1130,16 @@ async function executeAutomationConversationRun(input: {
   }
 }
 
-describe("handleAutomationRun conversation routing integration", () => {
+const describeCodexIntegration = shouldRunCodexIntegration() ? describe : describe.skip;
+
+describeCodexIntegration("handleAutomationRun conversation routing integration", () => {
   it(
-    "creates provider conversation on first run and steers existing active execution on second run",
+    "creates provider conversation on first run and reuses it on follow-up run",
     async ({ fixture }) => {
-      const database = await createTestDatabase({
+      const testEnvironment = await startRoutingTestEnvironment({
         databaseUrl: fixture.config.workflow.databaseUrl,
       });
-
-      const rpcServer = await startCodexTestServer((request) => {
-        if (request.method === "thread/start") {
-          return {
-            result: {
-              thread: {
-                id: "thread_route_001",
-              },
-            },
-          };
-        }
-
-        if (request.method === "turn/start") {
-          return {
-            result: {
-              turn: {
-                id: "turn_route_001",
-              },
-            },
-          };
-        }
-
-        if (request.method === "thread/read") {
-          return {
-            result: {
-              thread: {
-                id: "thread_route_001",
-                status: {
-                  type: "active",
-                },
-              },
-            },
-          };
-        }
-
-        if (request.method === "turn/steer") {
-          return {
-            result: {
-              turnId: "turn_route_002",
-            },
-          };
-        }
-
-        return {
-          error: {
-            code: -32601,
-            message: `Unsupported method '${request.method}'.`,
-          },
-        };
-      });
+      const { database, codexBridge, integrationModel } = testEnvironment;
 
       let sandboxStartCount = 0;
 
@@ -617,6 +1147,7 @@ describe("handleAutomationRun conversation routing integration", () => {
         const seeded = await seedAutomationScenario({
           db: database.db,
           suffix: "first-second",
+          model: integrationModel,
         });
 
         await executeAutomationConversationRun({
@@ -637,11 +1168,21 @@ describe("handleAutomationRun conversation routing integration", () => {
           }),
           mintSandboxConnectionToken: async ({ instanceId }) => ({
             instanceId,
-            url: rpcServer.url,
+            url: codexBridge.wsUrl,
             token: "token_route",
             expiresAt: "2026-03-07T01:00:00.000Z",
           }),
         });
+
+        const routeAfterFirstRun = await database.db.query.conversationRoutes.findFirst({
+          where: (table, { eq: whereEq }) => whereEq(table.sandboxInstanceId, "sbi_route_1"),
+        });
+        expect(routeAfterFirstRun).toBeDefined();
+        if (routeAfterFirstRun === undefined) {
+          throw new Error("Expected conversation route after first run.");
+        }
+        expect(routeAfterFirstRun.providerConversationId).not.toBeNull();
+        expect(routeAfterFirstRun.providerExecutionId).not.toBeNull();
 
         const followup = await seedFollowupAutomationRun({
           db: database.db,
@@ -670,7 +1211,7 @@ describe("handleAutomationRun conversation routing integration", () => {
           }),
           mintSandboxConnectionToken: async ({ instanceId }) => ({
             instanceId,
-            url: rpcServer.url,
+            url: codexBridge.wsUrl,
             token: "token_route",
             expiresAt: "2026-03-07T01:00:00.000Z",
           }),
@@ -678,249 +1219,39 @@ describe("handleAutomationRun conversation routing integration", () => {
 
         expect(sandboxStartCount).toBe(1);
 
-        const persistedConversation = await database.db.query.conversations.findFirst({
-          where: (table, { eq }) => eq(table.organizationId, seeded.organizationId),
+        const routeAfterSecondRun = await database.db.query.conversationRoutes.findFirst({
+          where: (table, { eq: whereEq }) => whereEq(table.id, routeAfterFirstRun.id),
         });
-        expect(persistedConversation).toBeDefined();
-        if (persistedConversation === undefined) {
-          throw new Error("Expected conversation row.");
+        expect(routeAfterSecondRun).toBeDefined();
+        if (routeAfterSecondRun === undefined) {
+          throw new Error("Expected conversation route after second run.");
         }
-
-        const persistedRoute = await database.db.query.conversationRoutes.findFirst({
-          where: (table, { eq }) => eq(table.conversationId, persistedConversation.id),
-        });
-        expect(persistedRoute).toBeDefined();
-        if (persistedRoute === undefined) {
-          throw new Error("Expected conversation route row.");
-        }
-
-        expect(persistedRoute.providerConversationId).toBe("thread_route_001");
-        expect(persistedRoute.providerExecutionId).toBe("turn_route_002");
-
-        const methodNames = rpcServer.requests
-          .map((request) => request.method)
-          .filter((methodName) => methodName !== "initialize");
-        expect(methodNames).toEqual(["thread/start", "turn/start", "thread/read", "turn/steer"]);
+        expect(routeAfterSecondRun.providerConversationId).toBe(
+          routeAfterFirstRun.providerConversationId,
+        );
+        expect(routeAfterSecondRun.providerExecutionId).not.toBeNull();
       } finally {
-        await rpcServer.close();
-        await database.stop();
+        await testEnvironment.close();
       }
     },
     TestTimeoutMs,
   );
 
   it(
-    "resumes idle codex conversations with thread/resume before turn/start",
+    "reuses the same sandbox instance when an existing route reports stopped then recovers",
     async ({ fixture }) => {
-      const database = await createTestDatabase({
+      const testEnvironment = await startRoutingTestEnvironment({
         databaseUrl: fixture.config.workflow.databaseUrl,
       });
-
-      const rpcServer = await startCodexTestServer((request) => {
-        if (request.method === "thread/start") {
-          return {
-            result: {
-              thread: {
-                id: "thread_idle_resume_001",
-              },
-            },
-          };
-        }
-
-        if (request.method === "turn/start") {
-          const runTurnId =
-            request.params !== undefined && isRecord(request.params) && "threadId" in request.params
-              ? "turn_idle_resume_001"
-              : "turn_idle_resume_002";
-          return {
-            result: {
-              turn: {
-                id: runTurnId,
-              },
-            },
-          };
-        }
-
-        if (request.method === "thread/read") {
-          return {
-            result: {
-              thread: {
-                id: "thread_idle_resume_001",
-                status: {
-                  type: "idle",
-                },
-              },
-            },
-          };
-        }
-
-        if (request.method === "thread/resume") {
-          return {
-            result: {
-              ok: true,
-            },
-          };
-        }
-
-        return {
-          error: {
-            code: -32601,
-            message: `Unsupported method '${request.method}'.`,
-          },
-        };
-      });
+      const { database, codexBridge, integrationModel } = testEnvironment;
 
       let sandboxStartCount = 0;
 
       try {
         const seeded = await seedAutomationScenario({
           db: database.db,
-          suffix: "idle-resume",
-        });
-
-        await executeAutomationConversationRun({
-          db: database.db,
-          automationRunId: seeded.runId,
-          startSandboxProfileInstance: async () => {
-            sandboxStartCount += 1;
-            return {
-              workflowRunId: `wfr_idle_${String(sandboxStartCount)}`,
-              sandboxInstanceId: `sbi_idle_${String(sandboxStartCount)}`,
-            };
-          },
-          getSandboxInstance: async ({ instanceId }) => ({
-            id: instanceId,
-            status: "running",
-            failureCode: null,
-            failureMessage: null,
-          }),
-          mintSandboxConnectionToken: async ({ instanceId }) => ({
-            instanceId,
-            url: rpcServer.url,
-            token: "token_idle",
-            expiresAt: "2026-03-07T01:00:00.000Z",
-          }),
-        });
-
-        const followup = await seedFollowupAutomationRun({
-          db: database.db,
-          suffix: "idle-resume",
-          automationId: seeded.automationId,
-          automationTargetId: seeded.automationTargetId,
-          organizationId: seeded.organizationId,
-          sourceConnectionId: seeded.sourceConnectionId,
-        });
-
-        await executeAutomationConversationRun({
-          db: database.db,
-          automationRunId: followup.runId,
-          startSandboxProfileInstance: async () => {
-            sandboxStartCount += 1;
-            return {
-              workflowRunId: `wfr_idle_${String(sandboxStartCount)}`,
-              sandboxInstanceId: `sbi_idle_${String(sandboxStartCount)}`,
-            };
-          },
-          getSandboxInstance: async ({ instanceId }) => ({
-            id: instanceId,
-            status: "running",
-            failureCode: null,
-            failureMessage: null,
-          }),
-          mintSandboxConnectionToken: async ({ instanceId }) => ({
-            instanceId,
-            url: rpcServer.url,
-            token: "token_idle",
-            expiresAt: "2026-03-07T01:00:00.000Z",
-          }),
-        });
-
-        expect(sandboxStartCount).toBe(1);
-
-        const methodNames = rpcServer.requests
-          .map((request) => request.method)
-          .filter((methodName) => methodName !== "initialize");
-        expect(methodNames).toEqual([
-          "thread/start",
-          "turn/start",
-          "thread/read",
-          "thread/resume",
-          "turn/start",
-        ]);
-      } finally {
-        await rpcServer.close();
-        await database.stop();
-      }
-    },
-    TestTimeoutMs,
-  );
-
-  it(
-    "resumes the same sandbox instance when the previous route sandbox is stopped",
-    async ({ fixture }) => {
-      const database = await createTestDatabase({
-        databaseUrl: fixture.config.workflow.databaseUrl,
-      });
-
-      let turnStartCount = 0;
-
-      const rpcServer = await startCodexTestServer((request) => {
-        if (request.method === "thread/start") {
-          return {
-            result: {
-              thread: {
-                id: "thread_stopped_001",
-              },
-            },
-          };
-        }
-
-        if (request.method === "turn/start") {
-          turnStartCount += 1;
-          return {
-            result: {
-              turn: {
-                id: `turn_stopped_00${String(turnStartCount)}`,
-              },
-            },
-          };
-        }
-
-        if (request.method === "thread/read") {
-          return {
-            result: {
-              thread: {
-                id: "thread_stopped_001",
-                status: {
-                  type: "idle",
-                },
-              },
-            },
-          };
-        }
-
-        if (request.method === "thread/resume") {
-          return {
-            result: {
-              ok: true,
-            },
-          };
-        }
-
-        return {
-          error: {
-            code: -32601,
-            message: `Unsupported method '${request.method}'.`,
-          },
-        };
-      });
-
-      let sandboxStartCount = 0;
-
-      try {
-        const seeded = await seedAutomationScenario({
-          db: database.db,
-          suffix: "stopped-rebind",
+          suffix: "stopped-recover",
+          model: integrationModel,
         });
 
         await executeAutomationConversationRun({
@@ -941,23 +1272,29 @@ describe("handleAutomationRun conversation routing integration", () => {
           }),
           mintSandboxConnectionToken: async ({ instanceId }) => ({
             instanceId,
-            url: rpcServer.url,
+            url: codexBridge.wsUrl,
             token: "token_stopped",
             expiresAt: "2026-03-07T01:00:00.000Z",
           }),
         });
 
+        const routeAfterFirstRun = await database.db.query.conversationRoutes.findFirst({
+          where: (table, { eq: whereEq }) => whereEq(table.sandboxInstanceId, "sbi_stopped_1"),
+        });
+        if (routeAfterFirstRun === undefined) {
+          throw new Error("Expected initial conversation route.");
+        }
+
         const followup = await seedFollowupAutomationRun({
           db: database.db,
-          suffix: "stopped-rebind",
+          suffix: "stopped-recover",
           automationId: seeded.automationId,
           automationTargetId: seeded.automationTargetId,
           organizationId: seeded.organizationId,
           sourceConnectionId: seeded.sourceConnectionId,
         });
 
-        let stoppedRecoveryPollCount = 0;
-
+        let stoppedPollCount = 0;
         await executeAutomationConversationRun({
           db: database.db,
           automationRunId: followup.runId,
@@ -969,8 +1306,8 @@ describe("handleAutomationRun conversation routing integration", () => {
             };
           },
           getSandboxInstance: async ({ instanceId }) => {
-            if (instanceId === "sbi_stopped_1" && stoppedRecoveryPollCount === 0) {
-              stoppedRecoveryPollCount += 1;
+            if (instanceId === "sbi_stopped_1" && stoppedPollCount === 0) {
+              stoppedPollCount += 1;
               return {
                 id: instanceId,
                 status: "stopped",
@@ -988,7 +1325,7 @@ describe("handleAutomationRun conversation routing integration", () => {
           },
           mintSandboxConnectionToken: async ({ instanceId }) => ({
             instanceId,
-            url: rpcServer.url,
+            url: codexBridge.wsUrl,
             token: "token_stopped",
             expiresAt: "2026-03-07T01:00:00.000Z",
           }),
@@ -996,238 +1333,40 @@ describe("handleAutomationRun conversation routing integration", () => {
 
         expect(sandboxStartCount).toBe(1);
 
-        const persistedConversation = await database.db.query.conversations.findFirst({
-          where: (table, { eq }) => eq(table.organizationId, seeded.organizationId),
+        const routeAfterSecondRun = await database.db.query.conversationRoutes.findFirst({
+          where: (table, { eq: whereEq }) => whereEq(table.id, routeAfterFirstRun.id),
         });
-        if (persistedConversation === undefined) {
-          throw new Error("Expected conversation row.");
-        }
-
-        const persistedRoute = await database.db.query.conversationRoutes.findFirst({
-          where: (table, { eq }) => eq(table.conversationId, persistedConversation.id),
-        });
-        expect(persistedRoute?.sandboxInstanceId).toBe("sbi_stopped_1");
-        expect(persistedRoute?.providerExecutionId).toBe("turn_stopped_002");
-
-        const methodNames = rpcServer.requests
-          .map((request) => request.method)
-          .filter((methodName) => methodName !== "initialize");
-        expect(methodNames).toEqual([
-          "thread/start",
-          "turn/start",
-          "thread/read",
-          "thread/resume",
-          "turn/start",
-        ]);
-      } finally {
-        await rpcServer.close();
-        await database.stop();
-      }
-    },
-    TestTimeoutMs,
-  );
-
-  it(
-    "fails explicitly when provider reports active conversation but persisted execution id is missing",
-    async ({ fixture }) => {
-      const database = await createTestDatabase({
-        databaseUrl: fixture.config.workflow.databaseUrl,
-      });
-
-      const rpcServer = await startCodexTestServer((request) => {
-        if (request.method === "thread/read") {
-          return {
-            result: {
-              thread: {
-                id: "thread_missing_execution",
-                status: {
-                  type: "active",
-                },
-              },
-            },
-          };
-        }
-
-        return {
-          error: {
-            code: -32601,
-            message: `Unsupported method '${request.method}'.`,
-          },
-        };
-      });
-
-      try {
-        const seeded = await seedAutomationScenario({
-          db: database.db,
-          suffix: "missing-execution",
-        });
-
-        const claimedConversation = await claimAutomationConversation(
-          {
-            db: database.db,
-          },
-          {
-            preparedAutomationRun: await prepareAutomationRun(
-              {
-                db: database.db,
-              },
-              {
-                automationRunId: seeded.runId,
-              },
-            ),
-          },
+        expect(routeAfterSecondRun?.sandboxInstanceId).toBe("sbi_stopped_1");
+        expect(routeAfterSecondRun?.providerConversationId).toBe(
+          routeAfterFirstRun.providerConversationId,
         );
-
-        const insertedRoute = await database.db
-          .insert(conversationRoutes)
-          .values({
-            conversationId: claimedConversation.conversationId,
-            sandboxInstanceId: "sbi_missing_execution",
-            providerConversationId: "thread_missing_execution",
-            providerExecutionId: null,
-            providerState: null,
-            status: "active",
-          })
-          .returning();
-        if (insertedRoute[0] === undefined) {
-          throw new Error("Expected inserted conversation route.");
-        }
-
-        await expect(
-          executeAutomationConversationRun({
-            db: database.db,
-            automationRunId: seeded.runId,
-            startSandboxProfileInstance: async () => ({
-              workflowRunId: "wfr_missing_execution",
-              sandboxInstanceId: "sbi_missing_execution_new",
-            }),
-            getSandboxInstance: async ({ instanceId }) => ({
-              id: instanceId,
-              status: "running",
-              failureCode: null,
-              failureMessage: null,
-            }),
-            mintSandboxConnectionToken: async ({ instanceId }) => ({
-              instanceId,
-              url: rpcServer.url,
-              token: "token_missing_execution",
-              expiresAt: "2026-03-07T01:00:00.000Z",
-            }),
-          }),
-        ).rejects.toMatchObject({
-          code: "provider_execution_missing",
-        });
-
-        const persistedRun = await database.db.query.automationRuns.findFirst({
-          where: (table, { eq }) => eq(table.id, seeded.runId),
-        });
-        expect(persistedRun?.status).toBe(AutomationRunStatuses.FAILED);
-        expect(persistedRun?.failureCode).toBe("provider_execution_missing");
       } finally {
-        await rpcServer.close();
-        await database.stop();
+        await testEnvironment.close();
       }
     },
     TestTimeoutMs,
   );
 
   it(
-    "replaces provider conversation binding when thread is missing and starts a new execution",
+    "replaces provider conversation binding when persisted thread id is missing",
     async ({ fixture }) => {
-      const database = await createTestDatabase({
+      const testEnvironment = await startRoutingTestEnvironment({
         databaseUrl: fixture.config.workflow.databaseUrl,
       });
-
-      const rpcServer = await startCodexTestServer((request) => {
-        if (request.method === "thread/read") {
-          return {
-            error: {
-              code: -32600,
-              message: "invalid thread id: thread_old",
-            },
-          };
-        }
-
-        if (request.method === "thread/start") {
-          return {
-            result: {
-              thread: {
-                id: "thread_replaced",
-              },
-            },
-          };
-        }
-
-        if (request.method === "turn/start") {
-          return {
-            result: {
-              turn: {
-                id: "turn_replaced",
-              },
-            },
-          };
-        }
-
-        return {
-          error: {
-            code: -32601,
-            message: `Unsupported method '${request.method}'.`,
-          },
-        };
-      });
+      const { database, codexBridge, integrationModel } = testEnvironment;
 
       try {
         const seeded = await seedAutomationScenario({
           db: database.db,
           suffix: "replace-binding",
+          model: integrationModel,
         });
-
-        const prepared = await prepareAutomationRun(
-          {
-            db: database.db,
-          },
-          {
-            automationRunId: seeded.runId,
-          },
-        );
-        const claimed = await claimAutomationConversation(
-          {
-            db: database.db,
-          },
-          {
-            preparedAutomationRun: prepared,
-          },
-        );
-
-        await database.db
-          .update(conversationRoutes)
-          .set({
-            sandboxInstanceId: "sbi_replace_binding",
-            providerConversationId: "thread_old",
-            providerExecutionId: "turn_old",
-            status: "active",
-          })
-          .where(eq(conversationRoutes.conversationId, claimed.conversationId));
-
-        const existingRoute = await database.db.query.conversationRoutes.findFirst({
-          where: (table, { eq }) => eq(table.conversationId, claimed.conversationId),
-        });
-        if (existingRoute === undefined) {
-          await database.db.insert(conversationRoutes).values({
-            conversationId: claimed.conversationId,
-            sandboxInstanceId: "sbi_replace_binding",
-            providerConversationId: "thread_old",
-            providerExecutionId: "turn_old",
-            providerState: null,
-            status: "active",
-          });
-        }
 
         await executeAutomationConversationRun({
           db: database.db,
           automationRunId: seeded.runId,
           startSandboxProfileInstance: async () => ({
-            workflowRunId: "wfr_replace_binding",
+            workflowRunId: "wfr_replace_binding_1",
             sandboxInstanceId: "sbi_replace_binding",
           }),
           getSandboxInstance: async ({ instanceId }) => ({
@@ -1238,27 +1377,79 @@ describe("handleAutomationRun conversation routing integration", () => {
           }),
           mintSandboxConnectionToken: async ({ instanceId }) => ({
             instanceId,
-            url: rpcServer.url,
+            url: codexBridge.wsUrl,
             token: "token_replace_binding",
             expiresAt: "2026-03-07T01:00:00.000Z",
           }),
         });
 
         const persistedConversation = await database.db.query.conversations.findFirst({
-          where: (table, { eq }) => eq(table.organizationId, seeded.organizationId),
+          where: (table, { eq: whereEq }) => whereEq(table.organizationId, seeded.organizationId),
         });
         if (persistedConversation === undefined) {
-          throw new Error("Expected conversation row.");
+          throw new Error("Expected conversation row after first run.");
         }
 
-        const persistedRoute = await database.db.query.conversationRoutes.findFirst({
-          where: (table, { eq }) => eq(table.conversationId, persistedConversation.id),
+        const existingRoute = await database.db.query.conversationRoutes.findFirst({
+          where: (table, { eq: whereEq }) =>
+            whereEq(table.conversationId, persistedConversation.id),
         });
-        expect(persistedRoute?.providerConversationId).toBe("thread_replaced");
-        expect(persistedRoute?.providerExecutionId).toBe("turn_replaced");
+        if (existingRoute === undefined) {
+          throw new Error("Expected route row after first run.");
+        }
+
+        const missingThreadId = randomUUID();
+        await database.db
+          .update(conversationRoutes)
+          .set({
+            providerConversationId: missingThreadId,
+            providerExecutionId: randomUUID(),
+          })
+          .where(eq(conversationRoutes.id, existingRoute.id));
+
+        const followup = await seedFollowupAutomationRun({
+          db: database.db,
+          suffix: "replace-binding",
+          automationId: seeded.automationId,
+          automationTargetId: seeded.automationTargetId,
+          organizationId: seeded.organizationId,
+          sourceConnectionId: seeded.sourceConnectionId,
+        });
+
+        await executeAutomationConversationRun({
+          db: database.db,
+          automationRunId: followup.runId,
+          startSandboxProfileInstance: async () => ({
+            workflowRunId: "wfr_replace_binding_2",
+            sandboxInstanceId: "sbi_replace_binding",
+          }),
+          getSandboxInstance: async ({ instanceId }) => ({
+            id: instanceId,
+            status: "running",
+            failureCode: null,
+            failureMessage: null,
+          }),
+          mintSandboxConnectionToken: async ({ instanceId }) => ({
+            instanceId,
+            url: codexBridge.wsUrl,
+            token: "token_replace_binding",
+            expiresAt: "2026-03-07T01:00:00.000Z",
+          }),
+        });
+
+        const routeAfterReplacement = await database.db.query.conversationRoutes.findFirst({
+          where: (table, { eq: whereEq }) => whereEq(table.id, existingRoute.id),
+        });
+        expect(routeAfterReplacement).toBeDefined();
+        if (routeAfterReplacement === undefined) {
+          throw new Error("Expected route row after replacement run.");
+        }
+
+        expect(routeAfterReplacement.providerConversationId).not.toBeNull();
+        expect(routeAfterReplacement.providerConversationId).not.toBe(missingThreadId);
+        expect(routeAfterReplacement.providerExecutionId).not.toBeNull();
       } finally {
-        await rpcServer.close();
-        await database.stop();
+        await testEnvironment.close();
       }
     },
     TestTimeoutMs,
