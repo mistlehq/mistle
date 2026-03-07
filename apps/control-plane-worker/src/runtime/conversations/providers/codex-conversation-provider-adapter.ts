@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { systemScheduler, type TimerHandle } from "@mistle/time";
 import WebSocket, { type RawData } from "ws";
 
 import { connectSandboxAgentConnection } from "../../services/sandbox-agent-connection.js";
@@ -8,11 +9,7 @@ import type {
   ProviderConnection,
   ProviderInspectConversationOutput,
 } from "../provider-adapter.js";
-import {
-  ConversationProviderError,
-  ConversationProviderErrorCodes,
-  type ConversationProviderErrorCode,
-} from "../provider-errors.js";
+import { ConversationProviderError, ConversationProviderErrorCodes } from "../provider-errors.js";
 
 const CodexMethodNames = {
   THREAD_READ: "thread/read",
@@ -21,7 +18,11 @@ const CodexMethodNames = {
   TURN_START: "turn/start",
   TURN_STEER: "turn/steer",
 } as const;
-const CodexModelOptionKey = "model";
+
+const CodexJsonRpcErrorCodes = {
+  INVALID_REQUEST: -32600,
+} as const;
+const CodexJsonRpcRequestTimeoutMs = 60_000;
 
 export type CodexStartExecutionInputItem = {
   type: "text";
@@ -44,6 +45,19 @@ type JsonRpcClientConnection = {
   socket: WebSocket;
   sendText: (payload: string) => Promise<void>;
 };
+
+type CodexRequestFailureCause = {
+  method: string;
+  errorCode: number | null;
+  errorMessage: string;
+  errorData?: unknown;
+};
+
+const CodexInitializeClientInfo = {
+  name: "mistle_control_plane_worker",
+  title: "Mistle Control Plane Worker",
+  version: "0.1.0",
+} as const;
 
 function toText(data: RawData): string {
   if (typeof data === "string") {
@@ -121,47 +135,31 @@ function readNestedValue(value: unknown, path: readonly string[]): unknown {
 }
 
 function normalizeThreadStatus(statusValue: unknown): ProviderInspectConversationOutput["status"] {
-  if (typeof statusValue === "string") {
-    const normalizedStatus = statusValue.toLowerCase().replaceAll("_", "").replaceAll("-", "");
-    if (normalizedStatus.includes("active")) {
+  if (!isRecord(statusValue) || typeof statusValue.type !== "string") {
+    throw new ConversationProviderError({
+      code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
+      message: "Codex inspect did not return thread.status.type.",
+    });
+  }
+
+  switch (statusValue.type) {
+    case "active":
       return "active";
-    }
-    if (normalizedStatus.includes("systemerror") || normalizedStatus === "error") {
+    case "systemError":
       return "error";
-    }
-    if (normalizedStatus.includes("idle") || normalizedStatus.includes("notloaded")) {
+    case "idle":
+    case "notLoaded":
       return "idle";
-    }
+    default:
+      throw new ConversationProviderError({
+        code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
+        message: `Codex inspect returned unsupported thread status type '${statusValue.type}'.`,
+      });
   }
-
-  if (isRecord(statusValue)) {
-    const typeValue = statusValue.type;
-    if (typeof typeValue === "string") {
-      return normalizeThreadStatus(typeValue);
-    }
-    const statusField = statusValue.status;
-    if (typeof statusField === "string") {
-      return normalizeThreadStatus(statusField);
-    }
-    const kindValue = statusValue.kind;
-    if (typeof kindValue === "string") {
-      return normalizeThreadStatus(kindValue);
-    }
-    const tagValue = statusValue.tag;
-    if (typeof tagValue === "string") {
-      return normalizeThreadStatus(tagValue);
-    }
-  }
-
-  throw new ConversationProviderError({
-    code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
-    message: "Codex inspect did not return a recognized thread status shape.",
-  });
 }
 
 function extractProviderConversationId(result: unknown): string {
-  const providerConversationId =
-    readNestedString(result, ["thread", "id"]) ?? readNestedString(result, ["id"]);
+  const providerConversationId = readNestedString(result, ["thread", "id"]);
   if (providerConversationId === null || providerConversationId.length === 0) {
     throw new ConversationProviderError({
       code: ConversationProviderErrorCodes.PROVIDER_CREATE_CONVERSATION_FAILED,
@@ -172,35 +170,151 @@ function extractProviderConversationId(result: unknown): string {
   return providerConversationId;
 }
 
-function extractProviderExecutionId(
-  result: unknown,
-  failureCode: ConversationProviderErrorCode,
-): string {
-  const providerExecutionId =
-    readNestedString(result, ["turn", "id"]) ?? readNestedString(result, ["id"]);
+function extractTurnStartExecutionId(result: unknown): string {
+  const providerExecutionId = readNestedString(result, ["turn", "id"]);
   if (providerExecutionId === null || providerExecutionId.length === 0) {
     throw new ConversationProviderError({
-      code: failureCode,
-      message: "Codex turn response did not include turn.id.",
+      code: ConversationProviderErrorCodes.PROVIDER_START_EXECUTION_FAILED,
+      message: "Codex turn/start response did not include turn.id.",
     });
   }
 
   return providerExecutionId;
 }
 
-function isProviderConversationMissingError(error: unknown): boolean {
+function extractTurnSteerExecutionId(result: unknown): string {
+  const providerExecutionId = readNestedString(result, ["turnId"]);
+  if (providerExecutionId === null || providerExecutionId.length === 0) {
+    throw new ConversationProviderError({
+      code: ConversationProviderErrorCodes.PROVIDER_STEER_EXECUTION_FAILED,
+      message: "Codex turn/steer response did not include turnId.",
+    });
+  }
+
+  return providerExecutionId;
+}
+
+function readCodexRequestFailureCause(error: unknown): CodexRequestFailureCause | null {
   if (!(error instanceof ConversationProviderError)) {
-    return false;
+    return null;
   }
   if (error.code !== ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED) {
+    return null;
+  }
+
+  if (!isRecord(error.cause)) {
+    return null;
+  }
+
+  const methodValue = error.cause.method;
+  const errorMessageValue = error.cause.errorMessage;
+  const errorCodeValue = error.cause.errorCode;
+  if (typeof methodValue !== "string") {
+    return null;
+  }
+  if (typeof errorMessageValue !== "string") {
+    return null;
+  }
+  if (errorCodeValue !== null && typeof errorCodeValue !== "number") {
+    return null;
+  }
+
+  const cause: CodexRequestFailureCause = {
+    method: methodValue,
+    errorCode: errorCodeValue,
+    errorMessage: errorMessageValue,
+  };
+  if ("errorData" in error.cause) {
+    cause.errorData = error.cause.errorData;
+  }
+
+  return cause;
+}
+
+function isProviderConversationMissingError(error: unknown): boolean {
+  const cause = readCodexRequestFailureCause(error);
+  if (cause === null) {
+    return false;
+  }
+  if (cause.errorCode !== CodexJsonRpcErrorCodes.INVALID_REQUEST) {
     return false;
   }
 
-  const normalizedMessage = error.message.toLowerCase();
+  if (cause.method === CodexMethodNames.THREAD_READ) {
+    return cause.errorMessage.startsWith("invalid thread id:");
+  }
+  if (cause.method === CodexMethodNames.THREAD_RESUME) {
+    return (
+      cause.errorMessage.startsWith("invalid thread id:") ||
+      cause.errorMessage.startsWith("thread not found:")
+    );
+  }
+  if (
+    cause.method === CodexMethodNames.TURN_START ||
+    cause.method === CodexMethodNames.TURN_STEER
+  ) {
+    return (
+      cause.errorMessage.startsWith("invalid thread id:") ||
+      cause.errorMessage.startsWith("thread not found:")
+    );
+  }
+
+  return false;
+}
+
+function isThreadReadNotLoadedError(error: unknown): boolean {
+  const cause = readCodexRequestFailureCause(error);
+  if (cause === null) {
+    return false;
+  }
+  if (cause.method !== CodexMethodNames.THREAD_READ) {
+    return false;
+  }
+  if (cause.errorCode !== CodexJsonRpcErrorCodes.INVALID_REQUEST) {
+    return false;
+  }
+
+  return cause.errorMessage.startsWith("thread not loaded:");
+}
+
+function isThreadResumeNoRolloutError(error: unknown): boolean {
+  const cause = readCodexRequestFailureCause(error);
+  if (cause === null) {
+    return false;
+  }
+  if (cause.method !== CodexMethodNames.THREAD_RESUME) {
+    return false;
+  }
+  if (cause.errorCode !== CodexJsonRpcErrorCodes.INVALID_REQUEST) {
+    return false;
+  }
+
+  return cause.errorMessage.startsWith("no rollout found for thread id ");
+}
+
+function missingInspectConversationOutput(): ProviderInspectConversationOutput {
+  return {
+    exists: false,
+    status: "idle",
+    activeExecutionId: null,
+  };
+}
+
+function isProviderExecutionMissingError(error: unknown): boolean {
+  const cause = readCodexRequestFailureCause(error);
+  if (cause === null) {
+    return false;
+  }
+  if (cause.method !== CodexMethodNames.TURN_STEER) {
+    return false;
+  }
+  if (cause.errorCode !== CodexJsonRpcErrorCodes.INVALID_REQUEST) {
+    return false;
+  }
+
   return (
-    normalizedMessage.includes("not found") ||
-    normalizedMessage.includes("unknown thread") ||
-    normalizedMessage.includes("no such thread")
+    cause.errorMessage === "no active turn to steer" ||
+    cause.errorMessage.startsWith("expected active turn id `")
   );
 }
 
@@ -212,19 +326,37 @@ async function sendJsonRpcRequest(
 
   return await new Promise<unknown>((resolve, reject) => {
     const socket = connection.socket;
+    let settled = false;
+    const timeout: TimerHandle = systemScheduler.schedule(() => {
+      fail(
+        new ConversationProviderError({
+          code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
+          message: `Timed out waiting ${String(CodexJsonRpcRequestTimeoutMs)}ms for Codex app-server request '${input.method}'.`,
+        }),
+      );
+    }, CodexJsonRpcRequestTimeoutMs);
 
     function cleanup(): void {
+      systemScheduler.cancel(timeout);
       socket.off("message", handleMessage);
       socket.off("error", handleError);
       socket.off("close", handleClose);
     }
 
     function fail(error: Error): void {
+      if (settled) {
+        return;
+      }
+      settled = true;
       cleanup();
       reject(error);
     }
 
     function succeed(value: unknown): void {
+      if (settled) {
+        return;
+      }
+      settled = true;
       cleanup();
       resolve(value);
     }
@@ -248,11 +380,17 @@ async function sendJsonRpcRequest(
           responsePayload.error.message === undefined
             ? "Codex app-server JSON-RPC request failed without an error message."
             : responsePayload.error.message;
+        const rpcErrorCode = responsePayload.error.code ?? null;
         fail(
           new ConversationProviderError({
             code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
             message: `Codex app-server request '${input.method}' failed (${errorCode}): ${errorMessage}`,
-            cause: responsePayload.error.data,
+            cause: {
+              method: input.method,
+              errorCode: rpcErrorCode,
+              errorMessage,
+              errorData: responsePayload.error.data,
+            },
           }),
         );
         return;
@@ -304,6 +442,49 @@ async function sendJsonRpcRequest(
   });
 }
 
+async function sendJsonRpcNotification(
+  connection: JsonRpcClientConnection,
+  input: { method: string; params?: unknown },
+): Promise<void> {
+  const requestPayload =
+    input.params === undefined
+      ? {
+          method: input.method,
+        }
+      : {
+          method: input.method,
+          params: input.params,
+        };
+  try {
+    await connection.sendText(JSON.stringify(requestPayload));
+  } catch (error) {
+    throw new ConversationProviderError({
+      code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
+      message: `Failed to send Codex app-server notification '${input.method}'.`,
+      cause: error,
+    });
+  }
+}
+
+async function initializeCodexSession(connection: JsonRpcClientConnection): Promise<void> {
+  const initializeResult = await sendJsonRpcRequest(connection, {
+    method: "initialize",
+    params: {
+      clientInfo: CodexInitializeClientInfo,
+    },
+  });
+  if (!isRecord(initializeResult) || typeof initializeResult.userAgent !== "string") {
+    throw new ConversationProviderError({
+      code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
+      message: "Codex initialize response did not include userAgent.",
+    });
+  }
+
+  await sendJsonRpcNotification(connection, {
+    method: "initialized",
+  });
+}
+
 function toCodexTextInputItems(inputText: string): CodexStartExecutionInputItem[] {
   return [
     {
@@ -314,14 +495,14 @@ function toCodexTextInputItems(inputText: string): CodexStartExecutionInputItem[
 }
 
 function resolveCodexModel(options: Record<string, unknown> | undefined): string {
-  if (options === undefined || !(CodexModelOptionKey in options)) {
+  if (options === undefined || !("model" in options)) {
     throw new ConversationProviderError({
       code: ConversationProviderErrorCodes.PROVIDER_CREATE_CONVERSATION_FAILED,
       message: "Codex createConversation requires options.model.",
     });
   }
 
-  const modelValue = options[CodexModelOptionKey];
+  const modelValue = options.model;
   if (typeof modelValue !== "string" || modelValue.trim().length === 0) {
     throw new ConversationProviderError({
       code: ConversationProviderErrorCodes.PROVIDER_CREATE_CONVERSATION_FAILED,
@@ -329,7 +510,7 @@ function resolveCodexModel(options: Record<string, unknown> | undefined): string
     });
   }
 
-  return modelValue;
+  return modelValue.trim();
 }
 
 export function createCodexConversationProviderAdapter(): ConversationProviderAdapter {
@@ -350,21 +531,28 @@ export function createCodexConversationProviderAdapter(): ConversationProviderAd
         connectInput.connectTimeoutMs = input.connectTimeoutMs;
       }
       const connection = await connectSandboxAgentConnection(connectInput);
-      const jsonRpcConnection: JsonRpcClientConnection = {
-        socket: connection.socket,
-        sendText: connection.sendText,
-      };
+      try {
+        const jsonRpcConnection: JsonRpcClientConnection = {
+          socket: connection.socket,
+          sendText: connection.sendText,
+        };
 
-      const providerConnection: ProviderConnection = {
-        request: async (requestInput) => {
-          return await sendJsonRpcRequest(jsonRpcConnection, requestInput);
-        },
-        close: async () => {
-          await connection.close();
-        },
-      };
+        await initializeCodexSession(jsonRpcConnection);
 
-      return providerConnection;
+        const providerConnection: ProviderConnection = {
+          request: async (requestInput) => {
+            return await sendJsonRpcRequest(jsonRpcConnection, requestInput);
+          },
+          close: async () => {
+            await connection.close();
+          },
+        };
+
+        return providerConnection;
+      } catch (error) {
+        await connection.close();
+        throw error;
+      }
     },
     inspectConversation: async (input) => {
       let inspectResult: unknown;
@@ -377,9 +565,56 @@ export function createCodexConversationProviderAdapter(): ConversationProviderAd
         });
       } catch (error) {
         if (isProviderConversationMissingError(error)) {
+          return missingInspectConversationOutput();
+        }
+        if (isThreadReadNotLoadedError(error)) {
+          try {
+            await input.connection.request({
+              method: CodexMethodNames.THREAD_RESUME,
+              params: {
+                threadId: input.providerConversationId,
+              },
+            });
+          } catch (resumeError) {
+            if (
+              isProviderConversationMissingError(resumeError) ||
+              isThreadResumeNoRolloutError(resumeError)
+            ) {
+              return missingInspectConversationOutput();
+            }
+            throw new ConversationProviderError({
+              code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
+              message:
+                resumeError instanceof Error
+                  ? resumeError.message
+                  : "Codex inspect failed with non-error exception while resuming thread.",
+              cause: resumeError,
+            });
+          }
+
+          try {
+            inspectResult = await input.connection.request({
+              method: CodexMethodNames.THREAD_READ,
+              params: {
+                threadId: input.providerConversationId,
+              },
+            });
+          } catch (readAfterResumeError) {
+            if (isProviderConversationMissingError(readAfterResumeError)) {
+              return missingInspectConversationOutput();
+            }
+            throw new ConversationProviderError({
+              code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
+              message:
+                readAfterResumeError instanceof Error
+                  ? readAfterResumeError.message
+                  : "Codex inspect failed with non-error exception after resuming thread.",
+              cause: readAfterResumeError,
+            });
+          }
           return {
-            exists: false,
-            status: "idle",
+            exists: true,
+            status: normalizeThreadStatus(readNestedValue(inspectResult, ["thread", "status"])),
             activeExecutionId: null,
           };
         }
@@ -393,20 +628,12 @@ export function createCodexConversationProviderAdapter(): ConversationProviderAd
         });
       }
 
-      const threadStatusValue =
-        readNestedValue(inspectResult, ["thread", "status"]) ??
-        readNestedString(inspectResult, ["status"]) ??
-        (isRecord(inspectResult) ? inspectResult.status : null);
-
-      const activeExecutionId =
-        readNestedString(inspectResult, ["thread", "activeTurnId"]) ??
-        readNestedString(inspectResult, ["activeTurnId"]) ??
-        null;
+      const threadStatusValue = readNestedValue(inspectResult, ["thread", "status"]);
 
       return {
         exists: true,
         status: normalizeThreadStatus(threadStatusValue),
-        activeExecutionId,
+        activeExecutionId: null,
       };
     },
     createConversation: async (input) => {
@@ -442,6 +669,16 @@ export function createCodexConversationProviderAdapter(): ConversationProviderAd
           },
         });
       } catch (error) {
+        if (isProviderConversationMissingError(error)) {
+          throw new ConversationProviderError({
+            code: ConversationProviderErrorCodes.PROVIDER_CONVERSATION_MISSING,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Codex resume conversation failed with non-error exception.",
+            cause: error,
+          });
+        }
         throw new ConversationProviderError({
           code: ConversationProviderErrorCodes.PROVIDER_RESUME_FAILED,
           message:
@@ -463,6 +700,16 @@ export function createCodexConversationProviderAdapter(): ConversationProviderAd
           },
         });
       } catch (error) {
+        if (isProviderConversationMissingError(error)) {
+          throw new ConversationProviderError({
+            code: ConversationProviderErrorCodes.PROVIDER_CONVERSATION_MISSING,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Codex start execution failed with non-error exception.",
+            cause: error,
+          });
+        }
         throw new ConversationProviderError({
           code: ConversationProviderErrorCodes.PROVIDER_START_EXECUTION_FAILED,
           message:
@@ -474,10 +721,7 @@ export function createCodexConversationProviderAdapter(): ConversationProviderAd
       }
 
       return {
-        providerExecutionId: extractProviderExecutionId(
-          startResult,
-          ConversationProviderErrorCodes.PROVIDER_START_EXECUTION_FAILED,
-        ),
+        providerExecutionId: extractTurnStartExecutionId(startResult),
       };
     },
     steerExecution: async (input) => {
@@ -492,6 +736,26 @@ export function createCodexConversationProviderAdapter(): ConversationProviderAd
           },
         });
       } catch (error) {
+        if (isProviderConversationMissingError(error)) {
+          throw new ConversationProviderError({
+            code: ConversationProviderErrorCodes.PROVIDER_CONVERSATION_MISSING,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Codex steer execution failed with non-error exception.",
+            cause: error,
+          });
+        }
+        if (isProviderExecutionMissingError(error)) {
+          throw new ConversationProviderError({
+            code: ConversationProviderErrorCodes.PROVIDER_EXECUTION_MISSING,
+            message:
+              error instanceof Error
+                ? error.message
+                : "Codex steer execution failed with non-error exception.",
+            cause: error,
+          });
+        }
         throw new ConversationProviderError({
           code: ConversationProviderErrorCodes.PROVIDER_STEER_EXECUTION_FAILED,
           message:
@@ -503,10 +767,7 @@ export function createCodexConversationProviderAdapter(): ConversationProviderAd
       }
 
       return {
-        providerExecutionId: extractProviderExecutionId(
-          steerResult,
-          ConversationProviderErrorCodes.PROVIDER_STEER_EXECUTION_FAILED,
-        ),
+        providerExecutionId: extractTurnSteerExecutionId(steerResult),
       };
     },
   };
