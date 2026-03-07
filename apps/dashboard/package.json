@@ -26,6 +26,7 @@
     "@mistle/time": "workspace:*",
     "@mistle/ui": "workspace:*",
     "@phosphor-icons/react": "^2.1.7",
+    "@pierre/diffs": "^1.0.11",
     "@rjsf/core": "~6.3.1",
     "@rjsf/utils": "~6.3.1",
     "@rjsf/validator-ajv8": "~6.3.1",
