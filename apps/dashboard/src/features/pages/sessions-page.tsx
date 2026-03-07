@@ -1,26 +1,18 @@
-import type { ConnectError, ConnectOK, PTYConnectRequest } from "@mistle/sandbox-session-protocol";
 import {
   Alert,
   AlertDescription,
   AlertTitle,
+  Badge,
   Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Field,
-  FieldContent,
-  FieldLabel,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "@mistle/ui";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { z } from "zod";
+import { useQuery } from "@tanstack/react-query";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
@@ -31,52 +23,12 @@ import {
   listSandboxProfiles,
   listSandboxProfileVersions,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
-import {
-  getSandboxInstanceStatus,
-  mintSandboxInstanceConnectionToken,
-  startSandboxInstanceFromProfileVersion,
-} from "../sessions/sessions-service.js";
+import { useSandboxSessionLaunchState } from "../sessions/use-sandbox-session-launch-state.js";
+import { formatDateTime } from "../shared/date-formatters.js";
 
 const SANDBOX_PROFILE_LIST_LIMIT = 100;
-const SESSION_CONNECT_TIMEOUT_MS = 15_000;
-const SANDBOX_START_TIMEOUT_MS = 5 * 60 * 1000;
-const SANDBOX_START_POLL_INTERVAL_MS = 1_000;
 
-const ConnectOkSchema = z
-  .object({
-    type: z.literal("connect.ok"),
-    requestId: z.string().min(1),
-  })
-  .strict();
-
-const ConnectErrorSchema = z
-  .object({
-    type: z.literal("connect.error"),
-    requestId: z.string().min(1),
-    code: z.string().min(1),
-    message: z.string().min(1),
-  })
-  .strict();
-
-type ConnectControlMessage = ConnectOK | ConnectError;
-
-type StartSessionStep = "idle" | "starting" | "securing" | "connecting" | "connected";
-
-type ConnectedSession = {
-  profileId: string;
-  sandboxInstanceId: string;
-  workflowRunId: string;
-  connectionUrl: string;
-  connectedAtIso: string;
-  expiresAtIso: string;
-};
-
-export function shouldHandleSocketClose<Socket>(
-  activeSocket: Socket | null,
-  closingSocket: Socket,
-): boolean {
-  return activeSocket === closingSocket;
-}
+type SandboxSessionStatus = "starting" | "running" | "stopped" | "failed";
 
 function resolveLatestVersion(versions: readonly { version: number }[]): number | null {
   if (versions.length === 0) {
@@ -97,165 +49,49 @@ function resolveLatestVersion(versions: readonly { version: number }[]): number 
   return latestVersion;
 }
 
-function resolveStartStepLabel(step: StartSessionStep): string {
-  if (step === "starting") {
-    return "Starting sandbox...";
-  }
-  if (step === "securing") {
-    return "Securing connection...";
-  }
-  if (step === "connecting") {
-    return "Opening terminal...";
-  }
-  return "Start session";
-}
-
-function parseConnectControlMessage(payload: string): ConnectControlMessage | null {
-  let parsedPayload: unknown;
-  try {
-    parsedPayload = JSON.parse(payload);
-  } catch {
-    return null;
+function getSandboxSessionStatusBadgeUi(status: SandboxSessionStatus): {
+  label: string;
+  variant: "secondary" | "outline" | "destructive";
+  className?: string;
+} {
+  if (status === "running") {
+    return {
+      label: "Running",
+      variant: "secondary",
+      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+    };
   }
 
-  const parsedConnectOk = ConnectOkSchema.safeParse(parsedPayload);
-  if (parsedConnectOk.success) {
-    return parsedConnectOk.data;
+  if (status === "failed") {
+    return {
+      label: "Failed",
+      variant: "destructive",
+    };
   }
 
-  const parsedConnectError = ConnectErrorSchema.safeParse(parsedPayload);
-  if (parsedConnectError.success) {
-    return parsedConnectError.data;
+  if (status === "stopped") {
+    return {
+      label: "Stopped",
+      variant: "outline",
+    };
   }
 
-  return null;
-}
-
-async function waitForSandboxInstanceToRun(input: {
-  instanceId: string;
-  signal?: AbortSignal;
-}): Promise<void> {
-  const deadline = Date.now() + SANDBOX_START_TIMEOUT_MS;
-
-  while (Date.now() < deadline) {
-    const status = await getSandboxInstanceStatus({
-      instanceId: input.instanceId,
-      ...(input.signal === undefined ? {} : { signal: input.signal }),
-    });
-
-    if (status.status === "running") {
-      return;
-    }
-
-    if (status.status === "failed" || status.status === "stopped") {
-      throw new Error(
-        status.failureMessage ??
-          `Sandbox instance entered terminal status '${status.status}' before becoming ready.`,
-      );
-    }
-
-    await new Promise<void>((resolve) => {
-      window.setTimeout(resolve, SANDBOX_START_POLL_INTERVAL_MS);
-    });
-  }
-
-  throw new Error("Sandbox instance did not become ready before the start timeout elapsed.");
-}
-
-async function connectSandboxPtySession(input: { connectionUrl: string }): Promise<WebSocket> {
-  return new Promise((resolve, reject) => {
-    const websocket = new WebSocket(input.connectionUrl);
-    const requestId = crypto.randomUUID();
-    let settled = false;
-
-    const timeoutId = window.setTimeout(() => {
-      failConnection("Timed out while establishing sandbox session connection.");
-    }, SESSION_CONNECT_TIMEOUT_MS);
-
-    function cleanupListeners(): void {
-      window.clearTimeout(timeoutId);
-      websocket.removeEventListener("open", handleOpen);
-      websocket.removeEventListener("message", handleMessage);
-      websocket.removeEventListener("error", handleError);
-      websocket.removeEventListener("close", handleClose);
-    }
-
-    function failConnection(message: string): void {
-      if (settled) {
-        return;
-      }
-
-      settled = true;
-      cleanupListeners();
-      websocket.close();
-      reject(new Error(message));
-    }
-
-    function completeConnection(): void {
-      if (settled) {
-        return;
-      }
-
-      settled = true;
-      cleanupListeners();
-      resolve(websocket);
-    }
-
-    function handleOpen(): void {
-      const connectRequest: PTYConnectRequest = {
-        type: "connect",
-        v: 1,
-        requestId,
-        channel: {
-          kind: "pty",
-          session: "create",
-        },
-      };
-
-      websocket.send(JSON.stringify(connectRequest));
-    }
-
-    function handleMessage(event: MessageEvent): void {
-      if (typeof event.data !== "string") {
-        return;
-      }
-
-      const controlMessage = parseConnectControlMessage(event.data);
-      if (controlMessage === null || controlMessage.requestId !== requestId) {
-        return;
-      }
-
-      if (controlMessage.type === "connect.ok") {
-        completeConnection();
-        return;
-      }
-
-      failConnection(controlMessage.message);
-    }
-
-    function handleError(): void {
-      failConnection("Sandbox websocket connection failed.");
-    }
-
-    function handleClose(): void {
-      failConnection("Sandbox websocket connection closed before terminal was ready.");
-    }
-
-    websocket.addEventListener("open", handleOpen);
-    websocket.addEventListener("message", handleMessage);
-    websocket.addEventListener("error", handleError);
-    websocket.addEventListener("close", handleClose);
-  });
+  return {
+    label: "Starting",
+    variant: "outline",
+  };
 }
 
 export function SessionsPage(): React.JSX.Element {
-  const websocketRef = useRef<WebSocket | null>(null);
-  const manualDisconnectRef = useRef(false);
-
+  const navigate = useNavigate();
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
-  const [step, setStep] = useState<StartSessionStep>("idle");
-  const [startErrorMessage, setStartErrorMessage] = useState<string | null>(null);
-  const [connectedSession, setConnectedSession] = useState<ConnectedSession | null>(null);
+  const {
+    launchedSessions,
+    startErrorMessage,
+    isStartingSession,
+    startSession,
+    clearStartErrorMessage,
+  } = useSandboxSessionLaunchState();
 
   const profilesQuery = useQuery({
     queryKey: sandboxProfilesListQueryKey({
@@ -288,114 +124,11 @@ export function SessionsPage(): React.JSX.Element {
     enabled: selectedProfileId !== null,
     retry: false,
   });
+
   const selectedProfileVersion = useMemo(
     () => resolveLatestVersion(versionsQuery.data?.versions ?? []),
     [versionsQuery.data?.versions],
   );
-
-  useEffect(() => {
-    return () => {
-      websocketRef.current?.close(1000, "Session page unmounted.");
-      websocketRef.current = null;
-    };
-  }, []);
-
-  function disconnectSession(): void {
-    manualDisconnectRef.current = true;
-    websocketRef.current?.close(1000, "Disconnected from sessions page.");
-    websocketRef.current = null;
-    setConnectedSession(null);
-    setStep("idle");
-    setStartErrorMessage(null);
-    manualDisconnectRef.current = false;
-  }
-
-  function handleSocketClose(event: CloseEvent): void {
-    const closingSocket = event.currentTarget;
-    if (!(closingSocket instanceof WebSocket)) {
-      return;
-    }
-
-    if (!shouldHandleSocketClose(websocketRef.current, closingSocket)) {
-      return;
-    }
-
-    websocketRef.current = null;
-    setConnectedSession(null);
-    setStep("idle");
-    if (manualDisconnectRef.current) {
-      manualDisconnectRef.current = false;
-      return;
-    }
-
-    setStartErrorMessage("Sandbox session connection closed.");
-  }
-
-  const startSessionMutation = useMutation({
-    mutationFn: async () => {
-      if (selectedProfileId === null) {
-        throw new Error("Select a sandbox profile before starting a session.");
-      }
-      if (selectedProfileVersion === null) {
-        throw new Error("No sandbox profile version is available for the selected profile.");
-      }
-
-      disconnectSession();
-      setStartErrorMessage(null);
-      setStep("starting");
-
-      const startedInstance = await startSandboxInstanceFromProfileVersion({
-        profileId: selectedProfileId,
-        profileVersion: selectedProfileVersion,
-      });
-
-      await waitForSandboxInstanceToRun({
-        instanceId: startedInstance.sandboxInstanceId,
-      });
-
-      setStep("securing");
-      const mintedConnection = await mintSandboxInstanceConnectionToken({
-        instanceId: startedInstance.sandboxInstanceId,
-      });
-
-      setStep("connecting");
-      const websocket = await connectSandboxPtySession({
-        connectionUrl: mintedConnection.connectionUrl,
-      });
-
-      return {
-        selectedProfileId,
-        selectedProfileVersion,
-        startedInstance,
-        mintedConnection,
-        websocket,
-      };
-    },
-    onSuccess: (result) => {
-      websocketRef.current = result.websocket;
-      manualDisconnectRef.current = false;
-      result.websocket.addEventListener("close", handleSocketClose);
-      setConnectedSession({
-        profileId: result.selectedProfileId,
-        sandboxInstanceId: result.startedInstance.sandboxInstanceId,
-        workflowRunId: result.startedInstance.workflowRunId,
-        connectionUrl: result.mintedConnection.connectionUrl,
-        connectedAtIso: new Date().toISOString(),
-        expiresAtIso: result.mintedConnection.connectionExpiresAt,
-      });
-      setStep("connected");
-      setStartErrorMessage(null);
-    },
-    onError: (error) => {
-      setStep("idle");
-      setStartErrorMessage(
-        resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not establish sandbox session.",
-        }),
-      );
-    },
-  });
 
   const selectedProfileDisplayText =
     selectedProfileId === null
@@ -409,138 +142,154 @@ export function SessionsPage(): React.JSX.Element {
     selectedProfileVersion !== null &&
     !profilesQuery.isPending &&
     !versionsQuery.isPending &&
-    !startSessionMutation.isPending;
+    !isStartingSession;
+  const sortedSessions = [...launchedSessions].sort((left, right) => {
+    const statusRank: Record<SandboxSessionStatus, number> = {
+      starting: 0,
+      running: 1,
+      failed: 2,
+      stopped: 3,
+    };
+
+    const rankDifference = statusRank[left.status] - statusRank[right.status];
+    if (rankDifference !== 0) {
+      return rankDifference;
+    }
+
+    return Date.parse(right.createdAtIso) - Date.parse(left.createdAtIso);
+  });
 
   return (
-    <div className="gap-4 flex flex-col">
-      <Card>
-        <CardHeader>
-          <CardTitle>Start New Session</CardTitle>
-          <CardDescription>
-            Select a sandbox profile, then establish a sandbox session connection.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="gap-4 flex flex-col">
-          {profilesQuery.isError ? (
-            <Alert variant="destructive">
-              <AlertTitle>Could not load sandbox profiles</AlertTitle>
-              <AlertDescription>
-                {resolveApiErrorMessage({
-                  error: profilesQuery.error,
-                  fallbackMessage: "Could not load sandbox profiles.",
-                })}
-              </AlertDescription>
-            </Alert>
-          ) : null}
-          {versionsQuery.isError ? (
-            <Alert variant="destructive">
-              <AlertTitle>Could not resolve sandbox profile version</AlertTitle>
-              <AlertDescription>
-                {resolveApiErrorMessage({
-                  error: versionsQuery.error,
-                  fallbackMessage: "Could not load sandbox profile versions.",
-                })}
-              </AlertDescription>
-            </Alert>
-          ) : null}
-
-          {startErrorMessage !== null ? (
-            <Alert variant="destructive">
-              <AlertTitle>Session start failed</AlertTitle>
-              <AlertDescription>{startErrorMessage}</AlertDescription>
-            </Alert>
-          ) : null}
-
-          <Field>
-            <FieldLabel htmlFor="session-start-profile">Sandbox profile</FieldLabel>
-            <FieldContent>
-              <Select
-                disabled={profilesQuery.isPending || (profilesQuery.data?.items.length ?? 0) === 0}
-                onValueChange={(value) => {
-                  if (value === null || value.length === 0) {
-                    setSelectedProfileId(null);
-                    return;
-                  }
-                  setSelectedProfileId(value);
-                }}
-                value={selectedProfileSelectValue}
-              >
-                <SelectTrigger aria-label="Sandbox profile" id="session-start-profile">
-                  <SelectValue placeholder="Select sandbox profile">
-                    {selectedProfileDisplayText}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {(profilesQuery.data?.items ?? []).map((profile) => (
-                    <SelectItem key={profile.id} value={profile.id}>
-                      {profile.displayName}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </FieldContent>
-          </Field>
-
-          <div className="gap-2 flex flex-wrap">
-            <Button
-              disabled={!canStartSession}
-              onClick={() => {
-                startSessionMutation.mutate();
-              }}
-              type="button"
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-4">
+        <h1 className="text-xl font-semibold">Start a new session</h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            disabled={profilesQuery.isPending || (profilesQuery.data?.items.length ?? 0) === 0}
+            onValueChange={(value) => {
+              clearStartErrorMessage();
+              if (value === null || value.length === 0) {
+                setSelectedProfileId(null);
+                return;
+              }
+              setSelectedProfileId(value);
+            }}
+            value={selectedProfileSelectValue}
+          >
+            <SelectTrigger
+              aria-label="Sandbox profile"
+              className="min-w-56"
+              id="session-start-profile"
             >
-              {resolveStartStepLabel(step)}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+              <SelectValue placeholder="Select sandbox profile">
+                {selectedProfileDisplayText}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {(profilesQuery.data?.items ?? []).map((profile) => (
+                <SelectItem key={profile.id} value={profile.id}>
+                  {profile.displayName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            disabled={!canStartSession}
+            onClick={() => {
+              if (selectedProfileId === null || selectedProfileVersion === null) {
+                return;
+              }
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Connection Status</CardTitle>
-          <CardDescription>
-            {connectedSession === null
-              ? "No active sandbox session connection."
-              : "Sandbox session connection is established."}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="gap-2 flex flex-col">
-          {connectedSession === null ? (
-            <p className="text-muted-foreground text-sm">
-              Start a session above to establish a connection.
-            </p>
-          ) : (
-            <>
-              <p className="text-sm">
-                <span className="font-medium">Status:</span> Connected
-              </p>
-              <p className="text-sm">
-                <span className="font-medium">Sandbox instance:</span>{" "}
-                {connectedSession.sandboxInstanceId}
-              </p>
-              <p className="text-sm">
-                <span className="font-medium">Profile:</span> {connectedSession.profileId}
-              </p>
-              <p className="text-sm">
-                <span className="font-medium">Workflow run:</span> {connectedSession.workflowRunId}
-              </p>
-              <p className="text-sm">
-                <span className="font-medium">Connected at:</span>{" "}
-                {new Date(connectedSession.connectedAtIso).toLocaleString()}
-              </p>
-              <p className="text-sm">
-                <span className="font-medium">Token expires:</span>{" "}
-                {new Date(connectedSession.expiresAtIso).toLocaleString()}
-              </p>
-              <div className="gap-2 flex flex-wrap">
-                <Button onClick={disconnectSession} type="button" variant="outline">
-                  Disconnect
-                </Button>
+              startSession({
+                profileId: selectedProfileId,
+                profileDisplayName: selectedProfileDisplayText,
+                profileVersion: selectedProfileVersion,
+              });
+            }}
+            type="button"
+          >
+            {isStartingSession ? "Starting sandbox..." : "Start session"}
+          </Button>
+        </div>
+
+        {profilesQuery.isError ? (
+          <Alert variant="destructive">
+            <AlertTitle>Could not load sandbox profiles</AlertTitle>
+            <AlertDescription>
+              {resolveApiErrorMessage({
+                error: profilesQuery.error,
+                fallbackMessage: "Could not load sandbox profiles.",
+              })}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {versionsQuery.isError ? (
+          <Alert variant="destructive">
+            <AlertTitle>Could not resolve sandbox profile version</AlertTitle>
+            <AlertDescription>
+              {resolveApiErrorMessage({
+                error: versionsQuery.error,
+                fallbackMessage: "Could not load sandbox profile versions.",
+              })}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {startErrorMessage === null ? null : (
+          <Alert variant="destructive">
+            <AlertTitle>Session start failed</AlertTitle>
+            <AlertDescription>{startErrorMessage}</AlertDescription>
+          </Alert>
+        )}
+      </div>
+
+      {launchedSessions.length === 0 ? null : (
+        <div className="flex flex-col gap-3">
+          {sortedSessions.map((session) => {
+            const statusUi = getSandboxSessionStatusBadgeUi(session.status);
+
+            return (
+              <div
+                className="flex items-start justify-between gap-4 rounded-md border p-4"
+                key={session.sandboxInstanceId}
+              >
+                <div className="min-w-0 flex flex-col gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-medium">{session.profileDisplayName}</p>
+                    <Badge className={statusUi.className} variant={statusUi.variant}>
+                      {statusUi.label}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-col gap-1 text-sm">
+                    <p className="break-all">
+                      <span className="font-medium">Sandbox instance:</span>{" "}
+                      {session.sandboxInstanceId}
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Started {formatDateTime(session.createdAtIso)}
+                    </p>
+                  </div>
+                  {session.failureMessage === null ? null : (
+                    <p className="text-destructive whitespace-pre-wrap text-sm">
+                      {session.failureMessage}
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 flex-col gap-2">
+                  <Button
+                    disabled={session.status !== "running"}
+                    onClick={() => {
+                      navigate(`/sessions/${encodeURIComponent(session.sandboxInstanceId)}`);
+                    }}
+                    type="button"
+                  >
+                    Open session
+                  </Button>
+                </div>
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
