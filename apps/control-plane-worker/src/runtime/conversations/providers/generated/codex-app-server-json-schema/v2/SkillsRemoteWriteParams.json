@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SkillsRemoteWriteParams",
+  "type": "object",
+  "required": ["hazelnutId"],
+  "properties": {
+    "hazelnutId": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FuzzyFileSearchSessionCompletedNotification",
+  "type": "object",
+  "required": ["sessionId"],
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    }
+  }
+}
