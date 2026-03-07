@@ -1,6 +1,7 @@
 import { ApprovalDecisionButtons } from "../../codex-client/approval-decision-buttons.js";
 import type { CodexFileChangeApprovalRequestEntry } from "../../codex-client/codex-server-requests-state.js";
 import type { ChatFileChangeEntry } from "../chat-types.js";
+import { ChatDiffView } from "./chat-diff-view.js";
 
 type ChatFileChangeBlockProps = {
   approvalRequest: CodexFileChangeApprovalRequestEntry | null;
@@ -32,9 +33,7 @@ export function ChatFileChangeBlock({
                 <p className="text-muted-foreground text-xs">{change.kind}</p>
               )}
               {change.diff === null || change.diff.trim().length === 0 ? null : (
-                <pre className="bg-muted mt-2 overflow-x-auto rounded-md p-3 text-xs leading-5 whitespace-pre-wrap">
-                  {change.diff}
-                </pre>
+                <ChatDiffView diff={change.diff} path={change.path} />
               )}
             </div>
           ))}
