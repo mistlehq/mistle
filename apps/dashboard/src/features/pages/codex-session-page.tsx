@@ -3,6 +3,7 @@ import { useParams } from "react-router";
 
 import { ChatComposer } from "../chat/components/chat-composer.js";
 import { ChatThread } from "../chat/components/chat-thread.js";
+import { CodexServerRequestsPanel } from "../codex-client/codex-server-requests-panel.js";
 import { SessionMoreActions } from "../sessions/session-more-actions.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import { useCodexSessionPageController } from "./use-codex-session-page-controller.js";
@@ -21,6 +22,7 @@ export function CodexSessionPage(): React.JSX.Element {
     setComposerText,
     hasTopAlert,
     moreActionsState,
+    serverRequestsState,
     sandboxFailureMessage,
     sandboxStatusQuery,
     sessionHeaderStatusUi,
@@ -48,6 +50,23 @@ export function CodexSessionPage(): React.JSX.Element {
     </div>
   );
   useAppShellHeaderActions(headerActions);
+
+  const transcriptItemIds = new Set(
+    chatState.entries.flatMap((entry) => {
+      if (entry.kind === "command-execution" || entry.kind === "file-change") {
+        return [entry.id];
+      }
+
+      return [];
+    }),
+  );
+  const unmatchedServerRequests = serverRequestsState.pendingServerRequests.filter((entry) => {
+    if (entry.kind !== "command-approval" && entry.kind !== "file-change-approval") {
+      return true;
+    }
+
+    return !transcriptItemIds.has(entry.itemId);
+  });
 
   if (sandboxInstanceId === null) {
     return (
@@ -94,12 +113,22 @@ export function CodexSessionPage(): React.JSX.Element {
         style={{ scrollbarGutter: "stable both-edges" }}
       >
         <div className="mx-auto w-full max-w-3xl px-4 pb-4">
-          <ChatThread entries={chatState.entries} />
+          <ChatThread
+            entries={chatState.entries}
+            isRespondingToServerRequest={serverRequestsState.isRespondingToServerRequest}
+            onRespondToServerRequest={serverRequestsState.respondToServerRequest}
+            pendingServerRequests={serverRequestsState.pendingServerRequests}
+          />
         </div>
       </div>
 
       <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
         <div className="mx-auto w-full max-w-3xl px-4">
+          <CodexServerRequestsPanel
+            entries={unmatchedServerRequests}
+            isRespondingToServerRequest={serverRequestsState.isRespondingToServerRequest}
+            onRespondToServerRequest={serverRequestsState.respondToServerRequest}
+          />
           <ChatComposer
             canInterruptTurn={composerState.canInterruptTurn}
             canSteerTurn={composerState.canSteerTurn}

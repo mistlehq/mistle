@@ -1,3 +1,8 @@
+import type {
+  CodexCommandApprovalRequestEntry,
+  CodexFileChangeApprovalRequestEntry,
+  CodexServerRequestEntry,
+} from "../../codex-client/codex-server-requests-state.js";
 import type { ChatEntry } from "../chat-types.js";
 import { buildChatTurnGroups } from "../chat-view-model.js";
 import { ChatAssistantMessage } from "./chat-assistant-message.js";
@@ -5,6 +10,9 @@ import { ChatUserMessage } from "./chat-user-message.js";
 
 type ChatThreadProps = {
   entries: readonly ChatEntry[];
+  isRespondingToServerRequest: boolean;
+  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  pendingServerRequests: readonly CodexServerRequestEntry[];
 };
 
 function shouldRenderCommandAsCodeBlock(command: string | null): boolean {
@@ -15,7 +23,63 @@ function shouldRenderCommandAsCodeBlock(command: string | null): boolean {
   return command.includes("\n") || command.length > 120;
 }
 
-export function ChatThread({ entries }: ChatThreadProps): React.JSX.Element {
+function findCommandApprovalRequest(
+  requests: readonly CodexServerRequestEntry[],
+  itemId: string,
+): CodexCommandApprovalRequestEntry | null {
+  const request = requests.find(
+    (entry): entry is CodexCommandApprovalRequestEntry =>
+      entry.kind === "command-approval" && entry.itemId === itemId,
+  );
+
+  return request ?? null;
+}
+
+function findFileChangeApprovalRequest(
+  requests: readonly CodexServerRequestEntry[],
+  itemId: string,
+): CodexFileChangeApprovalRequestEntry | null {
+  const request = requests.find(
+    (entry): entry is CodexFileChangeApprovalRequestEntry =>
+      entry.kind === "file-change-approval" && entry.itemId === itemId,
+  );
+
+  return request ?? null;
+}
+
+function InlineApprovalActions(input: {
+  availableDecisions: readonly string[];
+  isRespondingToServerRequest: boolean;
+  onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
+  requestId: string | number;
+}): React.JSX.Element {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {input.availableDecisions.map((decision) => (
+        <button
+          className="rounded-md border px-3 py-1.5 font-medium text-sm transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={input.isRespondingToServerRequest}
+          key={decision}
+          onClick={() => {
+            input.onRespondToServerRequest(input.requestId, {
+              decision,
+            });
+          }}
+          type="button"
+        >
+          {decision}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function ChatThread({
+  entries,
+  isRespondingToServerRequest,
+  onRespondToServerRequest,
+  pendingServerRequests,
+}: ChatThreadProps): React.JSX.Element {
   const chatTurnGroups = buildChatTurnGroups(entries);
 
   return (
@@ -71,6 +135,10 @@ export function ChatThread({ entries }: ChatThreadProps): React.JSX.Element {
                 }
 
                 if (block.kind === "file-change") {
+                  const approvalRequest = findFileChangeApprovalRequest(
+                    pendingServerRequests,
+                    block.id,
+                  );
                   return (
                     <div className="space-y-3 rounded-xl border p-3" key={block.id}>
                       <div className="flex items-center justify-between gap-3">
@@ -101,6 +169,37 @@ export function ChatThread({ entries }: ChatThreadProps): React.JSX.Element {
                           {block.output}
                         </pre>
                       )}
+                      {approvalRequest === null ? null : (
+                        <div className="space-y-3 rounded-lg border border-dashed bg-muted/30 p-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="font-medium text-sm">Approve file changes</p>
+                            <p className="text-muted-foreground text-xs">
+                              {approvalRequest.method}
+                            </p>
+                          </div>
+                          {approvalRequest.reason === null ? null : (
+                            <p className="text-sm leading-6 whitespace-pre-wrap">
+                              {approvalRequest.reason}
+                            </p>
+                          )}
+                          {approvalRequest.grantRoot === null ? null : (
+                            <p className="text-muted-foreground text-xs">
+                              grant root: {approvalRequest.grantRoot}
+                            </p>
+                          )}
+                          <InlineApprovalActions
+                            availableDecisions={approvalRequest.availableDecisions}
+                            isRespondingToServerRequest={isRespondingToServerRequest}
+                            onRespondToServerRequest={onRespondToServerRequest}
+                            requestId={approvalRequest.requestId}
+                          />
+                          {approvalRequest.responseErrorMessage === null ? null : (
+                            <p className="text-destructive text-sm">
+                              {approvalRequest.responseErrorMessage}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 }
@@ -126,6 +225,7 @@ export function ChatThread({ entries }: ChatThreadProps): React.JSX.Element {
                   );
                 }
 
+                const approvalRequest = findCommandApprovalRequest(pendingServerRequests, block.id);
                 const displayCommand = block.command ?? "Command unavailable";
                 const renderCommandAsCodeBlock = shouldRenderCommandAsCodeBlock(displayCommand);
                 return (
@@ -155,6 +255,42 @@ export function ChatThread({ entries }: ChatThreadProps): React.JSX.Element {
                       <pre className="bg-muted overflow-x-auto rounded-md p-3 text-xs leading-5 whitespace-pre-wrap">
                         {block.output}
                       </pre>
+                    )}
+                    {approvalRequest === null ? null : (
+                      <div className="space-y-3 rounded-lg border border-dashed bg-muted/30 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="font-medium text-sm">Approve command</p>
+                          <p className="text-muted-foreground text-xs">{approvalRequest.method}</p>
+                        </div>
+                        {approvalRequest.reason === null ? null : (
+                          <p className="text-sm leading-6 whitespace-pre-wrap">
+                            {approvalRequest.reason}
+                          </p>
+                        )}
+                        <pre className="bg-muted max-h-80 overflow-auto rounded-md p-3 text-xs leading-5 whitespace-pre-wrap">
+                          {approvalRequest.command ?? block.command ?? "Command unavailable"}
+                        </pre>
+                        {approvalRequest.networkHost === null ? null : (
+                          <p className="text-muted-foreground text-xs">
+                            network: {approvalRequest.networkProtocol ?? "unknown"}://
+                            {approvalRequest.networkHost}
+                            {approvalRequest.networkPort === null
+                              ? null
+                              : `:${approvalRequest.networkPort}`}
+                          </p>
+                        )}
+                        <InlineApprovalActions
+                          availableDecisions={approvalRequest.availableDecisions}
+                          isRespondingToServerRequest={isRespondingToServerRequest}
+                          onRespondToServerRequest={onRespondToServerRequest}
+                          requestId={approvalRequest.requestId}
+                        />
+                        {approvalRequest.responseErrorMessage === null ? null : (
+                          <p className="text-destructive text-sm">
+                            {approvalRequest.responseErrorMessage}
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 );
