@@ -154,6 +154,18 @@ async function startCodexTestServer(
       }
       requests.push(request);
 
+      if (request.method === "initialize") {
+        socket.send(
+          JSON.stringify({
+            id: idValue,
+            result: {
+              userAgent: "mistle-codex-test-server",
+            },
+          }),
+        );
+        return;
+      }
+
       const response = handler(request);
       if ("error" in response) {
         socket.send(
@@ -586,9 +598,7 @@ describe("handleAutomationRun conversation routing integration", () => {
         if (request.method === "turn/steer") {
           return {
             result: {
-              turn: {
-                id: "turn_route_002",
-              },
+              turnId: "turn_route_002",
             },
           };
         }
@@ -687,7 +697,9 @@ describe("handleAutomationRun conversation routing integration", () => {
         expect(persistedRoute.providerConversationId).toBe("thread_route_001");
         expect(persistedRoute.providerExecutionId).toBe("turn_route_002");
 
-        const methodNames = rpcServer.requests.map((request) => request.method);
+        const methodNames = rpcServer.requests
+          .map((request) => request.method)
+          .filter((methodName) => methodName !== "initialize");
         expect(methodNames).toEqual(["thread/start", "turn/start", "thread/read", "turn/steer"]);
       } finally {
         await rpcServer.close();
@@ -825,7 +837,9 @@ describe("handleAutomationRun conversation routing integration", () => {
 
         expect(sandboxStartCount).toBe(1);
 
-        const methodNames = rpcServer.requests.map((request) => request.method);
+        const methodNames = rpcServer.requests
+          .map((request) => request.method)
+          .filter((methodName) => methodName !== "initialize");
         expect(methodNames).toEqual([
           "thread/start",
           "turn/start",
@@ -995,7 +1009,9 @@ describe("handleAutomationRun conversation routing integration", () => {
         expect(persistedRoute?.sandboxInstanceId).toBe("sbi_stopped_1");
         expect(persistedRoute?.providerExecutionId).toBe("turn_stopped_002");
 
-        const methodNames = rpcServer.requests.map((request) => request.method);
+        const methodNames = rpcServer.requests
+          .map((request) => request.method)
+          .filter((methodName) => methodName !== "initialize");
         expect(methodNames).toEqual([
           "thread/start",
           "turn/start",
@@ -1126,8 +1142,8 @@ describe("handleAutomationRun conversation routing integration", () => {
         if (request.method === "thread/read") {
           return {
             error: {
-              code: -32004,
-              message: "thread not found",
+              code: -32600,
+              message: "invalid thread id: thread_old",
             },
           };
         }
