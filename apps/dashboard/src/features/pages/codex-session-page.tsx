@@ -2,6 +2,7 @@ import { Alert, AlertDescription, AlertTitle, Badge } from "@mistle/ui";
 import { useParams } from "react-router";
 
 import { ChatComposer } from "../chat/components/chat-composer.js";
+import { ChatThread } from "../chat/components/chat-thread.js";
 import { SessionMoreActions } from "../sessions/session-more-actions.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import { useCodexSessionPageController } from "./use-codex-session-page-controller.js";
@@ -25,6 +26,7 @@ export function CodexSessionPage(): React.JSX.Element {
     sessionHeaderStatusUi,
     startErrorMessage,
     submitComposer,
+    chatState,
   } = useCodexSessionPageController({
     sandboxInstanceId,
   });
@@ -86,13 +88,13 @@ export function CodexSessionPage(): React.JSX.Element {
       ) : null}
 
       <div
-        aria-label="Conversation chat"
         className="min-h-0 flex-1 overflow-y-auto"
         role="region"
+        aria-label="Conversation chat"
         style={{ scrollbarGutter: "stable both-edges" }}
       >
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-3 px-4 pb-4">
-          <div className="text-muted-foreground py-12 text-sm">No messages yet.</div>
+        <div className="mx-auto w-full max-w-3xl px-4 pb-4">
+          <ChatThread entries={chatState.entries} />
         </div>
       </div>
 
