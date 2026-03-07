@@ -26,6 +26,7 @@ import {
 } from "../settings/model.js";
 import { SettingsBackButton } from "../settings/settings-back-button.js";
 import { SettingsSectionNav } from "../settings/settings-section-nav.js";
+import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 import { clearAuthenticatedSessionCache } from "./session-cache.js";
 import { TopLoadingBar } from "./top-loading-bar.js";
@@ -69,12 +70,14 @@ export function AppShell(): React.JSX.Element {
   const previousNonSettingsPathRef = useRef<string>("/");
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [signOutError, setSignOutError] = useState<string | null>(null);
+  const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
   const inSettings = isSettingsPath(location.pathname);
   const inSandboxProfiles =
     location.pathname === "/sandbox-profiles" || location.pathname.startsWith("/sandbox-profiles/");
   const inDashboardRoot = location.pathname === "/";
   const inSessions =
     location.pathname === "/sessions" || location.pathname.startsWith("/sessions/");
+  const inSessionDetail = location.pathname.startsWith("/sessions/");
   const showBreadcrumbs = inSettings || inSandboxProfiles || inDashboardRoot || inSessions;
 
   useEffect(() => {
@@ -151,22 +154,39 @@ export function AppShell(): React.JSX.Element {
         <SidebarRail />
       </Sidebar>
 
-      <SidebarInset className="from-background to-muted/20 min-h-svh bg-linear-to-b">
-        <TopLoadingBar />
-        <header className="bg-background/80 sticky top-0 z-10 flex h-12 items-center border-b px-4 backdrop-blur-sm">
-          <SidebarTrigger className="-ml-1" />
-          {showBreadcrumbs ? (
-            <div className="ml-2 min-w-0 flex-1">
-              <AppBreadcrumbs />
+      <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
+        <SidebarInset
+          className={
+            inSessionDetail
+              ? "from-background to-muted/20 h-svh overflow-hidden bg-linear-to-b"
+              : "from-background to-muted/20 min-h-svh bg-linear-to-b"
+          }
+        >
+          <TopLoadingBar />
+          <header className="bg-background/80 sticky top-0 z-10 flex h-12 items-center border-b px-4 backdrop-blur-sm">
+            <SidebarTrigger className="-ml-1" />
+            {showBreadcrumbs ? (
+              <div className="ml-2 min-w-0 flex-1">
+                <AppBreadcrumbs />
+              </div>
+            ) : (
+              <div className="flex-1" />
+            )}
+            {headerActions ? <div className="ml-4 shrink-0">{headerActions}</div> : null}
+          </header>
+          <div
+            className={
+              inSessionDetail
+                ? "min-w-0 flex min-h-0 flex-1 flex-col overflow-hidden"
+                : "min-w-0 flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-6"
+            }
+          >
+            <div className="min-w-0 min-h-0 flex-1">
+              <Outlet />
             </div>
-          ) : null}
-        </header>
-        <div className="min-w-0 flex flex-1 flex-col px-4 py-6">
-          <div className="min-w-0 flex-1">
-            <Outlet />
           </div>
-        </div>
-      </SidebarInset>
+        </SidebarInset>
+      </AppShellHeaderActionsContext.Provider>
     </SidebarProvider>
   );
 }
