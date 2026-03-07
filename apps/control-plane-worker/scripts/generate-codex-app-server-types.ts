@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { chmod, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -190,6 +190,70 @@ function runCommandOrThrow(input: RunCommandInput): void {
   );
 }
 
+function normalizeImportSpecifier(specifier: string): string {
+  if (specifier.endsWith("/v2")) {
+    return `${specifier}/index.js`;
+  }
+
+  if (
+    specifier.endsWith(".js") ||
+    specifier.endsWith(".mjs") ||
+    specifier.endsWith(".cjs") ||
+    specifier.endsWith(".json")
+  ) {
+    return specifier;
+  }
+  return `${specifier}.js`;
+}
+
+function normalizeRelativeImportSpecifiers(sourceText: string): string {
+  const fromSpecifierPattern = /(from\s+["'])(\.\.?\/[^"']+)(["'])/g;
+  const importSpecifierPattern = /(import\s*\(\s*["'])(\.\.?\/[^"']+)(["'])/g;
+
+  return sourceText
+    .replace(fromSpecifierPattern, (_match, prefix: string, specifier: string, suffix: string) => {
+      return `${prefix}${normalizeImportSpecifier(specifier)}${suffix}`;
+    })
+    .replace(
+      importSpecifierPattern,
+      (_match, prefix: string, specifier: string, suffix: string) => {
+        return `${prefix}${normalizeImportSpecifier(specifier)}${suffix}`;
+      },
+    );
+}
+
+async function listTypeScriptFilesRecursively(directoryPath: string): Promise<string[]> {
+  const directoryEntries = await readdir(directoryPath, { withFileTypes: true });
+  const nestedPaths = await Promise.all(
+    directoryEntries.map(async (entry): Promise<string[]> => {
+      const resolvedPath = join(directoryPath, entry.name);
+      if (entry.isDirectory()) {
+        return listTypeScriptFilesRecursively(resolvedPath);
+      }
+      if (entry.isFile() && entry.name.endsWith(".ts")) {
+        return [resolvedPath];
+      }
+      return [];
+    }),
+  );
+
+  return nestedPaths.flat();
+}
+
+async function normalizeGeneratedTypeScriptImports(directoryPath: string): Promise<void> {
+  const typeScriptFilePaths = await listTypeScriptFilesRecursively(directoryPath);
+
+  await Promise.all(
+    typeScriptFilePaths.map(async (filePath) => {
+      const currentContent = await readFile(filePath, "utf8");
+      const normalizedContent = normalizeRelativeImportSpecifiers(currentContent);
+      if (normalizedContent !== currentContent) {
+        await writeFile(filePath, normalizedContent);
+      }
+    }),
+  );
+}
+
 async function run(): Promise<void> {
   const targetTriple = resolveSupportedCodexTargetTriple();
   const release = await fetchLatestCodexRelease();
@@ -234,6 +298,7 @@ async function run(): Promise<void> {
       args: ["app-server", "generate-ts", "--out", GeneratedTypesOutputPath],
       cwd: AppRootPath,
     });
+    await normalizeGeneratedTypeScriptImports(GeneratedTypesOutputPath);
 
     console.log("Generating JSON Schema bundle...");
     runCommandOrThrow({
