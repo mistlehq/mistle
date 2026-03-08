@@ -6,6 +6,8 @@
     "dev": "tsx ./scripts/dev/start.ts",
     "dev:nix": "nix develop --command pnpm dev",
     "dev:workspace": "turbo watch dev --ui=tui --filter=!@mistle/sandbox-runtime",
+    "storybook": "pnpm --filter @mistle/storybook storybook",
+    "storybook:build": "pnpm --filter @mistle/storybook build-storybook",
     "dev:down": "tsx ./scripts/dev/down.ts",
     "dev:reset": "tsx ./scripts/dev/down.ts --volumes",
     "dev:reset:hard": "tsx ./scripts/dev/down.ts --volumes --rmi-local",
@@ -30,7 +32,7 @@
     "test:integration": "tsx ./scripts/test/run-integration.ts",
     "test:system": "pnpm --filter @mistle/tests test:system",
     "test:e2e": "pnpm --filter @mistle/tests test:e2e",
-    "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test",
+    "ci": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm storybook:build && pnpm test",
     "ci:nix": "nix develop --command pnpm run ci",
     "prepare": "node -e \"const cp = require('child_process'); if (!(process.env.CI || process.env.LEFTHOOK === '0')) { try { cp.execSync('git rev-parse --is-inside-work-tree', { stdio: 'ignore' }); cp.execSync('lefthook install', { stdio: 'inherit' }); } catch {} }\""
   },
