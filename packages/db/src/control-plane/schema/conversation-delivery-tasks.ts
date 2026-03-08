@@ -29,9 +29,10 @@ export const conversationDeliveryTasks = controlPlaneSchema.table(
     automationRunId: text("automation_run_id")
       .notNull()
       .references(() => automationRuns.id, { onDelete: "cascade" }),
-    sourceWebhookEventId: text("source_webhook_event_id")
-      .notNull()
-      .references(() => integrationWebhookEvents.id, { onDelete: "cascade" }),
+    sourceWebhookEventId: text("source_webhook_event_id").references(
+      () => integrationWebhookEvents.id,
+      { onDelete: "set null" },
+    ),
     sourceOrderKey: text("source_order_key").notNull(),
     status: text("status")
       .notNull()

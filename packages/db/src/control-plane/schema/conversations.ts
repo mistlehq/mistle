@@ -83,6 +83,9 @@ export const conversations = controlPlaneSchema.table(
     ),
     index("conversations_organization_id_idx").on(table.organizationId),
     index("conversations_sandbox_profile_id_idx").on(table.sandboxProfileId),
+    index("conversations_last_processed_webhook_event_id_idx").on(
+      table.lastProcessedWebhookEventId,
+    ),
     index("conversations_org_owner_idx").on(table.organizationId, table.ownerKind, table.ownerId),
   ],
 );
