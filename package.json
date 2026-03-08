@@ -6,6 +6,8 @@
     "dev": "tsx ./scripts/dev/start.ts",
     "dev:nix": "nix develop --command pnpm dev",
     "dev:workspace": "turbo watch dev --ui=tui --filter=!@mistle/sandbox-runtime",
+    "storybook": "pnpm --filter @mistle/storybook storybook",
+    "storybook:build": "pnpm --filter @mistle/storybook build-storybook",
     "dev:down": "tsx ./scripts/dev/down.ts",
     "dev:reset": "tsx ./scripts/dev/down.ts --volumes",
     "dev:reset:hard": "tsx ./scripts/dev/down.ts --volumes --rmi-local",

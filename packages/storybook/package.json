@@ -1,0 +1,35 @@
+{
+  "name": "@mistle/storybook",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build",
+    "lint": "oxlint --deny-warnings -c ../../.oxlintrc.jsonc .",
+    "typecheck": "tsc --noEmit --project ./tsconfig.json",
+    "test": "vitest run --passWithNoTests",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@mistle/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@storybook/addon-a11y": "^10.2.16",
+    "@storybook/addon-docs": "^10.2.16",
+    "@storybook/addon-links": "^10.2.16",
+    "@storybook/addon-vitest": "^10.2.16",
+    "@storybook/react-vite": "^10.2.16",
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^5.1.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "storybook": "^10.2.16",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2",
+    "vite-tsconfig-paths": "^6.1.0",
+    "vitest": "^4.0.18"
+  }
+}
