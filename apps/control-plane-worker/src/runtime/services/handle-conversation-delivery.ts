@@ -184,9 +184,15 @@ async function markConversationDeliveryProcessorIdleIfEmpty(
   input: HandleConversationDeliveryWorkflowInput,
 ): Promise<boolean> {
   return db.transaction(async (transaction) => {
-    const processor = await transaction.query.conversationDeliveryProcessors.findFirst({
-      where: (table, { eq: whereEq }) => whereEq(table.conversationId, input.conversationId),
-    });
+    const [processor] = await transaction
+      .select({
+        conversationId: conversationDeliveryProcessors.conversationId,
+        generation: conversationDeliveryProcessors.generation,
+        status: conversationDeliveryProcessors.status,
+      })
+      .from(conversationDeliveryProcessors)
+      .where(eq(conversationDeliveryProcessors.conversationId, input.conversationId))
+      .for("update");
     if (
       processor === undefined ||
       processor.generation !== input.generation ||
@@ -330,7 +336,6 @@ async function waitForSandboxInstanceRunning(
     organizationId: string;
     sandboxInstanceId: string;
     timeoutMs?: number;
-    treatStoppedAsRecovering?: boolean;
   },
 ): Promise<void> {
   const timeoutMs = input.timeoutMs ?? SandboxStartTimeoutMs;
@@ -355,7 +360,7 @@ async function waitForSandboxInstanceRunning(
       });
     }
 
-    if (sandboxInstance.status === "stopped" && !input.treatStoppedAsRecovering) {
+    if (sandboxInstance.status === "stopped") {
       throw new ConversationDeliveryExecutionError({
         code: ConversationDeliveryFailureCodes.CONVERSATION_RECOVERY_FAILED,
         message:
@@ -546,26 +551,6 @@ async function ensureConversationDeliverySandbox(
       {
         organizationId: input.automation.organizationId,
         sandboxInstanceId: existingRoute.sandboxInstanceId,
-      },
-    );
-
-    return {
-      routeId: existingRoute.id,
-      sandboxInstanceId: existingRoute.sandboxInstanceId,
-      providerConversationId: existingRoute.providerConversationId,
-      providerExecutionId: existingRoute.providerExecutionId,
-    };
-  }
-
-  if (routeSandboxStatus === "stopped") {
-    await waitForSandboxInstanceRunning(
-      {
-        getSandboxInstance: deps.getSandboxInstance,
-      },
-      {
-        organizationId: input.automation.organizationId,
-        sandboxInstanceId: existingRoute.sandboxInstanceId,
-        treatStoppedAsRecovering: true,
       },
     );
 
@@ -1014,7 +999,7 @@ export async function handleConversationDelivery(
 
       if (
         loadedTask.conversation.lastProcessedSourceOrderKey !== null &&
-        loadedTask.task.sourceOrderKey <= loadedTask.conversation.lastProcessedSourceOrderKey
+        loadedTask.task.sourceOrderKey < loadedTask.conversation.lastProcessedSourceOrderKey
       ) {
         await markConversationDeliveryIgnored(deps.db, loadedTask);
         continue;

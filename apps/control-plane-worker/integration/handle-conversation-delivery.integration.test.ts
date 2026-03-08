@@ -12,6 +12,8 @@ import {
   ConversationCreatedByKinds,
   ConversationOwnerKinds,
   ConversationProviderFamilies,
+  conversationRoutes,
+  ConversationRouteStatuses,
   ConversationStatuses,
   createControlPlaneDatabase,
   integrationConnections,
@@ -28,6 +30,7 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
+import { systemSleeper } from "@mistle/time";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
@@ -52,6 +55,7 @@ async function createTestDatabase(input: { databaseUrl: string }) {
 
   return {
     db,
+    pool,
     stop: async () => {
       await pool.end();
     },
@@ -71,6 +75,38 @@ function createUnexpectedDeliveryDependencies(db: ReturnType<typeof createContro
       throw new Error("Expected sandbox connection minting to be unreachable in this test.");
     },
   };
+}
+
+async function waitForBlockedProcessorUpdate(input: {
+  database: Awaited<ReturnType<typeof createTestDatabase>>;
+  timeoutMs?: number;
+}): Promise<void> {
+  const deadline = Date.now() + (input.timeoutMs ?? 5_000);
+
+  while (Date.now() < deadline) {
+    const result = await input.database.pool.query<{
+      blocked: boolean;
+    }>(
+      `
+        select exists (
+          select 1
+          from pg_stat_activity
+          where datname = current_database()
+            and wait_event_type = 'Lock'
+            and state = 'active'
+            and query ilike '%conversation_delivery_processors%'
+        ) as blocked
+      `,
+    );
+
+    if (result.rows[0]?.blocked === true) {
+      return;
+    }
+
+    await systemSleeper.sleep(50);
+  }
+
+  throw new Error("Timed out waiting for the processor idle transition to block on the row lock.");
 }
 
 async function seedConversationDeliveryScenario(input: {
@@ -208,7 +244,12 @@ async function seedConversationDeliveryScenario(input: {
 
   return {
     automationId,
+    automationTargetId,
     conversationId,
+    organizationId,
+    sandboxProfileId,
+    targetKey,
+    connectionId,
   };
 }
 
@@ -336,6 +377,263 @@ describe("handleConversationDelivery integration", () => {
         });
         expect(processor?.status).toBe(ConversationDeliveryProcessorStatuses.IDLE);
         expect(processor?.activeWorkflowRunId).toBeNull();
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "does not drop equal source-order keys as stale when GitHub cannot break the tie",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const seeded = await seedConversationDeliveryScenario({
+          database,
+          suffix: "worker_conversation_delivery_equal_key",
+          conversationLastProcessedSourceOrderKey: "2026-03-08T09:03:00Z#00000000000000002003",
+          tasks: [
+            {
+              taskSuffix: "worker_conversation_delivery_equal_key",
+              sourceOrderKey: "2026-03-08T09:03:00Z#00000000000000002003",
+              renderedInput: null,
+              renderedConversationKey: "issue-1",
+            },
+          ],
+        });
+
+        const result = await handleConversationDelivery(
+          createUnexpectedDeliveryDependencies(database.db),
+          {
+            conversationId: seeded.conversationId,
+            generation: 1,
+          },
+        );
+
+        expect(result).toEqual({
+          conversationId: seeded.conversationId,
+          generation: 1,
+        });
+
+        const queuedTask = await database.db.query.conversationDeliveryTasks.findFirst({
+          where: (table, { eq }) => eq(table.id, "cdt_worker_conversation_delivery_equal_key"),
+        });
+        expect(queuedTask?.status).toBe(ConversationDeliveryTaskStatuses.FAILED);
+
+        const automationRun = await database.db.query.automationRuns.findFirst({
+          where: (table, { eq }) => eq(table.id, "aru_worker_conversation_delivery_equal_key"),
+        });
+        expect(automationRun?.status).toBe(AutomationRunStatuses.FAILED);
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "does not lose a newly queued task while the processor is exiting",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const seeded = await seedConversationDeliveryScenario({
+          database,
+          suffix: "worker_conversation_delivery_race",
+          conversationLastProcessedSourceOrderKey: "2026-03-08T09:10:00Z#00000000000000003000",
+          tasks: [],
+        });
+
+        const lockedProcessorConnection = await database.pool.connect();
+        try {
+          await lockedProcessorConnection.query("begin");
+          await lockedProcessorConnection.query(
+            `
+              select conversation_id
+              from ${CONTROL_PLANE_SCHEMA_NAME}.conversation_delivery_processors
+              where conversation_id = $1
+              for update
+            `,
+            [seeded.conversationId],
+          );
+
+          const drainPromise = handleConversationDelivery(
+            createUnexpectedDeliveryDependencies(database.db),
+            {
+              conversationId: seeded.conversationId,
+              generation: 1,
+            },
+          );
+
+          await waitForBlockedProcessorUpdate({
+            database,
+          });
+
+          await database.db.insert(integrationWebhookEvents).values({
+            id: "iwe_worker_conversation_delivery_race",
+            organizationId: seeded.organizationId,
+            integrationConnectionId: seeded.connectionId,
+            targetKey: seeded.targetKey,
+            externalEventId: "evt_worker_conversation_delivery_race",
+            externalDeliveryId: "delivery_worker_conversation_delivery_race",
+            providerEventType: "issue_comment",
+            eventType: "github.issue_comment.created",
+            payload: {
+              issue: {
+                number: 1,
+              },
+            },
+            status: IntegrationWebhookEventStatuses.PROCESSED,
+            sourceOccurredAt: "2026-03-08T09:09:00Z",
+            sourceOrderKey: "2026-03-08T09:09:00Z#00000000000000002999",
+          });
+          await database.db.insert(automationRuns).values({
+            id: "aru_worker_conversation_delivery_race",
+            automationId: seeded.automationId,
+            automationTargetId: seeded.automationTargetId,
+            sourceWebhookEventId: "iwe_worker_conversation_delivery_race",
+            conversationId: seeded.conversationId,
+            renderedInput: "Handle raced event",
+            renderedConversationKey: "issue-1",
+            status: AutomationRunStatuses.RUNNING,
+          });
+          await database.db.insert(conversationDeliveryTasks).values({
+            id: "cdt_worker_conversation_delivery_race",
+            conversationId: seeded.conversationId,
+            automationRunId: "aru_worker_conversation_delivery_race",
+            sourceWebhookEventId: "iwe_worker_conversation_delivery_race",
+            sourceOrderKey: "2026-03-08T09:09:00Z#00000000000000002999",
+            sandboxProfileId: seeded.sandboxProfileId,
+            sandboxProfileVersion: 1,
+            providerFamily: ConversationProviderFamilies.CODEX,
+            providerModel: "gpt-5.3-codex",
+            status: ConversationDeliveryTaskStatuses.QUEUED,
+          });
+
+          await lockedProcessorConnection.query("commit");
+
+          await drainPromise;
+        } finally {
+          await lockedProcessorConnection.query("rollback").catch(() => undefined);
+          lockedProcessorConnection.release();
+        }
+
+        const queuedTask = await database.db.query.conversationDeliveryTasks.findFirst({
+          where: (table, { eq }) => eq(table.id, "cdt_worker_conversation_delivery_race"),
+        });
+        expect(queuedTask?.status).toBe(ConversationDeliveryTaskStatuses.IGNORED);
+        expect(queuedTask?.finishedAt).not.toBeNull();
+
+        const automationRun = await database.db.query.automationRuns.findFirst({
+          where: (table, { eq }) => eq(table.id, "aru_worker_conversation_delivery_race"),
+        });
+        expect(automationRun?.status).toBe(AutomationRunStatuses.IGNORED);
+
+        const processor = await database.db.query.conversationDeliveryProcessors.findFirst({
+          where: (table, { eq }) => eq(table.conversationId, seeded.conversationId),
+        });
+        expect(processor?.status).toBe(ConversationDeliveryProcessorStatuses.IDLE);
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "starts a fresh sandbox and rebinds the route when the prior sandbox is stopped",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const seeded = await seedConversationDeliveryScenario({
+          database,
+          suffix: "worker_conversation_delivery_stopped",
+          conversationLastProcessedSourceOrderKey: null,
+          tasks: [
+            {
+              taskSuffix: "worker_conversation_delivery_stopped",
+              sourceOrderKey: "2026-03-08T09:15:00Z#00000000000000004000",
+              renderedInput: "Handle stopped sandbox",
+              renderedConversationKey: "issue-1",
+            },
+          ],
+        });
+
+        await database.db.insert(conversationRoutes).values({
+          id: "crt_worker_conversation_delivery_stopped",
+          conversationId: seeded.conversationId,
+          sandboxInstanceId: "sbi_stopped_worker_conversation_delivery_stopped",
+          providerConversationId: "thread_worker_conversation_delivery_stopped",
+          providerExecutionId: null,
+          status: ConversationRouteStatuses.ACTIVE,
+        });
+
+        const result = await handleConversationDelivery(
+          {
+            db: database.db,
+            startSandboxProfileInstance: async () => ({
+              workflowRunId: "wfr_worker_conversation_delivery_stopped",
+              sandboxInstanceId: "sbi_recovered_worker_conversation_delivery_stopped",
+            }),
+            getSandboxInstance: async (input) => {
+              if (input.instanceId === "sbi_stopped_worker_conversation_delivery_stopped") {
+                return {
+                  id: input.instanceId,
+                  status: "stopped",
+                  failureCode: null,
+                  failureMessage: null,
+                };
+              }
+
+              if (input.instanceId === "sbi_recovered_worker_conversation_delivery_stopped") {
+                return {
+                  id: input.instanceId,
+                  status: "running",
+                  failureCode: null,
+                  failureMessage: null,
+                };
+              }
+
+              throw new Error(`Unexpected sandbox instance '${input.instanceId}'.`);
+            },
+            mintSandboxConnectionToken: async () => {
+              throw new Error("Stop after sandbox recovery.");
+            },
+          },
+          {
+            conversationId: seeded.conversationId,
+            generation: 1,
+          },
+        );
+
+        expect(result).toEqual({
+          conversationId: seeded.conversationId,
+          generation: 1,
+        });
+
+        const route = await database.db.query.conversationRoutes.findFirst({
+          where: (table, { eq }) => eq(table.id, "crt_worker_conversation_delivery_stopped"),
+        });
+        expect(route?.sandboxInstanceId).toBe("sbi_recovered_worker_conversation_delivery_stopped");
+
+        const failedTask = await database.db.query.conversationDeliveryTasks.findFirst({
+          where: (table, { eq }) => eq(table.id, "cdt_worker_conversation_delivery_stopped"),
+        });
+        expect(failedTask?.status).toBe(ConversationDeliveryTaskStatuses.FAILED);
+
+        const failedRun = await database.db.query.automationRuns.findFirst({
+          where: (table, { eq }) => eq(table.id, "aru_worker_conversation_delivery_stopped"),
+        });
+        expect(failedRun?.status).toBe(AutomationRunStatuses.FAILED);
       } finally {
         await database.stop();
       }

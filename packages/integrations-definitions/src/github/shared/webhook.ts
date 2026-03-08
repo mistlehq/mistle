@@ -12,8 +12,9 @@ import type { GitHubTargetSecrets } from "./target-secret-schema.js";
 const GitHubWebhookEventHeaderName = "x-github-event";
 const GitHubWebhookDeliveryHeaderName = "x-github-delivery";
 const GitHubWebhookSignatureHeaderName = "x-hub-signature-256";
-const GitHubIssueCommentCreatedEventType = "github.issue_comment.created";
 const GitHubIssueCommentProviderEventType = "issue_comment";
+const GitHubPullRequestProviderEventType = "pull_request";
+const GitHubPullRequestReviewCommentProviderEventType = "pull_request_review_comment";
 
 function isRecord(input: unknown): input is Record<string, unknown> {
   return typeof input === "object" && input !== null;
@@ -128,34 +129,183 @@ function resolveEventType(input: { providerEventType: string; action: string }):
   return `${GitHubFamilyId}.${providerEventType}.${action}`;
 }
 
-function resolveIssueCommentMetadata(input: Record<string, unknown>): {
+function resolveRecordField(input: {
+  payload: Record<string, unknown>;
+  field: string;
+  errorMessage: string;
+}): Record<string, unknown> {
+  const value = input.payload[input.field];
+  if (!isRecord(value)) {
+    throw new Error(input.errorMessage);
+  }
+
+  return value;
+}
+
+function resolveTimestampField(input: {
+  record: Record<string, unknown>;
+  field: string;
+  errorMessage: string;
+}): string {
+  const value = input.record[input.field];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw new Error(input.errorMessage);
+  }
+
+  return value;
+}
+
+function resolveNumericIdentifier(input: { value: unknown; errorMessage: string }): string {
+  if (typeof input.value === "number" && Number.isInteger(input.value) && input.value >= 0) {
+    return input.value.toString();
+  }
+
+  if (typeof input.value === "string" && /^\d+$/.test(input.value.trim())) {
+    return input.value.trim();
+  }
+
+  throw new Error(input.errorMessage);
+}
+
+function buildSourceMetadata(input: {
+  record: Record<string, unknown>;
+  timestampField: string;
+  timestampErrorMessage: string;
+  identifierErrorMessage: string;
+}): {
   occurredAt: string;
   sourceOrderKey: string;
 } {
-  const comment = input.comment;
-  if (!isRecord(comment)) {
-    throw new Error("GitHub issue comment webhook payload is missing comment context.");
-  }
-
-  const createdAt = comment.created_at;
-  if (typeof createdAt !== "string" || createdAt.trim().length === 0) {
-    throw new Error("GitHub issue comment webhook payload is missing comment.created_at.");
-  }
-
-  const commentId = comment.id;
-  let normalizedCommentId: string;
-  if (typeof commentId === "number" && Number.isInteger(commentId) && commentId >= 0) {
-    normalizedCommentId = commentId.toString();
-  } else if (typeof commentId === "string" && /^\d+$/.test(commentId.trim())) {
-    normalizedCommentId = commentId.trim();
-  } else {
-    throw new Error("GitHub issue comment webhook payload is missing a numeric comment.id.");
-  }
+  const occurredAt = resolveTimestampField({
+    record: input.record,
+    field: input.timestampField,
+    errorMessage: input.timestampErrorMessage,
+  });
+  const normalizedIdentifier = resolveNumericIdentifier({
+    value: input.record.id,
+    errorMessage: input.identifierErrorMessage,
+  });
 
   return {
-    occurredAt: createdAt,
-    sourceOrderKey: `${createdAt}#${normalizedCommentId.padStart(20, "0")}`,
+    occurredAt,
+    sourceOrderKey: `${occurredAt}#${normalizedIdentifier.padStart(20, "0")}`,
   };
+}
+
+function resolveIssueCommentTimestampField(action: string): string {
+  switch (action) {
+    case "created":
+      return "created_at";
+    case "edited":
+    case "deleted":
+      return "updated_at";
+    default:
+      throw new Error(
+        `GitHub issue_comment action '${action}' does not expose deterministic source ordering metadata.`,
+      );
+  }
+}
+
+function resolveIssueCommentMetadata(input: { payload: Record<string, unknown>; action: string }): {
+  occurredAt: string;
+  sourceOrderKey: string;
+} {
+  const comment = resolveRecordField({
+    payload: input.payload,
+    field: "comment",
+    errorMessage: "GitHub issue comment webhook payload is missing comment context.",
+  });
+
+  const timestampField = resolveIssueCommentTimestampField(input.action);
+  return buildSourceMetadata({
+    record: comment,
+    timestampField,
+    timestampErrorMessage: `GitHub issue comment webhook payload is missing comment.${timestampField}.`,
+    identifierErrorMessage: "GitHub issue comment webhook payload is missing a numeric comment.id.",
+  });
+}
+
+function resolvePullRequestReviewCommentMetadata(input: {
+  payload: Record<string, unknown>;
+  action: string;
+}): {
+  occurredAt: string;
+  sourceOrderKey: string;
+} {
+  const comment = resolveRecordField({
+    payload: input.payload,
+    field: "comment",
+    errorMessage: "GitHub pull request review comment webhook payload is missing comment context.",
+  });
+
+  const timestampField =
+    input.action === "created"
+      ? "created_at"
+      : input.action === "edited" || input.action === "deleted"
+        ? "updated_at"
+        : null;
+  if (timestampField === null) {
+    throw new Error(
+      `GitHub pull_request_review_comment action '${input.action}' does not expose deterministic source ordering metadata.`,
+    );
+  }
+
+  return buildSourceMetadata({
+    record: comment,
+    timestampField,
+    timestampErrorMessage: `GitHub pull request review comment webhook payload is missing comment.${timestampField}.`,
+    identifierErrorMessage:
+      "GitHub pull request review comment webhook payload is missing a numeric comment.id.",
+  });
+}
+
+function resolvePullRequestMetadata(input: { payload: Record<string, unknown>; action: string }): {
+  occurredAt: string;
+  sourceOrderKey: string;
+} {
+  const pullRequest = resolveRecordField({
+    payload: input.payload,
+    field: "pull_request",
+    errorMessage: "GitHub pull request webhook payload is missing pull_request context.",
+  });
+
+  const timestampField = input.action === "opened" ? "created_at" : "updated_at";
+  return buildSourceMetadata({
+    record: pullRequest,
+    timestampField,
+    timestampErrorMessage: `GitHub pull request webhook payload is missing pull_request.${timestampField}.`,
+    identifierErrorMessage:
+      "GitHub pull request webhook payload is missing a numeric pull_request.id.",
+  });
+}
+
+function resolveSourceMetadata(input: {
+  payload: Record<string, unknown>;
+  providerEventType: string;
+  action: string;
+}): {
+  occurredAt: string;
+  sourceOrderKey: string;
+} | null {
+  switch (input.providerEventType) {
+    case GitHubIssueCommentProviderEventType:
+      return resolveIssueCommentMetadata({
+        payload: input.payload,
+        action: input.action,
+      });
+    case GitHubPullRequestReviewCommentProviderEventType:
+      return resolvePullRequestReviewCommentMetadata({
+        payload: input.payload,
+        action: input.action,
+      });
+    case GitHubPullRequestProviderEventType:
+      return resolvePullRequestMetadata({
+        payload: input.payload,
+        action: input.action,
+      });
+    default:
+      return null;
+  }
 }
 
 async function verifyGitHubSignature(input: {
@@ -265,11 +415,11 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
     const deliveryId = resolveDeliveryId(input.headers);
     resolveInstallationId(payload);
 
-    const issueCommentMetadata =
-      providerEventType === GitHubIssueCommentProviderEventType &&
-      eventType === GitHubIssueCommentCreatedEventType
-        ? resolveIssueCommentMetadata(payload)
-        : null;
+    const sourceMetadata = resolveSourceMetadata({
+      payload,
+      providerEventType,
+      action,
+    });
 
     return {
       externalEventId: deliveryId,
@@ -277,11 +427,11 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
       providerEventType,
       eventType,
       payload,
-      ...(issueCommentMetadata === null
+      ...(sourceMetadata === null
         ? {}
         : {
-            occurredAt: issueCommentMetadata.occurredAt,
-            sourceOrderKey: issueCommentMetadata.sourceOrderKey,
+            occurredAt: sourceMetadata.occurredAt,
+            sourceOrderKey: sourceMetadata.sourceOrderKey,
           }),
     };
   },

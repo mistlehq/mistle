@@ -360,7 +360,12 @@ describe("GitHubWebhookHandler", () => {
       rawBody: encodePayload(PullRequestReviewCommentCreatedPayload),
     });
 
-    expect(parsed.eventType).toBe("github.pull_request_review_comment.created");
+    expect(parsed).toMatchObject({
+      providerEventType: "pull_request_review_comment",
+      eventType: "github.pull_request_review_comment.created",
+      occurredAt: PullRequestReviewCommentCreatedPayload.comment.created_at,
+      sourceOrderKey: `${PullRequestReviewCommentCreatedPayload.comment.created_at}#${PullRequestReviewCommentCreatedPayload.comment.id.toString().padStart(20, "0")}`,
+    });
   });
 
   it("returns derived event type for unsupported official GitHub events", async () => {
@@ -374,7 +379,12 @@ describe("GitHubWebhookHandler", () => {
       rawBody: encodePayload(PullRequestOpenedPayload),
     });
 
-    expect(parsed.eventType).toBe("github.pull_request.opened");
+    expect(parsed).toMatchObject({
+      providerEventType: "pull_request",
+      eventType: "github.pull_request.opened",
+      occurredAt: PullRequestOpenedPayload.pull_request.created_at,
+      sourceOrderKey: `${PullRequestOpenedPayload.pull_request.created_at}#${PullRequestOpenedPayload.pull_request.id.toString().padStart(20, "0")}`,
+    });
   });
 
   it("fails when x-github-delivery header is missing", () => {

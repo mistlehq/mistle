@@ -604,9 +604,14 @@ async function startConversationDeliveryProcessor(input: {
   }
 
   const claimedProcessor = await input.deps.db.transaction(async (transaction) => {
-    const processor = await transaction.query.conversationDeliveryProcessors.findFirst({
-      where: (table, { eq: whereEq }) => whereEq(table.conversationId, input.conversationId),
-    });
+    const [processor] = await transaction
+      .select({
+        generation: conversationDeliveryProcessors.generation,
+        status: conversationDeliveryProcessors.status,
+      })
+      .from(conversationDeliveryProcessors)
+      .where(eq(conversationDeliveryProcessors.conversationId, input.conversationId))
+      .for("update");
     if (processor === undefined) {
       throw new AutomationRunExecutionError({
         code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
