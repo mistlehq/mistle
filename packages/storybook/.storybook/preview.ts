@@ -1,5 +1,6 @@
 import type { Preview } from "@storybook/react-vite";
 
+import "../../../apps/dashboard/src/index.css";
 import "@mistle/ui/styles.css";
 
 const preview: Preview = {

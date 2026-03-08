@@ -9,13 +9,17 @@ const config: StorybookConfig = {
     name: "@storybook/react-vite",
     options: {},
   },
+  staticDirs: ["../../../apps/dashboard/public"],
   addons: [
     "@storybook/addon-docs",
     "@storybook/addon-links",
     "@storybook/addon-a11y",
     "@storybook/addon-vitest",
   ],
-  stories: ["../../ui/src/**/*.stories.@(ts|tsx)"],
+  stories: [
+    "../../ui/src/**/*.stories.@(ts|tsx)",
+    "../../../apps/dashboard/src/**/*.stories.@(ts|tsx)",
+  ],
   async viteFinal(config) {
     return mergeConfig(config, {
       plugins: [react(), tailwindcss(), tsconfigPaths()],
