@@ -92,6 +92,13 @@
       "when": 1772772287486,
       "tag": "0012_add-integration-connection-display-name",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1772970416189,
+      "tag": "0013_add-conversation-delivery-foundation",
+      "breakpoints": true
     }
   ]
 }
