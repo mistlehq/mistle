@@ -3,14 +3,15 @@ import type { OpenWorkflow, Worker } from "openworkflow";
 
 import { createHandleAutomationRunWorkflow } from "./workflows/handle-automation-run/index.js";
 import type {
-  AcquiredAutomationConnection,
-  AcquireAutomationConnectionInput,
-  DeliverAutomationPayloadInput,
-  EnsureAutomationSandboxInput,
-  EnsuredAutomationSandbox,
+  EnqueuePreparedAutomationRunInput,
   HandleAutomationRunWorkflowInput,
   PreparedAutomationRun,
 } from "./workflows/handle-automation-run/index.js";
+import { createHandleConversationDeliveryWorkflow } from "./workflows/handle-conversation-delivery/index.js";
+import type {
+  HandleConversationDeliveryWorkflowInput,
+  HandleConversationDeliveryWorkflowOutput,
+} from "./workflows/handle-conversation-delivery/index.js";
 import { createHandleIntegrationWebhookEventWorkflow } from "./workflows/handle-integration-webhook-event/index.js";
 import type {
   HandleIntegrationWebhookEventWorkflowInput,
@@ -41,20 +42,18 @@ export type ControlPlaneWorkerServices = {
     prepareAutomationRun: (
       input: HandleAutomationRunWorkflowInput,
     ) => Promise<PreparedAutomationRun>;
-    ensureAutomationSandbox: (
-      input: EnsureAutomationSandboxInput,
-    ) => Promise<EnsuredAutomationSandbox>;
-    acquireAutomationConnection: (
-      input: AcquireAutomationConnectionInput,
-    ) => Promise<AcquiredAutomationConnection>;
-    deliverAutomationPayload: (input: DeliverAutomationPayloadInput) => Promise<void>;
-    markAutomationRunCompleted: (input: HandleAutomationRunWorkflowInput) => Promise<void>;
+    enqueuePreparedAutomationRun: (input: EnqueuePreparedAutomationRunInput) => Promise<void>;
     markAutomationRunFailed: (input: {
       automationRunId: string;
       failureCode: string;
       failureMessage: string;
     }) => Promise<void>;
     resolveAutomationRunFailure: (input: { error: unknown }) => { code: string; message: string };
+  };
+  conversationDeliveries?: {
+    handleConversationDelivery: (
+      input: HandleConversationDeliveryWorkflowInput,
+    ) => Promise<HandleConversationDeliveryWorkflowOutput>;
   };
   integrationWebhooks?: {
     handleWebhookEvent: (
@@ -74,6 +73,7 @@ export type ControlPlaneWorkerServices = {
 
 export const ControlPlaneWorkerWorkflowIds = {
   HANDLE_AUTOMATION_RUN: "handleAutomationRun",
+  HANDLE_CONVERSATION_DELIVERY: "handleConversationDelivery",
   HANDLE_INTEGRATION_WEBHOOK_EVENT: "handleIntegrationWebhookEvent",
   SEND_ORGANIZATION_INVITATION: "sendOrganizationInvitation",
   SEND_VERIFICATION_OTP: "sendVerificationOTP",
@@ -110,12 +110,23 @@ export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): 
         transitionAutomationRunToRunning:
           input.services.automationRuns.transitionAutomationRunToRunning,
         prepareAutomationRun: input.services.automationRuns.prepareAutomationRun,
-        ensureAutomationSandbox: input.services.automationRuns.ensureAutomationSandbox,
-        acquireAutomationConnection: input.services.automationRuns.acquireAutomationConnection,
-        deliverAutomationPayload: input.services.automationRuns.deliverAutomationPayload,
-        markAutomationRunCompleted: input.services.automationRuns.markAutomationRunCompleted,
+        enqueuePreparedAutomationRun: input.services.automationRuns.enqueuePreparedAutomationRun,
         markAutomationRunFailed: input.services.automationRuns.markAutomationRunFailed,
         resolveAutomationRunFailure: input.services.automationRuns.resolveAutomationRunFailure,
+      });
+      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
+      continue;
+    }
+
+    if (workflowId === ControlPlaneWorkerWorkflowIds.HANDLE_CONVERSATION_DELIVERY) {
+      if (input.services.conversationDeliveries === undefined) {
+        throw new Error(
+          "Control-plane conversation deliveries service is required for handleConversationDelivery workflow.",
+        );
+      }
+      const workflow = createHandleConversationDeliveryWorkflow({
+        handleConversationDelivery:
+          input.services.conversationDeliveries.handleConversationDelivery,
       });
       input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
       continue;

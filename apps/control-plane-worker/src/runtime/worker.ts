@@ -23,6 +23,7 @@ export function createRuntimeWorker(ctx: {
     maxConcurrentWorkflows: ctx.config.workflow.concurrency,
     enabledWorkflows: [
       ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_RUN,
+      ControlPlaneWorkerWorkflowIds.HANDLE_CONVERSATION_DELIVERY,
       ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT,
       ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
       ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,

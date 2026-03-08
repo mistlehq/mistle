@@ -12,6 +12,8 @@ import type { GitHubTargetSecrets } from "./target-secret-schema.js";
 const GitHubWebhookEventHeaderName = "x-github-event";
 const GitHubWebhookDeliveryHeaderName = "x-github-delivery";
 const GitHubWebhookSignatureHeaderName = "x-hub-signature-256";
+const GitHubIssueCommentCreatedEventType = "github.issue_comment.created";
+const GitHubIssueCommentProviderEventType = "issue_comment";
 
 function isRecord(input: unknown): input is Record<string, unknown> {
   return typeof input === "object" && input !== null;
@@ -126,6 +128,36 @@ function resolveEventType(input: { providerEventType: string; action: string }):
   return `${GitHubFamilyId}.${providerEventType}.${action}`;
 }
 
+function resolveIssueCommentMetadata(input: Record<string, unknown>): {
+  occurredAt: string;
+  sourceOrderKey: string;
+} {
+  const comment = input.comment;
+  if (!isRecord(comment)) {
+    throw new Error("GitHub issue comment webhook payload is missing comment context.");
+  }
+
+  const createdAt = comment.created_at;
+  if (typeof createdAt !== "string" || createdAt.trim().length === 0) {
+    throw new Error("GitHub issue comment webhook payload is missing comment.created_at.");
+  }
+
+  const commentId = comment.id;
+  let normalizedCommentId: string;
+  if (typeof commentId === "number" && Number.isInteger(commentId) && commentId >= 0) {
+    normalizedCommentId = commentId.toString();
+  } else if (typeof commentId === "string" && /^\d+$/.test(commentId.trim())) {
+    normalizedCommentId = commentId.trim();
+  } else {
+    throw new Error("GitHub issue comment webhook payload is missing a numeric comment.id.");
+  }
+
+  return {
+    occurredAt: createdAt,
+    sourceOrderKey: `${createdAt}#${normalizedCommentId.padStart(20, "0")}`,
+  };
+}
+
 async function verifyGitHubSignature(input: {
   secret: string;
   payload: string;
@@ -226,18 +258,31 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
     const payload = parseJsonPayload(input.rawBody);
     const providerEventType = resolveProviderEventType(input.headers);
     const action = resolveAction(payload);
+    const eventType = resolveEventType({
+      providerEventType,
+      action,
+    });
     const deliveryId = resolveDeliveryId(input.headers);
     resolveInstallationId(payload);
+
+    const issueCommentMetadata =
+      providerEventType === GitHubIssueCommentProviderEventType &&
+      eventType === GitHubIssueCommentCreatedEventType
+        ? resolveIssueCommentMetadata(payload)
+        : null;
 
     return {
       externalEventId: deliveryId,
       externalDeliveryId: deliveryId,
       providerEventType,
-      eventType: resolveEventType({
-        providerEventType,
-        action,
-      }),
+      eventType,
       payload,
+      ...(issueCommentMetadata === null
+        ? {}
+        : {
+            occurredAt: issueCommentMetadata.occurredAt,
+            sourceOrderKey: issueCommentMetadata.sourceOrderKey,
+          }),
     };
   },
 };

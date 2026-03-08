@@ -73,11 +73,16 @@ function createParsedEvent(input?: {
   providerEventType?: string;
   payload?: unknown;
 }) {
+  const sourceOccurredAt = IssueCommentCreatedPayload.comment.created_at;
+  const sourceOrderKey = `${sourceOccurredAt}#${IssueCommentCreatedPayload.comment.id.toString().padStart(20, "0")}`;
+
   return {
     externalEventId: "delivery_123",
     externalDeliveryId: "delivery_123",
     providerEventType: input?.providerEventType ?? "issue_comment",
     eventType: input?.eventType ?? "github.issue_comment.created",
+    sourceOccurredAt,
+    sourceOrderKey,
     payload:
       input?.payload === undefined
         ? toPayloadRecord(IssueCommentCreatedPayload)
@@ -273,6 +278,8 @@ describe("GitHubWebhookHandler", () => {
       externalDeliveryId: "delivery_123",
       providerEventType: "issue_comment",
       eventType: "github.issue_comment.created",
+      occurredAt: IssueCommentCreatedPayload.comment.created_at,
+      sourceOrderKey: `${IssueCommentCreatedPayload.comment.created_at}#${IssueCommentCreatedPayload.comment.id.toString().padStart(20, "0")}`,
     });
     expect(parsed.payload).toEqual(IssueCommentCreatedPayload);
   });

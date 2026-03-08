@@ -3,6 +3,7 @@ export { createControlPlaneOpenWorkflow } from "./client.js";
 export { ControlPlaneWorkerWorkflowIds, createControlPlaneWorker } from "./worker.js";
 export {
   HandleAutomationRunWorkflowSpec,
+  HandleConversationDeliveryWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
   StartSandboxProfileInstanceWorkflowSpec,
@@ -10,17 +11,19 @@ export {
   SendVerificationOTPWorkflowSpec,
 } from "./workflows/index.js";
 export {
-  type AcquiredAutomationConnection,
-  type AcquireAutomationConnectionInput,
   createHandleAutomationRunWorkflow,
   type CreateHandleAutomationRunWorkflowInput,
-  type DeliverAutomationPayloadInput,
-  type EnsuredAutomationSandbox,
-  type EnsureAutomationSandboxInput,
+  type EnqueuePreparedAutomationRunInput,
   type HandleAutomationRunWorkflowInput,
   type HandleAutomationRunWorkflowOutput,
   type PreparedAutomationRun,
 } from "./workflows/handle-automation-run/index.js";
+export {
+  createHandleConversationDeliveryWorkflow,
+  type CreateHandleConversationDeliveryWorkflowInput,
+  type HandleConversationDeliveryWorkflowInput,
+  type HandleConversationDeliveryWorkflowOutput,
+} from "./workflows/handle-conversation-delivery/index.js";
 export {
   createHandleIntegrationWebhookEventWorkflow,
   type CreateHandleIntegrationWebhookEventWorkflowInput,

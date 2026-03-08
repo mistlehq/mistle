@@ -1,10 +1,11 @@
-import { index, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { bigint, index, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
 import { automationRuns } from "./automation-runs.js";
-import { conversations } from "./conversations.js";
+import { conversations, type ConversationProviderFamily } from "./conversations.js";
 import { integrationWebhookEvents } from "./integration-webhook-events.js";
 import { controlPlaneSchema } from "./namespace.js";
+import { sandboxProfiles } from "./sandbox-profiles.js";
 
 export const ConversationDeliveryTaskStatuses = {
   QUEUED: "queued",
@@ -33,6 +34,12 @@ export const conversationDeliveryTasks = controlPlaneSchema.table(
       .notNull()
       .references(() => integrationWebhookEvents.id, { onDelete: "cascade" }),
     sourceOrderKey: text("source_order_key").notNull(),
+    sandboxProfileId: text("sandbox_profile_id")
+      .notNull()
+      .references(() => sandboxProfiles.id, { onDelete: "restrict" }),
+    sandboxProfileVersion: bigint("sandbox_profile_version", { mode: "number" }).notNull(),
+    providerFamily: text("provider_family").notNull().$type<ConversationProviderFamily>(),
+    providerModel: text("provider_model").notNull(),
     status: text("status")
       .notNull()
       .$type<ConversationDeliveryTaskStatus>()

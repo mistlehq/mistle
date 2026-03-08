@@ -13,6 +13,10 @@ CREATE TABLE "control_plane"."conversation_delivery_tasks" (
 	"automation_run_id" text NOT NULL,
 	"source_webhook_event_id" text NOT NULL,
 	"source_order_key" text NOT NULL,
+	"sandbox_profile_id" text NOT NULL,
+	"sandbox_profile_version" bigint NOT NULL,
+	"provider_family" text NOT NULL,
+	"provider_model" text NOT NULL,
 	"status" text DEFAULT 'queued' NOT NULL,
 	"failure_code" text,
 	"failure_message" text,
@@ -34,6 +38,7 @@ ALTER TABLE "control_plane"."conversation_delivery_processors" ADD CONSTRAINT "c
 ALTER TABLE "control_plane"."conversation_delivery_tasks" ADD CONSTRAINT "conversation_delivery_tasks_conversation_id_conversations_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "control_plane"."conversations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."conversation_delivery_tasks" ADD CONSTRAINT "conversation_delivery_tasks_automation_run_id_automation_runs_id_fk" FOREIGN KEY ("automation_run_id") REFERENCES "control_plane"."automation_runs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."conversation_delivery_tasks" ADD CONSTRAINT "conversation_delivery_tasks_source_webhook_event_id_integration_webhook_events_id_fk" FOREIGN KEY ("source_webhook_event_id") REFERENCES "control_plane"."integration_webhook_events"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "control_plane"."conversation_delivery_tasks" ADD CONSTRAINT "conversation_delivery_tasks_sandbox_profile_id_sandbox_profiles_id_fk" FOREIGN KEY ("sandbox_profile_id") REFERENCES "control_plane"."sandbox_profiles"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "conversation_delivery_tasks_automation_run_id_uidx" ON "control_plane"."conversation_delivery_tasks" USING btree ("automation_run_id");--> statement-breakpoint
 CREATE INDEX "conversation_delivery_tasks_conversation_id_idx" ON "control_plane"."conversation_delivery_tasks" USING btree ("conversation_id");--> statement-breakpoint
 CREATE INDEX "conversation_delivery_tasks_source_webhook_event_id_idx" ON "control_plane"."conversation_delivery_tasks" USING btree ("source_webhook_event_id");--> statement-breakpoint

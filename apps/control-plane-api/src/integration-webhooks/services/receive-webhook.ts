@@ -225,6 +225,8 @@ export async function receiveIntegrationWebhook(
       providerEventType: webhookEvent.event.providerEventType,
       payload: webhookEvent.event.payload,
       status: IntegrationWebhookEventStatuses.RECEIVED,
+      sourceOccurredAt: webhookEvent.event.occurredAt,
+      sourceOrderKey: webhookEvent.event.sourceOrderKey,
     })
     .onConflictDoNothing({
       target: [integrationWebhookEvents.targetKey, integrationWebhookEvents.externalEventId],

@@ -1,19 +1,17 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 import type {
-  AcquiredAutomationConnection,
-  AcquireAutomationConnectionInput,
   ControlPlaneWorkerServices,
-  DeliverAutomationPayloadInput,
-  EnsuredAutomationSandbox,
-  EnsureAutomationSandboxInput,
+  EnqueuePreparedAutomationRunInput,
+  HandleConversationDeliveryWorkflowInput,
+  HandleConversationDeliveryWorkflowOutput,
   HandleAutomationRunWorkflowInput,
-  PreparedAutomationRun,
   HandleIntegrationWebhookEventWorkflowInput,
   HandleIntegrationWebhookEventWorkflowOutput,
+  PreparedAutomationRun,
   StartSandboxProfileInstanceWorkflowInput,
   StartSandboxProfileInstanceWorkflowOutput,
-  createControlPlaneOpenWorkflow,
 } from "@mistle/workflows/control-plane";
 
 import type { ControlPlaneWorkerConfig } from "../../types.js";
@@ -35,6 +33,41 @@ export type StartSandboxProfileInstanceServiceInput = StartSandboxProfileInstanc
 export type StartSandboxProfileInstanceServiceOutput = StartSandboxProfileInstanceWorkflowOutput;
 
 export type HandleAutomationRunServiceDependencies = {
+  db: ControlPlaneDatabase;
+  openWorkflow?: ReturnType<typeof createControlPlaneOpenWorkflow>;
+};
+
+export type HandleAutomationRunServiceInput = HandleAutomationRunWorkflowInput;
+export type HandleAutomationRunTransitionServiceOutput = { shouldProcess: boolean };
+export type PrepareAutomationRunServiceOutput = PreparedAutomationRun;
+export type EnqueuePreparedAutomationRunServiceInput = EnqueuePreparedAutomationRunInput;
+export type DeliverAutomationPayloadServiceInput = {
+  preparedAutomationRun: PreparedAutomationRun;
+  ensuredAutomationSandbox: {
+    sandboxInstanceId: string;
+    startupWorkflowRunId: string;
+  };
+  acquiredAutomationConnection: {
+    instanceId: string;
+    url: string;
+    token: string;
+    expiresAt: string;
+  };
+};
+export type HandleAutomationRunMarkFailedServiceInput = {
+  automationRunId: string;
+  failureCode: string;
+  failureMessage: string;
+};
+export type HandleAutomationRunResolveFailureServiceInput = {
+  error: unknown;
+};
+export type HandleAutomationRunResolveFailureServiceOutput = {
+  code: string;
+  message: string;
+};
+
+export type HandleConversationDeliveryServiceDependencies = {
   db: ControlPlaneDatabase;
   startSandboxProfileInstance: (input: {
     organizationId: string;
@@ -63,26 +96,8 @@ export type HandleAutomationRunServiceDependencies = {
   }>;
 };
 
-export type HandleAutomationRunServiceInput = HandleAutomationRunWorkflowInput;
-export type HandleAutomationRunTransitionServiceOutput = { shouldProcess: boolean };
-export type PrepareAutomationRunServiceOutput = PreparedAutomationRun;
-export type EnsureAutomationSandboxServiceInput = EnsureAutomationSandboxInput;
-export type EnsureAutomationSandboxServiceOutput = EnsuredAutomationSandbox;
-export type AcquireAutomationConnectionServiceInput = AcquireAutomationConnectionInput;
-export type AcquireAutomationConnectionServiceOutput = AcquiredAutomationConnection;
-export type DeliverAutomationPayloadServiceInput = DeliverAutomationPayloadInput;
-export type HandleAutomationRunMarkFailedServiceInput = {
-  automationRunId: string;
-  failureCode: string;
-  failureMessage: string;
-};
-export type HandleAutomationRunResolveFailureServiceInput = {
-  error: unknown;
-};
-export type HandleAutomationRunResolveFailureServiceOutput = {
-  code: string;
-  message: string;
-};
+export type HandleConversationDeliveryServiceInput = HandleConversationDeliveryWorkflowInput;
+export type HandleConversationDeliveryServiceOutput = HandleConversationDeliveryWorkflowOutput;
 
 export type HandleIntegrationWebhookEventServiceDependencies = {
   db: ControlPlaneDatabase;
