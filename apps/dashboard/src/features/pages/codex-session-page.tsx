@@ -1,11 +1,12 @@
-import { Alert, AlertDescription, AlertTitle, Badge } from "@mistle/ui";
+import { Badge } from "@mistle/ui";
 import { useParams } from "react-router";
 
-import { ChatComposer } from "../chat/components/chat-composer.js";
-import { ChatThread } from "../chat/components/chat-thread.js";
-import { CodexServerRequestsPanel } from "../codex-client/codex-server-requests-panel.js";
 import { SessionMoreActions } from "../sessions/session-more-actions.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
+import {
+  CodexSessionPageView,
+  type CodexSessionPageComposerProps,
+} from "./codex-session-page-view.js";
 import { useCodexSessionPageController } from "./use-codex-session-page-controller.js";
 
 export function CodexSessionPage(): React.JSX.Element {
@@ -70,85 +71,77 @@ export function CodexSessionPage(): React.JSX.Element {
 
   if (sandboxInstanceId === null) {
     return (
-      <Alert variant="destructive">
-        <AlertTitle>Session id is missing</AlertTitle>
-        <AlertDescription>Open a session from the Sessions page.</AlertDescription>
-      </Alert>
+      <CodexSessionPageView
+        chatEntries={[]}
+        composerProps={createEmptyComposerProps()}
+        hasTopAlert={false}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={function onRespondToServerRequest() {}}
+        sandboxFailureMessage={null}
+        sandboxInstanceId={null}
+        sandboxStatusErrorMessage={null}
+        serverRequestPanelEntries={[]}
+        startErrorMessage={null}
+      />
     );
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      {hasTopAlert ? (
-        <div className="mx-auto flex w-full max-w-3xl flex-none flex-col gap-4 px-4 py-6">
-          {sandboxStatusQuery.isError ? (
-            <Alert variant="destructive">
-              <AlertTitle>Could not load sandbox status</AlertTitle>
-              <AlertDescription>
-                {sandboxStatusQuery.error instanceof Error
-                  ? sandboxStatusQuery.error.message
-                  : "Could not load sandbox status."}
-              </AlertDescription>
-            </Alert>
-          ) : null}
-          {startErrorMessage !== null ? (
-            <Alert variant="destructive">
-              <AlertTitle>Session connection error</AlertTitle>
-              <AlertDescription>{startErrorMessage}</AlertDescription>
-            </Alert>
-          ) : null}
-          {sandboxFailureMessage === null ? null : (
-            <Alert variant="destructive">
-              <AlertTitle>Sandbox failed</AlertTitle>
-              <AlertDescription>{sandboxFailureMessage}</AlertDescription>
-            </Alert>
-          )}
-        </div>
-      ) : null}
-
-      <div
-        className="min-h-0 flex-1 overflow-y-auto"
-        role="region"
-        aria-label="Conversation chat"
-        style={{ scrollbarGutter: "stable both-edges" }}
-      >
-        <div className="mx-auto w-full max-w-3xl px-4 pb-4">
-          <ChatThread
-            entries={chatState.entries}
-            isRespondingToServerRequest={serverRequestsState.isRespondingToServerRequest}
-            onRespondToServerRequest={serverRequestsState.respondToServerRequest}
-            pendingServerRequests={serverRequestsState.pendingServerRequests}
-          />
-        </div>
-      </div>
-
-      <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
-        <div className="mx-auto w-full max-w-3xl px-4">
-          <CodexServerRequestsPanel
-            entries={unmatchedServerRequests}
-            isRespondingToServerRequest={serverRequestsState.isRespondingToServerRequest}
-            onRespondToServerRequest={serverRequestsState.respondToServerRequest}
-          />
-          <ChatComposer
-            canInterruptTurn={composerState.canInterruptTurn}
-            canSteerTurn={composerState.canSteerTurn}
-            completedErrorMessage={composerState.completedErrorMessage}
-            composerText={composerText}
-            isConnected={composerState.isConnected}
-            isInterruptingTurn={composerState.isInterruptingTurn}
-            isStartingTurn={composerState.isStartingTurn}
-            isSteeringTurn={composerState.isSteeringTurn}
-            isUpdatingComposerConfig={composerState.isUpdatingComposerConfig}
-            modelOptions={composerModelOptions}
-            onComposerTextChange={setComposerText}
-            onModelChange={setComposerModel}
-            onReasoningEffortChange={setComposerReasoningEffort}
-            onSubmit={submitComposer}
-            selectedModel={selectedComposerModel}
-            selectedReasoningEffort={selectedComposerReasoningEffort}
-          />
-        </div>
-      </div>
-    </div>
+    <CodexSessionPageView
+      chatEntries={chatState.entries}
+      composerProps={{
+        canInterruptTurn: composerState.canInterruptTurn,
+        canSteerTurn: composerState.canSteerTurn,
+        completedErrorMessage: composerState.completedErrorMessage,
+        composerText,
+        isConnected: composerState.isConnected,
+        isInterruptingTurn: composerState.isInterruptingTurn,
+        isStartingTurn: composerState.isStartingTurn,
+        isSteeringTurn: composerState.isSteeringTurn,
+        isUpdatingComposerConfig: composerState.isUpdatingComposerConfig,
+        modelOptions: composerModelOptions,
+        onComposerTextChange: setComposerText,
+        onModelChange: setComposerModel,
+        onReasoningEffortChange: setComposerReasoningEffort,
+        onSubmit: submitComposer,
+        selectedModel: selectedComposerModel,
+        selectedReasoningEffort: selectedComposerReasoningEffort,
+      }}
+      hasTopAlert={hasTopAlert}
+      isRespondingToServerRequest={serverRequestsState.isRespondingToServerRequest}
+      onRespondToServerRequest={serverRequestsState.respondToServerRequest}
+      sandboxFailureMessage={sandboxFailureMessage}
+      sandboxInstanceId={sandboxInstanceId}
+      sandboxStatusErrorMessage={
+        sandboxStatusQuery.isError
+          ? sandboxStatusQuery.error instanceof Error
+            ? sandboxStatusQuery.error.message
+            : "Could not load sandbox status."
+          : null
+      }
+      serverRequestPanelEntries={unmatchedServerRequests}
+      startErrorMessage={startErrorMessage}
+    />
   );
+}
+
+function createEmptyComposerProps(): CodexSessionPageComposerProps {
+  return {
+    canInterruptTurn: false,
+    canSteerTurn: false,
+    completedErrorMessage: null,
+    composerText: "",
+    isConnected: false,
+    isInterruptingTurn: false,
+    isStartingTurn: false,
+    isSteeringTurn: false,
+    isUpdatingComposerConfig: false,
+    modelOptions: [],
+    onComposerTextChange: function onComposerTextChange() {},
+    onModelChange: function onModelChange() {},
+    onReasoningEffortChange: function onReasoningEffortChange() {},
+    onSubmit: function onSubmit() {},
+    selectedModel: null,
+    selectedReasoningEffort: null,
+  };
 }

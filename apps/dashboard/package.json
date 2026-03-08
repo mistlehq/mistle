@@ -17,8 +17,6 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@fontsource-variable/inter": "^5.2.8",
-    "@fontsource-variable/quicksand": "^5.2.8",
     "@mistle/codex-app-server-client": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
@@ -51,6 +49,7 @@
     "openapi-typescript": "^7.13.0",
     "pg": "^8.19.0",
     "smol-toml": "^1.6.0",
+    "storybook": "^10.2.16",
     "tailwindcss": "^4.2.0",
     "vite": "^7.2.2",
     "vite-tsconfig-paths": "^6.1.0",
