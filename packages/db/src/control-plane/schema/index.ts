@@ -44,6 +44,20 @@ export {
   type InsertConversation,
 } from "./conversations.js";
 export {
+  conversationDeliveryProcessors,
+  ConversationDeliveryProcessorStatuses,
+  type ConversationDeliveryProcessor,
+  type ConversationDeliveryProcessorStatus,
+  type InsertConversationDeliveryProcessor,
+} from "./conversation-delivery-processors.js";
+export {
+  conversationDeliveryTasks,
+  ConversationDeliveryTaskStatuses,
+  type ConversationDeliveryTask,
+  type ConversationDeliveryTaskStatus,
+  type InsertConversationDeliveryTask,
+} from "./conversation-delivery-tasks.js";
+export {
   conversationRoutes,
   ConversationRouteStatuses,
   type ConversationRoute,

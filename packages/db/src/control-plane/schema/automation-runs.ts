@@ -3,6 +3,7 @@ import { typeid } from "typeid-js";
 
 import { automationTargets } from "./automation-targets.js";
 import { automations } from "./automations.js";
+import { conversations } from "./conversations.js";
 import { integrationWebhookEvents } from "./integration-webhook-events.js";
 import { controlPlaneSchema } from "./namespace.js";
 
@@ -30,12 +31,18 @@ export const automationRuns = controlPlaneSchema.table(
     automationTargetId: text("automation_target_id").references(() => automationTargets.id, {
       onDelete: "set null",
     }),
+    conversationId: text("conversation_id").references(() => conversations.id, {
+      onDelete: "set null",
+    }),
     sourceWebhookEventId: text("source_webhook_event_id").references(
       () => integrationWebhookEvents.id,
       {
         onDelete: "set null",
       },
     ),
+    renderedInput: text("rendered_input"),
+    renderedConversationKey: text("rendered_conversation_key"),
+    renderedIdempotencyKey: text("rendered_idempotency_key"),
     status: text("status")
       .notNull()
       .$type<AutomationRunStatus>()
@@ -58,6 +65,7 @@ export const automationRuns = controlPlaneSchema.table(
     ),
     index("automation_runs_automation_id_idx").on(table.automationId),
     index("automation_runs_automation_target_id_idx").on(table.automationTargetId),
+    index("automation_runs_conversation_id_idx").on(table.conversationId),
     index("automation_runs_source_webhook_event_id_idx").on(table.sourceWebhookEventId),
     index("automation_runs_status_idx").on(table.status),
     index("automation_runs_created_at_idx").on(table.createdAt),
