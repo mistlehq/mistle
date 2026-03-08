@@ -1,13 +1,3 @@
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarHeader,
-  SidebarInset,
-  SidebarProvider,
-  SidebarRail,
-  SidebarTrigger,
-} from "@mistle/ui";
 import { CpuIcon, HouseIcon, TerminalIcon } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
@@ -27,6 +17,7 @@ import {
 import { SettingsBackButton } from "../settings/settings-back-button.js";
 import { SettingsSectionNav } from "../settings/settings-section-nav.js";
 import { AppShellHeaderActionsContext } from "./app-shell-header-actions.js";
+import { AppShellView } from "./app-shell-view.js";
 import { OrganizationMenuTrigger } from "./organization-menu-trigger.js";
 import { clearAuthenticatedSessionCache } from "./session-cache.js";
 import { TopLoadingBar } from "./top-loading-bar.js";
@@ -41,8 +32,6 @@ const MAIN_NAV_GROUPS: readonly SidebarNavGroup[] = [
     ],
   },
 ];
-
-const DASHBOARD_SIDEBAR_WIDTH = "14rem";
 
 function HomeNavIcon(props: { className?: string; "aria-hidden"?: boolean }): React.JSX.Element {
   return <HouseIcon {...props} />;
@@ -112,33 +101,15 @@ export function AppShell(): React.JSX.Element {
   }
 
   return (
-    <SidebarProvider style={{ "--sidebar-width": DASHBOARD_SIDEBAR_WIDTH } as React.CSSProperties}>
-      <Sidebar>
-        <SidebarHeader className={inSettings ? "pb-0" : undefined}>
-          <div>
-            {inSettings ? (
-              <SettingsBackButton
-                onBack={() => {
-                  void handleBackToApp();
-                }}
-              />
-            ) : (
-              <OrganizationMenuTrigger
-                isSigningOut={isSigningOut}
-                onNavigateToSettings={() => {
-                  void handleNavigateToSettings();
-                }}
-                onSignOut={() => {
-                  void handleSignOut();
-                }}
-                organizationErrorMessage={organizationSummary.organizationErrorMessage}
-                organizationName={organizationSummary.organizationName}
-              />
-            )}
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          {inSettings ? (
+    <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
+      <AppShellView
+        breadcrumbs={showBreadcrumbs ? <AppBreadcrumbs /> : null}
+        headerActions={headerActions}
+        isSessionDetail={inSessionDetail}
+        mainContent={<Outlet />}
+        showBreadcrumbs={showBreadcrumbs}
+        sidebarContent={
+          inSettings ? (
             <SettingsSectionNav />
           ) : (
             <SidebarNavGroups
@@ -146,47 +117,33 @@ export function AppShell(): React.JSX.Element {
               pathname={location.pathname}
               showGroupLabel={false}
             />
-          )}
-        </SidebarContent>
-        <SidebarFooter>
-          <ErrorNotice message={signOutError} />
-        </SidebarFooter>
-        <SidebarRail />
-      </Sidebar>
-
-      <AppShellHeaderActionsContext.Provider value={setHeaderActions}>
-        <SidebarInset
-          className={
-            inSessionDetail
-              ? "from-background to-muted/20 h-svh overflow-hidden bg-linear-to-b"
-              : "from-background to-muted/20 min-h-svh bg-linear-to-b"
-          }
-        >
-          <TopLoadingBar />
-          <header className="bg-background/80 sticky top-0 z-10 flex h-12 items-center border-b px-4 backdrop-blur-sm">
-            <SidebarTrigger className="-ml-1" />
-            {showBreadcrumbs ? (
-              <div className="ml-2 min-w-0 flex-1">
-                <AppBreadcrumbs />
-              </div>
-            ) : (
-              <div className="flex-1" />
-            )}
-            {headerActions ? <div className="ml-4 shrink-0">{headerActions}</div> : null}
-          </header>
-          <div
-            className={
-              inSessionDetail
-                ? "min-w-0 flex min-h-0 flex-1 flex-col overflow-hidden"
-                : "min-w-0 flex min-h-0 flex-1 flex-col overflow-hidden px-4 py-6"
-            }
-          >
-            <div className="min-w-0 min-h-0 flex-1">
-              <Outlet />
-            </div>
-          </div>
-        </SidebarInset>
-      </AppShellHeaderActionsContext.Provider>
-    </SidebarProvider>
+          )
+        }
+        sidebarFooterContent={<ErrorNotice message={signOutError} />}
+        sidebarHeaderContent={
+          inSettings ? (
+            <SettingsBackButton
+              onBack={() => {
+                void handleBackToApp();
+              }}
+            />
+          ) : (
+            <OrganizationMenuTrigger
+              isSigningOut={isSigningOut}
+              onNavigateToSettings={() => {
+                void handleNavigateToSettings();
+              }}
+              onSignOut={() => {
+                void handleSignOut();
+              }}
+              organizationErrorMessage={organizationSummary.organizationErrorMessage}
+              organizationName={organizationSummary.organizationName}
+            />
+          )
+        }
+        topLoadingBar={<TopLoadingBar />}
+        {...(inSettings ? { sidebarHeaderClassName: "pb-0" } : {})}
+      />
+    </AppShellHeaderActionsContext.Provider>
   );
 }
