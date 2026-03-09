@@ -90,6 +90,7 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
           maxConcurrentWorkflows: 1,
           enabledWorkflows: [
             ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_RUN,
+            ControlPlaneWorkerWorkflowIds.HANDLE_CONVERSATION_DELIVERY,
             ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT,
             ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
             ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
@@ -145,6 +146,12 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
                   message: "Automation run execution failed with a non-error exception.",
                 };
               },
+            },
+            conversationDelivery: {
+              handleConversationDelivery: async (input) => ({
+                conversationId: input.conversationId,
+                generation: input.generation,
+              }),
             },
             integrationWebhooks: {
               handleWebhookEvent: async (input) => ({

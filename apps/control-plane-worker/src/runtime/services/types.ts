@@ -8,6 +8,8 @@ import type {
   EnsuredAutomationSandbox,
   EnsureAutomationSandboxInput,
   HandleAutomationRunWorkflowInput,
+  HandleConversationDeliveryWorkflowInput,
+  HandleConversationDeliveryWorkflowOutput,
   PreparedAutomationRun,
   HandleIntegrationWebhookEventWorkflowInput,
   HandleIntegrationWebhookEventWorkflowOutput,
@@ -83,6 +85,9 @@ export type HandleAutomationRunResolveFailureServiceOutput = {
   code: string;
   message: string;
 };
+
+export type HandleConversationDeliveryServiceInput = HandleConversationDeliveryWorkflowInput;
+export type HandleConversationDeliveryServiceOutput = HandleConversationDeliveryWorkflowOutput;
 
 export type HandleIntegrationWebhookEventServiceDependencies = {
   db: ControlPlaneDatabase;

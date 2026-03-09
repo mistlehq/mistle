@@ -2,16 +2,33 @@ export {
   activateConversationRoute,
   type ActivateConversationRouteInput,
 } from "./activate-conversation-route.js";
+export {
+  claimNextConversationDeliveryTask,
+  type ClaimNextConversationDeliveryTaskInput,
+} from "./claim-next-conversation-delivery-task.js";
 export { claimConversation, type ClaimConversationInput } from "./claim-conversation.js";
 export {
   createConversationRoute,
   type CreateConversationRouteInput,
 } from "./create-conversation-route.js";
 export {
+  ensureConversationDeliveryProcessor,
+  type EnsureConversationDeliveryProcessorInput,
+  type EnsureConversationDeliveryProcessorOutput,
+} from "./ensure-conversation-delivery-processor.js";
+export {
+  enqueueConversationDeliveryTask,
+  type EnqueueConversationDeliveryTaskInput,
+} from "./enqueue-conversation-delivery-task.js";
+export {
   ConversationPersistenceError,
   ConversationPersistenceErrorCodes,
   type ConversationPersistenceErrorCode,
 } from "./errors.js";
+export {
+  finalizeConversationDeliveryTask,
+  type FinalizeConversationDeliveryTaskInput,
+} from "./finalize-conversation-delivery-task.js";
 export {
   ConversationProviderError,
   ConversationProviderErrorCodes,

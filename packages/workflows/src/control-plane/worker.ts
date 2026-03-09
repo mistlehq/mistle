@@ -11,6 +11,11 @@ import type {
   HandleAutomationRunWorkflowInput,
   PreparedAutomationRun,
 } from "./workflows/handle-automation-run/index.js";
+import {
+  createHandleConversationDeliveryWorkflow,
+  type HandleConversationDeliveryWorkflowInput,
+  type HandleConversationDeliveryWorkflowOutput,
+} from "./workflows/handle-conversation-delivery/index.js";
 import { createHandleIntegrationWebhookEventWorkflow } from "./workflows/handle-integration-webhook-event/index.js";
 import type {
   HandleIntegrationWebhookEventWorkflowInput,
@@ -56,6 +61,11 @@ export type ControlPlaneWorkerServices = {
     }) => Promise<void>;
     resolveAutomationRunFailure: (input: { error: unknown }) => { code: string; message: string };
   };
+  conversationDelivery?: {
+    handleConversationDelivery: (
+      input: HandleConversationDeliveryWorkflowInput,
+    ) => Promise<HandleConversationDeliveryWorkflowOutput>;
+  };
   integrationWebhooks?: {
     handleWebhookEvent: (
       input: HandleIntegrationWebhookEventWorkflowInput,
@@ -74,6 +84,7 @@ export type ControlPlaneWorkerServices = {
 
 export const ControlPlaneWorkerWorkflowIds = {
   HANDLE_AUTOMATION_RUN: "handleAutomationRun",
+  HANDLE_CONVERSATION_DELIVERY: "handleConversationDelivery",
   HANDLE_INTEGRATION_WEBHOOK_EVENT: "handleIntegrationWebhookEvent",
   SEND_ORGANIZATION_INVITATION: "sendOrganizationInvitation",
   SEND_VERIFICATION_OTP: "sendVerificationOTP",
@@ -116,6 +127,19 @@ export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): 
         markAutomationRunCompleted: input.services.automationRuns.markAutomationRunCompleted,
         markAutomationRunFailed: input.services.automationRuns.markAutomationRunFailed,
         resolveAutomationRunFailure: input.services.automationRuns.resolveAutomationRunFailure,
+      });
+      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
+      continue;
+    }
+
+    if (workflowId === ControlPlaneWorkerWorkflowIds.HANDLE_CONVERSATION_DELIVERY) {
+      if (input.services.conversationDelivery === undefined) {
+        throw new Error(
+          "Control-plane conversation delivery service is required for handleConversationDelivery workflow.",
+        );
+      }
+      const workflow = createHandleConversationDeliveryWorkflow({
+        handleConversationDelivery: input.services.conversationDelivery.handleConversationDelivery,
       });
       input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
       continue;
