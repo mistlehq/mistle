@@ -17,7 +17,6 @@ import {
   paginateKeyset,
   parseKeysetPageSize,
 } from "@mistle/http/pagination";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -67,10 +66,9 @@ type IntegrationConnectionListItem = {
   updatedAt: string;
 };
 
-const IntegrationRegistry = createIntegrationRegistry();
-
 export async function listIntegrationConnections(
   db: AppContext["var"]["db"],
+  integrationRegistry: AppContext["var"]["integrationRegistry"],
   input: ListIntegrationConnectionsInput,
 ): Promise<KeysetPaginatedResult<IntegrationConnectionListItem>> {
   let pageSize: number;
@@ -186,6 +184,7 @@ export async function listIntegrationConnections(
       ...result,
       items: result.items.map((connection) => ({
         ...buildResourceSummary(connection, {
+          integrationRegistry,
           targetsByKey,
           resourceStatesByConnectionId,
         }),
@@ -226,6 +225,7 @@ function normalizeTimestamp(value: string | Date): string {
 function buildResourceSummary(
   connection: IntegrationConnection,
   input: {
+    integrationRegistry: AppContext["var"]["integrationRegistry"];
     targetsByKey: ReadonlyMap<string, IntegrationTarget>;
     resourceStatesByConnectionId: ReadonlyMap<
       string,
@@ -238,7 +238,7 @@ function buildResourceSummary(
     return {};
   }
 
-  const definition = IntegrationRegistry.getDefinition({
+  const definition = input.integrationRegistry.getDefinition({
     familyId: target.familyId,
     variantId: target.variantId,
   });

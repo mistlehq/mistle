@@ -35,10 +35,14 @@ export function createIntegrationConnectionsApp(): AppRoutes<
         throw new Error("Expected authenticated session to be available.");
       }
 
-      const result = await listIntegrationConnections(ctx.get("db"), {
-        ...query,
-        organizationId: session.session.activeOrganizationId,
-      });
+      const result = await listIntegrationConnections(
+        ctx.get("db"),
+        ctx.get("integrationRegistry"),
+        {
+          ...query,
+          organizationId: session.session.activeOrganizationId,
+        },
+      );
 
       return ctx.json(result, 200);
     } catch (error) {
