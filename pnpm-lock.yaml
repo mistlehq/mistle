@@ -524,19 +524,12 @@ importers:
 
   packages/codex-app-server-client:
     dependencies:
-      '@mistle/sandbox-session-protocol':
+      '@mistle/sandbox-agent-client':
         specifier: workspace:*
-        version: link:../sandbox-session-protocol
-      ws:
-        specifier: ^8.18.3
-        version: 8.19.0
+        version: link:../sandbox-agent-client
       zod:
         specifier: ^4.1.12
         version: 4.3.6
-    devDependencies:
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
 
   packages/config:
     dependencies:
@@ -714,6 +707,19 @@ importers:
       testcontainers:
         specifier: ^11.7.2
         version: 11.12.0
+
+  packages/sandbox-agent-client:
+    dependencies:
+      '@mistle/sandbox-session-protocol':
+        specifier: workspace:*
+        version: link:../sandbox-session-protocol
+      ws:
+        specifier: ^8.18.3
+        version: 8.19.0
+    devDependencies:
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
 
   packages/sandbox-runtime-plan-compiler:
     dependencies:

@@ -1,5 +1,5 @@
 {
-  "name": "@mistle/codex-app-server-client",
+  "name": "@mistle/sandbox-agent-client",
   "private": true,
   "type": "module",
   "exports": {
@@ -37,7 +37,10 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@mistle/sandbox-agent-client": "workspace:*",
-    "zod": "^4.1.12"
+    "@mistle/sandbox-session-protocol": "workspace:*",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
   }
 }

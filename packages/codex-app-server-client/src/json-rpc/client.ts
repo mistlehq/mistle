@@ -1,37 +1,37 @@
-import { CodexSessionClient } from "../session/client.js";
+import { SandboxAgentClient } from "@mistle/sandbox-agent-client";
 import type {
-  CodexJsonRpcErrorResponse,
-  CodexJsonRpcId,
-  CodexJsonRpcNotification,
-  CodexJsonRpcServerRequest,
-  CodexJsonRpcSuccessResponse,
-  CodexSessionEvent,
-} from "../session/types.js";
+  SandboxAgentEvent,
+  SandboxAgentJsonRpcErrorResponse,
+  SandboxAgentJsonRpcId,
+  SandboxAgentJsonRpcNotification,
+  SandboxAgentJsonRpcServerRequest,
+  SandboxAgentJsonRpcSuccessResponse,
+} from "@mistle/sandbox-agent-client";
 
 type PendingRequest = {
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
 };
 
-type NotificationListener = (notification: CodexJsonRpcNotification) => void;
-type ServerRequestListener = (request: CodexJsonRpcServerRequest) => void;
+type NotificationListener = (notification: SandboxAgentJsonRpcNotification) => void;
+type ServerRequestListener = (request: SandboxAgentJsonRpcServerRequest) => void;
 
 function isErrorResponse(
-  response: CodexJsonRpcSuccessResponse | CodexJsonRpcErrorResponse,
-): response is CodexJsonRpcErrorResponse {
+  response: SandboxAgentJsonRpcSuccessResponse | SandboxAgentJsonRpcErrorResponse,
+): response is SandboxAgentJsonRpcErrorResponse {
   return "error" in response;
 }
 
 export class CodexJsonRpcClient {
-  readonly #sessionClient: CodexSessionClient;
-  readonly #pendingRequests = new Map<CodexJsonRpcId, PendingRequest>();
+  readonly #sessionClient: SandboxAgentClient;
+  readonly #pendingRequests = new Map<SandboxAgentJsonRpcId, PendingRequest>();
   readonly #notificationListeners = new Set<NotificationListener>();
   readonly #serverRequestListeners = new Set<ServerRequestListener>();
   readonly #unsubscribeSessionEvent: () => void;
 
   #nextId = 0;
 
-  constructor(sessionClient: CodexSessionClient) {
+  constructor(sessionClient: SandboxAgentClient) {
     this.#sessionClient = sessionClient;
     this.#unsubscribeSessionEvent = sessionClient.onEvent((event) => {
       this.#handleSessionEvent(event);
@@ -85,7 +85,7 @@ export class CodexJsonRpcClient {
     });
   }
 
-  respond(id: CodexJsonRpcId, result: unknown): void {
+  respond(id: SandboxAgentJsonRpcId, result: unknown): void {
     this.#sessionClient.sendJson({
       id,
       result,
@@ -106,7 +106,7 @@ export class CodexJsonRpcClient {
     };
   }
 
-  #handleSessionEvent(event: CodexSessionEvent): void {
+  #handleSessionEvent(event: SandboxAgentEvent): void {
     if (event.type === "notification") {
       for (const listener of this.#notificationListeners) {
         listener(event.notification);

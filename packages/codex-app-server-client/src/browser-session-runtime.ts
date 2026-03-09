@@ -1,1 +1,1 @@
-export { createBrowserCodexSessionRuntime } from "./session/browser-runtime.js";
+export { createBrowserSandboxAgentRuntime as createBrowserCodexSessionRuntime } from "@mistle/sandbox-agent-client/browser";

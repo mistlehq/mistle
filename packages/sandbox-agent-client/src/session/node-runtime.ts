@@ -3,12 +3,12 @@ import { randomUUID } from "node:crypto";
 import WebSocket, { type RawData } from "ws";
 
 import {
-  type CodexScheduledTask,
-  type CodexSessionRuntime,
-  type CodexSessionSocket,
-  type CodexSessionSocketEventMap,
-  CodexSessionSocketReadyStates,
-  type CodexSessionSocketEventName,
+  type SandboxAgentScheduledTask,
+  type SandboxAgentRuntime,
+  type SandboxAgentSocket,
+  type SandboxAgentSocketEventMap,
+  SandboxAgentSocketReadyStates,
+  type SandboxAgentSocketEventName,
 } from "./runtime.js";
 
 function toMessageData(data: RawData): unknown {
@@ -25,26 +25,26 @@ function toMessageData(data: RawData): unknown {
   return Buffer.concat(data).toString("utf8");
 }
 
-function toReadyState(value: number): CodexSessionSocket["readyState"] {
+function toReadyState(value: number): SandboxAgentSocket["readyState"] {
   switch (value) {
-    case CodexSessionSocketReadyStates.CONNECTING:
-    case CodexSessionSocketReadyStates.OPEN:
-    case CodexSessionSocketReadyStates.CLOSING:
-    case CodexSessionSocketReadyStates.CLOSED:
+    case SandboxAgentSocketReadyStates.CONNECTING:
+    case SandboxAgentSocketReadyStates.OPEN:
+    case SandboxAgentSocketReadyStates.CLOSING:
+    case SandboxAgentSocketReadyStates.CLOSED:
       return value;
     default:
       throw new Error(`Unsupported node websocket ready state '${String(value)}'.`);
   }
 }
 
-class NodeCodexSessionSocket implements CodexSessionSocket {
+class NodeSandboxAgentSocket implements SandboxAgentSocket {
   readonly #socket: WebSocket;
   readonly #listenerMap = new Map<
-    CodexSessionSocketEventMap[CodexSessionSocketEventName],
+    SandboxAgentSocketEventMap[SandboxAgentSocketEventName],
     (event: unknown) => void
   >();
   readonly #messageListenerMap = new Map<
-    CodexSessionSocketEventMap["message"],
+    SandboxAgentSocketEventMap["message"],
     (data: RawData) => void
   >();
 
@@ -52,13 +52,13 @@ class NodeCodexSessionSocket implements CodexSessionSocket {
     this.#socket = new WebSocket(connectionUrl);
   }
 
-  get readyState(): CodexSessionSocket["readyState"] {
+  get readyState(): SandboxAgentSocket["readyState"] {
     return toReadyState(this.#socket.readyState);
   }
 
-  addEventListener<EventName extends CodexSessionSocketEventName>(
+  addEventListener<EventName extends SandboxAgentSocketEventName>(
     eventName: EventName,
-    listener: CodexSessionSocketEventMap[EventName],
+    listener: SandboxAgentSocketEventMap[EventName],
   ): void {
     if (eventName === "message") {
       const wrappedMessageListener = (data: RawData): void => {
@@ -78,9 +78,9 @@ class NodeCodexSessionSocket implements CodexSessionSocket {
     this.#socket.on(eventName, wrappedListener);
   }
 
-  removeEventListener<EventName extends CodexSessionSocketEventName>(
+  removeEventListener<EventName extends SandboxAgentSocketEventName>(
     eventName: EventName,
-    listener: CodexSessionSocketEventMap[EventName],
+    listener: SandboxAgentSocketEventMap[EventName],
   ): void {
     if (eventName === "message") {
       const wrappedMessageListener = this.#messageListenerMap.get(listener);
@@ -111,7 +111,7 @@ class NodeCodexSessionSocket implements CodexSessionSocket {
   }
 }
 
-class NodeCodexScheduledTask implements CodexScheduledTask {
+class NodeSandboxAgentScheduledTask implements SandboxAgentScheduledTask {
   readonly #timeoutId: NodeJS.Timeout;
 
   constructor(timeoutId: NodeJS.Timeout) {
@@ -123,11 +123,11 @@ class NodeCodexScheduledTask implements CodexScheduledTask {
   }
 }
 
-export function createNodeCodexSessionRuntime(): CodexSessionRuntime {
+export function createNodeSandboxAgentRuntime(): SandboxAgentRuntime {
   return {
-    createSocket: (connectionUrl) => new NodeCodexSessionSocket(connectionUrl),
+    createSocket: (connectionUrl) => new NodeSandboxAgentSocket(connectionUrl),
     createRequestId: () => randomUUID(),
     scheduleTimeout: (callback, timeoutMs) =>
-      new NodeCodexScheduledTask(setTimeout(callback, timeoutMs)),
+      new NodeSandboxAgentScheduledTask(setTimeout(callback, timeoutMs)),
   };
 }

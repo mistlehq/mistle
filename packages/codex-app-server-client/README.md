@@ -1,24 +1,19 @@
 # @mistle/codex-app-server-client
 
-Shared client package for talking to the Codex app server over the sandbox agent channel.
+Shared client package for speaking the Codex app server protocol on top of the sandbox agent channel.
 
 ## What This Package Owns
 
-This package gives apps one reusable way to open a sandbox agent channel, complete the session handshake, speak JSON-RPC over that channel, and call Codex app server methods. Today the main consumer is `apps/dashboard`, but the package is structured so other apps or workers can use the same client without depending on dashboard code.
+This package gives apps one reusable way to speak Codex app server JSON-RPC and typed Codex operations once a sandbox agent connection exists. Today the main consumer is `apps/dashboard`, but the package is structured so other apps or workers can use the same Codex protocol client without depending on dashboard code.
 
 ## Internal Split
 
-The package is split into three layers under `src/`:
+The package is split into two layers under `src/`:
 
-- `session/`
 - `json-rpc/`
 - `codex/`
 
-### `session/`
-
-Files in `session/` handle connection lifecycle and message transport: browser or Node websocket setup, the sandbox agent `connect` handshake, connection state, and parsing incoming messages into higher-level event categories.
-
-This layer is **not Codex app server specific**, but it is **specific to our sandbox session transport**. It exists because JSON-RPC is not the first protocol boundary. The client must first open the websocket and complete the sandbox handshake before the Codex app server can speak over the channel.
+The sandbox agent transport/session layer now lives in `@mistle/sandbox-agent-client`.
 
 ### `json-rpc/`
 
@@ -34,35 +29,31 @@ This is the only layer that is truly **Codex app server specific**.
 
 ## Why The Package Is Not Split Further Today
 
-There is a reasonable future split where:
+There is still a reasonable future split where:
 
-- `session/` moves into a sandbox session client package
 - `json-rpc/` moves into a generic JSON-RPC package
 - `codex/` remains in `@mistle/codex-app-server-client`
 
 We are not doing that today because:
 
-- there is currently no second consumer for the lower layers
-- splitting them into separate packages now would add package overhead without reducing meaningful coupling yet
+- there is currently no second consumer for the JSON-RPC layer
+- splitting that layer further today would add package overhead without reducing meaningful coupling yet
 
-The current package boundary is pragmatic: consumers import one package today, while the internal layering keeps the future extraction boundary explicit if another non-Codex consumer appears.
+The current package boundary is pragmatic: sandbox transport/session concerns are separated out, while Codex-specific protocol behavior remains together in one package.
 
 ## Public API
 
 The package exposes:
 
 - the main public exports from `src/index.ts`
-- browser runtime entrypoint from `src/browser.ts`
-- Node runtime entrypoint from `src/node.ts`
-
-Thin compatibility wrappers also exist at the package root source level so existing imports do not break while the internal module layout stays clean.
+- thin compatibility wrappers for the older Codex session exports so existing imports do not break during the transition to `@mistle/sandbox-agent-client`
 
 ## Usage Direction
 
 Use this package for:
 
-- shared Codex app server transport/protocol logic
-- browser and Node consumers that need to talk to the Codex app server
+- shared Codex app server JSON-RPC and operation wrappers
+- consumers that need to talk to the Codex app server after the sandbox agent connection has been established
 
 Do not use this package for:
 

@@ -4,25 +4,25 @@ import type {
   ConnectOK,
 } from "@mistle/sandbox-session-protocol";
 
-import { CodexSessionSocketReadyStates, type CodexSessionRuntime } from "./runtime.js";
+import { SandboxAgentSocketReadyStates, type SandboxAgentRuntime } from "./runtime.js";
 import type {
-  CodexJsonRpcErrorResponse,
-  CodexJsonRpcNotification,
-  CodexJsonRpcServerRequest,
-  CodexJsonRpcSuccessResponse,
-  CodexSessionConnectionState,
-  CodexSessionEvent,
+  SandboxAgentJsonRpcErrorResponse,
+  SandboxAgentJsonRpcNotification,
+  SandboxAgentJsonRpcServerRequest,
+  SandboxAgentJsonRpcSuccessResponse,
+  SandboxAgentConnectionState,
+  SandboxAgentEvent,
 } from "./types.js";
 
 const DefaultConnectTimeoutMs = 15_000;
 
-export type CodexSessionClientInput = {
+export type SandboxAgentClientInput = {
   connectionUrl: string;
-  runtime: CodexSessionRuntime;
+  runtime: SandboxAgentRuntime;
   connectTimeoutMs?: number;
 };
 
-type EventListener = (event: CodexSessionEvent) => void;
+type EventListener = (event: SandboxAgentEvent) => void;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -85,7 +85,9 @@ export function parseConnectControlMessage(payload: string): ConnectOK | Connect
   return null;
 }
 
-export function parseJsonRpcSuccessResponse(value: unknown): CodexJsonRpcSuccessResponse | null {
+export function parseJsonRpcSuccessResponse(
+  value: unknown,
+): SandboxAgentJsonRpcSuccessResponse | null {
   if (!isRecord(value) || !("result" in value)) {
     return null;
   }
@@ -101,7 +103,7 @@ export function parseJsonRpcSuccessResponse(value: unknown): CodexJsonRpcSuccess
   };
 }
 
-export function parseJsonRpcErrorResponse(value: unknown): CodexJsonRpcErrorResponse | null {
+export function parseJsonRpcErrorResponse(value: unknown): SandboxAgentJsonRpcErrorResponse | null {
   if (!isRecord(value)) {
     return null;
   }
@@ -128,7 +130,7 @@ export function parseJsonRpcErrorResponse(value: unknown): CodexJsonRpcErrorResp
   };
 }
 
-export function parseJsonRpcNotification(value: unknown): CodexJsonRpcNotification | null {
+export function parseJsonRpcNotification(value: unknown): SandboxAgentJsonRpcNotification | null {
   if (!isRecord(value) || "id" in value) {
     return null;
   }
@@ -144,7 +146,7 @@ export function parseJsonRpcNotification(value: unknown): CodexJsonRpcNotificati
   };
 }
 
-export function parseJsonRpcServerRequest(value: unknown): CodexJsonRpcServerRequest | null {
+export function parseJsonRpcServerRequest(value: unknown): SandboxAgentJsonRpcServerRequest | null {
   if (!isRecord(value)) {
     return null;
   }
@@ -174,23 +176,23 @@ function readMessageEventPayload(event: unknown): unknown {
   return event;
 }
 
-export class CodexSessionClient {
+export class SandboxAgentClient {
   readonly #connectionUrl: string;
   readonly #connectTimeoutMs: number;
   readonly #listeners = new Set<EventListener>();
-  readonly #runtime: CodexSessionRuntime;
+  readonly #runtime: SandboxAgentRuntime;
 
-  #socket: import("./runtime.js").CodexSessionSocket | null = null;
-  #state: CodexSessionConnectionState = "idle";
+  #socket: import("./runtime.js").SandboxAgentSocket | null = null;
+  #state: SandboxAgentConnectionState = "idle";
   #errorMessage: string | null = null;
 
-  constructor(input: CodexSessionClientInput) {
+  constructor(input: SandboxAgentClientInput) {
     this.#connectionUrl = input.connectionUrl;
     this.#runtime = input.runtime;
     this.#connectTimeoutMs = input.connectTimeoutMs ?? DefaultConnectTimeoutMs;
   }
 
-  get state(): CodexSessionConnectionState {
+  get state(): SandboxAgentConnectionState {
     return this.#state;
   }
 
@@ -207,7 +209,7 @@ export class CodexSessionClient {
 
   async connect(): Promise<void> {
     if (this.#socket !== null) {
-      throw new Error("Codex session client is already connected or connecting.");
+      throw new Error("Sandbox agent client is already connected or connecting.");
     }
 
     this.#setState("connecting_socket", null);
@@ -321,8 +323,8 @@ export class CodexSessionClient {
 
   sendJson(payload: unknown): void {
     const socket = this.#socket;
-    if (socket === null || socket.readyState !== CodexSessionSocketReadyStates.OPEN) {
-      throw new Error("Codex session socket is not open.");
+    if (socket === null || socket.readyState !== SandboxAgentSocketReadyStates.OPEN) {
+      throw new Error("Sandbox agent socket is not open.");
     }
 
     socket.send(JSON.stringify(payload));
@@ -336,7 +338,7 @@ export class CodexSessionClient {
     this.#setState("ready", null);
   }
 
-  #setState(state: CodexSessionConnectionState, errorMessage: string | null): void {
+  #setState(state: SandboxAgentConnectionState, errorMessage: string | null): void {
     this.#state = state;
     this.#errorMessage = errorMessage;
     this.#emit({
@@ -346,7 +348,7 @@ export class CodexSessionClient {
     });
   }
 
-  #emit(event: CodexSessionEvent): void {
+  #emit(event: SandboxAgentEvent): void {
     for (const listener of this.#listeners) {
       listener(event);
     }
