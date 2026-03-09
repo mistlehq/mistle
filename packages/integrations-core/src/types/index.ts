@@ -174,15 +174,13 @@ export function egressUrlRef(routeId: string): EgressUrlRef {
 
 export type IntegrationMcpValue = string | EgressUrlRef;
 
-export type IntegrationMcpTransport = "streamable-http" | "sse" | "stdio";
+export type IntegrationMcpTransport = "streamable-http" | "stdio";
 
 export const IntegrationMcpTransports: {
   STREAMABLE_HTTP: IntegrationMcpTransport;
-  SSE: IntegrationMcpTransport;
   STDIO: IntegrationMcpTransport;
 } = {
   STREAMABLE_HTTP: "streamable-http",
-  SSE: "sse",
   STDIO: "stdio",
 };
 
