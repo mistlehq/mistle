@@ -177,13 +177,6 @@ const RuntimePlanSchema = z.object({
       runtimeKey: z.string().min(1),
       clientId: z.string().min(1),
       endpointKey: z.string().min(1),
-      capabilities: z.object({
-        conversation: z
-          .object({
-            providerFamily: z.string().min(1),
-          })
-          .optional(),
-      }),
     }),
   ),
 });

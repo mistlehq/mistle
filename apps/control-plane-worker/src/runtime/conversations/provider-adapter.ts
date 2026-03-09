@@ -1,9 +1,8 @@
-import {
-  ConversationProviderFamilies,
-  type ConversationProviderFamily,
-} from "@mistle/db/control-plane";
+import { OpenAiApiKeyDefinition } from "@mistle/integrations-definitions";
 
 import { createCodexConversationProviderAdapter } from "./providers/codex-conversation-provider-adapter.js";
+
+const OpenAiIntegrationFamilyId = OpenAiApiKeyDefinition.familyId;
 
 export type ProviderConversationStatus = "idle" | "active" | "error";
 
@@ -74,7 +73,6 @@ export type ProviderInterruptExecutionInput = {
 };
 
 export type ConversationProviderAdapter = {
-  providerFamily: ConversationProviderFamily;
   connect: (input: ProviderConnectInput) => Promise<ProviderConnection>;
   inspectConversation: (
     input: ProviderInspectConversationInput,
@@ -89,10 +87,12 @@ export type ConversationProviderAdapter = {
 };
 
 export function getConversationProviderAdapter(
-  providerFamily: ConversationProviderFamily,
+  integrationFamilyId: string,
 ): ConversationProviderAdapter {
-  switch (providerFamily) {
-    case ConversationProviderFamilies.CODEX:
+  switch (integrationFamilyId) {
+    case OpenAiIntegrationFamilyId:
       return createCodexConversationProviderAdapter();
   }
+
+  throw new Error(`Unsupported conversation integration family '${integrationFamilyId}'.`);
 }

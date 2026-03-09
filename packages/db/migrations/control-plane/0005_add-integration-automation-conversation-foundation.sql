@@ -79,7 +79,7 @@ CREATE TABLE "control_plane"."conversations" (
 	"created_by_kind" text NOT NULL,
 	"created_by_id" text NOT NULL,
 	"sandbox_profile_id" text NOT NULL,
-	"provider_family" text NOT NULL,
+	"integration_family_id" text NOT NULL,
 	"conversation_key" text NOT NULL,
 	"title" text,
 	"preview" text,

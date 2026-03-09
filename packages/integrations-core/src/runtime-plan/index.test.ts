@@ -97,11 +97,6 @@ describe("assembleCompiledRuntimePlan", () => {
               runtimeKey: "github-app-server",
               clientId: "codex-cli",
               endpointKey: "app-server-b",
-              capabilities: {
-                conversation: {
-                  providerFamily: "codex",
-                },
-              },
             },
           ],
         },
@@ -193,11 +188,6 @@ describe("assembleCompiledRuntimePlan", () => {
               runtimeKey: "codex-app-server",
               clientId: "codex-cli",
               endpointKey: "app-server-a",
-              capabilities: {
-                conversation: {
-                  providerFamily: "codex",
-                },
-              },
             },
           ],
         },
@@ -234,22 +224,12 @@ describe("assembleCompiledRuntimePlan", () => {
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server-a",
-        capabilities: {
-          conversation: {
-            providerFamily: "codex",
-          },
-        },
       },
       {
         bindingId: "bind_b",
         runtimeKey: "github-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server-b",
-        capabilities: {
-          conversation: {
-            providerFamily: "codex",
-          },
-        },
       },
     ]);
   });

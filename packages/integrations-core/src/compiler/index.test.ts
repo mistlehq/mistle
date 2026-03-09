@@ -150,11 +150,6 @@ function createOpenAiDefinition(): IntegrationDefinition<
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
-          capabilities: {
-            conversation: {
-              providerFamily: "codex",
-            },
-          },
         },
       ],
     }),
@@ -455,11 +450,6 @@ describe("compileRuntimePlan", () => {
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server",
-        capabilities: {
-          conversation: {
-            providerFamily: "codex",
-          },
-        },
       },
     ]);
     expect(runtimePlan.artifactRemovals).toEqual([]);

@@ -515,7 +515,6 @@ function resolveCodexModel(options: Record<string, unknown> | undefined): string
 
 export function createCodexConversationProviderAdapter(): ConversationProviderAdapter {
   return {
-    providerFamily: "codex",
     connect: async (input) => {
       const connectInput: {
         connectionUrl: string;
