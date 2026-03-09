@@ -1,5 +1,9 @@
 import {
+  integrationConnectionResources,
+  integrationConnectionResourceStates,
   integrationConnections,
+  IntegrationConnectionResourceSyncStates,
+  IntegrationConnectionStatuses,
   integrationTargets,
   IntegrationBindingKinds,
   sandboxProfiles,
@@ -14,7 +18,7 @@ import {
   SandboxProfilesNotFoundCodes,
 } from "../src/sandbox-profiles/services/errors.js";
 import { putProfileVersionIntegrationBindings } from "../src/sandbox-profiles/services/put-profile-version-integration-bindings.js";
-import { it } from "./test-context.js";
+import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
 describe("sandbox profile version put integration bindings service integration", () => {
   it("replaces integration bindings for a profile version", async ({ fixture }) => {
@@ -25,7 +29,7 @@ describe("sandbox profile version put integration bindings service integration",
     await fixture.db
       .insert(integrationTargets)
       .values({
-        targetKey: "openai-default",
+        targetKey: "openai-default-put-bindings-service",
         familyId: "openai",
         variantId: "openai-default",
         enabled: true,
@@ -42,7 +46,7 @@ describe("sandbox profile version put integration bindings service integration",
         {
           id: "icn_put_bindings_service_001",
           organizationId: authenticatedSession.organizationId,
-          targetKey: "openai-default",
+          targetKey: "openai-default-put-bindings-service",
           displayName: "Service Connection A",
           config: {
             auth_scheme: "api-key",
@@ -51,7 +55,7 @@ describe("sandbox profile version put integration bindings service integration",
         {
           id: "icn_put_bindings_service_002",
           organizationId: authenticatedSession.organizationId,
-          targetKey: "openai-default",
+          targetKey: "openai-default-put-bindings-service",
           displayName: "Service Connection B",
           config: {
             auth_scheme: "api-key",
@@ -68,7 +72,7 @@ describe("sandbox profile version put integration bindings service integration",
       id: "sbp_put_bindings_service_001",
       organizationId: authenticatedSession.organizationId,
       displayName: "PUT Bindings Profile",
-      status: "active",
+      status: IntegrationConnectionStatuses.ACTIVE,
     });
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_put_bindings_service_001",
@@ -114,7 +118,7 @@ describe("sandbox profile version put integration bindings service integration",
             kind: IntegrationBindingKinds.AGENT,
             config: {
               runtime: "codex-cli",
-              defaultModel: "gpt-5.2",
+              defaultModel: "gpt-5.3-codex",
               reasoningEffort: "medium",
             },
           },
@@ -141,7 +145,7 @@ describe("sandbox profile version put integration bindings service integration",
     expect(updatedBinding?.kind).toBe(IntegrationBindingKinds.AGENT);
     expect(updatedBinding?.config).toEqual({
       runtime: "codex-cli",
-      defaultModel: "gpt-5.2",
+      defaultModel: "gpt-5.3-codex",
       reasoningEffort: "medium",
     });
 
@@ -196,7 +200,7 @@ describe("sandbox profile version put integration bindings service integration",
       id: "sbp_put_bindings_missing_version_001",
       organizationId: authenticatedSession.organizationId,
       displayName: "Missing Version",
-      status: "active",
+      status: IntegrationConnectionStatuses.ACTIVE,
     });
 
     await expect(
@@ -242,7 +246,7 @@ describe("sandbox profile version put integration bindings service integration",
       id: "sbp_put_bindings_connection_reference_001",
       organizationId: firstOrgSession.organizationId,
       displayName: "Connection Reference",
-      status: "active",
+      status: IntegrationConnectionStatuses.ACTIVE,
     });
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_put_bindings_connection_reference_001",
@@ -315,7 +319,7 @@ describe("sandbox profile version put integration bindings service integration",
       id: "sbp_put_bindings_invalid_binding_reference_001",
       organizationId: authenticatedSession.organizationId,
       displayName: "Invalid Binding Reference",
-      status: "active",
+      status: IntegrationConnectionStatuses.ACTIVE,
     });
     await fixture.db.insert(sandboxProfileVersions).values({
       sandboxProfileId: "sbp_put_bindings_invalid_binding_reference_001",
@@ -366,4 +370,249 @@ describe("sandbox profile version put integration bindings service integration",
       code: SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_REFERENCE,
     });
   });
+
+  it("accepts a github binding when the selected repositories are accessible in the synced snapshot", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-github-accessible@example.com",
+    });
+
+    await insertGitHubBindingValidationFixture({
+      fixture,
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_put_bindings_github_accessible_001",
+      profileVersion: 1,
+      connectionId: "icn_put_bindings_github_accessible_001",
+      targetKey: "github-cloud-put-bindings-accessible",
+    });
+
+    await fixture.db.insert(integrationConnectionResourceStates).values({
+      connectionId: "icn_put_bindings_github_accessible_001",
+      familyId: "github",
+      kind: "repository",
+      syncState: IntegrationConnectionResourceSyncStates.READY,
+      totalCount: 2,
+      lastSyncedAt: "2026-03-09T10:00:00.000Z",
+    });
+    await fixture.db.insert(integrationConnectionResources).values([
+      {
+        id: "rsc_put_bindings_github_accessible_001",
+        connectionId: "icn_put_bindings_github_accessible_001",
+        familyId: "github",
+        kind: "repository",
+        handle: "mistlehq/mistle",
+        displayName: "mistlehq/mistle",
+        metadata: {
+          visibility: "private",
+        },
+        lastSeenAt: "2026-03-09T10:00:00.000Z",
+      },
+      {
+        id: "rsc_put_bindings_github_accessible_002",
+        connectionId: "icn_put_bindings_github_accessible_001",
+        familyId: "github",
+        kind: "repository",
+        handle: "mistlehq/platform",
+        displayName: "mistlehq/platform",
+        metadata: {
+          visibility: "private",
+        },
+        lastSeenAt: "2026-03-09T10:00:00.000Z",
+      },
+    ]);
+
+    const result = await putProfileVersionIntegrationBindings(
+      {
+        db: fixture.db,
+      },
+      {
+        organizationId: authenticatedSession.organizationId,
+        profileId: "sbp_put_bindings_github_accessible_001",
+        profileVersion: 1,
+        bindings: [
+          {
+            connectionId: "icn_put_bindings_github_accessible_001",
+            kind: IntegrationBindingKinds.GIT,
+            config: {
+              repositories: ["mistlehq/mistle", "mistlehq/platform"],
+            },
+          },
+        ],
+      },
+    );
+
+    expect(result.bindings).toHaveLength(1);
+    expect(result.bindings[0]?.config).toEqual({
+      repositories: ["mistlehq/mistle", "mistlehq/platform"],
+    });
+  });
+
+  it("rejects a github binding when the selected repositories are not accessible in the synced snapshot", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-github-unavailable@example.com",
+    });
+
+    await insertGitHubBindingValidationFixture({
+      fixture,
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_put_bindings_github_unavailable_001",
+      profileVersion: 1,
+      connectionId: "icn_put_bindings_github_unavailable_001",
+      targetKey: "github-cloud-put-bindings-unavailable",
+    });
+
+    await fixture.db.insert(integrationConnectionResourceStates).values({
+      connectionId: "icn_put_bindings_github_unavailable_001",
+      familyId: "github",
+      kind: "repository",
+      syncState: IntegrationConnectionResourceSyncStates.READY,
+      totalCount: 1,
+      lastSyncedAt: "2026-03-09T10:00:00.000Z",
+    });
+    await fixture.db.insert(integrationConnectionResources).values({
+      id: "rsc_put_bindings_github_unavailable_001",
+      connectionId: "icn_put_bindings_github_unavailable_001",
+      familyId: "github",
+      kind: "repository",
+      handle: "mistlehq/mistle",
+      displayName: "mistlehq/mistle",
+      metadata: {
+        visibility: "private",
+      },
+      lastSeenAt: "2026-03-09T10:00:00.000Z",
+    });
+
+    await expect(
+      putProfileVersionIntegrationBindings(
+        {
+          db: fixture.db,
+        },
+        {
+          organizationId: authenticatedSession.organizationId,
+          profileId: "sbp_put_bindings_github_unavailable_001",
+          profileVersion: 1,
+          bindings: [
+            {
+              clientRef: "draft-github-binding",
+              connectionId: "icn_put_bindings_github_unavailable_001",
+              kind: IntegrationBindingKinds.GIT,
+              config: {
+                repositories: ["mistlehq/private-repo"],
+              },
+            },
+          ],
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
+      details: {
+        issues: [
+          {
+            clientRef: "draft-github-binding",
+            validatorCode: "system.inaccessible_resource_reference",
+            field: "repositories",
+            safeMessage:
+              "Selected repository 'mistlehq/private-repo' is no longer accessible for this connection.",
+          },
+        ],
+      },
+    });
+  });
+
+  it("rejects a github binding when repository sync has not produced a usable snapshot yet", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-github-never-synced@example.com",
+    });
+
+    await insertGitHubBindingValidationFixture({
+      fixture,
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_put_bindings_github_never_synced_001",
+      profileVersion: 1,
+      connectionId: "icn_put_bindings_github_never_synced_001",
+      targetKey: "github-cloud-put-bindings-never-synced",
+    });
+
+    await expect(
+      putProfileVersionIntegrationBindings(
+        {
+          db: fixture.db,
+        },
+        {
+          organizationId: authenticatedSession.organizationId,
+          profileId: "sbp_put_bindings_github_never_synced_001",
+          profileVersion: 1,
+          bindings: [
+            {
+              connectionId: "icn_put_bindings_github_never_synced_001",
+              kind: IntegrationBindingKinds.GIT,
+              config: {
+                repositories: ["mistlehq/mistle"],
+              },
+            },
+          ],
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
+      details: {
+        issues: [
+          {
+            validatorCode: "system.resource_sync_required",
+            field: "repositories",
+            safeMessage:
+              "Resource sync is required before repositories can be selected for this connection.",
+          },
+        ],
+      },
+    });
+  });
 });
+
+async function insertGitHubBindingValidationFixture(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  organizationId: string;
+  profileId: string;
+  profileVersion: number;
+  connectionId: string;
+  targetKey: string;
+}): Promise<void> {
+  await input.fixture.db
+    .insert(integrationTargets)
+    .values({
+      targetKey: input.targetKey,
+      familyId: "github",
+      variantId: "github-cloud",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.github.com",
+        web_base_url: "https://github.com",
+      },
+    })
+    .onConflictDoNothing();
+
+  await input.fixture.db.insert(sandboxProfiles).values({
+    id: input.profileId,
+    organizationId: input.organizationId,
+    displayName: "GitHub Binding Validation",
+    status: IntegrationConnectionStatuses.ACTIVE,
+  });
+  await input.fixture.db.insert(sandboxProfileVersions).values({
+    sandboxProfileId: input.profileId,
+    version: input.profileVersion,
+  });
+  await input.fixture.db.insert(integrationConnections).values({
+    id: input.connectionId,
+    organizationId: input.organizationId,
+    targetKey: input.targetKey,
+    displayName: "GitHub Connection",
+    config: {
+      auth_scheme: "api-key",
+    },
+  });
+}
