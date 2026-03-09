@@ -1,7 +1,10 @@
 import {
   integrationConnections,
   type IntegrationConnection,
+  type IntegrationConnectionResourceState,
+  type IntegrationConnectionResourceSyncState,
   type IntegrationConnectionStatus,
+  type IntegrationTarget,
 } from "@mistle/db/control-plane";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import {
@@ -14,6 +17,7 @@ import {
   paginateKeyset,
   parseKeysetPageSize,
 } from "@mistle/http/pagination";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -22,6 +26,7 @@ import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsBadRequestError,
 } from "./errors.js";
+import { projectConnectionResourceSummaries } from "./project-connection-resource-summaries.js";
 
 const PAGE_SIZE_OPTIONS = {
   defaultLimit: 20,
@@ -51,9 +56,18 @@ type IntegrationConnectionListItem = {
   externalSubjectId?: string;
   config?: Record<string, unknown>;
   targetSnapshotConfig?: Record<string, unknown>;
+  resources?: Array<{
+    kind: string;
+    selectionMode: "single" | "multi";
+    count: number;
+    syncState: IntegrationConnectionResourceSyncState;
+    lastSyncedAt?: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 };
+
+const IntegrationRegistry = createIntegrationRegistry();
 
 export async function listIntegrationConnections(
   db: AppContext["var"]["db"],
@@ -136,9 +150,45 @@ export async function listIntegrationConnections(
       },
     });
 
+    const pageTargetKeys = [...new Set(result.items.map((connection) => connection.targetKey))];
+    const pageConnectionIds = result.items.map((connection) => connection.id);
+
+    const [targets, resourceStates] = await Promise.all([
+      pageTargetKeys.length === 0
+        ? Promise.resolve([])
+        : db.query.integrationTargets.findMany({
+            where: (table, { inArray }) => inArray(table.targetKey, pageTargetKeys),
+          }),
+      pageConnectionIds.length === 0
+        ? Promise.resolve([])
+        : db.query.integrationConnectionResourceStates.findMany({
+            where: (table, { inArray }) => inArray(table.connectionId, pageConnectionIds),
+          }),
+    ]);
+
+    const targetsByKey = new Map(targets.map((target) => [target.targetKey, target]));
+    const resourceStatesByConnectionId = new Map<
+      string,
+      Array<IntegrationConnectionResourceState>
+    >();
+
+    for (const resourceState of resourceStates) {
+      const existingStates = resourceStatesByConnectionId.get(resourceState.connectionId);
+      if (existingStates === undefined) {
+        resourceStatesByConnectionId.set(resourceState.connectionId, [resourceState]);
+        continue;
+      }
+
+      existingStates.push(resourceState);
+    }
+
     return {
       ...result,
       items: result.items.map((connection) => ({
+        ...buildResourceSummary(connection, {
+          targetsByKey,
+          resourceStatesByConnectionId,
+        }),
         id: connection.id,
         targetKey: connection.targetKey,
         displayName: connection.displayName,
@@ -170,5 +220,32 @@ export async function listIntegrationConnections(
 }
 
 function normalizeTimestamp(value: string | Date): string {
-  return typeof value === "string" ? value : value.toISOString();
+  return new Date(value).toISOString();
+}
+
+function buildResourceSummary(
+  connection: IntegrationConnection,
+  input: {
+    targetsByKey: ReadonlyMap<string, IntegrationTarget>;
+    resourceStatesByConnectionId: ReadonlyMap<
+      string,
+      ReadonlyArray<IntegrationConnectionResourceState>
+    >;
+  },
+): Pick<IntegrationConnectionListItem, "resources"> {
+  const target = input.targetsByKey.get(connection.targetKey);
+  if (target === undefined) {
+    return {};
+  }
+
+  const definition = IntegrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+  const resources = projectConnectionResourceSummaries({
+    definition,
+    resourceStates: input.resourceStatesByConnectionId.get(connection.id) ?? [],
+  });
+
+  return resources.length === 0 ? {} : { resources };
 }

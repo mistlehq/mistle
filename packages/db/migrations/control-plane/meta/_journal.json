@@ -43,6 +43,13 @@
       "when": 1773022873807,
       "tag": "0005_add-integration-automation-conversation-foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1773037376750,
+      "tag": "0006_add-integration-connection-resources",
+      "breakpoints": true
     }
   ]
 }

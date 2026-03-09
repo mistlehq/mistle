@@ -1,9 +1,13 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { IntegrationConnectionStatuses } from "@mistle/db/control-plane";
+import {
+  IntegrationConnectionResourceSyncStates,
+  IntegrationConnectionStatuses,
+} from "@mistle/db/control-plane";
 import {
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
 } from "@mistle/http/pagination";
+import { IntegrationResourceSelectionModes } from "@mistle/integrations-core";
 
 import {
   IntegrationConnectionsBadRequestCodes,
@@ -16,6 +20,24 @@ const IntegrationConnectionStatusSchema = z.enum([
   IntegrationConnectionStatuses.REVOKED,
 ]);
 
+const IntegrationConnectionResourceSummarySchema = z
+  .object({
+    kind: z.string().min(1),
+    selectionMode: z.enum([
+      IntegrationResourceSelectionModes.SINGLE,
+      IntegrationResourceSelectionModes.MULTI,
+    ]),
+    count: z.number().int().min(0),
+    syncState: z.enum([
+      IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+      IntegrationConnectionResourceSyncStates.SYNCING,
+      IntegrationConnectionResourceSyncStates.READY,
+      IntegrationConnectionResourceSyncStates.ERROR,
+    ]),
+    lastSyncedAt: z.string().min(1).optional(),
+  })
+  .strict();
+
 export const IntegrationConnectionSchema = z
   .object({
     id: z.string().min(1),
@@ -25,6 +47,7 @@ export const IntegrationConnectionSchema = z
     externalSubjectId: z.string().min(1).optional(),
     config: z.record(z.string(), z.unknown()).optional(),
     targetSnapshotConfig: z.record(z.string(), z.unknown()).optional(),
+    resources: z.array(IntegrationConnectionResourceSummarySchema).optional(),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),
   })

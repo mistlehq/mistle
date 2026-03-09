@@ -1,6 +1,8 @@
 import {
+  integrationConnectionResourceStates,
   integrationConnections,
   IntegrationConnectionStatuses,
+  IntegrationConnectionResourceSyncStates,
   integrationTargets,
 } from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
@@ -96,6 +98,19 @@ describe("integration connections list integration", () => {
       },
     ]);
 
+    await fixture.db.insert(integrationConnectionResourceStates).values({
+      connectionId: "icn_001",
+      familyId: "github",
+      kind: "repository",
+      syncState: IntegrationConnectionResourceSyncStates.READY,
+      totalCount: 7,
+      lastSyncedAt: "2026-01-04T00:00:00.000Z",
+      lastSyncStartedAt: "2026-01-04T00:00:00.000Z",
+      lastSyncFinishedAt: "2026-01-04T00:00:00.000Z",
+      lastErrorCode: null,
+      lastErrorMessage: null,
+    });
+
     const firstPageResponse = await fixture.request("/v1/integration/connections?limit=2", {
       headers: {
         cookie: firstOrgSession.cookie,
@@ -125,6 +140,15 @@ describe("integration connections list integration", () => {
         targetSnapshotConfig: {
           base_url: "https://github.com",
         },
+        resources: [
+          {
+            kind: "repository",
+            selectionMode: "multi",
+            count: 7,
+            syncState: IntegrationConnectionResourceSyncStates.READY,
+            lastSyncedAt: "2026-01-04T00:00:00.000Z",
+          },
+        ],
         createdAt: firstConnectionCreatedAt.toISOString(),
         updatedAt: firstConnectionCreatedAt.toISOString(),
       },
@@ -169,6 +193,14 @@ describe("integration connections list integration", () => {
         targetKey: "github_cloud",
         displayName: "GitHub Revoked",
         status: IntegrationConnectionStatuses.REVOKED,
+        resources: [
+          {
+            kind: "repository",
+            selectionMode: "multi",
+            count: 0,
+            syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+          },
+        ],
         createdAt: thirdConnectionCreatedAt.toISOString(),
         updatedAt: thirdConnectionCreatedAt.toISOString(),
       },
