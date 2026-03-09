@@ -106,6 +106,7 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
                 automationRunId: input.automationRunId,
                 automationRunCreatedAt: "2026-01-01T00:00:00.000Z",
                 automationId: "atm_test",
+                conversationId: "cnv_test",
                 automationTargetId: "atg_test",
                 organizationId: "org_test",
                 sandboxProfileId: "sbp_test",

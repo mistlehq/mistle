@@ -14,6 +14,7 @@ export type PreparedAutomationRun = {
   automationRunId: string;
   automationRunCreatedAt: string;
   automationId: string;
+  conversationId: string;
   automationTargetId: string;
   organizationId: string;
   sandboxProfileId: string;

@@ -206,6 +206,7 @@ function createDeliverInput(connectionUrl: string): DeliverAutomationPayloadServ
       automationRunId: "aru_test_001",
       automationRunCreatedAt: "2026-03-05T00:00:00.000Z",
       automationId: "atm_test_001",
+      conversationId: "cnv_test_001",
       automationTargetId: "atg_test_001",
       organizationId: "org_test_001",
       sandboxProfileId: "sbp_test_001",

@@ -4,11 +4,15 @@ import {
   AutomationRunStatuses,
   type AutomationRunStatus,
   type ControlPlaneDatabase,
+  ConversationCreatedByKinds,
+  ConversationOwnerKinds,
+  IntegrationBindingKinds,
 } from "@mistle/db/control-plane";
 import { systemSleeper } from "@mistle/time";
 import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
+import { claimConversation } from "../conversations/index.js";
 import {
   connectSandboxAgentConnection,
   sendSandboxAgentMessage,
@@ -68,6 +72,13 @@ export type MarkAutomationRunFailedInput = {
   failureMessage: string;
 };
 
+type ControlPlaneTransaction = Parameters<ControlPlaneDatabase["transaction"]>[0] extends (
+  tx: infer T,
+  ...args: never[]
+) => Promise<unknown>
+  ? T
+  : never;
+
 const TerminalAutomationRunStatuses = new Set<AutomationRunStatus>([
   AutomationRunStatuses.COMPLETED,
   AutomationRunStatuses.FAILED,
@@ -85,6 +96,10 @@ const AutomationRunFailureCodes = {
   WEBHOOK_EVENT_REFERENCE_MISSING: "webhook_event_reference_missing",
   WEBHOOK_EVENT_NOT_FOUND: "webhook_event_not_found",
   WEBHOOK_AUTOMATION_NOT_FOUND: "webhook_automation_not_found",
+  AGENT_BINDING_NOT_FOUND: "agent_binding_not_found",
+  AGENT_BINDING_AMBIGUOUS: "agent_binding_ambiguous",
+  AGENT_BINDING_CONNECTION_NOT_FOUND: "agent_binding_connection_not_found",
+  AGENT_BINDING_TARGET_NOT_FOUND: "agent_binding_target_not_found",
   TEMPLATE_RENDER_FAILED: "template_render_failed",
   AUTOMATION_RUN_EXECUTION_FAILED: "automation_run_execution_failed",
 } as const;
@@ -263,6 +278,7 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     id: string;
     createdAt: string;
     automationId: string;
+    conversationId: string | null;
     renderedInput: string | null;
     renderedConversationKey: string | null;
     renderedIdempotencyKey: string | null;
@@ -294,12 +310,13 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
   }
 
   if (
+    input.automationRun.conversationId === null ||
     input.automationRun.renderedInput === null ||
     input.automationRun.renderedConversationKey === null
   ) {
     throw new AutomationRunExecutionError({
       code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
-      message: `Automation run '${input.automationRun.id}' is missing persisted rendered state.`,
+      message: `Automation run '${input.automationRun.id}' is missing persisted prepared state.`,
     });
   }
 
@@ -307,6 +324,7 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     automationRunId: input.automationRun.id,
     automationRunCreatedAt: input.automationRun.createdAt,
     automationId: input.automationRun.automationId,
+    conversationId: input.automationRun.conversationId,
     automationTargetId: input.automationTarget.id,
     organizationId: input.automation.organizationId,
     sandboxProfileId: input.automationTarget.sandboxProfileId,
@@ -321,6 +339,66 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     renderedConversationKey: input.automationRun.renderedConversationKey,
     renderedIdempotencyKey: input.automationRun.renderedIdempotencyKey,
   };
+}
+
+async function resolveAutomationConversationIntegrationFamilyId(
+  db: ControlPlaneDatabase | ControlPlaneTransaction,
+  input: {
+    automationRunId: string;
+    organizationId: string;
+    sandboxProfileId: string;
+    sandboxProfileVersion: number;
+  },
+): Promise<string> {
+  const agentBindings = await db.query.sandboxProfileVersionIntegrationBindings.findMany({
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.sandboxProfileId, input.sandboxProfileId),
+        whereEq(table.sandboxProfileVersion, input.sandboxProfileVersion),
+        whereEq(table.kind, IntegrationBindingKinds.AGENT),
+      ),
+    orderBy: (table, { asc }) => [asc(table.id)],
+  });
+
+  const agentBinding = agentBindings[0];
+  if (agentBinding === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AGENT_BINDING_NOT_FOUND,
+      message: `Automation run '${input.automationRunId}' requires exactly one AGENT binding on sandbox profile '${input.sandboxProfileId}' version '${input.sandboxProfileVersion}', but none were found.`,
+    });
+  }
+  if (agentBindings[1] !== undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AGENT_BINDING_AMBIGUOUS,
+      message: `Automation run '${input.automationRunId}' requires exactly one AGENT binding on sandbox profile '${input.sandboxProfileId}' version '${input.sandboxProfileVersion}', but multiple were found.`,
+    });
+  }
+
+  const agentConnection = await db.query.integrationConnections.findFirst({
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.id, agentBinding.connectionId),
+        whereEq(table.organizationId, input.organizationId),
+      ),
+  });
+  if (agentConnection === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AGENT_BINDING_CONNECTION_NOT_FOUND,
+      message: `Automation run '${input.automationRunId}' references AGENT binding '${agentBinding.id}' with connection '${agentBinding.connectionId}' that is missing or inaccessible.`,
+    });
+  }
+
+  const agentTarget = await db.query.integrationTargets.findFirst({
+    where: (table, { eq: whereEq }) => whereEq(table.targetKey, agentConnection.targetKey),
+  });
+  if (agentTarget === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AGENT_BINDING_TARGET_NOT_FOUND,
+      message: `Automation run '${input.automationRunId}' references AGENT connection '${agentConnection.id}' with target '${agentConnection.targetKey}' that does not exist.`,
+    });
+  }
+
+  return agentTarget.familyId;
 }
 
 export async function prepareAutomationRun(
@@ -406,6 +484,7 @@ export async function prepareAutomationRun(
       id: automationRun.id,
       createdAt: automationRun.createdAt,
       automationId: automationRun.automationId,
+      conversationId: automationRun.conversationId,
       renderedInput: automationRun.renderedInput,
       renderedConversationKey: automationRun.renderedConversationKey,
       renderedIdempotencyKey: automationRun.renderedIdempotencyKey,
@@ -463,20 +542,50 @@ export async function prepareAutomationRun(
     });
   }
 
-  await deps.db
-    .update(automationRuns)
-    .set({
-      renderedInput: compiledTemplates.renderedInput,
-      renderedConversationKey: compiledTemplates.renderedConversationKey,
-      renderedIdempotencyKey: compiledTemplates.renderedIdempotencyKey,
-      updatedAt: sql`now()`,
-    })
-    .where(eq(automationRuns.id, automationRun.id));
+  const claimedConversationId = await deps.db.transaction(async (tx) => {
+    const integrationFamilyId = await resolveAutomationConversationIntegrationFamilyId(tx, {
+      automationRunId: automationRun.id,
+      organizationId: automation.organizationId,
+      sandboxProfileId: automationTarget.sandboxProfileId,
+      sandboxProfileVersion,
+    });
+
+    const claimedConversation = await claimConversation(
+      {
+        db: tx,
+      },
+      {
+        organizationId: automation.organizationId,
+        ownerKind: ConversationOwnerKinds.AUTOMATION_TARGET,
+        ownerId: automationTarget.id,
+        createdByKind: ConversationCreatedByKinds.WEBHOOK,
+        createdById: webhookEvent.id,
+        conversationKey: compiledTemplates.renderedConversationKey,
+        sandboxProfileId: automationTarget.sandboxProfileId,
+        integrationFamilyId,
+        preview: compiledTemplates.renderedInput,
+      },
+    );
+
+    await tx
+      .update(automationRuns)
+      .set({
+        conversationId: claimedConversation.id,
+        renderedInput: compiledTemplates.renderedInput,
+        renderedConversationKey: compiledTemplates.renderedConversationKey,
+        renderedIdempotencyKey: compiledTemplates.renderedIdempotencyKey,
+        updatedAt: sql`now()`,
+      })
+      .where(eq(automationRuns.id, automationRun.id));
+
+    return claimedConversation.id;
+  });
 
   return {
     automationRunId: automationRun.id,
     automationRunCreatedAt: automationRun.createdAt,
     automationId: automationRun.automationId,
+    conversationId: claimedConversationId,
     automationTargetId: automationTarget.id,
     organizationId: automation.organizationId,
     sandboxProfileId: automationTarget.sandboxProfileId,
