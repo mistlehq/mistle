@@ -100,14 +100,70 @@ export const InteractiveEditing: Story = {
   play: async ({ canvasElement }): Promise<void> => {
     const canvas = within(canvasElement);
     const input = canvas.getByLabelText("Display name");
+    const saveButton = canvas.getByRole("button", { name: "Save" });
+    const cancelButton = canvas.getByRole("button", { name: "Cancel" });
+
+    await expect(saveButton).toBeDisabled();
+    await expect(cancelButton).toBeDisabled();
 
     await userEvent.clear(input);
     await userEvent.type(input, "Mistle Storybook");
-    await userEvent.click(canvas.getByRole("button", { name: "Save" }));
+    await expect(saveButton).toBeEnabled();
+    await expect(cancelButton).toBeEnabled();
+    await userEvent.click(saveButton);
     await expect(canvas.getByRole("button", { name: "Saved" })).toBeVisible();
     await userEvent.clear(input);
     await userEvent.type(input, "Mistle Storybook Draft");
-    await userEvent.click(canvas.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(cancelButton);
     await expect(canvas.getByDisplayValue("Mistle Developer")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Save" })).toBeDisabled();
+  },
+};
+
+export const SaveResetsSuccessState: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    const initialName = "Mistle Developer";
+    const [displayNameDraft, setDisplayNameDraft] = useState(initialName);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
+    const normalizedDisplayName = displayNameDraft.trim();
+    const displayName = normalizedDisplayName.length > 0 ? normalizedDisplayName : initialName;
+    const hasDirtyChanges = normalizedDisplayName !== initialName;
+
+    return (
+      <ProfileSettingsPageView
+        displayName={displayName}
+        displayNameDraft={displayNameDraft}
+        email="developer@mistle.so"
+        fieldError={null}
+        hasDirtyChanges={hasDirtyChanges}
+        onCancelChanges={() => {
+          setDisplayNameDraft(initialName);
+          setSaveSuccess(false);
+        }}
+        onDisplayNameChange={(nextValue) => {
+          setDisplayNameDraft(nextValue);
+          setSaveSuccess(false);
+        }}
+        onSaveChanges={() => {
+          setSaveSuccess(true);
+        }}
+        saveSuccess={saveSuccess}
+        saving={false}
+      />
+    );
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByLabelText("Display name");
+
+    await userEvent.clear(input);
+    await userEvent.type(input, "Saved Name");
+    await userEvent.click(canvas.getByRole("button", { name: "Save" }));
+    await expect(canvas.getByRole("button", { name: "Saved" })).toBeVisible();
+
+    await userEvent.type(input, " Updated");
+    await expect(canvas.getByRole("button", { name: "Save" })).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: "Saved" })).not.toBeInTheDocument();
   },
 };

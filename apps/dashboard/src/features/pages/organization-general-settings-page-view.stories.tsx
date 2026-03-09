@@ -123,14 +123,82 @@ export const InteractiveEditing: Story = {
   play: async ({ canvasElement }): Promise<void> => {
     const canvas = within(canvasElement);
     const input = canvas.getByLabelText("Organization name");
+    const saveButton = canvas.getByRole("button", { name: "Save" });
+    const cancelButton = canvas.getByRole("button", { name: "Cancel" });
+
+    await expect(saveButton).toBeDisabled();
+    await expect(cancelButton).toBeDisabled();
 
     await userEvent.clear(input);
     await userEvent.type(input, "Mistle Storybook Labs");
-    await userEvent.click(canvas.getByRole("button", { name: "Save" }));
+    await expect(saveButton).toBeEnabled();
+    await expect(cancelButton).toBeEnabled();
+    await userEvent.click(saveButton);
     await expect(canvas.getByRole("button", { name: "Saved" })).toBeVisible();
     await userEvent.clear(input);
     await userEvent.type(input, "Draft Labs");
-    await userEvent.click(canvas.getByRole("button", { name: "Cancel" }));
+    await userEvent.click(cancelButton);
     await expect(canvas.getByDisplayValue("Mistle Labs")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Save" })).toBeDisabled();
+  },
+};
+
+export const InteractiveRetryAndValidation: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    const initialName = "Mistle Labs";
+    const [isLoaded, setIsLoaded] = useState(false);
+    const [name, setName] = useState(initialName);
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
+    const normalizedName = name.trim();
+    const hasDirtyChanges = normalizedName !== initialName;
+    const nameErrorMessage = normalizedName.length === 0 ? "Organization name is required." : null;
+
+    return (
+      <OrganizationGeneralSettingsPageView
+        hasDirtyChanges={hasDirtyChanges}
+        isLoading={false}
+        isSaving={false}
+        loadErrorMessage={isLoaded ? null : "Could not load organization settings."}
+        name={name}
+        nameErrorMessage={nameErrorMessage}
+        onCancelChanges={() => {
+          setName(initialName);
+          setSaveSuccess(false);
+        }}
+        onNameChange={(nextValue) => {
+          setName(nextValue);
+          setSaveSuccess(false);
+        }}
+        onRetryLoad={() => {
+          setIsLoaded(true);
+        }}
+        onSaveChanges={() => {
+          setSaveSuccess(true);
+        }}
+        saveErrorMessage={null}
+        saveSuccess={saveSuccess}
+      />
+    );
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByText("Could not load organization settings.")).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+
+    const input = canvas.getByLabelText("Organization name");
+    const saveButton = canvas.getByRole("button", { name: "Save" });
+
+    await expect(input).toBeVisible();
+    await userEvent.clear(input);
+    await expect(canvas.getByText("Organization name is required.")).toBeVisible();
+    await expect(saveButton).toBeDisabled();
+
+    await userEvent.type(input, "Mistle Labs SG");
+    await expect(canvas.queryByText("Organization name is required.")).not.toBeInTheDocument();
+    await expect(saveButton).toBeEnabled();
+    await userEvent.click(saveButton);
+    await expect(canvas.getByRole("button", { name: "Saved" })).toBeVisible();
   },
 };
