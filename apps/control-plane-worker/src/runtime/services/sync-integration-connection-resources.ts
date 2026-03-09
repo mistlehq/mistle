@@ -344,20 +344,12 @@ function validateDiscoveredResources(
     }
   }
 
-  return parsedResources.map((resource) =>
-    resource.externalId === undefined
-      ? {
-          handle: resource.handle,
-          displayName: resource.displayName,
-          metadata: resource.metadata,
-        }
-      : {
-          externalId: resource.externalId,
-          handle: resource.handle,
-          displayName: resource.displayName,
-          metadata: resource.metadata,
-        },
-  );
+  return parsedResources.map((resource) => ({
+    ...(resource.externalId === undefined ? {} : { externalId: resource.externalId }),
+    handle: resource.handle,
+    displayName: resource.displayName,
+    metadata: resource.metadata,
+  }));
 }
 
 async function markResourceSyncing(input: {
