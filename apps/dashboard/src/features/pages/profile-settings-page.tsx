@@ -1,23 +1,12 @@
 import { systemScheduler } from "@mistle/time";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  Field,
-  FieldContent,
-  FieldError,
-  FieldLabel,
-  Input,
-} from "@mistle/ui";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-import { UserIdentitySummary } from "../account/user-identity-summary.js";
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { updateProfileDisplayName } from "../settings/profile/profile-service.js";
-import { SaveActions } from "../settings/save-actions.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
+import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
 export function ProfileSettingsPage(): React.JSX.Element {
   const queryClient = useQueryClient();
@@ -87,46 +76,17 @@ export function ProfileSettingsPage(): React.JSX.Element {
   const displayName = normalizedDisplayName.length > 0 ? normalizedDisplayName : session.user.email;
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader>
-          <UserIdentitySummary email={session.user.email} name={displayName} />
-        </CardHeader>
-      </Card>
-      <Card>
-        <CardContent className="gap-4 flex flex-col">
-          <p aria-live="polite" className="sr-only" role="status">
-            {saveSuccess ? "Personal settings updated." : ""}
-          </p>
-          <Field>
-            <FieldLabel htmlFor="display-name">Display name</FieldLabel>
-            <FieldContent>
-              <Input
-                id="display-name"
-                onChange={(event) => {
-                  handleDisplayNameChange(event.target.value);
-                }}
-                value={displayNameDraft}
-              />
-            </FieldContent>
-            {fieldError ? <FieldError errors={[{ message: fieldError }]} /> : null}
-          </Field>
-          <Field>
-            <FieldLabel>Email</FieldLabel>
-            <FieldContent>
-              <Input disabled readOnly value={session.user.email} />
-            </FieldContent>
-          </Field>
-          <SaveActions
-            cancelDisabled={!hasDirtyChanges || saveMutation.isPending}
-            onCancel={handleCancelChanges}
-            onSave={handleSaveChanges}
-            saveDisabled={!hasDirtyChanges || saveMutation.isPending}
-            saveSuccess={saveSuccess}
-            saving={saveMutation.isPending}
-          />
-        </CardContent>
-      </Card>
-    </div>
+    <ProfileSettingsPageView
+      displayName={displayName}
+      displayNameDraft={displayNameDraft}
+      email={session.user.email}
+      fieldError={fieldError}
+      hasDirtyChanges={hasDirtyChanges}
+      onCancelChanges={handleCancelChanges}
+      onDisplayNameChange={handleDisplayNameChange}
+      onSaveChanges={handleSaveChanges}
+      saveSuccess={saveSuccess}
+      saving={saveMutation.isPending}
+    />
   );
 }
