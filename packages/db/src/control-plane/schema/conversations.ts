@@ -1,6 +1,7 @@
 import { index, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
+import { integrationWebhookEvents } from "./integration-webhook-events.js";
 import { controlPlaneSchema } from "./namespace.js";
 import { organizations } from "./organizations.js";
 import { sandboxProfiles } from "./sandbox-profiles.js";
@@ -58,6 +59,13 @@ export const conversations = controlPlaneSchema.table(
     title: text("title"),
     preview: text("preview"),
     status: text("status").notNull().$type<ConversationStatus>(),
+    lastProcessedSourceOrderKey: text("last_processed_source_order_key"),
+    lastProcessedWebhookEventId: text("last_processed_webhook_event_id").references(
+      () => integrationWebhookEvents.id,
+      {
+        onDelete: "set null",
+      },
+    ),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .notNull()
       .defaultNow(),

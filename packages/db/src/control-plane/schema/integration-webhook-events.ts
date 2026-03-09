@@ -38,6 +38,8 @@ export const integrationWebhookEvents = controlPlaneSchema.table(
     eventType: text("event_type").notNull(),
     providerEventType: text("provider_event_type").notNull(),
     payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    sourceOccurredAt: timestamp("source_occurred_at", { withTimezone: true, mode: "string" }),
+    sourceOrderKey: text("source_order_key"),
     status: text("status")
       .notNull()
       .$type<IntegrationWebhookEventStatus>()
@@ -57,6 +59,7 @@ export const integrationWebhookEvents = controlPlaneSchema.table(
     index("integration_webhook_events_status_idx").on(table.status),
     index("integration_webhook_events_event_type_idx").on(table.eventType),
     index("integration_webhook_events_external_delivery_id_idx").on(table.externalDeliveryId),
+    index("integration_webhook_events_source_order_key_idx").on(table.sourceOrderKey),
   ],
 );
 

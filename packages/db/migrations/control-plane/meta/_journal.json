@@ -40,57 +40,8 @@
     {
       "idx": 5,
       "version": "7",
-      "when": 1772288521704,
-      "tag": "0005_add-integration-connections",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1772289380120,
-      "tag": "0006_add-profile-version-bindings",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1772292000637,
-      "tag": "0007_add-integration-oauth-sessions",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1772292045018,
-      "tag": "0008_add-integration-webhook-events",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1772292081688,
-      "tag": "0009_add-integration-conversation-routes",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1772294151232,
-      "tag": "0010_add-integration-targets",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1772596345814,
-      "tag": "0011_add-automations",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "7",
-      "when": 1772772287486,
-      "tag": "0012_add-integration-connection-display-name",
+      "when": 1773022873807,
+      "tag": "0005_add-integration-automation-conversation-foundation",
       "breakpoints": true
     }
   ]
