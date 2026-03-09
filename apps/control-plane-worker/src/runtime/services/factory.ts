@@ -1,5 +1,8 @@
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
-import { HandleAutomationRunWorkflowSpec } from "@mistle/workflows/control-plane";
+import {
+  HandleAutomationRunWorkflowSpec,
+  type HandleConversationDeliveryWorkflowInput,
+} from "@mistle/workflows/control-plane";
 
 import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
@@ -13,6 +16,7 @@ import {
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
 } from "./handle-automation-run.js";
+import { handleConversationDelivery } from "./handle-conversation-delivery.js";
 import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";
 import { startSandboxProfileInstance } from "./start-sandbox-profile-instance.js";
 import type {
@@ -89,6 +93,13 @@ export function createControlPlaneWorkerServices(
       },
       resolveAutomationRunFailure: ({ error }) => {
         return resolveAutomationRunFailure(error);
+      },
+    },
+    conversationDelivery: {
+      handleConversationDelivery: async (
+        workflowInput: HandleConversationDeliveryWorkflowInput,
+      ) => {
+        return handleConversationDelivery(workflowInput);
       },
     },
     integrationWebhooks: {
