@@ -125,9 +125,3 @@ export interface AgentRuntime {
   readonly metadata: AgentRuntimeMetadata;
   connect(input: AgentRuntimeConnectInput): Promise<ConnectedAgentRuntime>;
 }
-
-export function isAgentWebSocketTransport(
-  transport: AgentTransport,
-): transport is AgentWebSocketTransport {
-  return transport.kind === AgentTransportKinds.WEBSOCKET;
-}

@@ -1,6 +1,7 @@
 export { Agent } from "./agent.js";
 export type { AgentInput } from "./agent.js";
-export { AgentThreadStatuses, AgentTransportKinds, isAgentWebSocketTransport } from "./types.js";
+export { isAgentWebSocketTransport } from "./transport.js";
+export { AgentThreadStatuses, AgentTransportKinds } from "./types.js";
 export type {
   AgentInputItem,
   AgentInputTextItem,
