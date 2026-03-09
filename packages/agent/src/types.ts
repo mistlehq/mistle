@@ -1,5 +1,4 @@
 export const AgentTransportKinds = {
-  STDIO: "stdio",
   WEBSOCKET: "websocket",
 } as const;
 
@@ -12,15 +11,7 @@ export type AgentWebSocketTransport = {
   protocols?: readonly string[];
 };
 
-export type AgentStdioTransport = {
-  kind: typeof AgentTransportKinds.STDIO;
-  command: string;
-  args?: readonly string[];
-  cwd?: string;
-  env?: Readonly<Record<string, string>>;
-};
-
-export type AgentTransport = AgentWebSocketTransport | AgentStdioTransport;
+export type AgentTransport = AgentWebSocketTransport;
 
 export type AgentRuntimeInfo = {
   familyId: string;
@@ -127,8 +118,4 @@ export function isAgentWebSocketTransport(
   transport: AgentTransport,
 ): transport is AgentWebSocketTransport {
   return transport.kind === AgentTransportKinds.WEBSOCKET;
-}
-
-export function isAgentStdioTransport(transport: AgentTransport): transport is AgentStdioTransport {
-  return transport.kind === AgentTransportKinds.STDIO;
 }

@@ -13,7 +13,7 @@ This package currently establishes the shared contract only:
 - `Agent`
 - `AgentRuntime`
 - runtime metadata
-- transport specifications
+- websocket transport specification
 - thread and turn operation types
 
 Future PRs will connect runtime implementations and integration-owned runtime registration into this public interface.

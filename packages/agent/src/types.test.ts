@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  AgentThreadStatuses,
-  AgentTransportKinds,
-  isAgentStdioTransport,
-  isAgentWebSocketTransport,
-} from "./index.js";
+import { AgentThreadStatuses, AgentTransportKinds, isAgentWebSocketTransport } from "./index.js";
 
 describe("agent transport helpers", () => {
   it("identifies websocket transports", () => {
@@ -15,18 +10,6 @@ describe("agent transport helpers", () => {
     };
 
     expect(isAgentWebSocketTransport(transport)).toBe(true);
-    expect(isAgentStdioTransport(transport)).toBe(false);
-  });
-
-  it("identifies stdio transports", () => {
-    const transport = {
-      kind: AgentTransportKinds.STDIO,
-      command: "codex",
-      args: ["app-server"],
-    };
-
-    expect(isAgentStdioTransport(transport)).toBe(true);
-    expect(isAgentWebSocketTransport(transport)).toBe(false);
   });
 });
 
