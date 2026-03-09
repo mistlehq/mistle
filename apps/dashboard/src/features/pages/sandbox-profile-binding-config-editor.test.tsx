@@ -5,6 +5,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
+  resolveBindingConfigUiModel,
   SandboxProfileBindingConfigEditor,
   type IntegrationConnectionSummary,
   type IntegrationTargetSummary,
@@ -71,7 +72,7 @@ describe("SandboxProfileBindingConfigEditor", () => {
     expect(screen.getAllByText("*").length).toBe(2);
   });
 
-  it("renders GitHub binding config with packages/ui input widget", () => {
+  it("resolves GitHub binding config to a resource-backed repository widget", () => {
     const target: IntegrationTargetSummary = {
       targetKey: "target-github",
       displayName: "GitHub",
@@ -90,6 +91,15 @@ describe("SandboxProfileBindingConfigEditor", () => {
       displayName: "GitHub Production",
       targetKey: target.targetKey,
       status: "active",
+      resources: [
+        {
+          kind: "repository",
+          selectionMode: "multi",
+          count: 24,
+          syncState: "ready",
+          lastSyncedAt: "2026-03-09T12:00:00.000Z",
+        },
+      ],
       config: {
         auth_scheme: "oauth",
       },
@@ -101,15 +111,34 @@ describe("SandboxProfileBindingConfigEditor", () => {
       config: {},
     };
 
-    const { container } = renderBindingEditor({
+    const resolvedUiModel = resolveBindingConfigUiModel({
       row,
       connections: [connection],
       targets: [target],
     });
 
-    expect(screen.getByText("Repositories")).toBeDefined();
-    expect(screen.getByLabelText("Repositories")).toBeDefined();
-    expect(screen.getByPlaceholderText("owner/repository, owner/another-repository")).toBeDefined();
-    expect(container.querySelectorAll('[data-slot="input"]').length).toBe(1);
+    expect(resolvedUiModel).toMatchObject({
+      mode: "form",
+      uiSchema: {
+        repositories: {
+          "ui:widget": "integration-resource-string-array",
+          "ui:options": {
+            connectionId: "connection-github",
+            kind: "repository",
+            title: "Repositories",
+            searchPlaceholder: "Search repositories",
+            emptyMessage: "No repositories available for this connection.",
+            refreshLabel: "Refresh repositories",
+            resourceSummary: {
+              kind: "repository",
+              selectionMode: "multi",
+              count: 24,
+              syncState: "ready",
+              lastSyncedAt: "2026-03-09T12:00:00.000Z",
+            },
+          },
+        },
+      },
+    });
   });
 });

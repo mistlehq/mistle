@@ -4,7 +4,7 @@ import type {
   IntegrationKind,
 } from "@mistle/integrations-core";
 
-import { GitHubBindingConfigForm } from "../github/shared/binding-config-form.js";
+import { resolveGitHubBindingConfigForm } from "../github/shared/binding-config-form.js";
 import { GitHubCloudBindingConfigSchema } from "../github/variants/github-cloud/binding-config-schema.js";
 import { GitHubCloudTargetConfigSchema } from "../github/variants/github-cloud/target-config-schema.js";
 import { GitHubEnterpriseServerBindingConfigSchema } from "../github/variants/github-enterprise-server/binding-config-schema.js";
@@ -49,7 +49,7 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
     kind: "git",
     targetConfigSchema: GitHubCloudTargetConfigSchema,
     bindingConfigSchema: GitHubCloudBindingConfigSchema,
-    bindingConfigForm: GitHubBindingConfigForm,
+    bindingConfigForm: resolveGitHubBindingConfigForm,
   },
   {
     familyId: "github",
@@ -57,7 +57,7 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
     kind: "git",
     targetConfigSchema: GitHubEnterpriseServerTargetConfigSchema,
     bindingConfigSchema: GitHubEnterpriseServerBindingConfigSchema,
-    bindingConfigForm: GitHubBindingConfigForm,
+    bindingConfigForm: resolveGitHubBindingConfigForm,
   },
   {
     familyId: "openai",

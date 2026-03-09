@@ -14,6 +14,7 @@ import {
   SandboxProfilesNotFoundError,
 } from "./errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
+import { validateBindingResources } from "./validate-binding-resources.js";
 
 type PutProfileVersionIntegrationBindingsInput = {
   organizationId: string;
@@ -33,6 +34,20 @@ type PutProfileVersionIntegrationBindingsResult = {
 };
 
 const IntegrationRegistry = createIntegrationRegistry();
+
+function toRecord(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("Expected parsed binding config to be an object.");
+  }
+
+  const record: Record<string, unknown> = {};
+
+  for (const [key, entryValue] of Object.entries(value)) {
+    record[key] = entryValue;
+  }
+
+  return record;
+}
 
 function findDuplicateBindingId(
   bindings: PutProfileVersionIntegrationBindingsInput["bindings"],
@@ -173,6 +188,14 @@ export async function putProfileVersionIntegrationBindings(
     }
   }
 
+  const validatedBindings: Array<{
+    clientRef?: string;
+    bindingIdOrDraftIndex: string;
+    bindingConfig: Record<string, unknown>;
+    connectionId: string;
+    definition: ReturnType<typeof IntegrationRegistry.getDefinitionOrThrow>;
+  }> = [];
+
   for (const [bindingIndex, binding] of input.bindings.entries()) {
     const resolvedConnection = availableConnectionsById.get(binding.connectionId);
     if (resolvedConnection === undefined) {
@@ -237,6 +260,35 @@ export async function putProfileVersionIntegrationBindings(
         },
       );
     }
+
+    validatedBindings.push({
+      ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
+      bindingIdOrDraftIndex: binding.id ?? `draft:${String(bindingIndex)}`,
+      bindingConfig: toRecord(validationResult.parsed.bindingConfig),
+      connectionId: binding.connectionId,
+      definition,
+    });
+  }
+
+  const bindingResourceValidationResult = await validateBindingResources({
+    db,
+    bindings: validatedBindings,
+  });
+  if (!bindingResourceValidationResult.ok) {
+    const firstIssue = bindingResourceValidationResult.issues[0];
+    throw new SandboxProfilesIntegrationBindingsBadRequestError(
+      SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
+      `Binding '${firstIssue?.bindingIdOrDraftIndex ?? "unknown"}' has invalid config reference: ${firstIssue?.safeMessage ?? "Binding config is invalid."}`,
+      {
+        issues: bindingResourceValidationResult.issues.map((issue) => ({
+          ...(issue.clientRef === undefined ? {} : { clientRef: issue.clientRef }),
+          bindingIdOrDraftIndex: issue.bindingIdOrDraftIndex,
+          validatorCode: issue.validatorCode,
+          field: issue.field,
+          safeMessage: issue.safeMessage,
+        })),
+      },
+    );
   }
 
   return db.transaction(async (tx) => {

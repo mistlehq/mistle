@@ -25,7 +25,8 @@ export const GitHubResourceDefinitions: ReadonlyArray<IntegrationResourceDefinit
     kind: "repository",
     selectionMode: IntegrationResourceSelectionModes.MULTI,
     bindingField: "repositories",
-    displayName: "Repositories",
+    displayNameSingular: "repository",
+    displayNamePlural: "repositories",
     description: "GitHub repositories accessible to this connection.",
     credential: ({ connection }) => {
       const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(connection.config);

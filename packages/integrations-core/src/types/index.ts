@@ -66,6 +66,28 @@ export const IntegrationResourceSelectionModes: {
   MULTI: "multi",
 };
 
+export type IntegrationResourceSyncState = "never-synced" | "syncing" | "ready" | "error";
+
+export const IntegrationResourceSyncStates: {
+  NEVER_SYNCED: IntegrationResourceSyncState;
+  SYNCING: IntegrationResourceSyncState;
+  READY: IntegrationResourceSyncState;
+  ERROR: IntegrationResourceSyncState;
+} = {
+  NEVER_SYNCED: "never-synced",
+  SYNCING: "syncing",
+  READY: "ready",
+  ERROR: "error",
+};
+
+export type IntegrationFormConnectionResourceSummary = {
+  kind: string;
+  selectionMode: IntegrationResourceSelectionMode;
+  count: number;
+  syncState: IntegrationResourceSyncState;
+  lastSyncedAt?: string | undefined;
+};
+
 export type IntegrationResourceCredentialRef = {
   secretType: string;
   purpose?: string;
@@ -85,7 +107,8 @@ export type IntegrationResourceDefinition = {
   kind: string;
   selectionMode: IntegrationResourceSelectionMode;
   bindingField: string;
-  displayName: string;
+  displayNameSingular: string;
+  displayNamePlural: string;
   description?: string;
   credential?: IntegrationResourceCredentialRef | IntegrationResourceCredentialSelector;
 };
@@ -188,8 +211,10 @@ export type IntegrationFormContext<
     secrets?: TTargetSecrets;
   };
   connection?: {
+    id?: string;
     rawConfig: Record<string, unknown>;
     config: TConnectionConfig;
+    resources?: readonly IntegrationFormConnectionResourceSummary[];
   };
   currentValue?: Record<string, unknown>;
   parsedCurrentValue?: TBindingConfig;

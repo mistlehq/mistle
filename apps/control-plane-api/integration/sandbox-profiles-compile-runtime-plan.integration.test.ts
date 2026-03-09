@@ -8,6 +8,7 @@ import {
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
 import { IntegrationSupportedAuthSchemes } from "@mistle/integrations-core";
+import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
 import { compileProfileVersionRuntimePlan } from "../src/sandbox-profiles/services/compile-profile-version-runtime-plan.js";
@@ -26,6 +27,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     const authenticatedSession = await fixture.authSession({
       email: "integration-sandbox-profile-compile-success@example.com",
     });
+    const targetKey = "openai-default-compile-runtime-plan";
 
     await fixture.db.insert(sandboxProfiles).values({
       id: "sbp_compile_success",
@@ -40,19 +42,20 @@ describe("sandbox profile compile runtime plan integration", () => {
     await fixture.db
       .insert(integrationTargets)
       .values({
-        targetKey: "openai-default",
+        targetKey,
         familyId: "openai",
         variantId: "openai-default",
         enabled: true,
         config: {
           api_base_url: "https://api.openai.com/v1",
+          binding_capabilities: createOpenAiRawBindingCapabilities(),
         },
       })
       .onConflictDoNothing();
     await fixture.db.insert(integrationConnections).values({
       id: "icn_compile_success",
       organizationId: authenticatedSession.organizationId,
-      targetKey: "openai-default",
+      targetKey,
       displayName: "Compile Success Connection",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {

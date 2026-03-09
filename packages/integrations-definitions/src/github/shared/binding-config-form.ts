@@ -1,22 +1,61 @@
-import type { ResolvedIntegrationForm } from "@mistle/integrations-core";
+import type {
+  IntegrationFormConnectionResourceSummary,
+  IntegrationFormContext,
+  ResolvedIntegrationForm,
+} from "@mistle/integrations-core";
 
-export const GitHubBindingConfigForm: ResolvedIntegrationForm = {
-  schema: {
-    properties: {
+type GitHubBindingFormContext = IntegrationFormContext;
+
+function resolveRepositoryResourceSummary(
+  input: GitHubBindingFormContext,
+): IntegrationFormConnectionResourceSummary | undefined {
+  return input.connection?.resources?.find((resource) => resource.kind === "repository");
+}
+
+export function resolveGitHubBindingConfigForm(
+  input: GitHubBindingFormContext,
+): ResolvedIntegrationForm {
+  const connectionId = input.connection?.id;
+  if (connectionId === undefined) {
+    throw new Error("GitHub binding form requires connection context.");
+  }
+
+  const repositoryResourceSummary = resolveRepositoryResourceSummary(input);
+
+  return {
+    schema: {
+      properties: {
+        repositories: {
+          title: "Repositories",
+          default: [],
+        },
+      },
+    },
+    uiSchema: {
       repositories: {
-        title: "Repositories",
-        default: [],
+        "ui:widget": "integration-resource-string-array",
+        "ui:options": {
+          connectionId,
+          kind: "repository",
+          title: "Repositories",
+          searchPlaceholder: "Search repositories",
+          emptyMessage: "No repositories available for this connection.",
+          refreshLabel: "Refresh repositories",
+          ...(repositoryResourceSummary === undefined
+            ? {}
+            : {
+                resourceSummary: {
+                  kind: repositoryResourceSummary.kind,
+                  selectionMode: repositoryResourceSummary.selectionMode,
+                  count: repositoryResourceSummary.count,
+                  syncState: repositoryResourceSummary.syncState,
+                  ...(repositoryResourceSummary.lastSyncedAt === undefined
+                    ? {}
+                    : { lastSyncedAt: repositoryResourceSummary.lastSyncedAt }),
+                },
+              }),
+        },
       },
     },
-  },
-  uiSchema: {
-    repositories: {
-      "ui:widget": "comma-separated-string-array",
-      "ui:options": {
-        addLabel: "Repository",
-        delimiter: ",",
-        placeholder: "owner/repository, owner/another-repository",
-      },
-    },
-  },
-};
+  };
+}
