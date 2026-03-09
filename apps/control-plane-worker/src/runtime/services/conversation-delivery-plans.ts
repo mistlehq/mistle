@@ -18,7 +18,6 @@ export type ConversationDeliverySandboxAction =
 
 export function resolveConversationDeliverySandboxAction(input: {
   sandboxInstanceId: string | null;
-  providerConversationId: string | null;
   sandboxStatus: "starting" | "running" | "stopped" | "failed" | null;
 }): ConversationDeliverySandboxAction {
   if (input.sandboxInstanceId === null) {
@@ -27,11 +26,37 @@ export function resolveConversationDeliverySandboxAction(input: {
   if (input.sandboxStatus === "running") {
     return ConversationDeliverySandboxActions.REUSE_EXISTING;
   }
-  if (input.providerConversationId !== null) {
-    return ConversationDeliverySandboxActions.FAIL;
+
+  return ConversationDeliverySandboxActions.FAIL;
+}
+
+export const ConversationRouteBindingActions = {
+  CREATE_ROUTE: "create_route",
+  ACTIVATE_PENDING_ROUTE: "activate_pending_route",
+  REUSE_ACTIVE_ROUTE: "reuse_active_route",
+  FAIL_SANDBOX_MISMATCH: "fail_sandbox_mismatch",
+} as const;
+
+export type ConversationRouteBindingAction =
+  (typeof ConversationRouteBindingActions)[keyof typeof ConversationRouteBindingActions];
+
+export function resolveConversationRouteBindingAction(input: {
+  routeId: string | null;
+  routeSandboxInstanceId: string | null;
+  providerConversationId: string | null;
+  ensuredSandboxInstanceId: string;
+}): ConversationRouteBindingAction {
+  if (input.routeId === null) {
+    return ConversationRouteBindingActions.CREATE_ROUTE;
+  }
+  if (input.routeSandboxInstanceId !== input.ensuredSandboxInstanceId) {
+    return ConversationRouteBindingActions.FAIL_SANDBOX_MISMATCH;
+  }
+  if (input.providerConversationId === null) {
+    return ConversationRouteBindingActions.ACTIVATE_PENDING_ROUTE;
   }
 
-  return ConversationDeliverySandboxActions.START_NEW;
+  return ConversationRouteBindingActions.REUSE_ACTIVE_ROUTE;
 }
 
 export const ConversationExecutionActions = {
