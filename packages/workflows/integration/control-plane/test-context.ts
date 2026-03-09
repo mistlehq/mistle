@@ -139,10 +139,56 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
               },
             },
             conversationDelivery: {
-              handleConversationDelivery: async (input) => ({
-                conversationId: input.conversationId,
-                generation: input.generation,
+              claimOrResumeConversationDeliveryTask: async () => null,
+              idleConversationDeliveryProcessorIfEmpty: async () => true,
+              prepareAutomationRun: async () => ({
+                automationRunId: "aru_test",
+                automationRunCreatedAt: "2026-01-01T00:00:00.000Z",
+                organizationId: "org_test",
+                automationId: "atm_test",
+                automationTargetId: "atg_test",
+                sandboxProfileId: "sbp_test",
+                sandboxProfileVersion: 1,
+                integrationFamilyId: "openai",
+                webhookEventId: "iwe_test",
+                webhookEventType: "github.issue_comment.created",
+                webhookProviderEventType: "issue_comment",
+                webhookExternalEventId: "evt_test",
+                webhookExternalDeliveryId: "delivery_test",
+                webhookPayload: {},
+                renderedInput: "hello",
+                renderedConversationKey: "conversation-key",
+                renderedIdempotencyKey: null,
+                conversationId: "con_test",
+                webhookSourceOrderKey: "2026-01-01T00:00:00Z#0001",
               }),
+              ensureAutomationSandbox: async () => ({
+                sandboxInstanceId: "sbi_test",
+                startupWorkflowRunId: "wf_start_sandbox_test",
+              }),
+              acquireAutomationConnection: async () => ({
+                instanceId: "sbi_test",
+                url: "ws://127.0.0.1:0",
+                token: "token_test",
+                expiresAt: "2026-01-01T00:00:00.000Z",
+              }),
+              deliverAutomationPayload: async () => {},
+              markAutomationRunCompleted: async () => {},
+              markAutomationRunFailed: async () => {},
+              finalizeConversationDeliveryTask: async () => {},
+              resolveAutomationRunFailure: ({ error }) => {
+                if (error instanceof Error) {
+                  return {
+                    code: "automation_run_execution_failed",
+                    message: error.message,
+                  };
+                }
+
+                return {
+                  code: "automation_run_execution_failed",
+                  message: "Automation run execution failed with a non-error exception.",
+                };
+              },
             },
             integrationWebhooks: {
               handleWebhookEvent: async (input) => ({

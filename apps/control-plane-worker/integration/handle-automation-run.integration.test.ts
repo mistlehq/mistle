@@ -47,7 +47,18 @@ import {
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
 } from "../src/runtime/services/handle-automation-run.js";
-import { handleConversationDelivery } from "../src/runtime/services/handle-conversation-delivery.js";
+import {
+  acquireConversationDeliveryConnection,
+  claimOrResumeConversationDeliveryTask,
+  completeConversationDeliveryAutomationRun,
+  deliverConversationAutomationPayload,
+  ensureConversationDeliverySandbox,
+  failConversationDeliveryAutomationRun,
+  finalizeConversationDeliveryActiveTask,
+  idleConversationDeliveryProcessor,
+  prepareConversationDeliveryAutomationRun,
+  resolveAutomationRunFailure as resolveConversationDeliveryFailure,
+} from "../src/runtime/services/handle-conversation-delivery.js";
 import { it } from "./test-context.js";
 
 const TestTimeoutMs = 120_000;
@@ -301,31 +312,136 @@ describe("handleAutomationRun integration", () => {
         throw new Error("Expected persisted conversation delivery processor.");
       }
 
-      await handleConversationDelivery(
-        {
-          db: input.db,
-          startSandboxProfileInstance: async () => ({
-            workflowRunId: "wf_start_sandbox_test",
-            sandboxInstanceId: "sbi_test",
-          }),
-          getSandboxInstance: async () => ({
-            id: "sbi_test",
-            status: "running",
-            failureCode: null,
-            failureMessage: null,
-          }),
-          mintSandboxConnectionToken: async () => ({
-            instanceId: "sbi_test",
-            url: deliveryServer.url,
-            token: "connect_token_test",
-            expiresAt: "2026-03-09T00:00:30.000Z",
-          }),
-        },
-        {
-          conversationId: preparedAutomationRun.conversationId,
-          generation: persistedProcessor.generation,
-        },
-      );
+      while (true) {
+        const activeTask = await claimOrResumeConversationDeliveryTask(
+          {
+            db: input.db,
+          },
+          {
+            conversationId: preparedAutomationRun.conversationId,
+            generation: persistedProcessor.generation,
+          },
+        );
+
+        if (activeTask === null) {
+          const didIdleProcessor = await idleConversationDeliveryProcessor(
+            {
+              db: input.db,
+            },
+            {
+              conversationId: preparedAutomationRun.conversationId,
+              generation: persistedProcessor.generation,
+            },
+          );
+          if (didIdleProcessor) {
+            break;
+          }
+
+          continue;
+        }
+
+        try {
+          const preparedTaskRun = await prepareConversationDeliveryAutomationRun(
+            {
+              db: input.db,
+            },
+            {
+              automationRunId: activeTask.automationRunId,
+            },
+          );
+          const ensuredSandbox = await ensureConversationDeliverySandbox(
+            {
+              db: input.db,
+              startSandboxProfileInstance: async () => ({
+                workflowRunId: "wf_start_sandbox_test",
+                sandboxInstanceId: "sbi_test",
+              }),
+            },
+            {
+              preparedAutomationRun: preparedTaskRun,
+            },
+          );
+          const acquiredConnection = await acquireConversationDeliveryConnection(
+            {
+              getSandboxInstance: async () => ({
+                id: "sbi_test",
+                status: "running",
+                failureCode: null,
+                failureMessage: null,
+              }),
+              mintSandboxConnectionToken: async () => ({
+                instanceId: "sbi_test",
+                url: deliveryServer.url,
+                token: "connect_token_test",
+                expiresAt: "2026-03-09T00:00:30.000Z",
+              }),
+            },
+            {
+              preparedAutomationRun: preparedTaskRun,
+              ensuredAutomationSandbox: ensuredSandbox,
+            },
+          );
+
+          await deliverConversationAutomationPayload(
+            {
+              db: input.db,
+            },
+            {
+              taskId: activeTask.taskId,
+              generation: persistedProcessor.generation,
+              preparedAutomationRun: preparedTaskRun,
+              ensuredAutomationSandbox: ensuredSandbox,
+              acquiredAutomationConnection: acquiredConnection,
+            },
+          );
+
+          await completeConversationDeliveryAutomationRun(
+            {
+              db: input.db,
+            },
+            {
+              automationRunId: activeTask.automationRunId,
+            },
+          );
+
+          await finalizeConversationDeliveryActiveTask(
+            {
+              db: input.db,
+            },
+            {
+              taskId: activeTask.taskId,
+              generation: persistedProcessor.generation,
+              status: "completed",
+            },
+          );
+        } catch (error) {
+          const failure = resolveConversationDeliveryFailure({
+            error,
+          });
+          await failConversationDeliveryAutomationRun(
+            {
+              db: input.db,
+            },
+            {
+              automationRunId: activeTask.automationRunId,
+              failureCode: failure.code,
+              failureMessage: failure.message,
+            },
+          );
+          await finalizeConversationDeliveryActiveTask(
+            {
+              db: input.db,
+            },
+            {
+              taskId: activeTask.taskId,
+              generation: persistedProcessor.generation,
+              status: "failed",
+              failureCode: failure.code,
+              failureMessage: failure.message,
+            },
+          );
+        }
+      }
 
       await deliveryServer.payload;
     } catch (error) {

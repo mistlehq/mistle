@@ -20,7 +20,13 @@ export {
 } from "./workflows/handle-automation-run/index.js";
 export {
   createHandleConversationDeliveryWorkflow,
+  ActiveConversationDeliveryTaskStatuses,
+  type ActiveConversationDeliveryTask,
+  type ActiveConversationDeliveryTaskStatus,
+  type AcquiredAutomationConnection,
   type CreateHandleConversationDeliveryWorkflowInput,
+  type EnsuredAutomationSandbox,
+  type FinalConversationDeliveryTaskStatus,
   type HandleConversationDeliveryWorkflowInput,
   type HandleConversationDeliveryWorkflowOutput,
 } from "./workflows/handle-conversation-delivery/index.js";

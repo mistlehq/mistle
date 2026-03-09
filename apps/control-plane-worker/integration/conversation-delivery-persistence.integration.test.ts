@@ -5,6 +5,7 @@ import {
   automations,
   AutomationKinds,
   conversationDeliveryProcessors,
+  conversationDeliveryTasks,
   ConversationDeliveryProcessorStatuses,
   ConversationDeliveryTaskStatuses,
   ConversationCreatedByKinds,
@@ -35,6 +36,9 @@ import {
   ensureConversationDeliveryProcessor,
   enqueueConversationDeliveryTask,
   finalizeConversationDeliveryTask,
+  findActiveConversationDeliveryTask,
+  idleConversationDeliveryProcessorIfEmpty,
+  markConversationDeliveryTaskDelivering,
 } from "../src/runtime/conversations/index.js";
 import { it } from "./test-context.js";
 
@@ -378,7 +382,7 @@ describe("conversation delivery persistence integration", () => {
     }
   });
 
-  it("claims the next queued delivery task in source order and marks it processing", async ({
+  it("claims the next queued delivery task in source order and marks it claimed", async ({
     fixture,
   }) => {
     const database = await createTestDatabase({
@@ -446,12 +450,15 @@ describe("conversation delivery persistence integration", () => {
         { db: database.db },
         {
           conversationId: scope.conversationId,
+          generation: 3,
         },
       );
 
       expect(claimedTask?.id).toBe(secondTask.id);
-      expect(claimedTask?.status).toBe(ConversationDeliveryTaskStatuses.PROCESSING);
-      expect(claimedTask?.startedAt).not.toBeNull();
+      expect(claimedTask?.status).toBe(ConversationDeliveryTaskStatuses.CLAIMED);
+      expect(claimedTask?.processorGeneration).toBe(3);
+      expect(claimedTask?.attemptCount).toBe(1);
+      expect(claimedTask?.claimedAt).not.toBeNull();
 
       const persistedFirstTask = await database.db.query.conversationDeliveryTasks.findFirst({
         where: (table, { eq }) => eq(table.automationRunId, firstAutomationRunId),
@@ -462,7 +469,7 @@ describe("conversation delivery persistence integration", () => {
     }
   });
 
-  it("finalizes a processing delivery task with terminal status and timestamps", async ({
+  it("marks a claimed task delivering and then finalizes it with a terminal status", async ({
     fixture,
   }) => {
     const database = await createTestDatabase({
@@ -504,16 +511,29 @@ describe("conversation delivery persistence integration", () => {
         { db: database.db },
         {
           conversationId: scope.conversationId,
+          generation: 2,
         },
       );
       if (claimedTask === null) {
         throw new Error("Expected a claimed conversation delivery task.");
       }
 
-      const finalizedTask = await finalizeConversationDeliveryTask(
+      const deliveringTask = await markConversationDeliveryTaskDelivering(
         { db: database.db },
         {
           taskId: claimedTask.id,
+          generation: 2,
+        },
+      );
+
+      expect(deliveringTask.status).toBe(ConversationDeliveryTaskStatuses.DELIVERING);
+      expect(deliveringTask.deliveryStartedAt).not.toBeNull();
+
+      const finalizedTask = await finalizeConversationDeliveryTask(
+        { db: database.db },
+        {
+          taskId: deliveringTask.id,
+          generation: 2,
           status: ConversationDeliveryTaskStatuses.FAILED,
           failureCode: "delivery_failed",
           failureMessage: "Delivery failed for testing.",
@@ -529,13 +549,160 @@ describe("conversation delivery persistence integration", () => {
         finalizeConversationDeliveryTask(
           { db: database.db },
           {
-            taskId: claimedTask.id,
+            taskId: deliveringTask.id,
+            generation: 2,
             status: ConversationDeliveryTaskStatuses.COMPLETED,
           },
         ),
       ).rejects.toMatchObject({
-        code: ConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_PROCESSING,
+        code: ConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_ACTIVE,
       });
+    } finally {
+      await database.stop();
+    }
+  });
+
+  it("resumes the active task claimed by the current processor generation", async ({ fixture }) => {
+    const database = await createTestDatabase({
+      databaseUrl: fixture.config.workflow.databaseUrl,
+    });
+
+    try {
+      const scope = await seedConversationDeliveryScope({
+        db: database.db,
+        suffix: "resume-active",
+      });
+      const webhookEventId = await insertWebhookEvent({
+        db: database.db,
+        organizationId: scope.organizationId,
+        integrationConnectionId: scope.integrationConnectionId,
+        targetKey: scope.targetKey,
+        suffix: "resume-active",
+        sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+      });
+      const automationRunId = await insertAutomationRun({
+        db: database.db,
+        automationId: scope.automationId,
+        automationTargetId: scope.automationTargetId,
+        conversationId: scope.conversationId,
+        webhookEventId,
+        suffix: "resume-active",
+      });
+
+      const task = await enqueueConversationDeliveryTask(
+        { db: database.db },
+        {
+          conversationId: scope.conversationId,
+          automationRunId,
+          sourceWebhookEventId: webhookEventId,
+          sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+        },
+      );
+
+      await database.db
+        .update(conversationDeliveryTasks)
+        .set({
+          status: ConversationDeliveryTaskStatuses.CLAIMED,
+          processorGeneration: 7,
+          attemptCount: 1,
+          claimedAt: "2026-03-09T00:00:01.000Z",
+          updatedAt: "2026-03-09T00:00:01.000Z",
+        })
+        .where(eq(conversationDeliveryTasks.id, task.id));
+
+      const activeTask = await findActiveConversationDeliveryTask(
+        { db: database.db },
+        {
+          conversationId: scope.conversationId,
+          generation: 7,
+        },
+      );
+
+      expect(activeTask).toMatchObject({
+        id: task.id,
+        status: ConversationDeliveryTaskStatuses.CLAIMED,
+        processorGeneration: 7,
+      });
+    } finally {
+      await database.stop();
+    }
+  });
+
+  it("does not idle the processor while claimed or delivering tasks still exist", async ({
+    fixture,
+  }) => {
+    const database = await createTestDatabase({
+      databaseUrl: fixture.config.workflow.databaseUrl,
+    });
+
+    try {
+      const scope = await seedConversationDeliveryScope({
+        db: database.db,
+        suffix: "idle-active",
+      });
+      const webhookEventId = await insertWebhookEvent({
+        db: database.db,
+        organizationId: scope.organizationId,
+        integrationConnectionId: scope.integrationConnectionId,
+        targetKey: scope.targetKey,
+        suffix: "idle-active",
+        sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+      });
+      const automationRunId = await insertAutomationRun({
+        db: database.db,
+        automationId: scope.automationId,
+        automationTargetId: scope.automationTargetId,
+        conversationId: scope.conversationId,
+        webhookEventId,
+        suffix: "idle-active",
+      });
+
+      const task = await enqueueConversationDeliveryTask(
+        { db: database.db },
+        {
+          conversationId: scope.conversationId,
+          automationRunId,
+          sourceWebhookEventId: webhookEventId,
+          sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+        },
+      );
+
+      await database.db
+        .insert(conversationDeliveryProcessors)
+        .values({
+          conversationId: scope.conversationId,
+          generation: 4,
+          status: ConversationDeliveryProcessorStatuses.RUNNING,
+          activeWorkflowRunId: null,
+        })
+        .onConflictDoNothing();
+
+      await database.db
+        .update(conversationDeliveryTasks)
+        .set({
+          status: ConversationDeliveryTaskStatuses.DELIVERING,
+          processorGeneration: 4,
+          attemptCount: 1,
+          claimedAt: "2026-03-09T00:00:01.000Z",
+          deliveryStartedAt: "2026-03-09T00:00:02.000Z",
+          updatedAt: "2026-03-09T00:00:02.000Z",
+        })
+        .where(eq(conversationDeliveryTasks.id, task.id));
+
+      const didIdle = await idleConversationDeliveryProcessorIfEmpty(
+        { db: database.db },
+        {
+          conversationId: scope.conversationId,
+          generation: 4,
+        },
+      );
+
+      expect(didIdle).toBe(false);
+
+      const processor = await database.db.query.conversationDeliveryProcessors.findFirst({
+        where: (table, { eq }) => eq(table.conversationId, scope.conversationId),
+      });
+      expect(processor?.status).toBe(ConversationDeliveryProcessorStatuses.RUNNING);
     } finally {
       await database.stop();
     }

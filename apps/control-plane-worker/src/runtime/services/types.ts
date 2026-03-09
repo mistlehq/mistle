@@ -1,7 +1,11 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type {
+  ActiveConversationDeliveryTask,
+  AcquiredAutomationConnection,
   ControlPlaneWorkerServices,
+  EnsuredAutomationSandbox,
+  FinalConversationDeliveryTaskStatus,
   HandoffAutomationRunDeliveryInput,
   HandleAutomationRunWorkflowInput,
   HandleConversationDeliveryWorkflowInput,
@@ -59,6 +63,15 @@ export type HandleAutomationRunResolveFailureServiceOutput = {
 
 export type HandleConversationDeliveryServiceInput = HandleConversationDeliveryWorkflowInput;
 export type HandleConversationDeliveryServiceOutput = HandleConversationDeliveryWorkflowOutput;
+export type ClaimOrResumeConversationDeliveryTaskServiceOutput =
+  ActiveConversationDeliveryTask | null;
+export type FinalizeConversationDeliveryTaskServiceInput = {
+  taskId: string;
+  generation: number;
+  status: FinalConversationDeliveryTaskStatus;
+  failureCode?: string | null;
+  failureMessage?: string | null;
+};
 
 export type EnsureAutomationSandboxDependencies = {
   db: ControlPlaneDatabase;
@@ -81,10 +94,7 @@ export type EnsureAutomationSandboxServiceInput = {
   preparedAutomationRun: PreparedAutomationRun;
 };
 
-export type EnsureAutomationSandboxServiceOutput = {
-  sandboxInstanceId: string;
-  startupWorkflowRunId: string;
-};
+export type EnsureAutomationSandboxServiceOutput = EnsuredAutomationSandbox;
 
 export type AcquireAutomationConnectionDependencies = {
   getSandboxInstance: (input: { organizationId: string; instanceId: string }) => Promise<{
@@ -106,12 +116,7 @@ export type AcquireAutomationConnectionServiceInput = {
   ensuredAutomationSandbox: EnsureAutomationSandboxServiceOutput;
 };
 
-export type AcquireAutomationConnectionServiceOutput = {
-  instanceId: string;
-  url: string;
-  token: string;
-  expiresAt: string;
-};
+export type AcquireAutomationConnectionServiceOutput = AcquiredAutomationConnection;
 
 export type DeliverAutomationPayloadServiceInput = {
   preparedAutomationRun: PreparedAutomationRun;

@@ -3,7 +3,7 @@ import {
   ConversationDeliveryTaskStatuses,
   type ConversationDeliveryTaskStatus,
 } from "@mistle/db/control-plane";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 
 import { ConversationPersistenceError, ConversationPersistenceErrorCodes } from "./errors.js";
 import type { ConversationPersistenceDependencies } from "./types.js";
@@ -16,6 +16,7 @@ const FinalConversationDeliveryTaskStatuses = new Set<ConversationDeliveryTaskSt
 
 export type FinalizeConversationDeliveryTaskInput = {
   taskId: string;
+  generation: number;
   status: ConversationDeliveryTaskStatus;
   failureCode?: string | null;
   failureMessage?: string | null;
@@ -44,7 +45,11 @@ export async function finalizeConversationDeliveryTask(
     .where(
       and(
         eq(conversationDeliveryTasks.id, input.taskId),
-        eq(conversationDeliveryTasks.status, ConversationDeliveryTaskStatuses.PROCESSING),
+        eq(conversationDeliveryTasks.processorGeneration, input.generation),
+        or(
+          eq(conversationDeliveryTasks.status, ConversationDeliveryTaskStatuses.CLAIMED),
+          eq(conversationDeliveryTasks.status, ConversationDeliveryTaskStatuses.DELIVERING),
+        ),
       ),
     )
     .returning();
@@ -64,7 +69,7 @@ export async function finalizeConversationDeliveryTask(
   }
 
   throw new ConversationPersistenceError({
-    code: ConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_PROCESSING,
-    message: `Conversation delivery task '${input.taskId}' is not in processing status.`,
+    code: ConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_ACTIVE,
+    message: `Conversation delivery task '${input.taskId}' is not active for generation '${input.generation}'.`,
   });
 }

@@ -9,8 +9,11 @@ import type {
 } from "./workflows/handle-automation-run/index.js";
 import {
   createHandleConversationDeliveryWorkflow,
+  type ActiveConversationDeliveryTask,
+  type AcquiredAutomationConnection,
+  type EnsuredAutomationSandbox,
+  type FinalConversationDeliveryTaskStatus,
   type HandleConversationDeliveryWorkflowInput,
-  type HandleConversationDeliveryWorkflowOutput,
 } from "./workflows/handle-conversation-delivery/index.js";
 import { createHandleIntegrationWebhookEventWorkflow } from "./workflows/handle-integration-webhook-event/index.js";
 import type {
@@ -51,9 +54,41 @@ export type ControlPlaneWorkerServices = {
     resolveAutomationRunFailure: (input: { error: unknown }) => { code: string; message: string };
   };
   conversationDelivery?: {
-    handleConversationDelivery: (
+    claimOrResumeConversationDeliveryTask: (
       input: HandleConversationDeliveryWorkflowInput,
-    ) => Promise<HandleConversationDeliveryWorkflowOutput>;
+    ) => Promise<ActiveConversationDeliveryTask | null>;
+    idleConversationDeliveryProcessorIfEmpty: (
+      input: HandleConversationDeliveryWorkflowInput,
+    ) => Promise<boolean>;
+    prepareAutomationRun: (input: { automationRunId: string }) => Promise<PreparedAutomationRun>;
+    ensureAutomationSandbox: (input: {
+      preparedAutomationRun: PreparedAutomationRun;
+    }) => Promise<EnsuredAutomationSandbox>;
+    acquireAutomationConnection: (input: {
+      preparedAutomationRun: PreparedAutomationRun;
+      ensuredAutomationSandbox: EnsuredAutomationSandbox;
+    }) => Promise<AcquiredAutomationConnection>;
+    deliverAutomationPayload: (input: {
+      taskId: string;
+      generation: number;
+      preparedAutomationRun: PreparedAutomationRun;
+      ensuredAutomationSandbox: EnsuredAutomationSandbox;
+      acquiredAutomationConnection: AcquiredAutomationConnection;
+    }) => Promise<void>;
+    markAutomationRunCompleted: (input: { automationRunId: string }) => Promise<void>;
+    markAutomationRunFailed: (input: {
+      automationRunId: string;
+      failureCode: string;
+      failureMessage: string;
+    }) => Promise<void>;
+    finalizeConversationDeliveryTask: (input: {
+      taskId: string;
+      generation: number;
+      status: FinalConversationDeliveryTaskStatus;
+      failureCode?: string | null;
+      failureMessage?: string | null;
+    }) => Promise<void>;
+    resolveAutomationRunFailure: (input: { error: unknown }) => { code: string; message: string };
   };
   integrationWebhooks?: {
     handleWebhookEvent: (
@@ -125,7 +160,21 @@ export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): 
         );
       }
       const workflow = createHandleConversationDeliveryWorkflow({
-        handleConversationDelivery: input.services.conversationDelivery.handleConversationDelivery,
+        claimOrResumeConversationDeliveryTask:
+          input.services.conversationDelivery.claimOrResumeConversationDeliveryTask,
+        idleConversationDeliveryProcessorIfEmpty:
+          input.services.conversationDelivery.idleConversationDeliveryProcessorIfEmpty,
+        prepareAutomationRun: input.services.conversationDelivery.prepareAutomationRun,
+        ensureAutomationSandbox: input.services.conversationDelivery.ensureAutomationSandbox,
+        acquireAutomationConnection:
+          input.services.conversationDelivery.acquireAutomationConnection,
+        deliverAutomationPayload: input.services.conversationDelivery.deliverAutomationPayload,
+        markAutomationRunCompleted: input.services.conversationDelivery.markAutomationRunCompleted,
+        markAutomationRunFailed: input.services.conversationDelivery.markAutomationRunFailed,
+        finalizeConversationDeliveryTask:
+          input.services.conversationDelivery.finalizeConversationDeliveryTask,
+        resolveAutomationRunFailure:
+          input.services.conversationDelivery.resolveAutomationRunFailure,
       });
       input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
       continue;

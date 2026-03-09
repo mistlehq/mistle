@@ -8,6 +8,7 @@ import type { ConversationPersistenceDependencies } from "./types.js";
 
 export type ClaimNextConversationDeliveryTaskInput = {
   conversationId: string;
+  generation: number;
 };
 
 export async function claimNextConversationDeliveryTask(
@@ -34,8 +35,11 @@ export async function claimNextConversationDeliveryTask(
     const updatedRows = await tx
       .update(conversationDeliveryTasks)
       .set({
-        status: ConversationDeliveryTaskStatuses.PROCESSING,
-        startedAt: sql`now()`,
+        status: ConversationDeliveryTaskStatuses.CLAIMED,
+        processorGeneration: input.generation,
+        attemptCount: sql`${conversationDeliveryTasks.attemptCount} + 1`,
+        claimedAt: sql`now()`,
+        deliveryStartedAt: null,
         updatedAt: sql`now()`,
       })
       .where(

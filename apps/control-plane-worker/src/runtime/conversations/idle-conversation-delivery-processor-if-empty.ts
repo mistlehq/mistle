@@ -14,10 +14,14 @@ export async function idleConversationDeliveryProcessorIfEmpty(
 ): Promise<boolean> {
   return deps.db.transaction(async (tx) => {
     const queuedTask = await tx.query.conversationDeliveryTasks.findFirst({
-      where: (table, { and: whereAnd, eq: whereEq }) =>
+      where: (table, { and: whereAnd, eq: whereEq, or: whereOr }) =>
         whereAnd(
           whereEq(table.conversationId, input.conversationId),
-          whereEq(table.status, ConversationDeliveryTaskStatuses.QUEUED),
+          whereOr(
+            whereEq(table.status, ConversationDeliveryTaskStatuses.QUEUED),
+            whereEq(table.status, ConversationDeliveryTaskStatuses.CLAIMED),
+            whereEq(table.status, ConversationDeliveryTaskStatuses.DELIVERING),
+          ),
         ),
     });
     if (queuedTask !== undefined) {

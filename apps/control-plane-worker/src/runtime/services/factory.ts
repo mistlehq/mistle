@@ -14,7 +14,18 @@ import {
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
 } from "./handle-automation-run.js";
-import { handleConversationDelivery } from "./handle-conversation-delivery.js";
+import {
+  acquireConversationDeliveryConnection,
+  claimOrResumeConversationDeliveryTask,
+  completeConversationDeliveryAutomationRun,
+  deliverConversationAutomationPayload,
+  ensureConversationDeliverySandbox,
+  failConversationDeliveryAutomationRun,
+  finalizeConversationDeliveryActiveTask,
+  idleConversationDeliveryProcessor,
+  prepareConversationDeliveryAutomationRun,
+  resolveAutomationRunFailure as resolveConversationDeliveryFailure,
+} from "./handle-conversation-delivery.js";
 import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";
 import { startSandboxProfileInstance } from "./start-sandbox-profile-instance.js";
 import type {
@@ -82,21 +93,126 @@ export function createControlPlaneWorkerServices(
       },
     },
     conversationDelivery: {
-      handleConversationDelivery: async (
+      claimOrResumeConversationDeliveryTask: async (
         workflowInput: HandleConversationDeliveryWorkflowInput,
       ) => {
-        return handleConversationDelivery(
+        return claimOrResumeConversationDeliveryTask(
+          {
+            db: input.db,
+          },
+          workflowInput,
+        );
+      },
+      idleConversationDeliveryProcessorIfEmpty: async (
+        workflowInput: HandleConversationDeliveryWorkflowInput,
+      ) => {
+        return idleConversationDeliveryProcessor(
+          {
+            db: input.db,
+          },
+          workflowInput,
+        );
+      },
+      prepareAutomationRun: async ({ automationRunId }) => {
+        return prepareConversationDeliveryAutomationRun(
+          {
+            db: input.db,
+          },
+          {
+            automationRunId,
+          },
+        );
+      },
+      ensureAutomationSandbox: async ({ preparedAutomationRun }) => {
+        return ensureConversationDeliverySandbox(
           {
             db: input.db,
             startSandboxProfileInstance: (startInput) =>
               controlPlaneInternalClient.startSandboxProfileInstance(startInput),
+          },
+          {
+            preparedAutomationRun,
+          },
+        );
+      },
+      acquireAutomationConnection: async ({ preparedAutomationRun, ensuredAutomationSandbox }) => {
+        return acquireConversationDeliveryConnection(
+          {
             getSandboxInstance: (sandboxInput) =>
               controlPlaneInternalClient.getSandboxInstance(sandboxInput),
             mintSandboxConnectionToken: (mintInput) =>
               controlPlaneInternalClient.mintSandboxConnectionToken(mintInput),
           },
-          workflowInput,
+          {
+            preparedAutomationRun,
+            ensuredAutomationSandbox,
+          },
         );
+      },
+      deliverAutomationPayload: async ({
+        taskId,
+        generation,
+        preparedAutomationRun,
+        ensuredAutomationSandbox,
+        acquiredAutomationConnection,
+      }) => {
+        await deliverConversationAutomationPayload(
+          {
+            db: input.db,
+          },
+          {
+            taskId,
+            generation,
+            preparedAutomationRun,
+            ensuredAutomationSandbox,
+            acquiredAutomationConnection,
+          },
+        );
+      },
+      markAutomationRunCompleted: async ({ automationRunId }) => {
+        await completeConversationDeliveryAutomationRun(
+          {
+            db: input.db,
+          },
+          {
+            automationRunId,
+          },
+        );
+      },
+      markAutomationRunFailed: async ({ automationRunId, failureCode, failureMessage }) => {
+        await failConversationDeliveryAutomationRun(
+          {
+            db: input.db,
+          },
+          {
+            automationRunId,
+            failureCode,
+            failureMessage,
+          },
+        );
+      },
+      finalizeConversationDeliveryTask: async ({
+        taskId,
+        generation,
+        status,
+        failureCode,
+        failureMessage,
+      }) => {
+        await finalizeConversationDeliveryActiveTask(
+          {
+            db: input.db,
+          },
+          {
+            taskId,
+            generation,
+            status,
+            failureCode: failureCode ?? null,
+            failureMessage: failureMessage ?? null,
+          },
+        );
+      },
+      resolveAutomationRunFailure: ({ error }) => {
+        return resolveConversationDeliveryFailure(error);
       },
     },
     integrationWebhooks: {
