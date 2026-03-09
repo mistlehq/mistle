@@ -603,16 +603,45 @@ export type RuntimeClient = RuntimeClientBase<string>;
 
 export type CompileBindingEgressRoute = Omit<EgressCredentialRoute, "routeId" | "bindingId">;
 
+export type AgentRuntimeConversationProviderFamily = "codex";
+
+export const AgentRuntimeConversationProviderFamilies: {
+  CODEX: AgentRuntimeConversationProviderFamily;
+} = {
+  CODEX: "codex",
+};
+
+export type AgentRuntimeConversationCapability = {
+  providerFamily: AgentRuntimeConversationProviderFamily;
+};
+
+export type AgentRuntimeCapabilities = {
+  conversation?: AgentRuntimeConversationCapability;
+};
+
+export type CompileBindingAgentRuntime = {
+  runtimeKey: string;
+  clientId: string;
+  endpointKey: string;
+  capabilities: AgentRuntimeCapabilities;
+};
+
+export type CompiledAgentRuntime = CompileBindingAgentRuntime & {
+  bindingId: string;
+};
+
 export type CompileBindingResult = {
   egressRoutes: ReadonlyArray<CompileBindingEgressRoute>;
   artifacts: ReadonlyArray<RuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
+  agentRuntimes?: ReadonlyArray<CompileBindingAgentRuntime>;
 };
 
 export type CompiledBindingResult = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
+  agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
 };
 
 export type IntegrationMcpDefinitionValue =
@@ -794,6 +823,7 @@ export type CompiledRuntimePlan = {
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   artifactRemovals: ReadonlyArray<CompiledRuntimeArtifactRemovalSpec>;
   runtimeClients: ReadonlyArray<RuntimeClient>;
+  agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
 };
 
 export type IntegrationDefinitionLocator = {

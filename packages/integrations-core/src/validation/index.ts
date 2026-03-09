@@ -665,6 +665,73 @@ function validateRuntimeClients(input: ReadonlyArray<CompiledRuntimeClient>): vo
   }
 }
 
+function validateAgentRuntimes(input: {
+  compiledBindingResults: ReadonlyArray<CompiledBindingResult>;
+}): void {
+  for (const compiledBindingResult of input.compiledBindingResults) {
+    const endpointKeysByClientId = new Map<string, Set<string>>();
+    const runtimeKeys = new Set<string>();
+
+    for (const runtimeClient of compiledBindingResult.runtimeClients) {
+      let endpointKeys = endpointKeysByClientId.get(runtimeClient.clientId);
+      if (endpointKeys === undefined) {
+        endpointKeys = new Set<string>();
+        endpointKeysByClientId.set(runtimeClient.clientId, endpointKeys);
+      }
+
+      for (const endpoint of runtimeClient.endpoints) {
+        endpointKeys.add(endpoint.endpointKey);
+      }
+    }
+
+    for (const agentRuntime of compiledBindingResult.agentRuntimes) {
+      if (agentRuntime.runtimeKey.trim().length === 0) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+          `Agent runtime for binding '${agentRuntime.bindingId}' must define a non-empty runtimeKey.`,
+        );
+      }
+
+      if (runtimeKeys.has(agentRuntime.runtimeKey)) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+          `Duplicate agent runtime key '${agentRuntime.runtimeKey}' detected for binding '${agentRuntime.bindingId}'.`,
+        );
+      }
+      runtimeKeys.add(agentRuntime.runtimeKey);
+
+      if (agentRuntime.clientId.trim().length === 0) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+          `Agent runtime '${agentRuntime.runtimeKey}' for binding '${agentRuntime.bindingId}' must define a non-empty clientId.`,
+        );
+      }
+
+      const endpointKeys = endpointKeysByClientId.get(agentRuntime.clientId);
+      if (endpointKeys === undefined) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+          `Agent runtime '${agentRuntime.runtimeKey}' for binding '${agentRuntime.bindingId}' references missing runtime client '${agentRuntime.clientId}'.`,
+        );
+      }
+
+      if (agentRuntime.endpointKey.trim().length === 0) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+          `Agent runtime '${agentRuntime.runtimeKey}' for binding '${agentRuntime.bindingId}' must define a non-empty endpointKey.`,
+        );
+      }
+
+      if (!endpointKeys.has(agentRuntime.endpointKey)) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+          `Agent runtime '${agentRuntime.runtimeKey}' for binding '${agentRuntime.bindingId}' references missing endpoint '${agentRuntime.endpointKey}' on client '${agentRuntime.clientId}'.`,
+        );
+      }
+    }
+  }
+}
+
 export function validateCompiledBindingResults(input: {
   compiledBindingResults: ReadonlyArray<CompiledBindingResult>;
 }): void {
@@ -673,4 +740,7 @@ export function validateCompiledBindingResults(input: {
   validateRoutes(flattenedResults.egressRoutes);
   validateArtifacts(flattenedResults.artifacts);
   validateRuntimeClients(flattenedResults.runtimeClients);
+  validateAgentRuntimes({
+    compiledBindingResults: input.compiledBindingResults,
+  });
 }
