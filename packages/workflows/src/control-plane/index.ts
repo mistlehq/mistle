@@ -25,6 +25,7 @@ export {
   type ActiveConversationDeliveryTask,
   type ActiveConversationDeliveryTaskStatus,
   type AcquiredAutomationConnection,
+  type ConversationDeliveryTaskAction,
   type CreateHandleConversationDeliveryWorkflowInput,
   type EnsuredAutomationSandbox,
   type FinalConversationDeliveryTaskStatus,

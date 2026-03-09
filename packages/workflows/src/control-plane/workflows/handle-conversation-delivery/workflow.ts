@@ -34,11 +34,16 @@ export type AcquiredAutomationConnection = {
 };
 
 export type FinalConversationDeliveryTaskStatus = "completed" | "failed" | "ignored";
+export type ConversationDeliveryTaskAction = "deliver" | "ignore";
 
 export type CreateHandleConversationDeliveryWorkflowInput = {
   claimOrResumeConversationDeliveryTask: (
     input: HandleConversationDeliveryWorkflowInput,
   ) => Promise<ActiveConversationDeliveryTask | null>;
+  resolveConversationDeliveryTaskAction: (input: {
+    taskId: string;
+    generation: number;
+  }) => Promise<ConversationDeliveryTaskAction>;
   idleConversationDeliveryProcessorIfEmpty: (
     input: HandleConversationDeliveryWorkflowInput,
   ) => Promise<boolean>;
@@ -58,6 +63,7 @@ export type CreateHandleConversationDeliveryWorkflowInput = {
     acquiredAutomationConnection: AcquiredAutomationConnection;
   }) => Promise<void>;
   markAutomationRunCompleted: (input: { automationRunId: string }) => Promise<void>;
+  markAutomationRunIgnored: (input: { automationRunId: string }) => Promise<void>;
   markAutomationRunFailed: (input: {
     automationRunId: string;
     failureCode: string;
@@ -104,6 +110,53 @@ export function createHandleConversationDeliveryWorkflow(
             generation: input.generation,
           };
         }
+
+        iteration += 1;
+        continue;
+      }
+
+      const taskAction = await step.run(
+        {
+          name: getConversationDeliveryStepName({
+            prefix: "resolve-conversation-delivery-task-action",
+            taskId: activeTask.taskId,
+          }),
+        },
+        async () =>
+          ctx.resolveConversationDeliveryTaskAction({
+            taskId: activeTask.taskId,
+            generation: input.generation,
+          }),
+      );
+
+      if (taskAction === "ignore") {
+        await step.run(
+          {
+            name: getConversationDeliveryStepName({
+              prefix: "mark-automation-run-ignored",
+              taskId: activeTask.taskId,
+            }),
+          },
+          async () =>
+            ctx.markAutomationRunIgnored({
+              automationRunId: activeTask.automationRunId,
+            }),
+        );
+
+        await step.run(
+          {
+            name: getConversationDeliveryStepName({
+              prefix: "finalize-conversation-delivery-task-ignored",
+              taskId: activeTask.taskId,
+            }),
+          },
+          async () =>
+            ctx.finalizeConversationDeliveryTask({
+              taskId: activeTask.taskId,
+              generation: input.generation,
+              status: "ignored",
+            }),
+        );
 
         iteration += 1;
         continue;

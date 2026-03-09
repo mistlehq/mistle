@@ -140,6 +140,7 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
             },
             conversationDelivery: {
               claimOrResumeConversationDeliveryTask: async () => null,
+              resolveConversationDeliveryTaskAction: async () => "deliver",
               idleConversationDeliveryProcessorIfEmpty: async () => true,
               prepareAutomationRun: async () => ({
                 automationRunId: "aru_test",
@@ -174,6 +175,7 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
               }),
               deliverAutomationPayload: async () => {},
               markAutomationRunCompleted: async () => {},
+              markAutomationRunIgnored: async () => {},
               markAutomationRunFailed: async () => {},
               finalizeConversationDeliveryTask: async () => {},
               resolveAutomationRunFailure: ({ error }) => {

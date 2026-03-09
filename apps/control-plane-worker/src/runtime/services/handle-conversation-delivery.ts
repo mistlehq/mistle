@@ -8,6 +8,7 @@ import {
 } from "@mistle/workflows/control-plane";
 
 import {
+  ConversationDeliveryTaskActions,
   claimNextConversationDeliveryTask,
   ConversationPersistenceError,
   ConversationPersistenceErrorCodes,
@@ -15,12 +16,14 @@ import {
   findActiveConversationDeliveryTask,
   idleConversationDeliveryProcessorIfEmpty,
   markConversationDeliveryTaskDelivering,
+  resolveConversationDeliveryTaskAction,
 } from "../conversations/index.js";
 import {
   acquireAutomationConnection,
   deliverAutomationPayload,
   ensureAutomationSandbox,
   markAutomationRunCompleted,
+  markAutomationRunIgnored,
   markAutomationRunFailed,
   prepareAutomationRun,
   resolveAutomationRunFailure,
@@ -98,6 +101,21 @@ export async function idleConversationDeliveryProcessor(
   input: HandleConversationDeliveryWorkflowInput,
 ) {
   return idleConversationDeliveryProcessorIfEmpty(
+    {
+      db: deps.db,
+    },
+    input,
+  );
+}
+
+export async function resolveConversationDeliveryActiveTaskAction(
+  deps: Pick<HandleConversationDeliveryDependencies, "db">,
+  input: {
+    taskId: string;
+    generation: number;
+  },
+) {
+  return resolveConversationDeliveryTaskAction(
     {
       db: deps.db,
     },
@@ -221,6 +239,20 @@ export async function completeConversationDeliveryAutomationRun(
   );
 }
 
+export async function ignoreConversationDeliveryAutomationRun(
+  deps: Pick<HandleConversationDeliveryDependencies, "db">,
+  input: {
+    automationRunId: string;
+  },
+) {
+  await markAutomationRunIgnored(
+    {
+      db: deps.db,
+    },
+    input,
+  );
+}
+
 export async function failConversationDeliveryAutomationRun(
   deps: Pick<HandleConversationDeliveryDependencies, "db">,
   input: {
@@ -256,3 +288,4 @@ export async function finalizeConversationDeliveryActiveTask(
 }
 
 export { resolveAutomationRunFailure };
+export { ConversationDeliveryTaskActions };

@@ -87,6 +87,10 @@ export type MarkAutomationRunFailedInput = {
   failureMessage: string;
 };
 
+export type MarkAutomationRunIgnoredInput = {
+  automationRunId: string;
+};
+
 const TerminalAutomationRunStatuses = new Set<AutomationRunStatus>([
   AutomationRunStatuses.COMPLETED,
   AutomationRunStatuses.FAILED,
@@ -911,5 +915,51 @@ export async function markAutomationRunFailed(
   throw new AutomationRunExecutionError({
     code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
     message: `Automation run '${input.automationRunId}' could not be marked failed from status '${existingRun.status}'.`,
+  });
+}
+
+export async function markAutomationRunIgnored(
+  deps: HandleAutomationRunDependencies,
+  input: MarkAutomationRunIgnoredInput,
+): Promise<void> {
+  const updatedRows = await deps.db
+    .update(automationRuns)
+    .set({
+      status: AutomationRunStatuses.IGNORED,
+      failureCode: null,
+      failureMessage: null,
+      finishedAt: sql`now()`,
+      updatedAt: sql`now()`,
+    })
+    .where(
+      and(
+        eq(automationRuns.id, input.automationRunId),
+        eq(automationRuns.status, AutomationRunStatuses.RUNNING),
+      ),
+    )
+    .returning({
+      id: automationRuns.id,
+    });
+  if (updatedRows.length > 0) {
+    return;
+  }
+
+  const existingRun = await deps.db.query.automationRuns.findFirst({
+    where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
+  });
+  if (existingRun === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_NOT_FOUND,
+      message: `Automation run '${input.automationRunId}' was not found.`,
+    });
+  }
+
+  if (existingRun.status === AutomationRunStatuses.IGNORED) {
+    return;
+  }
+
+  throw new AutomationRunExecutionError({
+    code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+    message: `Automation run '${input.automationRunId}' could not be marked ignored from status '${existingRun.status}'.`,
   });
 }

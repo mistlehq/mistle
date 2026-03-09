@@ -9,6 +9,7 @@ import {
   ConversationDeliveryProcessorStatuses,
   ConversationDeliveryTaskStatuses,
   ConversationCreatedByKinds,
+  conversations,
   ConversationOwnerKinds,
   createControlPlaneDatabase,
   integrationConnections,
@@ -39,6 +40,7 @@ import {
   findActiveConversationDeliveryTask,
   idleConversationDeliveryProcessorIfEmpty,
   markConversationDeliveryTaskDelivering,
+  resolveConversationDeliveryTaskAction,
 } from "../src/runtime/conversations/index.js";
 import { it } from "./test-context.js";
 
@@ -557,6 +559,155 @@ describe("conversation delivery persistence integration", () => {
       ).rejects.toMatchObject({
         code: ConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_ACTIVE,
       });
+    } finally {
+      await database.stop();
+    }
+  });
+
+  it("updates the conversation high-water mark when a task completes", async ({ fixture }) => {
+    const database = await createTestDatabase({
+      databaseUrl: fixture.config.workflow.databaseUrl,
+    });
+
+    try {
+      const scope = await seedConversationDeliveryScope({
+        db: database.db,
+        suffix: "complete-high-water",
+      });
+      const webhookEventId = await insertWebhookEvent({
+        db: database.db,
+        organizationId: scope.organizationId,
+        integrationConnectionId: scope.integrationConnectionId,
+        targetKey: scope.targetKey,
+        suffix: "complete-high-water",
+        sourceOrderKey: "2026-03-09T00:00:00Z#0005",
+      });
+      const automationRunId = await insertAutomationRun({
+        db: database.db,
+        automationId: scope.automationId,
+        automationTargetId: scope.automationTargetId,
+        conversationId: scope.conversationId,
+        webhookEventId,
+        suffix: "complete-high-water",
+      });
+
+      await enqueueConversationDeliveryTask(
+        { db: database.db },
+        {
+          conversationId: scope.conversationId,
+          automationRunId,
+          sourceWebhookEventId: webhookEventId,
+          sourceOrderKey: "2026-03-09T00:00:00Z#0005",
+        },
+      );
+      const claimedTask = await claimNextConversationDeliveryTask(
+        { db: database.db },
+        {
+          conversationId: scope.conversationId,
+          generation: 9,
+        },
+      );
+      if (claimedTask === null) {
+        throw new Error("Expected a claimed conversation delivery task.");
+      }
+
+      await markConversationDeliveryTaskDelivering(
+        { db: database.db },
+        {
+          taskId: claimedTask.id,
+          generation: 9,
+        },
+      );
+
+      const completedTask = await finalizeConversationDeliveryTask(
+        { db: database.db },
+        {
+          taskId: claimedTask.id,
+          generation: 9,
+          status: ConversationDeliveryTaskStatuses.COMPLETED,
+        },
+      );
+      const conversation = await database.db.query.conversations.findFirst({
+        where: (table, { eq }) => eq(table.id, scope.conversationId),
+      });
+
+      expect(completedTask.status).toBe(ConversationDeliveryTaskStatuses.COMPLETED);
+      expect(conversation).toMatchObject({
+        id: scope.conversationId,
+        lastProcessedSourceOrderKey: "2026-03-09T00:00:00Z#0005",
+        lastProcessedWebhookEventId: webhookEventId,
+      });
+    } finally {
+      await database.stop();
+    }
+  });
+
+  it("returns ignore when a task is stale against the conversation high-water mark", async ({
+    fixture,
+  }) => {
+    const database = await createTestDatabase({
+      databaseUrl: fixture.config.workflow.databaseUrl,
+    });
+
+    try {
+      const scope = await seedConversationDeliveryScope({
+        db: database.db,
+        suffix: "stale-action",
+      });
+      const webhookEventId = await insertWebhookEvent({
+        db: database.db,
+        organizationId: scope.organizationId,
+        integrationConnectionId: scope.integrationConnectionId,
+        targetKey: scope.targetKey,
+        suffix: "stale-action",
+        sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+      });
+      const automationRunId = await insertAutomationRun({
+        db: database.db,
+        automationId: scope.automationId,
+        automationTargetId: scope.automationTargetId,
+        conversationId: scope.conversationId,
+        webhookEventId,
+        suffix: "stale-action",
+      });
+
+      await database.db
+        .update(conversations)
+        .set({
+          lastProcessedSourceOrderKey: "2026-03-09T00:00:00Z#0002",
+          lastProcessedWebhookEventId: webhookEventId,
+        })
+        .where(eq(conversations.id, scope.conversationId));
+
+      const task = await enqueueConversationDeliveryTask(
+        { db: database.db },
+        {
+          conversationId: scope.conversationId,
+          automationRunId,
+          sourceWebhookEventId: webhookEventId,
+          sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+        },
+      );
+      await database.db
+        .update(conversationDeliveryTasks)
+        .set({
+          status: ConversationDeliveryTaskStatuses.CLAIMED,
+          processorGeneration: 11,
+          attemptCount: 1,
+          claimedAt: "2026-03-09T00:00:01.000Z",
+          updatedAt: "2026-03-09T00:00:01.000Z",
+        })
+        .where(eq(conversationDeliveryTasks.id, task.id));
+
+      const action = await resolveConversationDeliveryTaskAction(
+        { db: database.db },
+        {
+          taskId: task.id,
+          generation: 11,
+        },
+      );
+
+      expect(action).toBe("ignore");
     } finally {
       await database.stop();
     }

@@ -29,6 +29,11 @@ export {
   type MarkConversationDeliveryTaskDeliveringInput,
 } from "./mark-conversation-delivery-task-delivering.js";
 export {
+  ConversationDeliveryTaskActions,
+  resolveConversationDeliveryTaskAction,
+  type ConversationDeliveryTaskAction,
+} from "./resolve-conversation-delivery-task-action.js";
+export {
   enqueueConversationDeliveryTask,
   type EnqueueConversationDeliveryTaskInput,
 } from "./enqueue-conversation-delivery-task.js";
