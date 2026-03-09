@@ -10,11 +10,9 @@ import {
   resolveOtpValidationError,
   type AuthStep,
 } from "./auth-flow.js";
-import { AuthPageShell, AuthPageWidths } from "./auth-page-shell.js";
 import { resolvePostLoginPath } from "./auth-redirect.js";
-import { EmailStage } from "./email-stage.js";
+import { AuthScreenView } from "./auth-screen-view.js";
 import { resolveErrorMessage } from "./messages.js";
-import { OtpStage } from "./otp-stage.js";
 
 export function AuthScreen(): React.JSX.Element {
   const queryClient = useQueryClient();
@@ -104,31 +102,19 @@ export function AuthScreen(): React.JSX.Element {
   }
 
   return (
-    <AuthPageShell
-      maxWidthClass={AuthPageWidths.SM}
-      title={authStep === "email" ? "Log in with email" : null}
-    >
-      {authStep === "email" ? (
-        <EmailStage
-          authError={authError}
-          email={email}
-          footerError={sessionQuery.isError ? sessionQuery.error.message : null}
-          isSendingOtp={isSendingOtp}
-          onEmailChange={setEmail}
-          onSubmit={handleSendOtp}
-        />
-      ) : (
-        <OtpStage
-          authError={authError}
-          email={email}
-          footerError={sessionQuery.isError ? sessionQuery.error.message : null}
-          isVerifyingOtp={isVerifyingOtp}
-          onOtpChange={setOtp}
-          onSubmit={handleVerifyOtp}
-          onUseDifferentEmail={handleUseDifferentEmail}
-          otp={otp}
-        />
-      )}
-    </AuthPageShell>
+    <AuthScreenView
+      authError={authError}
+      authStep={authStep}
+      email={email}
+      footerError={sessionQuery.isError ? sessionQuery.error.message : null}
+      isSendingOtp={isSendingOtp}
+      isVerifyingOtp={isVerifyingOtp}
+      onEmailChange={setEmail}
+      onOtpChange={setOtp}
+      onSendOtp={handleSendOtp}
+      onUseDifferentEmail={handleUseDifferentEmail}
+      onVerifyOtp={handleVerifyOtp}
+      otp={otp}
+    />
   );
 }

@@ -1,4 +1,5 @@
 import type { Decorator } from "@storybook/react-vite";
+import { MemoryRouter } from "react-router";
 
 export const withDashboardCenteredSurface: Decorator = (Story): React.JSX.Element => {
   return (
@@ -15,5 +16,13 @@ export const withDashboardPageWidth: Decorator = (Story): React.JSX.Element => {
     <div className="mx-auto w-full max-w-3xl px-4 py-6">
       <Story />
     </div>
+  );
+};
+
+export const withDashboardMemoryRouter: Decorator = (Story): React.JSX.Element => {
+  return (
+    <MemoryRouter>
+      <Story />
+    </MemoryRouter>
   );
 };
