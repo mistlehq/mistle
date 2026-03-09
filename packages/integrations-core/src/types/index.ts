@@ -66,12 +66,59 @@ export const IntegrationResourceSelectionModes: {
   MULTI: "multi",
 };
 
+export type IntegrationResourceCredentialRef = {
+  secretType: string;
+  purpose?: string;
+  resolverKey?: string;
+};
+
+export type IntegrationResourceCredentialSelectorInput = {
+  connection: IntegrationConnection;
+  kind: string;
+};
+
+export type IntegrationResourceCredentialSelector = (
+  input: IntegrationResourceCredentialSelectorInput,
+) => IntegrationResourceCredentialRef | undefined;
+
 export type IntegrationResourceDefinition = {
   kind: string;
   selectionMode: IntegrationResourceSelectionMode;
   bindingField: string;
   displayName: string;
   description?: string;
+  credential?: IntegrationResourceCredentialRef | IntegrationResourceCredentialSelector;
+};
+
+export type DiscoveredIntegrationResource = {
+  externalId?: string;
+  handle: string;
+  displayName: string;
+  metadata: Record<string, unknown>;
+};
+
+export type ListConnectionResourcesInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  kind: string;
+  credential?: IntegrationCredentialResolverResult;
+};
+
+export type ListConnectionResourcesResult = {
+  resources: ReadonlyArray<DiscoveredIntegrationResource>;
+};
+
+export type IntegrationResourceSyncTrigger = {
+  eventType: string;
+  resourceKinds: ReadonlyArray<string>;
 };
 
 export type IntegrationConfigSchema<TOutput> = z.ZodType<TOutput>;
@@ -743,6 +790,14 @@ export type IntegrationDefinition<
     Record<string, string>
   >;
   resourceDefinitions?: ReadonlyArray<IntegrationResourceDefinition>;
+  resourceSyncTriggers?: ReadonlyArray<IntegrationResourceSyncTrigger>;
+  listConnectionResources?(
+    input: ListConnectionResourcesInput<
+      ParsedSchemaOutput<TTargetConfigSchema>,
+      ParsedSchemaOutput<TTargetSecretsSchema>,
+      ParsedOptionalSchemaOutput<TConnectionConfigSchema>
+    >,
+  ): MaybePromise<ListConnectionResourcesResult>;
   mcp?: IntegrationMcpDefinition<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TBindingConfigSchema>,

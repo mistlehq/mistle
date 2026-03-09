@@ -5,6 +5,7 @@ import {
   IntegrationWebhookEventStatuses,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 import type {
   HandleIntegrationWebhookEventWorkflowInput,
   HandleIntegrationWebhookEventWorkflowOutput,
@@ -15,7 +16,13 @@ import { resolveWebhookAutomationTargets } from "./resolve-webhook-automation-ta
 
 type HandleIntegrationWebhookEventDependencies = {
   db: ControlPlaneDatabase;
+  integrationRegistry: IntegrationRegistry;
   enqueueAutomationRuns: (input: { automationRunIds: ReadonlyArray<string> }) => Promise<void>;
+  enqueueResourceSync: (input: {
+    organizationId: string;
+    connectionId: string;
+    kind: string;
+  }) => Promise<void>;
 };
 
 function isTerminalWebhookEventStatus(input: string): boolean {
@@ -39,6 +46,40 @@ async function updateWebhookEventStatus(input: {
       finalizedAt: input.finalized ? sql`now()` : null,
     })
     .where(eq(integrationWebhookEvents.id, input.webhookEventId));
+}
+
+async function resolveResourceSyncKindsForWebhookEvent(input: {
+  db: ControlPlaneDatabase;
+  integrationRegistry: IntegrationRegistry;
+  targetKey: string;
+  eventType: string;
+}): Promise<ReadonlyArray<string>> {
+  const target = await input.db.query.integrationTargets.findFirst({
+    columns: {
+      familyId: true,
+      variantId: true,
+    },
+    where: (table, { eq: whereEq }) => whereEq(table.targetKey, input.targetKey),
+  });
+  if (target === undefined) {
+    throw new Error(`Integration target '${input.targetKey}' was not found.`);
+  }
+
+  const definition = input.integrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+  if (definition === undefined) {
+    throw new Error(
+      `Integration definition '${target.familyId}::${target.variantId}' was not found.`,
+    );
+  }
+
+  const matchedTrigger = definition.resourceSyncTriggers?.find(
+    (trigger) => trigger.eventType === input.eventType,
+  );
+
+  return matchedTrigger?.resourceKinds ?? [];
 }
 
 export async function handleIntegrationWebhookEvent(
@@ -66,13 +107,27 @@ export async function handleIntegrationWebhookEvent(
       finalized: false,
     });
 
+    const resourceSyncKinds = await resolveResourceSyncKindsForWebhookEvent({
+      db: deps.db,
+      integrationRegistry: deps.integrationRegistry,
+      targetKey: webhookEvent.targetKey,
+      eventType: webhookEvent.eventType,
+    });
+    for (const kind of resourceSyncKinds) {
+      await deps.enqueueResourceSync({
+        organizationId: webhookEvent.organizationId,
+        connectionId: webhookEvent.integrationConnectionId,
+        kind,
+      });
+    }
+
     const resolvedTargets = await resolveWebhookAutomationTargets(deps.db, {
       organizationId: webhookEvent.organizationId,
       integrationConnectionId: webhookEvent.integrationConnectionId,
       eventType: webhookEvent.eventType,
       payload: webhookEvent.payload,
     });
-    if (resolvedTargets.length === 0) {
+    if (resolvedTargets.length === 0 && resourceSyncKinds.length === 0) {
       await updateWebhookEventStatus({
         db: deps.db,
         webhookEventId: input.webhookEventId,
@@ -85,40 +140,42 @@ export async function handleIntegrationWebhookEvent(
       };
     }
 
-    await deps.db
-      .insert(automationRuns)
-      .values(
-        resolvedTargets.map((resolvedTarget) => ({
-          automationId: resolvedTarget.automationId,
-          automationTargetId: resolvedTarget.automationTargetId,
-          sourceWebhookEventId: input.webhookEventId,
-          status: AutomationRunStatuses.QUEUED,
-        })),
-      )
-      .onConflictDoNothing({
-        target: [automationRuns.automationTargetId, automationRuns.sourceWebhookEventId],
-      });
+    if (resolvedTargets.length > 0) {
+      await deps.db
+        .insert(automationRuns)
+        .values(
+          resolvedTargets.map((resolvedTarget) => ({
+            automationId: resolvedTarget.automationId,
+            automationTargetId: resolvedTarget.automationTargetId,
+            sourceWebhookEventId: input.webhookEventId,
+            status: AutomationRunStatuses.QUEUED,
+          })),
+        )
+        .onConflictDoNothing({
+          target: [automationRuns.automationTargetId, automationRuns.sourceWebhookEventId],
+        });
 
-    const queuedAutomationRuns = await deps.db.query.automationRuns.findMany({
-      columns: {
-        id: true,
-      },
-      where: (table, { and: whereAnd, eq: whereEq, inArray: whereInArray }) =>
-        whereAnd(
-          whereEq(table.sourceWebhookEventId, input.webhookEventId),
-          whereEq(table.status, AutomationRunStatuses.QUEUED),
-          whereInArray(
-            table.automationTargetId,
-            resolvedTargets.map((target) => target.automationTargetId),
+      const queuedAutomationRuns = await deps.db.query.automationRuns.findMany({
+        columns: {
+          id: true,
+        },
+        where: (table, { and: whereAnd, eq: whereEq, inArray: whereInArray }) =>
+          whereAnd(
+            whereEq(table.sourceWebhookEventId, input.webhookEventId),
+            whereEq(table.status, AutomationRunStatuses.QUEUED),
+            whereInArray(
+              table.automationTargetId,
+              resolvedTargets.map((target) => target.automationTargetId),
+            ),
           ),
-        ),
-    });
-
-    const queuedAutomationRunIds = queuedAutomationRuns.map((queuedRun) => queuedRun.id);
-    if (queuedAutomationRunIds.length > 0) {
-      await deps.enqueueAutomationRuns({
-        automationRunIds: queuedAutomationRunIds,
       });
+
+      const queuedAutomationRunIds = queuedAutomationRuns.map((queuedRun) => queuedRun.id);
+      if (queuedAutomationRunIds.length > 0) {
+        await deps.enqueueAutomationRuns({
+          automationRunIds: queuedAutomationRunIds,
+        });
+      }
     }
 
     await updateWebhookEventStatus({

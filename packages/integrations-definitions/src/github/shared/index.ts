@@ -14,7 +14,9 @@ export { GitHubTargetSecretSchema, type GitHubTargetSecrets } from "./target-sec
 export { compileGitHubBinding, type GitHubCompileBindingInput } from "./compile-binding.js";
 export { GitHubBindingConfigForm } from "./binding-config-form.js";
 export { GitHubAppOAuthHandler } from "./oauth-handler.js";
+export { listGitHubConnectionResources } from "./list-connection-resources.js";
 export {
   GitHubAppInstallationCredentialResolver,
   GitHubCredentialResolverKeys,
 } from "./credential-resolver.js";
+export { GitHubResourceDefinitions, GitHubResourceSyncTriggers } from "./resource-definitions.js";

@@ -5,6 +5,7 @@ import { createAuthApp } from "../auth/app.js";
 import { createIntegrationConnectionsApp } from "../integration-connections/index.js";
 import { createIntegrationTargetsApp } from "../integration-targets/index.js";
 import { createIntegrationWebhooksApp } from "../integration-webhooks/index.js";
+import { createInternalIntegrationConnectionsApp } from "../internal-integration-connections/index.js";
 import { createInternalIntegrationCredentialsApp } from "../internal-integration-credentials/index.js";
 import { createInternalSandboxRuntimeApp } from "../internal-sandbox-runtime/index.js";
 import { createAppContextMiddleware } from "../middleware/app-context.js";
@@ -84,9 +85,11 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
 }
 
 export function registerInternalApiRouteModules(app: ControlPlaneApp): void {
+  const internalIntegrationConnectionsApp = createInternalIntegrationConnectionsApp();
   const internalIntegrationCredentialsApp = createInternalIntegrationCredentialsApp();
   const internalSandboxRuntimeApp = createInternalSandboxRuntimeApp();
 
+  app.route(internalIntegrationConnectionsApp.basePath, internalIntegrationConnectionsApp.routes);
   app.route(internalIntegrationCredentialsApp.basePath, internalIntegrationCredentialsApp.routes);
   app.route(internalSandboxRuntimeApp.basePath, internalSandboxRuntimeApp.routes);
 }

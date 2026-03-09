@@ -1,13 +1,18 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
+import { GitHubConnectionConfigSchema } from "../../shared/auth.js";
 import { GitHubBindingConfigForm } from "../../shared/binding-config-form.js";
 import { GitHubFamilyId } from "../../shared/constants.js";
 import {
   GitHubAppInstallationCredentialResolver,
   GitHubCredentialResolverKeys,
 } from "../../shared/credential-resolver.js";
+import { listGitHubConnectionResources } from "../../shared/list-connection-resources.js";
 import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
-import { GitHubResourceDefinitions } from "../../shared/resource-definitions.js";
+import {
+  GitHubResourceDefinitions,
+  GitHubResourceSyncTriggers,
+} from "../../shared/resource-definitions.js";
 import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
 import { GitHubEnterpriseServerSupportedAuthSchemes } from "./auth.js";
 import { GitHubEnterpriseServerBindingConfigSchema } from "./binding-config-schema.js";
@@ -18,7 +23,8 @@ import { GitHubEnterpriseServerWebhookHandler } from "./webhook.js";
 type GitHubEnterpriseServerIntegrationDefinition = IntegrationDefinition<
   typeof GitHubEnterpriseServerTargetConfigSchema,
   typeof GitHubTargetSecretSchema,
-  typeof GitHubEnterpriseServerBindingConfigSchema
+  typeof GitHubEnterpriseServerBindingConfigSchema,
+  typeof GitHubConnectionConfigSchema
 >;
 
 export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegrationDefinition = {
@@ -32,6 +38,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   targetSecretSchema: GitHubTargetSecretSchema,
   bindingConfigSchema: GitHubEnterpriseServerBindingConfigSchema,
   bindingConfigForm: GitHubBindingConfigForm,
+  connectionConfigSchema: GitHubConnectionConfigSchema,
   supportedAuthSchemes: GitHubEnterpriseServerSupportedAuthSchemes,
   credentialResolvers: {
     custom: {
@@ -44,5 +51,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   },
   webhookHandler: GitHubEnterpriseServerWebhookHandler,
   resourceDefinitions: GitHubResourceDefinitions,
+  resourceSyncTriggers: GitHubResourceSyncTriggers,
+  listConnectionResources: listGitHubConnectionResources,
   compileBinding: compileGitHubEnterpriseServerBinding,
 };

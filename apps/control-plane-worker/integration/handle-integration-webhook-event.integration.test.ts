@@ -22,6 +22,7 @@ import {
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
 import {
+  createIntegrationRegistry,
   createOpenAiRawBindingCapabilities,
   OpenAiApiKeyDefinition,
   OpenAiReasoningEfforts,
@@ -254,6 +255,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
         const workflowOutput = await handleIntegrationWebhookEvent(
           {
             db: database.db,
+            integrationRegistry: createIntegrationRegistry(),
             enqueueAutomationRuns: async ({ automationRunIds }) => {
               for (const automationRunId of automationRunIds) {
                 await executeHandleAutomationRunSteps({
@@ -262,6 +264,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
                 });
               }
             },
+            enqueueResourceSync: async () => {},
           },
           {
             webhookEventId,
@@ -359,7 +362,9 @@ describe("handleIntegrationWebhookEvent integration", () => {
         const workflowOutput = await handleIntegrationWebhookEvent(
           {
             db: database.db,
+            integrationRegistry: createIntegrationRegistry(),
             enqueueAutomationRuns: async () => {},
+            enqueueResourceSync: async () => {},
           },
           {
             webhookEventId,
@@ -379,6 +384,98 @@ describe("handleIntegrationWebhookEvent integration", () => {
         }
 
         expect(persistedEvent.status).toBe(IntegrationWebhookEventStatuses.IGNORED);
+        expect(persistedEvent.finalizedAt).toBeDefined();
+
+        const queuedRuns = await database.db.query.automationRuns.findMany({
+          where: (table, { eq }) => eq(table.sourceWebhookEventId, webhookEventId),
+        });
+        expect(queuedRuns).toHaveLength(0);
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "marks webhook event processed when a resource sync trigger matches without automation targets",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const organizationId = "org_worker_webhook_resource_sync";
+        const targetKey = "github-cloud-worker-webhook-resource-sync";
+        const connectionId = "icn_worker_webhook_resource_sync";
+        const webhookEventId = "iwe_worker_webhook_resource_sync";
+
+        await database.db.insert(organizations).values({
+          id: organizationId,
+          name: "Worker Resource Sync Org",
+          slug: "worker-resource-sync-org",
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey,
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: connectionId,
+          organizationId,
+          targetKey,
+          displayName: "Worker webhook connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "123456",
+          config: {},
+        });
+        await database.db.insert(integrationWebhookEvents).values({
+          id: webhookEventId,
+          organizationId,
+          integrationConnectionId: connectionId,
+          targetKey,
+          externalEventId: "evt_resource_sync",
+          externalDeliveryId: "delivery_resource_sync",
+          providerEventType: "installation_repositories",
+          eventType: "github.installation_repositories.added",
+          payload: {
+            installation: {
+              id: 12345,
+            },
+          },
+          status: IntegrationWebhookEventStatuses.RECEIVED,
+        });
+
+        const workflowOutput = await handleIntegrationWebhookEvent(
+          {
+            db: database.db,
+            integrationRegistry: createIntegrationRegistry(),
+            enqueueAutomationRuns: async () => {},
+            enqueueResourceSync: async () => {},
+          },
+          {
+            webhookEventId,
+          },
+        );
+
+        expect(workflowOutput).toEqual({
+          webhookEventId,
+        });
+
+        const persistedEvent = await database.db.query.integrationWebhookEvents.findFirst({
+          where: (table, { eq }) => eq(table.id, webhookEventId),
+        });
+        expect(persistedEvent).toBeDefined();
+        if (persistedEvent === undefined) {
+          throw new Error("Expected persisted webhook event.");
+        }
+
+        expect(persistedEvent.status).toBe(IntegrationWebhookEventStatuses.PROCESSED);
         expect(persistedEvent.finalizedAt).toBeDefined();
 
         const queuedRuns = await database.db.query.automationRuns.findMany({
