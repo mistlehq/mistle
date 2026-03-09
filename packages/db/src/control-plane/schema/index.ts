@@ -31,6 +31,20 @@ export {
   type IntegrationConnectionStatus,
 } from "./integration-connections.js";
 export {
+  conversationDeliveryProcessors,
+  ConversationDeliveryProcessorStatuses,
+  type ConversationDeliveryProcessor,
+  type ConversationDeliveryProcessorStatus,
+  type InsertConversationDeliveryProcessor,
+} from "./conversation-delivery-processors.js";
+export {
+  conversationDeliveryTasks,
+  ConversationDeliveryTaskStatuses,
+  type ConversationDeliveryTask,
+  type ConversationDeliveryTaskStatus,
+  type InsertConversationDeliveryTask,
+} from "./conversation-delivery-tasks.js";
+export {
   conversations,
   ConversationCreatedByKinds,
   ConversationOwnerKinds,
