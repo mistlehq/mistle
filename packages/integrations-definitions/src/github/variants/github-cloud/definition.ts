@@ -1,13 +1,18 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
+import { GitHubConnectionConfigSchema } from "../../shared/auth.js";
 import { GitHubBindingConfigForm } from "../../shared/binding-config-form.js";
 import { GitHubFamilyId } from "../../shared/constants.js";
 import {
   GitHubAppInstallationCredentialResolver,
   GitHubCredentialResolverKeys,
 } from "../../shared/credential-resolver.js";
+import { listGitHubConnectionResources } from "../../shared/list-connection-resources.js";
 import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
-import { GitHubResourceDefinitions } from "../../shared/resource-definitions.js";
+import {
+  GitHubResourceDefinitions,
+  GitHubResourceSyncTriggers,
+} from "../../shared/resource-definitions.js";
 import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
 import { GitHubCloudSupportedAuthSchemes } from "./auth.js";
 import { GitHubCloudBindingConfigSchema } from "./binding-config-schema.js";
@@ -18,7 +23,8 @@ import { GitHubCloudWebhookHandler } from "./webhook.js";
 type GitHubCloudIntegrationDefinition = IntegrationDefinition<
   typeof GitHubCloudTargetConfigSchema,
   typeof GitHubTargetSecretSchema,
-  typeof GitHubCloudBindingConfigSchema
+  typeof GitHubCloudBindingConfigSchema,
+  typeof GitHubConnectionConfigSchema
 >;
 
 export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
@@ -32,6 +38,7 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
   targetSecretSchema: GitHubTargetSecretSchema,
   bindingConfigSchema: GitHubCloudBindingConfigSchema,
   bindingConfigForm: GitHubBindingConfigForm,
+  connectionConfigSchema: GitHubConnectionConfigSchema,
   supportedAuthSchemes: GitHubCloudSupportedAuthSchemes,
   credentialResolvers: {
     custom: {
@@ -44,5 +51,7 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
   },
   webhookHandler: GitHubCloudWebhookHandler,
   resourceDefinitions: GitHubResourceDefinitions,
+  resourceSyncTriggers: GitHubResourceSyncTriggers,
+  listConnectionResources: listGitHubConnectionResources,
   compileBinding: compileGitHubCloudBinding,
 };

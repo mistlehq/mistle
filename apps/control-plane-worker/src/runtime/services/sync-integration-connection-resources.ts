@@ -7,9 +7,12 @@ import {
 } from "@mistle/db/control-plane";
 import type {
   AnyIntegrationDefinition,
+  DiscoveredIntegrationResource,
   IntegrationConnection,
-  IntegrationCredentialResolverResult,
+  IntegrationResourceCredentialRef,
   IntegrationResolvedTarget,
+  ListConnectionResourcesInput,
+  ListConnectionResourcesResult,
 } from "@mistle/integrations-core";
 import { eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -32,46 +35,6 @@ const DiscoveredIntegrationResourceSchema = z
     metadata: z.record(z.string(), z.unknown()),
   })
   .strict();
-
-type DiscoveredIntegrationResource = {
-  externalId?: string;
-  handle: string;
-  displayName: string;
-  metadata: Record<string, unknown>;
-};
-
-type ResourceSyncCredentialRequirement = {
-  secretType: string;
-  purpose?: string;
-  resolverKey?: string;
-};
-
-type IntegrationConnectionResourceDefinition = NonNullable<
-  AnyIntegrationDefinition["resourceDefinitions"]
->[number] & {
-  credential?: ResourceSyncCredentialRequirement;
-};
-
-type ListConnectionResourcesInput = {
-  organizationId: string;
-  targetKey: string;
-  target: IntegrationResolvedTarget<Record<string, unknown>, Record<string, string>>;
-  connection: IntegrationConnection & {
-    config: Record<string, unknown>;
-  };
-  kind: string;
-  credential?: IntegrationCredentialResolverResult;
-};
-
-type ListConnectionResourcesResult = {
-  resources: ReadonlyArray<DiscoveredIntegrationResource>;
-};
-
-type ResourceListingIntegrationDefinition = AnyIntegrationDefinition & {
-  listConnectionResources(
-    input: ListConnectionResourcesInput,
-  ): Promise<ListConnectionResourcesResult> | ListConnectionResourcesResult;
-};
 
 export async function syncIntegrationConnectionResources(
   deps: SyncIntegrationConnectionResourcesServiceDependencies,
@@ -174,9 +137,16 @@ export async function syncIntegrationConnectionResources(
           : definition.connectionConfigSchema.parse(connection.config ?? {}),
     });
     const resolvedCredential = await resolveResourceCredential({
-      connectionId: connection.id,
-      credential:
-        resourceDefinition.credential === undefined ? undefined : resourceDefinition.credential,
+      connection: {
+        id: connection.id,
+        status: connection.status,
+        ...(connection.externalSubjectId === null
+          ? {}
+          : { externalSubjectId: connection.externalSubjectId }),
+        config: parsedConnectionConfig,
+      },
+      kind: input.kind,
+      credential: resourceDefinition.credential,
       resolveIntegrationCredential: deps.resolveIntegrationCredential,
     });
 
@@ -232,13 +202,17 @@ export async function syncIntegrationConnectionResources(
 function findResourceDefinition(
   definition: AnyIntegrationDefinition,
   kind: string,
-): IntegrationConnectionResourceDefinition | undefined {
+): NonNullable<AnyIntegrationDefinition["resourceDefinitions"]>[number] | undefined {
   return definition.resourceDefinitions?.find((candidate) => candidate.kind === kind);
 }
 
 function hasListConnectionResources(
   definition: AnyIntegrationDefinition,
-): definition is ResourceListingIntegrationDefinition {
+): definition is AnyIntegrationDefinition & {
+  listConnectionResources(
+    input: ListConnectionResourcesInput,
+  ): Promise<ListConnectionResourcesResult> | ListConnectionResourcesResult;
+} {
   return (
     "listConnectionResources" in definition &&
     typeof definition.listConnectionResources === "function"
@@ -291,19 +265,25 @@ async function resolveTargetSecrets(input: {
 }
 
 async function resolveResourceCredential(input: {
-  connectionId: string;
+  connection: IntegrationConnection;
+  kind: string;
   credential:
-    | {
-        secretType: string;
-        purpose?: string;
-        resolverKey?: string;
-      }
+    | IntegrationResourceCredentialRef
+    | ((input: {
+        connection: IntegrationConnection;
+        kind: string;
+      }) => IntegrationResourceCredentialRef | undefined)
     | undefined;
   resolveIntegrationCredential:
     | SyncIntegrationConnectionResourcesServiceDependencies["resolveIntegrationCredential"]
     | undefined;
 }): Promise<ResolveResourceSyncCredentialOutput | undefined> {
-  if (input.credential === undefined) {
+  const credentialRequirement = resolveResourceCredentialRequirement({
+    connection: input.connection,
+    kind: input.kind,
+    credential: input.credential,
+  });
+  if (credentialRequirement === undefined) {
     return undefined;
   }
 
@@ -312,13 +292,40 @@ async function resolveResourceCredential(input: {
   }
 
   return input.resolveIntegrationCredential({
-    connectionId: input.connectionId,
-    secretType: input.credential.secretType,
-    ...(input.credential.purpose === undefined ? {} : { purpose: input.credential.purpose }),
-    ...(input.credential.resolverKey === undefined
+    connectionId: input.connection.id,
+    secretType: credentialRequirement.secretType,
+    ...(credentialRequirement.purpose === undefined
       ? {}
-      : { resolverKey: input.credential.resolverKey }),
+      : { purpose: credentialRequirement.purpose }),
+    ...(credentialRequirement.resolverKey === undefined
+      ? {}
+      : { resolverKey: credentialRequirement.resolverKey }),
   });
+}
+
+function resolveResourceCredentialRequirement(input: {
+  connection: IntegrationConnection;
+  kind: string;
+  credential:
+    | IntegrationResourceCredentialRef
+    | ((input: {
+        connection: IntegrationConnection;
+        kind: string;
+      }) => IntegrationResourceCredentialRef | undefined)
+    | undefined;
+}): IntegrationResourceCredentialRef | undefined {
+  if (input.credential === undefined) {
+    return undefined;
+  }
+
+  if (typeof input.credential === "function") {
+    return input.credential({
+      connection: input.connection,
+      kind: input.kind,
+    });
+  }
+
+  return input.credential;
 }
 
 function validateDiscoveredResources(

@@ -45,7 +45,7 @@ async function createTestDatabase(input: { databaseUrl: string }) {
 }
 
 describe("syncIntegrationConnectionResources integration", () => {
-  it("marks sync state as error and preserves the last snapshot when listing is not implemented", async ({
+  it("marks sync state as error and preserves the last snapshot when credential resolution is unavailable", async ({
     fixture,
   }) => {
     const database = await createTestDatabase({
@@ -121,7 +121,7 @@ describe("syncIntegrationConnectionResources integration", () => {
             kind: "repository",
           },
         ),
-      ).rejects.toThrow("does not implement resource listing");
+      ).rejects.toThrow("Resource sync credential resolution is not configured.");
 
       const persistedState = await database.db.query.integrationConnectionResourceStates.findFirst({
         where: (table, { and, eq }) =>
@@ -139,7 +139,9 @@ describe("syncIntegrationConnectionResources integration", () => {
       );
       expect(persistedState.lastSyncFinishedAt).toBeTruthy();
       expect(persistedState.lastErrorCode).toBe("resource_sync_failed");
-      expect(persistedState.lastErrorMessage).toContain("does not implement resource listing");
+      expect(persistedState.lastErrorMessage).toContain(
+        "Resource sync credential resolution is not configured.",
+      );
 
       const persistedResources = await database.db.query.integrationConnectionResources.findMany({
         where: (table, { and, eq }) =>
