@@ -1,4 +1,5 @@
 import {
+  conversations,
   conversationDeliveryTasks,
   ConversationDeliveryTaskStatuses,
   type ConversationDeliveryTaskStatus,
@@ -33,43 +34,57 @@ export async function finalizeConversationDeliveryTask(
     });
   }
 
-  const updatedRows = await deps.db
-    .update(conversationDeliveryTasks)
-    .set({
-      status: input.status,
-      failureCode: input.failureCode ?? null,
-      failureMessage: input.failureMessage ?? null,
-      finishedAt: sql`now()`,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(conversationDeliveryTasks.id, input.taskId),
-        eq(conversationDeliveryTasks.processorGeneration, input.generation),
-        or(
-          eq(conversationDeliveryTasks.status, ConversationDeliveryTaskStatuses.CLAIMED),
-          eq(conversationDeliveryTasks.status, ConversationDeliveryTaskStatuses.DELIVERING),
+  return deps.db.transaction(async (tx) => {
+    const updatedRows = await tx
+      .update(conversationDeliveryTasks)
+      .set({
+        status: input.status,
+        failureCode: input.failureCode ?? null,
+        failureMessage: input.failureMessage ?? null,
+        finishedAt: sql`now()`,
+        updatedAt: sql`now()`,
+      })
+      .where(
+        and(
+          eq(conversationDeliveryTasks.id, input.taskId),
+          eq(conversationDeliveryTasks.processorGeneration, input.generation),
+          or(
+            eq(conversationDeliveryTasks.status, ConversationDeliveryTaskStatuses.CLAIMED),
+            eq(conversationDeliveryTasks.status, ConversationDeliveryTaskStatuses.DELIVERING),
+          ),
         ),
-      ),
-    )
-    .returning();
-  const updatedTask = updatedRows[0];
-  if (updatedTask !== undefined) {
-    return updatedTask;
-  }
+      )
+      .returning();
+    const updatedTask = updatedRows[0];
+    if (updatedTask !== undefined) {
+      if (input.status === ConversationDeliveryTaskStatuses.COMPLETED) {
+        await tx
+          .update(conversations)
+          .set({
+            lastProcessedSourceOrderKey: updatedTask.sourceOrderKey,
+            lastProcessedWebhookEventId: updatedTask.sourceWebhookEventId,
+            updatedAt: sql`now()`,
+            lastActivityAt: sql`now()`,
+          })
+          .where(eq(conversations.id, updatedTask.conversationId));
+      }
 
-  const existingTask = await deps.db.query.conversationDeliveryTasks.findFirst({
-    where: (table, { eq }) => eq(table.id, input.taskId),
-  });
-  if (existingTask === undefined) {
-    throw new ConversationPersistenceError({
-      code: ConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_FOUND,
-      message: `Conversation delivery task '${input.taskId}' was not found.`,
+      return updatedTask;
+    }
+
+    const existingTask = await tx.query.conversationDeliveryTasks.findFirst({
+      where: (table, { eq }) => eq(table.id, input.taskId),
     });
-  }
+    if (existingTask === undefined) {
+      throw new ConversationPersistenceError({
+        code: ConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_FOUND,
+        message: `Conversation delivery task '${input.taskId}' was not found.`,
+      });
+    }
 
-  throw new ConversationPersistenceError({
-    code: ConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_ACTIVE,
-    message: `Conversation delivery task '${input.taskId}' is not active for generation '${input.generation}'.`,
+    throw new ConversationPersistenceError({
+      code: ConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_ACTIVE,
+      message: `Conversation delivery task '${input.taskId}' is not active for generation '${input.generation}'.`,
+    });
   });
 }

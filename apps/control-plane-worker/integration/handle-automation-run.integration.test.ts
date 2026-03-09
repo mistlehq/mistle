@@ -51,12 +51,15 @@ import {
   acquireConversationDeliveryConnection,
   claimOrResumeConversationDeliveryTask,
   completeConversationDeliveryAutomationRun,
+  ConversationDeliveryTaskActions,
   deliverConversationAutomationPayload,
   ensureConversationDeliverySandbox,
   failConversationDeliveryAutomationRun,
   finalizeConversationDeliveryActiveTask,
+  ignoreConversationDeliveryAutomationRun,
   idleConversationDeliveryProcessor,
   prepareConversationDeliveryAutomationRun,
+  resolveConversationDeliveryActiveTaskAction,
   resolveAutomationRunFailure as resolveConversationDeliveryFailure,
 } from "../src/runtime/services/handle-conversation-delivery.js";
 import { it } from "./test-context.js";
@@ -272,6 +275,7 @@ describe("handleAutomationRun integration", () => {
   async function executeHandleAutomationRunSteps(input: {
     db: ReturnType<typeof createControlPlaneDatabase>;
     automationRunId: string;
+    expectDelivery?: boolean;
   }) {
     const workflowInput: HandleAutomationRunWorkflowInput = {
       automationRunId: input.automationRunId,
@@ -337,6 +341,38 @@ describe("handleAutomationRun integration", () => {
             break;
           }
 
+          continue;
+        }
+
+        const taskAction = await resolveConversationDeliveryActiveTaskAction(
+          {
+            db: input.db,
+          },
+          {
+            taskId: activeTask.taskId,
+            generation: persistedProcessor.generation,
+          },
+        );
+
+        if (taskAction === ConversationDeliveryTaskActions.IGNORE) {
+          await ignoreConversationDeliveryAutomationRun(
+            {
+              db: input.db,
+            },
+            {
+              automationRunId: activeTask.automationRunId,
+            },
+          );
+          await finalizeConversationDeliveryActiveTask(
+            {
+              db: input.db,
+            },
+            {
+              taskId: activeTask.taskId,
+              generation: persistedProcessor.generation,
+              status: "ignored",
+            },
+          );
           continue;
         }
 
@@ -443,7 +479,9 @@ describe("handleAutomationRun integration", () => {
         }
       }
 
-      await deliveryServer.payload;
+      if (input.expectDelivery !== false) {
+        await deliveryServer.payload;
+      }
     } catch (error) {
       const failure = resolveAutomationRunFailure(error);
       await markAutomationRunFailed(
@@ -1075,6 +1113,195 @@ describe("handleAutomationRun integration", () => {
         expect(persistedProcessor).toMatchObject({
           conversationId: persistedRun.conversationId,
           status: ConversationDeliveryProcessorStatuses.IDLE,
+        });
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "marks older queued runs ignored after a newer run already advanced the conversation",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const organizationId = "org_worker_automation_run_ignore_stale";
+        const sandboxProfileId = "sbp_worker_automation_run_ignore_stale";
+        const automationId = "atm_worker_automation_run_ignore_stale";
+        const automationTargetId = "atg_worker_automation_run_ignore_stale";
+        const newerWebhookEventId = "iwe_worker_automation_run_ignore_stale_newer";
+        const olderWebhookEventId = "iwe_worker_automation_run_ignore_stale_older";
+        const newerAutomationRunId = "aru_worker_automation_run_ignore_stale_newer";
+        const olderAutomationRunId = "aru_worker_automation_run_ignore_stale_older";
+        const connectionId = "icn_worker_automation_run_ignore_stale";
+        const targetKey = "github-cloud-worker-automation-run-ignore-stale";
+
+        await database.db.insert(organizations).values({
+          id: organizationId,
+          name: "Worker Automation Ignore Stale",
+          slug: "worker-automation-ignore-stale",
+        });
+        await database.db.insert(sandboxProfiles).values({
+          id: sandboxProfileId,
+          organizationId,
+          displayName: "Automation Ignore Stale Profile",
+          status: "active",
+        });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+          suffix: "worker_automation_run_ignore_stale",
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey,
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: connectionId,
+          organizationId,
+          targetKey,
+          displayName: "Worker automation connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "123456",
+          config: {},
+        });
+        await database.db.insert(automations).values({
+          id: automationId,
+          organizationId,
+          kind: AutomationKinds.WEBHOOK,
+          name: "Automation Ignore Stale",
+          enabled: true,
+        });
+        await database.db.insert(webhookAutomations).values({
+          automationId,
+          integrationConnectionId: connectionId,
+          eventTypes: ["github.issue_comment.created"],
+          payloadFilter: null,
+          inputTemplate: "Handle {{payload.comment.body}}",
+          conversationKeyTemplate: "issue-{{payload.issue.number}}",
+          idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
+        });
+        await database.db.insert(automationTargets).values({
+          id: automationTargetId,
+          automationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+        });
+        await database.db.insert(integrationWebhookEvents).values([
+          {
+            id: newerWebhookEventId,
+            organizationId,
+            integrationConnectionId: connectionId,
+            targetKey,
+            externalEventId: "evt_ignore_stale_newer",
+            externalDeliveryId: "delivery_ignore_stale_newer",
+            sourceOccurredAt: "2026-03-09T00:00:02.000Z",
+            sourceOrderKey: "2026-03-09T00:00:02Z#0002",
+            providerEventType: "issue_comment",
+            eventType: "github.issue_comment.created",
+            payload: {
+              issue: {
+                number: 202,
+              },
+              comment: {
+                body: "@mistlebot newer",
+              },
+            },
+            status: IntegrationWebhookEventStatuses.PROCESSED,
+          },
+          {
+            id: olderWebhookEventId,
+            organizationId,
+            integrationConnectionId: connectionId,
+            targetKey,
+            externalEventId: "evt_ignore_stale_older",
+            externalDeliveryId: "delivery_ignore_stale_older",
+            sourceOccurredAt: "2026-03-09T00:00:01.000Z",
+            sourceOrderKey: "2026-03-09T00:00:01Z#0001",
+            providerEventType: "issue_comment",
+            eventType: "github.issue_comment.created",
+            payload: {
+              issue: {
+                number: 202,
+              },
+              comment: {
+                body: "@mistlebot older",
+              },
+            },
+            status: IntegrationWebhookEventStatuses.PROCESSED,
+          },
+        ]);
+        await database.db.insert(automationRuns).values([
+          {
+            id: newerAutomationRunId,
+            automationId,
+            automationTargetId,
+            sourceWebhookEventId: newerWebhookEventId,
+            status: AutomationRunStatuses.QUEUED,
+          },
+          {
+            id: olderAutomationRunId,
+            automationId,
+            automationTargetId,
+            sourceWebhookEventId: olderWebhookEventId,
+            status: AutomationRunStatuses.QUEUED,
+          },
+        ]);
+
+        await executeHandleAutomationRunSteps({
+          db: database.db,
+          automationRunId: newerAutomationRunId,
+        });
+        await executeHandleAutomationRunSteps({
+          db: database.db,
+          automationRunId: olderAutomationRunId,
+          expectDelivery: false,
+        });
+
+        const newerRun = await database.db.query.automationRuns.findFirst({
+          where: (table, { eq }) => eq(table.id, newerAutomationRunId),
+        });
+        const olderRun = await database.db.query.automationRuns.findFirst({
+          where: (table, { eq }) => eq(table.id, olderAutomationRunId),
+        });
+        const olderTask = await database.db.query.conversationDeliveryTasks.findFirst({
+          where: (table, { eq }) => eq(table.automationRunId, olderAutomationRunId),
+        });
+
+        expect(newerRun).toBeDefined();
+        expect(olderRun).toBeDefined();
+        if (newerRun === undefined || olderRun === undefined) {
+          throw new Error("Expected persisted automation runs.");
+        }
+
+        const conversation = await database.db.query.conversations.findFirst({
+          where: (table, { eq }) => eq(table.id, newerRun.conversationId ?? ""),
+        });
+
+        expect(newerRun.status).toBe(AutomationRunStatuses.COMPLETED);
+        expect(olderRun.status).toBe(AutomationRunStatuses.IGNORED);
+        expect(olderTask).toMatchObject({
+          automationRunId: olderAutomationRunId,
+          status: ConversationDeliveryTaskStatuses.IGNORED,
+          failureCode: null,
+          failureMessage: null,
+        });
+        expect(conversation).toMatchObject({
+          id: newerRun.conversationId,
+          lastProcessedSourceOrderKey: "2026-03-09T00:00:02Z#0002",
+          lastProcessedWebhookEventId: newerWebhookEventId,
         });
       } finally {
         await database.stop();

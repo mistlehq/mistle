@@ -23,8 +23,10 @@ import {
   ensureConversationDeliverySandbox,
   failConversationDeliveryAutomationRun,
   finalizeConversationDeliveryActiveTask,
+  ignoreConversationDeliveryAutomationRun,
   idleConversationDeliveryProcessor,
   prepareConversationDeliveryAutomationRun,
+  resolveConversationDeliveryActiveTaskAction,
   resolveAutomationRunFailure as resolveConversationDeliveryFailure,
 } from "./handle-conversation-delivery.js";
 import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";
@@ -106,6 +108,17 @@ export function createControlPlaneWorkerServices(
           workflowInput,
         );
       },
+      resolveConversationDeliveryTaskAction: async ({ taskId, generation }) => {
+        return resolveConversationDeliveryActiveTaskAction(
+          {
+            db: input.db,
+          },
+          {
+            taskId,
+            generation,
+          },
+        );
+      },
       idleConversationDeliveryProcessorIfEmpty: async (
         workflowInput: HandleConversationDeliveryWorkflowInput,
       ) => {
@@ -174,6 +187,16 @@ export function createControlPlaneWorkerServices(
       },
       markAutomationRunCompleted: async ({ automationRunId }) => {
         await completeConversationDeliveryAutomationRun(
+          {
+            db: input.db,
+          },
+          {
+            automationRunId,
+          },
+        );
+      },
+      markAutomationRunIgnored: async ({ automationRunId }) => {
+        await ignoreConversationDeliveryAutomationRun(
           {
             db: input.db,
           },

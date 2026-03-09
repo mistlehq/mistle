@@ -11,6 +11,7 @@ import {
   createHandleConversationDeliveryWorkflow,
   type ActiveConversationDeliveryTask,
   type AcquiredAutomationConnection,
+  type ConversationDeliveryTaskAction,
   type EnsuredAutomationSandbox,
   type FinalConversationDeliveryTaskStatus,
   type HandleConversationDeliveryWorkflowInput,
@@ -62,6 +63,10 @@ export type ControlPlaneWorkerServices = {
     claimOrResumeConversationDeliveryTask: (
       input: HandleConversationDeliveryWorkflowInput,
     ) => Promise<ActiveConversationDeliveryTask | null>;
+    resolveConversationDeliveryTaskAction: (input: {
+      taskId: string;
+      generation: number;
+    }) => Promise<ConversationDeliveryTaskAction>;
     idleConversationDeliveryProcessorIfEmpty: (
       input: HandleConversationDeliveryWorkflowInput,
     ) => Promise<boolean>;
@@ -81,6 +86,7 @@ export type ControlPlaneWorkerServices = {
       acquiredAutomationConnection: AcquiredAutomationConnection;
     }) => Promise<void>;
     markAutomationRunCompleted: (input: { automationRunId: string }) => Promise<void>;
+    markAutomationRunIgnored: (input: { automationRunId: string }) => Promise<void>;
     markAutomationRunFailed: (input: {
       automationRunId: string;
       failureCode: string;
@@ -173,6 +179,8 @@ export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): 
       const workflow = createHandleConversationDeliveryWorkflow({
         claimOrResumeConversationDeliveryTask:
           input.services.conversationDelivery.claimOrResumeConversationDeliveryTask,
+        resolveConversationDeliveryTaskAction:
+          input.services.conversationDelivery.resolveConversationDeliveryTaskAction,
         idleConversationDeliveryProcessorIfEmpty:
           input.services.conversationDelivery.idleConversationDeliveryProcessorIfEmpty,
         prepareAutomationRun: input.services.conversationDelivery.prepareAutomationRun,
@@ -181,6 +189,7 @@ export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): 
           input.services.conversationDelivery.acquireAutomationConnection,
         deliverAutomationPayload: input.services.conversationDelivery.deliverAutomationPayload,
         markAutomationRunCompleted: input.services.conversationDelivery.markAutomationRunCompleted,
+        markAutomationRunIgnored: input.services.conversationDelivery.markAutomationRunIgnored,
         markAutomationRunFailed: input.services.conversationDelivery.markAutomationRunFailed,
         finalizeConversationDeliveryTask:
           input.services.conversationDelivery.finalizeConversationDeliveryTask,

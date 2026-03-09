@@ -4,6 +4,7 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import type {
   ActiveConversationDeliveryTask,
   AcquiredAutomationConnection,
+  ConversationDeliveryTaskAction,
   ControlPlaneWorkerServices,
   EnsuredAutomationSandbox,
   FinalConversationDeliveryTaskStatus,
@@ -68,6 +69,7 @@ export type HandleConversationDeliveryServiceInput = HandleConversationDeliveryW
 export type HandleConversationDeliveryServiceOutput = HandleConversationDeliveryWorkflowOutput;
 export type ClaimOrResumeConversationDeliveryTaskServiceOutput =
   ActiveConversationDeliveryTask | null;
+export type ResolveConversationDeliveryTaskActionServiceOutput = ConversationDeliveryTaskAction;
 export type FinalizeConversationDeliveryTaskServiceInput = {
   taskId: string;
   generation: number;
