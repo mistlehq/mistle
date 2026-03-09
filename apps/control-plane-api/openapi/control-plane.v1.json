@@ -88,6 +88,36 @@
                             "type": "object",
                             "additionalProperties": {}
                           },
+                          "resources": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "kind": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "selectionMode": {
+                                  "type": "string",
+                                  "enum": ["single", "multi"]
+                                },
+                                "count": {
+                                  "type": "integer",
+                                  "minimum": 0
+                                },
+                                "syncState": {
+                                  "type": "string",
+                                  "enum": ["never-synced", "syncing", "ready", "error"]
+                                },
+                                "lastSyncedAt": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["kind", "selectionMode", "count", "syncState"],
+                              "additionalProperties": false
+                            }
+                          },
                           "createdAt": {
                             "type": "string",
                             "minLength": 1
@@ -343,6 +373,36 @@
                       "type": "object",
                       "additionalProperties": {}
                     },
+                    "resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "selectionMode": {
+                            "type": "string",
+                            "enum": ["single", "multi"]
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "syncState": {
+                            "type": "string",
+                            "enum": ["never-synced", "syncing", "ready", "error"]
+                          },
+                          "lastSyncedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": ["kind", "selectionMode", "count", "syncState"],
+                        "additionalProperties": false
+                      }
+                    },
                     "createdAt": {
                       "type": "string",
                       "minLength": 1
@@ -583,6 +643,36 @@
                     "targetSnapshotConfig": {
                       "type": "object",
                       "additionalProperties": {}
+                    },
+                    "resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "selectionMode": {
+                            "type": "string",
+                            "enum": ["single", "multi"]
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "syncState": {
+                            "type": "string",
+                            "enum": ["never-synced", "syncing", "ready", "error"]
+                          },
+                          "lastSyncedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": ["kind", "selectionMode", "count", "syncState"],
+                        "additionalProperties": false
+                      }
                     },
                     "createdAt": {
                       "type": "string",
@@ -1017,6 +1107,36 @@
                     "targetSnapshotConfig": {
                       "type": "object",
                       "additionalProperties": {}
+                    },
+                    "resources": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "selectionMode": {
+                            "type": "string",
+                            "enum": ["single", "multi"]
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "syncState": {
+                            "type": "string",
+                            "enum": ["never-synced", "syncing", "ready", "error"]
+                          },
+                          "lastSyncedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": ["kind", "selectionMode", "count", "syncState"],
+                        "additionalProperties": false
+                      }
                     },
                     "createdAt": {
                       "type": "string",

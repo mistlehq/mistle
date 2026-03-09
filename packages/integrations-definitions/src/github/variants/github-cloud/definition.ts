@@ -7,6 +7,7 @@ import {
   GitHubCredentialResolverKeys,
 } from "../../shared/credential-resolver.js";
 import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
+import { GitHubResourceDefinitions } from "../../shared/resource-definitions.js";
 import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
 import { GitHubCloudSupportedAuthSchemes } from "./auth.js";
 import { GitHubCloudBindingConfigSchema } from "./binding-config-schema.js";
@@ -42,5 +43,6 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
     oauth: GitHubAppOAuthHandler,
   },
   webhookHandler: GitHubCloudWebhookHandler,
+  resourceDefinitions: GitHubResourceDefinitions,
   compileBinding: compileGitHubCloudBinding,
 };

@@ -1,6 +1,8 @@
 import {
   integrationConnections,
   type IntegrationConnection,
+  type IntegrationConnectionResourceState,
+  type IntegrationConnectionResourceSyncState,
   type IntegrationConnectionStatus,
 } from "@mistle/db/control-plane";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
@@ -22,6 +24,7 @@ import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsBadRequestError,
 } from "./errors.js";
+import { projectConnectionResourceSummaries } from "./project-connection-resource-summaries.js";
 
 const PAGE_SIZE_OPTIONS = {
   defaultLimit: 20,
@@ -51,12 +54,28 @@ type IntegrationConnectionListItem = {
   externalSubjectId?: string;
   config?: Record<string, unknown>;
   targetSnapshotConfig?: Record<string, unknown>;
+  resources?: Array<{
+    kind: string;
+    selectionMode: "single" | "multi";
+    count: number;
+    syncState: IntegrationConnectionResourceSyncState;
+    lastSyncedAt?: string;
+  }>;
   createdAt: string;
   updatedAt: string;
 };
 
+type IntegrationConnectionListRow = IntegrationConnection & {
+  target: {
+    familyId: string;
+    variantId: string;
+  } | null;
+  resourceStates: Array<IntegrationConnectionResourceState>;
+};
+
 export async function listIntegrationConnections(
   db: AppContext["var"]["db"],
+  integrationRegistry: AppContext["var"]["integrationRegistry"],
   input: ListIntegrationConnectionsInput,
 ): Promise<KeysetPaginatedResult<IntegrationConnectionListItem>> {
   let pageSize: number;
@@ -75,70 +94,84 @@ export async function listIntegrationConnections(
   }
 
   try {
-    const result = await paginateKeyset<IntegrationConnection, IntegrationConnectionsCursor>({
-      query: {
-        after: input.after,
-        before: input.before,
-      },
-      pageSize,
-      decodeCursor: ({ encodedCursor, cursorName }) =>
-        decodeKeysetCursorOrThrow({
-          encodedCursor,
-          cursorName,
-          schema: CursorSchema,
-          mapDecodeError: ({ cursorName: decodeCursorName, reason }) => {
-            const reasonToMessage = {
-              [KeysetCursorDecodeErrorReasons.INVALID_BASE64URL]: `\`${decodeCursorName}\` cursor is not valid base64url.`,
-              [KeysetCursorDecodeErrorReasons.INVALID_JSON]: `\`${decodeCursorName}\` cursor does not contain valid JSON.`,
-              [KeysetCursorDecodeErrorReasons.INVALID_SHAPE]: `\`${decodeCursorName}\` cursor has an invalid shape.`,
-            } as const;
+    const result = await paginateKeyset<IntegrationConnectionListRow, IntegrationConnectionsCursor>(
+      {
+        query: {
+          after: input.after,
+          before: input.before,
+        },
+        pageSize,
+        decodeCursor: ({ encodedCursor, cursorName }) =>
+          decodeKeysetCursorOrThrow({
+            encodedCursor,
+            cursorName,
+            schema: CursorSchema,
+            mapDecodeError: ({ cursorName: decodeCursorName, reason }) => {
+              const reasonToMessage = {
+                [KeysetCursorDecodeErrorReasons.INVALID_BASE64URL]: `\`${decodeCursorName}\` cursor is not valid base64url.`,
+                [KeysetCursorDecodeErrorReasons.INVALID_JSON]: `\`${decodeCursorName}\` cursor does not contain valid JSON.`,
+                [KeysetCursorDecodeErrorReasons.INVALID_SHAPE]: `\`${decodeCursorName}\` cursor has an invalid shape.`,
+              } as const;
 
-            return new IntegrationConnectionsBadRequestError(
-              IntegrationConnectionsBadRequestCodes.INVALID_PAGINATION_CURSOR,
-              reasonToMessage[reason],
-            );
-          },
+              return new IntegrationConnectionsBadRequestError(
+                IntegrationConnectionsBadRequestCodes.INVALID_PAGINATION_CURSOR,
+                reasonToMessage[reason],
+              );
+            },
+          }),
+        encodeCursor: encodeKeysetCursor,
+        getCursor: (connection) => ({
+          id: connection.id,
         }),
-      encodeCursor: encodeKeysetCursor,
-      getCursor: (connection) => ({
-        id: connection.id,
-      }),
-      fetchPage: async ({ direction, cursor, limitPlusOne }) =>
-        db.query.integrationConnections.findMany({
-          where: (table, { and, eq, gt, lt }) => {
-            const organizationScope = eq(table.organizationId, input.organizationId);
+        fetchPage: async ({ direction, cursor, limitPlusOne }) =>
+          db.query.integrationConnections.findMany({
+            where: (table, { and, eq, gt, lt }) => {
+              const organizationScope = eq(table.organizationId, input.organizationId);
 
-            if (cursor === undefined) {
-              return organizationScope;
-            }
+              if (cursor === undefined) {
+                return organizationScope;
+              }
 
-            if (direction === KeysetPaginationDirections.FORWARD) {
-              return and(organizationScope, gt(table.id, cursor.id));
-            }
+              if (direction === KeysetPaginationDirections.FORWARD) {
+                return and(organizationScope, gt(table.id, cursor.id));
+              }
 
-            return and(organizationScope, lt(table.id, cursor.id));
-          },
-          orderBy:
-            direction === KeysetPaginationDirections.BACKWARD
-              ? (table, { desc }) => [desc(table.id)]
-              : (table, { asc }) => [asc(table.id)],
-          limit: limitPlusOne,
-        }),
-      countTotalResults: async () => {
-        const [result] = await db
-          .select({
-            totalResults: sql<number>`count(*)::int`,
-          })
-          .from(integrationConnections)
-          .where(eq(integrationConnections.organizationId, input.organizationId));
+              return and(organizationScope, lt(table.id, cursor.id));
+            },
+            orderBy:
+              direction === KeysetPaginationDirections.BACKWARD
+                ? (table, { desc }) => [desc(table.id)]
+                : (table, { asc }) => [asc(table.id)],
+            limit: limitPlusOne,
+            with: {
+              resourceStates: true,
+              target: {
+                columns: {
+                  familyId: true,
+                  variantId: true,
+                },
+              },
+            },
+          }),
+        countTotalResults: async () => {
+          const [result] = await db
+            .select({
+              totalResults: sql<number>`count(*)::int`,
+            })
+            .from(integrationConnections)
+            .where(eq(integrationConnections.organizationId, input.organizationId));
 
-        return result?.totalResults ?? 0;
+          return result?.totalResults ?? 0;
+        },
       },
-    });
+    );
 
     return {
       ...result,
       items: result.items.map((connection) => ({
+        ...buildResourceSummary(connection, {
+          integrationRegistry,
+        }),
         id: connection.id,
         targetKey: connection.targetKey,
         displayName: connection.displayName,
@@ -170,5 +203,28 @@ export async function listIntegrationConnections(
 }
 
 function normalizeTimestamp(value: string | Date): string {
-  return typeof value === "string" ? value : value.toISOString();
+  return new Date(value).toISOString();
+}
+
+function buildResourceSummary(
+  connection: IntegrationConnectionListRow,
+  input: {
+    integrationRegistry: AppContext["var"]["integrationRegistry"];
+  },
+): Pick<IntegrationConnectionListItem, "resources"> {
+  const target = connection.target;
+  if (target === null) {
+    return {};
+  }
+
+  const definition = input.integrationRegistry.getDefinition({
+    familyId: target.familyId,
+    variantId: target.variantId,
+  });
+  const resources = projectConnectionResourceSummaries({
+    definition,
+    resourceStates: connection.resourceStates,
+  });
+
+  return resources.length === 0 ? {} : { resources };
 }

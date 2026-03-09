@@ -43,6 +43,19 @@ const IntegrationConnectionSchema = z
     externalSubjectId: z.string().min(1).optional(),
     config: z.record(z.string(), z.unknown()).optional(),
     targetSnapshotConfig: z.record(z.string(), z.unknown()).optional(),
+    resources: z
+      .array(
+        z
+          .object({
+            kind: z.string().min(1),
+            selectionMode: z.enum(["single", "multi"]),
+            count: z.number().int().min(0),
+            syncState: z.enum(["never-synced", "syncing", "ready", "error"]),
+            lastSyncedAt: z.string().min(1).optional(),
+          })
+          .strict(),
+      )
+      .optional(),
     createdAt: z.string().min(1),
     updatedAt: z.string().min(1),
   })

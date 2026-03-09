@@ -56,6 +56,24 @@ export type IntegrationBinding = {
   config: Record<string, unknown>;
 };
 
+export type IntegrationResourceSelectionMode = "single" | "multi";
+
+export const IntegrationResourceSelectionModes: {
+  SINGLE: IntegrationResourceSelectionMode;
+  MULTI: IntegrationResourceSelectionMode;
+} = {
+  SINGLE: "single",
+  MULTI: "multi",
+};
+
+export type IntegrationResourceDefinition = {
+  kind: string;
+  selectionMode: IntegrationResourceSelectionMode;
+  bindingField: string;
+  displayName: string;
+  description?: string;
+};
+
 export type IntegrationConfigSchema<TOutput> = z.ZodType<TOutput>;
 
 type ParsedSchemaOutput<TSchema extends IntegrationConfigSchema<unknown>> =
@@ -741,6 +759,7 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetSecretsSchema>,
     Record<string, string>
   >;
+  resourceDefinitions?: ReadonlyArray<IntegrationResourceDefinition>;
   mcp?: IntegrationMcpDefinition<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TBindingConfigSchema>,
