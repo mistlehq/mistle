@@ -4,14 +4,20 @@ import {
   automationTargets,
   automations,
   AutomationKinds,
+  ConversationCreatedByKinds,
+  ConversationOwnerKinds,
+  ConversationStatuses,
   createControlPlaneDatabase,
   integrationConnections,
   IntegrationConnectionStatuses,
+  IntegrationBindingKinds,
   integrationTargets,
   integrationWebhookEvents,
   IntegrationWebhookEventStatuses,
   organizations,
   sandboxProfiles,
+  sandboxProfileVersions,
+  sandboxProfileVersionIntegrationBindings,
   CONTROL_PLANE_SCHEMA_NAME,
   webhookAutomations,
 } from "@mistle/db/control-plane";
@@ -20,6 +26,12 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
+import {
+  createOpenAiRawBindingCapabilities,
+  OpenAiApiKeyDefinition,
+  OpenAiReasoningEfforts,
+  OpenAiRuntimes,
+} from "@mistle/integrations-definitions";
 import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
 import { eq } from "drizzle-orm";
 import { Pool } from "pg";
@@ -35,6 +47,10 @@ import {
 import { it } from "./test-context.js";
 
 const TestTimeoutMs = 120_000;
+const OpenAiAgentTargetConfig = {
+  api_base_url: "https://api.openai.com/v1",
+  binding_capabilities: createOpenAiRawBindingCapabilities(),
+};
 
 async function createTestDatabase(input: { databaseUrl: string }) {
   await runControlPlaneMigrations({
@@ -56,6 +72,53 @@ async function createTestDatabase(input: { databaseUrl: string }) {
       await pool.end();
     },
   };
+}
+
+async function seedOpenAiAgentBinding(input: {
+  db: ReturnType<typeof createControlPlaneDatabase>;
+  organizationId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  suffix: string;
+}) {
+  const targetKey = `openai-agent-${input.suffix}`;
+  const connectionId = `icn_openai_agent_${input.suffix}`;
+  const bindingId = `ibd_openai_agent_${input.suffix}`;
+
+  await input.db.insert(integrationTargets).values({
+    targetKey,
+    familyId: OpenAiApiKeyDefinition.familyId,
+    variantId: OpenAiApiKeyDefinition.variantId,
+    enabled: true,
+    config: OpenAiAgentTargetConfig,
+  });
+  await input.db.insert(integrationConnections).values({
+    id: connectionId,
+    organizationId: input.organizationId,
+    targetKey,
+    displayName: "OpenAI agent connection",
+    status: IntegrationConnectionStatuses.ACTIVE,
+    externalSubjectId: "openai-agent-subject",
+    config: {
+      auth_scheme: "api-key",
+    },
+  });
+  await input.db.insert(sandboxProfileVersions).values({
+    sandboxProfileId: input.sandboxProfileId,
+    version: input.sandboxProfileVersion,
+  });
+  await input.db.insert(sandboxProfileVersionIntegrationBindings).values({
+    id: bindingId,
+    sandboxProfileId: input.sandboxProfileId,
+    sandboxProfileVersion: input.sandboxProfileVersion,
+    connectionId,
+    kind: IntegrationBindingKinds.AGENT,
+    config: {
+      runtime: OpenAiRuntimes.CODEX_CLI,
+      defaultModel: "gpt-5.2",
+      reasoningEffort: OpenAiReasoningEfforts.MEDIUM,
+    },
+  });
 }
 
 describe("handleAutomationRun integration", () => {
@@ -116,6 +179,13 @@ describe("handleAutomationRun integration", () => {
           organizationId,
           displayName: "Automation Prepare Profile",
           status: "active",
+        });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 7,
+          suffix: "worker_automation_prepare",
         });
         await database.db.insert(integrationTargets).values({
           targetKey,
@@ -196,10 +266,14 @@ describe("handleAutomationRun integration", () => {
         const persistedRun = await database.db.query.automationRuns.findFirst({
           where: (table, { eq }) => eq(table.id, automationRunId),
         });
+        const persistedConversation = await database.db.query.conversations.findFirst({
+          where: (table, { eq }) => eq(table.id, preparedRun.conversationId),
+        });
 
         expect(preparedRun).toMatchObject({
           automationRunId,
           automationId,
+          conversationId: expect.stringMatching(/^cnv_/),
           automationTargetId,
           organizationId,
           sandboxProfileId,
@@ -223,9 +297,23 @@ describe("handleAutomationRun integration", () => {
         });
         expect(persistedRun).toMatchObject({
           id: automationRunId,
+          conversationId: preparedRun.conversationId,
           renderedInput: "Handle @mistlebot prepare",
           renderedConversationKey: "issue-777",
           renderedIdempotencyKey: "delivery_prepare",
+        });
+        expect(persistedConversation).toMatchObject({
+          id: preparedRun.conversationId,
+          organizationId,
+          ownerKind: ConversationOwnerKinds.AUTOMATION_TARGET,
+          ownerId: automationTargetId,
+          createdByKind: ConversationCreatedByKinds.WEBHOOK,
+          createdById: webhookEventId,
+          sandboxProfileId,
+          integrationFamilyId: OpenAiApiKeyDefinition.familyId,
+          conversationKey: "issue-777",
+          preview: "Handle @mistlebot prepare",
+          status: ConversationStatuses.PENDING,
         });
       } finally {
         await database.stop();
@@ -261,6 +349,13 @@ describe("handleAutomationRun integration", () => {
           organizationId,
           displayName: "Automation Replay Snapshot Profile",
           status: "active",
+        });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 5,
+          suffix: "worker_automation_replay_snapshot",
         });
         await database.db.insert(integrationTargets).values({
           targetKey,
@@ -361,6 +456,7 @@ describe("handleAutomationRun integration", () => {
         });
 
         expect(firstPreparedRun).toMatchObject({
+          conversationId: expect.stringMatching(/^cnv_/),
           renderedInput: "Handle @mistlebot replay snapshot",
           renderedConversationKey: "issue-105",
           renderedIdempotencyKey: "delivery_replay_snapshot",
@@ -368,6 +464,7 @@ describe("handleAutomationRun integration", () => {
         expect(replayPreparedRun).toEqual(firstPreparedRun);
         expect(persistedRun).toMatchObject({
           id: automationRunId,
+          conversationId: firstPreparedRun.conversationId,
           renderedInput: "Handle @mistlebot replay snapshot",
           renderedConversationKey: "issue-105",
           renderedIdempotencyKey: "delivery_replay_snapshot",
@@ -406,6 +503,13 @@ describe("handleAutomationRun integration", () => {
           organizationId,
           displayName: "Automation Run Complete Profile",
           status: "active",
+        });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+          suffix: "worker_automation_run_complete",
         });
         await database.db.insert(integrationTargets).values({
           targetKey,
@@ -527,6 +631,13 @@ describe("handleAutomationRun integration", () => {
           displayName: "Automation Run Running Profile",
           status: "active",
         });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+          suffix: "worker_automation_run_running",
+        });
         await database.db.insert(integrationTargets).values({
           targetKey,
           familyId: "github",
@@ -645,6 +756,13 @@ describe("handleAutomationRun integration", () => {
           organizationId,
           displayName: "Automation Run Fail Profile",
           status: "active",
+        });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+          suffix: "worker_automation_run_fail",
         });
         await database.db.insert(integrationTargets).values({
           targetKey,
