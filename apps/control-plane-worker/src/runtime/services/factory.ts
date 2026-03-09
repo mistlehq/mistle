@@ -223,6 +223,7 @@ export function createControlPlaneWorkerServices(
         return handleIntegrationWebhookEvent(
           {
             db: input.db,
+            integrationRegistry,
             enqueueAutomationRuns: async ({ automationRunIds }) => {
               for (const automationRunId of automationRunIds) {
                 await input.openWorkflow.runWorkflow(
@@ -235,6 +236,13 @@ export function createControlPlaneWorkerServices(
                   },
                 );
               }
+            },
+            enqueueResourceSync: async ({ organizationId, connectionId, kind }) => {
+              await controlPlaneInternalClient.requestIntegrationConnectionResourceRefresh({
+                organizationId,
+                connectionId,
+                kind,
+              });
             },
           },
           workflowInput,

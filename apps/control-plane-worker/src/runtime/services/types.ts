@@ -129,7 +129,13 @@ export type DeliverAutomationPayloadServiceInput = {
 
 export type HandleIntegrationWebhookEventServiceDependencies = {
   db: ControlPlaneDatabase;
+  integrationRegistry: IntegrationRegistry;
   enqueueAutomationRuns: (input: { automationRunIds: ReadonlyArray<string> }) => Promise<void>;
+  enqueueResourceSync: (input: {
+    organizationId: string;
+    connectionId: string;
+    kind: string;
+  }) => Promise<void>;
 };
 
 export type HandleIntegrationWebhookEventServiceInput = HandleIntegrationWebhookEventWorkflowInput;

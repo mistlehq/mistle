@@ -22,6 +22,7 @@ import {
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
 import {
+  createIntegrationRegistry,
   createOpenAiRawBindingCapabilities,
   OpenAiApiKeyDefinition,
   OpenAiReasoningEfforts,
@@ -254,6 +255,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
         const workflowOutput = await handleIntegrationWebhookEvent(
           {
             db: database.db,
+            integrationRegistry: createIntegrationRegistry(),
             enqueueAutomationRuns: async ({ automationRunIds }) => {
               for (const automationRunId of automationRunIds) {
                 await executeHandleAutomationRunSteps({
@@ -262,6 +264,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
                 });
               }
             },
+            enqueueResourceSync: async () => {},
           },
           {
             webhookEventId,
@@ -359,7 +362,9 @@ describe("handleIntegrationWebhookEvent integration", () => {
         const workflowOutput = await handleIntegrationWebhookEvent(
           {
             db: database.db,
+            integrationRegistry: createIntegrationRegistry(),
             enqueueAutomationRuns: async () => {},
+            enqueueResourceSync: async () => {},
           },
           {
             webhookEventId,

@@ -42,6 +42,10 @@ export type MintSandboxConnectionTokenInput =
   paths["/internal/sandbox-runtime/mint-connection-token"]["post"]["requestBody"]["content"]["application/json"];
 export type MintSandboxConnectionTokenOutput =
   paths["/internal/sandbox-runtime/mint-connection-token"]["post"]["responses"]["200"]["content"]["application/json"];
+export type RequestIntegrationConnectionResourceRefreshInput =
+  paths["/internal/integration-connections/refresh-resource"]["post"]["requestBody"]["content"]["application/json"];
+export type RequestIntegrationConnectionResourceRefreshOutput =
+  paths["/internal/integration-connections/refresh-resource"]["post"]["responses"]["202"]["content"]["application/json"];
 
 function extractErrorMessage(input: unknown): string {
   const parsedError = InternalErrorSchema.safeParse(input);
@@ -154,6 +158,23 @@ export class ControlPlaneInternalClient {
 
     throw new Error(
       `Control-plane internal sandbox read failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
+    );
+  }
+
+  async requestIntegrationConnectionResourceRefresh(
+    input: RequestIntegrationConnectionResourceRefreshInput,
+  ): Promise<RequestIntegrationConnectionResourceRefreshOutput> {
+    const result = await this.#client.POST("/internal/integration-connections/refresh-resource", {
+      body: input,
+      signal: AbortSignal.timeout(this.#requestTimeoutMs),
+    });
+
+    if (result.response.status === 202 && result.data !== undefined) {
+      return result.data;
+    }
+
+    throw new Error(
+      `Control-plane internal resource refresh failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
     );
   }
 }
