@@ -4,7 +4,7 @@ import {
   type ListConnectionResourcesInput,
   type ListConnectionResourcesResult,
 } from "@mistle/integrations-core";
-import { request } from "@octokit/request";
+import { Octokit } from "octokit";
 import { z } from "zod";
 
 import { GitHubConnectionConfigSchema, type GitHubConnectionConfig } from "./auth.js";
@@ -38,6 +38,18 @@ const GitHubApiVersion = "2022-11-28";
 const GitHubRepositoryKind = "repository";
 const GitHubPageSize = 100;
 
+function createGitHubOctokit(input: { apiBaseUrl: string; token: string }): Octokit {
+  return new Octokit({
+    auth: input.token,
+    baseUrl: input.apiBaseUrl,
+    request: {
+      headers: {
+        "x-github-api-version": GitHubApiVersion,
+      },
+    },
+  });
+}
+
 function toDiscoveredResource(resource: GitHubRepository): DiscoveredIntegrationResource {
   return {
     externalId: resource.id.toString(),
@@ -65,15 +77,14 @@ async function listGitHubInstallationRepositories(input: {
   apiBaseUrl: string;
   token: string;
 }): Promise<ReadonlyArray<GitHubRepository>> {
+  const octokit = createGitHubOctokit({
+    apiBaseUrl: input.apiBaseUrl,
+    token: input.token,
+  });
   const repositories: GitHubRepository[] = [];
 
   for (let page = 1; ; page += 1) {
-    const response = await request("GET /installation/repositories", {
-      baseUrl: input.apiBaseUrl,
-      headers: {
-        authorization: `Bearer ${input.token}`,
-        "x-github-api-version": GitHubApiVersion,
-      },
+    const response = await octokit.rest.apps.listReposAccessibleToInstallation({
       per_page: GitHubPageSize,
       page,
     });
@@ -90,15 +101,14 @@ async function listGitHubUserRepositories(input: {
   apiBaseUrl: string;
   token: string;
 }): Promise<ReadonlyArray<GitHubRepository>> {
+  const octokit = createGitHubOctokit({
+    apiBaseUrl: input.apiBaseUrl,
+    token: input.token,
+  });
   const repositories: GitHubRepository[] = [];
 
   for (let page = 1; ; page += 1) {
-    const response = await request("GET /user/repos", {
-      baseUrl: input.apiBaseUrl,
-      headers: {
-        authorization: `token ${input.token}`,
-        "x-github-api-version": GitHubApiVersion,
-      },
+    const response = await octokit.rest.repos.listForAuthenticatedUser({
       affiliation: "owner,collaborator,organization_member",
       sort: "full_name",
       per_page: GitHubPageSize,
