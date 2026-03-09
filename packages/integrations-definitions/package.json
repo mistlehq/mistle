@@ -9,6 +9,12 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./agent-runtimes": {
+      "types": "./src/agent-runtimes/index.ts",
+      "node": "./dist/agent-runtimes/index.js",
+      "import": "./src/agent-runtimes/index.ts",
+      "default": "./src/agent-runtimes/index.ts"
+    },
     "./forms": {
       "types": "./src/forms/index.ts",
       "node": "./dist/forms/index.js",
@@ -32,13 +38,17 @@
   },
   "dependencies": {
     "@mistle/integrations-core": "workspace:*",
+    "@mistle/sandbox-session-protocol": "workspace:*",
+    "@mistle/time": "workspace:*",
     "@octokit/auth-app": "^8.2.0",
     "@octokit/request": "^10.0.8",
     "@octokit/webhooks-methods": "^6.0.0",
+    "ws": "^8.19.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@octokit/webhooks-examples": "^7.6.1",
-    "@octokit/webhooks-types": "^7.6.1"
+    "@octokit/webhooks-types": "^7.6.1",
+    "@types/ws": "^8.18.1"
   }
 }

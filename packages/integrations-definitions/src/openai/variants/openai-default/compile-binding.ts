@@ -1,9 +1,10 @@
-import type {
-  AgentRuntimeConversationProviderFamily,
-  CompileBindingInput,
-  CompileBindingResult,
-} from "@mistle/integrations-core";
+import type { CompileBindingInput, CompileBindingResult } from "@mistle/integrations-core";
 
+import {
+  OpenAiDefaultCodexAppServerEndpointKey,
+  OpenAiDefaultCodexAppServerRuntimeKey,
+  OpenAiDefaultCodexConversationProviderFamily,
+} from "./agent-runtime-constants.js";
 import { resolveOpenAiCredentialSecretType } from "./auth.js";
 import type { OpenAiApiKeyBindingConfig } from "./binding-config-schema.js";
 import type { OpenAiApiKeyTargetConfig } from "./target-config-schema.js";
@@ -14,9 +15,7 @@ export type OpenAiApiKeyCompileBindingInput = CompileBindingInput<
 >;
 
 const CodexCliArtifactKey = "codex-cli";
-const CodexConversationProviderFamily: AgentRuntimeConversationProviderFamily = "codex";
-const CodexAppServerProcessKey = "codex-app-server";
-const CodexAppServerEndpointKey = "app-server";
+const CodexAppServerProcessKey = OpenAiDefaultCodexAppServerRuntimeKey;
 const CodexAppServerListenUrl = "ws://127.0.0.1:4500";
 const CodexGitHubRepository = "openai/codex";
 const CodexGitHubAssets = {
@@ -144,7 +143,7 @@ export function compileOpenAiApiKeyBinding(
         ],
         endpoints: [
           {
-            endpointKey: CodexAppServerEndpointKey,
+            endpointKey: OpenAiDefaultCodexAppServerEndpointKey,
             processKey: CodexAppServerProcessKey,
             transport: {
               type: "ws",
@@ -157,12 +156,12 @@ export function compileOpenAiApiKeyBinding(
     ],
     agentRuntimes: [
       {
-        runtimeKey: CodexAppServerProcessKey,
+        runtimeKey: OpenAiDefaultCodexAppServerRuntimeKey,
         clientId: input.binding.config.runtime,
-        endpointKey: CodexAppServerEndpointKey,
+        endpointKey: OpenAiDefaultCodexAppServerEndpointKey,
         capabilities: {
           conversation: {
-            providerFamily: CodexConversationProviderFamily,
+            providerFamily: OpenAiDefaultCodexConversationProviderFamily,
           },
         },
       },

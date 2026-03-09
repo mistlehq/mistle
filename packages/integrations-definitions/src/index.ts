@@ -7,7 +7,6 @@ import { OpenAiApiKeyDefinition } from "./openai/index.js";
 export * from "./github/index.js";
 export * from "./linear/index.js";
 export * from "./openai/index.js";
-export * from "./forms/index.js";
 
 const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> = [
   GitHubCloudDefinition,

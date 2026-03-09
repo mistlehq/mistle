@@ -1,5 +1,13 @@
 export { OpenAiApiKeyDefinition } from "./definition.js";
 export {
+  OpenAiDefaultAgentRuntimes,
+  createCodexConversationProviderAdapter,
+} from "./agent-runtime.js";
+export {
+  OpenAiDefaultCodexAppServerEndpointKey,
+  OpenAiDefaultCodexAppServerRuntimeKey,
+} from "./agent-runtime-constants.js";
+export {
   OpenAiApiKeyTargetConfigSchema,
   type OpenAiApiKeyTargetConfig,
 } from "./target-config-schema.js";

@@ -183,6 +183,9 @@ importers:
       '@mistle/emails':
         specifier: workspace:*
         version: link:../../packages/emails
+      '@mistle/integrations-definitions':
+        specifier: workspace:*
+        version: link:../../packages/integrations-definitions
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
@@ -670,6 +673,12 @@ importers:
       '@mistle/integrations-core':
         specifier: workspace:*
         version: link:../integrations-core
+      '@mistle/sandbox-session-protocol':
+        specifier: workspace:*
+        version: link:../sandbox-session-protocol
+      '@mistle/time':
+        specifier: workspace:*
+        version: link:../time
       '@octokit/auth-app':
         specifier: ^8.2.0
         version: 8.2.0
@@ -679,6 +688,9 @@ importers:
       '@octokit/webhooks-methods':
         specifier: ^6.0.0
         version: 6.0.0
+      ws:
+        specifier: ^8.19.0
+        version: 8.19.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -689,6 +701,9 @@ importers:
       '@octokit/webhooks-types':
         specifier: ^7.6.1
         version: 7.6.1
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
 
   packages/logging:
     dependencies:
