@@ -1,5 +1,6 @@
 import {
   integrationConnectionResourceStates,
+  type IntegrationConnectionResourceSyncState,
   IntegrationConnectionResourceSyncStates,
 } from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
@@ -25,11 +26,8 @@ export type RequestIntegrationConnectionResourceRefreshResult = {
   connectionId: string;
   familyId: string;
   kind: string;
-  syncState: "syncing";
+  syncState: typeof IntegrationConnectionResourceSyncStates.SYNCING;
 };
-
-type IntegrationConnectionResourceSyncState =
-  (typeof IntegrationConnectionResourceSyncStates)[keyof typeof IntegrationConnectionResourceSyncStates];
 
 type PersistedResourceStateSnapshot = {
   familyId: string;
@@ -39,6 +37,15 @@ type PersistedResourceStateSnapshot = {
   lastErrorCode: string | null;
   lastErrorMessage: string | null;
 };
+
+type AcquireResourceSyncAttemptResult =
+  | {
+      alreadySyncing: true;
+    }
+  | {
+      alreadySyncing: false;
+      startedAt: string;
+    };
 
 export async function requestIntegrationConnectionResourceRefresh(
   db: ControlPlaneDatabase,
@@ -101,16 +108,20 @@ export async function requestIntegrationConnectionResourceRefresh(
   }
 
   const existingState = connection.resourceStates[0];
-  const needsSyncingUpdate =
-    existingState === undefined ||
-    existingState.syncState !== IntegrationConnectionResourceSyncStates.SYNCING;
-  if (needsSyncingUpdate) {
-    await setResourceStateSyncing({
-      db,
+  const syncAttempt = await acquireResourceSyncAttempt({
+    db,
+    connectionId: connection.id,
+    familyId: target.familyId,
+    kind: input.kind,
+  });
+
+  if (syncAttempt.alreadySyncing) {
+    return {
       connectionId: connection.id,
       familyId: target.familyId,
       kind: input.kind,
-    });
+      syncState: IntegrationConnectionResourceSyncStates.SYNCING,
+    };
   }
 
   try {
@@ -125,18 +136,17 @@ export async function requestIntegrationConnectionResourceRefresh(
         idempotencyKey: createResourceSyncIdempotencyKey({
           connectionId: input.connectionId,
           kind: input.kind,
+          startedAt: syncAttempt.startedAt,
         }),
       },
     );
   } catch (error) {
-    if (needsSyncingUpdate) {
-      await restoreResourceStateAfterEnqueueFailure({
-        db,
-        connectionId: connection.id,
-        kind: input.kind,
-        previousState: existingState,
-      });
-    }
+    await restoreResourceStateAfterEnqueueFailure({
+      db,
+      connectionId: connection.id,
+      kind: input.kind,
+      previousState: existingState,
+    });
     throw error;
   }
 
@@ -148,17 +158,21 @@ export async function requestIntegrationConnectionResourceRefresh(
   };
 }
 
-function createResourceSyncIdempotencyKey(input: { connectionId: string; kind: string }): string {
-  return `integration-connection-resource-sync:${input.connectionId}:${input.kind}`;
+function createResourceSyncIdempotencyKey(input: {
+  connectionId: string;
+  kind: string;
+  startedAt: string;
+}): string {
+  return `integration-connection-resource-sync:${input.connectionId}:${input.kind}:${input.startedAt}`;
 }
 
-async function setResourceStateSyncing(input: {
+async function acquireResourceSyncAttempt(input: {
   db: ControlPlaneDatabase;
   connectionId: string;
   familyId: string;
   kind: string;
-}): Promise<void> {
-  await input.db
+}): Promise<AcquireResourceSyncAttemptResult> {
+  const updatedStates = await input.db
     .insert(integrationConnectionResourceStates)
     .values({
       connectionId: input.connectionId,
@@ -183,7 +197,27 @@ async function setResourceStateSyncing(input: {
         lastErrorMessage: null,
         updatedAt: sql`now()`,
       },
+      setWhere: sql`${integrationConnectionResourceStates.syncState} <> ${IntegrationConnectionResourceSyncStates.SYNCING}`,
+    })
+    .returning({
+      lastSyncStartedAt: integrationConnectionResourceStates.lastSyncStartedAt,
     });
+
+  const updatedState = updatedStates[0];
+  if (updatedState === undefined) {
+    return {
+      alreadySyncing: true,
+    };
+  }
+
+  if (updatedState.lastSyncStartedAt === null) {
+    throw new Error("Expected acquired resource sync attempt to have a start timestamp.");
+  }
+
+  return {
+    alreadySyncing: false,
+    startedAt: updatedState.lastSyncStartedAt,
+  };
 }
 
 async function restoreResourceStateAfterEnqueueFailure(input: {
