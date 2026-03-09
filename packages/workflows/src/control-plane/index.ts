@@ -7,6 +7,7 @@ export {
   HandleIntegrationWebhookEventWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
   StartSandboxProfileInstanceWorkflowSpec,
+  SyncIntegrationConnectionResourcesWorkflowSpec,
   SendOrganizationInvitationWorkflowSpec,
   SendVerificationOTPWorkflowSpec,
 } from "./workflows/index.js";
@@ -45,6 +46,12 @@ export {
   type StartSandboxProfileInstanceWorkflowInput,
   type StartSandboxProfileInstanceWorkflowOutput,
 } from "./workflows/start-sandbox-profile-instance/index.js";
+export {
+  createSyncIntegrationConnectionResourcesWorkflow,
+  type CreateSyncIntegrationConnectionResourcesWorkflowInput,
+  type SyncIntegrationConnectionResourcesWorkflowInput,
+  type SyncIntegrationConnectionResourcesWorkflowOutput,
+} from "./workflows/sync-integration-connection-resources/index.js";
 export {
   createSendOrganizationInvitationWorkflow,
   type CreateSendOrganizationInvitationWorkflowInput,

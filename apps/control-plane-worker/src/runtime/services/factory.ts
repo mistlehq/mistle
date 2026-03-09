@@ -1,4 +1,5 @@
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import {
   HandleAutomationRunWorkflowSpec,
   type HandleConversationDeliveryWorkflowInput,
@@ -19,6 +20,7 @@ import {
 import { handleConversationDelivery } from "./handle-conversation-delivery.js";
 import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";
 import { startSandboxProfileInstance } from "./start-sandbox-profile-instance.js";
+import { syncIntegrationConnectionResources } from "./sync-integration-connection-resources.js";
 import type {
   ControlPlaneWorkerRuntimeServices,
   CreateControlPlaneWorkerServicesInput,
@@ -28,6 +30,7 @@ export function createControlPlaneWorkerServices(
   input: CreateControlPlaneWorkerServicesInput,
 ): ControlPlaneWorkerRuntimeServices {
   const emailSender = createEmailSender(input.config);
+  const integrationRegistry = createIntegrationRegistry();
   const controlPlaneInternalClient = new ControlPlaneInternalClient({
     baseUrl: input.config.controlPlaneApi.baseUrl,
     internalAuthServiceToken: input.internalAuthServiceToken,
@@ -148,6 +151,41 @@ export function createControlPlaneWorkerServices(
           {
             db: input.db,
             dataPlaneSandboxInstancesClient: input.dataPlaneSandboxInstancesClient,
+          },
+          workflowInput,
+        );
+      },
+    },
+    integrationConnectionResources: {
+      syncIntegrationConnectionResources: async (workflowInput) => {
+        return syncIntegrationConnectionResources(
+          {
+            db: input.db,
+            integrationRegistry,
+            resolveIntegrationCredential: async (resolveInput) =>
+              controlPlaneInternalClient.resolveIntegrationCredential(resolveInput),
+            resolveIntegrationTargetSecrets: async (resolveInput) => {
+              const resolvedSecrets =
+                await controlPlaneInternalClient.resolveIntegrationTargetSecrets({
+                  targets: [
+                    {
+                      targetKey: resolveInput.targetKey,
+                      encryptedSecrets: resolveInput.encryptedSecrets,
+                    },
+                  ],
+                });
+
+              const resolvedTarget = resolvedSecrets.targets[0];
+              if (resolvedTarget === undefined) {
+                throw new Error(
+                  `Resolved target secrets for '${resolveInput.targetKey}' were not returned.`,
+                );
+              }
+
+              return {
+                secrets: resolvedTarget.secrets,
+              };
+            },
           },
           workflowInput,
         );

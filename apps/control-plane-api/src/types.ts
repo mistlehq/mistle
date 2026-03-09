@@ -3,7 +3,10 @@ import type { OpenAPIHono } from "@hono/zod-openapi";
 import { AppIds, type loadConfig } from "@mistle/config";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
-import type { HandleIntegrationWebhookEventWorkflowInput } from "@mistle/workflows/control-plane";
+import type {
+  HandleIntegrationWebhookEventWorkflowInput,
+  createControlPlaneOpenWorkflow,
+} from "@mistle/workflows/control-plane";
 import type { Context, Hono } from "hono";
 
 import type { ControlPlaneAuth } from "./auth/index.js";
@@ -67,6 +70,7 @@ export type AppContextVariables = {
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   integrationRegistry: IntegrationRegistry;
+  openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
   services: AppServices;
   session: AppSession | null;
 };
