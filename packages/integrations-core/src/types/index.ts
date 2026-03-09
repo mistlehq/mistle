@@ -619,27 +619,10 @@ export type RuntimeClient = RuntimeClientBase<string>;
 
 export type CompileBindingEgressRoute = Omit<EgressCredentialRoute, "routeId" | "bindingId">;
 
-export type AgentRuntimeConversationProviderFamily = "codex";
-
-export const AgentRuntimeConversationProviderFamilies: {
-  CODEX: AgentRuntimeConversationProviderFamily;
-} = {
-  CODEX: "codex",
-};
-
-export type AgentRuntimeConversationCapability = {
-  providerFamily: AgentRuntimeConversationProviderFamily;
-};
-
-export type AgentRuntimeCapabilities = {
-  conversation?: AgentRuntimeConversationCapability;
-};
-
 export type CompileBindingAgentRuntime = {
   runtimeKey: string;
   clientId: string;
   endpointKey: string;
-  capabilities: AgentRuntimeCapabilities;
 };
 
 export type CompiledAgentRuntime = CompileBindingAgentRuntime & {

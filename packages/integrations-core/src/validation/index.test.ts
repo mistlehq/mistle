@@ -711,11 +711,6 @@ describe("validateCompiledBindingResults", () => {
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
-          capabilities: {
-            conversation: {
-              providerFamily: "codex",
-            },
-          },
         },
       ],
     });
@@ -740,11 +735,6 @@ describe("validateCompiledBindingResults", () => {
           runtimeKey: "codex-app-server",
           clientId: "missing-client",
           endpointKey: "app-server",
-          capabilities: {
-            conversation: {
-              providerFamily: "codex",
-            },
-          },
         },
       ],
     });
@@ -795,11 +785,6 @@ describe("validateCompiledBindingResults", () => {
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
-          capabilities: {
-            conversation: {
-              providerFamily: "codex",
-            },
-          },
         },
       ],
     });

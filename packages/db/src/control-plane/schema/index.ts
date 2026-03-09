@@ -67,12 +67,11 @@ export {
   conversations,
   ConversationCreatedByKinds,
   ConversationOwnerKinds,
-  ConversationProviderFamilies,
   ConversationStatuses,
   type Conversation,
   type ConversationCreatedByKind,
+  type ConversationIntegrationFamilyId,
   type ConversationOwnerKind,
-  type ConversationProviderFamily,
   type ConversationStatus,
   type InsertConversation,
 } from "./conversations.js";

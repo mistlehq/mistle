@@ -4,7 +4,6 @@ import {
   AutomationKinds,
   ConversationCreatedByKinds,
   ConversationOwnerKinds,
-  ConversationProviderFamilies,
   ConversationRouteStatuses,
   ConversationStatuses,
   createControlPlaneDatabase,
@@ -117,7 +116,7 @@ describe("conversation persistence integration", () => {
           createdById: scope.automationId,
           conversationKey: "key-claim-new",
           sandboxProfileId: scope.sandboxProfileId,
-          providerFamily: ConversationProviderFamilies.CODEX,
+          integrationFamilyId: "openai",
           preview: "First conversation message",
         },
       );
@@ -162,7 +161,7 @@ describe("conversation persistence integration", () => {
           createdById: scope.automationId,
           conversationKey: "key-claim-twice",
           sandboxProfileId: scope.sandboxProfileId,
-          providerFamily: ConversationProviderFamilies.CODEX,
+          integrationFamilyId: "openai",
           preview: "Initial message",
         },
       );
@@ -176,7 +175,7 @@ describe("conversation persistence integration", () => {
           createdById: scope.automationId,
           conversationKey: "key-claim-twice",
           sandboxProfileId: scope.sandboxProfileId,
-          providerFamily: ConversationProviderFamilies.CODEX,
+          integrationFamilyId: "openai",
           preview: "Initial message",
         },
       );
@@ -220,7 +219,7 @@ describe("conversation persistence integration", () => {
           createdByKind: ConversationCreatedByKinds.USER,
           createdById: "usr_cpw_conversation_claim_integration_binding",
           sandboxProfileId: scope.sandboxProfileId,
-          providerFamily: ConversationProviderFamilies.CODEX,
+          integrationFamilyId: "openai",
           preview: "Dashboard message",
         },
       );
@@ -254,7 +253,7 @@ describe("conversation persistence integration", () => {
             createdById: scope.automationId,
             conversationKey: "key-claim-title",
             sandboxProfileId: scope.sandboxProfileId,
-            providerFamily: ConversationProviderFamilies.CODEX,
+            integrationFamilyId: "openai",
             title: "Should be rejected",
             preview: "Initial message",
           },
@@ -291,7 +290,7 @@ describe("conversation persistence integration", () => {
           createdById: scope.automationId,
           conversationKey: "key-claim-preview-truncate",
           sandboxProfileId: scope.sandboxProfileId,
-          providerFamily: ConversationProviderFamilies.CODEX,
+          integrationFamilyId: "openai",
           preview: longPreview,
         },
       );
@@ -323,7 +322,7 @@ describe("conversation persistence integration", () => {
           createdById: scope.automationId,
           conversationKey: "key-create-route",
           sandboxProfileId: scope.sandboxProfileId,
-          providerFamily: ConversationProviderFamilies.CODEX,
+          integrationFamilyId: "openai",
           preview: "Create route message",
         },
       );
@@ -367,7 +366,7 @@ describe("conversation persistence integration", () => {
           createdById: scope.automationId,
           conversationKey: "key-activate",
           sandboxProfileId: scope.sandboxProfileId,
-          providerFamily: ConversationProviderFamilies.CODEX,
+          integrationFamilyId: "openai",
           preview: "Activate message",
         },
       );
@@ -434,7 +433,7 @@ describe("conversation persistence integration", () => {
           createdById: scope.automationId,
           conversationKey: "key-rebind",
           sandboxProfileId: scope.sandboxProfileId,
-          providerFamily: ConversationProviderFamilies.CODEX,
+          integrationFamilyId: "openai",
           preview: "Rebind message",
         },
       );
@@ -494,7 +493,7 @@ describe("conversation persistence integration", () => {
           createdById: scope.automationId,
           conversationKey: "key-replace",
           sandboxProfileId: scope.sandboxProfileId,
-          providerFamily: ConversationProviderFamilies.CODEX,
+          integrationFamilyId: "openai",
           preview: "Replace message",
         },
       );
@@ -560,7 +559,7 @@ describe("conversation persistence integration", () => {
           createdById: scope.automationId,
           conversationKey: "key-update-execution",
           sandboxProfileId: scope.sandboxProfileId,
-          providerFamily: ConversationProviderFamilies.CODEX,
+          integrationFamilyId: "openai",
           preview: "Update execution message",
         },
       );

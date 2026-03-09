@@ -183,6 +183,9 @@ importers:
       '@mistle/emails':
         specifier: workspace:*
         version: link:../../packages/emails
+      '@mistle/integrations-definitions':
+        specifier: workspace:*
+        version: link:../../packages/integrations-definitions
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging

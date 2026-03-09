@@ -22,13 +22,7 @@ export const ConversationCreatedByKinds = {
 
 export type ConversationCreatedByKind =
   (typeof ConversationCreatedByKinds)[keyof typeof ConversationCreatedByKinds];
-
-export const ConversationProviderFamilies = {
-  CODEX: "codex",
-} as const;
-
-export type ConversationProviderFamily =
-  (typeof ConversationProviderFamilies)[keyof typeof ConversationProviderFamilies];
+export type ConversationIntegrationFamilyId = string;
 
 export const ConversationStatuses = {
   PENDING: "pending",
@@ -54,7 +48,9 @@ export const conversations = controlPlaneSchema.table(
     sandboxProfileId: text("sandbox_profile_id")
       .notNull()
       .references(() => sandboxProfiles.id, { onDelete: "cascade" }),
-    providerFamily: text("provider_family").notNull().$type<ConversationProviderFamily>(),
+    integrationFamilyId: text("integration_family_id")
+      .notNull()
+      .$type<ConversationIntegrationFamilyId>(),
     conversationKey: text("conversation_key").notNull(),
     title: text("title"),
     preview: text("preview"),

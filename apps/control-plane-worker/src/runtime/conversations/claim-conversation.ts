@@ -3,9 +3,9 @@ import {
   ConversationStatuses,
   ConversationOwnerKinds,
   type ConversationCreatedByKind,
+  type ConversationIntegrationFamilyId,
   type InsertConversation,
   type ConversationOwnerKind,
-  type ConversationProviderFamily,
 } from "@mistle/db/control-plane";
 import { typeid } from "typeid-js";
 
@@ -20,7 +20,7 @@ export type ClaimConversationInput = {
   createdById: string;
   conversationKey?: string;
   sandboxProfileId: string;
-  providerFamily: ConversationProviderFamily;
+  integrationFamilyId: ConversationIntegrationFamilyId;
   title?: string | null;
   preview?: string | null;
 };
@@ -71,7 +71,7 @@ export async function claimConversation(
     createdById: input.createdById,
     conversationKey: resolvedConversationKey,
     sandboxProfileId: input.sandboxProfileId,
-    providerFamily: input.providerFamily,
+    integrationFamilyId: input.integrationFamilyId,
     title: null,
     preview: input.preview == null ? null : input.preview.slice(0, 160),
     status: ConversationStatuses.PENDING,

@@ -23,6 +23,7 @@
     "@mistle/data-plane-trpc": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/emails": "workspace:*",
+    "@mistle/integrations-definitions": "workspace:*",
     "@mistle/logging": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/telemetry": "workspace:*",

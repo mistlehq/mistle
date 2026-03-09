@@ -224,11 +224,6 @@ trust_level = "trusted"
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server",
-        capabilities: {
-          conversation: {
-            providerFamily: "codex",
-          },
-        },
       },
     ]);
   });

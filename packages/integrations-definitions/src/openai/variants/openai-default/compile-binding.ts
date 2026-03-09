@@ -1,8 +1,4 @@
-import type {
-  AgentRuntimeConversationProviderFamily,
-  CompileBindingInput,
-  CompileBindingResult,
-} from "@mistle/integrations-core";
+import type { CompileBindingInput, CompileBindingResult } from "@mistle/integrations-core";
 
 import { resolveOpenAiCredentialSecretType } from "./auth.js";
 import type { OpenAiApiKeyBindingConfig } from "./binding-config-schema.js";
@@ -14,7 +10,6 @@ export type OpenAiApiKeyCompileBindingInput = CompileBindingInput<
 >;
 
 const CodexCliArtifactKey = "codex-cli";
-const CodexConversationProviderFamily: AgentRuntimeConversationProviderFamily = "codex";
 const CodexAppServerProcessKey = "codex-app-server";
 const CodexAppServerEndpointKey = "app-server";
 const CodexAppServerListenUrl = "ws://127.0.0.1:4500";
@@ -160,11 +155,6 @@ export function compileOpenAiApiKeyBinding(
         runtimeKey: CodexAppServerProcessKey,
         clientId: input.binding.config.runtime,
         endpointKey: CodexAppServerEndpointKey,
-        capabilities: {
-          conversation: {
-            providerFamily: CodexConversationProviderFamily,
-          },
-        },
       },
     ],
   };
