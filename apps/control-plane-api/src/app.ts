@@ -27,7 +27,6 @@ export async function createApp(
     internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
     db: resources.db,
     integrationRegistry: resources.integrationRegistry,
-    openWorkflow: resources.openWorkflow,
     services,
   });
   setAppResources(app, resources);

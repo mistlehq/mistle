@@ -24,7 +24,6 @@ import {
 } from "./services/errors.js";
 import { listIntegrationConnectionResources } from "./services/list-connection-resources.js";
 import { listIntegrationConnections } from "./services/list-connections.js";
-import { requestIntegrationConnectionResourceRefresh } from "./services/request-resource-refresh.js";
 import { startOAuthConnection } from "./services/start-oauth-connection.js";
 import { updateIntegrationConnection } from "./services/update-api-key-connection.js";
 
@@ -89,16 +88,11 @@ export function createIntegrationConnectionsApp(): AppRoutes<
         throw new Error("Expected authenticated session to be available.");
       }
 
-      const result = await requestIntegrationConnectionResourceRefresh(
-        ctx.get("db"),
-        ctx.get("integrationRegistry"),
-        ctx.get("openWorkflow"),
-        {
-          organizationId: session.session.activeOrganizationId,
-          connectionId: params.connectionId,
-          kind: params.kind,
-        },
-      );
+      const result = await ctx.get("services").integrationConnections.requestResourceRefresh({
+        organizationId: session.session.activeOrganizationId,
+        connectionId: params.connectionId,
+        kind: params.kind,
+      });
 
       return ctx.json(result, 202);
     } catch (error) {

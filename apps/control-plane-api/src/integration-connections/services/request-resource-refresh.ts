@@ -2,10 +2,12 @@ import {
   integrationConnectionResourceStates,
   IntegrationConnectionResourceSyncStates,
 } from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { SyncIntegrationConnectionResourcesWorkflowSpec } from "@mistle/workflows/control-plane";
+import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
-import type { AppContext } from "../../types.js";
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsBadRequestError,
@@ -39,9 +41,9 @@ type PersistedResourceStateSnapshot = {
 };
 
 export async function requestIntegrationConnectionResourceRefresh(
-  db: AppContext["var"]["db"],
-  integrationRegistry: AppContext["var"]["integrationRegistry"],
-  openWorkflow: AppContext["var"]["openWorkflow"],
+  db: ControlPlaneDatabase,
+  integrationRegistry: IntegrationRegistry,
+  openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>,
   input: RequestIntegrationConnectionResourceRefreshInput,
 ): Promise<RequestIntegrationConnectionResourceRefreshResult> {
   const connection = await db.query.integrationConnections.findFirst({
@@ -151,7 +153,7 @@ function createResourceSyncIdempotencyKey(input: { connectionId: string; kind: s
 }
 
 async function setResourceStateSyncing(input: {
-  db: AppContext["var"]["db"];
+  db: ControlPlaneDatabase;
   connectionId: string;
   familyId: string;
   kind: string;
@@ -185,7 +187,7 @@ async function setResourceStateSyncing(input: {
 }
 
 async function restoreResourceStateAfterEnqueueFailure(input: {
-  db: AppContext["var"]["db"];
+  db: ControlPlaneDatabase;
   connectionId: string;
   kind: string;
   previousState: PersistedResourceStateSnapshot | undefined;

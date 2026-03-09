@@ -1,6 +1,5 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
-import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 
 import { createAuthApp } from "../auth/app.js";
 import { createIntegrationConnectionsApp } from "../integration-connections/index.js";
@@ -29,7 +28,6 @@ type RegisterAppRoutesInput = {
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   integrationRegistry: IntegrationRegistry;
-  openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
   services: AppServices;
 };
 
@@ -45,7 +43,6 @@ export function registerAppRoutes(input: RegisterAppRoutesInput): void {
       internalAuthServiceToken: input.internalAuthServiceToken,
       db,
       integrationRegistry: input.integrationRegistry,
-      openWorkflow: input.openWorkflow,
       services,
     }),
   );

@@ -13,7 +13,6 @@ export function createAppContextMiddleware(
     ctx.set("internalAuthServiceToken", appContext.internalAuthServiceToken);
     ctx.set("db", appContext.db);
     ctx.set("integrationRegistry", appContext.integrationRegistry);
-    ctx.set("openWorkflow", appContext.openWorkflow);
     ctx.set("services", appContext.services);
     ctx.set("session", null);
     await next();
