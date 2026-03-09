@@ -107,7 +107,8 @@ export type IntegrationResourceDefinition = {
   kind: string;
   selectionMode: IntegrationResourceSelectionMode;
   bindingField: string;
-  displayName: string;
+  displayNameSingular: string;
+  displayNamePlural: string;
   description?: string;
   credential?: IntegrationResourceCredentialRef | IntegrationResourceCredentialSelector;
 };

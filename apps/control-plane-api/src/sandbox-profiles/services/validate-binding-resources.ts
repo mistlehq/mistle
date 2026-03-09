@@ -1,4 +1,6 @@
 import {
+  type IntegrationConnectionResource,
+  type IntegrationConnectionResourceState,
   IntegrationConnectionResourceStatuses,
   IntegrationConnectionResourceSyncStates,
 } from "@mistle/db/control-plane";
@@ -29,34 +31,55 @@ type PendingSelectionValidation = {
   connectionId: string;
   kind: string;
   field: string;
-  displayName: string;
+  displayNameSingular: string;
+  displayNamePlural: string;
   selectedHandles: readonly string[];
 };
 
-function createStateKey(input: { connectionId: string; kind: string }): string {
-  return `${input.connectionId}::${input.kind}`;
-}
+type ResourceStateByConnection = Map<string, Map<string, IntegrationConnectionResourceState>>;
 
-function createResourceKey(input: { connectionId: string; kind: string; handle: string }): string {
-  return `${input.connectionId}::${input.kind}::${input.handle}`;
-}
+type AccessibleHandlesByConnection = Map<string, Map<string, Set<string>>>;
 
-function resolveResourceLabel(displayName: string): string {
-  return displayName.trim().toLowerCase();
-}
+function buildResourceStateByConnection(
+  resourceStates: readonly IntegrationConnectionResourceState[],
+): ResourceStateByConnection {
+  const resourceStateByConnection: ResourceStateByConnection = new Map();
 
-function resolveSingularResourceLabel(displayName: string): string {
-  const resourceLabel = resolveResourceLabel(displayName);
+  for (const resourceState of resourceStates) {
+    let resourceStateByKind = resourceStateByConnection.get(resourceState.connectionId);
+    if (resourceStateByKind === undefined) {
+      resourceStateByKind = new Map();
+      resourceStateByConnection.set(resourceState.connectionId, resourceStateByKind);
+    }
 
-  if (resourceLabel.endsWith("ies")) {
-    return `${resourceLabel.slice(0, -3)}y`;
+    resourceStateByKind.set(resourceState.kind, resourceState);
   }
 
-  if (resourceLabel.endsWith("s")) {
-    return resourceLabel.slice(0, -1);
+  return resourceStateByConnection;
+}
+
+function buildAccessibleHandlesByConnection(
+  accessibleResources: readonly IntegrationConnectionResource[],
+): AccessibleHandlesByConnection {
+  const accessibleHandlesByConnection: AccessibleHandlesByConnection = new Map();
+
+  for (const resource of accessibleResources) {
+    let accessibleHandlesByKind = accessibleHandlesByConnection.get(resource.connectionId);
+    if (accessibleHandlesByKind === undefined) {
+      accessibleHandlesByKind = new Map();
+      accessibleHandlesByConnection.set(resource.connectionId, accessibleHandlesByKind);
+    }
+
+    let accessibleHandles = accessibleHandlesByKind.get(resource.kind);
+    if (accessibleHandles === undefined) {
+      accessibleHandles = new Set();
+      accessibleHandlesByKind.set(resource.kind, accessibleHandles);
+    }
+
+    accessibleHandles.add(resource.handle);
   }
 
-  return resourceLabel;
+  return accessibleHandlesByConnection;
 }
 
 function readSelectedHandles(input: {
@@ -118,7 +141,8 @@ function collectPendingSelections(
         connectionId: binding.connectionId,
         kind: resourceDefinition.kind,
         field: resourceDefinition.bindingField,
-        displayName: resourceDefinition.displayName,
+        displayNameSingular: resourceDefinition.displayNameSingular,
+        displayNamePlural: resourceDefinition.displayNamePlural,
         selectedHandles: [...new Set(selectedHandles)],
       });
     }
@@ -159,15 +183,7 @@ export async function validateBindingResources(input: {
     where: (table, { and, inArray }) =>
       and(inArray(table.connectionId, connectionIds), inArray(table.kind, kinds)),
   });
-  const resourceStateByKey = new Map(
-    resourceStates.map((resourceState) => [
-      createStateKey({
-        connectionId: resourceState.connectionId,
-        kind: resourceState.kind,
-      }),
-      resourceState,
-    ]),
-  );
+  const resourceStateByConnection = buildResourceStateByConnection(resourceStates);
 
   const accessibleResources =
     handles.length === 0
@@ -181,27 +197,14 @@ export async function validateBindingResources(input: {
               eq(table.status, IntegrationConnectionResourceStatuses.ACCESSIBLE),
             ),
         });
-  const accessibleResourceKeySet = new Set(
-    accessibleResources.map((resource) =>
-      createResourceKey({
-        connectionId: resource.connectionId,
-        kind: resource.kind,
-        handle: resource.handle,
-      }),
-    ),
-  );
+  const accessibleHandlesByConnection = buildAccessibleHandlesByConnection(accessibleResources);
 
   const issues: BindingResourceValidationIssue[] = [];
 
   for (const selection of pendingSelections) {
-    const resourceLabel = resolveResourceLabel(selection.displayName);
-    const singularResourceLabel = resolveSingularResourceLabel(selection.displayName);
-    const resourceState = resourceStateByKey.get(
-      createStateKey({
-        connectionId: selection.connectionId,
-        kind: selection.kind,
-      }),
-    );
+    const resourceState = resourceStateByConnection
+      .get(selection.connectionId)
+      ?.get(selection.kind);
 
     if (
       resourceState === undefined ||
@@ -212,7 +215,7 @@ export async function validateBindingResources(input: {
         ...(selection.clientRef === undefined ? {} : { clientRef: selection.clientRef }),
         validatorCode: "system.resource_sync_required",
         field: selection.field,
-        safeMessage: `Resource sync is required before ${resourceLabel} can be selected for this connection.`,
+        safeMessage: `Resource sync is required before ${selection.displayNamePlural} can be selected for this connection.`,
       });
       continue;
     }
@@ -226,7 +229,7 @@ export async function validateBindingResources(input: {
         ...(selection.clientRef === undefined ? {} : { clientRef: selection.clientRef }),
         validatorCode: "system.resource_sync_in_progress",
         field: selection.field,
-        safeMessage: `Resource sync is still in progress for ${resourceLabel}.`,
+        safeMessage: `Resource sync is still in progress for ${selection.displayNamePlural}.`,
       });
       continue;
     }
@@ -240,20 +243,17 @@ export async function validateBindingResources(input: {
         ...(selection.clientRef === undefined ? {} : { clientRef: selection.clientRef }),
         validatorCode: "system.resource_sync_failed",
         field: selection.field,
-        safeMessage: `Resource sync failed before any ${resourceLabel} were available for selection.`,
+        safeMessage: `Resource sync failed before any ${selection.displayNamePlural} were available for selection.`,
       });
       continue;
     }
 
     for (const handle of selection.selectedHandles) {
       if (
-        accessibleResourceKeySet.has(
-          createResourceKey({
-            connectionId: selection.connectionId,
-            kind: selection.kind,
-            handle,
-          }),
-        )
+        accessibleHandlesByConnection
+          .get(selection.connectionId)
+          ?.get(selection.kind)
+          ?.has(handle) === true
       ) {
         continue;
       }
@@ -263,7 +263,7 @@ export async function validateBindingResources(input: {
         ...(selection.clientRef === undefined ? {} : { clientRef: selection.clientRef }),
         validatorCode: "system.inaccessible_resource_reference",
         field: selection.field,
-        safeMessage: `Selected ${singularResourceLabel} '${handle}' is no longer accessible for this connection.`,
+        safeMessage: `Selected ${selection.displayNameSingular} '${handle}' is no longer accessible for this connection.`,
       });
     }
   }
