@@ -283,6 +283,7 @@ describe("integration connections create api key integration", () => {
         cookie: authenticatedSession.cookie,
       },
       body: JSON.stringify({
+        displayName: "Missing target connection",
         apiKey: "sk-test-no-records",
       }),
     });

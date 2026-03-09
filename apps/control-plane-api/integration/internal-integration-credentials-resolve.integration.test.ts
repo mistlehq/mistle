@@ -35,6 +35,7 @@ describe("internal integration credentials resolve", () => {
           cookie: authSession.cookie,
         },
         body: JSON.stringify({
+          displayName: "OpenAI internal credential test",
           apiKey: "sk-integration-test",
         }),
       },
