@@ -513,6 +513,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/test-harness
 
+  packages/agent: {}
+
   packages/automations:
     dependencies:
       liquidjs:
