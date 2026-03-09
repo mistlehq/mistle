@@ -3,6 +3,7 @@ import { Outlet } from "react-router";
 
 import { useAppPageMeta } from "../navigation/route-meta.js";
 import { SettingsHeaderActionsContext } from "./settings-header-actions.js";
+import { SettingsLayoutView } from "./settings-layout-view.js";
 
 export function SettingsLayout(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
@@ -13,18 +14,13 @@ export function SettingsLayout(): React.JSX.Element {
 
   return (
     <SettingsHeaderActionsContext.Provider value={setHeaderActions}>
-      <div className="gap-4 flex flex-col">
-        <div className="flex items-start justify-between gap-3">
-          <div className="gap-1 flex flex-col">
-            <h1 className="text-xl font-semibold">{title}</h1>
-            {shouldShowDescription ? (
-              <p className="text-muted-foreground text-sm">{description}</p>
-            ) : null}
-          </div>
-          {headerActions ? <div className="shrink-0">{headerActions}</div> : null}
-        </div>
+      <SettingsLayoutView
+        description={shouldShowDescription ? description : ""}
+        headerActions={headerActions}
+        title={title}
+      >
         <Outlet />
-      </div>
+      </SettingsLayoutView>
     </SettingsHeaderActionsContext.Provider>
   );
 }
