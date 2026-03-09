@@ -5,6 +5,7 @@ import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 import {
   acquireAutomationConnection,
+  claimAutomationConversation,
   deliverAutomationPayload,
   ensureAutomationSandbox,
   markAutomationRunCompleted,
@@ -41,6 +42,14 @@ export function createControlPlaneWorkerServices(
       },
       prepareAutomationRun: async (workflowInput) => {
         return prepareAutomationRun(
+          {
+            db: input.db,
+          },
+          workflowInput,
+        );
+      },
+      claimAutomationConversation: async (workflowInput) => {
+        return claimAutomationConversation(
           {
             db: input.db,
           },

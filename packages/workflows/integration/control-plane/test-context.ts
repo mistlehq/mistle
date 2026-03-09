@@ -119,6 +119,9 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
                 renderedConversationKey: "conversation-key",
                 renderedIdempotencyKey: null,
               }),
+              claimAutomationConversation: async () => ({
+                conversationId: "cnv_test",
+              }),
               ensureAutomationSandbox: async () => ({
                 sandboxInstanceId: "sbi_test",
                 startupWorkflowRunId: "wf_start_sandbox_test",

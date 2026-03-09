@@ -5,6 +5,7 @@ import {
   automations,
   AutomationKinds,
   createControlPlaneDatabase,
+  IntegrationBindingKinds,
   integrationConnections,
   IntegrationConnectionStatuses,
   integrationTargets,
@@ -12,6 +13,8 @@ import {
   IntegrationWebhookEventStatuses,
   organizations,
   sandboxProfiles,
+  sandboxProfileVersionIntegrationBindings,
+  sandboxProfileVersions,
   CONTROL_PLANE_SCHEMA_NAME,
   webhookAutomations,
 } from "@mistle/db/control-plane";
@@ -25,6 +28,7 @@ import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
 import {
+  claimAutomationConversation,
   markAutomationRunCompleted,
   markAutomationRunFailed,
   prepareAutomationRun,
@@ -75,7 +79,10 @@ describe("handleAutomationRun integration", () => {
     }
 
     try {
-      await prepareAutomationRun(deps, workflowInput);
+      const preparedAutomationRun = await prepareAutomationRun(deps, workflowInput);
+      await claimAutomationConversation(deps, {
+        preparedAutomationRun,
+      });
       await markAutomationRunCompleted(deps, workflowInput);
     } catch (error) {
       const failure = resolveAutomationRunFailure(error);
@@ -86,6 +93,51 @@ describe("handleAutomationRun integration", () => {
       });
       throw error;
     }
+  }
+
+  async function seedAgentBinding(input: {
+    db: ReturnType<typeof createControlPlaneDatabase>;
+    organizationId: string;
+    sandboxProfileId: string;
+    sandboxProfileVersion: number;
+    suffix: string;
+  }) {
+    const agentTargetKey = `openai-default-${input.suffix}`;
+    const agentConnectionId = `icn_agent_${input.suffix}`;
+
+    await input.db.insert(integrationTargets).values({
+      targetKey: agentTargetKey,
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {},
+    });
+    await input.db.insert(integrationConnections).values({
+      id: agentConnectionId,
+      organizationId: input.organizationId,
+      targetKey: agentTargetKey,
+      displayName: `Agent Connection ${input.suffix}`,
+      status: IntegrationConnectionStatuses.ACTIVE,
+      externalSubjectId: `openai-agent-${input.suffix}`,
+      config: {
+        auth_scheme: "api_key",
+      },
+    });
+    await input.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: input.sandboxProfileId,
+      version: input.sandboxProfileVersion,
+    });
+    await input.db.insert(sandboxProfileVersionIntegrationBindings).values({
+      sandboxProfileId: input.sandboxProfileId,
+      sandboxProfileVersion: input.sandboxProfileVersion,
+      connectionId: agentConnectionId,
+      kind: IntegrationBindingKinds.AGENT,
+      config: {
+        runtime: "codex-cli",
+        defaultModel: "gpt-5.3-codex",
+        reasoningEffort: "medium",
+      },
+    });
   }
 
   it(
@@ -225,6 +277,158 @@ describe("handleAutomationRun integration", () => {
   );
 
   it(
+    "claims the logical conversation and persists rendered delivery state on the run",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const organizationId = "org_worker_automation_claim";
+        const sandboxProfileId = "sbp_worker_automation_claim";
+        const automationId = "atm_worker_automation_claim";
+        const automationTargetId = "atg_worker_automation_claim";
+        const webhookEventId = "iwe_worker_automation_claim";
+        const automationRunId = "aru_worker_automation_claim";
+        const connectionId = "icn_worker_automation_claim";
+        const targetKey = "github-cloud-worker-automation-claim";
+
+        await database.db.insert(organizations).values({
+          id: organizationId,
+          name: "Worker Automation Claim",
+          slug: "worker-automation-claim",
+        });
+        await database.db.insert(sandboxProfiles).values({
+          id: sandboxProfileId,
+          organizationId,
+          displayName: "Automation Claim Profile",
+          status: "active",
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey,
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: connectionId,
+          organizationId,
+          targetKey,
+          displayName: "Worker automation connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "123456",
+          config: {},
+        });
+        await database.db.insert(automations).values({
+          id: automationId,
+          organizationId,
+          kind: AutomationKinds.WEBHOOK,
+          name: "Automation Claim",
+          enabled: true,
+        });
+        await database.db.insert(webhookAutomations).values({
+          automationId,
+          integrationConnectionId: connectionId,
+          eventTypes: ["github.issue_comment.created"],
+          payloadFilter: null,
+          inputTemplate: "Handle {{payload.comment.body}}",
+          conversationKeyTemplate: "issue-{{payload.issue.number}}",
+          idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
+        });
+        await database.db.insert(automationTargets).values({
+          id: automationTargetId,
+          automationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 3,
+        });
+        await seedAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 3,
+          suffix: "worker_automation_claim",
+        });
+        await database.db.insert(integrationWebhookEvents).values({
+          id: webhookEventId,
+          organizationId,
+          integrationConnectionId: connectionId,
+          targetKey,
+          externalEventId: "evt_claim",
+          externalDeliveryId: "delivery_claim",
+          providerEventType: "issue_comment",
+          eventType: "github.issue_comment.created",
+          payload: {
+            issue: {
+              number: 42,
+            },
+            comment: {
+              body: "@mistlebot claim",
+            },
+          },
+          status: IntegrationWebhookEventStatuses.PROCESSED,
+        });
+        await database.db.insert(automationRuns).values({
+          id: automationRunId,
+          automationId,
+          automationTargetId,
+          sourceWebhookEventId: webhookEventId,
+          status: AutomationRunStatuses.RUNNING,
+        });
+
+        const preparedRun = await prepareAutomationRun(
+          {
+            db: database.db,
+          },
+          {
+            automationRunId,
+          },
+        );
+        const claimedConversation = await claimAutomationConversation(
+          {
+            db: database.db,
+          },
+          {
+            preparedAutomationRun: preparedRun,
+          },
+        );
+
+        const persistedRun = await database.db.query.automationRuns.findFirst({
+          where: (table, { eq }) => eq(table.id, automationRunId),
+        });
+        const persistedConversation = await database.db.query.conversations.findFirst({
+          where: (table, { eq }) => eq(table.id, claimedConversation.conversationId),
+        });
+
+        expect(persistedRun?.conversationId).toBe(claimedConversation.conversationId);
+        expect(persistedRun?.renderedInput).toBe("Handle @mistlebot claim");
+        expect(persistedRun?.renderedConversationKey).toBe("issue-42");
+        expect(persistedRun?.renderedIdempotencyKey).toBe("delivery_claim");
+
+        expect(persistedConversation).toMatchObject({
+          id: claimedConversation.conversationId,
+          organizationId,
+          ownerKind: "automation_target",
+          ownerId: automationTargetId,
+          conversationKey: "issue-42",
+          sandboxProfileId,
+          providerFamily: "codex",
+          createdByKind: "webhook",
+          createdById: webhookEventId,
+          status: "pending",
+          preview: "Handle @mistlebot claim",
+        });
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
     "marks queued runs completed when templates compile successfully",
     async ({ fixture }) => {
       const database = await createTestDatabase({
@@ -293,6 +497,13 @@ describe("handleAutomationRun integration", () => {
           sandboxProfileId,
           sandboxProfileVersion: 1,
         });
+        await seedAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+          suffix: "worker_automation_run_complete",
+        });
         await database.db.insert(integrationWebhookEvents).values({
           id: webhookEventId,
           organizationId,
@@ -337,6 +548,10 @@ describe("handleAutomationRun integration", () => {
         expect(persistedRun.startedAt).toBeDefined();
         expect(persistedRun.finishedAt).toBeDefined();
         expect(persistedRun.failureCode).toBeNull();
+        expect(persistedRun.conversationId).not.toBeNull();
+        expect(persistedRun.renderedInput).toBe("Handle @mistlebot run");
+        expect(persistedRun.renderedConversationKey).toBe("issue-99");
+        expect(persistedRun.renderedIdempotencyKey).toBe("delivery_complete");
       } finally {
         await database.stop();
       }
@@ -413,6 +628,13 @@ describe("handleAutomationRun integration", () => {
           sandboxProfileId,
           sandboxProfileVersion: 1,
         });
+        await seedAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+          suffix: "worker_automation_run_running",
+        });
         await database.db.insert(integrationWebhookEvents).values({
           id: webhookEventId,
           organizationId,
@@ -456,6 +678,7 @@ describe("handleAutomationRun integration", () => {
         expect(persistedRun.status).toBe(AutomationRunStatuses.COMPLETED);
         expect(persistedRun.finishedAt).toBeDefined();
         expect(persistedRun.failureCode).toBeNull();
+        expect(persistedRun.conversationId).not.toBeNull();
       } finally {
         await database.stop();
       }
@@ -531,6 +754,13 @@ describe("handleAutomationRun integration", () => {
           automationId,
           sandboxProfileId,
           sandboxProfileVersion: 1,
+        });
+        await seedAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 1,
+          suffix: "worker_automation_run_fail",
         });
         await database.db.insert(integrationWebhookEvents).values({
           id: webhookEventId,

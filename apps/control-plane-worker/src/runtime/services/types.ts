@@ -3,6 +3,8 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type {
   AcquiredAutomationConnection,
   AcquireAutomationConnectionInput,
+  ClaimedAutomationConversation,
+  ClaimAutomationConversationInput,
   ControlPlaneWorkerServices,
   DeliverAutomationPayloadInput,
   EnsuredAutomationSandbox,
@@ -66,6 +68,8 @@ export type HandleAutomationRunServiceDependencies = {
 export type HandleAutomationRunServiceInput = HandleAutomationRunWorkflowInput;
 export type HandleAutomationRunTransitionServiceOutput = { shouldProcess: boolean };
 export type PrepareAutomationRunServiceOutput = PreparedAutomationRun;
+export type ClaimAutomationConversationServiceInput = ClaimAutomationConversationInput;
+export type ClaimAutomationConversationServiceOutput = ClaimedAutomationConversation;
 export type EnsureAutomationSandboxServiceInput = EnsureAutomationSandboxInput;
 export type EnsureAutomationSandboxServiceOutput = EnsuredAutomationSandbox;
 export type AcquireAutomationConnectionServiceInput = AcquireAutomationConnectionInput;

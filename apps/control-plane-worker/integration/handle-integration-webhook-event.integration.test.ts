@@ -3,6 +3,7 @@ import {
   automations,
   AutomationKinds,
   createControlPlaneDatabase,
+  IntegrationBindingKinds,
   integrationConnections,
   IntegrationConnectionStatuses,
   integrationTargets,
@@ -10,6 +11,8 @@ import {
   IntegrationWebhookEventStatuses,
   organizations,
   sandboxProfiles,
+  sandboxProfileVersionIntegrationBindings,
+  sandboxProfileVersions,
   CONTROL_PLANE_SCHEMA_NAME,
   webhookAutomations,
 } from "@mistle/db/control-plane";
@@ -23,6 +26,7 @@ import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
 import {
+  claimAutomationConversation,
   markAutomationRunCompleted,
   markAutomationRunFailed,
   prepareAutomationRun,
@@ -57,6 +61,51 @@ async function createTestDatabase(input: { databaseUrl: string }) {
 }
 
 describe("handleIntegrationWebhookEvent integration", () => {
+  async function seedAgentBinding(input: {
+    db: ReturnType<typeof createControlPlaneDatabase>;
+    organizationId: string;
+    sandboxProfileId: string;
+    sandboxProfileVersion: number;
+    suffix: string;
+  }) {
+    const agentTargetKey = `openai-default-${input.suffix}`;
+    const agentConnectionId = `icn_agent_${input.suffix}`;
+
+    await input.db.insert(integrationTargets).values({
+      targetKey: agentTargetKey,
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {},
+    });
+    await input.db.insert(integrationConnections).values({
+      id: agentConnectionId,
+      organizationId: input.organizationId,
+      targetKey: agentTargetKey,
+      displayName: `Agent Connection ${input.suffix}`,
+      status: IntegrationConnectionStatuses.ACTIVE,
+      externalSubjectId: `openai-agent-${input.suffix}`,
+      config: {
+        auth_scheme: "api_key",
+      },
+    });
+    await input.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: input.sandboxProfileId,
+      version: input.sandboxProfileVersion,
+    });
+    await input.db.insert(sandboxProfileVersionIntegrationBindings).values({
+      sandboxProfileId: input.sandboxProfileId,
+      sandboxProfileVersion: input.sandboxProfileVersion,
+      connectionId: agentConnectionId,
+      kind: IntegrationBindingKinds.AGENT,
+      config: {
+        runtime: "codex-cli",
+        defaultModel: "gpt-5.3-codex",
+        reasoningEffort: "medium",
+      },
+    });
+  }
+
   async function executeHandleAutomationRunSteps(input: {
     db: ReturnType<typeof createControlPlaneDatabase>;
     automationRunId: string;
@@ -74,7 +123,10 @@ describe("handleIntegrationWebhookEvent integration", () => {
     }
 
     try {
-      await prepareAutomationRun(deps, workflowInput);
+      const preparedAutomationRun = await prepareAutomationRun(deps, workflowInput);
+      await claimAutomationConversation(deps, {
+        preparedAutomationRun,
+      });
       await markAutomationRunCompleted(deps, workflowInput);
     } catch (error) {
       const failure = resolveAutomationRunFailure(error);
@@ -132,6 +184,13 @@ describe("handleIntegrationWebhookEvent integration", () => {
           organizationId,
           displayName: "Worker Queue Profile",
           status: "active",
+        });
+        await seedAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 2,
+          suffix: "worker_webhook_queue",
         });
         await database.db.insert(automations).values({
           id: automationId,
@@ -226,6 +285,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
         expect(queuedRun.automationId).toBe(automationId);
         expect(queuedRun.automationTargetId).toBe(automationTargetId);
         expect(queuedRun.status).toBe("completed");
+        expect(queuedRun.conversationId).not.toBeNull();
       } finally {
         await database.stop();
       }

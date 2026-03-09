@@ -2,6 +2,10 @@ import { renderTemplateString } from "@mistle/automations";
 import {
   automationRuns,
   AutomationRunStatuses,
+  ConversationCreatedByKinds,
+  ConversationOwnerKinds,
+  ConversationProviderFamilies,
+  IntegrationBindingKinds,
   type AutomationRunStatus,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
@@ -9,6 +13,7 @@ import { systemSleeper } from "@mistle/time";
 import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
+import { claimConversation } from "../conversations/index.js";
 import {
   connectSandboxAgentConnection,
   sendSandboxAgentMessage,
@@ -16,6 +21,8 @@ import {
 import type {
   AcquireAutomationConnectionServiceOutput,
   AcquireAutomationConnectionServiceInput,
+  ClaimAutomationConversationServiceInput,
+  ClaimAutomationConversationServiceOutput,
   DeliverAutomationPayloadServiceInput,
   EnsureAutomationSandboxServiceOutput,
   EnsureAutomationSandboxServiceInput,
@@ -82,6 +89,10 @@ const AutomationRunFailureCodes = {
   AUTOMATION_NOT_FOUND: "automation_not_found",
   AUTOMATION_TARGET_REFERENCE_MISSING: "automation_target_reference_missing",
   AUTOMATION_TARGET_NOT_FOUND: "automation_target_not_found",
+  AUTOMATION_TARGET_BINDING_MISSING: "automation_target_binding_missing",
+  AUTOMATION_TARGET_BINDING_AMBIGUOUS: "automation_target_binding_ambiguous",
+  AUTOMATION_TARGET_BINDING_INVALID: "automation_target_binding_invalid",
+  AUTOMATION_TARGET_PROVIDER_UNSUPPORTED: "automation_target_provider_unsupported",
   WEBHOOK_EVENT_REFERENCE_MISSING: "webhook_event_reference_missing",
   WEBHOOK_EVENT_NOT_FOUND: "webhook_event_not_found",
   WEBHOOK_AUTOMATION_NOT_FOUND: "webhook_automation_not_found",
@@ -97,6 +108,82 @@ class AutomationRunExecutionError extends Error {
       cause: input.cause,
     });
     this.code = input.code;
+  }
+}
+
+async function loadAutomationTargetProviderFamily(
+  db: ControlPlaneDatabase,
+  input: {
+    automationTargetId: string;
+    sandboxProfileId: string;
+    sandboxProfileVersion: number;
+  },
+) {
+  const agentBindings = await db.query.sandboxProfileVersionIntegrationBindings.findMany({
+    where: (table, { and: whereAnd, eq: whereEq }) =>
+      whereAnd(
+        whereEq(table.sandboxProfileId, input.sandboxProfileId),
+        whereEq(table.sandboxProfileVersion, input.sandboxProfileVersion),
+        whereEq(table.kind, IntegrationBindingKinds.AGENT),
+      ),
+  });
+  if (agentBindings.length === 0) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_TARGET_BINDING_MISSING,
+      message: `Automation target '${input.automationTargetId}' does not have an agent integration binding for sandbox profile '${input.sandboxProfileId}' version '${String(input.sandboxProfileVersion)}'.`,
+    });
+  }
+  if (agentBindings.length > 1) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_TARGET_BINDING_AMBIGUOUS,
+      message: `Automation target '${input.automationTargetId}' has multiple agent integration bindings for sandbox profile '${input.sandboxProfileId}' version '${String(input.sandboxProfileVersion)}'.`,
+    });
+  }
+
+  const agentBinding = agentBindings[0];
+  if (agentBinding === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_TARGET_BINDING_MISSING,
+      message: "Expected an agent integration binding but none was available.",
+    });
+  }
+
+  const connection = await db.query.integrationConnections.findFirst({
+    columns: {
+      id: true,
+      targetKey: true,
+    },
+    where: (table, { eq: whereEq }) => whereEq(table.id, agentBinding.connectionId),
+  });
+  if (connection === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_TARGET_BINDING_INVALID,
+      message: `Agent integration binding '${agentBinding.id}' references missing connection '${agentBinding.connectionId}'.`,
+    });
+  }
+
+  const target = await db.query.integrationTargets.findFirst({
+    columns: {
+      targetKey: true,
+      familyId: true,
+    },
+    where: (table, { eq: whereEq }) => whereEq(table.targetKey, connection.targetKey),
+  });
+  if (target === undefined) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_TARGET_BINDING_INVALID,
+      message: `Agent connection '${connection.id}' references missing target '${connection.targetKey}'.`,
+    });
+  }
+
+  switch (target.familyId) {
+    case "openai":
+      return ConversationProviderFamilies.CODEX;
+    default:
+      throw new AutomationRunExecutionError({
+        code: AutomationRunFailureCodes.AUTOMATION_TARGET_PROVIDER_UNSUPPORTED,
+        message: `Automation target '${input.automationTargetId}' uses unsupported provider family '${target.familyId}' for conversations.`,
+      });
   }
 }
 
@@ -385,6 +472,50 @@ export async function prepareAutomationRun(
     renderedInput: compiledTemplates.renderedInput,
     renderedConversationKey: compiledTemplates.renderedConversationKey,
     renderedIdempotencyKey: compiledTemplates.renderedIdempotencyKey,
+  };
+}
+
+export async function claimAutomationConversation(
+  deps: HandleAutomationRunDependencies,
+  input: ClaimAutomationConversationServiceInput,
+): Promise<ClaimAutomationConversationServiceOutput> {
+  const providerFamily = await loadAutomationTargetProviderFamily(deps.db, {
+    automationTargetId: input.preparedAutomationRun.automationTargetId,
+    sandboxProfileId: input.preparedAutomationRun.sandboxProfileId,
+    sandboxProfileVersion: input.preparedAutomationRun.sandboxProfileVersion,
+  });
+
+  const conversation = await claimConversation(
+    {
+      db: deps.db,
+    },
+    {
+      organizationId: input.preparedAutomationRun.organizationId,
+      ownerKind: ConversationOwnerKinds.AUTOMATION_TARGET,
+      ownerId: input.preparedAutomationRun.automationTargetId,
+      createdByKind: ConversationCreatedByKinds.WEBHOOK,
+      createdById: input.preparedAutomationRun.webhookEventId,
+      conversationKey: input.preparedAutomationRun.renderedConversationKey,
+      sandboxProfileId: input.preparedAutomationRun.sandboxProfileId,
+      providerFamily,
+      title: null,
+      preview: input.preparedAutomationRun.renderedInput,
+    },
+  );
+
+  await deps.db
+    .update(automationRuns)
+    .set({
+      conversationId: conversation.id,
+      renderedInput: input.preparedAutomationRun.renderedInput,
+      renderedConversationKey: input.preparedAutomationRun.renderedConversationKey,
+      renderedIdempotencyKey: input.preparedAutomationRun.renderedIdempotencyKey,
+      updatedAt: sql`now()`,
+    })
+    .where(eq(automationRuns.id, input.preparedAutomationRun.automationRunId));
+
+  return {
+    conversationId: conversation.id,
   };
 }
 

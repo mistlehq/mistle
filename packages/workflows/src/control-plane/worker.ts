@@ -5,6 +5,8 @@ import { createHandleAutomationRunWorkflow } from "./workflows/handle-automation
 import type {
   AcquiredAutomationConnection,
   AcquireAutomationConnectionInput,
+  ClaimedAutomationConversation,
+  ClaimAutomationConversationInput,
   DeliverAutomationPayloadInput,
   EnsureAutomationSandboxInput,
   EnsuredAutomationSandbox,
@@ -41,6 +43,9 @@ export type ControlPlaneWorkerServices = {
     prepareAutomationRun: (
       input: HandleAutomationRunWorkflowInput,
     ) => Promise<PreparedAutomationRun>;
+    claimAutomationConversation: (
+      input: ClaimAutomationConversationInput,
+    ) => Promise<ClaimedAutomationConversation>;
     ensureAutomationSandbox: (
       input: EnsureAutomationSandboxInput,
     ) => Promise<EnsuredAutomationSandbox>;
@@ -110,6 +115,7 @@ export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): 
         transitionAutomationRunToRunning:
           input.services.automationRuns.transitionAutomationRunToRunning,
         prepareAutomationRun: input.services.automationRuns.prepareAutomationRun,
+        claimAutomationConversation: input.services.automationRuns.claimAutomationConversation,
         ensureAutomationSandbox: input.services.automationRuns.ensureAutomationSandbox,
         acquireAutomationConnection: input.services.automationRuns.acquireAutomationConnection,
         deliverAutomationPayload: input.services.automationRuns.deliverAutomationPayload,

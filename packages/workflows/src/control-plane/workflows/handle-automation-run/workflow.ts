@@ -33,6 +33,14 @@ export type EnsureAutomationSandboxInput = {
   preparedAutomationRun: PreparedAutomationRun;
 };
 
+export type ClaimAutomationConversationInput = {
+  preparedAutomationRun: PreparedAutomationRun;
+};
+
+export type ClaimedAutomationConversation = {
+  conversationId: string;
+};
+
 export type EnsuredAutomationSandbox = {
   sandboxInstanceId: string;
   startupWorkflowRunId: string;
@@ -72,6 +80,9 @@ export type CreateHandleAutomationRunWorkflowInput = {
     input: HandleAutomationRunWorkflowInput,
   ) => Promise<HandleAutomationRunTransitionResult>;
   prepareAutomationRun: (input: HandleAutomationRunWorkflowInput) => Promise<PreparedAutomationRun>;
+  claimAutomationConversation: (
+    input: ClaimAutomationConversationInput,
+  ) => Promise<ClaimedAutomationConversation>;
   ensureAutomationSandbox: (
     input: EnsureAutomationSandboxInput,
   ) => Promise<EnsuredAutomationSandbox>;
@@ -105,6 +116,12 @@ export function createHandleAutomationRunWorkflow(
     try {
       const preparedAutomationRun = await step.run({ name: "prepare-automation-run" }, async () =>
         ctx.prepareAutomationRun(workflowInput),
+      );
+
+      await step.run({ name: "claim-automation-conversation" }, async () =>
+        ctx.claimAutomationConversation({
+          preparedAutomationRun,
+        }),
       );
 
       const ensuredAutomationSandbox = await step.run(

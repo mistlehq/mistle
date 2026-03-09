@@ -12,6 +12,8 @@ export {
 export {
   type AcquiredAutomationConnection,
   type AcquireAutomationConnectionInput,
+  type ClaimedAutomationConversation,
+  type ClaimAutomationConversationInput,
   createHandleAutomationRunWorkflow,
   type CreateHandleAutomationRunWorkflowInput,
   type DeliverAutomationPayloadInput,
