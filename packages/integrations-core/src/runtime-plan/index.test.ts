@@ -91,6 +91,19 @@ describe("assembleCompiledRuntimePlan", () => {
               ],
             },
           ],
+          agentRuntimes: [
+            {
+              bindingId: "bind_b",
+              runtimeKey: "github-app-server",
+              clientId: "codex-cli",
+              endpointKey: "app-server-b",
+              capabilities: {
+                conversation: {
+                  providerFamily: "codex",
+                },
+              },
+            },
+          ],
         },
         {
           egressRoutes: [
@@ -174,6 +187,19 @@ describe("assembleCompiledRuntimePlan", () => {
               ],
             },
           ],
+          agentRuntimes: [
+            {
+              bindingId: "bind_a",
+              runtimeKey: "codex-app-server",
+              clientId: "codex-cli",
+              endpointKey: "app-server-a",
+              capabilities: {
+                conversation: {
+                  providerFamily: "codex",
+                },
+              },
+            },
+          ],
         },
       ],
     });
@@ -201,6 +227,30 @@ describe("assembleCompiledRuntimePlan", () => {
     expect(runtimeClient?.endpoints.map((endpoint) => endpoint.endpointKey)).toEqual([
       "app-server-a",
       "app-server-b",
+    ]);
+    expect(plan.agentRuntimes).toEqual([
+      {
+        bindingId: "bind_a",
+        runtimeKey: "codex-app-server",
+        clientId: "codex-cli",
+        endpointKey: "app-server-a",
+        capabilities: {
+          conversation: {
+            providerFamily: "codex",
+          },
+        },
+      },
+      {
+        bindingId: "bind_b",
+        runtimeKey: "github-app-server",
+        clientId: "codex-cli",
+        endpointKey: "app-server-b",
+        capabilities: {
+          conversation: {
+            providerFamily: "codex",
+          },
+        },
+      },
     ]);
   });
 
@@ -233,6 +283,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            agentRuntimes: [],
           },
           {
             egressRoutes: [],
@@ -250,6 +301,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            agentRuntimes: [],
           },
         ],
       }),
@@ -283,6 +335,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            agentRuntimes: [],
           },
           {
             egressRoutes: [],
@@ -300,6 +353,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            agentRuntimes: [],
           },
         ],
       });
@@ -345,6 +399,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            agentRuntimes: [],
           },
           {
             egressRoutes: [],
@@ -367,6 +422,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            agentRuntimes: [],
           },
         ],
       }),
@@ -405,6 +461,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            agentRuntimes: [],
           },
           {
             egressRoutes: [],
@@ -427,6 +484,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            agentRuntimes: [],
           },
         ],
       });
@@ -470,6 +528,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            agentRuntimes: [],
           },
         ],
       }),
@@ -506,6 +565,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            agentRuntimes: [],
           },
         ],
       });
@@ -543,6 +603,7 @@ describe("assembleCompiledRuntimePlan", () => {
             },
           ],
           runtimeClients: [],
+          agentRuntimes: [],
         },
       ],
       previousCompiledBindingResults: [
@@ -567,6 +628,7 @@ describe("assembleCompiledRuntimePlan", () => {
             },
           ],
           runtimeClients: [],
+          agentRuntimes: [],
         },
       ],
     });

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import type {
+  CompileBindingAgentRuntime,
   CompiledBindingResult,
   EgressCredentialRoute,
   RuntimeClientEndpointSpec,
@@ -70,6 +71,7 @@ function createCompiledBindingResult(input: {
   };
   runtimeClientProcesses?: ReadonlyArray<RuntimeClientProcessSpec>;
   runtimeClientEndpoints?: ReadonlyArray<RuntimeClientEndpointSpec>;
+  agentRuntimes?: ReadonlyArray<CompileBindingAgentRuntime>;
 }): CompiledBindingResult {
   const hasRuntimeClient =
     input.runtimeClientSetup !== undefined ||
@@ -108,6 +110,11 @@ function createCompiledBindingResult(input: {
             endpoints: input.runtimeClientEndpoints ?? [],
           },
         ],
+    agentRuntimes:
+      input.agentRuntimes?.map((agentRuntime) => ({
+        ...agentRuntime,
+        bindingId: input.route.bindingId,
+      })) ?? [],
   };
 }
 
@@ -674,5 +681,144 @@ describe("validateCompiledBindingResults", () => {
         compiledBindingResults: [result],
       }),
     ).toThrowError(IntegrationCompilerError);
+  });
+
+  it("accepts agent runtimes that reference an existing client endpoint", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      runtimeClientSetup: {
+        clientId: "codex-cli",
+        env: {},
+        files: [],
+      },
+      runtimeClientEndpoints: [
+        {
+          endpointKey: "app-server",
+          transport: {
+            type: "ws",
+            url: "ws://127.0.0.1:4747",
+          },
+          connectionMode: "dedicated",
+        },
+      ],
+      agentRuntimes: [
+        {
+          runtimeKey: "codex-app-server",
+          clientId: "codex-cli",
+          endpointKey: "app-server",
+          capabilities: {
+            conversation: {
+              providerFamily: "codex",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).not.toThrow();
+  });
+
+  it("fails when an agent runtime references a missing client", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      agentRuntimes: [
+        {
+          runtimeKey: "codex-app-server",
+          clientId: "missing-client",
+          endpointKey: "app-server",
+          capabilities: {
+            conversation: {
+              providerFamily: "codex",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+
+    try {
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(IntegrationCompilerError);
+      if (error instanceof IntegrationCompilerError) {
+        expect(error.code).toBe(CompilerErrorCodes.AGENT_RUNTIME_CONFLICT);
+      }
+    }
+  });
+
+  it("fails when an agent runtime references a missing endpoint", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      runtimeClientSetup: {
+        clientId: "codex-cli",
+        env: {},
+        files: [],
+      },
+      runtimeClientEndpoints: [
+        {
+          endpointKey: "other-endpoint",
+          transport: {
+            type: "ws",
+            url: "ws://127.0.0.1:4747",
+          },
+          connectionMode: "dedicated",
+        },
+      ],
+      agentRuntimes: [
+        {
+          runtimeKey: "codex-app-server",
+          clientId: "codex-cli",
+          endpointKey: "app-server",
+          capabilities: {
+            conversation: {
+              providerFamily: "codex",
+            },
+          },
+        },
+      ],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+
+    try {
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(IntegrationCompilerError);
+      if (error instanceof IntegrationCompilerError) {
+        expect(error.code).toBe(CompilerErrorCodes.AGENT_RUNTIME_CONFLICT);
+      }
+    }
   });
 });

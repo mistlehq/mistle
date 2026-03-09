@@ -145,6 +145,18 @@ function createOpenAiDefinition(): IntegrationDefinition<
           ],
         },
       ],
+      agentRuntimes: [
+        {
+          runtimeKey: "codex-app-server",
+          clientId: "codex-cli",
+          endpointKey: "app-server",
+          capabilities: {
+            conversation: {
+              providerFamily: "codex",
+            },
+          },
+        },
+      ],
     }),
   };
 }
@@ -434,6 +446,19 @@ describe("compileRuntimePlan", () => {
           signal: "sigterm",
           timeoutMs: 10_000,
           gracePeriodMs: 2_000,
+        },
+      },
+    ]);
+    expect(runtimePlan.agentRuntimes).toEqual([
+      {
+        bindingId: "bind_openai_agent",
+        runtimeKey: "codex-app-server",
+        clientId: "codex-cli",
+        endpointKey: "app-server",
+        capabilities: {
+          conversation: {
+            providerFamily: "codex",
+          },
         },
       },
     ]);

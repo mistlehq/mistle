@@ -171,6 +171,21 @@ const RuntimePlanSchema = z.object({
       ),
     }),
   ),
+  agentRuntimes: z.array(
+    z.object({
+      bindingId: z.string().min(1),
+      runtimeKey: z.string().min(1),
+      clientId: z.string().min(1),
+      endpointKey: z.string().min(1),
+      capabilities: z.object({
+        conversation: z
+          .object({
+            providerFamily: z.string().min(1),
+          })
+          .optional(),
+      }),
+    }),
+  ),
 });
 
 const SandboxStartupInputSchema = z.object({
@@ -214,6 +229,7 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
     artifacts: [],
     artifactRemovals: [],
     runtimeClients: [],
+    agentRuntimes: [],
   };
 }
 

@@ -642,6 +642,11 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         bindingId: bindingInput.binding.id,
       }),
       runtimeClients: compileBindingResult.runtimeClients,
+      agentRuntimes:
+        compileBindingResult.agentRuntimes?.map((agentRuntime) => ({
+          ...agentRuntime,
+          bindingId: bindingInput.binding.id,
+        })) ?? [],
     };
 
     preparedBindings.push({

@@ -219,6 +219,18 @@ trust_level = "trusted"
         connectionMode: "dedicated",
       },
     ]);
+    expect(compiled.agentRuntimes).toEqual([
+      {
+        runtimeKey: "codex-app-server",
+        clientId: "codex-cli",
+        endpointKey: "app-server",
+        capabilities: {
+          conversation: {
+            providerFamily: "codex",
+          },
+        },
+      },
+    ]);
   });
 
   it("uses target base-url host and path for custom upstreams", () => {
