@@ -90,6 +90,7 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
           maxConcurrentWorkflows: 1,
           enabledWorkflows: [
             ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_RUN,
+            ControlPlaneWorkerWorkflowIds.HANDLE_CONVERSATION_DELIVERY,
             ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT,
             ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
             ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
@@ -108,29 +109,20 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
                 automationTargetId: "atg_test",
                 organizationId: "org_test",
                 sandboxProfileId: "sbp_test",
-                sandboxProfileVersion: 1,
                 webhookEventId: "iwe_test",
                 webhookEventType: "github.issue_comment.created",
                 webhookProviderEventType: "issue_comment",
                 webhookExternalEventId: "evt_test",
                 webhookExternalDeliveryId: "delivery_test",
                 webhookPayload: {},
+                sourceOccurredAt: "2026-01-01T00:00:00.000Z",
+                sourceOrderKey: "2026-01-01T00:00:00.000Z#00000000000000000001",
+                providerFamily: "codex",
                 renderedInput: "hello",
                 renderedConversationKey: "conversation-key",
                 renderedIdempotencyKey: null,
               }),
-              ensureAutomationSandbox: async () => ({
-                sandboxInstanceId: "sbi_test",
-                startupWorkflowRunId: "wf_start_sandbox_test",
-              }),
-              acquireAutomationConnection: async () => ({
-                instanceId: "sbi_test",
-                url: "ws://gateway.example/sbi_test?connect_token=token_test",
-                token: "token_test",
-                expiresAt: "2026-01-01T00:00:30.000Z",
-              }),
-              deliverAutomationPayload: async () => {},
-              markAutomationRunCompleted: async () => {},
+              enqueuePreparedAutomationRun: async () => {},
               markAutomationRunFailed: async () => {},
               resolveAutomationRunFailure: ({ error }) => {
                 if (error instanceof Error) {
@@ -145,6 +137,12 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
                   message: "Automation run execution failed with a non-error exception.",
                 };
               },
+            },
+            conversationDeliveries: {
+              handleConversationDelivery: async (input) => ({
+                conversationId: input.conversationId,
+                generation: input.generation,
+              }),
             },
             integrationWebhooks: {
               handleWebhookEvent: async (input) => ({

@@ -3,6 +3,7 @@ import {
   automations,
   AutomationKinds,
   createControlPlaneDatabase,
+  IntegrationBindingKinds,
   integrationConnections,
   IntegrationConnectionStatuses,
   integrationTargets,
@@ -10,6 +11,8 @@ import {
   IntegrationWebhookEventStatuses,
   organizations,
   sandboxProfiles,
+  sandboxProfileVersionIntegrationBindings,
+  sandboxProfileVersions,
   CONTROL_PLANE_SCHEMA_NAME,
   webhookAutomations,
 } from "@mistle/db/control-plane";
@@ -18,12 +21,16 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
-import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
+import {
+  createControlPlaneBackend,
+  createControlPlaneOpenWorkflow,
+  type HandleAutomationRunWorkflowInput,
+} from "@mistle/workflows/control-plane";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
 import {
-  markAutomationRunCompleted,
+  enqueuePreparedAutomationRun,
   markAutomationRunFailed,
   prepareAutomationRun,
   resolveAutomationRunFailure,
@@ -56,9 +63,28 @@ async function createTestDatabase(input: { databaseUrl: string }) {
   };
 }
 
+async function createTestWorkflowClient(input: { databaseUrl: string; namespaceId: string }) {
+  const backend = await createControlPlaneBackend({
+    url: input.databaseUrl,
+    namespaceId: input.namespaceId,
+    runMigrations: true,
+  });
+  const openWorkflow = createControlPlaneOpenWorkflow({
+    backend,
+  });
+
+  return {
+    openWorkflow,
+    stop: async () => {
+      await backend.stop();
+    },
+  };
+}
+
 describe("handleIntegrationWebhookEvent integration", () => {
   async function executeHandleAutomationRunSteps(input: {
     db: ReturnType<typeof createControlPlaneDatabase>;
+    openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
     automationRunId: string;
   }) {
     const workflowInput: HandleAutomationRunWorkflowInput = {
@@ -66,6 +92,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
     };
     const deps = {
       db: input.db,
+      openWorkflow: input.openWorkflow,
     };
 
     const transitionResult = await transitionAutomationRunToRunning(deps, workflowInput);
@@ -74,8 +101,10 @@ describe("handleIntegrationWebhookEvent integration", () => {
     }
 
     try {
-      await prepareAutomationRun(deps, workflowInput);
-      await markAutomationRunCompleted(deps, workflowInput);
+      const preparedAutomationRun = await prepareAutomationRun(deps, workflowInput);
+      await enqueuePreparedAutomationRun(deps, {
+        preparedAutomationRun,
+      });
     } catch (error) {
       const failure = resolveAutomationRunFailure(error);
       await markAutomationRunFailed(deps, {
@@ -93,6 +122,10 @@ describe("handleIntegrationWebhookEvent integration", () => {
       const database = await createTestDatabase({
         databaseUrl: fixture.config.workflow.databaseUrl,
       });
+      const workflowClient = await createTestWorkflowClient({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+        namespaceId: `${fixture.config.workflow.namespaceId}-handle-integration-webhook-event`,
+      });
 
       try {
         const organizationId = "org_worker_webhook_queue";
@@ -102,6 +135,8 @@ describe("handleIntegrationWebhookEvent integration", () => {
         const automationId = "atm_worker_webhook_queue";
         const automationTargetId = "atg_worker_webhook_queue";
         const webhookEventId = "iwe_worker_webhook_queue";
+        const agentConnectionId = "icn_agent_worker_webhook_queue";
+        const agentTargetKey = "openai-default-worker-webhook-queue";
 
         await database.db.insert(organizations).values({
           id: organizationId,
@@ -127,11 +162,40 @@ describe("handleIntegrationWebhookEvent integration", () => {
           externalSubjectId: "123456",
           config: {},
         });
+        await database.db.insert(integrationTargets).values({
+          targetKey: agentTargetKey,
+          familyId: "openai",
+          variantId: "openai-default",
+          enabled: true,
+          config: {},
+        });
+        await database.db.insert(integrationConnections).values({
+          id: agentConnectionId,
+          organizationId,
+          targetKey: agentTargetKey,
+          displayName: "Worker webhook agent connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "openai-agent",
+          config: {},
+        });
         await database.db.insert(sandboxProfiles).values({
           id: sandboxProfileId,
           organizationId,
           displayName: "Worker Queue Profile",
           status: "active",
+        });
+        await database.db.insert(sandboxProfileVersions).values({
+          sandboxProfileId,
+          version: 2,
+        });
+        await database.db.insert(sandboxProfileVersionIntegrationBindings).values({
+          sandboxProfileId,
+          sandboxProfileVersion: 2,
+          connectionId: agentConnectionId,
+          kind: IntegrationBindingKinds.AGENT,
+          config: {
+            defaultModel: "gpt-5.3-codex",
+          },
         });
         await database.db.insert(automations).values({
           id: automationId,
@@ -180,6 +244,8 @@ describe("handleIntegrationWebhookEvent integration", () => {
             },
           },
           status: IntegrationWebhookEventStatuses.RECEIVED,
+          sourceOccurredAt: "2026-03-08T08:21:00Z",
+          sourceOrderKey: "2026-03-08T08:21:00Z#00000000000000001006",
         });
 
         const workflowOutput = await handleIntegrationWebhookEvent(
@@ -189,6 +255,7 @@ describe("handleIntegrationWebhookEvent integration", () => {
               for (const automationRunId of automationRunIds) {
                 await executeHandleAutomationRunSteps({
                   db: database.db,
+                  openWorkflow: workflowClient.openWorkflow,
                   automationRunId,
                 });
               }
@@ -225,8 +292,9 @@ describe("handleIntegrationWebhookEvent integration", () => {
 
         expect(queuedRun.automationId).toBe(automationId);
         expect(queuedRun.automationTargetId).toBe(automationTargetId);
-        expect(queuedRun.status).toBe("completed");
+        expect(queuedRun.status).toBe("running");
       } finally {
+        await workflowClient.stop();
         await database.stop();
       }
     },

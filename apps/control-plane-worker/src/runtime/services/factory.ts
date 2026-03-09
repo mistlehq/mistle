@@ -4,15 +4,13 @@ import { HandleAutomationRunWorkflowSpec } from "@mistle/workflows/control-plane
 import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 import {
-  acquireAutomationConnection,
-  deliverAutomationPayload,
-  ensureAutomationSandbox,
-  markAutomationRunCompleted,
+  enqueuePreparedAutomationRun,
   markAutomationRunFailed,
   prepareAutomationRun,
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
 } from "./handle-automation-run.js";
+import { handleConversationDelivery } from "./handle-conversation-delivery.js";
 import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";
 import { startSandboxProfileInstance } from "./start-sandbox-profile-instance.js";
 import type {
@@ -35,6 +33,7 @@ export function createControlPlaneWorkerServices(
         return transitionAutomationRunToRunning(
           {
             db: input.db,
+            openWorkflow: input.openWorkflow,
           },
           workflowInput,
         );
@@ -43,38 +42,16 @@ export function createControlPlaneWorkerServices(
         return prepareAutomationRun(
           {
             db: input.db,
+            openWorkflow: input.openWorkflow,
           },
           workflowInput,
         );
       },
-      ensureAutomationSandbox: async (workflowInput) => {
-        return ensureAutomationSandbox(
+      enqueuePreparedAutomationRun: async (workflowInput) => {
+        await enqueuePreparedAutomationRun(
           {
             db: input.db,
-            startSandboxProfileInstance: (startInput) =>
-              controlPlaneInternalClient.startSandboxProfileInstance(startInput),
-          },
-          workflowInput,
-        );
-      },
-      acquireAutomationConnection: async (workflowInput) => {
-        return acquireAutomationConnection(
-          {
-            getSandboxInstance: (sandboxInput) =>
-              controlPlaneInternalClient.getSandboxInstance(sandboxInput),
-            mintSandboxConnectionToken: (mintInput) =>
-              controlPlaneInternalClient.mintSandboxConnectionToken(mintInput),
-          },
-          workflowInput,
-        );
-      },
-      deliverAutomationPayload: async (workflowInput) => {
-        await deliverAutomationPayload(workflowInput);
-      },
-      markAutomationRunCompleted: async (workflowInput) => {
-        await markAutomationRunCompleted(
-          {
-            db: input.db,
+            openWorkflow: input.openWorkflow,
           },
           workflowInput,
         );
@@ -89,6 +66,22 @@ export function createControlPlaneWorkerServices(
       },
       resolveAutomationRunFailure: ({ error }) => {
         return resolveAutomationRunFailure(error);
+      },
+    },
+    conversationDeliveries: {
+      handleConversationDelivery: async (workflowInput) => {
+        return handleConversationDelivery(
+          {
+            db: input.db,
+            startSandboxProfileInstance: (startInput) =>
+              controlPlaneInternalClient.startSandboxProfileInstance(startInput),
+            getSandboxInstance: (sandboxInput) =>
+              controlPlaneInternalClient.getSandboxInstance(sandboxInput),
+            mintSandboxConnectionToken: (mintInput) =>
+              controlPlaneInternalClient.mintSandboxConnectionToken(mintInput),
+          },
+          workflowInput,
+        );
       },
     },
     integrationWebhooks: {
