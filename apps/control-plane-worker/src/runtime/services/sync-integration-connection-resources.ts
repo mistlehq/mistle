@@ -116,13 +116,6 @@ export async function syncIntegrationConnectionResources(
     );
   }
 
-  await markResourceSyncing({
-    db: deps.db,
-    connectionId: connection.id,
-    familyId: target.familyId,
-    kind: input.kind,
-  });
-
   try {
     if (connection.status !== IntegrationConnectionStatuses.ACTIVE) {
       throw new Error(`Integration connection '${connection.id}' is not active.`);
@@ -130,6 +123,13 @@ export async function syncIntegrationConnectionResources(
     if (!target.enabled) {
       throw new Error(`Integration target '${target.targetKey}' is disabled.`);
     }
+
+    await markResourceSyncing({
+      db: deps.db,
+      connectionId: connection.id,
+      familyId: target.familyId,
+      kind: input.kind,
+    });
 
     const definition = deps.integrationRegistry.getDefinition({
       familyId: target.familyId,
