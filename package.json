@@ -38,7 +38,7 @@
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.3",
-    "@commitlint/config-conventional": "^20.4.2",
+    "@commitlint/config-conventional": "^20.4.3",
     "@fast-check/vitest": "^0.2.4",
     "@playwright/test": "^1.58.1",
     "@types/node": "^24.12.0",
