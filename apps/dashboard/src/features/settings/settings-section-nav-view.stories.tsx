@@ -1,26 +1,28 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { MemoryRouter } from "react-router";
 
-import { withDashboardPageWidth } from "../../storybook/decorators.js";
+import {
+  createDashboardMemoryRouterDecorator,
+  withDashboardPageWidth,
+} from "../../storybook/decorators.js";
 import { SettingsSectionNavView } from "./settings-section-nav-view.js";
+import { SettingsStoryPathnames } from "./settings-story-fixtures.js";
 
 const meta = {
   title: "Dashboard/Settings/SettingsSectionNavView",
   component: SettingsSectionNavView,
   decorators: [
     withDashboardPageWidth,
-    function MemoryRouterDecorator(Story): React.JSX.Element {
+    createDashboardMemoryRouterDecorator(),
+    function WithStoryContainer(Story): React.JSX.Element {
       return (
-        <MemoryRouter>
-          <div className="max-w-xs">
-            <Story />
-          </div>
-        </MemoryRouter>
+        <div className="max-w-xs">
+          <Story />
+        </div>
       );
     },
   ],
   args: {
-    pathname: "/settings/account/profile",
+    pathname: SettingsStoryPathnames.ACCOUNT_PROFILE,
   },
 } satisfies Meta<typeof SettingsSectionNavView>;
 
@@ -32,18 +34,18 @@ export const Profile: Story = {};
 
 export const General: Story = {
   args: {
-    pathname: "/settings/organization/general",
+    pathname: SettingsStoryPathnames.ORGANIZATION_GENERAL,
   },
 };
 
 export const Members: Story = {
   args: {
-    pathname: "/settings/organization/members",
+    pathname: SettingsStoryPathnames.ORGANIZATION_MEMBERS,
   },
 };
 
 export const Integrations: Story = {
   args: {
-    pathname: "/settings/organization/integrations",
+    pathname: SettingsStoryPathnames.ORGANIZATION_INTEGRATIONS,
   },
 };
