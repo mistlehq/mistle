@@ -5,22 +5,33 @@ import {
 import {
   ActiveConversationDeliveryTaskStatuses,
   type HandleConversationDeliveryWorkflowInput,
+  type ResolvedConversationDeliveryRoute,
 } from "@mistle/workflows/control-plane";
 
 import {
+  activateConversationRoute,
   ConversationDeliveryTaskActions,
   claimNextConversationDeliveryTask,
   ConversationPersistenceError,
   ConversationPersistenceErrorCodes,
+  createConversationRoute,
   finalizeConversationDeliveryTask,
   findActiveConversationDeliveryTask,
+  getConversationProviderAdapter,
   idleConversationDeliveryProcessorIfEmpty,
   markConversationDeliveryTaskDelivering,
+  rebindConversationSandbox,
   resolveConversationDeliveryTaskAction,
+  updateConversationExecution,
 } from "../conversations/index.js";
 import {
+  ConversationDeliverySandboxActions,
+  ConversationExecutionActions,
+  resolveConversationDeliverySandboxAction,
+  resolveConversationExecutionAction,
+} from "./conversation-delivery-plans.js";
+import {
   acquireAutomationConnection,
-  deliverAutomationPayload,
   ensureAutomationSandbox,
   markAutomationRunCompleted,
   markAutomationRunIgnored,
@@ -30,6 +41,10 @@ import {
   type AcquireAutomationConnectionDependencies,
   type EnsureAutomationSandboxDependencies,
 } from "./handle-automation-run.js";
+import type {
+  DeliverConversationAutomationPayloadServiceInput,
+  EnsureConversationDeliverySandboxServiceInput,
+} from "./types.js";
 
 export type HandleConversationDeliveryDependencies = {
   db: ControlPlaneDatabase;
@@ -37,6 +52,50 @@ export type HandleConversationDeliveryDependencies = {
   getSandboxInstance: AcquireAutomationConnectionDependencies["getSandboxInstance"];
   mintSandboxConnectionToken: AcquireAutomationConnectionDependencies["mintSandboxConnectionToken"];
 };
+
+class ConversationDeliveryExecutionError extends Error {}
+
+function isRouteBoundToSandbox(input: {
+  resolvedConversationRoute: ResolvedConversationDeliveryRoute;
+  sandboxInstanceId: string;
+}) {
+  return input.resolvedConversationRoute.sandboxInstanceId === input.sandboxInstanceId;
+}
+
+async function steerConversationExecution(input: {
+  adapter: ReturnType<typeof getConversationProviderAdapter>;
+  connection: Awaited<ReturnType<ReturnType<typeof getConversationProviderAdapter>["connect"]>>;
+  route: {
+    id: string;
+    conversationId: string;
+    providerConversationId: string | null;
+    providerExecutionId: string | null;
+  };
+  inputText: string;
+}) {
+  if (input.route.providerConversationId === null) {
+    throw new ConversationDeliveryExecutionError(
+      `Conversation '${input.route.conversationId}' is missing provider conversation id while attempting to steer execution.`,
+    );
+  }
+  if (input.route.providerExecutionId === null) {
+    throw new ConversationDeliveryExecutionError(
+      `Conversation '${input.route.conversationId}' is missing provider execution id while attempting to steer execution.`,
+    );
+  }
+  if (input.adapter.steerExecution === undefined) {
+    throw new ConversationDeliveryExecutionError(
+      `Conversation integration family does not support steering execution for conversation '${input.route.conversationId}'.`,
+    );
+  }
+
+  return input.adapter.steerExecution({
+    connection: input.connection,
+    providerConversationId: input.route.providerConversationId,
+    providerExecutionId: input.route.providerExecutionId,
+    inputText: input.inputText,
+  });
+}
 
 export type ClaimOrResumeConversationDeliveryTaskInput = HandleConversationDeliveryWorkflowInput;
 
@@ -137,16 +196,77 @@ export async function prepareConversationDeliveryAutomationRun(
   );
 }
 
+export async function resolveConversationDeliveryRoute(
+  deps: Pick<HandleConversationDeliveryDependencies, "db">,
+  input: {
+    conversationId: string;
+  },
+): Promise<ResolvedConversationDeliveryRoute> {
+  const conversation = await deps.db.query.conversations.findFirst({
+    where: (table, { eq }) => eq(table.id, input.conversationId),
+  });
+  if (conversation === undefined) {
+    throw new ConversationPersistenceError({
+      code: ConversationPersistenceErrorCodes.CONVERSATION_NOT_FOUND,
+      message: `Conversation '${input.conversationId}' was not found.`,
+    });
+  }
+
+  const route = await deps.db.query.conversationRoutes.findFirst({
+    where: (table, { eq }) => eq(table.conversationId, input.conversationId),
+  });
+
+  return {
+    conversationId: conversation.id,
+    integrationFamilyId: conversation.integrationFamilyId,
+    routeId: route?.id ?? null,
+    sandboxInstanceId: route?.sandboxInstanceId ?? null,
+    providerConversationId: route?.providerConversationId ?? null,
+    providerExecutionId: route?.providerExecutionId ?? null,
+    providerState: route?.providerState ?? null,
+  };
+}
+
 export async function ensureConversationDeliverySandbox(
-  deps: Pick<HandleConversationDeliveryDependencies, "db" | "startSandboxProfileInstance">,
-  input: Parameters<typeof ensureAutomationSandbox>[1],
+  deps: Pick<
+    HandleConversationDeliveryDependencies,
+    "db" | "getSandboxInstance" | "startSandboxProfileInstance"
+  >,
+  input: EnsureConversationDeliverySandboxServiceInput,
 ) {
+  if (input.resolvedConversationRoute.sandboxInstanceId !== null) {
+    const existingSandbox = await deps.getSandboxInstance({
+      organizationId: input.preparedAutomationRun.organizationId,
+      instanceId: input.resolvedConversationRoute.sandboxInstanceId,
+    });
+
+    const sandboxAction = resolveConversationDeliverySandboxAction({
+      sandboxInstanceId: input.resolvedConversationRoute.sandboxInstanceId,
+      providerConversationId: input.resolvedConversationRoute.providerConversationId,
+      sandboxStatus: existingSandbox.status,
+    });
+
+    if (sandboxAction === ConversationDeliverySandboxActions.REUSE_EXISTING) {
+      return {
+        sandboxInstanceId: existingSandbox.id,
+        startupWorkflowRunId: null,
+      };
+    }
+    if (sandboxAction === ConversationDeliverySandboxActions.FAIL) {
+      throw new ConversationDeliveryExecutionError(
+        `Conversation '${input.preparedAutomationRun.conversationId}' is bound to sandbox '${input.resolvedConversationRoute.sandboxInstanceId}', but that sandbox is '${existingSandbox.status}'.`,
+      );
+    }
+  }
+
   return ensureAutomationSandbox(
     {
       db: deps.db,
       startSandboxProfileInstance: deps.startSandboxProfileInstance,
     },
-    input,
+    {
+      preparedAutomationRun: input.preparedAutomationRun,
+    },
   );
 }
 
@@ -168,16 +288,9 @@ export async function acquireConversationDeliveryConnection(
 
 export async function deliverConversationAutomationPayload(
   deps: Pick<HandleConversationDeliveryDependencies, "db">,
-  input: {
+  input: DeliverConversationAutomationPayloadServiceInput & {
     taskId: string;
     generation: number;
-    preparedAutomationRun: Parameters<typeof deliverAutomationPayload>[0]["preparedAutomationRun"];
-    ensuredAutomationSandbox: Parameters<
-      typeof deliverAutomationPayload
-    >[0]["ensuredAutomationSandbox"];
-    acquiredAutomationConnection: Parameters<
-      typeof deliverAutomationPayload
-    >[0]["acquiredAutomationConnection"];
   },
 ) {
   const task = await deps.db.query.conversationDeliveryTasks.findFirst({
@@ -218,11 +331,151 @@ export async function deliverConversationAutomationPayload(
     },
   );
 
-  await deliverAutomationPayload({
-    preparedAutomationRun: input.preparedAutomationRun,
-    ensuredAutomationSandbox: input.ensuredAutomationSandbox,
-    acquiredAutomationConnection: input.acquiredAutomationConnection,
+  const adapter = getConversationProviderAdapter(
+    input.resolvedConversationRoute.integrationFamilyId,
+  );
+  const connection = await adapter.connect({
+    connectionUrl: input.acquiredAutomationConnection.url,
+    requestId: input.taskId,
   });
+
+  try {
+    const persistedRouteId = input.resolvedConversationRoute.routeId;
+    let route =
+      persistedRouteId === null
+        ? await createConversationRoute(
+            {
+              db: deps.db,
+            },
+            {
+              conversationId: input.preparedAutomationRun.conversationId,
+              sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+            },
+          )
+        : await deps.db.query.conversationRoutes.findFirst({
+            where: (table, { eq }) => eq(table.id, persistedRouteId),
+          });
+
+    if (route === undefined) {
+      throw new ConversationPersistenceError({
+        code: ConversationPersistenceErrorCodes.CONVERSATION_ROUTE_NOT_FOUND,
+        message: `Conversation route for conversation '${input.preparedAutomationRun.conversationId}' was not found.`,
+      });
+    }
+
+    if (
+      route.providerConversationId !== null &&
+      !isRouteBoundToSandbox({
+        resolvedConversationRoute: {
+          conversationId: route.conversationId,
+          integrationFamilyId: input.resolvedConversationRoute.integrationFamilyId,
+          routeId: route.id,
+          sandboxInstanceId: route.sandboxInstanceId,
+          providerConversationId: route.providerConversationId,
+          providerExecutionId: route.providerExecutionId,
+          providerState: route.providerState,
+        },
+        sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+      })
+    ) {
+      throw new ConversationDeliveryExecutionError(
+        `Conversation '${input.preparedAutomationRun.conversationId}' is bound to sandbox '${route.sandboxInstanceId}', but delivery acquired sandbox '${input.ensuredAutomationSandbox.sandboxInstanceId}'.`,
+      );
+    }
+
+    if (route.providerConversationId === null) {
+      const createdConversation = await adapter.createConversation({
+        connection,
+      });
+
+      route = await activateConversationRoute(
+        {
+          db: deps.db,
+        },
+        {
+          conversationId: input.preparedAutomationRun.conversationId,
+          routeId: route.id,
+          sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+          providerConversationId: createdConversation.providerConversationId,
+          providerState: createdConversation.providerState,
+        },
+      );
+    } else if (route.sandboxInstanceId !== input.ensuredAutomationSandbox.sandboxInstanceId) {
+      route = await rebindConversationSandbox(
+        {
+          db: deps.db,
+        },
+        {
+          routeId: route.id,
+          sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+        },
+      );
+    }
+
+    if (route.providerConversationId === null) {
+      throw new ConversationDeliveryExecutionError(
+        `Conversation '${input.preparedAutomationRun.conversationId}' is missing provider conversation id after route activation.`,
+      );
+    }
+
+    const inspectResult = await adapter.inspectConversation({
+      connection,
+      providerConversationId: route.providerConversationId,
+    });
+    const executionAction = resolveConversationExecutionAction({
+      inspectConversation: inspectResult,
+      providerExecutionId: route.providerExecutionId,
+      adapter,
+    });
+
+    let executionUpdate;
+    switch (executionAction) {
+      case ConversationExecutionActions.START:
+        executionUpdate = await adapter.startExecution({
+          connection,
+          providerConversationId: route.providerConversationId,
+          inputText: input.preparedAutomationRun.renderedInput,
+        });
+        break;
+      case ConversationExecutionActions.STEER:
+        executionUpdate = await steerConversationExecution({
+          adapter,
+          connection,
+          route,
+          inputText: input.preparedAutomationRun.renderedInput,
+        });
+        break;
+      case ConversationExecutionActions.FAIL_MISSING_CONVERSATION:
+        throw new ConversationDeliveryExecutionError(
+          `Conversation '${input.preparedAutomationRun.conversationId}' references missing provider conversation '${route.providerConversationId}'.`,
+        );
+      case ConversationExecutionActions.FAIL_PROVIDER_ERROR:
+        throw new ConversationDeliveryExecutionError(
+          `Conversation '${input.preparedAutomationRun.conversationId}' provider conversation '${route.providerConversationId}' is in error state.`,
+        );
+      case ConversationExecutionActions.FAIL_MISSING_EXECUTION:
+        throw new ConversationDeliveryExecutionError(
+          `Conversation '${input.preparedAutomationRun.conversationId}' is missing provider execution id while provider conversation '${route.providerConversationId}' is active.`,
+        );
+      case ConversationExecutionActions.FAIL_STEER_NOT_SUPPORTED:
+        throw new ConversationDeliveryExecutionError(
+          `Conversation integration family '${input.resolvedConversationRoute.integrationFamilyId}' does not support steering active execution for conversation '${input.preparedAutomationRun.conversationId}'.`,
+        );
+    }
+
+    await updateConversationExecution(
+      {
+        db: deps.db,
+      },
+      {
+        routeId: route.id,
+        providerExecutionId: executionUpdate.providerExecutionId,
+        providerState: executionUpdate.providerState,
+      },
+    );
+  } finally {
+    await connection.close();
+  }
 }
 
 export async function completeConversationDeliveryAutomationRun(

@@ -163,6 +163,15 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
                 conversationId: "con_test",
                 webhookSourceOrderKey: "2026-01-01T00:00:00Z#0001",
               }),
+              resolveConversationDeliveryRoute: async () => ({
+                conversationId: "con_test",
+                integrationFamilyId: "openai",
+                routeId: null,
+                sandboxInstanceId: null,
+                providerConversationId: null,
+                providerExecutionId: null,
+                providerState: null,
+              }),
               ensureAutomationSandbox: async () => ({
                 sandboxInstanceId: "sbi_test",
                 startupWorkflowRunId: "wf_start_sandbox_test",

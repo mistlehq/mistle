@@ -494,12 +494,11 @@ function toCodexTextInputItems(inputText: string): CodexStartExecutionInputItem[
   ];
 }
 
-function resolveCodexModel(options: Record<string, unknown> | undefined): string {
-  if (options === undefined || !("model" in options)) {
-    throw new ConversationProviderError({
-      code: ConversationProviderErrorCodes.PROVIDER_CREATE_CONVERSATION_FAILED,
-      message: "Codex createConversation requires options.model.",
-    });
+function resolveCodexStartThreadParams(options: Record<string, unknown> | undefined): {
+  model?: string;
+} {
+  if (options === undefined || !("model" in options) || options.model === undefined) {
+    return {};
   }
 
   const modelValue = options.model;
@@ -510,7 +509,9 @@ function resolveCodexModel(options: Record<string, unknown> | undefined): string
     });
   }
 
-  return modelValue.trim();
+  return {
+    model: modelValue.trim(),
+  };
 }
 
 export function createCodexConversationProviderAdapter(): ConversationProviderAdapter {
@@ -640,9 +641,7 @@ export function createCodexConversationProviderAdapter(): ConversationProviderAd
       try {
         createResult = await input.connection.request({
           method: CodexMethodNames.THREAD_START,
-          params: {
-            model: resolveCodexModel(input.options),
-          },
+          params: resolveCodexStartThreadParams(input.options),
         });
       } catch (error) {
         throw new ConversationProviderError({
