@@ -1,9 +1,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
+  IntegrationConnectionResourceStatuses,
   IntegrationConnectionResourceSyncStates,
   IntegrationConnectionStatuses,
 } from "@mistle/db/control-plane";
 import {
+  createKeysetPageSizeSchema,
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
 } from "@mistle/http/pagination";
@@ -11,6 +13,7 @@ import { IntegrationResourceSelectionModes } from "@mistle/integrations-core";
 
 import {
   IntegrationConnectionsBadRequestCodes,
+  IntegrationConnectionsConflictCodes,
   IntegrationConnectionsNotFoundCodes,
 } from "./services/errors.js";
 
@@ -66,6 +69,9 @@ export const ValidationErrorResponseSchema = z
 const BadRequestCodeSchema = z.enum([
   IntegrationConnectionsBadRequestCodes.INVALID_LIST_CONNECTIONS_INPUT,
   IntegrationConnectionsBadRequestCodes.INVALID_PAGINATION_CURSOR,
+  IntegrationConnectionsBadRequestCodes.INVALID_LIST_CONNECTION_RESOURCES_INPUT,
+  IntegrationConnectionsBadRequestCodes.INVALID_RESOURCE_PAGINATION_CURSOR,
+  IntegrationConnectionsBadRequestCodes.RESOURCE_KIND_NOT_SUPPORTED,
   IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
   IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
   IntegrationConnectionsBadRequestCodes.API_KEY_NOT_SUPPORTED,
@@ -107,6 +113,95 @@ export const ListIntegrationConnectionsQuerySchema = createKeysetPaginationQuery
   defaultLimit: 20,
   maxLimit: 100,
 });
+
+export const IntegrationConnectionResourceSchema = z
+  .object({
+    id: z.string().min(1),
+    familyId: z.string().min(1),
+    kind: z.string().min(1),
+    externalId: z.string().min(1).optional(),
+    handle: z.string().min(1),
+    displayName: z.string().min(1),
+    status: z.enum([IntegrationConnectionResourceStatuses.ACCESSIBLE]),
+    metadata: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+
+export const ListIntegrationConnectionResourcesParamsSchema = z
+  .object({
+    connectionId: z.string().min(1),
+  })
+  .strict();
+
+export const ListIntegrationConnectionResourcesQuerySchema = z
+  .object({
+    kind: z.string().min(1),
+    search: z.string().min(1).optional(),
+    limit: z.preprocess(
+      (rawValue) => {
+        if (rawValue === undefined) {
+          return undefined;
+        }
+
+        if (typeof rawValue === "number") {
+          return rawValue;
+        }
+
+        if (typeof rawValue === "string") {
+          return Number(rawValue);
+        }
+
+        return rawValue;
+      },
+      createKeysetPageSizeSchema({ defaultLimit: 20, maxLimit: 100 }),
+    ),
+    after: z.string().min(1).optional(),
+    before: z.string().min(1).optional(),
+  })
+  .strict()
+  .refine((value) => !(value.after !== undefined && value.before !== undefined), {
+    message: "Only one of `after` or `before` can be provided.",
+  });
+
+export const ListIntegrationConnectionResourcesResponseSchema = z
+  .object({
+    connectionId: z.string().min(1),
+    familyId: z.string().min(1),
+    kind: z.string().min(1),
+    syncState: z.enum([
+      IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+      IntegrationConnectionResourceSyncStates.SYNCING,
+      IntegrationConnectionResourceSyncStates.READY,
+      IntegrationConnectionResourceSyncStates.ERROR,
+    ]),
+    lastSyncedAt: z.string().min(1).optional(),
+    lastErrorCode: z.string().min(1).optional(),
+    lastErrorMessage: z.string().min(1).optional(),
+    items: z.array(IntegrationConnectionResourceSchema),
+    page: z
+      .object({
+        totalResults: z.number().int().nonnegative(),
+        nextCursor: z.string().min(1).nullable(),
+        previousCursor: z.string().min(1).nullable(),
+      })
+      .strict(),
+  })
+  .strict();
+
+const ConflictCodeSchema = z.enum([
+  IntegrationConnectionsConflictCodes.RESOURCE_SYNC_REQUIRED,
+  IntegrationConnectionsConflictCodes.RESOURCE_SYNC_IN_PROGRESS,
+  IntegrationConnectionsConflictCodes.RESOURCE_SYNC_FAILED,
+]);
+
+export const IntegrationConnectionsConflictResponseSchema = z
+  .object({
+    code: ConflictCodeSchema,
+    message: z.string().min(1),
+    lastErrorCode: z.string().min(1).optional(),
+    lastErrorMessage: z.string().min(1).optional(),
+  })
+  .strict();
 
 export const ListIntegrationConnectionsResponseSchema = createKeysetPaginationEnvelopeSchema(
   IntegrationConnectionSchema,
@@ -226,6 +321,74 @@ export const listIntegrationConnectionsRoute = createRoute({
       content: {
         "application/json": {
           schema: IntegrationConnectionsForbiddenResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
+export const listIntegrationConnectionResourcesRoute = createRoute({
+  method: "get",
+  path: "/:connectionId/resources",
+  tags: ["Integrations"],
+  request: {
+    params: ListIntegrationConnectionResourcesParamsSchema,
+    query: ListIntegrationConnectionResourcesQuerySchema,
+  },
+  responses: {
+    200: {
+      description: "List resources exposed by an integration connection for a resource kind.",
+      content: {
+        "application/json": {
+          schema: ListIntegrationConnectionResourcesResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ListIntegrationConnectionsBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsUnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsForbiddenResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Integration connection was not found.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsNotFoundResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: "Resource listing requires a usable resource snapshot.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsConflictResponseSchema,
         },
       },
     },

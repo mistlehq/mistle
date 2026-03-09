@@ -1,6 +1,7 @@
 import { relations } from "drizzle-orm";
 
 import { integrationConnectionResourceStates } from "./integration-connection-resource-states.js";
+import { integrationConnectionResources } from "./integration-connection-resources.js";
 import { integrationConnections } from "./integration-connections.js";
 import { integrationTargets } from "./integration-targets.js";
 
@@ -11,7 +12,18 @@ export const integrationConnectionsRelations = relations(
       fields: [integrationConnections.targetKey],
       references: [integrationTargets.targetKey],
     }),
+    resources: many(integrationConnectionResources),
     resourceStates: many(integrationConnectionResourceStates),
+  }),
+);
+
+export const integrationConnectionResourcesRelations = relations(
+  integrationConnectionResources,
+  ({ one }) => ({
+    connection: one(integrationConnections, {
+      fields: [integrationConnectionResources.connectionId],
+      references: [integrationConnections.id],
+    }),
   }),
 );
 
