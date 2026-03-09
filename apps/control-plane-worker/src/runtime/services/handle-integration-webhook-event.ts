@@ -140,40 +140,42 @@ export async function handleIntegrationWebhookEvent(
       };
     }
 
-    await deps.db
-      .insert(automationRuns)
-      .values(
-        resolvedTargets.map((resolvedTarget) => ({
-          automationId: resolvedTarget.automationId,
-          automationTargetId: resolvedTarget.automationTargetId,
-          sourceWebhookEventId: input.webhookEventId,
-          status: AutomationRunStatuses.QUEUED,
-        })),
-      )
-      .onConflictDoNothing({
-        target: [automationRuns.automationTargetId, automationRuns.sourceWebhookEventId],
-      });
+    if (resolvedTargets.length > 0) {
+      await deps.db
+        .insert(automationRuns)
+        .values(
+          resolvedTargets.map((resolvedTarget) => ({
+            automationId: resolvedTarget.automationId,
+            automationTargetId: resolvedTarget.automationTargetId,
+            sourceWebhookEventId: input.webhookEventId,
+            status: AutomationRunStatuses.QUEUED,
+          })),
+        )
+        .onConflictDoNothing({
+          target: [automationRuns.automationTargetId, automationRuns.sourceWebhookEventId],
+        });
 
-    const queuedAutomationRuns = await deps.db.query.automationRuns.findMany({
-      columns: {
-        id: true,
-      },
-      where: (table, { and: whereAnd, eq: whereEq, inArray: whereInArray }) =>
-        whereAnd(
-          whereEq(table.sourceWebhookEventId, input.webhookEventId),
-          whereEq(table.status, AutomationRunStatuses.QUEUED),
-          whereInArray(
-            table.automationTargetId,
-            resolvedTargets.map((target) => target.automationTargetId),
+      const queuedAutomationRuns = await deps.db.query.automationRuns.findMany({
+        columns: {
+          id: true,
+        },
+        where: (table, { and: whereAnd, eq: whereEq, inArray: whereInArray }) =>
+          whereAnd(
+            whereEq(table.sourceWebhookEventId, input.webhookEventId),
+            whereEq(table.status, AutomationRunStatuses.QUEUED),
+            whereInArray(
+              table.automationTargetId,
+              resolvedTargets.map((target) => target.automationTargetId),
+            ),
           ),
-        ),
-    });
-
-    const queuedAutomationRunIds = queuedAutomationRuns.map((queuedRun) => queuedRun.id);
-    if (queuedAutomationRunIds.length > 0) {
-      await deps.enqueueAutomationRuns({
-        automationRunIds: queuedAutomationRunIds,
       });
+
+      const queuedAutomationRunIds = queuedAutomationRuns.map((queuedRun) => queuedRun.id);
+      if (queuedAutomationRunIds.length > 0) {
+        await deps.enqueueAutomationRuns({
+          automationRunIds: queuedAutomationRunIds,
+        });
+      }
     }
 
     await updateWebhookEventStatus({
