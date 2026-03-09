@@ -4,7 +4,6 @@ import {
   type IntegrationConnectionResourceState,
   type IntegrationConnectionResourceSyncState,
   type IntegrationConnectionStatus,
-  type IntegrationTarget,
 } from "@mistle/db/control-plane";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import {
@@ -66,6 +65,14 @@ type IntegrationConnectionListItem = {
   updatedAt: string;
 };
 
+type IntegrationConnectionListRow = IntegrationConnection & {
+  target: {
+    familyId: string;
+    variantId: string;
+  } | null;
+  resourceStates: Array<IntegrationConnectionResourceState>;
+};
+
 export async function listIntegrationConnections(
   db: AppContext["var"]["db"],
   integrationRegistry: AppContext["var"]["integrationRegistry"],
@@ -87,106 +94,83 @@ export async function listIntegrationConnections(
   }
 
   try {
-    const result = await paginateKeyset<IntegrationConnection, IntegrationConnectionsCursor>({
-      query: {
-        after: input.after,
-        before: input.before,
-      },
-      pageSize,
-      decodeCursor: ({ encodedCursor, cursorName }) =>
-        decodeKeysetCursorOrThrow({
-          encodedCursor,
-          cursorName,
-          schema: CursorSchema,
-          mapDecodeError: ({ cursorName: decodeCursorName, reason }) => {
-            const reasonToMessage = {
-              [KeysetCursorDecodeErrorReasons.INVALID_BASE64URL]: `\`${decodeCursorName}\` cursor is not valid base64url.`,
-              [KeysetCursorDecodeErrorReasons.INVALID_JSON]: `\`${decodeCursorName}\` cursor does not contain valid JSON.`,
-              [KeysetCursorDecodeErrorReasons.INVALID_SHAPE]: `\`${decodeCursorName}\` cursor has an invalid shape.`,
-            } as const;
+    const result = await paginateKeyset<IntegrationConnectionListRow, IntegrationConnectionsCursor>(
+      {
+        query: {
+          after: input.after,
+          before: input.before,
+        },
+        pageSize,
+        decodeCursor: ({ encodedCursor, cursorName }) =>
+          decodeKeysetCursorOrThrow({
+            encodedCursor,
+            cursorName,
+            schema: CursorSchema,
+            mapDecodeError: ({ cursorName: decodeCursorName, reason }) => {
+              const reasonToMessage = {
+                [KeysetCursorDecodeErrorReasons.INVALID_BASE64URL]: `\`${decodeCursorName}\` cursor is not valid base64url.`,
+                [KeysetCursorDecodeErrorReasons.INVALID_JSON]: `\`${decodeCursorName}\` cursor does not contain valid JSON.`,
+                [KeysetCursorDecodeErrorReasons.INVALID_SHAPE]: `\`${decodeCursorName}\` cursor has an invalid shape.`,
+              } as const;
 
-            return new IntegrationConnectionsBadRequestError(
-              IntegrationConnectionsBadRequestCodes.INVALID_PAGINATION_CURSOR,
-              reasonToMessage[reason],
-            );
-          },
-        }),
-      encodeCursor: encodeKeysetCursor,
-      getCursor: (connection) => ({
-        id: connection.id,
-      }),
-      fetchPage: async ({ direction, cursor, limitPlusOne }) =>
-        db.query.integrationConnections.findMany({
-          where: (table, { and, eq, gt, lt }) => {
-            const organizationScope = eq(table.organizationId, input.organizationId);
-
-            if (cursor === undefined) {
-              return organizationScope;
-            }
-
-            if (direction === KeysetPaginationDirections.FORWARD) {
-              return and(organizationScope, gt(table.id, cursor.id));
-            }
-
-            return and(organizationScope, lt(table.id, cursor.id));
-          },
-          orderBy:
-            direction === KeysetPaginationDirections.BACKWARD
-              ? (table, { desc }) => [desc(table.id)]
-              : (table, { asc }) => [asc(table.id)],
-          limit: limitPlusOne,
-        }),
-      countTotalResults: async () => {
-        const [result] = await db
-          .select({
-            totalResults: sql<number>`count(*)::int`,
-          })
-          .from(integrationConnections)
-          .where(eq(integrationConnections.organizationId, input.organizationId));
-
-        return result?.totalResults ?? 0;
-      },
-    });
-
-    const pageTargetKeys = [...new Set(result.items.map((connection) => connection.targetKey))];
-    const pageConnectionIds = result.items.map((connection) => connection.id);
-
-    const [targets, resourceStates] = await Promise.all([
-      pageTargetKeys.length === 0
-        ? Promise.resolve([])
-        : db.query.integrationTargets.findMany({
-            where: (table, { inArray }) => inArray(table.targetKey, pageTargetKeys),
+              return new IntegrationConnectionsBadRequestError(
+                IntegrationConnectionsBadRequestCodes.INVALID_PAGINATION_CURSOR,
+                reasonToMessage[reason],
+              );
+            },
           }),
-      pageConnectionIds.length === 0
-        ? Promise.resolve([])
-        : db.query.integrationConnectionResourceStates.findMany({
-            where: (table, { inArray }) => inArray(table.connectionId, pageConnectionIds),
+        encodeCursor: encodeKeysetCursor,
+        getCursor: (connection) => ({
+          id: connection.id,
+        }),
+        fetchPage: async ({ direction, cursor, limitPlusOne }) =>
+          db.query.integrationConnections.findMany({
+            where: (table, { and, eq, gt, lt }) => {
+              const organizationScope = eq(table.organizationId, input.organizationId);
+
+              if (cursor === undefined) {
+                return organizationScope;
+              }
+
+              if (direction === KeysetPaginationDirections.FORWARD) {
+                return and(organizationScope, gt(table.id, cursor.id));
+              }
+
+              return and(organizationScope, lt(table.id, cursor.id));
+            },
+            orderBy:
+              direction === KeysetPaginationDirections.BACKWARD
+                ? (table, { desc }) => [desc(table.id)]
+                : (table, { asc }) => [asc(table.id)],
+            limit: limitPlusOne,
+            with: {
+              resourceStates: true,
+              target: {
+                columns: {
+                  familyId: true,
+                  variantId: true,
+                },
+              },
+            },
           }),
-    ]);
+        countTotalResults: async () => {
+          const [result] = await db
+            .select({
+              totalResults: sql<number>`count(*)::int`,
+            })
+            .from(integrationConnections)
+            .where(eq(integrationConnections.organizationId, input.organizationId));
 
-    const targetsByKey = new Map(targets.map((target) => [target.targetKey, target]));
-    const resourceStatesByConnectionId = new Map<
-      string,
-      Array<IntegrationConnectionResourceState>
-    >();
-
-    for (const resourceState of resourceStates) {
-      const existingStates = resourceStatesByConnectionId.get(resourceState.connectionId);
-      if (existingStates === undefined) {
-        resourceStatesByConnectionId.set(resourceState.connectionId, [resourceState]);
-        continue;
-      }
-
-      existingStates.push(resourceState);
-    }
+          return result?.totalResults ?? 0;
+        },
+      },
+    );
 
     return {
       ...result,
       items: result.items.map((connection) => ({
         ...buildResourceSummary(connection, {
           integrationRegistry,
-          targetsByKey,
-          resourceStatesByConnectionId,
         }),
         id: connection.id,
         targetKey: connection.targetKey,
@@ -223,18 +207,13 @@ function normalizeTimestamp(value: string | Date): string {
 }
 
 function buildResourceSummary(
-  connection: IntegrationConnection,
+  connection: IntegrationConnectionListRow,
   input: {
     integrationRegistry: AppContext["var"]["integrationRegistry"];
-    targetsByKey: ReadonlyMap<string, IntegrationTarget>;
-    resourceStatesByConnectionId: ReadonlyMap<
-      string,
-      ReadonlyArray<IntegrationConnectionResourceState>
-    >;
   },
 ): Pick<IntegrationConnectionListItem, "resources"> {
-  const target = input.targetsByKey.get(connection.targetKey);
-  if (target === undefined) {
+  const target = connection.target;
+  if (target === null) {
     return {};
   }
 
@@ -244,7 +223,7 @@ function buildResourceSummary(
   });
   const resources = projectConnectionResourceSummaries({
     definition,
-    resourceStates: input.resourceStatesByConnectionId.get(connection.id) ?? [],
+    resourceStates: connection.resourceStates,
   });
 
   return resources.length === 0 ? {} : { resources };
