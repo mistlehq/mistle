@@ -191,6 +191,9 @@
                           "enum": [
                             "INVALID_LIST_CONNECTIONS_INPUT",
                             "INVALID_PAGINATION_CURSOR",
+                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
+                            "INVALID_RESOURCE_PAGINATION_CURSOR",
+                            "RESOURCE_KIND_NOT_SUPPORTED",
                             "INVALID_CREATE_CONNECTION_INPUT",
                             "INVALID_UPDATE_CONNECTION_INPUT",
                             "API_KEY_NOT_SUPPORTED",
@@ -277,6 +280,362 @@
                       "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
                     },
                     "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/integration/connections/:connectionId/resources": {
+      "get": {
+        "tags": ["Integrations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "connectionId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "after",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "before",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List resources exposed by an integration connection for a resource kind.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "connectionId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "familyId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "syncState": {
+                      "type": "string",
+                      "enum": ["never-synced", "syncing", "ready", "error"]
+                    },
+                    "lastSyncedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "lastErrorCode": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "lastErrorMessage": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "familyId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "externalId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "handle": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "displayName": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["accessible"]
+                          },
+                          "metadata": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "familyId",
+                          "kind",
+                          "handle",
+                          "displayName",
+                          "status",
+                          "metadata"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "page": {
+                      "type": "object",
+                      "properties": {
+                        "totalResults": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "nextCursor": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        },
+                        "previousCursor": {
+                          "type": ["string", "null"],
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["totalResults", "nextCursor", "previousCursor"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["connectionId", "familyId", "kind", "syncState", "items", "page"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INVALID_LIST_CONNECTIONS_INPUT",
+                            "INVALID_PAGINATION_CURSOR",
+                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
+                            "INVALID_RESOURCE_PAGINATION_CURSOR",
+                            "RESOURCE_KIND_NOT_SUPPORTED",
+                            "INVALID_CREATE_CONNECTION_INPUT",
+                            "INVALID_UPDATE_CONNECTION_INPUT",
+                            "API_KEY_NOT_SUPPORTED",
+                            "API_KEY_CONNECTION_REQUIRED",
+                            "INVALID_OAUTH_START_INPUT",
+                            "INVALID_OAUTH_COMPLETE_INPUT",
+                            "OAUTH_NOT_SUPPORTED",
+                            "OAUTH_HANDLER_NOT_CONFIGURED",
+                            "OAUTH_STATE_INVALID",
+                            "OAUTH_STATE_EXPIRED",
+                            "OAUTH_STATE_ALREADY_USED"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [false]
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["name", "message"],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": ["success", "error"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Integration connection was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Resource listing requires a usable resource snapshot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "RESOURCE_SYNC_REQUIRED",
+                        "RESOURCE_SYNC_IN_PROGRESS",
+                        "RESOURCE_SYNC_FAILED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "lastErrorCode": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "lastErrorMessage": {
                       "type": "string",
                       "minLength": 1
                     }
@@ -439,6 +798,9 @@
                           "enum": [
                             "INVALID_LIST_CONNECTIONS_INPUT",
                             "INVALID_PAGINATION_CURSOR",
+                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
+                            "INVALID_RESOURCE_PAGINATION_CURSOR",
+                            "RESOURCE_KIND_NOT_SUPPORTED",
                             "INVALID_CREATE_CONNECTION_INPUT",
                             "INVALID_UPDATE_CONNECTION_INPUT",
                             "API_KEY_NOT_SUPPORTED",
@@ -710,6 +1072,9 @@
                           "enum": [
                             "INVALID_LIST_CONNECTIONS_INPUT",
                             "INVALID_PAGINATION_CURSOR",
+                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
+                            "INVALID_RESOURCE_PAGINATION_CURSOR",
+                            "RESOURCE_KIND_NOT_SUPPORTED",
                             "INVALID_CREATE_CONNECTION_INPUT",
                             "INVALID_UPDATE_CONNECTION_INPUT",
                             "API_KEY_NOT_SUPPORTED",
@@ -906,6 +1271,9 @@
                           "enum": [
                             "INVALID_LIST_CONNECTIONS_INPUT",
                             "INVALID_PAGINATION_CURSOR",
+                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
+                            "INVALID_RESOURCE_PAGINATION_CURSOR",
+                            "RESOURCE_KIND_NOT_SUPPORTED",
                             "INVALID_CREATE_CONNECTION_INPUT",
                             "INVALID_UPDATE_CONNECTION_INPUT",
                             "API_KEY_NOT_SUPPORTED",
@@ -1174,6 +1542,9 @@
                           "enum": [
                             "INVALID_LIST_CONNECTIONS_INPUT",
                             "INVALID_PAGINATION_CURSOR",
+                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
+                            "INVALID_RESOURCE_PAGINATION_CURSOR",
+                            "RESOURCE_KIND_NOT_SUPPORTED",
                             "INVALID_CREATE_CONNECTION_INPUT",
                             "INVALID_UPDATE_CONNECTION_INPUT",
                             "API_KEY_NOT_SUPPORTED",

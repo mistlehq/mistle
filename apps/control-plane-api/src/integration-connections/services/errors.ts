@@ -1,6 +1,9 @@
 export const IntegrationConnectionsBadRequestCodes = {
   INVALID_LIST_CONNECTIONS_INPUT: "INVALID_LIST_CONNECTIONS_INPUT",
   INVALID_PAGINATION_CURSOR: "INVALID_PAGINATION_CURSOR",
+  INVALID_LIST_CONNECTION_RESOURCES_INPUT: "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
+  INVALID_RESOURCE_PAGINATION_CURSOR: "INVALID_RESOURCE_PAGINATION_CURSOR",
+  RESOURCE_KIND_NOT_SUPPORTED: "RESOURCE_KIND_NOT_SUPPORTED",
   INVALID_CREATE_CONNECTION_INPUT: "INVALID_CREATE_CONNECTION_INPUT",
   INVALID_UPDATE_CONNECTION_INPUT: "INVALID_UPDATE_CONNECTION_INPUT",
   API_KEY_NOT_SUPPORTED: "API_KEY_NOT_SUPPORTED",
@@ -42,5 +45,33 @@ export class IntegrationConnectionsNotFoundError extends Error {
     super(message);
     this.name = "IntegrationConnectionsNotFoundError";
     this.code = code;
+  }
+}
+
+export const IntegrationConnectionsConflictCodes = {
+  RESOURCE_SYNC_REQUIRED: "RESOURCE_SYNC_REQUIRED",
+  RESOURCE_SYNC_IN_PROGRESS: "RESOURCE_SYNC_IN_PROGRESS",
+  RESOURCE_SYNC_FAILED: "RESOURCE_SYNC_FAILED",
+} as const;
+
+export type IntegrationConnectionsConflictCode =
+  (typeof IntegrationConnectionsConflictCodes)[keyof typeof IntegrationConnectionsConflictCodes];
+
+export class IntegrationConnectionsConflictError extends Error {
+  code: IntegrationConnectionsConflictCode;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+
+  constructor(input: {
+    code: IntegrationConnectionsConflictCode;
+    message: string;
+    lastErrorCode?: string | null;
+    lastErrorMessage?: string | null;
+  }) {
+    super(input.message);
+    this.name = "IntegrationConnectionsConflictError";
+    this.code = input.code;
+    this.lastErrorCode = input.lastErrorCode ?? null;
+    this.lastErrorMessage = input.lastErrorMessage ?? null;
   }
 }

@@ -24,6 +24,7 @@ export {
   type IntegrationConnectionCredential,
 } from "./integration-connection-credentials.js";
 export {
+  integrationConnectionResourcesRelations,
   integrationConnectionResourceStatesRelations,
   integrationConnectionsRelations,
   integrationTargetsRelations,

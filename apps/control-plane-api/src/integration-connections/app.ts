@@ -7,7 +7,9 @@ import {
   completeOAuthConnectionRoute,
   createApiKeyConnectionRoute,
   IntegrationConnectionsBadRequestResponseSchema,
+  IntegrationConnectionsConflictResponseSchema,
   IntegrationConnectionsNotFoundResponseSchema,
+  listIntegrationConnectionResourcesRoute,
   listIntegrationConnectionsRoute,
   startOAuthConnectionRoute,
   updateIntegrationConnectionRoute,
@@ -16,8 +18,10 @@ import { completeOAuthConnection } from "./services/complete-oauth-connection.js
 import { createApiKeyConnection } from "./services/create-api-key-connection.js";
 import {
   IntegrationConnectionsBadRequestError,
+  IntegrationConnectionsConflictError,
   IntegrationConnectionsNotFoundError,
 } from "./services/errors.js";
+import { listIntegrationConnectionResources } from "./services/list-connection-resources.js";
 import { listIntegrationConnections } from "./services/list-connections.js";
 import { startOAuthConnection } from "./services/start-oauth-connection.js";
 import { updateIntegrationConnection } from "./services/update-api-key-connection.js";
@@ -47,6 +51,31 @@ export function createIntegrationConnectionsApp(): AppRoutes<
       return ctx.json(result, 200);
     } catch (error) {
       return handleListIntegrationConnectionsError(ctx, error);
+    }
+  });
+
+  routes.openapi(listIntegrationConnectionResourcesRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const query = ctx.req.valid("query");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+
+      const result = await listIntegrationConnectionResources(
+        ctx.get("db"),
+        ctx.get("integrationRegistry"),
+        {
+          organizationId: session.session.activeOrganizationId,
+          connectionId: params.connectionId,
+          ...query,
+        },
+      );
+
+      return ctx.json(result, 200);
+    } catch (error) {
+      return handleListIntegrationConnectionResourcesError(ctx, error);
     }
   });
 
@@ -188,6 +217,39 @@ function handleIntegrationConnectionMutationError(ctx: AppContext, error: unknow
     };
 
     return ctx.json(responseBody, 404);
+  }
+
+  throw error;
+}
+
+function handleListIntegrationConnectionResourcesError(ctx: AppContext, error: unknown) {
+  if (error instanceof IntegrationConnectionsBadRequestError) {
+    const responseBody: z.infer<typeof IntegrationConnectionsBadRequestResponseSchema> = {
+      code: error.code,
+      message: error.message,
+    };
+
+    return ctx.json(responseBody, 400);
+  }
+
+  if (error instanceof IntegrationConnectionsNotFoundError) {
+    const responseBody: z.infer<typeof IntegrationConnectionsNotFoundResponseSchema> = {
+      code: error.code,
+      message: error.message,
+    };
+
+    return ctx.json(responseBody, 404);
+  }
+
+  if (error instanceof IntegrationConnectionsConflictError) {
+    const responseBody: z.infer<typeof IntegrationConnectionsConflictResponseSchema> = {
+      code: error.code,
+      message: error.message,
+      ...(error.lastErrorCode === null ? {} : { lastErrorCode: error.lastErrorCode }),
+      ...(error.lastErrorMessage === null ? {} : { lastErrorMessage: error.lastErrorMessage }),
+    };
+
+    return ctx.json(responseBody, 409);
   }
 
   throw error;
