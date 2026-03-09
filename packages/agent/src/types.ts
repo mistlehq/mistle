@@ -13,12 +13,9 @@ export type AgentWebSocketTransport = {
 
 export type AgentTransport = AgentWebSocketTransport;
 
-export type AgentRuntimeInfo = {
-  familyId: string;
-  variantId: string;
-  runtimeKey: string;
+export type AgentRuntimeMetadata = {
+  id: string;
   displayName: string;
-  transportKinds: readonly AgentTransportKind[];
 };
 
 export type AgentInputTextItem = {
@@ -95,12 +92,27 @@ export type AgentSteerTurnResult = {
   turnId: string;
 };
 
-export type AgentRuntimeConnectInput = {
+export interface AgentSession {
+  readonly transport: AgentTransport;
+  close(): Promise<void>;
+  receive(): Promise<string>;
+  send(message: string): Promise<void>;
+}
+
+export type AgentSessionConnectInput = {
   transport: AgentTransport;
 };
 
+export interface AgentSessionConnector {
+  connect(input: AgentSessionConnectInput): Promise<AgentSession>;
+}
+
+export type AgentRuntimeConnectInput = {
+  session: AgentSession;
+};
+
 export interface ConnectedAgentRuntime {
-  readonly info: AgentRuntimeInfo;
+  readonly metadata: AgentRuntimeMetadata;
   close(): Promise<void>;
   readThread(input: AgentReadThreadInput): Promise<AgentThreadReadResult>;
   resumeThread(input: AgentResumeThreadInput): Promise<AgentResumeThreadResult>;
@@ -110,7 +122,7 @@ export interface ConnectedAgentRuntime {
 }
 
 export interface AgentRuntime {
-  readonly info: AgentRuntimeInfo;
+  readonly metadata: AgentRuntimeMetadata;
   connect(input: AgentRuntimeConnectInput): Promise<ConnectedAgentRuntime>;
 }
 

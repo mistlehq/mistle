@@ -2,30 +2,35 @@ import type {
   AgentReadThreadInput,
   AgentResumeThreadInput,
   AgentRuntime,
-  AgentRuntimeConnectInput,
+  AgentSession,
+  AgentSessionConnector,
   AgentStartThreadInput,
   AgentStartTurnInput,
   AgentSteerTurnInput,
   ConnectedAgentRuntime,
 } from "./types.js";
 
-export type AgentInput = AgentRuntimeConnectInput & {
+export type AgentInput = {
   runtime: AgentRuntime;
+  sessionConnector: AgentSessionConnector;
+  transport: AgentSession["transport"];
 };
 
 export class Agent {
   readonly #runtime: AgentRuntime;
-  readonly #transport: AgentRuntimeConnectInput["transport"];
+  readonly #sessionConnector: AgentSessionConnector;
+  readonly #transport: AgentSession["transport"];
 
   #connectedRuntime: ConnectedAgentRuntime | null = null;
 
   constructor(input: AgentInput) {
     this.#runtime = input.runtime;
+    this.#sessionConnector = input.sessionConnector;
     this.#transport = input.transport;
   }
 
-  get runtime(): AgentRuntime["info"] {
-    return this.#runtime.info;
+  get runtime(): AgentRuntime["metadata"] {
+    return this.#runtime.metadata;
   }
 
   get isConnected(): boolean {
@@ -37,9 +42,18 @@ export class Agent {
       throw new Error("Agent is already connected.");
     }
 
-    this.#connectedRuntime = await this.#runtime.connect({
+    const session = await this.#sessionConnector.connect({
       transport: this.#transport,
     });
+
+    try {
+      this.#connectedRuntime = await this.#runtime.connect({
+        session,
+      });
+    } catch (error) {
+      await session.close();
+      throw error;
+    }
   }
 
   async close(): Promise<void> {
