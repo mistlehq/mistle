@@ -133,6 +133,13 @@ export const ListIntegrationConnectionResourcesParamsSchema = z
   })
   .strict();
 
+export const RefreshIntegrationConnectionResourcesParamsSchema = z
+  .object({
+    connectionId: z.string().min(1),
+    kind: z.string().min(1),
+  })
+  .strict();
+
 export const ListIntegrationConnectionResourcesQuerySchema = z
   .object({
     kind: z.string().min(1),
@@ -185,6 +192,15 @@ export const ListIntegrationConnectionResourcesResponseSchema = z
         previousCursor: z.string().min(1).nullable(),
       })
       .strict(),
+  })
+  .strict();
+
+export const RefreshIntegrationConnectionResourcesResponseSchema = z
+  .object({
+    connectionId: z.string().min(1),
+    familyId: z.string().min(1),
+    kind: z.string().min(1),
+    syncState: z.literal(IntegrationConnectionResourceSyncStates.SYNCING),
   })
   .strict();
 
@@ -389,6 +405,65 @@ export const listIntegrationConnectionResourcesRoute = createRoute({
       content: {
         "application/json": {
           schema: IntegrationConnectionsConflictResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
+export const refreshIntegrationConnectionResourcesRoute = createRoute({
+  method: "post",
+  path: "/:connectionId/resources/:kind/refresh",
+  tags: ["Integrations"],
+  request: {
+    params: RefreshIntegrationConnectionResourcesParamsSchema,
+  },
+  responses: {
+    202: {
+      description: "Enqueue a resource sync for an integration connection resource kind.",
+      content: {
+        "application/json": {
+          schema: RefreshIntegrationConnectionResourcesResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ListIntegrationConnectionsBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsUnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsForbiddenResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Integration connection was not found.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsNotFoundResponseSchema,
         },
       },
     },

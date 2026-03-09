@@ -28,6 +28,11 @@ import type {
   StartSandboxProfileInstanceWorkflowInput,
   StartSandboxProfileInstanceWorkflowOutput,
 } from "./workflows/start-sandbox-profile-instance/index.js";
+import { createSyncIntegrationConnectionResourcesWorkflow } from "./workflows/sync-integration-connection-resources/index.js";
+import type {
+  SyncIntegrationConnectionResourcesWorkflowInput,
+  SyncIntegrationConnectionResourcesWorkflowOutput,
+} from "./workflows/sync-integration-connection-resources/index.js";
 
 export type ControlPlaneWorkerEmailDelivery = {
   emailSender: EmailSender;
@@ -104,6 +109,11 @@ export type ControlPlaneWorkerServices = {
       input: StartSandboxProfileInstanceWorkflowInput,
     ) => Promise<StartSandboxProfileInstanceWorkflowOutput>;
   };
+  integrationConnectionResources?: {
+    syncIntegrationConnectionResources: (
+      input: SyncIntegrationConnectionResourcesWorkflowInput,
+    ) => Promise<SyncIntegrationConnectionResourcesWorkflowOutput>;
+  };
 };
 
 export const ControlPlaneWorkerWorkflowIds = {
@@ -114,6 +124,7 @@ export const ControlPlaneWorkerWorkflowIds = {
   SEND_VERIFICATION_OTP: "sendVerificationOTP",
   REQUEST_DELETE_SANDBOX_PROFILE: "requestDeleteSandboxProfile",
   START_SANDBOX_PROFILE_INSTANCE: "startSandboxProfileInstance",
+  SYNC_INTEGRATION_CONNECTION_RESOURCES: "syncIntegrationConnectionResources",
 } as const;
 
 export type ControlPlaneWorkerWorkflowId =
@@ -236,6 +247,20 @@ export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): 
       }
       const workflow = createStartSandboxProfileInstanceWorkflow({
         startSandboxInstance: input.services.sandboxInstances.startSandboxProfileInstance,
+      });
+      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
+      continue;
+    }
+
+    if (workflowId === ControlPlaneWorkerWorkflowIds.SYNC_INTEGRATION_CONNECTION_RESOURCES) {
+      if (input.services.integrationConnectionResources === undefined) {
+        throw new Error(
+          "Control-plane integration connection resources service is required for syncIntegrationConnectionResources workflow.",
+        );
+      }
+      const workflow = createSyncIntegrationConnectionResourcesWorkflow({
+        syncIntegrationConnectionResources:
+          input.services.integrationConnectionResources.syncIntegrationConnectionResources,
       });
       input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
       continue;

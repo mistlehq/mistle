@@ -80,6 +80,9 @@ export interface paths {
                   code:
                     | "INVALID_LIST_CONNECTIONS_INPUT"
                     | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_LIST_CONNECTION_RESOURCES_INPUT"
+                    | "INVALID_RESOURCE_PAGINATION_CURSOR"
+                    | "RESOURCE_KIND_NOT_SUPPORTED"
                     | "INVALID_CREATE_CONNECTION_INPUT"
                     | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
@@ -221,6 +224,9 @@ export interface paths {
                   code:
                     | "INVALID_LIST_CONNECTIONS_INPUT"
                     | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_LIST_CONNECTION_RESOURCES_INPUT"
+                    | "INVALID_RESOURCE_PAGINATION_CURSOR"
+                    | "RESOURCE_KIND_NOT_SUPPORTED"
                     | "INVALID_CREATE_CONNECTION_INPUT"
                     | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
@@ -303,6 +309,311 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/integration/connections/:connectionId/resources": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query: {
+          after?: string;
+          before?: string;
+          kind: string;
+          limit?: number;
+          search?: string;
+        };
+        header?: never;
+        path: {
+          connectionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List resources exposed by an integration connection for a resource kind. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              connectionId: string;
+              familyId: string;
+              items: {
+                displayName: string;
+                externalId?: string;
+                familyId: string;
+                handle: string;
+                id: string;
+                kind: string;
+                metadata: {
+                  [key: string]: unknown;
+                };
+                /** @enum {string} */
+                status: "accessible";
+              }[];
+              kind: string;
+              lastErrorCode?: string;
+              lastErrorMessage?: string;
+              lastSyncedAt?: string;
+              page: {
+                nextCursor: string | null;
+                previousCursor: string | null;
+                totalResults: number;
+              };
+              /** @enum {string} */
+              syncState: "never-synced" | "syncing" | "ready" | "error";
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_LIST_CONNECTIONS_INPUT"
+                    | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_LIST_CONNECTION_RESOURCES_INPUT"
+                    | "INVALID_RESOURCE_PAGINATION_CURSOR"
+                    | "RESOURCE_KIND_NOT_SUPPORTED"
+                    | "INVALID_CREATE_CONNECTION_INPUT"
+                    | "INVALID_UPDATE_CONNECTION_INPUT"
+                    | "API_KEY_NOT_SUPPORTED"
+                    | "API_KEY_CONNECTION_REQUIRED"
+                    | "INVALID_OAUTH_START_INPUT"
+                    | "INVALID_OAUTH_COMPLETE_INPUT"
+                    | "OAUTH_NOT_SUPPORTED"
+                    | "OAUTH_HANDLER_NOT_CONFIGURED"
+                    | "OAUTH_STATE_INVALID"
+                    | "OAUTH_STATE_EXPIRED"
+                    | "OAUTH_STATE_ALREADY_USED";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Resource listing requires a usable resource snapshot. */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "RESOURCE_SYNC_REQUIRED" | "RESOURCE_SYNC_IN_PROGRESS" | "RESOURCE_SYNC_FAILED";
+              lastErrorCode?: string;
+              lastErrorMessage?: string;
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integration/connections/:connectionId/resources/:kind/refresh": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          connectionId: string;
+          kind: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Enqueue a resource sync for an integration connection resource kind. */
+        202: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              connectionId: string;
+              familyId: string;
+              kind: string;
+              /** @enum {string} */
+              syncState: "syncing";
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_LIST_CONNECTIONS_INPUT"
+                    | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_LIST_CONNECTION_RESOURCES_INPUT"
+                    | "INVALID_RESOURCE_PAGINATION_CURSOR"
+                    | "RESOURCE_KIND_NOT_SUPPORTED"
+                    | "INVALID_CREATE_CONNECTION_INPUT"
+                    | "INVALID_UPDATE_CONNECTION_INPUT"
+                    | "API_KEY_NOT_SUPPORTED"
+                    | "API_KEY_CONNECTION_REQUIRED"
+                    | "INVALID_OAUTH_START_INPUT"
+                    | "INVALID_OAUTH_COMPLETE_INPUT"
+                    | "OAUTH_NOT_SUPPORTED"
+                    | "OAUTH_HANDLER_NOT_CONFIGURED"
+                    | "OAUTH_STATE_INVALID"
+                    | "OAUTH_STATE_EXPIRED"
+                    | "OAUTH_STATE_ALREADY_USED";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/integration/connections/:targetKey/api-key": {
     parameters: {
       query?: never;
@@ -375,6 +686,9 @@ export interface paths {
                   code:
                     | "INVALID_LIST_CONNECTIONS_INPUT"
                     | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_LIST_CONNECTION_RESOURCES_INPUT"
+                    | "INVALID_RESOURCE_PAGINATION_CURSOR"
+                    | "RESOURCE_KIND_NOT_SUPPORTED"
                     | "INVALID_CREATE_CONNECTION_INPUT"
                     | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
@@ -529,6 +843,9 @@ export interface paths {
                   code:
                     | "INVALID_LIST_CONNECTIONS_INPUT"
                     | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_LIST_CONNECTION_RESOURCES_INPUT"
+                    | "INVALID_RESOURCE_PAGINATION_CURSOR"
+                    | "RESOURCE_KIND_NOT_SUPPORTED"
                     | "INVALID_CREATE_CONNECTION_INPUT"
                     | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
@@ -660,6 +977,9 @@ export interface paths {
                   code:
                     | "INVALID_LIST_CONNECTIONS_INPUT"
                     | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_LIST_CONNECTION_RESOURCES_INPUT"
+                    | "INVALID_RESOURCE_PAGINATION_CURSOR"
+                    | "RESOURCE_KIND_NOT_SUPPORTED"
                     | "INVALID_CREATE_CONNECTION_INPUT"
                     | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"

@@ -11,6 +11,7 @@ import {
   IntegrationConnectionsNotFoundResponseSchema,
   listIntegrationConnectionResourcesRoute,
   listIntegrationConnectionsRoute,
+  refreshIntegrationConnectionResourcesRoute,
   startOAuthConnectionRoute,
   updateIntegrationConnectionRoute,
 } from "./contracts.js";
@@ -76,6 +77,26 @@ export function createIntegrationConnectionsApp(): AppRoutes<
       return ctx.json(result, 200);
     } catch (error) {
       return handleListIntegrationConnectionResourcesError(ctx, error);
+    }
+  });
+
+  routes.openapi(refreshIntegrationConnectionResourcesRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+
+      const result = await ctx.get("services").integrationConnections.requestResourceRefresh({
+        organizationId: session.session.activeOrganizationId,
+        connectionId: params.connectionId,
+        kind: params.kind,
+      });
+
+      return ctx.json(result, 202);
+    } catch (error) {
+      return handleIntegrationConnectionMutationError(ctx, error);
     }
   });
 

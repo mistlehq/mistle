@@ -2,6 +2,7 @@ import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/c
 import { HandleIntegrationWebhookEventWorkflowSpec } from "@mistle/workflows/control-plane";
 
 import { createControlPlaneAuth } from "./auth/index.js";
+import { createIntegrationConnectionsService } from "./integration-connections/index.js";
 import type { AppRuntimeResources } from "./runtime/resources.js";
 import { SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS } from "./sandbox-instances/constants.js";
 import { createSandboxInstancesService } from "./sandbox-instances/index.js";
@@ -10,7 +11,7 @@ import type { AppServices, ControlPlaneApiRuntimeConfig } from "./types.js";
 
 type CreateAppServicesInput = {
   runtimeConfig: ControlPlaneApiRuntimeConfig;
-  resources: Pick<AppRuntimeResources, "db" | "openWorkflow">;
+  resources: Pick<AppRuntimeResources, "db" | "integrationRegistry" | "openWorkflow">;
 };
 
 export function createAppServices(input: CreateAppServicesInput): AppServices {
@@ -54,6 +55,11 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
         masterEncryptionKeys: config.integrations.masterEncryptionKeys,
       },
       db: resources.db,
+      openWorkflow: resources.openWorkflow,
+    }),
+    integrationConnections: createIntegrationConnectionsService({
+      db: resources.db,
+      integrationRegistry: resources.integrationRegistry,
       openWorkflow: resources.openWorkflow,
     }),
     integrationWebhooks: {

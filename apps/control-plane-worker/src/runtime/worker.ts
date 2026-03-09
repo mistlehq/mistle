@@ -29,6 +29,7 @@ export function createRuntimeWorker(ctx: {
       ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
       ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE,
       ControlPlaneWorkerWorkflowIds.START_SANDBOX_PROFILE_INSTANCE,
+      ControlPlaneWorkerWorkflowIds.SYNC_INTEGRATION_CONNECTION_RESOURCES,
     ],
     services: createControlPlaneWorkerServices({
       config: ctx.config,

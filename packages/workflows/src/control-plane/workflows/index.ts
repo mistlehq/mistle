@@ -39,6 +39,13 @@ import {
   StartSandboxProfileInstanceWorkflowSpec,
   type CreateStartSandboxProfileInstanceWorkflowInput,
 } from "./start-sandbox-profile-instance/index.js";
+import {
+  createSyncIntegrationConnectionResourcesWorkflow,
+  SyncIntegrationConnectionResourcesWorkflowSpec,
+  type CreateSyncIntegrationConnectionResourcesWorkflowInput,
+  type SyncIntegrationConnectionResourcesWorkflowInput,
+  type SyncIntegrationConnectionResourcesWorkflowOutput,
+} from "./sync-integration-connection-resources/index.js";
 
 /**
  * Control-plane workflow implementations.
@@ -50,7 +57,8 @@ export type ControlPlaneWorkflowDefinition =
   | ReturnType<typeof createSendOrganizationInvitationWorkflow>
   | ReturnType<typeof createSendVerificationOTPWorkflow>
   | ReturnType<typeof createRequestDeleteSandboxProfileWorkflow>
-  | ReturnType<typeof createStartSandboxProfileInstanceWorkflow>;
+  | ReturnType<typeof createStartSandboxProfileInstanceWorkflow>
+  | ReturnType<typeof createSyncIntegrationConnectionResourcesWorkflow>;
 
 export type ControlPlaneWorkflowDefinitions = {
   handleAutomationRun: ReturnType<typeof createHandleAutomationRunWorkflow>;
@@ -60,6 +68,9 @@ export type ControlPlaneWorkflowDefinitions = {
   sendVerificationOTP: ReturnType<typeof createSendVerificationOTPWorkflow>;
   requestDeleteSandboxProfile: ReturnType<typeof createRequestDeleteSandboxProfileWorkflow>;
   startSandboxProfileInstance: ReturnType<typeof createStartSandboxProfileInstanceWorkflow>;
+  syncIntegrationConnectionResources: ReturnType<
+    typeof createSyncIntegrationConnectionResourcesWorkflow
+  >;
 };
 
 export type CreateControlPlaneWorkflowDefinitionsInput = {
@@ -70,6 +81,7 @@ export type CreateControlPlaneWorkflowDefinitionsInput = {
   sendVerificationOTP: CreateSendVerificationOTPWorkflowInput;
   requestDeleteSandboxProfile: CreateRequestDeleteSandboxProfileWorkflowInput;
   startSandboxProfileInstance: CreateStartSandboxProfileInstanceWorkflowInput;
+  syncIntegrationConnectionResources: CreateSyncIntegrationConnectionResourcesWorkflowInput;
 };
 
 export function createControlPlaneWorkflowDefinitions(
@@ -93,6 +105,9 @@ export function createControlPlaneWorkflowDefinitions(
     startSandboxProfileInstance: createStartSandboxProfileInstanceWorkflow(
       ctx.startSandboxProfileInstance,
     ),
+    syncIntegrationConnectionResources: createSyncIntegrationConnectionResourcesWorkflow(
+      ctx.syncIntegrationConnectionResources,
+    ),
   };
 }
 
@@ -109,3 +124,8 @@ export { SendOrganizationInvitationWorkflowSpec };
 export { SendVerificationOTPWorkflowSpec };
 export { RequestDeleteSandboxProfileWorkflowSpec };
 export { StartSandboxProfileInstanceWorkflowSpec };
+export { SyncIntegrationConnectionResourcesWorkflowSpec };
+export type {
+  SyncIntegrationConnectionResourcesWorkflowInput,
+  SyncIntegrationConnectionResourcesWorkflowOutput,
+};
