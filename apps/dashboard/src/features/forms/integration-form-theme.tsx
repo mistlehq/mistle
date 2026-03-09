@@ -20,6 +20,8 @@ import type {
   WidgetProps,
 } from "@rjsf/utils";
 
+import { IntegrationResourceStringArrayWidget } from "./integration-resource-string-array-widget.js";
+
 type JsonObject = Record<string, unknown>;
 type IntegrationFormContext = {
   layout?: "vertical" | "horizontal";
@@ -218,4 +220,5 @@ export const IntegrationFormTemplates = {
 export const IntegrationFormWidgets = {
   SelectWidget,
   "comma-separated-string-array": CommaSeparatedStringArrayWidget,
+  "integration-resource-string-array": IntegrationResourceStringArrayWidget,
 };

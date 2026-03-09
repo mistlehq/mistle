@@ -1,7 +1,7 @@
 import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
 
 import { GitHubConnectionConfigSchema } from "../../shared/auth.js";
-import { GitHubBindingConfigForm } from "../../shared/binding-config-form.js";
+import { resolveGitHubBindingConfigForm } from "../../shared/binding-config-form.js";
 import { GitHubFamilyId } from "../../shared/constants.js";
 import {
   GitHubAppInstallationCredentialResolver,
@@ -37,7 +37,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   targetConfigSchema: GitHubEnterpriseServerTargetConfigSchema,
   targetSecretSchema: GitHubTargetSecretSchema,
   bindingConfigSchema: GitHubEnterpriseServerBindingConfigSchema,
-  bindingConfigForm: GitHubBindingConfigForm,
+  bindingConfigForm: resolveGitHubBindingConfigForm,
   connectionConfigSchema: GitHubConnectionConfigSchema,
   supportedAuthSchemes: GitHubEnterpriseServerSupportedAuthSchemes,
   credentialResolvers: {

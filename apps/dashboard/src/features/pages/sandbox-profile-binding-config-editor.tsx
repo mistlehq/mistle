@@ -9,6 +9,7 @@ import {
   IntegrationFormTemplates,
   IntegrationFormWidgets,
 } from "../forms/integration-form-theme.js";
+import type { IntegrationConnectionResourceSummary } from "../integrations/integrations-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
 
 const IntegrationRegistry = createIntegrationFormRegistry();
@@ -29,6 +30,7 @@ export type IntegrationConnectionSummary = {
   displayName: string;
   targetKey: string;
   status: "active" | "error" | "revoked";
+  resources?: readonly IntegrationConnectionResourceSummary[] | undefined;
   config?: Record<string, unknown> | undefined;
 };
 
@@ -254,8 +256,12 @@ function resolveFormModelFromContext(input: {
           config: input.context.parsedTargetConfig,
         },
         connection: {
+          id: input.context.connection.id,
           rawConfig: input.context.connection.config ?? {},
           config: input.context.parsedConnectionConfig,
+          ...(input.context.connection.resources === undefined
+            ? {}
+            : { resources: input.context.connection.resources }),
         },
         currentValue: input.row.config,
         ...(parsedCurrentValue.success ? { parsedCurrentValue: parsedCurrentValue.data } : {}),

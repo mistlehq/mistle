@@ -61,6 +61,48 @@ const IntegrationConnectionSchema = z
   })
   .strict();
 
+const IntegrationConnectionResourceSchema = z
+  .object({
+    id: z.string().min(1),
+    familyId: z.string().min(1),
+    kind: z.string().min(1),
+    externalId: z.string().min(1).optional(),
+    handle: z.string().min(1),
+    displayName: z.string().min(1),
+    status: z.literal("accessible"),
+    metadata: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+
+const IntegrationConnectionResourcesPageSchema = z
+  .object({
+    connectionId: z.string().min(1),
+    familyId: z.string().min(1),
+    kind: z.string().min(1),
+    syncState: z.enum(["never-synced", "syncing", "ready", "error"]),
+    lastSyncedAt: z.string().min(1).optional(),
+    lastErrorCode: z.string().min(1).optional(),
+    lastErrorMessage: z.string().min(1).optional(),
+    items: z.array(IntegrationConnectionResourceSchema),
+    page: z
+      .object({
+        totalResults: z.number().int().min(0),
+        nextCursor: z.string().min(1).nullable(),
+        previousCursor: z.string().min(1).nullable(),
+      })
+      .strict(),
+  })
+  .strict();
+
+const RefreshedIntegrationConnectionResourcesSchema = z
+  .object({
+    connectionId: z.string().min(1),
+    familyId: z.string().min(1),
+    kind: z.string().min(1),
+    syncState: z.literal("syncing"),
+  })
+  .strict();
+
 const IntegrationTargetsPageSchema = z
   .object({
     items: z.array(IntegrationTargetSchema),
@@ -99,8 +141,21 @@ const StartedOAuthConnectionSchema = z
 
 export type IntegrationTarget = z.infer<typeof IntegrationTargetSchema>;
 export type IntegrationConnection = z.infer<typeof IntegrationConnectionSchema>;
+export type IntegrationConnectionResourceSummary = NonNullable<
+  IntegrationConnection["resources"]
+>[number];
+export type IntegrationConnectionResource = z.infer<typeof IntegrationConnectionResourceSchema>;
 export type CreatedIntegrationConnection = z.infer<typeof IntegrationConnectionSchema>;
 export type StartedOAuthConnection = z.infer<typeof StartedOAuthConnectionSchema>;
+export type IntegrationConnectionResources = Omit<
+  z.infer<typeof IntegrationConnectionResourcesPageSchema>,
+  "items" | "page"
+> & {
+  items: readonly IntegrationConnectionResource[];
+};
+export type RefreshedIntegrationConnectionResources = z.infer<
+  typeof RefreshedIntegrationConnectionResourcesSchema
+>;
 
 export class IntegrationsApiError extends Error {
   readonly operation: string;
@@ -232,6 +287,105 @@ export async function listIntegrationDirectory(input: { signal?: AbortSignal }):
         operation: "listIntegrationDirectory",
         error,
         fallbackMessage: "Could not load integrations.",
+      }),
+    );
+  }
+}
+
+const INTEGRATION_CONNECTION_RESOURCES_PAGE_LIMIT = 100;
+
+export async function listIntegrationConnectionResources(input: {
+  connectionId: string;
+  kind: string;
+  search?: string;
+  signal?: AbortSignal;
+}): Promise<IntegrationConnectionResources> {
+  try {
+    const items: IntegrationConnectionResource[] = [];
+    let after: string | null = null;
+    let responseMetadata: Omit<IntegrationConnectionResources, "items"> | null = null;
+
+    for (;;) {
+      const response = await requestControlPlane({
+        operation: "listIntegrationConnectionResources",
+        method: "GET",
+        pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/resources`,
+        query: {
+          kind: input.kind,
+          limit: INTEGRATION_CONNECTION_RESOURCES_PAGE_LIMIT,
+          ...(input.search === undefined || input.search.length === 0
+            ? {}
+            : { search: input.search }),
+          ...(after === null ? {} : { after }),
+        },
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+        fallbackMessage: "Could not load integration connection resources.",
+      });
+
+      const data = await readJsonWithSchema({
+        response,
+        schema: IntegrationConnectionResourcesPageSchema,
+        operation: "listIntegrationConnectionResources",
+      });
+
+      items.push(...data.items);
+      responseMetadata = {
+        connectionId: data.connectionId,
+        familyId: data.familyId,
+        kind: data.kind,
+        syncState: data.syncState,
+        ...(data.lastSyncedAt === undefined ? {} : { lastSyncedAt: data.lastSyncedAt }),
+        ...(data.lastErrorCode === undefined ? {} : { lastErrorCode: data.lastErrorCode }),
+        ...(data.lastErrorMessage === undefined ? {} : { lastErrorMessage: data.lastErrorMessage }),
+      };
+
+      if (data.page.nextCursor === null) {
+        if (responseMetadata === null) {
+          throw new Error("Expected integration connection resources metadata to be present.");
+        }
+
+        return {
+          ...responseMetadata,
+          items,
+        };
+      }
+
+      after = data.page.nextCursor;
+    }
+  } catch (error) {
+    throw new IntegrationsApiError(
+      normalizeHttpApiError({
+        operation: "listIntegrationConnectionResources",
+        error,
+        fallbackMessage: "Could not load integration connection resources.",
+      }),
+    );
+  }
+}
+
+export async function refreshIntegrationConnectionResources(input: {
+  connectionId: string;
+  kind: string;
+}): Promise<RefreshedIntegrationConnectionResources> {
+  try {
+    const response = await requestControlPlane({
+      operation: "refreshIntegrationConnectionResources",
+      method: "POST",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/resources/${encodeURIComponent(input.kind)}/refresh`,
+      fallbackMessage: "Could not refresh integration connection resources.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: RefreshedIntegrationConnectionResourcesSchema,
+      operation: "refreshIntegrationConnectionResources",
+    });
+  } catch (error) {
+    throw new IntegrationsApiError(
+      normalizeHttpApiError({
+        operation: "refreshIntegrationConnectionResources",
+        error,
+        fallbackMessage: "Could not refresh integration connection resources.",
       }),
     );
   }
