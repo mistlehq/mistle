@@ -1,4 +1,4 @@
-import { index, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { index, integer, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
 import { automationRuns } from "./automation-runs.js";
@@ -8,7 +8,8 @@ import { controlPlaneSchema } from "./namespace.js";
 
 export const ConversationDeliveryTaskStatuses = {
   QUEUED: "queued",
-  PROCESSING: "processing",
+  CLAIMED: "claimed",
+  DELIVERING: "delivering",
   COMPLETED: "completed",
   FAILED: "failed",
   IGNORED: "ignored",
@@ -33,13 +34,19 @@ export const conversationDeliveryTasks = controlPlaneSchema.table(
       .notNull()
       .references(() => integrationWebhookEvents.id, { onDelete: "cascade" }),
     sourceOrderKey: text("source_order_key").notNull(),
+    processorGeneration: integer("processor_generation"),
     status: text("status")
       .notNull()
       .$type<ConversationDeliveryTaskStatus>()
       .default(ConversationDeliveryTaskStatuses.QUEUED),
+    attemptCount: integer("attempt_count").notNull().default(0),
     failureCode: text("failure_code"),
     failureMessage: text("failure_message"),
-    startedAt: timestamp("started_at", { withTimezone: true, mode: "string" }),
+    claimedAt: timestamp("claimed_at", { withTimezone: true, mode: "string" }),
+    deliveryStartedAt: timestamp("delivery_started_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
     finishedAt: timestamp("finished_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .notNull()

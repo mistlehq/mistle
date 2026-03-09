@@ -5,5 +5,11 @@ export {
 } from "./spec.js";
 export {
   createHandleConversationDeliveryWorkflow,
+  ActiveConversationDeliveryTaskStatuses,
+  type ActiveConversationDeliveryTask,
+  type ActiveConversationDeliveryTaskStatus,
+  type AcquiredAutomationConnection,
   type CreateHandleConversationDeliveryWorkflowInput,
+  type EnsuredAutomationSandbox,
+  type FinalConversationDeliveryTaskStatus,
 } from "./workflow.js";

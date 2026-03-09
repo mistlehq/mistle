@@ -13,12 +13,18 @@ import { systemSleeper } from "@mistle/time";
 import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
-import { claimConversation } from "../conversations/index.js";
+import {
+  claimConversation,
+  enqueueConversationDeliveryTask,
+  ensureConversationDeliveryProcessor,
+  setConversationDeliveryProcessorIdle,
+} from "../conversations/index.js";
 import {
   connectSandboxAgentConnection,
   sendSandboxAgentMessage,
 } from "./sandbox-agent-connection.js";
 import type {
+  HandoffAutomationRunDeliveryServiceInput,
   AcquireAutomationConnectionServiceOutput,
   AcquireAutomationConnectionServiceInput,
   DeliverAutomationPayloadServiceInput,
@@ -29,6 +35,14 @@ import type {
 
 export type HandleAutomationRunDependencies = {
   db: ControlPlaneDatabase;
+};
+
+export type HandoffAutomationRunDeliveryDependencies = {
+  db: ControlPlaneDatabase;
+  enqueueConversationDeliveryWorkflow: (input: {
+    conversationId: string;
+    generation: number;
+  }) => Promise<void>;
 };
 
 export type EnsureAutomationSandboxDependencies = {
@@ -94,6 +108,7 @@ const AutomationRunFailureCodes = {
   AGENT_BINDING_AMBIGUOUS: "agent_binding_ambiguous",
   AGENT_BINDING_CONNECTION_NOT_FOUND: "agent_binding_connection_not_found",
   AGENT_BINDING_TARGET_NOT_FOUND: "agent_binding_target_not_found",
+  WEBHOOK_EVENT_SOURCE_ORDER_KEY_MISSING: "webhook_event_source_order_key_missing",
   TEMPLATE_RENDER_FAILED: "template_render_failed",
   AUTOMATION_RUN_EXECUTION_FAILED: "automation_run_execution_failed",
 } as const;
@@ -291,6 +306,7 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     providerEventType: string;
     externalEventId: string;
     externalDeliveryId: string | null;
+    sourceOrderKey: string | null;
     payload: Record<string, unknown>;
   };
 }): PrepareAutomationRunServiceOutput | null {
@@ -328,6 +344,7 @@ function resolvePersistedPreparedAutomationRunSnapshot(input: {
     webhookProviderEventType: input.webhookEvent.providerEventType,
     webhookExternalEventId: input.webhookEvent.externalEventId,
     webhookExternalDeliveryId: input.webhookEvent.externalDeliveryId,
+    webhookSourceOrderKey: input.webhookEvent.sourceOrderKey ?? "",
     webhookPayload: input.webhookEvent.payload,
     renderedInput: input.automationRun.renderedInput,
     renderedConversationKey: input.automationRun.renderedConversationKey,
@@ -497,14 +514,29 @@ export async function prepareAutomationRun(
       providerEventType: webhookEvent.providerEventType,
       externalEventId: webhookEvent.externalEventId,
       externalDeliveryId: webhookEvent.externalDeliveryId,
+      sourceOrderKey: webhookEvent.sourceOrderKey,
       payload: webhookEvent.payload,
     },
   });
   if (persistedSnapshot !== null) {
+    if (persistedSnapshot.webhookSourceOrderKey.length === 0) {
+      throw new AutomationRunExecutionError({
+        code: AutomationRunFailureCodes.WEBHOOK_EVENT_SOURCE_ORDER_KEY_MISSING,
+        message: `Webhook event '${webhookEvent.id}' is missing source order key.`,
+      });
+    }
+
     return persistedSnapshot;
   }
 
   const idempotencyKeyTemplate = webhookAutomation.idempotencyKeyTemplate;
+  const webhookSourceOrderKey = webhookEvent.sourceOrderKey;
+  if (webhookSourceOrderKey === null || webhookSourceOrderKey.trim().length === 0) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.WEBHOOK_EVENT_SOURCE_ORDER_KEY_MISSING,
+      message: `Webhook event '${webhookEvent.id}' is missing source order key.`,
+    });
+  }
 
   let compiledTemplates: ReturnType<typeof compileTemplates>;
   try {
@@ -589,11 +621,65 @@ export async function prepareAutomationRun(
     webhookProviderEventType: webhookEvent.providerEventType,
     webhookExternalEventId: webhookEvent.externalEventId,
     webhookExternalDeliveryId: webhookEvent.externalDeliveryId,
+    webhookSourceOrderKey,
     webhookPayload: webhookEvent.payload,
     renderedInput: compiledTemplates.renderedInput,
     renderedConversationKey: compiledTemplates.renderedConversationKey,
     renderedIdempotencyKey: compiledTemplates.renderedIdempotencyKey,
   };
+}
+
+export async function handoffAutomationRunDelivery(
+  deps: HandoffAutomationRunDeliveryDependencies,
+  input: HandoffAutomationRunDeliveryServiceInput,
+): Promise<void> {
+  const enqueuedTask = await enqueueConversationDeliveryTask(
+    {
+      db: deps.db,
+    },
+    {
+      conversationId: input.preparedAutomationRun.conversationId,
+      automationRunId: input.preparedAutomationRun.automationRunId,
+      sourceWebhookEventId: input.preparedAutomationRun.webhookEventId,
+      sourceOrderKey: input.preparedAutomationRun.webhookSourceOrderKey,
+    },
+  );
+
+  const ensuredProcessor = await ensureConversationDeliveryProcessor(
+    {
+      db: deps.db,
+    },
+    {
+      conversationId: enqueuedTask.conversationId,
+    },
+  );
+  if (!ensuredProcessor.shouldStart) {
+    return;
+  }
+
+  try {
+    await deps.enqueueConversationDeliveryWorkflow({
+      conversationId: ensuredProcessor.conversationId,
+      generation: ensuredProcessor.generation,
+    });
+  } catch (error) {
+    await setConversationDeliveryProcessorIdle(
+      {
+        db: deps.db,
+      },
+      {
+        conversationId: ensuredProcessor.conversationId,
+        generation: ensuredProcessor.generation,
+      },
+    );
+
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+      message:
+        error instanceof Error ? error.message : "Failed to start conversation delivery workflow.",
+      cause: error,
+    });
+  }
 }
 
 export async function ensureAutomationSandbox(

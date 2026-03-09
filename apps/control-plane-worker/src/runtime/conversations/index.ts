@@ -17,6 +17,18 @@ export {
   type EnsureConversationDeliveryProcessorOutput,
 } from "./ensure-conversation-delivery-processor.js";
 export {
+  findActiveConversationDeliveryTask,
+  type FindActiveConversationDeliveryTaskInput,
+} from "./find-active-conversation-delivery-task.js";
+export {
+  idleConversationDeliveryProcessorIfEmpty,
+  type IdleConversationDeliveryProcessorIfEmptyInput,
+} from "./idle-conversation-delivery-processor-if-empty.js";
+export {
+  markConversationDeliveryTaskDelivering,
+  type MarkConversationDeliveryTaskDeliveringInput,
+} from "./mark-conversation-delivery-task-delivering.js";
+export {
   enqueueConversationDeliveryTask,
   type EnqueueConversationDeliveryTaskInput,
 } from "./enqueue-conversation-delivery-task.js";
@@ -54,6 +66,10 @@ export {
   rebindConversationSandbox,
   type RebindConversationSandboxInput,
 } from "./rebind-conversation-sandbox.js";
+export {
+  setConversationDeliveryProcessorIdle,
+  type SetConversationDeliveryProcessorIdleInput,
+} from "./set-conversation-delivery-processor-idle.js";
 export {
   replaceConversationBinding,
   type ReplaceConversationBindingInput,

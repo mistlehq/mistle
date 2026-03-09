@@ -1,4 +1,6 @@
 import {
+  ConversationDeliveryProcessorStatuses,
+  ConversationDeliveryTaskStatuses,
   automationRuns,
   AutomationRunStatuses,
   automationTargets,
@@ -36,14 +38,27 @@ import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control
 import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
+import { type RawData, WebSocketServer } from "ws";
 
 import {
-  markAutomationRunCompleted,
+  handoffAutomationRunDelivery,
   markAutomationRunFailed,
   prepareAutomationRun,
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
 } from "../src/runtime/services/handle-automation-run.js";
+import {
+  acquireConversationDeliveryConnection,
+  claimOrResumeConversationDeliveryTask,
+  completeConversationDeliveryAutomationRun,
+  deliverConversationAutomationPayload,
+  ensureConversationDeliverySandbox,
+  failConversationDeliveryAutomationRun,
+  finalizeConversationDeliveryActiveTask,
+  idleConversationDeliveryProcessor,
+  prepareConversationDeliveryAutomationRun,
+  resolveAutomationRunFailure as resolveConversationDeliveryFailure,
+} from "../src/runtime/services/handle-conversation-delivery.js";
 import { it } from "./test-context.js";
 
 const TestTimeoutMs = 120_000;
@@ -121,6 +136,138 @@ async function seedOpenAiAgentBinding(input: {
   });
 }
 
+type Deferred<T> = {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (reason: unknown) => void;
+};
+
+type AgentDeliveryTestServer = {
+  url: string;
+  payload: Promise<string>;
+  close: () => Promise<void>;
+};
+
+function createDeferred<T>(): Deferred<T> {
+  let resolveFn: ((value: T) => void) | undefined;
+  let rejectFn: ((reason: unknown) => void) | undefined;
+  const promise = new Promise<T>((resolve, reject) => {
+    resolveFn = resolve;
+    rejectFn = reject;
+  });
+
+  return {
+    promise,
+    resolve: (value) => {
+      if (resolveFn === undefined) {
+        throw new Error("Deferred resolve function was not initialized.");
+      }
+
+      resolveFn(value);
+    },
+    reject: (reason) => {
+      if (rejectFn === undefined) {
+        throw new Error("Deferred reject function was not initialized.");
+      }
+
+      rejectFn(reason);
+    },
+  };
+}
+
+function toText(data: RawData): string {
+  if (Buffer.isBuffer(data)) {
+    return data.toString("utf8");
+  }
+  if (data instanceof ArrayBuffer) {
+    return Buffer.from(data).toString("utf8");
+  }
+
+  return Buffer.concat(data).toString("utf8");
+}
+
+function parseRequestIdFromConnectMessage(data: RawData): string {
+  const payloadText = toText(data);
+  const parsedPayload: unknown = JSON.parse(payloadText);
+  if (
+    typeof parsedPayload !== "object" ||
+    parsedPayload === null ||
+    Array.isArray(parsedPayload) ||
+    !("type" in parsedPayload) ||
+    parsedPayload.type !== "connect" ||
+    !("requestId" in parsedPayload) ||
+    typeof parsedPayload.requestId !== "string" ||
+    !("channel" in parsedPayload) ||
+    typeof parsedPayload.channel !== "object" ||
+    parsedPayload.channel === null ||
+    !("kind" in parsedPayload.channel) ||
+    parsedPayload.channel.kind !== "agent"
+  ) {
+    throw new Error("Expected a sandbox agent connect request payload.");
+  }
+
+  return parsedPayload.requestId;
+}
+
+async function startAgentDeliveryTestServer(): Promise<AgentDeliveryTestServer> {
+  const payloadDeferred = createDeferred<string>();
+  const wsServer = new WebSocketServer({
+    host: "127.0.0.1",
+    port: 0,
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    wsServer.once("listening", resolve);
+    wsServer.once("error", reject);
+  });
+
+  wsServer.on("connection", (socket) => {
+    let didHandleConnect = false;
+
+    socket.on("message", (message) => {
+      if (!didHandleConnect) {
+        didHandleConnect = true;
+        const requestId = parseRequestIdFromConnectMessage(message);
+        socket.send(
+          JSON.stringify({
+            type: "connect.ok",
+            requestId,
+          }),
+        );
+        return;
+      }
+
+      payloadDeferred.resolve(toText(message));
+    });
+
+    socket.on("error", (error) => {
+      payloadDeferred.reject(error);
+    });
+  });
+
+  const address = wsServer.address();
+  if (typeof address !== "object" || address === null) {
+    throw new Error("Expected websocket server to expose a socket address.");
+  }
+
+  return {
+    url: `ws://127.0.0.1:${String(address.port)}`,
+    payload: payloadDeferred.promise,
+    close: async () => {
+      await new Promise<void>((resolve, reject) => {
+        wsServer.close((error) => {
+          if (error === undefined) {
+            resolve();
+            return;
+          }
+
+          reject(error);
+        });
+      });
+    },
+  };
+}
+
 describe("handleAutomationRun integration", () => {
   async function executeHandleAutomationRunSteps(input: {
     db: ReturnType<typeof createControlPlaneDatabase>;
@@ -129,26 +276,189 @@ describe("handleAutomationRun integration", () => {
     const workflowInput: HandleAutomationRunWorkflowInput = {
       automationRunId: input.automationRunId,
     };
-    const deps = {
-      db: input.db,
-    };
-
-    const transitionResult = await transitionAutomationRunToRunning(deps, workflowInput);
+    const transitionResult = await transitionAutomationRunToRunning(
+      {
+        db: input.db,
+      },
+      workflowInput,
+    );
     if (!transitionResult.shouldProcess) {
       return;
     }
 
+    const deliveryServer = await startAgentDeliveryTestServer();
+
     try {
-      await prepareAutomationRun(deps, workflowInput);
-      await markAutomationRunCompleted(deps, workflowInput);
+      const preparedAutomationRun = await prepareAutomationRun(
+        {
+          db: input.db,
+        },
+        workflowInput,
+      );
+      await handoffAutomationRunDelivery(
+        {
+          db: input.db,
+          enqueueConversationDeliveryWorkflow: async () => {},
+        },
+        {
+          preparedAutomationRun,
+        },
+      );
+
+      const persistedProcessor = await input.db.query.conversationDeliveryProcessors.findFirst({
+        where: (table, { eq }) => eq(table.conversationId, preparedAutomationRun.conversationId),
+      });
+      if (persistedProcessor === undefined) {
+        throw new Error("Expected persisted conversation delivery processor.");
+      }
+
+      while (true) {
+        const activeTask = await claimOrResumeConversationDeliveryTask(
+          {
+            db: input.db,
+          },
+          {
+            conversationId: preparedAutomationRun.conversationId,
+            generation: persistedProcessor.generation,
+          },
+        );
+
+        if (activeTask === null) {
+          const didIdleProcessor = await idleConversationDeliveryProcessor(
+            {
+              db: input.db,
+            },
+            {
+              conversationId: preparedAutomationRun.conversationId,
+              generation: persistedProcessor.generation,
+            },
+          );
+          if (didIdleProcessor) {
+            break;
+          }
+
+          continue;
+        }
+
+        try {
+          const preparedTaskRun = await prepareConversationDeliveryAutomationRun(
+            {
+              db: input.db,
+            },
+            {
+              automationRunId: activeTask.automationRunId,
+            },
+          );
+          const ensuredSandbox = await ensureConversationDeliverySandbox(
+            {
+              db: input.db,
+              startSandboxProfileInstance: async () => ({
+                workflowRunId: "wf_start_sandbox_test",
+                sandboxInstanceId: "sbi_test",
+              }),
+            },
+            {
+              preparedAutomationRun: preparedTaskRun,
+            },
+          );
+          const acquiredConnection = await acquireConversationDeliveryConnection(
+            {
+              getSandboxInstance: async () => ({
+                id: "sbi_test",
+                status: "running",
+                failureCode: null,
+                failureMessage: null,
+              }),
+              mintSandboxConnectionToken: async () => ({
+                instanceId: "sbi_test",
+                url: deliveryServer.url,
+                token: "connect_token_test",
+                expiresAt: "2026-03-09T00:00:30.000Z",
+              }),
+            },
+            {
+              preparedAutomationRun: preparedTaskRun,
+              ensuredAutomationSandbox: ensuredSandbox,
+            },
+          );
+
+          await deliverConversationAutomationPayload(
+            {
+              db: input.db,
+            },
+            {
+              taskId: activeTask.taskId,
+              generation: persistedProcessor.generation,
+              preparedAutomationRun: preparedTaskRun,
+              ensuredAutomationSandbox: ensuredSandbox,
+              acquiredAutomationConnection: acquiredConnection,
+            },
+          );
+
+          await completeConversationDeliveryAutomationRun(
+            {
+              db: input.db,
+            },
+            {
+              automationRunId: activeTask.automationRunId,
+            },
+          );
+
+          await finalizeConversationDeliveryActiveTask(
+            {
+              db: input.db,
+            },
+            {
+              taskId: activeTask.taskId,
+              generation: persistedProcessor.generation,
+              status: "completed",
+            },
+          );
+        } catch (error) {
+          const failure = resolveConversationDeliveryFailure({
+            error,
+          });
+          await failConversationDeliveryAutomationRun(
+            {
+              db: input.db,
+            },
+            {
+              automationRunId: activeTask.automationRunId,
+              failureCode: failure.code,
+              failureMessage: failure.message,
+            },
+          );
+          await finalizeConversationDeliveryActiveTask(
+            {
+              db: input.db,
+            },
+            {
+              taskId: activeTask.taskId,
+              generation: persistedProcessor.generation,
+              status: "failed",
+              failureCode: failure.code,
+              failureMessage: failure.message,
+            },
+          );
+        }
+      }
+
+      await deliveryServer.payload;
     } catch (error) {
       const failure = resolveAutomationRunFailure(error);
-      await markAutomationRunFailed(deps, {
-        automationRunId: workflowInput.automationRunId,
-        failureCode: failure.code,
-        failureMessage: failure.message,
-      });
+      await markAutomationRunFailed(
+        {
+          db: input.db,
+        },
+        {
+          automationRunId: workflowInput.automationRunId,
+          failureCode: failure.code,
+          failureMessage: failure.message,
+        },
+      );
       throw error;
+    } finally {
+      await deliveryServer.close();
     }
   }
 
@@ -235,6 +545,8 @@ describe("handleAutomationRun integration", () => {
           targetKey,
           externalEventId: "evt_prepare",
           externalDeliveryId: "delivery_prepare",
+          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
+          sourceOrderKey: "2026-03-09T00:00:00Z#0001",
           providerEventType: "issue_comment",
           eventType: "github.issue_comment.created",
           payload: {
@@ -283,6 +595,7 @@ describe("handleAutomationRun integration", () => {
           webhookProviderEventType: "issue_comment",
           webhookExternalEventId: "evt_prepare",
           webhookExternalDeliveryId: "delivery_prepare",
+          webhookSourceOrderKey: "2026-03-09T00:00:00Z#0001",
           renderedInput: "Handle @mistlebot prepare",
           renderedConversationKey: "issue-777",
           renderedIdempotencyKey: "delivery_prepare",
@@ -405,6 +718,8 @@ describe("handleAutomationRun integration", () => {
           targetKey,
           externalEventId: "evt_replay_snapshot",
           externalDeliveryId: "delivery_replay_snapshot",
+          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
+          sourceOrderKey: "2026-03-09T00:00:00Z#0002",
           providerEventType: "issue_comment",
           eventType: "github.issue_comment.created",
           payload: {
@@ -457,6 +772,7 @@ describe("handleAutomationRun integration", () => {
 
         expect(firstPreparedRun).toMatchObject({
           conversationId: expect.stringMatching(/^cnv_/),
+          webhookSourceOrderKey: "2026-03-09T00:00:00Z#0002",
           renderedInput: "Handle @mistlebot replay snapshot",
           renderedConversationKey: "issue-105",
           renderedIdempotencyKey: "delivery_replay_snapshot",
@@ -559,6 +875,8 @@ describe("handleAutomationRun integration", () => {
           targetKey,
           externalEventId: "evt_complete",
           externalDeliveryId: "delivery_complete",
+          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
+          sourceOrderKey: "2026-03-09T00:00:00Z#0003",
           providerEventType: "issue_comment",
           eventType: "github.issue_comment.created",
           payload: {
@@ -587,6 +905,14 @@ describe("handleAutomationRun integration", () => {
         const persistedRun = await database.db.query.automationRuns.findFirst({
           where: (table, { eq }) => eq(table.id, automationRunId),
         });
+        const persistedTask = await database.db.query.conversationDeliveryTasks.findFirst({
+          where: (table, { eq }) => eq(table.automationRunId, automationRunId),
+        });
+        const persistedProcessor = await database.db.query.conversationDeliveryProcessors.findFirst(
+          {
+            where: (table, { eq }) => eq(table.conversationId, persistedRun?.conversationId ?? ""),
+          },
+        );
         expect(persistedRun).toBeDefined();
         if (persistedRun === undefined) {
           throw new Error("Expected persisted automation run.");
@@ -596,6 +922,15 @@ describe("handleAutomationRun integration", () => {
         expect(persistedRun.startedAt).toBeDefined();
         expect(persistedRun.finishedAt).toBeDefined();
         expect(persistedRun.failureCode).toBeNull();
+        expect(persistedTask).toMatchObject({
+          automationRunId,
+          status: ConversationDeliveryTaskStatuses.COMPLETED,
+          failureCode: null,
+        });
+        expect(persistedProcessor).toMatchObject({
+          conversationId: persistedRun.conversationId,
+          status: ConversationDeliveryProcessorStatuses.IDLE,
+        });
       } finally {
         await database.stop();
       }
@@ -686,6 +1021,8 @@ describe("handleAutomationRun integration", () => {
           targetKey,
           externalEventId: "evt_running",
           externalDeliveryId: "delivery_running",
+          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
+          sourceOrderKey: "2026-03-09T00:00:00Z#0004",
           providerEventType: "issue_comment",
           eventType: "github.issue_comment.created",
           payload: {
@@ -714,6 +1051,14 @@ describe("handleAutomationRun integration", () => {
         const persistedRun = await database.db.query.automationRuns.findFirst({
           where: (table, { eq }) => eq(table.id, automationRunId),
         });
+        const persistedTask = await database.db.query.conversationDeliveryTasks.findFirst({
+          where: (table, { eq }) => eq(table.automationRunId, automationRunId),
+        });
+        const persistedProcessor = await database.db.query.conversationDeliveryProcessors.findFirst(
+          {
+            where: (table, { eq }) => eq(table.conversationId, persistedRun?.conversationId ?? ""),
+          },
+        );
         expect(persistedRun).toBeDefined();
         if (persistedRun === undefined) {
           throw new Error("Expected persisted automation run.");
@@ -722,6 +1067,15 @@ describe("handleAutomationRun integration", () => {
         expect(persistedRun.status).toBe(AutomationRunStatuses.COMPLETED);
         expect(persistedRun.finishedAt).toBeDefined();
         expect(persistedRun.failureCode).toBeNull();
+        expect(persistedTask).toMatchObject({
+          automationRunId,
+          status: ConversationDeliveryTaskStatuses.COMPLETED,
+          failureCode: null,
+        });
+        expect(persistedProcessor).toMatchObject({
+          conversationId: persistedRun.conversationId,
+          status: ConversationDeliveryProcessorStatuses.IDLE,
+        });
       } finally {
         await database.stop();
       }
@@ -812,6 +1166,8 @@ describe("handleAutomationRun integration", () => {
           targetKey,
           externalEventId: "evt_fail",
           externalDeliveryId: "delivery_fail",
+          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
+          sourceOrderKey: "2026-03-09T00:00:00Z#0005",
           providerEventType: "issue_comment",
           eventType: "github.issue_comment.created",
           payload: {
@@ -842,6 +1198,9 @@ describe("handleAutomationRun integration", () => {
         const persistedRun = await database.db.query.automationRuns.findFirst({
           where: (table, { eq }) => eq(table.id, automationRunId),
         });
+        const persistedTasks = await database.db.query.conversationDeliveryTasks.findMany({
+          where: (table, { eq }) => eq(table.automationRunId, automationRunId),
+        });
         expect(persistedRun).toBeDefined();
         if (persistedRun === undefined) {
           throw new Error("Expected persisted automation run.");
@@ -850,6 +1209,7 @@ describe("handleAutomationRun integration", () => {
         expect(persistedRun.status).toBe(AutomationRunStatuses.FAILED);
         expect(persistedRun.finishedAt).toBeDefined();
         expect(persistedRun.failureCode).toBe("template_render_failed");
+        expect(persistedTasks).toHaveLength(0);
       } finally {
         await database.stop();
       }

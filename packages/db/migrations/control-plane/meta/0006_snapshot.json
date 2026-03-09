@@ -732,12 +732,25 @@
           "primaryKey": false,
           "notNull": true
         },
+        "processor_generation": {
+          "name": "processor_generation",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "default": "'queued'"
+        },
+        "attempt_count": {
+          "name": "attempt_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "0"
         },
         "failure_code": {
           "name": "failure_code",
@@ -751,8 +764,14 @@
           "primaryKey": false,
           "notNull": false
         },
-        "started_at": {
-          "name": "started_at",
+        "claimed_at": {
+          "name": "claimed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delivery_started_at": {
+          "name": "delivery_started_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

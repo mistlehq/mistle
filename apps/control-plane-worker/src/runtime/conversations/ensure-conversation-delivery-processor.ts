@@ -9,7 +9,6 @@ import type { ConversationPersistenceDependencies } from "./types.js";
 
 export type EnsureConversationDeliveryProcessorInput = {
   conversationId: string;
-  workflowRunId: string;
 };
 
 export type EnsureConversationDeliveryProcessorOutput = {
@@ -28,7 +27,7 @@ export async function ensureConversationDeliveryProcessor(
       conversationId: input.conversationId,
       generation: 1,
       status: ConversationDeliveryProcessorStatuses.RUNNING,
-      activeWorkflowRunId: input.workflowRunId,
+      activeWorkflowRunId: null,
     })
     .onConflictDoNothing({
       target: [conversationDeliveryProcessors.conversationId],
@@ -48,7 +47,7 @@ export async function ensureConversationDeliveryProcessor(
     .set({
       generation: sql`${conversationDeliveryProcessors.generation} + 1`,
       status: ConversationDeliveryProcessorStatuses.RUNNING,
-      activeWorkflowRunId: input.workflowRunId,
+      activeWorkflowRunId: null,
       updatedAt: sql`now()`,
     })
     .where(
