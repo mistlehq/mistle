@@ -31,7 +31,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "liquidjs": "^10.24.0",
+    "liquidjs": "^10.25.0",
     "zod": "^4.3.6"
   }
 }
