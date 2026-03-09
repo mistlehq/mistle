@@ -1,0 +1,3 @@
+@import "@mistle/ui/styles.css";
+
+@source "../../../apps/dashboard/src/**/*.{ts,tsx}";

@@ -2,24 +2,31 @@
 
 This package hosts the single Storybook for the Mistle monorepo.
 
-## What belongs here
+## Scope
 
 - Shared UI stories from `packages/ui`
-- Dashboard stories for prop-driven view components
+- Selected dashboard stories
 - Shared Storybook configuration, global CSS imports, and addons
 
-## What should stay out
+## Component Boundary
 
-- App containers that require router, auth, or live session bootstrapping just to render
-- Storybook-only aliases for core runtime modules unless there is no other viable path
-- Feature logic that should first be split into a presentational view component
+- Put components in `packages/ui` only if they are app-agnostic, reusable, and safe to expose as shared UI API.
+- Keep dashboard-specific or product-aware components in `apps/dashboard`.
 
-## Where to put stories
+## Dashboard Story Rules
 
-- Colocate stories with the source component
-- Use `*.stories.tsx`
-- Keep dashboard stories inside `apps/dashboard/src/**`
-- Keep shared UI stories inside `packages/ui/src/**`
+- Story prop-driven `*-view.tsx` components.
+- Story self-contained local-state components only if they do not depend on app runtime services.
+- Do not story components that require auth, session bootstrapping, React Query wiring, live service clients, runtime env setup, or more than trivial `MemoryRouter` support.
+- If a component is worth storying but depends on runtime state, split out a view component first.
+
+## Placement
+
+- Use `*.stories.tsx`.
+- Keep dashboard stories in `apps/dashboard/src/**`.
+- Keep shared UI stories in `packages/ui/src/**`.
+
+Agent-specific working preferences live in `packages/storybook/AGENTS.md`.
 
 ## Commands
 
