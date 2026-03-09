@@ -4,6 +4,7 @@ import {
   AutomationRunStatuses,
   type AutomationRunStatus,
   type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
   ConversationCreatedByKinds,
   ConversationOwnerKinds,
   IntegrationBindingKinds,
@@ -71,13 +72,6 @@ export type MarkAutomationRunFailedInput = {
   failureCode: string;
   failureMessage: string;
 };
-
-type ControlPlaneTransaction = Parameters<ControlPlaneDatabase["transaction"]>[0] extends (
-  tx: infer T,
-  ...args: never[]
-) => Promise<unknown>
-  ? T
-  : never;
 
 const TerminalAutomationRunStatuses = new Set<AutomationRunStatus>([
   AutomationRunStatuses.COMPLETED,
