@@ -39,6 +39,15 @@ export interface paths {
                 displayName: string;
                 externalSubjectId?: string;
                 id: string;
+                resources?: {
+                  count: number;
+                  kind: string;
+                  lastSyncedAt?: string;
+                  /** @enum {string} */
+                  selectionMode: "single" | "multi";
+                  /** @enum {string} */
+                  syncState: "never-synced" | "syncing" | "ready" | "error";
+                }[];
                 /** @enum {string} */
                 status: "active" | "error" | "revoked";
                 targetKey: string;
@@ -181,6 +190,15 @@ export interface paths {
               displayName: string;
               externalSubjectId?: string;
               id: string;
+              resources?: {
+                count: number;
+                kind: string;
+                lastSyncedAt?: string;
+                /** @enum {string} */
+                selectionMode: "single" | "multi";
+                /** @enum {string} */
+                syncState: "never-synced" | "syncing" | "ready" | "error";
+              }[];
               /** @enum {string} */
               status: "active" | "error" | "revoked";
               targetKey: string;
@@ -326,6 +344,15 @@ export interface paths {
               displayName: string;
               externalSubjectId?: string;
               id: string;
+              resources?: {
+                count: number;
+                kind: string;
+                lastSyncedAt?: string;
+                /** @enum {string} */
+                selectionMode: "single" | "multi";
+                /** @enum {string} */
+                syncState: "never-synced" | "syncing" | "ready" | "error";
+              }[];
               /** @enum {string} */
               status: "active" | "error" | "revoked";
               targetKey: string;
@@ -471,6 +498,15 @@ export interface paths {
               displayName: string;
               externalSubjectId?: string;
               id: string;
+              resources?: {
+                count: number;
+                kind: string;
+                lastSyncedAt?: string;
+                /** @enum {string} */
+                selectionMode: "single" | "multi";
+                /** @enum {string} */
+                syncState: "never-synced" | "syncing" | "ready" | "error";
+              }[];
               /** @enum {string} */
               status: "active" | "error" | "revoked";
               targetKey: string;
