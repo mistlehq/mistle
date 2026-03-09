@@ -112,15 +112,68 @@ export const InteractiveFlow: Story = {
   },
   play: async ({ canvasElement }): Promise<void> => {
     const canvas = within(canvasElement);
+    const continueButton = canvas.getByRole("button", { name: "Continue with email" });
+
+    await expect(continueButton).toBeVisible();
 
     await userEvent.clear(canvas.getByLabelText("Email address"));
     await userEvent.type(canvas.getByLabelText("Email address"), "story@mistle.so");
-    await userEvent.click(canvas.getByRole("button", { name: "Continue with email" }));
+    await userEvent.click(continueButton);
 
     await expect(canvas.getByText(/We sent a one-time code to/i)).toBeVisible();
     await expect(canvas.getByText("story@mistle.so")).toBeVisible();
 
     await userEvent.click(canvas.getByRole("button", { name: "Use a different email" }));
     await expect(canvas.getByRole("button", { name: "Continue with email" })).toBeVisible();
+  },
+};
+
+export const InteractiveVerification: Story = {
+  render: function RenderStory(): React.JSX.Element {
+    const [otp, setOtp] = useState("");
+    const [statusMessage, setStatusMessage] = useState("Waiting for code entry.");
+
+    async function handleVerifyOtp(event: SyntheticEvent<HTMLFormElement>): Promise<void> {
+      event.preventDefault();
+      setStatusMessage(`Verification submitted for code ${otp}.`);
+    }
+
+    return (
+      <div className="flex flex-col gap-3">
+        <p aria-live="polite" role="status">
+          {statusMessage}
+        </p>
+        <AuthScreenView
+          authError={null}
+          authStep="otp"
+          email="story@mistle.so"
+          footerError={null}
+          isSendingOtp={false}
+          isVerifyingOtp={false}
+          onEmailChange={() => {}}
+          onOtpChange={setOtp}
+          onSendOtp={async () => {}}
+          onUseDifferentEmail={() => {
+            setOtp("");
+            setStatusMessage("Switched back to email entry.");
+          }}
+          onVerifyOtp={handleVerifyOtp}
+          otp={otp}
+        />
+      </div>
+    );
+  },
+  play: async ({ canvasElement }): Promise<void> => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByRole("status")).toHaveTextContent("Waiting for code entry.");
+    await userEvent.type(canvas.getByLabelText("One-time code"), "123456");
+    await userEvent.click(canvas.getByRole("button", { name: "Sign in" }));
+    await expect(canvas.getByRole("status")).toHaveTextContent(
+      "Verification submitted for code 123456.",
+    );
+
+    await userEvent.click(canvas.getByRole("button", { name: "Use a different email" }));
+    await expect(canvas.getByRole("status")).toHaveTextContent("Switched back to email entry.");
   },
 };
