@@ -1,5 +1,5 @@
-import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase, ControlPlaneTransaction } from "@mistle/db/control-plane";
 
 export type ConversationPersistenceDependencies = {
-  db: ControlPlaneDatabase;
+  db: ControlPlaneDatabase | ControlPlaneTransaction;
 };

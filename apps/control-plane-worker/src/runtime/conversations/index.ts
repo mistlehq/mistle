@@ -17,6 +17,10 @@ export {
   type EnsureConversationDeliveryProcessorOutput,
 } from "./ensure-conversation-delivery-processor.js";
 export {
+  idleConversationDeliveryProcessorIfEmpty,
+  type IdleConversationDeliveryProcessorIfEmptyInput,
+} from "./idle-conversation-delivery-processor-if-empty.js";
+export {
   enqueueConversationDeliveryTask,
   type EnqueueConversationDeliveryTaskInput,
 } from "./enqueue-conversation-delivery-task.js";
@@ -54,6 +58,10 @@ export {
   rebindConversationSandbox,
   type RebindConversationSandboxInput,
 } from "./rebind-conversation-sandbox.js";
+export {
+  setConversationDeliveryProcessorIdle,
+  type SetConversationDeliveryProcessorIdleInput,
+} from "./set-conversation-delivery-processor-idle.js";
 export {
   replaceConversationBinding,
   type ReplaceConversationBindingInput,

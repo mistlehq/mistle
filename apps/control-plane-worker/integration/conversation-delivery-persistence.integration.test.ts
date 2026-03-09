@@ -331,14 +331,12 @@ describe("conversation delivery persistence integration", () => {
         { db: database.db },
         {
           conversationId: scope.conversationId,
-          workflowRunId: "wf_conversation_delivery_1",
         },
       );
       const secondEnsure = await ensureConversationDeliveryProcessor(
         { db: database.db },
         {
           conversationId: scope.conversationId,
-          workflowRunId: "wf_conversation_delivery_2",
         },
       );
 
@@ -360,7 +358,6 @@ describe("conversation delivery persistence integration", () => {
         { db: database.db },
         {
           conversationId: scope.conversationId,
-          workflowRunId: "wf_conversation_delivery_3",
         },
       );
 
@@ -374,7 +371,7 @@ describe("conversation delivery persistence integration", () => {
         conversationId: scope.conversationId,
         generation: 2,
         status: ConversationDeliveryProcessorStatuses.RUNNING,
-        activeWorkflowRunId: "wf_conversation_delivery_3",
+        activeWorkflowRunId: null,
       });
     } finally {
       await database.stop();

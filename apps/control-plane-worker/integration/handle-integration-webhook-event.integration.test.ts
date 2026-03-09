@@ -5,11 +5,14 @@ import {
   createControlPlaneDatabase,
   integrationConnections,
   IntegrationConnectionStatuses,
+  IntegrationBindingKinds,
   integrationTargets,
   integrationWebhookEvents,
   IntegrationWebhookEventStatuses,
   organizations,
   sandboxProfiles,
+  sandboxProfileVersions,
+  sandboxProfileVersionIntegrationBindings,
   CONTROL_PLANE_SCHEMA_NAME,
   webhookAutomations,
 } from "@mistle/db/control-plane";
@@ -18,6 +21,12 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
+import {
+  createOpenAiRawBindingCapabilities,
+  OpenAiApiKeyDefinition,
+  OpenAiReasoningEfforts,
+  OpenAiRuntimes,
+} from "@mistle/integrations-definitions";
 import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
@@ -33,6 +42,10 @@ import { handleIntegrationWebhookEvent } from "../src/runtime/services/handle-in
 import { it } from "./test-context.js";
 
 const TestTimeoutMs = 120_000;
+const OpenAiAgentTargetConfig = {
+  api_base_url: "https://api.openai.com/v1",
+  binding_capabilities: createOpenAiRawBindingCapabilities(),
+};
 
 async function createTestDatabase(input: { databaseUrl: string }) {
   await runControlPlaneMigrations({
@@ -54,6 +67,53 @@ async function createTestDatabase(input: { databaseUrl: string }) {
       await pool.end();
     },
   };
+}
+
+async function seedOpenAiAgentBinding(input: {
+  db: ReturnType<typeof createControlPlaneDatabase>;
+  organizationId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  suffix: string;
+}) {
+  const targetKey = `openai-agent-${input.suffix}`;
+  const connectionId = `icn_openai_agent_${input.suffix}`;
+  const bindingId = `ibd_openai_agent_${input.suffix}`;
+
+  await input.db.insert(integrationTargets).values({
+    targetKey,
+    familyId: OpenAiApiKeyDefinition.familyId,
+    variantId: OpenAiApiKeyDefinition.variantId,
+    enabled: true,
+    config: OpenAiAgentTargetConfig,
+  });
+  await input.db.insert(integrationConnections).values({
+    id: connectionId,
+    organizationId: input.organizationId,
+    targetKey,
+    displayName: "OpenAI agent connection",
+    status: IntegrationConnectionStatuses.ACTIVE,
+    externalSubjectId: "openai-agent-subject",
+    config: {
+      auth_scheme: "api-key",
+    },
+  });
+  await input.db.insert(sandboxProfileVersions).values({
+    sandboxProfileId: input.sandboxProfileId,
+    version: input.sandboxProfileVersion,
+  });
+  await input.db.insert(sandboxProfileVersionIntegrationBindings).values({
+    id: bindingId,
+    sandboxProfileId: input.sandboxProfileId,
+    sandboxProfileVersion: input.sandboxProfileVersion,
+    connectionId,
+    kind: IntegrationBindingKinds.AGENT,
+    config: {
+      runtime: OpenAiRuntimes.CODEX_CLI,
+      defaultModel: "gpt-5.2",
+      reasoningEffort: OpenAiReasoningEfforts.MEDIUM,
+    },
+  });
 }
 
 describe("handleIntegrationWebhookEvent integration", () => {
@@ -133,6 +193,13 @@ describe("handleIntegrationWebhookEvent integration", () => {
           displayName: "Worker Queue Profile",
           status: "active",
         });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 2,
+          suffix: "worker_webhook_queue",
+        });
         await database.db.insert(automations).values({
           id: automationId,
           organizationId,
@@ -166,6 +233,8 @@ describe("handleIntegrationWebhookEvent integration", () => {
           targetKey,
           externalEventId: "evt_queue",
           externalDeliveryId: "delivery_queue",
+          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
+          sourceOrderKey: "2026-03-09T00:00:00Z#0001",
           providerEventType: "issue_comment",
           eventType: "github.issue_comment.created",
           payload: {

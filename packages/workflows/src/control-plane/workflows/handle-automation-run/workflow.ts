@@ -24,37 +24,15 @@ export type PreparedAutomationRun = {
   webhookProviderEventType: string;
   webhookExternalEventId: string;
   webhookExternalDeliveryId: string | null;
+  webhookSourceOrderKey: string;
   webhookPayload: Record<string, unknown>;
   renderedInput: string;
   renderedConversationKey: string;
   renderedIdempotencyKey: string | null;
 };
 
-export type EnsureAutomationSandboxInput = {
+export type HandoffAutomationRunDeliveryInput = {
   preparedAutomationRun: PreparedAutomationRun;
-};
-
-export type EnsuredAutomationSandbox = {
-  sandboxInstanceId: string;
-  startupWorkflowRunId: string;
-};
-
-export type AcquiredAutomationConnection = {
-  instanceId: string;
-  url: string;
-  token: string;
-  expiresAt: string;
-};
-
-export type AcquireAutomationConnectionInput = {
-  preparedAutomationRun: PreparedAutomationRun;
-  ensuredAutomationSandbox: EnsuredAutomationSandbox;
-};
-
-export type DeliverAutomationPayloadInput = {
-  preparedAutomationRun: PreparedAutomationRun;
-  ensuredAutomationSandbox: EnsuredAutomationSandbox;
-  acquiredAutomationConnection: AcquiredAutomationConnection;
 };
 
 export type HandleAutomationRunFailure = {
@@ -73,14 +51,7 @@ export type CreateHandleAutomationRunWorkflowInput = {
     input: HandleAutomationRunWorkflowInput,
   ) => Promise<HandleAutomationRunTransitionResult>;
   prepareAutomationRun: (input: HandleAutomationRunWorkflowInput) => Promise<PreparedAutomationRun>;
-  ensureAutomationSandbox: (
-    input: EnsureAutomationSandboxInput,
-  ) => Promise<EnsuredAutomationSandbox>;
-  acquireAutomationConnection: (
-    input: AcquireAutomationConnectionInput,
-  ) => Promise<AcquiredAutomationConnection>;
-  deliverAutomationPayload: (input: DeliverAutomationPayloadInput) => Promise<void>;
-  markAutomationRunCompleted: (input: HandleAutomationRunWorkflowInput) => Promise<void>;
+  handoffAutomationRunDelivery: (input: HandoffAutomationRunDeliveryInput) => Promise<void>;
   markAutomationRunFailed: (input: MarkAutomationRunFailedInput) => Promise<void>;
   resolveAutomationRunFailure: (input: { error: unknown }) => HandleAutomationRunFailure;
 };
@@ -108,33 +79,10 @@ export function createHandleAutomationRunWorkflow(
         ctx.prepareAutomationRun(workflowInput),
       );
 
-      const ensuredAutomationSandbox = await step.run(
-        { name: "ensure-automation-sandbox" },
-        async () =>
-          ctx.ensureAutomationSandbox({
-            preparedAutomationRun,
-          }),
-      );
-
-      const acquiredAutomationConnection = await step.run(
-        { name: "acquire-automation-connection" },
-        async () =>
-          ctx.acquireAutomationConnection({
-            preparedAutomationRun,
-            ensuredAutomationSandbox,
-          }),
-      );
-
-      await step.run({ name: "deliver-automation-payload" }, async () =>
-        ctx.deliverAutomationPayload({
+      await step.run({ name: "handoff-automation-run-delivery" }, async () =>
+        ctx.handoffAutomationRunDelivery({
           preparedAutomationRun,
-          ensuredAutomationSandbox,
-          acquiredAutomationConnection,
         }),
-      );
-
-      await step.run({ name: "mark-automation-run-completed" }, async () =>
-        ctx.markAutomationRunCompleted(workflowInput),
       );
     } catch (error) {
       const failure = ctx.resolveAutomationRunFailure({

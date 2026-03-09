@@ -216,6 +216,7 @@ function createDeliverInput(connectionUrl: string): DeliverAutomationPayloadServ
       webhookProviderEventType: "issue_comment",
       webhookExternalEventId: "evt_test_001",
       webhookExternalDeliveryId: "delivery_test_001",
+      webhookSourceOrderKey: "2026-03-05T00:00:00Z#0001",
       webhookPayload: {
         comment: {
           body: "@mistlebot run this",

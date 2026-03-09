@@ -116,23 +116,13 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
                 webhookProviderEventType: "issue_comment",
                 webhookExternalEventId: "evt_test",
                 webhookExternalDeliveryId: "delivery_test",
+                webhookSourceOrderKey: "2026-01-01T00:00:00Z#0001",
                 webhookPayload: {},
                 renderedInput: "hello",
                 renderedConversationKey: "conversation-key",
                 renderedIdempotencyKey: null,
               }),
-              ensureAutomationSandbox: async () => ({
-                sandboxInstanceId: "sbi_test",
-                startupWorkflowRunId: "wf_start_sandbox_test",
-              }),
-              acquireAutomationConnection: async () => ({
-                instanceId: "sbi_test",
-                url: "ws://gateway.example/sbi_test?connect_token=token_test",
-                token: "token_test",
-                expiresAt: "2026-01-01T00:00:30.000Z",
-              }),
-              deliverAutomationPayload: async () => {},
-              markAutomationRunCompleted: async () => {},
+              handoffAutomationRunDelivery: async () => {},
               markAutomationRunFailed: async () => {},
               resolveAutomationRunFailure: ({ error }) => {
                 if (error instanceof Error) {

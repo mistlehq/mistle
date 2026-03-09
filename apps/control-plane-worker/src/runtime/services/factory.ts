@@ -1,16 +1,14 @@
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   HandleAutomationRunWorkflowSpec,
+  HandleConversationDeliveryWorkflowSpec,
   type HandleConversationDeliveryWorkflowInput,
 } from "@mistle/workflows/control-plane";
 
 import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 import {
-  acquireAutomationConnection,
-  deliverAutomationPayload,
-  ensureAutomationSandbox,
-  markAutomationRunCompleted,
+  handoffAutomationRunDelivery,
   markAutomationRunFailed,
   prepareAutomationRun,
   resolveAutomationRunFailure,
@@ -51,34 +49,22 @@ export function createControlPlaneWorkerServices(
           workflowInput,
         );
       },
-      ensureAutomationSandbox: async (workflowInput) => {
-        return ensureAutomationSandbox(
+      handoffAutomationRunDelivery: async (workflowInput) => {
+        return handoffAutomationRunDelivery(
           {
             db: input.db,
-            startSandboxProfileInstance: (startInput) =>
-              controlPlaneInternalClient.startSandboxProfileInstance(startInput),
-          },
-          workflowInput,
-        );
-      },
-      acquireAutomationConnection: async (workflowInput) => {
-        return acquireAutomationConnection(
-          {
-            getSandboxInstance: (sandboxInput) =>
-              controlPlaneInternalClient.getSandboxInstance(sandboxInput),
-            mintSandboxConnectionToken: (mintInput) =>
-              controlPlaneInternalClient.mintSandboxConnectionToken(mintInput),
-          },
-          workflowInput,
-        );
-      },
-      deliverAutomationPayload: async (workflowInput) => {
-        await deliverAutomationPayload(workflowInput);
-      },
-      markAutomationRunCompleted: async (workflowInput) => {
-        await markAutomationRunCompleted(
-          {
-            db: input.db,
+            enqueueConversationDeliveryWorkflow: async (enqueueInput) => {
+              await input.openWorkflow.runWorkflow(
+                HandleConversationDeliveryWorkflowSpec,
+                {
+                  conversationId: enqueueInput.conversationId,
+                  generation: enqueueInput.generation,
+                },
+                {
+                  idempotencyKey: `conversation-delivery:${enqueueInput.conversationId}:${String(enqueueInput.generation)}`,
+                },
+              );
+            },
           },
           workflowInput,
         );
@@ -99,7 +85,18 @@ export function createControlPlaneWorkerServices(
       handleConversationDelivery: async (
         workflowInput: HandleConversationDeliveryWorkflowInput,
       ) => {
-        return handleConversationDelivery(workflowInput);
+        return handleConversationDelivery(
+          {
+            db: input.db,
+            startSandboxProfileInstance: (startInput) =>
+              controlPlaneInternalClient.startSandboxProfileInstance(startInput),
+            getSandboxInstance: (sandboxInput) =>
+              controlPlaneInternalClient.getSandboxInstance(sandboxInput),
+            mintSandboxConnectionToken: (mintInput) =>
+              controlPlaneInternalClient.mintSandboxConnectionToken(mintInput),
+          },
+          workflowInput,
+        );
       },
     },
     integrationWebhooks: {
