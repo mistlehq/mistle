@@ -15,6 +15,7 @@ import {
   type EnsuredAutomationSandbox,
   type FinalConversationDeliveryTaskStatus,
   type HandleConversationDeliveryWorkflowInput,
+  type ResolvedConversationDeliveryRoute,
 } from "./workflows/handle-conversation-delivery/index.js";
 import { createHandleIntegrationWebhookEventWorkflow } from "./workflows/handle-integration-webhook-event/index.js";
 import type {
@@ -71,8 +72,12 @@ export type ControlPlaneWorkerServices = {
       input: HandleConversationDeliveryWorkflowInput,
     ) => Promise<boolean>;
     prepareAutomationRun: (input: { automationRunId: string }) => Promise<PreparedAutomationRun>;
+    resolveConversationDeliveryRoute: (input: {
+      conversationId: string;
+    }) => Promise<ResolvedConversationDeliveryRoute>;
     ensureAutomationSandbox: (input: {
       preparedAutomationRun: PreparedAutomationRun;
+      resolvedConversationRoute: ResolvedConversationDeliveryRoute;
     }) => Promise<EnsuredAutomationSandbox>;
     acquireAutomationConnection: (input: {
       preparedAutomationRun: PreparedAutomationRun;
@@ -82,6 +87,7 @@ export type ControlPlaneWorkerServices = {
       taskId: string;
       generation: number;
       preparedAutomationRun: PreparedAutomationRun;
+      resolvedConversationRoute: ResolvedConversationDeliveryRoute;
       ensuredAutomationSandbox: EnsuredAutomationSandbox;
       acquiredAutomationConnection: AcquiredAutomationConnection;
     }) => Promise<void>;
@@ -184,6 +190,8 @@ export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): 
         idleConversationDeliveryProcessorIfEmpty:
           input.services.conversationDelivery.idleConversationDeliveryProcessorIfEmpty,
         prepareAutomationRun: input.services.conversationDelivery.prepareAutomationRun,
+        resolveConversationDeliveryRoute:
+          input.services.conversationDelivery.resolveConversationDeliveryRoute,
         ensureAutomationSandbox: input.services.conversationDelivery.ensureAutomationSandbox,
         acquireAutomationConnection:
           input.services.conversationDelivery.acquireAutomationConnection,

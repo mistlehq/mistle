@@ -12,9 +12,10 @@ import type {
   HandleAutomationRunWorkflowInput,
   HandleConversationDeliveryWorkflowInput,
   HandleConversationDeliveryWorkflowOutput,
-  PreparedAutomationRun,
   HandleIntegrationWebhookEventWorkflowInput,
   HandleIntegrationWebhookEventWorkflowOutput,
+  PreparedAutomationRun,
+  ResolvedConversationDeliveryRoute,
   StartSandboxProfileInstanceWorkflowInput,
   StartSandboxProfileInstanceWorkflowOutput,
   SyncIntegrationConnectionResourcesWorkflowInput,
@@ -70,6 +71,7 @@ export type HandleConversationDeliveryServiceOutput = HandleConversationDelivery
 export type ClaimOrResumeConversationDeliveryTaskServiceOutput =
   ActiveConversationDeliveryTask | null;
 export type ResolveConversationDeliveryTaskActionServiceOutput = ConversationDeliveryTaskAction;
+export type ResolveConversationDeliveryRouteServiceOutput = ResolvedConversationDeliveryRoute;
 export type FinalizeConversationDeliveryTaskServiceInput = {
   taskId: string;
   generation: number;
@@ -100,6 +102,10 @@ export type EnsureAutomationSandboxServiceInput = {
 };
 
 export type EnsureAutomationSandboxServiceOutput = EnsuredAutomationSandbox;
+export type EnsureConversationDeliverySandboxServiceInput = {
+  preparedAutomationRun: PreparedAutomationRun;
+  resolvedConversationRoute: ResolvedConversationDeliveryRoute;
+};
 
 export type AcquireAutomationConnectionDependencies = {
   getSandboxInstance: (input: { organizationId: string; instanceId: string }) => Promise<{
@@ -125,6 +131,12 @@ export type AcquireAutomationConnectionServiceOutput = AcquiredAutomationConnect
 
 export type DeliverAutomationPayloadServiceInput = {
   preparedAutomationRun: PreparedAutomationRun;
+  ensuredAutomationSandbox: EnsureAutomationSandboxServiceOutput;
+  acquiredAutomationConnection: AcquireAutomationConnectionServiceOutput;
+};
+export type DeliverConversationAutomationPayloadServiceInput = {
+  preparedAutomationRun: PreparedAutomationRun;
+  resolvedConversationRoute: ResolvedConversationDeliveryRoute;
   ensuredAutomationSandbox: EnsureAutomationSandboxServiceOutput;
   acquiredAutomationConnection: AcquireAutomationConnectionServiceOutput;
 };

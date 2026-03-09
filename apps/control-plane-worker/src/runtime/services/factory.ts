@@ -26,6 +26,7 @@ import {
   ignoreConversationDeliveryAutomationRun,
   idleConversationDeliveryProcessor,
   prepareConversationDeliveryAutomationRun,
+  resolveConversationDeliveryRoute,
   resolveConversationDeliveryActiveTaskAction,
   resolveAutomationRunFailure as resolveConversationDeliveryFailure,
 } from "./handle-conversation-delivery.js";
@@ -139,15 +140,28 @@ export function createControlPlaneWorkerServices(
           },
         );
       },
-      ensureAutomationSandbox: async ({ preparedAutomationRun }) => {
+      resolveConversationDeliveryRoute: async ({ conversationId }) => {
+        return resolveConversationDeliveryRoute(
+          {
+            db: input.db,
+          },
+          {
+            conversationId,
+          },
+        );
+      },
+      ensureAutomationSandbox: async ({ preparedAutomationRun, resolvedConversationRoute }) => {
         return ensureConversationDeliverySandbox(
           {
             db: input.db,
+            getSandboxInstance: (sandboxInput) =>
+              controlPlaneInternalClient.getSandboxInstance(sandboxInput),
             startSandboxProfileInstance: (startInput) =>
               controlPlaneInternalClient.startSandboxProfileInstance(startInput),
           },
           {
             preparedAutomationRun,
+            resolvedConversationRoute,
           },
         );
       },
@@ -169,6 +183,7 @@ export function createControlPlaneWorkerServices(
         taskId,
         generation,
         preparedAutomationRun,
+        resolvedConversationRoute,
         ensuredAutomationSandbox,
         acquiredAutomationConnection,
       }) => {
@@ -180,6 +195,7 @@ export function createControlPlaneWorkerServices(
             taskId,
             generation,
             preparedAutomationRun,
+            resolvedConversationRoute,
             ensuredAutomationSandbox,
             acquiredAutomationConnection,
           },

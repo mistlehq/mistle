@@ -29,6 +29,7 @@ export {
   type CreateHandleConversationDeliveryWorkflowInput,
   type EnsuredAutomationSandbox,
   type FinalConversationDeliveryTaskStatus,
+  type ResolvedConversationDeliveryRoute,
   type HandleConversationDeliveryWorkflowInput,
   type HandleConversationDeliveryWorkflowOutput,
 } from "./workflows/handle-conversation-delivery/index.js";

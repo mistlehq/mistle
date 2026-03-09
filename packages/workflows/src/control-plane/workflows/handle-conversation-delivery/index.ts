@@ -13,4 +13,5 @@ export {
   type CreateHandleConversationDeliveryWorkflowInput,
   type EnsuredAutomationSandbox,
   type FinalConversationDeliveryTaskStatus,
+  type ResolvedConversationDeliveryRoute,
 } from "./workflow.js";

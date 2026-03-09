@@ -23,7 +23,17 @@ export type ActiveConversationDeliveryTask = {
 
 export type EnsuredAutomationSandbox = {
   sandboxInstanceId: string;
-  startupWorkflowRunId: string;
+  startupWorkflowRunId: string | null;
+};
+
+export type ResolvedConversationDeliveryRoute = {
+  conversationId: string;
+  integrationFamilyId: string;
+  routeId: string | null;
+  sandboxInstanceId: string | null;
+  providerConversationId: string | null;
+  providerExecutionId: string | null;
+  providerState: unknown;
 };
 
 export type AcquiredAutomationConnection = {
@@ -48,8 +58,12 @@ export type CreateHandleConversationDeliveryWorkflowInput = {
     input: HandleConversationDeliveryWorkflowInput,
   ) => Promise<boolean>;
   prepareAutomationRun: (input: { automationRunId: string }) => Promise<PreparedAutomationRun>;
+  resolveConversationDeliveryRoute: (input: {
+    conversationId: string;
+  }) => Promise<ResolvedConversationDeliveryRoute>;
   ensureAutomationSandbox: (input: {
     preparedAutomationRun: PreparedAutomationRun;
+    resolvedConversationRoute: ResolvedConversationDeliveryRoute;
   }) => Promise<EnsuredAutomationSandbox>;
   acquireAutomationConnection: (input: {
     preparedAutomationRun: PreparedAutomationRun;
@@ -59,6 +73,7 @@ export type CreateHandleConversationDeliveryWorkflowInput = {
     taskId: string;
     generation: number;
     preparedAutomationRun: PreparedAutomationRun;
+    resolvedConversationRoute: ResolvedConversationDeliveryRoute;
     ensuredAutomationSandbox: EnsuredAutomationSandbox;
     acquiredAutomationConnection: AcquiredAutomationConnection;
   }) => Promise<void>;
@@ -173,6 +188,19 @@ export function createHandleConversationDeliveryWorkflow(
           async () => ctx.prepareAutomationRun({ automationRunId: activeTask.automationRunId }),
         );
 
+        const resolvedConversationRoute = await step.run(
+          {
+            name: getConversationDeliveryStepName({
+              prefix: "resolve-conversation-delivery-route",
+              taskId: activeTask.taskId,
+            }),
+          },
+          async () =>
+            ctx.resolveConversationDeliveryRoute({
+              conversationId: preparedAutomationRun.conversationId,
+            }),
+        );
+
         const ensuredAutomationSandbox = await step.run(
           {
             name: getConversationDeliveryStepName({
@@ -180,7 +208,11 @@ export function createHandleConversationDeliveryWorkflow(
               taskId: activeTask.taskId,
             }),
           },
-          async () => ctx.ensureAutomationSandbox({ preparedAutomationRun }),
+          async () =>
+            ctx.ensureAutomationSandbox({
+              preparedAutomationRun,
+              resolvedConversationRoute,
+            }),
         );
 
         const acquiredAutomationConnection = await step.run(
@@ -209,6 +241,7 @@ export function createHandleConversationDeliveryWorkflow(
               taskId: activeTask.taskId,
               generation: input.generation,
               preparedAutomationRun,
+              resolvedConversationRoute,
               ensuredAutomationSandbox,
               acquiredAutomationConnection,
             }),
