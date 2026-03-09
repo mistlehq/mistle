@@ -14,7 +14,6 @@ export type OpenAiApiKeyCompileBindingInput = CompileBindingInput<
 >;
 
 const CodexCliArtifactKey = "codex-cli";
-const CodexAgentRuntimeKey = "codex-app-server";
 const CodexConversationProviderFamily: AgentRuntimeConversationProviderFamily = "codex";
 const CodexAppServerProcessKey = "codex-app-server";
 const CodexAppServerEndpointKey = "app-server";
@@ -158,7 +157,7 @@ export function compileOpenAiApiKeyBinding(
     ],
     agentRuntimes: [
       {
-        runtimeKey: CodexAgentRuntimeKey,
+        runtimeKey: CodexAppServerProcessKey,
         clientId: input.binding.config.runtime,
         endpointKey: CodexAppServerEndpointKey,
         capabilities: {
