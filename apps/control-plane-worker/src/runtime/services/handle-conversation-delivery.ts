@@ -27,8 +27,11 @@ import {
 import {
   ConversationDeliverySandboxActions,
   ConversationExecutionActions,
+  ConversationSteerRecoveryActions,
+  isRecoverableLateSteerError,
   resolveConversationDeliverySandboxAction,
   resolveConversationExecutionAction,
+  resolveConversationSteerRecoveryAction,
 } from "./conversation-delivery-plans.js";
 import {
   acquireAutomationConnection,
@@ -95,6 +98,45 @@ async function steerConversationExecution(input: {
     providerExecutionId: input.route.providerExecutionId,
     inputText: input.inputText,
   });
+}
+
+async function recoverLateSteerExecution(input: {
+  adapter: ReturnType<typeof getConversationProviderAdapter>;
+  connection: Awaited<ReturnType<ReturnType<typeof getConversationProviderAdapter>["connect"]>>;
+  route: {
+    conversationId: string;
+    providerConversationId: string;
+  };
+  inputText: string;
+}) {
+  const inspectResult = await input.adapter.inspectConversation({
+    connection: input.connection,
+    providerConversationId: input.route.providerConversationId,
+  });
+  const recoveryAction = resolveConversationSteerRecoveryAction({
+    inspectConversation: inspectResult,
+  });
+
+  switch (recoveryAction) {
+    case ConversationSteerRecoveryActions.START:
+      return input.adapter.startExecution({
+        connection: input.connection,
+        providerConversationId: input.route.providerConversationId,
+        inputText: input.inputText,
+      });
+    case ConversationSteerRecoveryActions.FAIL_MISSING_CONVERSATION:
+      throw new ConversationDeliveryExecutionError(
+        `Conversation '${input.route.conversationId}' references missing provider conversation '${input.route.providerConversationId}' after steer reported no active turn.`,
+      );
+    case ConversationSteerRecoveryActions.FAIL_PROVIDER_ERROR:
+      throw new ConversationDeliveryExecutionError(
+        `Conversation '${input.route.conversationId}' provider conversation '${input.route.providerConversationId}' is in error state after steer reported no active turn.`,
+      );
+    case ConversationSteerRecoveryActions.FAIL_STILL_ACTIVE:
+      throw new ConversationDeliveryExecutionError(
+        `Conversation '${input.route.conversationId}' provider conversation '${input.route.providerConversationId}' is still active after steer reported no active turn.`,
+      );
+  }
 }
 
 export type ClaimOrResumeConversationDeliveryTaskInput = HandleConversationDeliveryWorkflowInput;
@@ -438,12 +480,28 @@ export async function deliverConversationAutomationPayload(
         });
         break;
       case ConversationExecutionActions.STEER:
-        executionUpdate = await steerConversationExecution({
-          adapter,
-          connection,
-          route,
-          inputText: input.preparedAutomationRun.renderedInput,
-        });
+        try {
+          executionUpdate = await steerConversationExecution({
+            adapter,
+            connection,
+            route,
+            inputText: input.preparedAutomationRun.renderedInput,
+          });
+        } catch (error) {
+          if (!isRecoverableLateSteerError({ error })) {
+            throw error;
+          }
+
+          executionUpdate = await recoverLateSteerExecution({
+            adapter,
+            connection,
+            route: {
+              conversationId: route.conversationId,
+              providerConversationId: route.providerConversationId,
+            },
+            inputText: input.preparedAutomationRun.renderedInput,
+          });
+        }
         break;
       case ConversationExecutionActions.FAIL_MISSING_CONVERSATION:
         throw new ConversationDeliveryExecutionError(
