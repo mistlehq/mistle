@@ -258,6 +258,71 @@ function compileTemplates(input: {
   };
 }
 
+function resolvePersistedPreparedAutomationRunSnapshot(input: {
+  automationRun: {
+    id: string;
+    createdAt: string;
+    automationId: string;
+    renderedInput: string | null;
+    renderedConversationKey: string | null;
+    renderedIdempotencyKey: string | null;
+  };
+  automationTarget: {
+    id: string;
+    sandboxProfileId: string;
+    sandboxProfileVersion: number;
+  };
+  automation: {
+    organizationId: string;
+  };
+  webhookEvent: {
+    id: string;
+    eventType: string;
+    providerEventType: string;
+    externalEventId: string;
+    externalDeliveryId: string | null;
+    payload: Record<string, unknown>;
+  };
+}): PrepareAutomationRunServiceOutput | null {
+  const hasPersistedSnapshot =
+    input.automationRun.renderedInput !== null ||
+    input.automationRun.renderedConversationKey !== null ||
+    input.automationRun.renderedIdempotencyKey !== null;
+
+  if (!hasPersistedSnapshot) {
+    return null;
+  }
+
+  if (
+    input.automationRun.renderedInput === null ||
+    input.automationRun.renderedConversationKey === null
+  ) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+      message: `Automation run '${input.automationRun.id}' is missing persisted rendered state.`,
+    });
+  }
+
+  return {
+    automationRunId: input.automationRun.id,
+    automationRunCreatedAt: input.automationRun.createdAt,
+    automationId: input.automationRun.automationId,
+    automationTargetId: input.automationTarget.id,
+    organizationId: input.automation.organizationId,
+    sandboxProfileId: input.automationTarget.sandboxProfileId,
+    sandboxProfileVersion: input.automationTarget.sandboxProfileVersion,
+    webhookEventId: input.webhookEvent.id,
+    webhookEventType: input.webhookEvent.eventType,
+    webhookProviderEventType: input.webhookEvent.providerEventType,
+    webhookExternalEventId: input.webhookEvent.externalEventId,
+    webhookExternalDeliveryId: input.webhookEvent.externalDeliveryId,
+    webhookPayload: input.webhookEvent.payload,
+    renderedInput: input.automationRun.renderedInput,
+    renderedConversationKey: input.automationRun.renderedConversationKey,
+    renderedIdempotencyKey: input.automationRun.renderedIdempotencyKey,
+  };
+}
+
 export async function prepareAutomationRun(
   deps: HandleAutomationRunDependencies,
   input: HandleAutomationRunWorkflowInput,
@@ -328,6 +393,44 @@ export async function prepareAutomationRun(
     });
   }
 
+  const sandboxProfileVersion = automationTarget.sandboxProfileVersion;
+  if (sandboxProfileVersion === null) {
+    throw new AutomationRunExecutionError({
+      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
+      message: `Automation target '${automationTarget.id}' does not define a sandbox profile version.`,
+    });
+  }
+
+  const persistedSnapshot = resolvePersistedPreparedAutomationRunSnapshot({
+    automationRun: {
+      id: automationRun.id,
+      createdAt: automationRun.createdAt,
+      automationId: automationRun.automationId,
+      renderedInput: automationRun.renderedInput,
+      renderedConversationKey: automationRun.renderedConversationKey,
+      renderedIdempotencyKey: automationRun.renderedIdempotencyKey,
+    },
+    automationTarget: {
+      id: automationTarget.id,
+      sandboxProfileId: automationTarget.sandboxProfileId,
+      sandboxProfileVersion,
+    },
+    automation: {
+      organizationId: automation.organizationId,
+    },
+    webhookEvent: {
+      id: webhookEvent.id,
+      eventType: webhookEvent.eventType,
+      providerEventType: webhookEvent.providerEventType,
+      externalEventId: webhookEvent.externalEventId,
+      externalDeliveryId: webhookEvent.externalDeliveryId,
+      payload: webhookEvent.payload,
+    },
+  });
+  if (persistedSnapshot !== null) {
+    return persistedSnapshot;
+  }
+
   const idempotencyKeyTemplate = webhookAutomation.idempotencyKeyTemplate;
 
   let compiledTemplates: ReturnType<typeof compileTemplates>;
@@ -360,13 +463,15 @@ export async function prepareAutomationRun(
     });
   }
 
-  const sandboxProfileVersion = automationTarget.sandboxProfileVersion;
-  if (sandboxProfileVersion === null) {
-    throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
-      message: `Automation target '${automationTarget.id}' does not define a sandbox profile version.`,
-    });
-  }
+  await deps.db
+    .update(automationRuns)
+    .set({
+      renderedInput: compiledTemplates.renderedInput,
+      renderedConversationKey: compiledTemplates.renderedConversationKey,
+      renderedIdempotencyKey: compiledTemplates.renderedIdempotencyKey,
+      updatedAt: sql`now()`,
+    })
+    .where(eq(automationRuns.id, automationRun.id));
 
   return {
     automationRunId: automationRun.id,

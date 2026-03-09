@@ -21,6 +21,7 @@ import {
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
 import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
+import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
@@ -192,6 +193,9 @@ describe("handleAutomationRun integration", () => {
             automationRunId,
           },
         );
+        const persistedRun = await database.db.query.automationRuns.findFirst({
+          where: (table, { eq }) => eq(table.id, automationRunId),
+        });
 
         expect(preparedRun).toMatchObject({
           automationRunId,
@@ -216,6 +220,157 @@ describe("handleAutomationRun integration", () => {
           comment: {
             body: "@mistlebot prepare",
           },
+        });
+        expect(persistedRun).toMatchObject({
+          id: automationRunId,
+          renderedInput: "Handle @mistlebot prepare",
+          renderedConversationKey: "issue-777",
+          renderedIdempotencyKey: "delivery_prepare",
+        });
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
+
+  it(
+    "reuses the persisted rendered snapshot when replaying a running run",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const organizationId = "org_worker_automation_replay_snapshot";
+        const sandboxProfileId = "sbp_worker_automation_replay_snapshot";
+        const automationId = "atm_worker_automation_replay_snapshot";
+        const automationTargetId = "atg_worker_automation_replay_snapshot";
+        const webhookEventId = "iwe_worker_automation_replay_snapshot";
+        const automationRunId = "aru_worker_automation_replay_snapshot";
+        const connectionId = "icn_worker_automation_replay_snapshot";
+        const targetKey = "github-cloud-worker-automation-replay-snapshot";
+
+        await database.db.insert(organizations).values({
+          id: organizationId,
+          name: "Worker Automation Replay Snapshot",
+          slug: "worker-automation-replay-snapshot",
+        });
+        await database.db.insert(sandboxProfiles).values({
+          id: sandboxProfileId,
+          organizationId,
+          displayName: "Automation Replay Snapshot Profile",
+          status: "active",
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey,
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: connectionId,
+          organizationId,
+          targetKey,
+          displayName: "Worker automation connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "123456",
+          config: {},
+        });
+        await database.db.insert(automations).values({
+          id: automationId,
+          organizationId,
+          kind: AutomationKinds.WEBHOOK,
+          name: "Automation Replay Snapshot",
+          enabled: true,
+        });
+        await database.db.insert(webhookAutomations).values({
+          automationId,
+          integrationConnectionId: connectionId,
+          eventTypes: ["github.issue_comment.created"],
+          payloadFilter: null,
+          inputTemplate: "Handle {{payload.comment.body}}",
+          conversationKeyTemplate: "issue-{{payload.issue.number}}",
+          idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
+        });
+        await database.db.insert(automationTargets).values({
+          id: automationTargetId,
+          automationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 5,
+        });
+        await database.db.insert(integrationWebhookEvents).values({
+          id: webhookEventId,
+          organizationId,
+          integrationConnectionId: connectionId,
+          targetKey,
+          externalEventId: "evt_replay_snapshot",
+          externalDeliveryId: "delivery_replay_snapshot",
+          providerEventType: "issue_comment",
+          eventType: "github.issue_comment.created",
+          payload: {
+            issue: {
+              number: 105,
+            },
+            comment: {
+              body: "@mistlebot replay snapshot",
+            },
+          },
+          status: IntegrationWebhookEventStatuses.PROCESSED,
+        });
+        await database.db.insert(automationRuns).values({
+          id: automationRunId,
+          automationId,
+          automationTargetId,
+          sourceWebhookEventId: webhookEventId,
+          status: AutomationRunStatuses.RUNNING,
+        });
+
+        const firstPreparedRun = await prepareAutomationRun(
+          {
+            db: database.db,
+          },
+          {
+            automationRunId,
+          },
+        );
+
+        await database.db
+          .update(webhookAutomations)
+          .set({
+            inputTemplate: "Changed {{payload.comment.body}}",
+            conversationKeyTemplate: "changed-issue-{{payload.issue.number}}",
+            idempotencyKeyTemplate: "changed-{{webhookEvent.externalDeliveryId}}",
+          })
+          .where(eq(webhookAutomations.automationId, automationId));
+
+        const replayPreparedRun = await prepareAutomationRun(
+          {
+            db: database.db,
+          },
+          {
+            automationRunId,
+          },
+        );
+        const persistedRun = await database.db.query.automationRuns.findFirst({
+          where: (table, { eq }) => eq(table.id, automationRunId),
+        });
+
+        expect(firstPreparedRun).toMatchObject({
+          renderedInput: "Handle @mistlebot replay snapshot",
+          renderedConversationKey: "issue-105",
+          renderedIdempotencyKey: "delivery_replay_snapshot",
+        });
+        expect(replayPreparedRun).toEqual(firstPreparedRun);
+        expect(persistedRun).toMatchObject({
+          id: automationRunId,
+          renderedInput: "Handle @mistlebot replay snapshot",
+          renderedConversationKey: "issue-105",
+          renderedIdempotencyKey: "delivery_replay_snapshot",
         });
       } finally {
         await database.stop();
