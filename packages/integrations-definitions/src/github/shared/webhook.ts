@@ -112,6 +112,51 @@ function resolveAction(input: Record<string, unknown>): string {
   return "unknown";
 }
 
+function resolveNumericIdentifier(input: Record<string, unknown>, key: string): string | null {
+  const value = input[key];
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0) {
+    return value.toString().padStart(20, "0");
+  }
+
+  if (typeof value === "string" && value.trim().length > 0) {
+    const normalizedValue = value.trim();
+    return /^\d+$/u.test(normalizedValue) ? normalizedValue.padStart(20, "0") : normalizedValue;
+  }
+
+  return null;
+}
+
+function resolveTimestampField(input: Record<string, unknown>, key: string): string | null {
+  const value = input[key];
+  if (typeof value !== "string" || value.trim().length === 0) {
+    return null;
+  }
+
+  const normalizedValue = value.trim();
+  return Number.isNaN(Date.parse(normalizedValue)) ? null : normalizedValue;
+}
+
+function resolveCommentOrdering(input: Record<string, unknown>): {
+  occurredAt?: string;
+  sourceOrderKey?: string;
+} {
+  const comment = input.comment;
+  if (!isRecord(comment)) {
+    return {};
+  }
+
+  const occurredAt = resolveTimestampField(comment, "created_at");
+  const commentId = resolveNumericIdentifier(comment, "id");
+  if (occurredAt === null || commentId === null) {
+    return {};
+  }
+
+  return {
+    occurredAt,
+    sourceOrderKey: `${occurredAt}#${commentId}`,
+  };
+}
+
 function sanitizeEventSegment(input: string): string {
   return input
     .trim()
@@ -228,6 +273,7 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
     const action = resolveAction(payload);
     const deliveryId = resolveDeliveryId(input.headers);
     resolveInstallationId(payload);
+    const ordering = resolveCommentOrdering(payload);
 
     return {
       externalEventId: deliveryId,
@@ -238,6 +284,8 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
         action,
       }),
       payload,
+      ...(ordering.occurredAt === undefined ? {} : { occurredAt: ordering.occurredAt }),
+      ...(ordering.sourceOrderKey === undefined ? {} : { sourceOrderKey: ordering.sourceOrderKey }),
     };
   },
 };

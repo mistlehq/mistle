@@ -42,6 +42,7 @@ function createGitHubWebhookPayload(): Record<string, unknown> {
     comment: {
       id: 1001,
       body: "Hello webhook",
+      created_at: "2026-03-10T00:00:00Z",
     },
   };
 }
@@ -180,6 +181,10 @@ describe("integration webhooks ingest integration", () => {
     expect(persistedEvent.organizationId).toBe(authenticatedSession.organizationId);
     expect(persistedEvent.integrationConnectionId).toBe(connectionId);
     expect(persistedEvent.payload).toEqual(payloadObject);
+    expect(new Date(String(persistedEvent.sourceOccurredAt)).toISOString()).toBe(
+      "2026-03-10T00:00:00.000Z",
+    );
+    expect(persistedEvent.sourceOrderKey).toBe("2026-03-10T00:00:00Z#00000000000000001001");
 
     const workflowRuns = await listWebhookWorkflowRuns({
       databaseUrl: fixture.databaseStack.directUrl,
