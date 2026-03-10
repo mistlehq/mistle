@@ -1,6 +1,6 @@
 import type { ChildProcess, SpawnSyncReturns } from "node:child_process";
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,7 +10,6 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(SCRIPT_DIR, "..", "..");
 const DEV_CONFIG_PATH = resolve(REPO_ROOT, "config", "config.development.toml");
 const DEV_COMPOSE_PATH = resolve(REPO_ROOT, "infra", "local", "docker-compose.yml");
-const DEV_ENV_LOCAL_PATH = resolve(REPO_ROOT, ".env.local");
 const DEV_CLOUDFLARED_CONFIG_DIR = resolve(REPO_ROOT, "infra", "local", ".generated");
 const DEV_CLOUDFLARED_CONFIG_PATH = resolve(DEV_CLOUDFLARED_CONFIG_DIR, "cloudflared-config.yml");
 
@@ -95,14 +94,6 @@ function readRequiredEnv(envVarName: string): string {
   }
 
   return value.trim();
-}
-
-function loadDevelopmentEnvFile(): void {
-  if (!existsSync(DEV_ENV_LOCAL_PATH)) {
-    return;
-  }
-
-  process.loadEnvFile(DEV_ENV_LOCAL_PATH);
 }
 
 function writeCloudflaredConfig(input: CloudflaredConfigInput): void {
@@ -262,8 +253,6 @@ process.once("SIGTERM", () => {
 });
 
 function start(): void {
-  loadDevelopmentEnvFile();
-
   console.log(
     "Starting local infra dependencies (Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM)...",
   );

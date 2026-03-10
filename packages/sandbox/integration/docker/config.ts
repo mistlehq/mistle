@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const DOCKER_INTEGRATION_ENABLEMENT_MESSAGE =
-  'MISTLE_SANDBOX_INTEGRATION=1 and MISTLE_SANDBOX_INTEGRATION_PROVIDERS includes "docker"';
+  'MISTLE_TEST_SANDBOX_INTEGRATION=1 and MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS includes "docker"';
 
 const DockerAdapterIntegrationConfigSchema = z
   .object({

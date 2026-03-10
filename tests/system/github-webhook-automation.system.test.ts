@@ -33,10 +33,10 @@ const AutomationRunTimeoutMs = 3 * 60_000;
 const ThreadReadTimeoutMs = 90_000;
 
 const RequiredEnvNames = [
-  "MISTLE_SYSTEM_OPENAI_API_KEY",
-  "MISTLE_SYSTEM_GITHUB_TOKEN",
-  "MISTLE_SYSTEM_GITHUB_TEST_REPOSITORY",
-  "MISTLE_SYSTEM_GITHUB_INSTALLATION_ID",
+  "MISTLE_TEST_OPENAI_API_KEY",
+  "MISTLE_TEST_GITHUB_TOKEN",
+  "MISTLE_TEST_GITHUB_TEST_REPOSITORY",
+  "MISTLE_TEST_GITHUB_INSTALLATION_ID",
   "CLOUDFLARE_TUNNEL_TOKEN",
   "CONTROL_PLANE_API_TUNNEL_HOSTNAME",
 ] as const;
@@ -114,7 +114,7 @@ function parseGitHubRepository(input: string): { owner: string; repo: string } {
     rest.length > 0
   ) {
     throw new Error(
-      `MISTLE_SYSTEM_GITHUB_TEST_REPOSITORY must be 'owner/repo'. Received '${input}'.`,
+      `MISTLE_TEST_GITHUB_TEST_REPOSITORY must be 'owner/repo'. Received '${input}'.`,
     );
   }
 
@@ -330,10 +330,10 @@ describeIf("system GitHub webhook automation", () => {
   it(
     "routes a real GitHub issue comment webhook into an automation conversation thread",
     async ({ fixture }) => {
-      const repository = parseGitHubRepository(requireEnv("MISTLE_SYSTEM_GITHUB_TEST_REPOSITORY"));
-      const githubToken = requireEnv("MISTLE_SYSTEM_GITHUB_TOKEN");
-      const githubInstallationId = requireEnv("MISTLE_SYSTEM_GITHUB_INSTALLATION_ID");
-      const openAiApiKey = requireEnv("MISTLE_SYSTEM_OPENAI_API_KEY");
+      const repository = parseGitHubRepository(requireEnv("MISTLE_TEST_GITHUB_TEST_REPOSITORY"));
+      const githubToken = requireEnv("MISTLE_TEST_GITHUB_TOKEN");
+      const githubInstallationId = requireEnv("MISTLE_TEST_GITHUB_INSTALLATION_ID");
+      const openAiApiKey = requireEnv("MISTLE_TEST_OPENAI_API_KEY");
       const dataPlaneGatewayBaseUrl = process.env.MISTLE_SYSTEM_DATA_PLANE_GATEWAY_BASE_URL;
       if (typeof dataPlaneGatewayBaseUrl !== "string" || dataPlaneGatewayBaseUrl.length === 0) {
         throw new Error(

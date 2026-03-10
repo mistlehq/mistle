@@ -52,13 +52,21 @@ nix develop
 pnpm install
 ```
 
-3. Copy and configure local environment values:
+3. Copy and configure local development environment values:
 
 ```bash
-cp sample.env.local .env.local
+cp sample.env.dev .env.dev
 ```
 
-`.env.local` is for local tooling and developer secrets only (for example tunnel tokens, or opt-in test toggles like `MISTLE_SANDBOX_INTEGRATION` and `MISTLE_SANDBOX_INTEGRATION_PROVIDERS`). Application runtime configuration should be set in `config/*.toml` and loaded via `MISTLE_CONFIG_PATH`, not stored in `.env.local`.
+`.env.dev` is for local tooling and developer-only values needed by `pnpm dev` (for example tunnel tokens and public tunnel hostnames). Application runtime configuration should be set in `config/*.toml` and loaded via `MISTLE_CONFIG_PATH`, not stored in `.env.dev`.
+
+Optional test-only secrets and opt-in test toggles belong in a separate file:
+
+```bash
+cp sample.env.test .env.test
+```
+
+`.env.test` is only for manual test inputs such as `MISTLE_TEST_OPENAI_API_KEY`, `MISTLE_TEST_GITHUB_TOKEN`, `MISTLE_TEST_GITHUB_TEST_REPOSITORY`, `MISTLE_TEST_GITHUB_INSTALLATION_ID`, and sandbox integration toggles like `MISTLE_TEST_SANDBOX_INTEGRATION`.
 
 4. Create a Cloudflare named tunnel (one-time):
 
@@ -79,7 +87,7 @@ Example naming:
 - `<control-plane-api-hostname>`: `control-plane-api-<your-suffix>.<your-zone>`
 - `<data-plane-api-hostname>`: `data-plane-api-<your-suffix>.<your-zone>`
 
-6. Fill required tunnel values in `.env.local`:
+6. Fill required tunnel values in `.env.dev`:
 
 ```bash
 cloudflared tunnel token <tunnel-name>
@@ -143,7 +151,7 @@ Allow this repo once:
 direnv allow
 ```
 
-This repo includes `.envrc` to auto-enter the flake shell and load `.env.local`.
+This repo includes `.envrc` to auto-enter the flake shell and load `.env.dev`.
 
 ### Validation
 
