@@ -12,7 +12,7 @@ import {
   type GetSandboxInstanceResponse,
   StartSandboxInstanceAcceptedResponseSchema,
   type StartSandboxInstanceAcceptedResponse,
-  StartSandboxInstanceInputSchema,
+  StartSandboxInstanceInputValidationSchema,
   type StartSandboxInstanceInput,
 } from "./contracts/index.js";
 
@@ -22,7 +22,7 @@ type GetSandboxProcedureSchemas = {
 };
 
 type StartSandboxProcedureSchemas = {
-  inputSchema: typeof StartSandboxInstanceInputSchema;
+  inputSchema: typeof StartSandboxInstanceInputValidationSchema;
   outputSchema: typeof StartSandboxInstanceAcceptedResponseSchema;
 };
 
@@ -44,7 +44,7 @@ export function createDataPlaneSandboxInstancesTrpcRouter<
       outputSchema: GetSandboxInstanceResponseSchema,
     }),
     start: input.createStartProcedure({
-      inputSchema: StartSandboxInstanceInputSchema,
+      inputSchema: StartSandboxInstanceInputValidationSchema,
       outputSchema: StartSandboxInstanceAcceptedResponseSchema,
     }),
   });
