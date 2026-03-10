@@ -44,7 +44,7 @@ import {
   resolveAutomationRunFailure,
   type AcquireAutomationConnectionDependencies,
   type EnsureAutomationSandboxDependencies,
-} from "./handle-automation-run.js";
+} from "../automation-workflows/workflows/automation-run-execution.js";
 import type {
   DeliverAutomationConversationPayloadServiceInput,
   EnsureAutomationConversationDeliverySandboxServiceInput,

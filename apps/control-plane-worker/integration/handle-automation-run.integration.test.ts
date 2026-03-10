@@ -40,6 +40,13 @@ import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
 import {
+  handoffAutomationRunDelivery,
+  markAutomationRunFailed,
+  prepareAutomationRun,
+  resolveAutomationRunFailure,
+  transitionAutomationRunToRunning,
+} from "../src/runtime/automation-workflows/workflows/automation-run-execution.js";
+import {
   claimOrResumeAutomationConversationDeliveryTask,
   AutomationConversationDeliveryTaskActions,
   finalizeAutomationConversationDeliveryActiveTask,
@@ -47,13 +54,6 @@ import {
   idleAutomationConversationDeliveryProcessor,
   resolveAutomationConversationDeliveryActiveTaskAction,
 } from "../src/runtime/services/handle-automation-conversation-delivery.js";
-import {
-  handoffAutomationRunDelivery,
-  markAutomationRunFailed,
-  prepareAutomationRun,
-  resolveAutomationRunFailure,
-  transitionAutomationRunToRunning,
-} from "../src/runtime/services/handle-automation-run.js";
 import { it } from "./test-context.js";
 
 const TestTimeoutMs = 120_000;

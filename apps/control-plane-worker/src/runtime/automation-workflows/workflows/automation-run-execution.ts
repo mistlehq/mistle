@@ -18,11 +18,7 @@ import {
   enqueueAutomationConversationDeliveryTask,
   ensureAutomationConversationDeliveryProcessor,
   setAutomationConversationDeliveryProcessorIdle,
-} from "../automation-conversations/index.js";
-import {
-  connectSandboxAgentConnection,
-  sendSandboxAgentMessage,
-} from "../automation-workflows/transport/sandbox-agent-connection.js";
+} from "../../automation-conversations/index.js";
 import type {
   HandoffAutomationRunDeliveryServiceInput,
   AcquireAutomationConnectionServiceOutput,
@@ -31,7 +27,11 @@ import type {
   EnsureAutomationSandboxServiceOutput,
   EnsureAutomationSandboxServiceInput,
   PrepareAutomationRunServiceOutput,
-} from "./types.js";
+} from "../../services/types.js";
+import {
+  connectSandboxAgentConnection,
+  sendSandboxAgentMessage,
+} from "../transport/sandbox-agent-connection.js";
 
 export type HandleAutomationRunDependencies = {
   db: ControlPlaneDatabase;

@@ -2,8 +2,8 @@ import { systemSleeper } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
-import { deliverAutomationPayload } from "../../services/handle-automation-run.js";
 import type { DeliverAutomationPayloadServiceInput } from "../../services/types.js";
+import { deliverAutomationPayload } from "../workflows/automation-run-execution.js";
 import {
   connectSandboxAgentConnection,
   sendSandboxAgentMessage,

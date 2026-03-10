@@ -6,6 +6,13 @@ import {
   type HandleAutomationConversationDeliveryWorkflowInput,
 } from "@mistle/workflows/control-plane";
 
+import {
+  handoffAutomationRunDelivery,
+  markAutomationRunFailed,
+  prepareAutomationRun,
+  resolveAutomationRunFailure,
+  transitionAutomationRunToRunning,
+} from "../automation-workflows/workflows/automation-run-execution.js";
 import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 import {
@@ -23,13 +30,6 @@ import {
   resolveAutomationConversationDeliveryActiveTaskAction,
   resolveAutomationRunFailure as resolveConversationDeliveryFailure,
 } from "./handle-automation-conversation-delivery.js";
-import {
-  handoffAutomationRunDelivery,
-  markAutomationRunFailed,
-  prepareAutomationRun,
-  resolveAutomationRunFailure,
-  transitionAutomationRunToRunning,
-} from "./handle-automation-run.js";
 import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";
 import { startSandboxProfileInstance } from "./start-sandbox-profile-instance.js";
 import { syncIntegrationConnectionResources } from "./sync-integration-connection-resources.js";
