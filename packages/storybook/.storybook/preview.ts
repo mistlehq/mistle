@@ -4,6 +4,11 @@ import "./preview.css";
 
 const preview: Preview = {
   parameters: {
+    options: {
+      storySort: {
+        order: ["Dashboard", "UI"],
+      },
+    },
     layout: "centered",
     actions: {
       argTypesRegex: "^on.*",
