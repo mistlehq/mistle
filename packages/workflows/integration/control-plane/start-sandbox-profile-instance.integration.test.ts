@@ -4,10 +4,10 @@ import { describe, expect } from "vitest";
 import {
   createControlPlaneBackend,
   createControlPlaneOpenWorkflow,
-  createStartSandboxProfileInstanceWorkflow,
   StartSandboxProfileInstanceWorkflowSpec,
   type StartSandboxProfileInstanceWorkflowInput,
 } from "../../src/control-plane/index.js";
+import { createStartSandboxProfileInstanceWorkflow } from "../../src/control-plane/workflows/start-sandbox-profile-instance/index.js";
 import { it as workflowIt } from "../test-context.js";
 
 function createRuntimePlan(input: {
