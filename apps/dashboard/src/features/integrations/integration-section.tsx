@@ -1,6 +1,6 @@
+import { SectionHeader } from "@mistle/ui";
 import type { ReactNode } from "react";
 
-import { SectionHeader } from "../shared/section-header.js";
 import type { IntegrationCardViewModel } from "./directory-model.js";
 
 type IntegrationSectionProps = {

@@ -1,7 +1,6 @@
 import type { CodexSessionConnectionState } from "@mistle/codex-app-server-client";
-import { DropdownMenuItem } from "@mistle/ui";
+import { DropdownMenuItem, MoreActionsMenu } from "@mistle/ui";
 
-import { MoreActionsMenu } from "../../components/more-actions-menu.js";
 import type { ConnectedCodexSession } from "../codex-client/codex-session-types.js";
 import { SessionConfigDialog } from "./session-config-dialog.js";
 

@@ -14,6 +14,7 @@ import {
   FieldContent,
   FieldLabel,
   Input,
+  SectionHeader,
   Select,
   SelectContent,
   SelectItem,
@@ -41,7 +42,6 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { SectionHeader } from "../shared/section-header.js";
 import {
   createDefaultBindingConfig,
   resolveBindingConfigUiModel,

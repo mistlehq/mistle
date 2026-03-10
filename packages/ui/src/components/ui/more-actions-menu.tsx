@@ -1,7 +1,10 @@
-import { cn, Button, DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "@mistle/ui";
 import { DotsThreeIcon } from "@phosphor-icons/react";
 
-type MoreActionsMenuProps = {
+import { cn } from "../../lib/utils.js";
+import { Button } from "./button.js";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from "./dropdown-menu.js";
+
+export type MoreActionsMenuProps = {
   triggerLabel: string;
   children: React.ReactNode;
   contentClassName?: string;
