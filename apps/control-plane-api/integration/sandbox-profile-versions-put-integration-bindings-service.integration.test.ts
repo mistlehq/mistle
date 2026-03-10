@@ -585,6 +585,74 @@ describe("sandbox profile version put integration bindings service integration",
       },
     });
   });
+
+  it("rejects multiple bindings from the same git integration family on one profile version", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email: "integration-sandbox-profile-version-put-bindings-duplicate-git-family@example.com",
+    });
+
+    await insertGitHubBindingValidationFixture({
+      fixture,
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_put_bindings_duplicate_git_family_001",
+      profileVersion: 1,
+      connectionId: "icn_put_bindings_duplicate_git_family_001",
+      targetKey: "github-cloud-put-bindings-duplicate-family-a",
+    });
+    await insertGitHubBindingValidationFixture({
+      fixture,
+      organizationId: authenticatedSession.organizationId,
+      profileId: "sbp_put_bindings_duplicate_git_family_001",
+      profileVersion: 1,
+      connectionId: "icn_put_bindings_duplicate_git_family_002",
+      targetKey: "github-cloud-put-bindings-duplicate-family-b",
+    });
+
+    await expect(
+      putProfileVersionIntegrationBindings(
+        {
+          db: fixture.db,
+        },
+        {
+          organizationId: authenticatedSession.organizationId,
+          profileId: "sbp_put_bindings_duplicate_git_family_001",
+          profileVersion: 1,
+          bindings: [
+            {
+              connectionId: "icn_put_bindings_duplicate_git_family_001",
+              kind: IntegrationBindingKinds.GIT,
+              config: {
+                repositories: ["mistlehq/mistle"],
+              },
+            },
+            {
+              clientRef: "duplicate-github-binding",
+              connectionId: "icn_put_bindings_duplicate_git_family_002",
+              kind: IntegrationBindingKinds.GIT,
+              config: {
+                repositories: ["mistlehq/platform"],
+              },
+            },
+          ],
+        },
+      ),
+    ).rejects.toMatchObject({
+      code: SandboxProfilesIntegrationBindingsBadRequestCodes.INVALID_BINDING_CONFIG_REFERENCE,
+      details: {
+        issues: [
+          {
+            clientRef: "duplicate-github-binding",
+            validatorCode: "system.duplicate_git_family_binding",
+            field: "connectionId",
+            safeMessage:
+              "Only one binding from Git integration family 'github' may exist on a sandbox profile version.",
+          },
+        ],
+      },
+    });
+  });
 });
 
 async function insertGitHubBindingValidationFixture(input: {
@@ -609,16 +677,22 @@ async function insertGitHubBindingValidationFixture(input: {
     })
     .onConflictDoNothing();
 
-  await input.fixture.db.insert(sandboxProfiles).values({
-    id: input.profileId,
-    organizationId: input.organizationId,
-    displayName: "GitHub Binding Validation",
-    status: IntegrationConnectionStatuses.ACTIVE,
-  });
-  await input.fixture.db.insert(sandboxProfileVersions).values({
-    sandboxProfileId: input.profileId,
-    version: input.profileVersion,
-  });
+  await input.fixture.db
+    .insert(sandboxProfiles)
+    .values({
+      id: input.profileId,
+      organizationId: input.organizationId,
+      displayName: "GitHub Binding Validation",
+      status: IntegrationConnectionStatuses.ACTIVE,
+    })
+    .onConflictDoNothing();
+  await input.fixture.db
+    .insert(sandboxProfileVersions)
+    .values({
+      sandboxProfileId: input.profileId,
+      version: input.profileVersion,
+    })
+    .onConflictDoNothing();
   await input.fixture.db.insert(integrationConnections).values({
     id: input.connectionId,
     organizationId: input.organizationId,

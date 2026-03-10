@@ -255,6 +255,121 @@ describe("sandbox profile version put integration bindings integration", () => {
     expect(responseBody.code).toBe("PROFILE_VERSION_NOT_FOUND");
   });
 
+  it("returns 400 when the request includes multiple bindings from the same git integration family", async ({
+    fixture,
+  }) => {
+    const authenticatedSession = await fixture.authSession({
+      email:
+        "integration-sandbox-profile-version-put-bindings-route-duplicate-git-family@example.com",
+    });
+
+    await fixture.db.insert(integrationTargets).values([
+      {
+        targetKey: "github-cloud-put-bindings-route-duplicate-family-a",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      },
+      {
+        targetKey: "github-cloud-put-bindings-route-duplicate-family-b",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          api_base_url: "https://api.github.com",
+          web_base_url: "https://github.com",
+        },
+      },
+    ]);
+
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_put_bindings_route_duplicate_family_001",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "github-cloud-put-bindings-route-duplicate-family-a",
+        displayName: "GitHub Route Family A",
+        config: {
+          auth_scheme: "api-key",
+        },
+      },
+      {
+        id: "icn_put_bindings_route_duplicate_family_002",
+        organizationId: authenticatedSession.organizationId,
+        targetKey: "github-cloud-put-bindings-route-duplicate-family-b",
+        displayName: "GitHub Route Family B",
+        config: {
+          auth_scheme: "api-key",
+        },
+      },
+    ]);
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_put_bindings_route_duplicate_family_001",
+      organizationId: authenticatedSession.organizationId,
+      displayName: "Duplicate Git Family Profile",
+      status: "active",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "sbp_put_bindings_route_duplicate_family_001",
+      version: 1,
+    });
+
+    const response = await fixture.request(
+      "/v1/sandbox/profiles/sbp_put_bindings_route_duplicate_family_001/versions/1/integration-bindings",
+      {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          cookie: authenticatedSession.cookie,
+        },
+        body: JSON.stringify({
+          bindings: [
+            {
+              connectionId: "icn_put_bindings_route_duplicate_family_001",
+              kind: IntegrationBindingKinds.GIT,
+              config: {
+                repositories: ["mistlehq/mistle"],
+              },
+            },
+            {
+              clientRef: "duplicate-github-binding",
+              connectionId: "icn_put_bindings_route_duplicate_family_002",
+              kind: IntegrationBindingKinds.GIT,
+              config: {
+                repositories: ["mistlehq/platform"],
+              },
+            },
+          ],
+        }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const responseBody = PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema.parse(
+      await response.json(),
+    );
+    if (!("details" in responseBody)) {
+      throw new Error("Expected integration bindings validation details.");
+    }
+    expect(responseBody.code).toBe("INVALID_BINDING_CONFIG_REFERENCE");
+    expect(responseBody.details).toEqual({
+      issues: [
+        {
+          clientRef: "duplicate-github-binding",
+          bindingIdOrDraftIndex: "draft:1",
+          validatorCode: "system.duplicate_git_family_binding",
+          field: "connectionId",
+          safeMessage:
+            "Only one binding from Git integration family 'github' may exist on a sandbox profile version.",
+        },
+      ],
+    });
+  });
+
   it("returns 400 when request references a non-existent binding id", async ({ fixture }) => {
     const authenticatedSession = await fixture.authSession({
       email:
