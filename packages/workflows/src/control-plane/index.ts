@@ -53,7 +53,13 @@ export { ControlPlaneOpenWorkflow } from "./constants.js";
 export type { CreateControlPlaneBackendInput } from "./backend.js";
 export type { CreateControlPlaneOpenWorkflowInput } from "./client.js";
 export type {
+  ControlPlaneAutomationConversationDeliveryServices,
+  ControlPlaneAutomationRunServices,
   ControlPlaneWorkerEmailDelivery,
+  ControlPlaneIntegrationConnectionResourceServices,
+  ControlPlaneIntegrationWebhookServices,
+  ControlPlaneSandboxInstanceServices,
+  ControlPlaneSandboxProfileServices,
   ControlPlaneWorkerServices,
   ControlPlaneWorkerWorkflowId,
   CreateControlPlaneWorkerInput,

@@ -42,88 +42,98 @@ export type ControlPlaneWorkerEmailDelivery = {
   };
 };
 
+export type ControlPlaneAutomationRunServices = {
+  transitionAutomationRunToRunning: (
+    input: HandleAutomationRunWorkflowInput,
+  ) => Promise<{ shouldProcess: boolean }>;
+  prepareAutomationRun: (input: HandleAutomationRunWorkflowInput) => Promise<PreparedAutomationRun>;
+  handoffAutomationRunDelivery: (input: HandoffAutomationRunDeliveryInput) => Promise<void>;
+  markAutomationRunFailed: (input: {
+    automationRunId: string;
+    failureCode: string;
+    failureMessage: string;
+  }) => Promise<void>;
+  resolveAutomationRunFailure: (input: { error: unknown }) => { code: string; message: string };
+};
+
+export type ControlPlaneAutomationConversationDeliveryServices = {
+  claimOrResumeAutomationConversationDeliveryTask: (
+    input: HandleAutomationConversationDeliveryWorkflowInput,
+  ) => Promise<ActiveAutomationConversationDeliveryTask | null>;
+  resolveAutomationConversationDeliveryTaskAction: (input: {
+    taskId: string;
+    generation: number;
+  }) => Promise<AutomationConversationDeliveryTaskAction>;
+  idleAutomationConversationDeliveryProcessorIfEmpty: (
+    input: HandleAutomationConversationDeliveryWorkflowInput,
+  ) => Promise<boolean>;
+  prepareAutomationRun: (input: { automationRunId: string }) => Promise<PreparedAutomationRun>;
+  resolveAutomationConversationDeliveryRoute: (input: {
+    conversationId: string;
+  }) => Promise<ResolvedAutomationConversationDeliveryRoute>;
+  ensureAutomationSandbox: (input: {
+    preparedAutomationRun: PreparedAutomationRun;
+    resolvedAutomationConversationRoute: ResolvedAutomationConversationDeliveryRoute;
+  }) => Promise<EnsuredAutomationSandbox>;
+  acquireAutomationConnection: (input: {
+    preparedAutomationRun: PreparedAutomationRun;
+    ensuredAutomationSandbox: EnsuredAutomationSandbox;
+  }) => Promise<AcquiredAutomationConnection>;
+  deliverAutomationPayload: (input: {
+    taskId: string;
+    generation: number;
+    preparedAutomationRun: PreparedAutomationRun;
+    resolvedAutomationConversationRoute: ResolvedAutomationConversationDeliveryRoute;
+    ensuredAutomationSandbox: EnsuredAutomationSandbox;
+    acquiredAutomationConnection: AcquiredAutomationConnection;
+  }) => Promise<void>;
+  markAutomationRunCompleted: (input: { automationRunId: string }) => Promise<void>;
+  markAutomationRunIgnored: (input: { automationRunId: string }) => Promise<void>;
+  markAutomationRunFailed: (input: {
+    automationRunId: string;
+    failureCode: string;
+    failureMessage: string;
+  }) => Promise<void>;
+  finalizeAutomationConversationDeliveryTask: (input: {
+    taskId: string;
+    generation: number;
+    status: FinalAutomationConversationDeliveryTaskStatus;
+    failureCode?: string | null;
+    failureMessage?: string | null;
+  }) => Promise<void>;
+  resolveAutomationRunFailure: (input: { error: unknown }) => { code: string; message: string };
+};
+
+export type ControlPlaneIntegrationWebhookServices = {
+  handleWebhookEvent: (
+    input: HandleIntegrationWebhookEventWorkflowInput,
+  ) => Promise<HandleIntegrationWebhookEventWorkflowOutput>;
+};
+
+export type ControlPlaneSandboxProfileServices = {
+  deleteSandboxProfile: (input: { organizationId: string; profileId: string }) => Promise<void>;
+};
+
+export type ControlPlaneSandboxInstanceServices = {
+  startSandboxProfileInstance: (
+    input: StartSandboxProfileInstanceWorkflowInput,
+  ) => Promise<StartSandboxProfileInstanceWorkflowOutput>;
+};
+
+export type ControlPlaneIntegrationConnectionResourceServices = {
+  syncIntegrationConnectionResources: (
+    input: SyncIntegrationConnectionResourcesWorkflowInput,
+  ) => Promise<SyncIntegrationConnectionResourcesWorkflowOutput>;
+};
+
 export type ControlPlaneWorkerServices = {
-  automationRuns?: {
-    transitionAutomationRunToRunning: (
-      input: HandleAutomationRunWorkflowInput,
-    ) => Promise<{ shouldProcess: boolean }>;
-    prepareAutomationRun: (
-      input: HandleAutomationRunWorkflowInput,
-    ) => Promise<PreparedAutomationRun>;
-    handoffAutomationRunDelivery: (input: HandoffAutomationRunDeliveryInput) => Promise<void>;
-    markAutomationRunFailed: (input: {
-      automationRunId: string;
-      failureCode: string;
-      failureMessage: string;
-    }) => Promise<void>;
-    resolveAutomationRunFailure: (input: { error: unknown }) => { code: string; message: string };
-  };
-  automationConversationDelivery?: {
-    claimOrResumeAutomationConversationDeliveryTask: (
-      input: HandleAutomationConversationDeliveryWorkflowInput,
-    ) => Promise<ActiveAutomationConversationDeliveryTask | null>;
-    resolveAutomationConversationDeliveryTaskAction: (input: {
-      taskId: string;
-      generation: number;
-    }) => Promise<AutomationConversationDeliveryTaskAction>;
-    idleAutomationConversationDeliveryProcessorIfEmpty: (
-      input: HandleAutomationConversationDeliveryWorkflowInput,
-    ) => Promise<boolean>;
-    prepareAutomationRun: (input: { automationRunId: string }) => Promise<PreparedAutomationRun>;
-    resolveAutomationConversationDeliveryRoute: (input: {
-      conversationId: string;
-    }) => Promise<ResolvedAutomationConversationDeliveryRoute>;
-    ensureAutomationSandbox: (input: {
-      preparedAutomationRun: PreparedAutomationRun;
-      resolvedAutomationConversationRoute: ResolvedAutomationConversationDeliveryRoute;
-    }) => Promise<EnsuredAutomationSandbox>;
-    acquireAutomationConnection: (input: {
-      preparedAutomationRun: PreparedAutomationRun;
-      ensuredAutomationSandbox: EnsuredAutomationSandbox;
-    }) => Promise<AcquiredAutomationConnection>;
-    deliverAutomationPayload: (input: {
-      taskId: string;
-      generation: number;
-      preparedAutomationRun: PreparedAutomationRun;
-      resolvedAutomationConversationRoute: ResolvedAutomationConversationDeliveryRoute;
-      ensuredAutomationSandbox: EnsuredAutomationSandbox;
-      acquiredAutomationConnection: AcquiredAutomationConnection;
-    }) => Promise<void>;
-    markAutomationRunCompleted: (input: { automationRunId: string }) => Promise<void>;
-    markAutomationRunIgnored: (input: { automationRunId: string }) => Promise<void>;
-    markAutomationRunFailed: (input: {
-      automationRunId: string;
-      failureCode: string;
-      failureMessage: string;
-    }) => Promise<void>;
-    finalizeAutomationConversationDeliveryTask: (input: {
-      taskId: string;
-      generation: number;
-      status: FinalAutomationConversationDeliveryTaskStatus;
-      failureCode?: string | null;
-      failureMessage?: string | null;
-    }) => Promise<void>;
-    resolveAutomationRunFailure: (input: { error: unknown }) => { code: string; message: string };
-  };
-  integrationWebhooks?: {
-    handleWebhookEvent: (
-      input: HandleIntegrationWebhookEventWorkflowInput,
-    ) => Promise<HandleIntegrationWebhookEventWorkflowOutput>;
-  };
+  automationRuns?: ControlPlaneAutomationRunServices;
+  automationConversationDelivery?: ControlPlaneAutomationConversationDeliveryServices;
+  integrationWebhooks?: ControlPlaneIntegrationWebhookServices;
   emailDelivery?: ControlPlaneWorkerEmailDelivery;
-  sandboxProfiles?: {
-    deleteSandboxProfile: (input: { organizationId: string; profileId: string }) => Promise<void>;
-  };
-  sandboxInstances?: {
-    startSandboxProfileInstance: (
-      input: StartSandboxProfileInstanceWorkflowInput,
-    ) => Promise<StartSandboxProfileInstanceWorkflowOutput>;
-  };
-  integrationConnectionResources?: {
-    syncIntegrationConnectionResources: (
-      input: SyncIntegrationConnectionResourcesWorkflowInput,
-    ) => Promise<SyncIntegrationConnectionResourcesWorkflowOutput>;
-  };
+  sandboxProfiles?: ControlPlaneSandboxProfileServices;
+  sandboxInstances?: ControlPlaneSandboxInstanceServices;
+  integrationConnectionResources?: ControlPlaneIntegrationConnectionResourceServices;
 };
 
 export const ControlPlaneWorkerWorkflowIds = {

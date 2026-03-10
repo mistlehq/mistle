@@ -2,7 +2,7 @@
 
 Reference catalog of control-plane workflows in `@mistle/workflows`.
 
-`packages/workflows` owns the workflow definitions and orchestration. Worker apps are responsible for supplying the runtime services that talk to databases, providers, sandboxes, SMTP, and internal APIs.
+`packages/workflows` owns the workflow definitions, orchestration, and shared runtime state transitions. Worker apps are responsible for supplying app-specific runtime services such as provider adapters, sandbox transport, SMTP, and internal APIs.
 
 ## Workflows
 
@@ -18,10 +18,10 @@ Reference catalog of control-plane workflows in `@mistle/workflows`.
 
 ## Worker Services
 
-`createControlPlaneWorker(...)` registers workflows through `src/control-plane/register/` and expects services grouped by domain:
+`createControlPlaneWorker(...)` registers workflows through `src/control-plane/register/` and expects named service ports grouped by domain:
 
 - `enabledWorkflows` with workflow ids from `ControlPlaneWorkerWorkflowIds`
-- `services.automationConversationDelivery`:
+- `services.automationConversationDelivery` (`ControlPlaneAutomationConversationDeliveryServices`):
   - `claimOrResumeAutomationConversationDeliveryTask`
   - `resolveAutomationConversationDeliveryTaskAction`
   - `idleAutomationConversationDeliveryProcessorIfEmpty`
@@ -35,20 +35,20 @@ Reference catalog of control-plane workflows in `@mistle/workflows`.
   - `markAutomationRunFailed`
   - `finalizeAutomationConversationDeliveryTask`
   - `resolveAutomationRunFailure`
-- `services.automationRuns`:
+- `services.automationRuns` (`ControlPlaneAutomationRunServices`):
   - `transitionAutomationRunToRunning`
   - `prepareAutomationRun`
   - `handoffAutomationRunDelivery`
   - `markAutomationRunFailed`
   - `resolveAutomationRunFailure`
-- `services.integrationWebhooks`:
+- `services.integrationWebhooks` (`ControlPlaneIntegrationWebhookServices`):
   - `handleWebhookEvent`
-- `services.emailDelivery`:
+- `services.emailDelivery` (`ControlPlaneWorkerEmailDelivery`):
   - `emailSender`
   - `from`
-- `services.sandboxProfiles`:
+- `services.sandboxProfiles` (`ControlPlaneSandboxProfileServices`):
   - `deleteSandboxProfile`
-- `services.sandboxInstances`:
+- `services.sandboxInstances` (`ControlPlaneSandboxInstanceServices`):
   - `startSandboxProfileInstance`
 
-When adding a new workflow, keep orchestration in this package and put the database or provider implementation in the worker app.
+When adding a new workflow, keep orchestration and persisted workflow-state transitions in this package. Put app-specific provider, transport, SMTP, and HTTP adapter code in the worker app.
