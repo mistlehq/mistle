@@ -20,17 +20,18 @@ import {
   getConversationProviderAdapter,
   idleConversationDeliveryProcessorIfEmpty,
   markConversationDeliveryTaskDelivering,
-  rebindConversationSandbox,
   resolveConversationDeliveryTaskAction,
   updateConversationExecution,
 } from "../conversations/index.js";
 import {
+  ConversationRouteBindingActions,
   ConversationDeliverySandboxActions,
   ConversationExecutionActions,
   ConversationSteerRecoveryActions,
   isRecoverableLateSteerError,
   resolveConversationDeliverySandboxAction,
   resolveConversationExecutionAction,
+  resolveConversationRouteBindingAction,
   resolveConversationSteerRecoveryAction,
 } from "./conversation-delivery-plans.js";
 import {
@@ -57,13 +58,6 @@ export type HandleConversationDeliveryDependencies = {
 };
 
 class ConversationDeliveryExecutionError extends Error {}
-
-function isRouteBoundToSandbox(input: {
-  resolvedConversationRoute: ResolvedConversationDeliveryRoute;
-  sandboxInstanceId: string;
-}) {
-  return input.resolvedConversationRoute.sandboxInstanceId === input.sandboxInstanceId;
-}
 
 async function steerConversationExecution(input: {
   adapter: ReturnType<typeof getConversationProviderAdapter>;
@@ -284,7 +278,6 @@ export async function ensureConversationDeliverySandbox(
 
     const sandboxAction = resolveConversationDeliverySandboxAction({
       sandboxInstanceId: input.resolvedConversationRoute.sandboxInstanceId,
-      providerConversationId: input.resolvedConversationRoute.providerConversationId,
       sandboxStatus: existingSandbox.status,
     });
 
@@ -405,53 +398,40 @@ export async function deliverConversationAutomationPayload(
       });
     }
 
-    if (
-      route.providerConversationId !== null &&
-      !isRouteBoundToSandbox({
-        resolvedConversationRoute: {
-          conversationId: route.conversationId,
-          integrationFamilyId: input.resolvedConversationRoute.integrationFamilyId,
-          routeId: route.id,
-          sandboxInstanceId: route.sandboxInstanceId,
-          providerConversationId: route.providerConversationId,
-          providerExecutionId: route.providerExecutionId,
-          providerState: route.providerState,
-        },
-        sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
-      })
-    ) {
-      throw new ConversationDeliveryExecutionError(
-        `Conversation '${input.preparedAutomationRun.conversationId}' is bound to sandbox '${route.sandboxInstanceId}', but delivery acquired sandbox '${input.ensuredAutomationSandbox.sandboxInstanceId}'.`,
-      );
-    }
+    const routeBindingAction = resolveConversationRouteBindingAction({
+      routeId: input.resolvedConversationRoute.routeId,
+      routeSandboxInstanceId: route.sandboxInstanceId,
+      providerConversationId: route.providerConversationId,
+      ensuredSandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+    });
 
-    if (route.providerConversationId === null) {
-      const createdConversation = await adapter.createConversation({
-        connection,
-      });
+    switch (routeBindingAction) {
+      case ConversationRouteBindingActions.CREATE_ROUTE:
+      case ConversationRouteBindingActions.ACTIVATE_PENDING_ROUTE: {
+        const createdConversation = await adapter.createConversation({
+          connection,
+        });
 
-      route = await activateConversationRoute(
-        {
-          db: deps.db,
-        },
-        {
-          conversationId: input.preparedAutomationRun.conversationId,
-          routeId: route.id,
-          sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
-          providerConversationId: createdConversation.providerConversationId,
-          providerState: createdConversation.providerState,
-        },
-      );
-    } else if (route.sandboxInstanceId !== input.ensuredAutomationSandbox.sandboxInstanceId) {
-      route = await rebindConversationSandbox(
-        {
-          db: deps.db,
-        },
-        {
-          routeId: route.id,
-          sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
-        },
-      );
+        route = await activateConversationRoute(
+          {
+            db: deps.db,
+          },
+          {
+            conversationId: input.preparedAutomationRun.conversationId,
+            routeId: route.id,
+            sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
+            providerConversationId: createdConversation.providerConversationId,
+            providerState: createdConversation.providerState,
+          },
+        );
+        break;
+      }
+      case ConversationRouteBindingActions.REUSE_ACTIVE_ROUTE:
+        break;
+      case ConversationRouteBindingActions.FAIL_SANDBOX_MISMATCH:
+        throw new ConversationDeliveryExecutionError(
+          `Conversation '${input.preparedAutomationRun.conversationId}' is bound to sandbox '${route.sandboxInstanceId}', but delivery acquired sandbox '${input.ensuredAutomationSandbox.sandboxInstanceId}'.`,
+        );
     }
 
     if (route.providerConversationId === null) {

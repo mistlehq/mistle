@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ConversationRouteBindingActions,
   ConversationDeliverySandboxActions,
   ConversationExecutionActions,
   ConversationSteerRecoveryActions,
   isRecoverableLateSteerError,
   resolveConversationDeliverySandboxAction,
   resolveConversationExecutionAction,
+  resolveConversationRouteBindingAction,
   resolveConversationSteerRecoveryAction,
 } from "./conversation-delivery-plans.js";
 
@@ -16,7 +18,6 @@ describe("conversation delivery plans", () => {
       expect(
         resolveConversationDeliverySandboxAction({
           sandboxInstanceId: null,
-          providerConversationId: null,
           sandboxStatus: null,
         }),
       ).toBe(ConversationDeliverySandboxActions.START_NEW);
@@ -26,7 +27,6 @@ describe("conversation delivery plans", () => {
       expect(
         resolveConversationDeliverySandboxAction({
           sandboxInstanceId: "sbi_123",
-          providerConversationId: "thread_123",
           sandboxStatus: "running",
         }),
       ).toBe(ConversationDeliverySandboxActions.REUSE_EXISTING);
@@ -36,20 +36,64 @@ describe("conversation delivery plans", () => {
       expect(
         resolveConversationDeliverySandboxAction({
           sandboxInstanceId: "sbi_123",
-          providerConversationId: "thread_123",
           sandboxStatus: "stopped",
         }),
       ).toBe(ConversationDeliverySandboxActions.FAIL);
     });
 
-    it("starts a new sandbox when a pre-activation route sandbox is no longer running", () => {
+    it("fails closed when a pending route sandbox is no longer running", () => {
       expect(
         resolveConversationDeliverySandboxAction({
           sandboxInstanceId: "sbi_123",
-          providerConversationId: null,
           sandboxStatus: "failed",
         }),
-      ).toBe(ConversationDeliverySandboxActions.START_NEW);
+      ).toBe(ConversationDeliverySandboxActions.FAIL);
+    });
+  });
+
+  describe("resolveConversationRouteBindingAction", () => {
+    it("creates a route when none exists yet", () => {
+      expect(
+        resolveConversationRouteBindingAction({
+          routeId: null,
+          routeSandboxInstanceId: null,
+          providerConversationId: null,
+          ensuredSandboxInstanceId: "sbi_123",
+        }),
+      ).toBe(ConversationRouteBindingActions.CREATE_ROUTE);
+    });
+
+    it("activates a pending route only when the same sandbox is reused", () => {
+      expect(
+        resolveConversationRouteBindingAction({
+          routeId: "cvr_123",
+          routeSandboxInstanceId: "sbi_123",
+          providerConversationId: null,
+          ensuredSandboxInstanceId: "sbi_123",
+        }),
+      ).toBe(ConversationRouteBindingActions.ACTIVATE_PENDING_ROUTE);
+    });
+
+    it("reuses an active route when the same sandbox and provider conversation are present", () => {
+      expect(
+        resolveConversationRouteBindingAction({
+          routeId: "cvr_123",
+          routeSandboxInstanceId: "sbi_123",
+          providerConversationId: "thread_123",
+          ensuredSandboxInstanceId: "sbi_123",
+        }),
+      ).toBe(ConversationRouteBindingActions.REUSE_ACTIVE_ROUTE);
+    });
+
+    it("fails when delivery attempts to continue a route on a different sandbox", () => {
+      expect(
+        resolveConversationRouteBindingAction({
+          routeId: "cvr_123",
+          routeSandboxInstanceId: "sbi_123",
+          providerConversationId: null,
+          ensuredSandboxInstanceId: "sbi_456",
+        }),
+      ).toBe(ConversationRouteBindingActions.FAIL_SANDBOX_MISMATCH);
     });
   });
 
