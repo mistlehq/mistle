@@ -33,7 +33,7 @@ import {
   resolveAutomationConversationExecutionAction,
   resolveAutomationConversationRouteBindingAction,
   resolveAutomationConversationSteerRecoveryAction,
-} from "./automation-conversation-delivery-plans.js";
+} from "../automation-workflows/planning/automation-conversation-delivery.js";
 import {
   acquireAutomationConnection,
   ensureAutomationSandbox,

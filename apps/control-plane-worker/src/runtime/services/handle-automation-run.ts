@@ -22,7 +22,7 @@ import {
 import {
   connectSandboxAgentConnection,
   sendSandboxAgentMessage,
-} from "./sandbox-agent-connection.js";
+} from "../automation-workflows/transport/sandbox-agent-connection.js";
 import type {
   HandoffAutomationRunDeliveryServiceInput,
   AcquireAutomationConnectionServiceOutput,

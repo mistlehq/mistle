@@ -2,12 +2,12 @@ import { systemSleeper } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
-import { deliverAutomationPayload } from "./handle-automation-run.js";
+import { deliverAutomationPayload } from "../../services/handle-automation-run.js";
+import type { DeliverAutomationPayloadServiceInput } from "../../services/types.js";
 import {
   connectSandboxAgentConnection,
   sendSandboxAgentMessage,
 } from "./sandbox-agent-connection.js";
-import type { DeliverAutomationPayloadServiceInput } from "./types.js";
 
 type Deferred<T> = {
   promise: Promise<T>;

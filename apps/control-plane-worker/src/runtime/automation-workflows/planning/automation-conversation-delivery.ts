@@ -1,11 +1,11 @@
 import type {
   ProviderInspectConversationOutput,
   ConversationProviderAdapter,
-} from "../automation-conversations/provider-adapter.js";
+} from "../../automation-conversations/provider-adapter.js";
 import {
   type ConversationProviderErrorCode,
   ConversationProviderErrorCodes,
-} from "../automation-conversations/provider-errors.js";
+} from "../../automation-conversations/provider-errors.js";
 
 export const AutomationConversationDeliverySandboxActions = {
   REUSE_EXISTING: "reuse_existing",
@@ -74,7 +74,9 @@ export type ConversationExecutionAction =
 export function resolveAutomationConversationExecutionAction(input: {
   inspectAutomationConversation: ProviderInspectConversationOutput;
   providerExecutionId: string | null;
-  adapter: Pick<ConversationProviderAdapter, "steerExecution">;
+  adapter: {
+    steerExecution?: ConversationProviderAdapter["steerExecution"];
+  };
 }): ConversationExecutionAction {
   if (!input.inspectAutomationConversation.exists) {
     return AutomationConversationExecutionActions.FAIL_MISSING_CONVERSATION;
