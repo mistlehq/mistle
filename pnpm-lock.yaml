@@ -999,6 +999,9 @@ importers:
 
   tests:
     devDependencies:
+      '@mistle/codex-app-server-client':
+        specifier: workspace:*
+        version: link:../packages/codex-app-server-client
       '@mistle/db':
         specifier: workspace:*
         version: link:../packages/db
