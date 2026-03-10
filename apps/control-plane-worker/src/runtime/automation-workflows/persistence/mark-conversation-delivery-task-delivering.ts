@@ -2,13 +2,12 @@ import {
   automationConversationDeliveryTasks,
   AutomationConversationDeliveryTaskStatuses,
 } from "@mistle/db/control-plane";
-import { and, eq, sql } from "drizzle-orm";
-
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
-} from "./errors.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
+  type AutomationConversationPersistenceDependencies,
+} from "@mistle/workflows/control-plane/runtime";
+import { and, eq, sql } from "drizzle-orm";
 
 export type MarkAutomationConversationDeliveryTaskDeliveringInput = {
   taskId: string;

@@ -16,13 +16,15 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
+import {
+  AutomationConversationPersistenceErrorCodes,
+  claimAutomationConversation,
+} from "@mistle/workflows/control-plane/runtime";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
 import {
   activateAutomationConversationRoute,
-  claimAutomationConversation,
-  AutomationConversationPersistenceErrorCodes,
   createAutomationConversationRoute,
   rebindAutomationConversationSandbox,
   replaceAutomationConversationBinding,

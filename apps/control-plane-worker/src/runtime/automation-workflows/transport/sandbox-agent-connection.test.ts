@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
 import type { DeliverAutomationPayloadServiceInput } from "../../services/types.js";
-import { deliverAutomationPayload } from "../workflows/automation-run-execution.js";
+import { deliverAutomationPayload } from "./deliver-automation-payload.js";
 import {
   connectSandboxAgentConnection,
   sendSandboxAgentMessage,
