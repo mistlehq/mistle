@@ -67,7 +67,7 @@ export const it = vitestIt.extend<{ fixture: DockerAdapterIntegrationFixture }>(
       const settings = dockerAdapterIntegrationSettings;
       if (!settings.enabled) {
         throw new Error(
-          'Docker adapter integration fixture requested while docker provider integration is disabled. Set MISTLE_SANDBOX_INTEGRATION=1 and include "docker" in MISTLE_SANDBOX_INTEGRATION_PROVIDERS.',
+          'Docker adapter integration fixture requested while docker provider integration is disabled. Set MISTLE_TEST_SANDBOX_INTEGRATION=1 and include "docker" in MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS.',
         );
       }
 

@@ -11,7 +11,8 @@ const SandboxIntegrationProvidersSchema = z
   .string()
   .trim()
   .min(1, {
-    message: "MISTLE_SANDBOX_INTEGRATION_PROVIDERS is required when MISTLE_SANDBOX_INTEGRATION=1.",
+    message:
+      "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS is required when MISTLE_TEST_SANDBOX_INTEGRATION=1.",
   })
   .transform((csv, context): ReadonlySet<SandboxProviderType> => {
     const rawProviders = csv
@@ -23,7 +24,7 @@ const SandboxIntegrationProvidersSchema = z
       context.addIssue({
         code: "custom",
         message:
-          "MISTLE_SANDBOX_INTEGRATION_PROVIDERS must include at least one provider when MISTLE_SANDBOX_INTEGRATION=1.",
+          "MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS must include at least one provider when MISTLE_TEST_SANDBOX_INTEGRATION=1.",
       });
       return z.NEVER;
     }
@@ -35,7 +36,7 @@ const SandboxIntegrationProvidersSchema = z
       if (!parsedProvider.success) {
         context.addIssue({
           code: "custom",
-          message: `Unsupported provider "${rawProvider}" in MISTLE_SANDBOX_INTEGRATION_PROVIDERS.`,
+          message: `Unsupported provider "${rawProvider}" in MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS.`,
         });
         continue;
       }
@@ -46,7 +47,8 @@ const SandboxIntegrationProvidersSchema = z
     if (providers.size === 0) {
       context.addIssue({
         code: "custom",
-        message: "No supported providers were configured in MISTLE_SANDBOX_INTEGRATION_PROVIDERS.",
+        message:
+          "No supported providers were configured in MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS.",
       });
       return z.NEVER;
     }
@@ -56,8 +58,8 @@ const SandboxIntegrationProvidersSchema = z
 
 const EnabledSandboxIntegrationConfigSchema = z
   .object({
-    MISTLE_SANDBOX_INTEGRATION: z.literal("1"),
-    MISTLE_SANDBOX_INTEGRATION_PROVIDERS: SandboxIntegrationProvidersSchema,
+    MISTLE_TEST_SANDBOX_INTEGRATION: z.literal("1"),
+    MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS: SandboxIntegrationProvidersSchema,
   })
   .strip();
 
@@ -76,7 +78,7 @@ export type SandboxIntegrationSettings =
 export function resolveSandboxIntegrationSettings(
   env: NodeJS.ProcessEnv,
 ): SandboxIntegrationSettings {
-  if (env.MISTLE_SANDBOX_INTEGRATION !== "1") {
+  if (env.MISTLE_TEST_SANDBOX_INTEGRATION !== "1") {
     return {
       enabled: false,
       providers: new Set<SandboxProviderType>(),
@@ -87,6 +89,6 @@ export function resolveSandboxIntegrationSettings(
 
   return {
     enabled: true,
-    providers: parsed.MISTLE_SANDBOX_INTEGRATION_PROVIDERS,
+    providers: parsed.MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS,
   };
 }

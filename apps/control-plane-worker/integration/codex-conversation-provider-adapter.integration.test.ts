@@ -17,7 +17,7 @@ import {
 } from "../src/runtime/automation-workflows/provider/provider-errors.js";
 import { createCodexConversationProviderAdapter } from "../src/runtime/automation-workflows/provider/providers/codex-conversation-provider-adapter.js";
 
-const OPENAI_API_KEY_ENV = "OPENAI_API_KEY";
+const OPENAI_API_KEY_ENV = "MISTLE_TEST_OPENAI_API_KEY";
 const PREFERRED_INTEGRATION_MODELS = ["gpt-5-codex-mini", "gpt-5.1-codex-mini"] as const;
 const EXECUTION_PROMPT = "Without using tools or shell commands, reply with exactly: ok";
 const EXPECTED_ASSISTANT_REPLY = "ok";
@@ -809,7 +809,7 @@ async function startCodexAppServer(
 ): Promise<StartedCodexAppServer> {
   const openAiApiKey = process.env[OPENAI_API_KEY_ENV];
   if (openAiApiKey === undefined || openAiApiKey.length === 0) {
-    throw new Error("OPENAI_API_KEY is required.");
+    throw new Error("MISTLE_TEST_OPENAI_API_KEY is required.");
   }
 
   const host = "127.0.0.1";

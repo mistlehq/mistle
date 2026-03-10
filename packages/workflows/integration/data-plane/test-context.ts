@@ -33,11 +33,11 @@ function normalizeError(error: unknown): Error {
 }
 
 function resolveDockerWorkflowIntegrationEnabled(): boolean {
-  if (process.env.MISTLE_SANDBOX_INTEGRATION !== "1") {
+  if (process.env.MISTLE_TEST_SANDBOX_INTEGRATION !== "1") {
     return false;
   }
 
-  const configuredProviders = (process.env.MISTLE_SANDBOX_INTEGRATION_PROVIDERS ?? "")
+  const configuredProviders = (process.env.MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS ?? "")
     .split(",")
     .map((provider) => provider.trim())
     .filter((provider) => provider.length > 0);
@@ -67,7 +67,7 @@ export const it = baseIt.extend<{ fixture: DataPlaneWorkflowFixture }>({
     async ({ databaseStack }, use) => {
       if (!dockerStartSandboxWorkflowIntegrationEnabled) {
         throw new Error(
-          'Docker workflow integration fixture requested while docker provider integration is disabled. Set MISTLE_SANDBOX_INTEGRATION=1 and include "docker" in MISTLE_SANDBOX_INTEGRATION_PROVIDERS.',
+          'Docker workflow integration fixture requested while docker provider integration is disabled. Set MISTLE_TEST_SANDBOX_INTEGRATION=1 and include "docker" in MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS.',
         );
       }
 

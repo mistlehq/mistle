@@ -55,7 +55,7 @@ export const it = vitestIt.extend<{ fixture: ModalAdapterIntegrationFixture }>({
 
       if (!settings.enabled) {
         throw new Error(
-          'Modal adapter integration fixture requested while modal provider integration is disabled. Set MISTLE_SANDBOX_INTEGRATION=1 and include "modal" in MISTLE_SANDBOX_INTEGRATION_PROVIDERS.',
+          'Modal adapter integration fixture requested while modal provider integration is disabled. Set MISTLE_TEST_SANDBOX_INTEGRATION=1 and include "modal" in MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS.',
         );
       }
 

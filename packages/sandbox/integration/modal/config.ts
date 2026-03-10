@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { ModalSandboxConfig } from "../../src/providers/modal/index.js";
 
 const MODAL_INTEGRATION_ENABLEMENT_MESSAGE =
-  'MISTLE_SANDBOX_INTEGRATION=1 and MISTLE_SANDBOX_INTEGRATION_PROVIDERS includes "modal"';
+  'MISTLE_TEST_SANDBOX_INTEGRATION=1 and MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS includes "modal"';
 
 const ModalAdapterIntegrationConfigSchema = z
   .object({

@@ -19,19 +19,19 @@ Provider-specific documentation lives with each provider:
 - [`src/providers/docker/README.md`](./src/providers/docker/README.md)
 
 Provider-scoped integration tests live under `integration/<provider>/` (for example `integration/modal/`).
-Integration test execution is gated at package level with `MISTLE_SANDBOX_INTEGRATION=1`, then narrowed by provider using `MISTLE_SANDBOX_INTEGRATION_PROVIDERS` (CSV). For example:
+Integration test execution is gated at package level with `MISTLE_TEST_SANDBOX_INTEGRATION=1`, then narrowed by provider using `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS` (CSV). For example:
 
 ```bash
-MISTLE_SANDBOX_INTEGRATION=1 MISTLE_SANDBOX_INTEGRATION_PROVIDERS=modal pnpm --filter @mistle/sandbox test:integration
+MISTLE_TEST_SANDBOX_INTEGRATION=1 MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=modal pnpm --filter @mistle/sandbox test:integration
 ```
 
 Docker integration tests also require `MISTLE_SANDBOX_DOCKER_SOCKET_PATH` (for example `/var/run/docker.sock`):
 
 ```bash
-MISTLE_SANDBOX_INTEGRATION=1 MISTLE_SANDBOX_INTEGRATION_PROVIDERS=docker MISTLE_SANDBOX_DOCKER_SOCKET_PATH=/var/run/docker.sock pnpm --filter @mistle/sandbox test:integration
+MISTLE_TEST_SANDBOX_INTEGRATION=1 MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker MISTLE_SANDBOX_DOCKER_SOCKET_PATH=/var/run/docker.sock pnpm --filter @mistle/sandbox test:integration
 ```
 
-List of valid providers for MISTLE_SANDBOX_INTEGRATION_PROVIDERS:
+List of valid providers for MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS:
 
 - `modal`
 - `docker`

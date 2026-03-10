@@ -60,8 +60,8 @@ They cover the full adapter lifecycle surface: `start`, mutate filesystem state,
 
 Required environment variables when enabled:
 
-- `MISTLE_SANDBOX_INTEGRATION=1`
-- `MISTLE_SANDBOX_INTEGRATION_PROVIDERS` includes `modal`
+- `MISTLE_TEST_SANDBOX_INTEGRATION=1`
+- `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS` includes `modal`
 - `MODAL_TOKEN_ID`
 - `MODAL_TOKEN_SECRET`
 - `MISTLE_SANDBOX_MODAL_APP_NAME`
