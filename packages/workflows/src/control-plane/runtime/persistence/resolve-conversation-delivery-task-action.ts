@@ -45,13 +45,13 @@ function assertTaskIsActiveForGeneration(input: {
 }
 
 export async function resolveAutomationConversationDeliveryTaskAction(
-  deps: AutomationConversationPersistenceDependencies,
+  ctx: AutomationConversationPersistenceDependencies,
   input: {
     taskId: string;
     generation: number;
   },
 ): Promise<AutomationConversationDeliveryTaskAction> {
-  const task = await deps.db.query.automationConversationDeliveryTasks.findFirst({
+  const task = await ctx.db.query.automationConversationDeliveryTasks.findFirst({
     columns: {
       id: true,
       conversationId: true,
@@ -73,7 +73,7 @@ export async function resolveAutomationConversationDeliveryTaskAction(
     generation: input.generation,
   });
 
-  const conversation = await deps.db.query.automationConversations.findFirst({
+  const conversation = await ctx.db.query.automationConversations.findFirst({
     columns: {
       id: true,
       lastProcessedSourceOrderKey: true,

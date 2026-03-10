@@ -9,10 +9,10 @@ export type IdleAutomationConversationDeliveryProcessorIfEmptyInput = {
 };
 
 export async function idleAutomationConversationDeliveryProcessorIfEmpty(
-  deps: AutomationConversationPersistenceDependencies,
+  ctx: AutomationConversationPersistenceDependencies,
   input: IdleAutomationConversationDeliveryProcessorIfEmptyInput,
 ): Promise<boolean> {
-  return deps.db.transaction(async (tx) => {
+  return ctx.db.transaction(async (tx) => {
     const queuedTask = await tx.query.automationConversationDeliveryTasks.findFirst({
       where: (table, { and: whereAnd, eq: whereEq, or: whereOr }) =>
         whereAnd(

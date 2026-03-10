@@ -12,10 +12,10 @@ export type ClaimNextConversationDeliveryTaskInput = {
 };
 
 export async function claimNextAutomationConversationDeliveryTask(
-  deps: AutomationConversationPersistenceDependencies,
+  ctx: AutomationConversationPersistenceDependencies,
   input: ClaimNextConversationDeliveryTaskInput,
 ) {
-  return deps.db.transaction(async (tx) => {
+  return ctx.db.transaction(async (tx) => {
     const nextTask = await tx.query.automationConversationDeliveryTasks.findFirst({
       where: (table, { and: whereAnd, eq: whereEq }) =>
         whereAnd(

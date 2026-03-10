@@ -36,9 +36,15 @@ import {
 } from "@mistle/integrations-definitions";
 import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
 import {
+  AutomationConversationDeliveryTaskActions,
+  claimOrResumeAutomationConversationDeliveryTask,
+  finalizeAutomationConversationDeliveryActiveTask,
   handoffAutomationRunDelivery,
+  ignoreAutomationConversationDeliveryAutomationRun,
+  idleAutomationConversationDeliveryProcessor,
   markAutomationRunFailed,
   prepareAutomationRun,
+  resolveAutomationConversationDeliveryActiveTaskAction,
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
 } from "@mistle/workflows/control-plane/runtime";
@@ -46,14 +52,6 @@ import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
-import {
-  AutomationConversationDeliveryTaskActions,
-  claimOrResumeAutomationConversationDeliveryTask,
-  finalizeAutomationConversationDeliveryActiveTask,
-  ignoreAutomationConversationDeliveryAutomationRun,
-  idleAutomationConversationDeliveryProcessor,
-  resolveAutomationConversationDeliveryActiveTaskAction,
-} from "../src/runtime/automation-workflows/workflows/conversation-delivery.js";
 import { it } from "./test-context.js";
 
 const TestTimeoutMs = 120_000;

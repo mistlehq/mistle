@@ -6,28 +6,25 @@ import {
   type HandleAutomationConversationDeliveryWorkflowInput,
 } from "@mistle/workflows/control-plane";
 import {
-  handoffAutomationRunDelivery,
-  markAutomationRunFailed,
-  prepareAutomationRun,
-  resolveAutomationRunFailure,
-  transitionAutomationRunToRunning,
-} from "@mistle/workflows/control-plane/runtime";
-
-import {
   acquireConversationDeliveryConnection,
   claimOrResumeAutomationConversationDeliveryTask,
   completeConversationDeliveryAutomationRun,
-  deliverConversationAutomationPayload,
   ensureConversationDeliverySandbox,
   failConversationDeliveryAutomationRun,
   finalizeAutomationConversationDeliveryActiveTask,
-  ignoreAutomationConversationDeliveryAutomationRun,
+  handoffAutomationRunDelivery,
   idleAutomationConversationDeliveryProcessor,
+  ignoreAutomationConversationDeliveryAutomationRun,
+  markAutomationRunFailed,
+  prepareAutomationRun,
   prepareConversationDeliveryAutomationRun,
-  resolveAutomationConversationDeliveryRoute,
+  resolveAutomationRunFailure,
   resolveAutomationConversationDeliveryActiveTaskAction,
-  resolveAutomationRunFailure as resolveConversationDeliveryFailure,
-} from "../automation-workflows/workflows/conversation-delivery.js";
+  resolveAutomationConversationDeliveryRoute,
+  transitionAutomationRunToRunning,
+} from "@mistle/workflows/control-plane/runtime";
+
+import { deliverConversationAutomationPayload } from "../automation-workflows/workflows/conversation-delivery.js";
 import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";
@@ -257,7 +254,7 @@ export function createControlPlaneWorkerServices(
         );
       },
       resolveAutomationRunFailure: ({ error }) => {
-        return resolveConversationDeliveryFailure(error);
+        return resolveAutomationRunFailure(error);
       },
     },
     integrationWebhooks: {
