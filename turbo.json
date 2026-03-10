@@ -12,6 +12,7 @@
   "tasks": {
     "dev": {
       "dependsOn": ["^build"],
+      "passThroughEnv": ["MISTLE_*"],
       "cache": false,
       "persistent": true,
       "interruptible": true
@@ -29,14 +30,17 @@
     },
     "test": {
       "dependsOn": ["^build", "^typecheck"],
+      "passThroughEnv": ["MISTLE_*"],
       "outputs": []
     },
     "test:property": {
       "dependsOn": ["^build"],
+      "passThroughEnv": ["MISTLE_*"],
       "outputs": []
     },
     "test:integration": {
       "dependsOn": ["^build"],
+      "passThroughEnv": ["MISTLE_*"],
       "outputs": []
     }
   }
