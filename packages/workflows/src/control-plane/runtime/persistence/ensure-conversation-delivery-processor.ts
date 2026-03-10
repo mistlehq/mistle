@@ -21,10 +21,10 @@ export type EnsureAutomationConversationDeliveryProcessorOutput = {
 };
 
 export async function ensureAutomationConversationDeliveryProcessor(
-  deps: AutomationConversationPersistenceDependencies,
+  ctx: AutomationConversationPersistenceDependencies,
   input: EnsureAutomationConversationDeliveryProcessorInput,
 ): Promise<EnsureAutomationConversationDeliveryProcessorOutput> {
-  const insertedRows = await deps.db
+  const insertedRows = await ctx.db
     .insert(automationConversationDeliveryProcessors)
     .values({
       conversationId: input.conversationId,
@@ -45,7 +45,7 @@ export async function ensureAutomationConversationDeliveryProcessor(
     };
   }
 
-  const updatedRows = await deps.db
+  const updatedRows = await ctx.db
     .update(automationConversationDeliveryProcessors)
     .set({
       generation: sql`${automationConversationDeliveryProcessors.generation} + 1`,
@@ -72,7 +72,7 @@ export async function ensureAutomationConversationDeliveryProcessor(
     };
   }
 
-  const existingProcessor = await deps.db.query.automationConversationDeliveryProcessors.findFirst({
+  const existingProcessor = await ctx.db.query.automationConversationDeliveryProcessors.findFirst({
     where: (table, { eq }) => eq(table.conversationId, input.conversationId),
   });
   if (existingProcessor === undefined) {

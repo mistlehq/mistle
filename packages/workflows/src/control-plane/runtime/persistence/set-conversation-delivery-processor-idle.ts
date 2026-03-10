@@ -12,10 +12,10 @@ export type SetAutomationConversationDeliveryProcessorIdleInput = {
 };
 
 export async function setAutomationConversationDeliveryProcessorIdle(
-  deps: AutomationConversationPersistenceDependencies,
+  ctx: AutomationConversationPersistenceDependencies,
   input: SetAutomationConversationDeliveryProcessorIdleInput,
 ): Promise<boolean> {
-  const updatedRows = await deps.db
+  const updatedRows = await ctx.db
     .update(automationConversationDeliveryProcessors)
     .set({
       status: AutomationConversationDeliveryProcessorStatuses.IDLE,

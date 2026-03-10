@@ -137,12 +137,12 @@ export type ClaimOrResumeAutomationConversationDeliveryTaskInput =
   HandleAutomationConversationDeliveryWorkflowInput;
 
 export async function claimOrResumeAutomationConversationDeliveryTask(
-  deps: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
+  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
   input: ClaimOrResumeAutomationConversationDeliveryTaskInput,
 ) {
   const activeTask = await findActiveAutomationConversationDeliveryTask(
     {
-      db: deps.db,
+      db: ctx.db,
     },
     {
       conversationId: input.conversationId,
@@ -174,7 +174,7 @@ export async function claimOrResumeAutomationConversationDeliveryTask(
 
   const claimedTask = await claimNextAutomationConversationDeliveryTask(
     {
-      db: deps.db,
+      db: ctx.db,
     },
     {
       conversationId: input.conversationId,
@@ -193,19 +193,19 @@ export async function claimOrResumeAutomationConversationDeliveryTask(
 }
 
 export async function idleAutomationConversationDeliveryProcessor(
-  deps: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
+  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
   input: HandleAutomationConversationDeliveryWorkflowInput,
 ) {
   return idleAutomationConversationDeliveryProcessorIfEmpty(
     {
-      db: deps.db,
+      db: ctx.db,
     },
     input,
   );
 }
 
 export async function resolveAutomationConversationDeliveryActiveTaskAction(
-  deps: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
+  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
   input: {
     taskId: string;
     generation: number;
@@ -213,19 +213,19 @@ export async function resolveAutomationConversationDeliveryActiveTaskAction(
 ) {
   return resolveAutomationConversationDeliveryTaskAction(
     {
-      db: deps.db,
+      db: ctx.db,
     },
     input,
   );
 }
 
 export async function prepareConversationDeliveryAutomationRun(
-  deps: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
+  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
   input: { automationRunId: string },
 ) {
   return prepareAutomationRun(
     {
-      db: deps.db,
+      db: ctx.db,
     },
     {
       automationRunId: input.automationRunId,
@@ -234,12 +234,12 @@ export async function prepareConversationDeliveryAutomationRun(
 }
 
 export async function resolveAutomationConversationDeliveryRoute(
-  deps: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
+  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
   input: {
     conversationId: string;
   },
 ): Promise<ResolvedAutomationConversationDeliveryRoute> {
-  const conversation = await deps.db.query.automationConversations.findFirst({
+  const conversation = await ctx.db.query.automationConversations.findFirst({
     where: (table, { eq }) => eq(table.id, input.conversationId),
   });
   if (conversation === undefined) {
@@ -249,7 +249,7 @@ export async function resolveAutomationConversationDeliveryRoute(
     });
   }
 
-  const route = await deps.db.query.automationConversationRoutes.findFirst({
+  const route = await ctx.db.query.automationConversationRoutes.findFirst({
     where: (table, { eq }) => eq(table.conversationId, input.conversationId),
   });
 
@@ -265,14 +265,14 @@ export async function resolveAutomationConversationDeliveryRoute(
 }
 
 export async function ensureConversationDeliverySandbox(
-  deps: Pick<
+  ctx: Pick<
     HandleAutomationConversationDeliveryDependencies,
     "db" | "getSandboxInstance" | "startSandboxProfileInstance"
   >,
   input: EnsureAutomationConversationDeliverySandboxServiceInput,
 ) {
   if (input.resolvedAutomationConversationRoute.sandboxInstanceId !== null) {
-    const existingSandbox = await deps.getSandboxInstance({
+    const existingSandbox = await ctx.getSandboxInstance({
       organizationId: input.preparedAutomationRun.organizationId,
       instanceId: input.resolvedAutomationConversationRoute.sandboxInstanceId,
     });
@@ -297,8 +297,8 @@ export async function ensureConversationDeliverySandbox(
 
   return ensureAutomationSandbox(
     {
-      db: deps.db,
-      startSandboxProfileInstance: deps.startSandboxProfileInstance,
+      db: ctx.db,
+      startSandboxProfileInstance: ctx.startSandboxProfileInstance,
     },
     {
       preparedAutomationRun: input.preparedAutomationRun,
@@ -307,7 +307,7 @@ export async function ensureConversationDeliverySandbox(
 }
 
 export async function acquireConversationDeliveryConnection(
-  deps: Pick<
+  ctx: Pick<
     HandleAutomationConversationDeliveryDependencies,
     "getSandboxInstance" | "mintSandboxConnectionToken"
   >,
@@ -315,21 +315,21 @@ export async function acquireConversationDeliveryConnection(
 ) {
   return acquireAutomationConnection(
     {
-      getSandboxInstance: deps.getSandboxInstance,
-      mintSandboxConnectionToken: deps.mintSandboxConnectionToken,
+      getSandboxInstance: ctx.getSandboxInstance,
+      mintSandboxConnectionToken: ctx.mintSandboxConnectionToken,
     },
     input,
   );
 }
 
 export async function deliverConversationAutomationPayload(
-  deps: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
+  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
   input: DeliverAutomationConversationPayloadServiceInput & {
     taskId: string;
     generation: number;
   },
 ) {
-  const task = await deps.db.query.automationConversationDeliveryTasks.findFirst({
+  const task = await ctx.db.query.automationConversationDeliveryTasks.findFirst({
     where: (table, { eq }) => eq(table.id, input.taskId),
   });
   if (task === undefined) {
@@ -361,7 +361,7 @@ export async function deliverConversationAutomationPayload(
 
   await markAutomationConversationDeliveryTaskDelivering(
     {
-      db: deps.db,
+      db: ctx.db,
     },
     {
       taskId: input.taskId,
@@ -383,14 +383,14 @@ export async function deliverConversationAutomationPayload(
       persistedRouteId === null
         ? await createAutomationConversationRoute(
             {
-              db: deps.db,
+              db: ctx.db,
             },
             {
               conversationId: input.preparedAutomationRun.conversationId,
               sandboxInstanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
             },
           )
-        : await deps.db.query.automationConversationRoutes.findFirst({
+        : await ctx.db.query.automationConversationRoutes.findFirst({
             where: (table, { eq }) => eq(table.id, persistedRouteId),
           });
 
@@ -417,7 +417,7 @@ export async function deliverConversationAutomationPayload(
 
         route = await activateAutomationConversationRoute(
           {
-            db: deps.db,
+            db: ctx.db,
           },
           {
             conversationId: input.preparedAutomationRun.conversationId,
@@ -506,7 +506,7 @@ export async function deliverConversationAutomationPayload(
 
     await updateAutomationConversationExecution(
       {
-        db: deps.db,
+        db: ctx.db,
       },
       {
         routeId: route.id,
@@ -520,35 +520,35 @@ export async function deliverConversationAutomationPayload(
 }
 
 export async function completeConversationDeliveryAutomationRun(
-  deps: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
+  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
   input: {
     automationRunId: string;
   },
 ) {
   await markAutomationRunCompleted(
     {
-      db: deps.db,
+      db: ctx.db,
     },
     input,
   );
 }
 
 export async function ignoreAutomationConversationDeliveryAutomationRun(
-  deps: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
+  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
   input: {
     automationRunId: string;
   },
 ) {
   await markAutomationRunIgnored(
     {
-      db: deps.db,
+      db: ctx.db,
     },
     input,
   );
 }
 
 export async function failConversationDeliveryAutomationRun(
-  deps: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
+  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
   input: {
     automationRunId: string;
     failureCode: string;
@@ -557,14 +557,14 @@ export async function failConversationDeliveryAutomationRun(
 ) {
   await markAutomationRunFailed(
     {
-      db: deps.db,
+      db: ctx.db,
     },
     input,
   );
 }
 
 export async function finalizeAutomationConversationDeliveryActiveTask(
-  deps: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
+  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
   input: {
     taskId: string;
     generation: number;
@@ -575,7 +575,7 @@ export async function finalizeAutomationConversationDeliveryActiveTask(
 ) {
   await finalizeAutomationConversationDeliveryTask(
     {
-      db: deps.db,
+      db: ctx.db,
     },
     input,
   );

@@ -17,10 +17,10 @@ export type EnqueueAutomationConversationDeliveryTaskInput = {
 };
 
 export async function enqueueAutomationConversationDeliveryTask(
-  deps: AutomationConversationPersistenceDependencies,
+  ctx: AutomationConversationPersistenceDependencies,
   input: EnqueueAutomationConversationDeliveryTaskInput,
 ) {
-  const insertedRows = await deps.db
+  const insertedRows = await ctx.db
     .insert(automationConversationDeliveryTasks)
     .values({
       conversationId: input.conversationId,
@@ -38,7 +38,7 @@ export async function enqueueAutomationConversationDeliveryTask(
     return insertedTask;
   }
 
-  const existingTask = await deps.db.query.automationConversationDeliveryTasks.findFirst({
+  const existingTask = await ctx.db.query.automationConversationDeliveryTasks.findFirst({
     where: (table, { eq }) => eq(table.automationRunId, input.automationRunId),
   });
   if (existingTask === undefined) {

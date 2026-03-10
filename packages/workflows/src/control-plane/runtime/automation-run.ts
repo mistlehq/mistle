@@ -140,10 +140,10 @@ export function resolveAutomationRunFailure(input: unknown): { code: string; mes
 }
 
 export async function transitionAutomationRunToRunning(
-  deps: HandleAutomationRunDependencies,
+  ctx: HandleAutomationRunDependencies,
   input: HandleAutomationRunWorkflowInput,
 ): Promise<TransitionAutomationRunToRunningOutput> {
-  const transitionedRows = await deps.db
+  const transitionedRows = await ctx.db
     .update(automationRuns)
     .set({
       status: AutomationRunStatuses.RUNNING,
@@ -165,7 +165,7 @@ export async function transitionAutomationRunToRunning(
     };
   }
 
-  const existingRun = await deps.db.query.automationRuns.findFirst({
+  const existingRun = await ctx.db.query.automationRuns.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
   });
   if (existingRun === undefined) {
@@ -407,10 +407,10 @@ async function resolveAutomationConversationIntegrationFamilyId(
 }
 
 export async function prepareAutomationRun(
-  deps: HandleAutomationRunDependencies,
+  ctx: HandleAutomationRunDependencies,
   input: HandleAutomationRunWorkflowInput,
 ): Promise<PreparedAutomationRun> {
-  const automationRun = await deps.db.query.automationRuns.findFirst({
+  const automationRun = await ctx.db.query.automationRuns.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
   });
   if (automationRun === undefined) {
@@ -420,7 +420,7 @@ export async function prepareAutomationRun(
     });
   }
 
-  const automation = await deps.db.query.automations.findFirst({
+  const automation = await ctx.db.query.automations.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.id, automationRun.automationId),
   });
   if (automation === undefined) {
@@ -446,7 +446,7 @@ export async function prepareAutomationRun(
     });
   }
 
-  const automationTarget = await deps.db.query.automationTargets.findFirst({
+  const automationTarget = await ctx.db.query.automationTargets.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.id, automationTargetId),
   });
   if (automationTarget === undefined) {
@@ -456,7 +456,7 @@ export async function prepareAutomationRun(
     });
   }
 
-  const webhookAutomation = await deps.db.query.webhookAutomations.findFirst({
+  const webhookAutomation = await ctx.db.query.webhookAutomations.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.automationId, automationRun.automationId),
   });
   if (webhookAutomation === undefined) {
@@ -466,7 +466,7 @@ export async function prepareAutomationRun(
     });
   }
 
-  const webhookEvent = await deps.db.query.integrationWebhookEvents.findFirst({
+  const webhookEvent = await ctx.db.query.integrationWebhookEvents.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.id, sourceWebhookEventId),
   });
   if (webhookEvent === undefined) {
@@ -562,7 +562,7 @@ export async function prepareAutomationRun(
     });
   }
 
-  const claimedConversationId = await deps.db.transaction(async (tx) => {
+  const claimedConversationId = await ctx.db.transaction(async (tx) => {
     const integrationFamilyId = await resolveAutomationConversationIntegrationFamilyId(tx, {
       automationRunId: automationRun.id,
       organizationId: automation.organizationId,
@@ -624,12 +624,12 @@ export async function prepareAutomationRun(
 }
 
 export async function handoffAutomationRunDelivery(
-  deps: HandoffAutomationRunDeliveryDependencies,
+  ctx: HandoffAutomationRunDeliveryDependencies,
   input: HandoffAutomationRunDeliveryInput,
 ): Promise<void> {
   const enqueuedTask = await enqueueAutomationConversationDeliveryTask(
     {
-      db: deps.db,
+      db: ctx.db,
     },
     {
       conversationId: input.preparedAutomationRun.conversationId,
@@ -641,7 +641,7 @@ export async function handoffAutomationRunDelivery(
 
   const ensuredProcessor = await ensureAutomationConversationDeliveryProcessor(
     {
-      db: deps.db,
+      db: ctx.db,
     },
     {
       conversationId: enqueuedTask.conversationId,
@@ -652,14 +652,14 @@ export async function handoffAutomationRunDelivery(
   }
 
   try {
-    await deps.enqueueConversationDeliveryWorkflow({
+    await ctx.enqueueConversationDeliveryWorkflow({
       conversationId: ensuredProcessor.conversationId,
       generation: ensuredProcessor.generation,
     });
   } catch (error) {
     await setAutomationConversationDeliveryProcessorIdle(
       {
-        db: deps.db,
+        db: ctx.db,
       },
       {
         conversationId: ensuredProcessor.conversationId,
@@ -677,12 +677,12 @@ export async function handoffAutomationRunDelivery(
 }
 
 export async function ensureAutomationSandbox(
-  deps: EnsureAutomationSandboxDependencies,
+  ctx: EnsureAutomationSandboxDependencies,
   input: {
     preparedAutomationRun: PreparedAutomationRun;
   },
 ): Promise<EnsuredAutomationSandbox> {
-  const automationRun = await deps.db.query.automationRuns.findFirst({
+  const automationRun = await ctx.db.query.automationRuns.findFirst({
     where: (table, { eq: whereEq }) =>
       whereEq(table.id, input.preparedAutomationRun.automationRunId),
   });
@@ -700,7 +700,7 @@ export async function ensureAutomationSandbox(
     });
   }
 
-  const startedSandbox = await deps.startSandboxProfileInstance({
+  const startedSandbox = await ctx.startSandboxProfileInstance({
     organizationId: input.preparedAutomationRun.organizationId,
     profileId: input.preparedAutomationRun.sandboxProfileId,
     profileVersion: input.preparedAutomationRun.sandboxProfileVersion,
@@ -718,7 +718,7 @@ export async function ensureAutomationSandbox(
 }
 
 export async function acquireAutomationConnection(
-  deps: AcquireAutomationConnectionDependencies,
+  ctx: AcquireAutomationConnectionDependencies,
   input: {
     preparedAutomationRun: PreparedAutomationRun;
     ensuredAutomationSandbox: EnsuredAutomationSandbox;
@@ -734,7 +734,7 @@ export async function acquireAutomationConnection(
   const deadline = Date.now() + SandboxStartTimeoutMs;
   let isSandboxRunning = false;
   while (Date.now() < deadline) {
-    const sandboxInstance = await deps.getSandboxInstance({
+    const sandboxInstance = await ctx.getSandboxInstance({
       organizationId: input.preparedAutomationRun.organizationId,
       instanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
     });
@@ -763,7 +763,7 @@ export async function acquireAutomationConnection(
     });
   }
 
-  const connection = await deps.mintSandboxConnectionToken({
+  const connection = await ctx.mintSandboxConnectionToken({
     organizationId: input.preparedAutomationRun.organizationId,
     instanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
   });
@@ -777,10 +777,10 @@ export async function acquireAutomationConnection(
 }
 
 export async function markAutomationRunCompleted(
-  deps: HandleAutomationRunDependencies,
+  ctx: HandleAutomationRunDependencies,
   input: HandleAutomationRunWorkflowInput,
 ): Promise<void> {
-  const updatedRows = await deps.db
+  const updatedRows = await ctx.db
     .update(automationRuns)
     .set({
       status: AutomationRunStatuses.COMPLETED,
@@ -802,7 +802,7 @@ export async function markAutomationRunCompleted(
     return;
   }
 
-  const existingRun = await deps.db.query.automationRuns.findFirst({
+  const existingRun = await ctx.db.query.automationRuns.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
   });
   if (existingRun === undefined) {
@@ -823,10 +823,10 @@ export async function markAutomationRunCompleted(
 }
 
 export async function markAutomationRunFailed(
-  deps: HandleAutomationRunDependencies,
+  ctx: HandleAutomationRunDependencies,
   input: MarkAutomationRunFailedInput,
 ): Promise<void> {
-  const updatedRows = await deps.db
+  const updatedRows = await ctx.db
     .update(automationRuns)
     .set({
       status: AutomationRunStatuses.FAILED,
@@ -848,7 +848,7 @@ export async function markAutomationRunFailed(
     return;
   }
 
-  const existingRun = await deps.db.query.automationRuns.findFirst({
+  const existingRun = await ctx.db.query.automationRuns.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
   });
   if (existingRun === undefined) {
@@ -873,10 +873,10 @@ export async function markAutomationRunFailed(
 }
 
 export async function markAutomationRunIgnored(
-  deps: HandleAutomationRunDependencies,
+  ctx: HandleAutomationRunDependencies,
   input: MarkAutomationRunIgnoredInput,
 ): Promise<void> {
-  const updatedRows = await deps.db
+  const updatedRows = await ctx.db
     .update(automationRuns)
     .set({
       status: AutomationRunStatuses.IGNORED,
@@ -898,7 +898,7 @@ export async function markAutomationRunIgnored(
     return;
   }
 
-  const existingRun = await deps.db.query.automationRuns.findFirst({
+  const existingRun = await ctx.db.query.automationRuns.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
   });
   if (existingRun === undefined) {

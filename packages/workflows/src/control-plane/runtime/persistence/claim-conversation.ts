@@ -29,7 +29,7 @@ export type ClaimAutomationConversationInput = {
 };
 
 export async function claimAutomationConversation(
-  deps: AutomationConversationPersistenceDependencies,
+  ctx: AutomationConversationPersistenceDependencies,
   input: ClaimAutomationConversationInput,
 ) {
   if (input.title !== undefined && input.title !== null) {
@@ -80,7 +80,7 @@ export async function claimAutomationConversation(
     status: AutomationConversationStatuses.PENDING,
   };
 
-  const insertedRows = await deps.db
+  const insertedRows = await ctx.db
     .insert(automationConversations)
     .values(insertValues)
     .onConflictDoNothing({
@@ -97,7 +97,7 @@ export async function claimAutomationConversation(
     return insertedAutomationConversation;
   }
 
-  const existingAutomationConversation = await deps.db.query.automationConversations.findFirst({
+  const existingAutomationConversation = await ctx.db.query.automationConversations.findFirst({
     where: (table, { and, eq }) =>
       and(
         eq(table.organizationId, input.organizationId),
