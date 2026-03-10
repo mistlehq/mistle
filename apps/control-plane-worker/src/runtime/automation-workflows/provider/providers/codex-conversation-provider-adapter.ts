@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 import WebSocket, { type RawData } from "ws";
 
-import { connectSandboxAgentConnection } from "../../automation-workflows/transport/sandbox-agent-connection.js";
+import { connectSandboxAgentConnection } from "../../transport/sandbox-agent-connection.js";
 import type {
   ConversationProviderAdapter,
   ProviderConnection,

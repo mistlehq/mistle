@@ -1,11 +1,11 @@
 import type {
   ProviderInspectConversationOutput,
   ConversationProviderAdapter,
-} from "../../automation-conversations/provider-adapter.js";
+} from "../provider/provider-adapter.js";
 import {
   type ConversationProviderErrorCode,
   ConversationProviderErrorCodes,
-} from "../../automation-conversations/provider-errors.js";
+} from "../provider/provider-errors.js";
 
 export const AutomationConversationDeliverySandboxActions = {
   REUSE_EXISTING: "reuse_existing",

@@ -8,7 +8,6 @@ import {
   type ResolvedAutomationConversationDeliveryRoute,
 } from "@mistle/workflows/control-plane";
 
-import { getConversationProviderAdapter } from "../../automation-conversations/provider-adapter.js";
 import type {
   DeliverAutomationConversationPayloadServiceInput,
   EnsureAutomationConversationDeliverySandboxServiceInput,
@@ -38,6 +37,7 @@ import {
   resolveAutomationConversationRouteBindingAction,
   resolveAutomationConversationSteerRecoveryAction,
 } from "../planning/automation-conversation-delivery.js";
+import { getConversationProviderAdapter } from "../provider/provider-adapter.js";
 import {
   acquireAutomationConnection,
   ensureAutomationSandbox,
