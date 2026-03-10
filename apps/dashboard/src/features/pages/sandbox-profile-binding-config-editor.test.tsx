@@ -69,10 +69,18 @@ describe("SandboxProfileBindingConfigEditor", () => {
     expect(screen.getByText("Additional instructions")).toBeDefined();
     expect(screen.getByLabelText("Default model")).toBeDefined();
     expect(screen.getByLabelText("Reasoning effort")).toBeDefined();
-    expect(screen.getByLabelText("Additional instructions")).toBeDefined();
+    const additionalInstructionsField = screen
+      .getAllByRole("textbox", {
+        name: "Additional instructions",
+      })
+      .find((field) => field instanceof HTMLTextAreaElement);
+    if (additionalInstructionsField === undefined) {
+      throw new Error("Expected Additional instructions textarea.");
+    }
+
     expect(container.querySelectorAll('[data-slot="select-trigger"]').length).toBe(2);
     expect(screen.getAllByText("*").length).toBe(2);
-    expect(container.querySelector("textarea")).not.toBeNull();
+    expect(container.querySelector("textarea")).toBe(additionalInstructionsField);
   });
 
   it("removes additional instructions from config when the textarea is cleared", () => {

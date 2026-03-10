@@ -153,6 +153,17 @@ describe("sandbox profile version put integration bindings integration", () => {
       additionalInstructions: "Prefer concise answers.",
     });
 
+    const persistedUpdatedBinding =
+      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+        where: (table, { eq }) => eq(table.id, "ibd_put_bindings_route_existing_001"),
+      });
+    expect(persistedUpdatedBinding?.config).toEqual({
+      runtime: "codex-cli",
+      defaultModel: "gpt-5.2",
+      reasoningEffort: "medium",
+      additionalInstructions: "Prefer concise answers.",
+    });
+
     const deletedBinding =
       await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
         where: (table, { eq }) => eq(table.id, "ibd_put_bindings_route_existing_002"),

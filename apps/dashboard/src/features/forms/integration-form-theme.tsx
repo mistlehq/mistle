@@ -162,18 +162,19 @@ function TextareaWidget(
   return (
     <Textarea
       aria-label={props.label}
+      autoFocus={props.autofocus}
       className="min-h-28 w-full resize-y"
       disabled={props.disabled || props.readonly}
       id={props.id}
-      onBlur={() => {
-        props.onBlur(props.id, value);
+      onBlur={(event) => {
+        props.onBlur(props.id, event.currentTarget.value);
       }}
       onChange={(event) => {
         const nextValue = event.currentTarget.value;
         props.onChange(nextValue.trim().length === 0 ? undefined : nextValue);
       }}
-      onFocus={() => {
-        props.onFocus(props.id, value);
+      onFocus={(event) => {
+        props.onFocus(props.id, event.currentTarget.value);
       }}
       placeholder={placeholder}
       rows={rows}
