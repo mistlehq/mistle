@@ -13,16 +13,6 @@ import { systemSleeper } from "@mistle/time";
 import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
-import {
-  claimAutomationConversation,
-  enqueueAutomationConversationDeliveryTask,
-  ensureAutomationConversationDeliveryProcessor,
-  setAutomationConversationDeliveryProcessorIdle,
-} from "../automation-conversations/index.js";
-import {
-  connectSandboxAgentConnection,
-  sendSandboxAgentMessage,
-} from "./sandbox-agent-connection.js";
 import type {
   HandoffAutomationRunDeliveryServiceInput,
   AcquireAutomationConnectionServiceOutput,
@@ -31,7 +21,17 @@ import type {
   EnsureAutomationSandboxServiceOutput,
   EnsureAutomationSandboxServiceInput,
   PrepareAutomationRunServiceOutput,
-} from "./types.js";
+} from "../../services/types.js";
+import {
+  claimAutomationConversation,
+  enqueueAutomationConversationDeliveryTask,
+  ensureAutomationConversationDeliveryProcessor,
+  setAutomationConversationDeliveryProcessorIdle,
+} from "../persistence/index.js";
+import {
+  connectSandboxAgentConnection,
+  sendSandboxAgentMessage,
+} from "../transport/sandbox-agent-connection.js";
 
 export type HandleAutomationRunDependencies = {
   db: ControlPlaneDatabase;

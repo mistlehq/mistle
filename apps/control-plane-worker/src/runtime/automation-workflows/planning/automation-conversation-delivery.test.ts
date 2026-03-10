@@ -10,7 +10,7 @@ import {
   resolveAutomationConversationExecutionAction,
   resolveAutomationConversationRouteBindingAction,
   resolveAutomationConversationSteerRecoveryAction,
-} from "./automation-conversation-delivery-plans.js";
+} from "./automation-conversation-delivery.js";
 
 describe("conversation delivery plans", () => {
   describe("resolveAutomationConversationDeliverySandboxAction", () => {

@@ -38,7 +38,7 @@ import {
   prepareAutomationRun,
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
-} from "../src/runtime/services/handle-automation-run.js";
+} from "../src/runtime/automation-workflows/workflows/automation-run-execution.js";
 import { handleIntegrationWebhookEvent } from "../src/runtime/services/handle-integration-webhook-event.js";
 import { it } from "./test-context.js";
 

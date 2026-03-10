@@ -8,6 +8,10 @@ import {
   type ResolvedAutomationConversationDeliveryRoute,
 } from "@mistle/workflows/control-plane";
 
+import type {
+  DeliverAutomationConversationPayloadServiceInput,
+  EnsureAutomationConversationDeliverySandboxServiceInput,
+} from "../../services/types.js";
 import {
   activateAutomationConversationRoute,
   AutomationConversationDeliveryTaskActions,
@@ -17,12 +21,11 @@ import {
   createAutomationConversationRoute,
   finalizeAutomationConversationDeliveryTask,
   findActiveAutomationConversationDeliveryTask,
-  getConversationProviderAdapter,
   idleAutomationConversationDeliveryProcessorIfEmpty,
   markAutomationConversationDeliveryTaskDelivering,
   resolveAutomationConversationDeliveryTaskAction,
   updateAutomationConversationExecution,
-} from "../automation-conversations/index.js";
+} from "../persistence/index.js";
 import {
   AutomationConversationRouteBindingActions,
   AutomationConversationDeliverySandboxActions,
@@ -33,7 +36,8 @@ import {
   resolveAutomationConversationExecutionAction,
   resolveAutomationConversationRouteBindingAction,
   resolveAutomationConversationSteerRecoveryAction,
-} from "./automation-conversation-delivery-plans.js";
+} from "../planning/automation-conversation-delivery.js";
+import { getConversationProviderAdapter } from "../provider/provider-adapter.js";
 import {
   acquireAutomationConnection,
   ensureAutomationSandbox,
@@ -44,11 +48,7 @@ import {
   resolveAutomationRunFailure,
   type AcquireAutomationConnectionDependencies,
   type EnsureAutomationSandboxDependencies,
-} from "./handle-automation-run.js";
-import type {
-  DeliverAutomationConversationPayloadServiceInput,
-  EnsureAutomationConversationDeliverySandboxServiceInput,
-} from "./types.js";
+} from "./automation-run-execution.js";
 
 export type HandleAutomationConversationDeliveryDependencies = {
   db: ControlPlaneDatabase;

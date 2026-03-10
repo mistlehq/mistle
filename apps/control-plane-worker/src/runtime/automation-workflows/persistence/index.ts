@@ -50,27 +50,6 @@ export {
   type FinalizeAutomationConversationDeliveryTaskInput,
 } from "./finalize-conversation-delivery-task.js";
 export {
-  ConversationProviderError,
-  ConversationProviderErrorCodes,
-  type ConversationProviderErrorCode,
-} from "./provider-errors.js";
-export {
-  getConversationProviderAdapter,
-  type ConversationProviderAdapter,
-  type ProviderConnection,
-  type ProviderConnectInput,
-  type ProviderCreateConversationInput,
-  type ProviderCreateConversationOutput,
-  type ProviderInspectConversationInput,
-  type ProviderInspectConversationOutput,
-  type ProviderInterruptExecutionInput,
-  type ProviderResumeConversationInput,
-  type ProviderStartExecutionInput,
-  type ProviderStartExecutionOutput,
-  type ProviderSteerExecutionInput,
-  type ProviderSteerExecutionOutput,
-} from "./provider-adapter.js";
-export {
   rebindAutomationConversationSandbox,
   type RebindAutomationConversationSandboxInput,
 } from "./rebind-conversation-sandbox.js";

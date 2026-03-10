@@ -2,7 +2,12 @@ import type { EmailSender } from "@mistle/emails";
 import type { OpenWorkflow, Worker } from "openworkflow";
 
 import {
-  createHandleAutomationConversationDeliveryWorkflow,
+  registerControlPlaneAuthWorkflows,
+  registerControlPlaneAutomationWorkflows,
+  registerControlPlaneIntegrationWorkflows,
+  registerControlPlaneSandboxWorkflows,
+} from "./register/index.js";
+import {
   type ActiveAutomationConversationDeliveryTask,
   type AcquiredAutomationConnection,
   type AutomationConversationDeliveryTaskAction,
@@ -11,26 +16,19 @@ import {
   type HandleAutomationConversationDeliveryWorkflowInput,
   type ResolvedAutomationConversationDeliveryRoute,
 } from "./workflows/handle-automation-conversation-delivery/index.js";
-import { createHandleAutomationRunWorkflow } from "./workflows/handle-automation-run/index.js";
 import type {
   HandoffAutomationRunDeliveryInput,
   HandleAutomationRunWorkflowInput,
   PreparedAutomationRun,
 } from "./workflows/handle-automation-run/index.js";
-import { createHandleIntegrationWebhookEventWorkflow } from "./workflows/handle-integration-webhook-event/index.js";
 import type {
   HandleIntegrationWebhookEventWorkflowInput,
   HandleIntegrationWebhookEventWorkflowOutput,
 } from "./workflows/handle-integration-webhook-event/index.js";
-import { createRequestDeleteSandboxProfileWorkflow } from "./workflows/request-delete-sandbox-profile/index.js";
-import { createSendOrganizationInvitationWorkflow } from "./workflows/send-organization-invitation/index.js";
-import { createSendVerificationOTPWorkflow } from "./workflows/send-verification-otp/index.js";
-import { createStartSandboxProfileInstanceWorkflow } from "./workflows/start-sandbox-profile-instance/index.js";
 import type {
   StartSandboxProfileInstanceWorkflowInput,
   StartSandboxProfileInstanceWorkflowOutput,
 } from "./workflows/start-sandbox-profile-instance/index.js";
-import { createSyncIntegrationConnectionResourcesWorkflow } from "./workflows/sync-integration-connection-resources/index.js";
 import type {
   SyncIntegrationConnectionResourcesWorkflowInput,
   SyncIntegrationConnectionResourcesWorkflowOutput,
@@ -158,141 +156,41 @@ function assertNever(value: never): never {
  */
 export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): Worker {
   for (const workflowId of input.enabledWorkflows) {
-    if (workflowId === ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_RUN) {
-      if (input.services.automationRuns === undefined) {
-        throw new Error(
-          "Control-plane automation runs service is required for handleAutomationRun workflow.",
-        );
-      }
-      const workflow = createHandleAutomationRunWorkflow({
-        transitionAutomationRunToRunning:
-          input.services.automationRuns.transitionAutomationRunToRunning,
-        prepareAutomationRun: input.services.automationRuns.prepareAutomationRun,
-        handoffAutomationRunDelivery: input.services.automationRuns.handoffAutomationRunDelivery,
-        markAutomationRunFailed: input.services.automationRuns.markAutomationRunFailed,
-        resolveAutomationRunFailure: input.services.automationRuns.resolveAutomationRunFailure,
-      });
-      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
-      continue;
-    }
-
-    if (workflowId === ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_CONVERSATION_DELIVERY) {
-      if (input.services.automationConversationDelivery === undefined) {
-        throw new Error(
-          "Control-plane automation conversation delivery service is required for handleAutomationConversationDelivery workflow.",
-        );
-      }
-      const workflow = createHandleAutomationConversationDeliveryWorkflow({
-        claimOrResumeAutomationConversationDeliveryTask:
-          input.services.automationConversationDelivery
-            .claimOrResumeAutomationConversationDeliveryTask,
-        resolveAutomationConversationDeliveryTaskAction:
-          input.services.automationConversationDelivery
-            .resolveAutomationConversationDeliveryTaskAction,
-        idleAutomationConversationDeliveryProcessorIfEmpty:
-          input.services.automationConversationDelivery
-            .idleAutomationConversationDeliveryProcessorIfEmpty,
-        prepareAutomationRun: input.services.automationConversationDelivery.prepareAutomationRun,
-        resolveAutomationConversationDeliveryRoute:
-          input.services.automationConversationDelivery.resolveAutomationConversationDeliveryRoute,
-        ensureAutomationSandbox:
-          input.services.automationConversationDelivery.ensureAutomationSandbox,
-        acquireAutomationConnection:
-          input.services.automationConversationDelivery.acquireAutomationConnection,
-        deliverAutomationPayload:
-          input.services.automationConversationDelivery.deliverAutomationPayload,
-        markAutomationRunCompleted:
-          input.services.automationConversationDelivery.markAutomationRunCompleted,
-        markAutomationRunIgnored:
-          input.services.automationConversationDelivery.markAutomationRunIgnored,
-        markAutomationRunFailed:
-          input.services.automationConversationDelivery.markAutomationRunFailed,
-        finalizeAutomationConversationDeliveryTask:
-          input.services.automationConversationDelivery.finalizeAutomationConversationDeliveryTask,
-        resolveAutomationRunFailure:
-          input.services.automationConversationDelivery.resolveAutomationRunFailure,
-      });
-      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
-      continue;
-    }
-
-    if (workflowId === ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT) {
-      if (input.services.integrationWebhooks === undefined) {
-        throw new Error(
-          "Control-plane integration webhooks service is required for handleIntegrationWebhookEvent workflow.",
-        );
-      }
-      const workflow = createHandleIntegrationWebhookEventWorkflow({
-        handleWebhookEvent: input.services.integrationWebhooks.handleWebhookEvent,
-      });
-      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
-      continue;
-    }
-
-    if (workflowId === ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION) {
-      if (input.services.emailDelivery === undefined) {
-        throw new Error(
-          "Control-plane email delivery service is required for sendOrganizationInvitation workflow.",
-        );
-      }
-      const workflow = createSendOrganizationInvitationWorkflow(input.services.emailDelivery);
-      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
-      continue;
-    }
-
-    if (workflowId === ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP) {
-      if (input.services.emailDelivery === undefined) {
-        throw new Error(
-          "Control-plane email delivery service is required for sendVerificationOTP workflow.",
-        );
-      }
-      const workflow = createSendVerificationOTPWorkflow(input.services.emailDelivery);
-      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
-      continue;
-    }
-
-    if (workflowId === ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE) {
-      if (input.services.sandboxProfiles === undefined) {
-        throw new Error(
-          "Control-plane sandbox profiles service is required for requestDeleteSandboxProfile workflow.",
-        );
-      }
-      const workflow = createRequestDeleteSandboxProfileWorkflow({
-        deleteSandboxProfile: input.services.sandboxProfiles.deleteSandboxProfile,
-      });
-      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
-      continue;
-    }
-
-    if (workflowId === ControlPlaneWorkerWorkflowIds.START_SANDBOX_PROFILE_INSTANCE) {
-      if (input.services.sandboxInstances === undefined) {
-        throw new Error(
-          "Control-plane sandbox instances service is required for startSandboxProfileInstance workflow.",
-        );
-      }
-      const workflow = createStartSandboxProfileInstanceWorkflow({
-        startSandboxInstance: input.services.sandboxInstances.startSandboxProfileInstance,
-      });
-      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
-      continue;
-    }
-
-    if (workflowId === ControlPlaneWorkerWorkflowIds.SYNC_INTEGRATION_CONNECTION_RESOURCES) {
-      if (input.services.integrationConnectionResources === undefined) {
-        throw new Error(
-          "Control-plane integration connection resources service is required for syncIntegrationConnectionResources workflow.",
-        );
-      }
-      const workflow = createSyncIntegrationConnectionResourcesWorkflow({
-        syncIntegrationConnectionResources:
-          input.services.integrationConnectionResources.syncIntegrationConnectionResources,
-      });
-      input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
-      continue;
+    switch (workflowId) {
+      case ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_RUN:
+      case ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_CONVERSATION_DELIVERY:
+      case ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT:
+      case ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION:
+      case ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP:
+      case ControlPlaneWorkerWorkflowIds.REQUEST_DELETE_SANDBOX_PROFILE:
+      case ControlPlaneWorkerWorkflowIds.START_SANDBOX_PROFILE_INSTANCE:
+      case ControlPlaneWorkerWorkflowIds.SYNC_INTEGRATION_CONNECTION_RESOURCES:
+        continue;
     }
 
     return assertNever(workflowId);
   }
+
+  registerControlPlaneAuthWorkflows({
+    openWorkflow: input.openWorkflow,
+    enabledWorkflows: input.enabledWorkflows,
+    services: input.services,
+  });
+  registerControlPlaneAutomationWorkflows({
+    openWorkflow: input.openWorkflow,
+    enabledWorkflows: input.enabledWorkflows,
+    services: input.services,
+  });
+  registerControlPlaneIntegrationWorkflows({
+    openWorkflow: input.openWorkflow,
+    enabledWorkflows: input.enabledWorkflows,
+    services: input.services,
+  });
+  registerControlPlaneSandboxWorkflows({
+    openWorkflow: input.openWorkflow,
+    enabledWorkflows: input.enabledWorkflows,
+    services: input.services,
+  });
 
   return input.openWorkflow.newWorker({
     concurrency: input.maxConcurrentWorkflows,
