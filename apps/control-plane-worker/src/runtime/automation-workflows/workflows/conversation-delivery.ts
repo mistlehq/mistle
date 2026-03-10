@@ -3,58 +3,30 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import {
-  ActiveAutomationConversationDeliveryTaskStatuses,
-  type HandleAutomationConversationDeliveryWorkflowInput,
-  type ResolvedAutomationConversationDeliveryRoute,
-} from "@mistle/workflows/control-plane";
-import {
-  acquireAutomationConnection,
-  ensureAutomationSandbox,
-  markAutomationRunCompleted,
-  markAutomationRunIgnored,
-  markAutomationRunFailed,
-  prepareAutomationRun,
-  resolveAutomationRunFailure,
-  type AcquireAutomationConnectionDependencies,
-  type EnsureAutomationSandboxDependencies,
+  AutomationConversationRouteBindingActions,
+  resolveAutomationConversationRouteBindingAction,
 } from "@mistle/workflows/control-plane/runtime";
 
-import type {
-  DeliverAutomationConversationPayloadServiceInput,
-  EnsureAutomationConversationDeliverySandboxServiceInput,
-} from "../../services/types.js";
+import type { DeliverAutomationConversationPayloadServiceInput } from "../../services/types.js";
 import {
   activateAutomationConversationRoute,
-  AutomationConversationDeliveryTaskActions,
-  claimNextAutomationConversationDeliveryTask,
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
   createAutomationConversationRoute,
-  finalizeAutomationConversationDeliveryTask,
-  findActiveAutomationConversationDeliveryTask,
-  idleAutomationConversationDeliveryProcessorIfEmpty,
   markAutomationConversationDeliveryTaskDelivering,
-  resolveAutomationConversationDeliveryTaskAction,
   updateAutomationConversationExecution,
 } from "../persistence/index.js";
 import {
-  AutomationConversationRouteBindingActions,
-  AutomationConversationDeliverySandboxActions,
   AutomationConversationExecutionActions,
   AutomationConversationSteerRecoveryActions,
   isRecoverableLateSteerError,
-  resolveAutomationConversationDeliverySandboxAction,
   resolveAutomationConversationExecutionAction,
-  resolveAutomationConversationRouteBindingAction,
   resolveAutomationConversationSteerRecoveryAction,
 } from "../planning/automation-conversation-delivery.js";
 import { getConversationProviderAdapter } from "../provider/provider-adapter.js";
 
-export type HandleAutomationConversationDeliveryDependencies = {
+export type DeliverConversationAutomationPayloadDependencies = {
   db: ControlPlaneDatabase;
-  startSandboxProfileInstance: EnsureAutomationSandboxDependencies["startSandboxProfileInstance"];
-  getSandboxInstance: AcquireAutomationConnectionDependencies["getSandboxInstance"];
-  mintSandboxConnectionToken: AcquireAutomationConnectionDependencies["mintSandboxConnectionToken"];
 };
 
 class ConversationDeliveryExecutionError extends Error {}
@@ -133,197 +105,8 @@ async function recoverLateSteerExecution(input: {
   }
 }
 
-export type ClaimOrResumeAutomationConversationDeliveryTaskInput =
-  HandleAutomationConversationDeliveryWorkflowInput;
-
-export async function claimOrResumeAutomationConversationDeliveryTask(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: ClaimOrResumeAutomationConversationDeliveryTaskInput,
-) {
-  const activeTask = await findActiveAutomationConversationDeliveryTask(
-    {
-      db: ctx.db,
-    },
-    {
-      conversationId: input.conversationId,
-      generation: input.generation,
-    },
-  );
-  if (activeTask !== undefined) {
-    if (activeTask.status === AutomationConversationDeliveryTaskStatuses.CLAIMED) {
-      return {
-        taskId: activeTask.id,
-        automationRunId: activeTask.automationRunId,
-        status: ActiveAutomationConversationDeliveryTaskStatuses.CLAIMED,
-      };
-    }
-
-    if (activeTask.status === AutomationConversationDeliveryTaskStatuses.DELIVERING) {
-      return {
-        taskId: activeTask.id,
-        automationRunId: activeTask.automationRunId,
-        status: ActiveAutomationConversationDeliveryTaskStatuses.DELIVERING,
-      };
-    }
-
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_DELIVERY_TASK_NOT_ACTIVE,
-      message: `AutomationConversation delivery task '${activeTask.id}' is in unexpected active status '${activeTask.status}'.`,
-    });
-  }
-
-  const claimedTask = await claimNextAutomationConversationDeliveryTask(
-    {
-      db: ctx.db,
-    },
-    {
-      conversationId: input.conversationId,
-      generation: input.generation,
-    },
-  );
-  if (claimedTask === null) {
-    return null;
-  }
-
-  return {
-    taskId: claimedTask.id,
-    automationRunId: claimedTask.automationRunId,
-    status: ActiveAutomationConversationDeliveryTaskStatuses.CLAIMED,
-  };
-}
-
-export async function idleAutomationConversationDeliveryProcessor(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: HandleAutomationConversationDeliveryWorkflowInput,
-) {
-  return idleAutomationConversationDeliveryProcessorIfEmpty(
-    {
-      db: ctx.db,
-    },
-    input,
-  );
-}
-
-export async function resolveAutomationConversationDeliveryActiveTaskAction(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: {
-    taskId: string;
-    generation: number;
-  },
-) {
-  return resolveAutomationConversationDeliveryTaskAction(
-    {
-      db: ctx.db,
-    },
-    input,
-  );
-}
-
-export async function prepareConversationDeliveryAutomationRun(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: { automationRunId: string },
-) {
-  return prepareAutomationRun(
-    {
-      db: ctx.db,
-    },
-    {
-      automationRunId: input.automationRunId,
-    },
-  );
-}
-
-export async function resolveAutomationConversationDeliveryRoute(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: {
-    conversationId: string;
-  },
-): Promise<ResolvedAutomationConversationDeliveryRoute> {
-  const conversation = await ctx.db.query.automationConversations.findFirst({
-    where: (table, { eq }) => eq(table.id, input.conversationId),
-  });
-  if (conversation === undefined) {
-    throw new AutomationConversationPersistenceError({
-      code: AutomationConversationPersistenceErrorCodes.CONVERSATION_NOT_FOUND,
-      message: `AutomationConversation '${input.conversationId}' was not found.`,
-    });
-  }
-
-  const route = await ctx.db.query.automationConversationRoutes.findFirst({
-    where: (table, { eq }) => eq(table.conversationId, input.conversationId),
-  });
-
-  return {
-    conversationId: conversation.id,
-    integrationFamilyId: conversation.integrationFamilyId,
-    routeId: route?.id ?? null,
-    sandboxInstanceId: route?.sandboxInstanceId ?? null,
-    providerConversationId: route?.providerConversationId ?? null,
-    providerExecutionId: route?.providerExecutionId ?? null,
-    providerState: route?.providerState ?? null,
-  };
-}
-
-export async function ensureConversationDeliverySandbox(
-  ctx: Pick<
-    HandleAutomationConversationDeliveryDependencies,
-    "db" | "getSandboxInstance" | "startSandboxProfileInstance"
-  >,
-  input: EnsureAutomationConversationDeliverySandboxServiceInput,
-) {
-  if (input.resolvedAutomationConversationRoute.sandboxInstanceId !== null) {
-    const existingSandbox = await ctx.getSandboxInstance({
-      organizationId: input.preparedAutomationRun.organizationId,
-      instanceId: input.resolvedAutomationConversationRoute.sandboxInstanceId,
-    });
-
-    const sandboxAction = resolveAutomationConversationDeliverySandboxAction({
-      sandboxInstanceId: input.resolvedAutomationConversationRoute.sandboxInstanceId,
-      sandboxStatus: existingSandbox.status,
-    });
-
-    if (sandboxAction === AutomationConversationDeliverySandboxActions.REUSE_EXISTING) {
-      return {
-        sandboxInstanceId: existingSandbox.id,
-        startupWorkflowRunId: null,
-      };
-    }
-    if (sandboxAction === AutomationConversationDeliverySandboxActions.FAIL) {
-      throw new ConversationDeliveryExecutionError(
-        `AutomationConversation '${input.preparedAutomationRun.conversationId}' is bound to sandbox '${input.resolvedAutomationConversationRoute.sandboxInstanceId}', but that sandbox is '${existingSandbox.status}'.`,
-      );
-    }
-  }
-
-  return ensureAutomationSandbox(
-    {
-      db: ctx.db,
-      startSandboxProfileInstance: ctx.startSandboxProfileInstance,
-    },
-    {
-      preparedAutomationRun: input.preparedAutomationRun,
-    },
-  );
-}
-
-export async function acquireConversationDeliveryConnection(
-  ctx: Pick<
-    HandleAutomationConversationDeliveryDependencies,
-    "getSandboxInstance" | "mintSandboxConnectionToken"
-  >,
-  input: Parameters<typeof acquireAutomationConnection>[1],
-) {
-  return acquireAutomationConnection(
-    {
-      getSandboxInstance: ctx.getSandboxInstance,
-      mintSandboxConnectionToken: ctx.mintSandboxConnectionToken,
-    },
-    input,
-  );
-}
-
 export async function deliverConversationAutomationPayload(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
+  ctx: DeliverConversationAutomationPayloadDependencies,
   input: DeliverAutomationConversationPayloadServiceInput & {
     taskId: string;
     generation: number;
@@ -518,68 +301,3 @@ export async function deliverConversationAutomationPayload(
     await connection.close();
   }
 }
-
-export async function completeConversationDeliveryAutomationRun(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: {
-    automationRunId: string;
-  },
-) {
-  await markAutomationRunCompleted(
-    {
-      db: ctx.db,
-    },
-    input,
-  );
-}
-
-export async function ignoreAutomationConversationDeliveryAutomationRun(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: {
-    automationRunId: string;
-  },
-) {
-  await markAutomationRunIgnored(
-    {
-      db: ctx.db,
-    },
-    input,
-  );
-}
-
-export async function failConversationDeliveryAutomationRun(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: {
-    automationRunId: string;
-    failureCode: string;
-    failureMessage: string;
-  },
-) {
-  await markAutomationRunFailed(
-    {
-      db: ctx.db,
-    },
-    input,
-  );
-}
-
-export async function finalizeAutomationConversationDeliveryActiveTask(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: {
-    taskId: string;
-    generation: number;
-    status: "completed" | "failed" | "ignored";
-    failureCode?: string | null;
-    failureMessage?: string | null;
-  },
-) {
-  await finalizeAutomationConversationDeliveryTask(
-    {
-      db: ctx.db,
-    },
-    input,
-  );
-}
-
-export { resolveAutomationRunFailure };
-export { AutomationConversationDeliveryTaskActions };

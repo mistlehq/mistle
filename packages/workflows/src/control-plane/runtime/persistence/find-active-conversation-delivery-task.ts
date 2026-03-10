@@ -8,10 +8,10 @@ export type FindActiveAutomationConversationDeliveryTaskInput = {
 };
 
 export async function findActiveAutomationConversationDeliveryTask(
-  deps: AutomationConversationPersistenceDependencies,
+  ctx: AutomationConversationPersistenceDependencies,
   input: FindActiveAutomationConversationDeliveryTaskInput,
 ) {
-  return deps.db.query.automationConversationDeliveryTasks.findFirst({
+  return ctx.db.query.automationConversationDeliveryTasks.findFirst({
     where: (table, { and: whereAnd, eq: whereEq, or: whereOr }) =>
       whereAnd(
         whereEq(table.conversationId, input.conversationId),

@@ -28,7 +28,7 @@ export type FinalizeAutomationConversationDeliveryTaskInput = {
 };
 
 export async function finalizeAutomationConversationDeliveryTask(
-  deps: AutomationConversationPersistenceDependencies,
+  ctx: AutomationConversationPersistenceDependencies,
   input: FinalizeAutomationConversationDeliveryTaskInput,
 ) {
   if (!FinalAutomationConversationDeliveryTaskStatuses.has(input.status)) {
@@ -38,7 +38,7 @@ export async function finalizeAutomationConversationDeliveryTask(
     });
   }
 
-  return deps.db.transaction(async (tx) => {
+  return ctx.db.transaction(async (tx) => {
     const updatedRows = await tx
       .update(automationConversationDeliveryTasks)
       .set({
