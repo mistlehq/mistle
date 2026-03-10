@@ -7,6 +7,17 @@ import {
   type HandleAutomationConversationDeliveryWorkflowInput,
   type ResolvedAutomationConversationDeliveryRoute,
 } from "@mistle/workflows/control-plane";
+import {
+  acquireAutomationConnection,
+  ensureAutomationSandbox,
+  markAutomationRunCompleted,
+  markAutomationRunIgnored,
+  markAutomationRunFailed,
+  prepareAutomationRun,
+  resolveAutomationRunFailure,
+  type AcquireAutomationConnectionDependencies,
+  type EnsureAutomationSandboxDependencies,
+} from "@mistle/workflows/control-plane/runtime";
 
 import type {
   DeliverAutomationConversationPayloadServiceInput,
@@ -38,17 +49,6 @@ import {
   resolveAutomationConversationSteerRecoveryAction,
 } from "../planning/automation-conversation-delivery.js";
 import { getConversationProviderAdapter } from "../provider/provider-adapter.js";
-import {
-  acquireAutomationConnection,
-  ensureAutomationSandbox,
-  markAutomationRunCompleted,
-  markAutomationRunIgnored,
-  markAutomationRunFailed,
-  prepareAutomationRun,
-  resolveAutomationRunFailure,
-  type AcquireAutomationConnectionDependencies,
-  type EnsureAutomationSandboxDependencies,
-} from "./automation-run-execution.js";
 
 export type HandleAutomationConversationDeliveryDependencies = {
   db: ControlPlaneDatabase;

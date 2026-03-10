@@ -1,5 +1,1 @@
-import type { ControlPlaneDatabase, ControlPlaneTransaction } from "@mistle/db/control-plane";
-
-export type AutomationConversationPersistenceDependencies = {
-  db: ControlPlaneDatabase | ControlPlaneTransaction;
-};
+export type { AutomationConversationPersistenceDependencies } from "@mistle/workflows/control-plane/runtime";

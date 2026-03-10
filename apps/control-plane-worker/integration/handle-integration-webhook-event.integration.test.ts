@@ -29,16 +29,16 @@ import {
   OpenAiRuntimes,
 } from "@mistle/integrations-definitions";
 import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
-import { Pool } from "pg";
-import { describe, expect } from "vitest";
-
 import {
   markAutomationRunCompleted,
   markAutomationRunFailed,
   prepareAutomationRun,
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
-} from "../src/runtime/automation-workflows/workflows/automation-run-execution.js";
+} from "@mistle/workflows/control-plane/runtime";
+import { Pool } from "pg";
+import { describe, expect } from "vitest";
+
 import { handleIntegrationWebhookEvent } from "../src/runtime/services/handle-integration-webhook-event.js";
 import { it } from "./test-context.js";
 

@@ -15,6 +15,12 @@
       "import": "./src/control-plane/index.ts",
       "default": "./src/control-plane/index.ts"
     },
+    "./control-plane/runtime": {
+      "types": "./src/control-plane/runtime/index.ts",
+      "node": "./dist/control-plane/runtime/index.js",
+      "import": "./src/control-plane/runtime/index.ts",
+      "default": "./src/control-plane/runtime/index.ts"
+    },
     "./data-plane": {
       "types": "./src/data-plane/index.ts",
       "node": "./dist/data-plane/index.js",
@@ -39,15 +45,18 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@mistle/automations": "workspace:*",
+    "@mistle/db": "workspace:*",
     "@mistle/emails": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/sandbox": "workspace:*",
+    "@mistle/time": "workspace:*",
+    "drizzle-orm": "^0.45.1",
     "openworkflow": "^0.8.1",
-    "postgres": "^3.4.8"
+    "postgres": "^3.4.8",
+    "typeid-js": "^1.2.0"
   },
   "devDependencies": {
-    "@mistle/db": "workspace:*",
-    "@mistle/test-harness": "workspace:*",
-    "typeid-js": "^1.2.0"
+    "@mistle/test-harness": "workspace:*"
   }
 }
