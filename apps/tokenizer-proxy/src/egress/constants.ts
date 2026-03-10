@@ -6,6 +6,7 @@ export const EgressRequestHeaders = {
   UPSTREAM_BASE_URL: "X-Mistle-Egress-Upstream-Base-Url",
   AUTH_INJECTION_TYPE: "X-Mistle-Egress-Auth-Injection-Type",
   AUTH_INJECTION_TARGET: "X-Mistle-Egress-Auth-Injection-Target",
+  AUTH_INJECTION_USERNAME: "X-Mistle-Egress-Auth-Injection-Username",
   CONNECTION_ID: "X-Mistle-Egress-Connection-Id",
   CREDENTIAL_SECRET_TYPE: "X-Mistle-Egress-Credential-Secret-Type",
   CREDENTIAL_PURPOSE: "X-Mistle-Egress-Credential-Purpose",

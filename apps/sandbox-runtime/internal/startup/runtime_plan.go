@@ -26,6 +26,7 @@ type RuntimePlan struct {
 	EgressRoutes     []EgressCredentialRoute      `json:"egressRoutes"`
 	Artifacts        []RuntimeArtifactSpec        `json:"artifacts"`
 	ArtifactRemovals []RuntimeArtifactRemovalSpec `json:"artifactRemovals"`
+	WorkspaceSources []WorkspaceSource            `json:"workspaceSources"`
 	RuntimeClients   []RuntimeClient              `json:"runtimeClients"`
 }
 
@@ -57,8 +58,9 @@ type EgressRouteUpstream struct {
 }
 
 type EgressAuthInjection struct {
-	Type   string `json:"type"`
-	Target string `json:"target"`
+	Type     string `json:"type"`
+	Target   string `json:"target"`
+	Username string `json:"username"`
 }
 
 type EgressCredentialResolver struct {
@@ -147,6 +149,14 @@ type RuntimeFileSpec struct {
 	Content string `json:"content"`
 }
 
+type WorkspaceSource struct {
+	SourceKind   string `json:"sourceKind"`
+	ResourceKind string `json:"resourceKind"`
+	Path         string `json:"path"`
+	OriginURL    string `json:"originUrl"`
+	RouteID      string `json:"routeId"`
+}
+
 func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 	if strings.TrimSpace(runtimePlan.SandboxProfileID) == "" {
 		return fmt.Errorf("runtime plan sandboxProfileId is required")
@@ -162,6 +172,9 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 	}
 	if runtimePlan.ArtifactRemovals == nil {
 		return fmt.Errorf("runtime plan artifactRemovals is required")
+	}
+	if runtimePlan.WorkspaceSources == nil {
+		return fmt.Errorf("runtime plan workspaceSources is required")
 	}
 	if runtimePlan.RuntimeClients == nil {
 		return fmt.Errorf("runtime plan runtimeClients is required")
@@ -190,6 +203,11 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 	}
 	for removalIndex, removal := range runtimePlan.ArtifactRemovals {
 		if err := validateArtifactRemoval(removal, removalIndex); err != nil {
+			return err
+		}
+	}
+	for sourceIndex, workspaceSource := range runtimePlan.WorkspaceSources {
+		if err := validateWorkspaceSource(workspaceSource, sourceIndex, routeIDs); err != nil {
 			return err
 		}
 	}
@@ -274,11 +292,51 @@ func validateEgressRoute(route EgressCredentialRoute, routeIndex int) error {
 	if strings.TrimSpace(route.AuthInjection.Target) == "" {
 		return fmt.Errorf("runtime plan egressRoutes[%d] authInjection.target is required", routeIndex)
 	}
+	if route.AuthInjection.Type != "basic" && strings.TrimSpace(route.AuthInjection.Username) != "" {
+		return fmt.Errorf("runtime plan egressRoutes[%d] authInjection.username is only supported for basic auth injection", routeIndex)
+	}
 	if strings.TrimSpace(route.CredentialResolver.ConnectionID) == "" {
 		return fmt.Errorf("runtime plan egressRoutes[%d] credentialResolver.connectionId is required", routeIndex)
 	}
 	if strings.TrimSpace(route.CredentialResolver.SecretType) == "" {
 		return fmt.Errorf("runtime plan egressRoutes[%d] credentialResolver.secretType is required", routeIndex)
+	}
+
+	return nil
+}
+
+func validateWorkspaceSource(
+	workspaceSource WorkspaceSource,
+	sourceIndex int,
+	routeIDs map[string]struct{},
+) error {
+	if strings.TrimSpace(workspaceSource.SourceKind) == "" {
+		return fmt.Errorf("runtime plan workspaceSources[%d].sourceKind is required", sourceIndex)
+	}
+	if workspaceSource.SourceKind != "git-clone" {
+		return fmt.Errorf("runtime plan workspaceSources[%d].sourceKind '%s' is not supported", sourceIndex, workspaceSource.SourceKind)
+	}
+	if strings.TrimSpace(workspaceSource.ResourceKind) == "" {
+		return fmt.Errorf("runtime plan workspaceSources[%d].resourceKind is required", sourceIndex)
+	}
+	if strings.TrimSpace(workspaceSource.Path) == "" {
+		return fmt.Errorf("runtime plan workspaceSources[%d].path is required", sourceIndex)
+	}
+	if strings.TrimSpace(workspaceSource.OriginURL) == "" {
+		return fmt.Errorf("runtime plan workspaceSources[%d].originUrl is required", sourceIndex)
+	}
+	parsedOriginURL, err := url.Parse(workspaceSource.OriginURL)
+	if err != nil {
+		return fmt.Errorf("runtime plan workspaceSources[%d].originUrl is invalid: %w", sourceIndex, err)
+	}
+	if parsedOriginURL.Scheme != "http" && parsedOriginURL.Scheme != "https" {
+		return fmt.Errorf("runtime plan workspaceSources[%d].originUrl must use http or https scheme", sourceIndex)
+	}
+	if strings.TrimSpace(workspaceSource.RouteID) == "" {
+		return fmt.Errorf("runtime plan workspaceSources[%d].routeId is required", sourceIndex)
+	}
+	if _, ok := routeIDs[workspaceSource.RouteID]; !ok {
+		return fmt.Errorf("runtime plan workspaceSources[%d].routeId '%s' does not reference a declared egress route", sourceIndex, workspaceSource.RouteID)
 	}
 
 	return nil

@@ -15,6 +15,7 @@ type EgressRouteMetadata = {
   upstreamBaseUrl: string;
   authInjectionType: "bearer" | "basic" | "header" | "query";
   authInjectionTarget: string;
+  authInjectionUsername?: string;
   connectionId: string;
   secretType: string;
   purpose?: string;
@@ -67,6 +68,10 @@ function resolveRouteMetadata(ctx: Context<AppContextBindings>): EgressRouteMeta
     headers,
     EgressRequestHeaders.CREDENTIAL_RESOLVER_KEY,
   );
+  const authInjectionUsername = readOptionalHeader(
+    headers,
+    EgressRequestHeaders.AUTH_INJECTION_USERNAME,
+  );
 
   return {
     upstreamBaseUrl: readRequiredHeader(headers, EgressRequestHeaders.UPSTREAM_BASE_URL),
@@ -74,6 +79,7 @@ function resolveRouteMetadata(ctx: Context<AppContextBindings>): EgressRouteMeta
       readRequiredHeader(headers, EgressRequestHeaders.AUTH_INJECTION_TYPE),
     ),
     authInjectionTarget: readRequiredHeader(headers, EgressRequestHeaders.AUTH_INJECTION_TARGET),
+    ...(authInjectionUsername === undefined ? {} : { authInjectionUsername }),
     connectionId: readRequiredHeader(headers, EgressRequestHeaders.CONNECTION_ID),
     secretType: readRequiredHeader(headers, EgressRequestHeaders.CREDENTIAL_SECRET_TYPE),
     ...(credentialPurpose === undefined ? {} : { purpose: credentialPurpose }),
@@ -152,8 +158,11 @@ function createUpstreamUrl(ctx: Context<AppContextBindings>, upstreamBaseUrl: st
   return upstreamUrl;
 }
 
-function toBasicAuthorizationValue(secretValue: string): string {
-  return `Basic ${Buffer.from(secretValue, "utf8").toString("base64")}`;
+function toBasicAuthorizationValue(input: { secretValue: string; username?: string }): string {
+  const credentials =
+    input.username === undefined ? input.secretValue : `${input.username}:${input.secretValue}`;
+
+  return `Basic ${Buffer.from(credentials, "utf8").toString("base64")}`;
 }
 
 function toBearerAuthorizationValue(secretValue: string): string {
@@ -165,6 +174,7 @@ function applyAuthInjection(input: {
   outgoingHeaders: Headers;
   authInjectionType: EgressRouteMetadata["authInjectionType"];
   authInjectionTarget: string;
+  authInjectionUsername?: string;
   secretValue: string;
 }): void {
   switch (input.authInjectionType) {
@@ -177,7 +187,12 @@ function applyAuthInjection(input: {
     case "basic":
       input.outgoingHeaders.set(
         input.authInjectionTarget,
-        toBasicAuthorizationValue(input.secretValue),
+        toBasicAuthorizationValue({
+          secretValue: input.secretValue,
+          ...(input.authInjectionUsername === undefined
+            ? {}
+            : { username: input.authInjectionUsername }),
+        }),
       );
       return;
     case "header":
@@ -307,6 +322,9 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
       outgoingHeaders,
       authInjectionType: routeMetadata.authInjectionType,
       authInjectionTarget: routeMetadata.authInjectionTarget,
+      ...(routeMetadata.authInjectionUsername === undefined
+        ? {}
+        : { authInjectionUsername: routeMetadata.authInjectionUsername }),
       secretValue: resolvedCredentialValue,
     });
 

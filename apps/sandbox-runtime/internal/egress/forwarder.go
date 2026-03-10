@@ -15,6 +15,7 @@ const (
 	HeaderEgressUpstreamBaseURL       = "X-Mistle-Egress-Upstream-Base-Url"
 	HeaderEgressAuthInjectionType     = "X-Mistle-Egress-Auth-Injection-Type"
 	HeaderEgressAuthInjectionTarget   = "X-Mistle-Egress-Auth-Injection-Target"
+	HeaderEgressAuthInjectionUsername = "X-Mistle-Egress-Auth-Injection-Username"
 	HeaderEgressConnectionID          = "X-Mistle-Egress-Connection-Id"
 	HeaderEgressCredentialSecretType  = "X-Mistle-Egress-Credential-Secret-Type"
 	HeaderEgressCredentialPurpose     = "X-Mistle-Egress-Credential-Purpose"
@@ -138,6 +139,12 @@ func (forwarder Forwarder) buildForwardRequest(input struct {
 	forwardRequest.Header.Set(HeaderEgressUpstreamBaseURL, input.route.Upstream.BaseURL)
 	forwardRequest.Header.Set(HeaderEgressAuthInjectionType, input.route.AuthInjection.Type)
 	forwardRequest.Header.Set(HeaderEgressAuthInjectionTarget, input.route.AuthInjection.Target)
+	if strings.TrimSpace(input.route.AuthInjection.Username) != "" {
+		forwardRequest.Header.Set(
+			HeaderEgressAuthInjectionUsername,
+			input.route.AuthInjection.Username,
+		)
+	}
 	forwardRequest.Header.Set(HeaderEgressConnectionID, input.route.CredentialResolver.ConnectionID)
 	forwardRequest.Header.Set(HeaderEgressCredentialSecretType, input.route.CredentialResolver.SecretType)
 	if strings.TrimSpace(input.route.CredentialResolver.Purpose) != "" {

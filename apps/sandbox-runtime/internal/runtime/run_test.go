@@ -31,13 +31,13 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("fails when runtime plan apply fails", func(t *testing.T) {
-		startupInputJSON := `{"bootstrapToken":"test-token","tunnelGatewayWsUrl":"ws://127.0.0.1:5003/tunnel/sandbox","runtimePlan":{"sandboxProfileId":"sbp_test","version":1,"image":{"source":"base","imageRef":"mistle/sandbox-base:dev"},"egressRoutes":[],"artifacts":[],"artifactRemovals":[],"runtimeClients":[{"clientId":"client_test","setup":{"env":{},"files":[{"fileId":"file_test","path":"/tmp","mode":420,"content":"invalid-target"}]},"processes":[],"endpoints":[]}]}}`
+		startupInputJSON := `{"bootstrapToken":"test-token","tunnelGatewayWsUrl":"ws://127.0.0.1:5003/tunnel/sandbox","runtimePlan":{"sandboxProfileId":"sbp_test","version":1,"image":{"source":"base","imageRef":"mistle/sandbox-base:dev"},"egressRoutes":[],"artifacts":[],"artifactRemovals":[],"runtimeClients":[{"clientId":"client_test","setup":{"env":{},"files":[{"fileId":"file_test","path":"/tmp","mode":420,"content":"invalid-target"}]},"processes":[],"endpoints":[]}],"workspaceSources":[]}}`
 
 		err := Run(RunInput{
 			LookupEnv: func(key string) (string, bool) {
 				switch key {
 				case config.ListenAddrEnv:
-					return ":8090", true
+					return ":0", true
 				case config.TokenizerProxyEgressBaseURLEnv:
 					return "http://127.0.0.1:5004/tokenizer-proxy/egress", true
 				default:
@@ -55,13 +55,13 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("fails when runtime client process startup fails", func(t *testing.T) {
-		startupInputJSON := `{"bootstrapToken":"test-token","tunnelGatewayWsUrl":"ws://127.0.0.1:5003/tunnel/sandbox","runtimePlan":{"sandboxProfileId":"sbp_test","version":1,"image":{"source":"base","imageRef":"mistle/sandbox-base:dev"},"egressRoutes":[],"artifacts":[],"artifactRemovals":[],"runtimeClients":[{"clientId":"client_codex","setup":{"env":{},"files":[]},"processes":[{"processKey":"process_codex_server","command":{"args":["/definitely/missing/binary"],"env":{},"cwd":"","timeoutMs":0},"readiness":{"type":"none","host":"","port":0,"timeoutMs":0,"url":"","expectedStatus":0},"stop":{"signal":"sigterm","timeoutMs":1000,"gracePeriodMs":100}}],"endpoints":[]}]}}`
+		startupInputJSON := `{"bootstrapToken":"test-token","tunnelGatewayWsUrl":"ws://127.0.0.1:5003/tunnel/sandbox","runtimePlan":{"sandboxProfileId":"sbp_test","version":1,"image":{"source":"base","imageRef":"mistle/sandbox-base:dev"},"egressRoutes":[],"artifacts":[],"artifactRemovals":[],"runtimeClients":[{"clientId":"client_codex","setup":{"env":{},"files":[]},"processes":[{"processKey":"process_codex_server","command":{"args":["/definitely/missing/binary"],"env":{},"cwd":"","timeoutMs":0},"readiness":{"type":"none","host":"","port":0,"timeoutMs":0,"url":"","expectedStatus":0},"stop":{"signal":"sigterm","timeoutMs":1000,"gracePeriodMs":100}}],"endpoints":[]}],"workspaceSources":[]}}`
 
 		err := Run(RunInput{
 			LookupEnv: func(key string) (string, bool) {
 				switch key {
 				case config.ListenAddrEnv:
-					return ":8090", true
+					return ":0", true
 				case config.TokenizerProxyEgressBaseURLEnv:
 					return "http://127.0.0.1:5004/tokenizer-proxy/egress", true
 				default:

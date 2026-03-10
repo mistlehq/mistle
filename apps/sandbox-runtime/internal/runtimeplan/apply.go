@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,7 +16,8 @@ import (
 )
 
 type ApplyInput struct {
-	RuntimePlan startup.RuntimePlan
+	RuntimePlan           startup.RuntimePlan
+	SandboxdEgressBaseURL string
 }
 
 const (
@@ -35,6 +37,11 @@ func Apply(input ApplyInput) error {
 	commandSet, err := resolveArtifactLifecycleCommandSet(input.RuntimePlan.Image.Source)
 	if err != nil {
 		return err
+	}
+	if len(input.RuntimePlan.WorkspaceSources) > 0 {
+		if strings.TrimSpace(input.SandboxdEgressBaseURL) == "" {
+			return fmt.Errorf("sandboxd egress base url is required when workspaceSources are declared")
+		}
 	}
 
 	if input.RuntimePlan.Image.Source == runtimeImageSourceSnapshot {
@@ -69,6 +76,18 @@ func Apply(input ApplyInput) error {
 		}
 	}
 
+	for sourceIndex, workspaceSource := range input.RuntimePlan.WorkspaceSources {
+		if err := applyWorkspaceSource(workspaceSource, input); err != nil {
+			return fmt.Errorf(
+				"runtime plan workspaceSources[%d] failed (sourceKind=%s path=%s): %w",
+				sourceIndex,
+				workspaceSource.SourceKind,
+				workspaceSource.Path,
+				err,
+			)
+		}
+	}
+
 	for clientIndex, runtimeClient := range input.RuntimePlan.RuntimeClients {
 		for fileIndex, file := range runtimeClient.Setup.Files {
 			if err := applyRuntimeFile(file); err != nil {
@@ -86,6 +105,114 @@ func Apply(input ApplyInput) error {
 	}
 
 	return nil
+}
+
+func applyWorkspaceSource(workspaceSource startup.WorkspaceSource, input ApplyInput) error {
+	switch workspaceSource.SourceKind {
+	case "git-clone":
+		return applyGitCloneWorkspaceSource(workspaceSource, input)
+	default:
+		return fmt.Errorf("workspace source kind '%s' is not supported", workspaceSource.SourceKind)
+	}
+}
+
+func applyGitCloneWorkspaceSource(workspaceSource startup.WorkspaceSource, input ApplyInput) error {
+	if pathExists(workspaceSource.Path) {
+		return fmt.Errorf("workspace source path '%s' already exists", workspaceSource.Path)
+	}
+
+	parentDirectory := filepath.Dir(workspaceSource.Path)
+	if err := os.MkdirAll(parentDirectory, 0o755); err != nil {
+		return fmt.Errorf("failed to create parent directory %s: %w", parentDirectory, err)
+	}
+
+	sandboxRouteURL, err := createWorkspaceSourceRouteURL(
+		input.SandboxdEgressBaseURL,
+		workspaceSource.RouteID,
+		workspaceSource.OriginURL,
+	)
+	if err != nil {
+		return fmt.Errorf("failed to resolve sandbox route URL: %w", err)
+	}
+
+	if err := runGitCommand([]string{"clone", "--origin", "origin", sandboxRouteURL, workspaceSource.Path}); err != nil {
+		return fmt.Errorf("failed to clone repository: %w", err)
+	}
+
+	if err := runGitCommand([]string{"-C", workspaceSource.Path, "remote", "set-url", "origin", workspaceSource.OriginURL}); err != nil {
+		return fmt.Errorf("failed to restore canonical origin URL: %w", err)
+	}
+
+	if err := runGitCommand([]string{
+		"-C",
+		workspaceSource.Path,
+		"config",
+		"--local",
+		"--replace-all",
+		fmt.Sprintf("url.%s.insteadOf", sandboxRouteURL),
+		workspaceSource.OriginURL,
+	}); err != nil {
+		return fmt.Errorf("failed to configure git url rewrite: %w", err)
+	}
+
+	return nil
+}
+
+func createWorkspaceSourceRouteURL(baseURL string, routeID string, originURL string) (string, error) {
+	parsedBaseURL, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil {
+		return "", fmt.Errorf("failed to parse base URL: %w", err)
+	}
+	parsedOriginURL, err := url.Parse(strings.TrimSpace(originURL))
+	if err != nil {
+		return "", fmt.Errorf("failed to parse origin URL: %w", err)
+	}
+	if strings.TrimSpace(parsedOriginURL.Path) == "" {
+		return "", fmt.Errorf("origin URL path is required")
+	}
+
+	routedURL := *parsedBaseURL
+	routedURL.Path = joinURLPath(routedURL.Path, "routes/"+url.PathEscape(routeID))
+	routedURL.Path = joinURLPath(routedURL.Path, parsedOriginURL.Path)
+	routedURL.RawQuery = ""
+	routedURL.Fragment = ""
+
+	return routedURL.String(), nil
+}
+
+func joinURLPath(basePath string, suffixPath string) string {
+	normalizedBasePath := strings.TrimSuffix(basePath, "/")
+	normalizedSuffixPath := strings.TrimPrefix(suffixPath, "/")
+
+	if normalizedBasePath == "" || normalizedBasePath == "/" {
+		if normalizedSuffixPath == "" {
+			return "/"
+		}
+
+		return "/" + normalizedSuffixPath
+	}
+
+	if normalizedSuffixPath == "" {
+		return normalizedBasePath
+	}
+
+	return normalizedBasePath + "/" + normalizedSuffixPath
+}
+
+func pathExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+func runGitCommand(args []string) error {
+	commandArgs := append([]string{"git"}, args...)
+
+	return runRuntimeArtifactCommand(startup.RuntimeArtifactCommand{
+		Args: commandArgs,
+		Env: map[string]string{
+			"GIT_TERMINAL_PROMPT": "0",
+		},
+	})
 }
 
 func resolveArtifactLifecycleCommandSet(source string) (artifactLifecycleCommandSet, error) {
