@@ -1,51 +1,37 @@
+import { readTestContext } from "@mistle/test-harness";
 import postgres from "postgres";
 import { it as vitestIt } from "vitest";
+import { z } from "zod";
 
 const WORKER_DATABASE_NAME_PREFIX = "mistle_workflows_it_worker_";
 const TEMPLATE_DATABASE_CLONE_LOCK_ID = 97_761_443;
+const TestContextId = "workflows.integration";
 
 export type WorkflowsIntegrationDatabaseStack = {
   directUrl: string;
   pooledUrl: string;
 };
 
-type SharedInfraConfig = {
-  databaseUsername: string;
-  databasePassword: string;
-  databaseDirectHost: string;
-  databaseDirectPort: number;
-  templateDatabaseName: string;
-};
+const SharedInfraConfigSchema = z
+  .object({
+    databaseUsername: z.string().min(1),
+    databasePassword: z.string().min(1),
+    databaseDirectHost: z.string().min(1),
+    databaseDirectPort: z.number().int().min(1).max(65_535),
+    templateDatabaseName: z.string().min(1),
+    mailpitSmtpHost: z.string().min(1),
+    mailpitSmtpPort: z.number().int().min(1).max(65_535),
+    mailpitHttpBaseUrl: z.url(),
+  })
+  .strict();
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (value === undefined || value.length === 0) {
-    throw new Error(`Missing required integration environment variable: ${name}`);
-  }
+type SharedInfraConfig = z.infer<typeof SharedInfraConfigSchema>;
 
-  return value;
-}
-
-function parsePort(input: { value: string; variableName: string }): number {
-  const parsedPort = Number.parseInt(input.value, 10);
-  if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65_535) {
-    throw new Error(`Environment variable ${input.variableName} must be a valid TCP port.`);
-  }
-
-  return parsedPort;
-}
-
-function readSharedInfraConfig(): SharedInfraConfig {
-  return {
-    databaseUsername: requireEnv("MISTLE_WF_IT_DB_USER"),
-    databasePassword: requireEnv("MISTLE_WF_IT_DB_PASSWORD"),
-    databaseDirectHost: requireEnv("MISTLE_WF_IT_DB_DIRECT_HOST"),
-    databaseDirectPort: parsePort({
-      value: requireEnv("MISTLE_WF_IT_DB_DIRECT_PORT"),
-      variableName: "MISTLE_WF_IT_DB_DIRECT_PORT",
-    }),
-    templateDatabaseName: requireEnv("MISTLE_WF_IT_TEMPLATE_DB_NAME"),
-  };
+async function readSharedInfraConfig(): Promise<SharedInfraConfig> {
+  return readTestContext({
+    id: TestContextId,
+    schema: SharedInfraConfigSchema,
+  });
 }
 
 function assertSafeIdentifier(identifier: string, label: string): string {
@@ -140,7 +126,7 @@ async function resetWorkerDatabaseFromTemplate(input: {
 export const it = vitestIt.extend<{ databaseStack: WorkflowsIntegrationDatabaseStack }>({
   databaseStack: [
     async ({}, use) => {
-      const sharedInfraConfig = readSharedInfraConfig();
+      const sharedInfraConfig = await readSharedInfraConfig();
       const workerScopedDatabaseName = createWorkerScopedDatabaseName(
         process.env.VITEST_POOL_ID ?? "0",
       );

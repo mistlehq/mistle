@@ -6,15 +6,14 @@ import {
 import {
   acquireSharedPostgresInfra,
   DEFAULT_SHARED_INTEGRATION_INFRA_KEY,
+  removeTestContext,
+  writeTestContext,
 } from "@mistle/test-harness";
 import { Client as PgClient } from "pg";
 
 const SHARED_INFRA_KEY = DEFAULT_SHARED_INTEGRATION_INFRA_KEY;
 const TEMPLATE_DATABASE_NAME = "mistle_data_plane_gateway_it_template";
-
-function setEnv(name: string, value: string): void {
-  process.env[name] = value;
-}
+const TestContextId = "data-plane-gateway.integration";
 
 function assertSafeIdentifier(identifier: string, label: string): string {
   if (!/^[a-z0-9_]+$/u.test(identifier)) {
@@ -97,17 +96,24 @@ export default async function setup(): Promise<() => Promise<void>> {
       migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
     });
 
-    setEnv("MISTLE_DP_GATEWAY_IT_DB_USER", postgresService.postgres.username);
-    setEnv("MISTLE_DP_GATEWAY_IT_DB_PASSWORD", postgresService.postgres.password);
-    setEnv("MISTLE_DP_GATEWAY_IT_DB_DIRECT_HOST", postgresService.postgres.host);
-    setEnv("MISTLE_DP_GATEWAY_IT_DB_DIRECT_PORT", String(postgresService.postgres.port));
-    setEnv("MISTLE_DP_GATEWAY_IT_TEMPLATE_DB_NAME", TEMPLATE_DATABASE_NAME);
+    await writeTestContext({
+      id: TestContextId,
+      value: {
+        databaseUsername: postgresService.postgres.username,
+        databasePassword: postgresService.postgres.password,
+        databaseDirectHost: postgresService.postgres.host,
+        databaseDirectPort: postgresService.postgres.port,
+        templateDatabaseName: TEMPLATE_DATABASE_NAME,
+      },
+    });
   } catch (error) {
+    await removeTestContext(TestContextId);
     await sharedInfraLease.release();
     throw error;
   }
 
   return async () => {
+    await removeTestContext(TestContextId);
     await sharedInfraLease.release();
   };
 }

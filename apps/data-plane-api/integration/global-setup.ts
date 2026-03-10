@@ -6,6 +6,8 @@ import {
 import {
   acquireSharedPostgresInfra,
   DEFAULT_SHARED_INTEGRATION_INFRA_KEY,
+  removeTestContext,
+  writeTestContext,
 } from "@mistle/test-harness";
 import { createDataPlaneBackend } from "@mistle/workflows/data-plane";
 import { Client as PgClient } from "pg";
@@ -14,10 +16,7 @@ const SHARED_INFRA_KEY = DEFAULT_SHARED_INTEGRATION_INFRA_KEY;
 const TEMPLATE_DATABASE_NAME = "mistle_data_plane_api_it_template";
 const WORKFLOW_NAMESPACE_ID = "integration";
 const INTERNAL_AUTH_SERVICE_TOKEN = "integration-service-token";
-
-function setEnv(name: string, value: string): void {
-  process.env[name] = value;
-}
+const TestContextId = "data-plane-api.integration";
 
 function assertSafeIdentifier(identifier: string, label: string): string {
   if (!/^[a-z0-9_]+$/u.test(identifier)) {
@@ -107,19 +106,26 @@ export default async function setup(): Promise<() => Promise<void>> {
     });
     await workflowBackend.stop();
 
-    setEnv("MISTLE_DP_API_IT_DB_USER", postgresService.postgres.username);
-    setEnv("MISTLE_DP_API_IT_DB_PASSWORD", postgresService.postgres.password);
-    setEnv("MISTLE_DP_API_IT_DB_DIRECT_HOST", postgresService.postgres.host);
-    setEnv("MISTLE_DP_API_IT_DB_DIRECT_PORT", String(postgresService.postgres.port));
-    setEnv("MISTLE_DP_API_IT_TEMPLATE_DB_NAME", TEMPLATE_DATABASE_NAME);
-    setEnv("MISTLE_DP_API_IT_WORKFLOW_NAMESPACE_ID", WORKFLOW_NAMESPACE_ID);
-    setEnv("MISTLE_DP_API_IT_INTERNAL_AUTH_SERVICE_TOKEN", INTERNAL_AUTH_SERVICE_TOKEN);
+    await writeTestContext({
+      id: TestContextId,
+      value: {
+        databaseUsername: postgresService.postgres.username,
+        databasePassword: postgresService.postgres.password,
+        databaseDirectHost: postgresService.postgres.host,
+        databaseDirectPort: postgresService.postgres.port,
+        templateDatabaseName: TEMPLATE_DATABASE_NAME,
+        workflowNamespaceId: WORKFLOW_NAMESPACE_ID,
+        internalAuthServiceToken: INTERNAL_AUTH_SERVICE_TOKEN,
+      },
+    });
   } catch (error) {
+    await removeTestContext(TestContextId);
     await sharedInfraLease.release();
     throw error;
   }
 
   return async () => {
+    await removeTestContext(TestContextId);
     await sharedInfraLease.release();
   };
 }
