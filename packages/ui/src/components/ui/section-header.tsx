@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type SectionHeaderProps = {
+export type SectionHeaderProps = {
   action?: ReactNode;
   title: string;
 };
