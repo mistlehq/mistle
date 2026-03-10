@@ -35,13 +35,13 @@ import {
   finalizeAutomationConversationDeliveryTask,
   findActiveAutomationConversationDeliveryTask,
   idleAutomationConversationDeliveryProcessorIfEmpty,
+  markAutomationConversationDeliveryTaskDelivering,
   resolveAutomationConversationDeliveryTaskAction,
 } from "@mistle/workflows/control-plane/runtime";
 import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
-import { markAutomationConversationDeliveryTaskDelivering } from "../src/runtime/automation-workflows/persistence/index.js";
 import { it } from "./test-context.js";
 
 async function createTestDatabase(input: { databaseUrl: string }) {

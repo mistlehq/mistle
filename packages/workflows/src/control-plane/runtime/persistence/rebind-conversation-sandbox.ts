@@ -1,27 +1,24 @@
 import {
   automationConversationRoutes,
-  automationConversations,
   AutomationConversationRouteStatuses,
   AutomationConversationStatuses,
 } from "@mistle/db/control-plane";
+import { eq, sql } from "drizzle-orm";
+
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
-  type AutomationConversationPersistenceDependencies,
-} from "@mistle/workflows/control-plane/runtime";
-import { eq, sql } from "drizzle-orm";
+} from "./errors.js";
+import type { AutomationConversationPersistenceDependencies } from "./types.js";
 
-export type ReplaceAutomationConversationBindingInput = {
+export type RebindAutomationConversationSandboxInput = {
   routeId: string;
   sandboxInstanceId: string;
-  providerConversationId: string;
-  providerExecutionId?: string | null;
-  providerState?: unknown;
 };
 
-export async function replaceAutomationConversationBinding(
+export async function rebindAutomationConversationSandbox(
   deps: AutomationConversationPersistenceDependencies,
-  input: ReplaceAutomationConversationBindingInput,
+  input: RebindAutomationConversationSandboxInput,
 ) {
   return deps.db.transaction(async (transaction) => {
     const persistedRoute = await transaction.query.automationConversationRoutes.findFirst({
@@ -36,7 +33,7 @@ export async function replaceAutomationConversationBinding(
     if (persistedRoute.status === AutomationConversationRouteStatuses.CLOSED) {
       throw new AutomationConversationPersistenceError({
         code: AutomationConversationPersistenceErrorCodes.CONVERSATION_ROUTE_CLOSED,
-        message: `AutomationConversation route '${input.routeId}' is closed and cannot replace binding.`,
+        message: `AutomationConversation route '${input.routeId}' is closed and cannot be rebound.`,
       });
     }
 
@@ -53,26 +50,15 @@ export async function replaceAutomationConversationBinding(
     if (persistedAutomationConversation.status === AutomationConversationStatuses.CLOSED) {
       throw new AutomationConversationPersistenceError({
         code: AutomationConversationPersistenceErrorCodes.CONVERSATION_CLOSED,
-        message: `AutomationConversation '${persistedAutomationConversation.id}' is closed and cannot replace binding.`,
+        message: `AutomationConversation '${persistedRoute.conversationId}' is closed and cannot be rebound.`,
       });
     }
-
-    await transaction
-      .update(automationConversations)
-      .set({
-        status: AutomationConversationStatuses.ACTIVE,
-        updatedAt: sql`now()`,
-      })
-      .where(eq(automationConversations.id, persistedAutomationConversation.id));
 
     const updatedRows = await transaction
       .update(automationConversationRoutes)
       .set({
         sandboxInstanceId: input.sandboxInstanceId,
-        providerConversationId: input.providerConversationId,
-        providerExecutionId: input.providerExecutionId ?? null,
-        providerState: input.providerState ?? null,
-        status: AutomationConversationRouteStatuses.ACTIVE,
+        providerExecutionId: null,
         updatedAt: sql`now()`,
       })
       .where(eq(automationConversationRoutes.id, input.routeId))
@@ -81,7 +67,7 @@ export async function replaceAutomationConversationBinding(
     if (updatedRoute === undefined) {
       throw new AutomationConversationPersistenceError({
         code: AutomationConversationPersistenceErrorCodes.CONVERSATION_ROUTE_NOT_FOUND,
-        message: `AutomationConversation route '${input.routeId}' was not found during replace binding update.`,
+        message: `AutomationConversation route '${input.routeId}' was not found during rebind update.`,
       });
     }
 

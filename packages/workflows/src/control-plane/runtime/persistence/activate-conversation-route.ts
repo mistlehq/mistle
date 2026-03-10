@@ -4,12 +4,13 @@ import {
   AutomationConversationRouteStatuses,
   AutomationConversationStatuses,
 } from "@mistle/db/control-plane";
+import { eq, sql } from "drizzle-orm";
+
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
-  type AutomationConversationPersistenceDependencies,
-} from "@mistle/workflows/control-plane/runtime";
-import { eq, sql } from "drizzle-orm";
+} from "./errors.js";
+import type { AutomationConversationPersistenceDependencies } from "./types.js";
 
 export type ActivateAutomationConversationRouteInput = {
   conversationId: string;
