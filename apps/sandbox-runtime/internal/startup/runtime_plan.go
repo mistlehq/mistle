@@ -58,8 +58,11 @@ type EgressRouteUpstream struct {
 }
 
 type EgressAuthInjection struct {
-	Type     string `json:"type"`
-	Target   string `json:"target"`
+	Type   string `json:"type"`
+	Target string `json:"target"`
+	// Username is only used for Basic auth routes that need a fixed username in
+	// addition to the resolved secret value, such as GitHub App HTTP Git access
+	// with x-access-token:<installation-token>.
 	Username string `json:"username"`
 }
 
@@ -154,6 +157,9 @@ type WorkspaceSource struct {
 	ResourceKind string `json:"resourceKind"`
 	Path         string `json:"path"`
 	OriginURL    string `json:"originUrl"`
+	// RouteID identifies the mediated egress route that startup should use to
+	// realize the source. Startup uses the route URL for clone/fetch traffic and
+	// then restores OriginURL as the canonical remote.
 	RouteID      string `json:"routeId"`
 }
 

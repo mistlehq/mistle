@@ -61,6 +61,8 @@ function parseAuthInjectionType(value: string): EgressRouteMetadata["authInjecti
   throw new Error(`Unsupported auth injection type '${value}'.`);
 }
 
+// Route metadata is carried on internal headers by sandboxd so tokenizer-proxy
+// can stay stateless and enforce the exact policy compileBinding resolved.
 function resolveRouteMetadata(ctx: Context<AppContextBindings>): EgressRouteMetadata {
   const headers = ctx.req.raw.headers;
   const credentialPurpose = readOptionalHeader(headers, EgressRequestHeaders.CREDENTIAL_PURPOSE);
@@ -143,6 +145,9 @@ function resolveForwardPath(basePath: string, targetPath: string): string {
   return joinPath(normalizedBasePath, normalizedTargetPath);
 }
 
+// The incoming request path is relative to the sandbox route URL, while the
+// upstream base URL still points at the canonical origin. This reattaches the
+// route-relative suffix to the canonical upstream path before forwarding.
 function createUpstreamUrl(ctx: Context<AppContextBindings>, upstreamBaseUrl: string): URL {
   const upstreamUrl = new URL(upstreamBaseUrl);
   const incomingUrl = new URL(ctx.req.url);
@@ -158,6 +163,8 @@ function createUpstreamUrl(ctx: Context<AppContextBindings>, upstreamBaseUrl: st
   return upstreamUrl;
 }
 
+// Some upstreams expect Basic auth as username:secret rather than a bare secret.
+// GitHub App HTTP Git access is the motivating case: x-access-token:<token>.
 function toBasicAuthorizationValue(input: { secretValue: string; username?: string }): string {
   const credentials =
     input.username === undefined ? input.secretValue : `${input.username}:${input.secretValue}`;
@@ -169,6 +176,8 @@ function toBearerAuthorizationValue(secretValue: string): string {
   return `Bearer ${secretValue}`;
 }
 
+// applyAuthInjection mutates the outgoing request in place because header- and
+// query-based auth schemes share the same forwarding pipeline.
 function applyAuthInjection(input: {
   upstreamUrl: URL;
   outgoingHeaders: Headers;

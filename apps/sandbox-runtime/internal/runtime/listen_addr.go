@@ -27,6 +27,10 @@ func parseListenAddr(listenAddr string) (string, error) {
 	return normalizedListenAddr, nil
 }
 
+// resolveLoopbackEgressBaseURL returns the sandboxd egress base URL as seen from
+// inside the sandbox itself. Workspace source realization runs before any runtime
+// clients start, so startup work has to call sandboxd over loopback instead of
+// relying on external service discovery or the configured listen host.
 func resolveLoopbackEgressBaseURL(listenAddr string) (string, error) {
 	parsedListenAddr, err := parseListenAddr(listenAddr)
 	if err != nil {

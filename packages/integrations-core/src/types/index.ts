@@ -539,6 +539,10 @@ export type EgressCredentialRoute = {
   authInjection: {
     type: "bearer" | "basic" | "header" | "query";
     target: string;
+    /**
+     * Optional fixed username used when the upstream expects Basic auth in the
+     * form of username:secret rather than just a secret value.
+     */
     username?: string;
   };
   credentialResolver: EgressCredentialResolverRef;
@@ -707,6 +711,11 @@ type GitCloneWorkspaceSourceBase<TRouteId> = {
   resourceKind: "repository";
   path: string;
   originUrl: string;
+  /**
+   * Route used to realize the source through mediated egress. Startup uses the
+   * route URL for the initial network operation and then restores originUrl as
+   * the canonical git remote.
+   */
   routeId: TRouteId;
 };
 
@@ -718,6 +727,11 @@ export type CompileBindingResult = {
   egressRoutes: ReadonlyArray<CompileBindingEgressRoute>;
   artifacts: ReadonlyArray<RuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
+  /**
+   * Sources that should appear in the workspace before runtime clients start.
+   * Definitions describe them in binding-local terms and the compiler resolves
+   * any route references into concrete compiled route IDs.
+   */
   workspaceSources?: ReadonlyArray<CompileBindingWorkspaceSource>;
   agentRuntimes?: ReadonlyArray<CompileBindingAgentRuntime>;
 };

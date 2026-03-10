@@ -33,6 +33,10 @@ const (
 	artifactLifecycleCommandSetUpdate  artifactLifecycleCommandSet = "update"
 )
 
+// Apply realizes the runtime plan on disk before runtime client processes are
+// launched. It owns filesystem mutations only; networked workspace sources must
+// go through sandboxd so later in-sandbox tool behavior matches startup
+// behavior.
 func Apply(input ApplyInput) error {
 	commandSet, err := resolveArtifactLifecycleCommandSet(input.RuntimePlan.Image.Source)
 	if err != nil {
@@ -116,6 +120,10 @@ func applyWorkspaceSource(workspaceSource startup.WorkspaceSource, input ApplyIn
 	}
 }
 
+// applyGitCloneWorkspaceSource performs the initial clone through sandboxd's
+// route-based egress path, then restores the canonical origin URL and writes a
+// repo-local insteadOf rule so later git commands continue to use mediated
+// auth without storing credentials in the repository config.
 func applyGitCloneWorkspaceSource(workspaceSource startup.WorkspaceSource, input ApplyInput) error {
 	if pathExists(workspaceSource.Path) {
 		return fmt.Errorf("workspace source path '%s' already exists", workspaceSource.Path)
@@ -158,6 +166,10 @@ func applyGitCloneWorkspaceSource(workspaceSource startup.WorkspaceSource, input
 	return nil
 }
 
+// createWorkspaceSourceRouteURL maps a canonical origin URL onto the sandboxd
+// route URL that tokenizer-proxy can authorize. The origin path is preserved so
+// git still requests the expected repository endpoint after the route prefix is
+// added.
 func createWorkspaceSourceRouteURL(baseURL string, routeID string, originURL string) (string, error) {
 	parsedBaseURL, err := url.Parse(strings.TrimSpace(baseURL))
 	if err != nil {
