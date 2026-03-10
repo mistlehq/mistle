@@ -273,6 +273,8 @@ describe("GitHubWebhookHandler", () => {
       externalDeliveryId: "delivery_123",
       providerEventType: "issue_comment",
       eventType: "github.issue_comment.created",
+      occurredAt: IssueCommentCreatedPayload.comment.created_at,
+      sourceOrderKey: `${IssueCommentCreatedPayload.comment.created_at}#${IssueCommentCreatedPayload.comment.id.toString().padStart(20, "0")}`,
     });
     expect(parsed.payload).toEqual(IssueCommentCreatedPayload);
   });

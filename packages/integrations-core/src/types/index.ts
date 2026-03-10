@@ -500,6 +500,7 @@ export type IntegrationWebhookEvent = {
   eventType: string;
   payload: Record<string, unknown>;
   occurredAt?: string;
+  sourceOrderKey?: string;
 };
 
 export type IntegrationWebhookHandler<

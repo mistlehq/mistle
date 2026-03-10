@@ -394,6 +394,217 @@ func TestRun(t *testing.T) {
 		}
 	})
 
+	t.Run("keeps bootstrap tunnel open for a second agent connection after the first closes", func(t *testing.T) {
+		agentRequestCh := make(chan string, 2)
+		handlerErrCh := make(chan error, 1)
+
+		agentServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			conn, err := websocket.Accept(writer, request, nil)
+			if err != nil {
+				handlerErrCh <- fmt.Errorf("expected agent websocket accept to succeed: %w", err)
+				return
+			}
+			defer conn.CloseNow()
+
+			handlerCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			messageType, payload, err := conn.Read(handlerCtx)
+			if err != nil {
+				handlerErrCh <- fmt.Errorf("expected agent request read to succeed: %w", err)
+				return
+			}
+			if messageType != websocket.MessageText {
+				handlerErrCh <- fmt.Errorf("expected agent request to be text, got %s", messageType.String())
+				return
+			}
+			agentRequestCh <- string(payload)
+
+			if err := conn.Write(handlerCtx, websocket.MessageText, []byte(`{"jsonrpc":"2.0","id":"res-1","result":{"ok":true}}`)); err != nil {
+				handlerErrCh <- fmt.Errorf("expected agent response write to succeed: %w", err)
+				return
+			}
+
+			_ = conn.Close(websocket.StatusNormalClosure, "agent session completed")
+		}))
+		defer agentServer.Close()
+
+		runCtx, cancelRun := context.WithCancel(context.Background())
+		defer cancelRun()
+
+		gatewayServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			conn, err := websocket.Accept(writer, request, nil)
+			if err != nil {
+				handlerErrCh <- fmt.Errorf("expected gateway websocket accept to succeed: %w", err)
+				return
+			}
+			defer conn.CloseNow()
+
+			handlerCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			for index := range 2 {
+				connectRequestPayload, err := json.Marshal(sessionprotocol.AgentConnectRequest{
+					Type:      sessionprotocol.MessageTypeConnect,
+					V:         sessionprotocol.ProtocolVersion,
+					RequestID: fmt.Sprintf("req_connect_agent_%d", index+1),
+					Channel: sessionprotocol.AgentConnectChannel{
+						Kind: sessionprotocol.ChannelKindAgent,
+					},
+				})
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected connect request payload marshal to succeed: %w", err)
+					return
+				}
+
+				if err := conn.Write(handlerCtx, websocket.MessageText, connectRequestPayload); err != nil {
+					handlerErrCh <- fmt.Errorf("expected connect request write to succeed: %w", err)
+					return
+				}
+
+				ackType, ackPayload, err := conn.Read(handlerCtx)
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected connect ack read to succeed: %w", err)
+					return
+				}
+				if ackType != websocket.MessageText {
+					handlerErrCh <- fmt.Errorf("expected connect ack to be text, got %s", ackType.String())
+					return
+				}
+
+				var connectOK sessionprotocol.ConnectOK
+				if err := json.Unmarshal(ackPayload, &connectOK); err != nil {
+					handlerErrCh <- fmt.Errorf("expected connect ack to decode: %w", err)
+					return
+				}
+				expectedRequestID := fmt.Sprintf("req_connect_agent_%d", index+1)
+				if connectOK.Type != sessionprotocol.MessageTypeConnectOK {
+					handlerErrCh <- fmt.Errorf("expected connect ack type '%s', got '%s'", sessionprotocol.MessageTypeConnectOK, connectOK.Type)
+					return
+				}
+				if connectOK.RequestID != expectedRequestID {
+					handlerErrCh <- fmt.Errorf("expected connect ack requestId '%s', got '%s'", expectedRequestID, connectOK.RequestID)
+					return
+				}
+
+				agentPayload := fmt.Sprintf(`{"jsonrpc":"2.0","id":"req-%d","method":"ping"}`, index+1)
+				if err := conn.Write(handlerCtx, websocket.MessageText, []byte(agentPayload)); err != nil {
+					handlerErrCh <- fmt.Errorf("expected gateway->runtime write to succeed: %w", err)
+					return
+				}
+
+				responseType, responsePayload, err := conn.Read(handlerCtx)
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected runtime->gateway read to succeed: %w", err)
+					return
+				}
+				if responseType != websocket.MessageText {
+					handlerErrCh <- fmt.Errorf("expected runtime->gateway response to be text, got %s", responseType.String())
+					return
+				}
+				expectedResponsePayload := `{"jsonrpc":"2.0","id":"res-1","result":{"ok":true}}`
+				if string(responsePayload) != expectedResponsePayload {
+					handlerErrCh <- fmt.Errorf("expected runtime->gateway response %q, got %q", expectedResponsePayload, string(responsePayload))
+					return
+				}
+
+				if index == 0 {
+					disconnectPayload, err := json.Marshal(sessionprotocol.Disconnect{
+						Type:   sessionprotocol.MessageTypeDisconnect,
+						Reason: "connection peer disconnected",
+					})
+					if err != nil {
+						handlerErrCh <- fmt.Errorf("expected disconnect payload marshal to succeed: %w", err)
+						return
+					}
+					if err := conn.Write(handlerCtx, websocket.MessageText, disconnectPayload); err != nil {
+						handlerErrCh <- fmt.Errorf("expected disconnect control write to succeed: %w", err)
+						return
+					}
+				}
+			}
+
+			cancelRun()
+			time.Sleep(100 * time.Millisecond)
+		}))
+		defer gatewayServer.Close()
+
+		gatewayWSURL := "ws" + strings.TrimPrefix(gatewayServer.URL, "http") + "/tunnel/sandbox/sbi_tunnel_test_004"
+		agentWSURL := "ws" + strings.TrimPrefix(agentServer.URL, "http")
+
+		runErrCh := make(chan error, 1)
+		go func() {
+			runErrCh <- Run(RunInput{
+				Context:        runCtx,
+				GatewayWSURL:   gatewayWSURL,
+				BootstrapToken: []byte("sandbox-bootstrap-token"),
+				AgentRuntimes: []startup.AgentRuntime{
+					{
+						BindingID:   "bind_openai",
+						RuntimeKey:  "codex-app-server",
+						ClientID:    "client_codex",
+						EndpointKey: "app-server",
+					},
+				},
+				RuntimeClients: []startup.RuntimeClient{
+					{
+						ClientID: "client_codex",
+						Setup: startup.RuntimeClientSetup{
+							Env:   map[string]string{},
+							Files: []startup.RuntimeFileSpec{},
+						},
+						Processes: []startup.RuntimeClientProcessSpec{},
+						Endpoints: []startup.RuntimeClientEndpointSpec{
+							{
+								EndpointKey:    "app-server",
+								ConnectionMode: "dedicated",
+								ProcessKey:     "codex-app-server",
+								Transport: startup.RuntimeClientEndpointTransport{
+									Type: "ws",
+									URL:  agentWSURL,
+								},
+							},
+						},
+					},
+				},
+			})
+		}()
+
+		for index := range 2 {
+			select {
+			case requestPayload := <-agentRequestCh:
+				expectedPayload := fmt.Sprintf(`{"jsonrpc":"2.0","id":"req-%d","method":"ping"}`, index+1)
+				if requestPayload != expectedPayload {
+					t.Fatalf("expected forwarded gateway payload %q, got %q", expectedPayload, requestPayload)
+				}
+			case handlerErr := <-handlerErrCh:
+				select {
+				case runErr := <-runErrCh:
+					t.Fatalf("expected websocket handlers to succeed, got %v (runErr=%v)", handlerErr, runErr)
+				default:
+					t.Fatalf("expected websocket handlers to succeed, got %v", handlerErr)
+				}
+			case <-time.After(3 * time.Second):
+				t.Fatal("expected agent endpoint to receive forwarded payload")
+			}
+		}
+
+		select {
+		case runErr := <-runErrCh:
+			if runErr != nil {
+				t.Fatalf("expected run to stop cleanly after context cancel, got %v", runErr)
+			}
+		case <-time.After(3 * time.Second):
+			t.Fatal("expected run to return after context cancel")
+		}
+
+		select {
+		case handlerErr := <-handlerErrCh:
+			t.Fatalf("expected websocket handlers to succeed, got %v", handlerErr)
+		default:
+		}
+	})
+
 	t.Run("connects to pty session, supports attach and resize, and closes cleanly", func(t *testing.T) {
 		handlerErrCh := make(chan error, 1)
 		gatewayServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -18,6 +19,12 @@ type resolvedAgentEndpoint struct {
 	ConnectionMode string
 	TransportURL   string
 }
+
+type agentRelayResult string
+
+const (
+	agentRelayResultDisconnected agentRelayResult = "disconnected"
+)
 
 func handleAgentConnectRequest(
 	ctx context.Context,
@@ -83,8 +90,12 @@ func handleAgentConnectRequest(
 		return fmt.Errorf("failed to write sandbox tunnel connect acknowledgement: %w", err)
 	}
 
-	if err := relayTunnelFrames(ctx, tunnelConn, agentConn); err != nil {
+	relayResult, err := relayTunnelFrames(ctx, tunnelConn, agentConn)
+	if err != nil {
 		return fmt.Errorf("sandbox tunnel websocket relay failed: %w", err)
+	}
+	if relayResult == agentRelayResultDisconnected {
+		return nil
 	}
 
 	return nil
@@ -154,21 +165,62 @@ func dialAgentEndpoint(ctx context.Context, transportURL string) (*websocket.Con
 	return conn, nil
 }
 
-func relayTunnelFrames(ctx context.Context, tunnelConn *websocket.Conn, agentConn *websocket.Conn) error {
-	relayContext, cancel := context.WithCancel(ctx)
-	defer cancel()
+func relayTunnelFrames(
+	ctx context.Context,
+	tunnelConn *websocket.Conn,
+	agentConn *websocket.Conn,
+) (agentRelayResult, error) {
+	relayContext, cancelAgentRelay := context.WithCancel(ctx)
+	defer cancelAgentRelay()
 
-	relayErrCh := make(chan error, 2)
+	agentRelayErrCh := make(chan error, 1)
+	go relayFramesDirection(
+		relayContext,
+		agentRelayErrCh,
+		agentConn,
+		tunnelConn,
+		"agent websocket",
+		"sandbox tunnel websocket",
+	)
 
-	go relayFramesDirection(relayContext, relayErrCh, tunnelConn, agentConn, "sandbox tunnel websocket", "agent websocket")
-	go relayFramesDirection(relayContext, relayErrCh, agentConn, tunnelConn, "agent websocket", "sandbox tunnel websocket")
+	for {
+		select {
+		case <-ctx.Done():
+			return "", ctx.Err()
+		case agentRelayErr := <-agentRelayErrCh:
+			if agentRelayErr == nil || isExpectedAgentDisconnect(agentRelayErr) {
+				return agentRelayResultDisconnected, nil
+			}
+			return "", agentRelayErr
+		default:
+		}
 
-	relayErr := <-relayErrCh
-	if relayErr != nil {
-		return relayErr
+		messageType, payload, err := tunnelConn.Read(ctx)
+		if err != nil {
+			return "", fmt.Errorf("sandbox tunnel websocket read failed: %w", err)
+		}
+
+		if messageType != websocket.MessageText && messageType != websocket.MessageBinary {
+			return "", fmt.Errorf(
+				"sandbox tunnel websocket produced unsupported message type %s",
+				messageType.String(),
+			)
+		}
+
+		if messageType == websocket.MessageText {
+			controlMessageType, parseErr := parseControlMessageType(payload)
+			if parseErr == nil && controlMessageType == sessionprotocol.MessageTypeDisconnect {
+				return agentRelayResultDisconnected, nil
+			}
+		}
+
+		if err := agentConn.Write(ctx, messageType, payload); err != nil {
+			if isExpectedAgentDisconnect(err) {
+				return agentRelayResultDisconnected, nil
+			}
+			return "", fmt.Errorf("agent websocket write failed: %w", err)
+		}
 	}
-
-	return nil
 }
 
 func relayFramesDirection(
@@ -195,5 +247,22 @@ func relayFramesDirection(
 			relayErrCh <- fmt.Errorf("%s write failed: %w", targetLabel, err)
 			return
 		}
+	}
+}
+
+func isExpectedAgentDisconnect(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, context.Canceled) {
+		return true
+	}
+
+	switch websocket.CloseStatus(err) {
+	case websocket.StatusNormalClosure, websocket.StatusGoingAway:
+		return true
+	default:
+		return false
 	}
 }

@@ -17,6 +17,10 @@ const CloseCodes: {
   REPLACED: 1012,
   PEER_DISCONNECTED: 1012,
 };
+const PeerDisconnectedControlPayload = JSON.stringify({
+  type: "disconnect",
+  reason: "Sandbox tunnel connection peer disconnected.",
+});
 
 function getOppositeSide(side: TunnelPeerSide): TunnelPeerSide {
   return side === "bootstrap" ? "connection" : "bootstrap";
@@ -109,6 +113,18 @@ export class TunnelRelayCoordinator {
     }
 
     if (input.side === "connection") {
+      const opposite = this.peerRegistry.getPeer({
+        instanceId: input.instanceId,
+        side: getOppositeSide(input.side),
+      });
+      if (opposite !== undefined) {
+        void this.frameTransport
+          .forwardToPeer({
+            target: opposite,
+            payload: PeerDisconnectedControlPayload,
+          })
+          .catch(() => undefined);
+      }
       return;
     }
 

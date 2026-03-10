@@ -8,6 +8,7 @@ export type SandboxSessionControlMessage =
   | PTYConnectRequest
   | ConnectOK
   | ConnectError
+  | Disconnect
   | PTYResize
   | PTYClose
   | PTYCloseOK
@@ -43,6 +44,10 @@ export interface ConnectError {
   requestId: string;
   code: string;
   message: string;
+}
+export interface Disconnect {
+  type: "disconnect";
+  reason?: string;
 }
 export interface PTYResize {
   type: "pty.resize";
