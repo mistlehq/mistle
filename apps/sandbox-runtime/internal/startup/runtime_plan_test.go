@@ -50,6 +50,7 @@ func TestValidateRuntimePlan(t *testing.T) {
 				},
 			},
 			RuntimeClients: []RuntimeClient{},
+			AgentRuntimes:  []AgentRuntime{},
 		})
 		if err != nil {
 			t.Fatalf("expected runtime plan validation to succeed, got %v", err)
@@ -96,6 +97,7 @@ func TestValidateRuntimePlan(t *testing.T) {
 				},
 			},
 			RuntimeClients: []RuntimeClient{},
+			AgentRuntimes:  []AgentRuntime{},
 		})
 		if err == nil {
 			t.Fatal("expected runtime plan validation to fail for unknown workspace source route")
@@ -138,6 +140,7 @@ func TestValidateRuntimePlan(t *testing.T) {
 			ArtifactRemovals: []RuntimeArtifactRemovalSpec{},
 			WorkspaceSources: []WorkspaceSource{},
 			RuntimeClients:   []RuntimeClient{},
+			AgentRuntimes:    []AgentRuntime{},
 		})
 		if err == nil {
 			t.Fatal("expected runtime plan validation to fail for non-basic auth usernames")

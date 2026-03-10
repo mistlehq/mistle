@@ -23,9 +23,10 @@ func handleAgentConnectRequest(
 	ctx context.Context,
 	tunnelConn *websocket.Conn,
 	connectRequest connectRequest,
+	agentRuntimes []startup.AgentRuntime,
 	runtimeClients []startup.RuntimeClient,
 ) error {
-	agentEndpoint, err := resolveAgentEndpoint(runtimeClients)
+	agentEndpoint, err := resolveAgentEndpoint(agentRuntimes, runtimeClients)
 	if err != nil {
 		if writeErr := writeConnectError(ctx, tunnelConn, sessionprotocol.ConnectError{
 			Type:      sessionprotocol.MessageTypeConnectError,
@@ -89,34 +90,56 @@ func handleAgentConnectRequest(
 	return nil
 }
 
-func resolveAgentEndpoint(runtimeClients []startup.RuntimeClient) (*resolvedAgentEndpoint, error) {
-	var agentEndpoint resolvedAgentEndpoint
-	endpointCount := 0
+func resolveAgentEndpoint(
+	agentRuntimes []startup.AgentRuntime,
+	runtimeClients []startup.RuntimeClient,
+) (*resolvedAgentEndpoint, error) {
+	if len(agentRuntimes) == 0 {
+		return nil, nil
+	}
+	if len(agentRuntimes) > 1 {
+		return nil, fmt.Errorf("runtime plan must declare at most one agent runtime for agent channel (found %d)", len(agentRuntimes))
+	}
 
+	agentRuntime := agentRuntimes[0]
 	for _, runtimeClient := range runtimeClients {
+		if runtimeClient.ClientID != agentRuntime.ClientID {
+			continue
+		}
+
 		for _, endpoint := range runtimeClient.Endpoints {
-			if endpoint.Transport.Type != "ws" {
+			if endpoint.EndpointKey != agentRuntime.EndpointKey {
 				continue
 			}
+			if endpoint.Transport.Type != "ws" {
+				return nil, fmt.Errorf(
+					"agent runtime '%s' on client '%s' must reference a websocket endpoint",
+					agentRuntime.RuntimeKey,
+					agentRuntime.ClientID,
+				)
+			}
 
-			endpointCount++
-			agentEndpoint = resolvedAgentEndpoint{
+			return &resolvedAgentEndpoint{
 				ClientID:       runtimeClient.ClientID,
 				EndpointKey:    endpoint.EndpointKey,
 				ConnectionMode: endpoint.ConnectionMode,
 				TransportURL:   endpoint.Transport.URL,
-			}
+			}, nil
 		}
+
+		return nil, fmt.Errorf(
+			"agent runtime '%s' references missing endpoint '%s' on client '%s'",
+			agentRuntime.RuntimeKey,
+			agentRuntime.EndpointKey,
+			agentRuntime.ClientID,
+		)
 	}
 
-	if endpointCount == 0 {
-		return nil, nil
-	}
-	if endpointCount > 1 {
-		return nil, fmt.Errorf("runtime plan must declare at most one runtime client websocket endpoint for agent channel (found %d)", endpointCount)
-	}
-
-	return &agentEndpoint, nil
+	return nil, fmt.Errorf(
+		"agent runtime '%s' references missing runtime client '%s'",
+		agentRuntime.RuntimeKey,
+		agentRuntime.ClientID,
+	)
 }
 
 func dialAgentEndpoint(ctx context.Context, transportURL string) (*websocket.Conn, error) {

@@ -22,6 +22,7 @@ type RunInput struct {
 	Context        context.Context
 	GatewayWSURL   string
 	BootstrapToken []byte
+	AgentRuntimes  []startup.AgentRuntime
 	RuntimeClients []startup.RuntimeClient
 }
 
@@ -124,6 +125,7 @@ func Run(input RunInput) error {
 				requestContext,
 				conn,
 				connectRequest,
+				input.AgentRuntimes,
 				input.RuntimeClients,
 			)
 			if err != nil {

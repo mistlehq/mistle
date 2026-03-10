@@ -223,6 +223,7 @@ func Run(input RunInput) (runErr error) {
 			Context:        tunnelContext,
 			GatewayWSURL:   startupInput.TunnelGatewayURL,
 			BootstrapToken: []byte(startupInput.BootstrapToken),
+			AgentRuntimes:  startupInput.RuntimePlan.AgentRuntimes,
 			RuntimeClients: startupInput.RuntimePlan.RuntimeClients,
 		})
 		if tunnelErr != nil {

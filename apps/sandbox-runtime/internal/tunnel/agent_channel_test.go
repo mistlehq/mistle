@@ -7,18 +7,31 @@ import (
 )
 
 func TestResolveAgentEndpoint(t *testing.T) {
-	t.Run("returns nil endpoint when runtime plan declares zero websocket endpoints", func(t *testing.T) {
-		endpoint, err := resolveAgentEndpoint([]startup.RuntimeClient{})
+	t.Run("returns nil endpoint when runtime plan declares zero agent runtimes", func(t *testing.T) {
+		endpoint, err := resolveAgentEndpoint([]startup.AgentRuntime{}, []startup.RuntimeClient{})
 		if err != nil {
-			t.Fatalf("expected endpoint resolution to succeed for zero websocket endpoints, got %v", err)
+			t.Fatalf("expected endpoint resolution to succeed for zero agent runtimes, got %v", err)
 		}
 		if endpoint != nil {
-			t.Fatal("expected nil endpoint when no websocket endpoint is declared")
+			t.Fatal("expected nil endpoint when no agent runtime is declared")
 		}
 	})
 
-	t.Run("fails when runtime plan declares multiple websocket endpoints", func(t *testing.T) {
-		_, err := resolveAgentEndpoint([]startup.RuntimeClient{
+	t.Run("fails when runtime plan declares multiple agent runtimes", func(t *testing.T) {
+		_, err := resolveAgentEndpoint([]startup.AgentRuntime{
+			{
+				BindingID:   "bind_one",
+				RuntimeKey:  "runtime_one",
+				ClientID:    "client_one",
+				EndpointKey: "endpoint_one",
+			},
+			{
+				BindingID:   "bind_two",
+				RuntimeKey:  "runtime_two",
+				ClientID:    "client_two",
+				EndpointKey: "endpoint_two",
+			},
+		}, []startup.RuntimeClient{
 			{
 				ClientID: "client_one",
 				Endpoints: []startup.RuntimeClientEndpointSpec{
@@ -47,12 +60,19 @@ func TestResolveAgentEndpoint(t *testing.T) {
 			},
 		})
 		if err == nil {
-			t.Fatal("expected endpoint resolution to fail when multiple websocket endpoints are declared")
+			t.Fatal("expected endpoint resolution to fail when multiple agent runtimes are declared")
 		}
 	})
 
-	t.Run("resolves single websocket endpoint", func(t *testing.T) {
-		endpoint, err := resolveAgentEndpoint([]startup.RuntimeClient{
+	t.Run("resolves declared agent runtime endpoint", func(t *testing.T) {
+		endpoint, err := resolveAgentEndpoint([]startup.AgentRuntime{
+			{
+				BindingID:   "bind_openai",
+				RuntimeKey:  "codex-app-server",
+				ClientID:    "client_codex",
+				EndpointKey: "app-server",
+			},
+		}, []startup.RuntimeClient{
 			{
 				ClientID: "client_codex",
 				Endpoints: []startup.RuntimeClientEndpointSpec{
@@ -87,8 +107,15 @@ func TestResolveAgentEndpoint(t *testing.T) {
 		}
 	})
 
-	t.Run("ignores non-websocket endpoints", func(t *testing.T) {
-		endpoint, err := resolveAgentEndpoint([]startup.RuntimeClient{
+	t.Run("fails when declared agent endpoint is not websocket", func(t *testing.T) {
+		endpoint, err := resolveAgentEndpoint([]startup.AgentRuntime{
+			{
+				BindingID:   "bind_openai",
+				RuntimeKey:  "codex-app-server",
+				ClientID:    "client_codex",
+				EndpointKey: "http-endpoint",
+			},
+		}, []startup.RuntimeClient{
 			{
 				ClientID: "client_codex",
 				Endpoints: []startup.RuntimeClientEndpointSpec{
@@ -103,11 +130,11 @@ func TestResolveAgentEndpoint(t *testing.T) {
 				},
 			},
 		})
-		if err != nil {
-			t.Fatalf("expected endpoint resolution to succeed for non-websocket endpoints, got %v", err)
+		if err == nil {
+			t.Fatal("expected endpoint resolution to fail for non-websocket agent endpoint")
 		}
 		if endpoint != nil {
-			t.Fatal("expected no resolved endpoint when only non-websocket endpoints exist")
+			t.Fatal("expected no resolved endpoint when agent runtime points at a non-websocket endpoint")
 		}
 	})
 }

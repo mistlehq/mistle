@@ -2,7 +2,7 @@
   "name": "@mistle/sandbox-runtime",
   "private": true,
   "scripts": {
-    "dev": "printf '%s' '{\"bootstrapToken\":\"dev-connect-token\",\"tunnelGatewayWsUrl\":\"ws://127.0.0.1:5003/tunnel/sandbox\",\"runtimePlan\":{\"sandboxProfileId\":\"sbp_dev\",\"version\":1,\"image\":{\"source\":\"base\",\"imageRef\":\"mistle/sandbox-base:dev\"},\"egressRoutes\":[],\"artifacts\":[],\"artifactRemovals\":[],\"runtimeClients\":[],\"workspaceSources\":[]}}' | SANDBOX_RUNTIME_LISTEN_ADDR=:8090 SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL=http://127.0.0.1:5004/tokenizer-proxy/egress go run ./cmd/sandboxd",
+    "dev": "printf '%s' '{\"bootstrapToken\":\"dev-connect-token\",\"tunnelGatewayWsUrl\":\"ws://127.0.0.1:5003/tunnel/sandbox\",\"runtimePlan\":{\"sandboxProfileId\":\"sbp_dev\",\"version\":1,\"image\":{\"source\":\"base\",\"imageRef\":\"mistle/sandbox-base:dev\"},\"egressRoutes\":[],\"artifacts\":[],\"artifactRemovals\":[],\"runtimeClients\":[],\"workspaceSources\":[],\"agentRuntimes\":[]}}' | SANDBOX_RUNTIME_LISTEN_ADDR=:8090 SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL=http://127.0.0.1:5004/tokenizer-proxy/egress go run ./cmd/sandboxd",
     "build": "mkdir -p dist/bin && go build -trimpath -o dist/bin/sandboxd ./cmd/sandboxd",
     "image:build:prod": "test -n \"$IMAGE_TAG\" && docker build --target sandbox-base-prod -f images/base/Dockerfile -t mistle/sandbox-base:$IMAGE_TAG ../..",
     "image:build:prod:sha": "IMAGE_TAG=$(git rev-parse --short=12 HEAD) pnpm image:build:prod",
