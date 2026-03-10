@@ -4,6 +4,7 @@ import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js
 import type {
   CompileBindingAgentRuntime,
   CompiledBindingResult,
+  CompiledWorkspaceSource,
   EgressCredentialRoute,
   RuntimeClientEndpointSpec,
   RuntimeClientProcessSpec,
@@ -71,6 +72,7 @@ function createCompiledBindingResult(input: {
   };
   runtimeClientProcesses?: ReadonlyArray<RuntimeClientProcessSpec>;
   runtimeClientEndpoints?: ReadonlyArray<RuntimeClientEndpointSpec>;
+  workspaceSources?: ReadonlyArray<CompiledWorkspaceSource>;
   agentRuntimes?: ReadonlyArray<CompileBindingAgentRuntime>;
 }): CompiledBindingResult {
   const hasRuntimeClient =
@@ -110,6 +112,7 @@ function createCompiledBindingResult(input: {
             endpoints: input.runtimeClientEndpoints ?? [],
           },
         ],
+    workspaceSources: input.workspaceSources ?? [],
     agentRuntimes:
       input.agentRuntimes?.map((agentRuntime) => ({
         ...agentRuntime,
@@ -195,6 +198,97 @@ describe("validateCompiledBindingResults", () => {
       expect(error).toBeInstanceOf(IntegrationCompilerError);
       if (error instanceof IntegrationCompilerError) {
         expect(error.code).toBe(CompilerErrorCodes.ROUTE_CONFLICT);
+      }
+    }
+  });
+
+  it("fails when a workspace source references an unknown route", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["github.com"],
+      }),
+      artifactKey: "artifact-a",
+      workspaceSources: [
+        {
+          sourceKind: "git-clone",
+          resourceKind: "repository",
+          path: "/workspace/repos/mistlehq/mistle",
+          originUrl: "https://github.com/mistlehq/mistle.git",
+          routeId: "route_missing",
+        },
+      ],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+
+    try {
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(IntegrationCompilerError);
+      if (error instanceof IntegrationCompilerError) {
+        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
+      }
+    }
+  });
+
+  it("fails on duplicate workspace source paths", () => {
+    const resultA = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["github.com"],
+      }),
+      artifactKey: "artifact-a",
+      workspaceSources: [
+        {
+          sourceKind: "git-clone",
+          resourceKind: "repository",
+          path: "/workspace/repos/mistlehq/mistle",
+          originUrl: "https://github.com/mistlehq/mistle.git",
+          routeId: "route_a",
+        },
+      ],
+    });
+    const resultB = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_b",
+        bindingId: "bind_b",
+        hosts: ["github.example.com"],
+      }),
+      artifactKey: "artifact-b",
+      workspaceSources: [
+        {
+          sourceKind: "git-clone",
+          resourceKind: "repository",
+          path: "/workspace/repos/mistlehq/mistle",
+          originUrl: "https://github.example.com/mistlehq/mistle.git",
+          routeId: "route_b",
+        },
+      ],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [resultA, resultB],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+
+    try {
+      validateCompiledBindingResults({
+        compiledBindingResults: [resultA, resultB],
+      });
+    } catch (error) {
+      expect(error).toBeInstanceOf(IntegrationCompilerError);
+      if (error instanceof IntegrationCompilerError) {
+        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
       }
     }
   });

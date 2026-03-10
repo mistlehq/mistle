@@ -25,6 +25,7 @@ function createRuntimePlan(input: {
     artifacts: [],
     artifactRemovals: [],
     runtimeClients: [],
+    workspaceSources: [],
     agentRuntimes: [],
   };
 }

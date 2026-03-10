@@ -642,6 +642,11 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         bindingId: bindingInput.binding.id,
       }),
       runtimeClients: compileBindingResult.runtimeClients,
+      workspaceSources:
+        compileBindingResult.workspaceSources?.map((workspaceSource) => ({
+          ...workspaceSource,
+          routeId: workspaceSource.routeId.routeId,
+        })) ?? [],
       agentRuntimes:
         compileBindingResult.agentRuntimes?.map((agentRuntime) => ({
           ...agentRuntime,

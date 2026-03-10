@@ -539,6 +539,7 @@ export type EgressCredentialRoute = {
   authInjection: {
     type: "bearer" | "basic" | "header" | "query";
     target: string;
+    username?: string;
   };
   credentialResolver: EgressCredentialResolverRef;
 };
@@ -701,10 +702,23 @@ export type CompiledAgentRuntime = CompileBindingAgentRuntime & {
   bindingId: string;
 };
 
+type GitCloneWorkspaceSourceBase<TRouteId> = {
+  sourceKind: "git-clone";
+  resourceKind: "repository";
+  path: string;
+  originUrl: string;
+  routeId: TRouteId;
+};
+
+export type CompileBindingWorkspaceSource = GitCloneWorkspaceSourceBase<EgressUrlRef>;
+
+export type CompiledWorkspaceSource = GitCloneWorkspaceSourceBase<string>;
+
 export type CompileBindingResult = {
   egressRoutes: ReadonlyArray<CompileBindingEgressRoute>;
   artifacts: ReadonlyArray<RuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
+  workspaceSources?: ReadonlyArray<CompileBindingWorkspaceSource>;
   agentRuntimes?: ReadonlyArray<CompileBindingAgentRuntime>;
 };
 
@@ -712,6 +726,7 @@ export type CompiledBindingResult = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
+  workspaceSources: ReadonlyArray<CompiledWorkspaceSource>;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
 };
 
@@ -902,6 +917,7 @@ export type CompiledRuntimePlan = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   artifactRemovals: ReadonlyArray<CompiledRuntimeArtifactRemovalSpec>;
+  workspaceSources: ReadonlyArray<CompiledWorkspaceSource>;
   runtimeClients: ReadonlyArray<RuntimeClient>;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
 };

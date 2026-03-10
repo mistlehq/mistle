@@ -70,6 +70,7 @@ const EgressCredentialRouteSchema = z
       .object({
         type: z.enum(["bearer", "basic", "header", "query"]),
         target: z.string().min(1),
+        username: z.string().min(1).optional(),
       })
       .strict(),
     credentialResolver: z
@@ -212,6 +213,18 @@ const RuntimeClientSchema = z
   })
   .strict();
 
+const WorkspaceSourceSchema = z.discriminatedUnion("sourceKind", [
+  z
+    .object({
+      sourceKind: z.literal("git-clone"),
+      resourceKind: z.literal("repository"),
+      path: z.string().min(1),
+      originUrl: z.url(),
+      routeId: z.string().min(1),
+    })
+    .strict(),
+]);
+
 const CompiledRuntimePlanSchema = z
   .object({
     sandboxProfileId: z.string().min(1),
@@ -220,6 +233,7 @@ const CompiledRuntimePlanSchema = z
     egressRoutes: z.array(EgressCredentialRouteSchema),
     artifacts: z.array(CompiledRuntimeArtifactSpecSchema),
     artifactRemovals: z.array(CompiledRuntimeArtifactRemovalSpecSchema),
+    workspaceSources: z.array(WorkspaceSourceSchema),
     runtimeClients: z.array(RuntimeClientSchema),
   })
   .strict();
