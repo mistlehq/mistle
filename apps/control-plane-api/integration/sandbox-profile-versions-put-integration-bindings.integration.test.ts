@@ -117,6 +117,7 @@ describe("sandbox profile version put integration bindings integration", () => {
                 runtime: "codex-cli",
                 defaultModel: "gpt-5.2",
                 reasoningEffort: "medium",
+                additionalInstructions: "Prefer concise answers.",
               },
             },
             {
@@ -149,6 +150,7 @@ describe("sandbox profile version put integration bindings integration", () => {
       runtime: "codex-cli",
       defaultModel: "gpt-5.2",
       reasoningEffort: "medium",
+      additionalInstructions: "Prefer concise answers.",
     });
 
     const deletedBinding =

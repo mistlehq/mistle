@@ -105,6 +105,10 @@ export function resolveOpenAiBindingConfigForm(
           oneOf: createChoiceList(reasoningOptions, OpenAiReasoningEffortLabelByValue),
           default: defaultReasoning,
         },
+        additionalInstructions: {
+          title: "Additional instructions",
+          description: "Added to the runtime's built-in agent instructions.",
+        },
       },
     },
     uiSchema: {
@@ -119,6 +123,12 @@ export function resolveOpenAiBindingConfigForm(
       },
       reasoningEffort: {
         "ui:widget": "SelectWidget",
+      },
+      additionalInstructions: {
+        "ui:widget": "TextareaWidget",
+        "ui:options": {
+          rows: 8,
+        },
       },
     },
   };

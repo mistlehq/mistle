@@ -64,6 +64,7 @@ describe("sandbox profile version integration bindings get integration", () => {
         runtime: "codex-cli",
         defaultModel: "gpt-5.3-codex",
         reasoningEffort: "medium",
+        additionalInstructions: "Prefer concise answers.",
       },
     });
 
@@ -81,7 +82,15 @@ describe("sandbox profile version integration bindings get integration", () => {
       await response.json(),
     );
     expect(responseBody.bindings).toHaveLength(1);
-    expect(responseBody.bindings[0]?.id).toBe("ibd_bindings_get_001");
+    expect(responseBody.bindings[0]).toMatchObject({
+      id: "ibd_bindings_get_001",
+      config: {
+        runtime: "codex-cli",
+        defaultModel: "gpt-5.3-codex",
+        reasoningEffort: "medium",
+        additionalInstructions: "Prefer concise answers.",
+      },
+    });
   }, 60_000);
 
   it("returns 404 when profile version is missing", async ({ fixture }) => {
