@@ -356,6 +356,9 @@ importers:
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@mistle/integrations-core':
+        specifier: workspace:*
+        version: link:../../packages/integrations-core
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
