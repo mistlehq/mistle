@@ -30,13 +30,11 @@ export type ControlPlaneWorkflowFixture = {
   openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
 };
 const TestContextId = "workflows.integration";
-const MailpitIntegrationContextSchema = z
-  .object({
-    mailpitSmtpHost: z.string().min(1),
-    mailpitSmtpPort: z.number().int().min(1).max(65_535),
-    mailpitHttpBaseUrl: z.url(),
-  })
-  .strict();
+const MailpitIntegrationContextSchema = z.looseObject({
+  mailpitSmtpHost: z.string().min(1),
+  mailpitSmtpPort: z.number().int().min(1).max(65_535),
+  mailpitHttpBaseUrl: z.url(),
+});
 
 export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
   fixture: [
