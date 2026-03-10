@@ -1,9 +1,75 @@
 import { describe, expect, it } from "vitest";
 
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
-import { assembleCompiledRuntimePlan } from "./index.js";
+import { assembleCompiledRuntimePlan, CompiledRuntimePlanSchema } from "./index.js";
 
 describe("assembleCompiledRuntimePlan", () => {
+  it("produces runtime plans accepted by the shared runtime-plan schema", () => {
+    const plan = assembleCompiledRuntimePlan({
+      sandboxProfileId: "sbp_123",
+      version: 7,
+      image: {
+        source: "base",
+        imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
+      },
+      runtimeContext: {
+        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
+      },
+      compiledBindingResults: [
+        {
+          egressRoutes: [],
+          artifacts: [],
+          runtimeClients: [
+            {
+              clientId: "codex-cli",
+              setup: {
+                env: {},
+                files: [],
+              },
+              processes: [
+                {
+                  processKey: "codex-app-server",
+                  command: {
+                    args: ["/workspace/.mistle/bin/codex", "app-server"],
+                  },
+                  readiness: {
+                    type: "none",
+                  },
+                  stop: {
+                    signal: "sigterm",
+                    timeoutMs: 10_000,
+                  },
+                },
+              ],
+              endpoints: [
+                {
+                  endpointKey: "app-server",
+                  processKey: "codex-app-server",
+                  transport: {
+                    type: "ws",
+                    url: "ws://127.0.0.1:4747",
+                  },
+                  connectionMode: "dedicated",
+                },
+              ],
+            },
+          ],
+          workspaceSources: [],
+          agentRuntimes: [
+            {
+              bindingId: "ibd_123",
+              runtimeKey: "codex-app-server",
+              clientId: "codex-cli",
+              endpointKey: "app-server",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(CompiledRuntimePlanSchema.parse(plan)).toEqual(plan);
+  });
+
   it("merges runtime client fragments and produces deterministic ordering", () => {
     const plan = assembleCompiledRuntimePlan({
       sandboxProfileId: "sbp_123",

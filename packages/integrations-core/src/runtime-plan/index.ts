@@ -15,6 +15,8 @@ import type {
   RuntimeClientProcessSpec,
 } from "../types/index.js";
 
+export { CompiledRuntimePlanSchema } from "./schema.js";
+
 type AssembleCompiledRuntimePlanInput = {
   sandboxProfileId: string;
   version: number;

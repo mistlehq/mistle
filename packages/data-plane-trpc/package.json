@@ -56,6 +56,7 @@
   },
   "dependencies": {
     "@mistle/db": "workspace:*",
+    "@mistle/integrations-core": "workspace:*",
     "@mistle/sandbox": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "@trpc/client": "^11.11.0",
