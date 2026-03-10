@@ -53,7 +53,7 @@ import {
   ignoreAutomationConversationDeliveryAutomationRun,
   idleAutomationConversationDeliveryProcessor,
   resolveAutomationConversationDeliveryActiveTaskAction,
-} from "../src/runtime/services/handle-automation-conversation-delivery.js";
+} from "../src/runtime/automation-workflows/workflows/conversation-delivery.js";
 import { it } from "./test-context.js";
 
 const TestTimeoutMs = 120_000;

@@ -13,8 +13,6 @@ import {
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
 } from "../automation-workflows/workflows/automation-run-execution.js";
-import { createEmailSender } from "./create-email-sender.js";
-import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 import {
   acquireConversationDeliveryConnection,
   claimOrResumeAutomationConversationDeliveryTask,
@@ -29,7 +27,9 @@ import {
   resolveAutomationConversationDeliveryRoute,
   resolveAutomationConversationDeliveryActiveTaskAction,
   resolveAutomationRunFailure as resolveConversationDeliveryFailure,
-} from "./handle-automation-conversation-delivery.js";
+} from "../automation-workflows/workflows/conversation-delivery.js";
+import { createEmailSender } from "./create-email-sender.js";
+import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";
 import { startSandboxProfileInstance } from "./start-sandbox-profile-instance.js";
 import { syncIntegrationConnectionResources } from "./sync-integration-connection-resources.js";

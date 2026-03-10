@@ -22,7 +22,11 @@ import {
   markAutomationConversationDeliveryTaskDelivering,
   resolveAutomationConversationDeliveryTaskAction,
   updateAutomationConversationExecution,
-} from "../automation-conversations/index.js";
+} from "../../automation-conversations/index.js";
+import type {
+  DeliverAutomationConversationPayloadServiceInput,
+  EnsureAutomationConversationDeliverySandboxServiceInput,
+} from "../../services/types.js";
 import {
   AutomationConversationRouteBindingActions,
   AutomationConversationDeliverySandboxActions,
@@ -33,7 +37,7 @@ import {
   resolveAutomationConversationExecutionAction,
   resolveAutomationConversationRouteBindingAction,
   resolveAutomationConversationSteerRecoveryAction,
-} from "../automation-workflows/planning/automation-conversation-delivery.js";
+} from "../planning/automation-conversation-delivery.js";
 import {
   acquireAutomationConnection,
   ensureAutomationSandbox,
@@ -44,11 +48,7 @@ import {
   resolveAutomationRunFailure,
   type AcquireAutomationConnectionDependencies,
   type EnsureAutomationSandboxDependencies,
-} from "../automation-workflows/workflows/automation-run-execution.js";
-import type {
-  DeliverAutomationConversationPayloadServiceInput,
-  EnsureAutomationConversationDeliverySandboxServiceInput,
-} from "./types.js";
+} from "./automation-run-execution.js";
 
 export type HandleAutomationConversationDeliveryDependencies = {
   db: ControlPlaneDatabase;
