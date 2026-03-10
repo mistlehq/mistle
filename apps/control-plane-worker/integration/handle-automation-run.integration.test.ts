@@ -35,20 +35,20 @@ import {
   OpenAiRuntimes,
 } from "@mistle/integrations-definitions";
 import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
-import { eq } from "drizzle-orm";
-import { Pool } from "pg";
-import { describe, expect } from "vitest";
-
 import {
   handoffAutomationRunDelivery,
   markAutomationRunFailed,
   prepareAutomationRun,
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
-} from "../src/runtime/automation-workflows/workflows/automation-run-execution.js";
+} from "@mistle/workflows/control-plane/runtime";
+import { eq } from "drizzle-orm";
+import { Pool } from "pg";
+import { describe, expect } from "vitest";
+
 import {
-  claimOrResumeAutomationConversationDeliveryTask,
   AutomationConversationDeliveryTaskActions,
+  claimOrResumeAutomationConversationDeliveryTask,
   finalizeAutomationConversationDeliveryActiveTask,
   ignoreAutomationConversationDeliveryAutomationRun,
   idleAutomationConversationDeliveryProcessor,

@@ -5,14 +5,14 @@ import {
   HandleAutomationConversationDeliveryWorkflowSpec,
   type HandleAutomationConversationDeliveryWorkflowInput,
 } from "@mistle/workflows/control-plane";
-
 import {
   handoffAutomationRunDelivery,
   markAutomationRunFailed,
   prepareAutomationRun,
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
-} from "../automation-workflows/workflows/automation-run-execution.js";
+} from "@mistle/workflows/control-plane/runtime";
+
 import {
   acquireConversationDeliveryConnection,
   claimOrResumeAutomationConversationDeliveryTask,
