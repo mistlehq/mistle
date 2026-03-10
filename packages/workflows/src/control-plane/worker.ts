@@ -60,7 +60,7 @@ export type ControlPlaneWorkerServices = {
     }) => Promise<void>;
     resolveAutomationRunFailure: (input: { error: unknown }) => { code: string; message: string };
   };
-  conversationDelivery?: {
+  automationConversationDelivery?: {
     claimOrResumeAutomationConversationDeliveryTask: (
       input: HandleAutomationConversationDeliveryWorkflowInput,
     ) => Promise<ActiveAutomationConversationDeliveryTask | null>;
@@ -72,7 +72,7 @@ export type ControlPlaneWorkerServices = {
       input: HandleAutomationConversationDeliveryWorkflowInput,
     ) => Promise<boolean>;
     prepareAutomationRun: (input: { automationRunId: string }) => Promise<PreparedAutomationRun>;
-    resolveConversationDeliveryRoute: (input: {
+    resolveAutomationConversationDeliveryRoute: (input: {
       conversationId: string;
     }) => Promise<ResolvedAutomationConversationDeliveryRoute>;
     ensureAutomationSandbox: (input: {
@@ -130,7 +130,7 @@ export type ControlPlaneWorkerServices = {
 
 export const ControlPlaneWorkerWorkflowIds = {
   HANDLE_AUTOMATION_RUN: "handleAutomationRun",
-  HANDLE_CONVERSATION_DELIVERY: "handleAutomationConversationDelivery",
+  HANDLE_AUTOMATION_CONVERSATION_DELIVERY: "handleAutomationConversationDelivery",
   HANDLE_INTEGRATION_WEBHOOK_EVENT: "handleIntegrationWebhookEvent",
   SEND_ORGANIZATION_INVITATION: "sendOrganizationInvitation",
   SEND_VERIFICATION_OTP: "sendVerificationOTP",
@@ -176,33 +176,41 @@ export function createControlPlaneWorker(input: CreateControlPlaneWorkerInput): 
       continue;
     }
 
-    if (workflowId === ControlPlaneWorkerWorkflowIds.HANDLE_CONVERSATION_DELIVERY) {
-      if (input.services.conversationDelivery === undefined) {
+    if (workflowId === ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_CONVERSATION_DELIVERY) {
+      if (input.services.automationConversationDelivery === undefined) {
         throw new Error(
-          "Control-plane conversation delivery service is required for handleAutomationConversationDelivery workflow.",
+          "Control-plane automation conversation delivery service is required for handleAutomationConversationDelivery workflow.",
         );
       }
       const workflow = createHandleAutomationConversationDeliveryWorkflow({
         claimOrResumeAutomationConversationDeliveryTask:
-          input.services.conversationDelivery.claimOrResumeAutomationConversationDeliveryTask,
+          input.services.automationConversationDelivery
+            .claimOrResumeAutomationConversationDeliveryTask,
         resolveAutomationConversationDeliveryTaskAction:
-          input.services.conversationDelivery.resolveAutomationConversationDeliveryTaskAction,
+          input.services.automationConversationDelivery
+            .resolveAutomationConversationDeliveryTaskAction,
         idleAutomationConversationDeliveryProcessorIfEmpty:
-          input.services.conversationDelivery.idleAutomationConversationDeliveryProcessorIfEmpty,
-        prepareAutomationRun: input.services.conversationDelivery.prepareAutomationRun,
-        resolveConversationDeliveryRoute:
-          input.services.conversationDelivery.resolveConversationDeliveryRoute,
-        ensureAutomationSandbox: input.services.conversationDelivery.ensureAutomationSandbox,
+          input.services.automationConversationDelivery
+            .idleAutomationConversationDeliveryProcessorIfEmpty,
+        prepareAutomationRun: input.services.automationConversationDelivery.prepareAutomationRun,
+        resolveAutomationConversationDeliveryRoute:
+          input.services.automationConversationDelivery.resolveAutomationConversationDeliveryRoute,
+        ensureAutomationSandbox:
+          input.services.automationConversationDelivery.ensureAutomationSandbox,
         acquireAutomationConnection:
-          input.services.conversationDelivery.acquireAutomationConnection,
-        deliverAutomationPayload: input.services.conversationDelivery.deliverAutomationPayload,
-        markAutomationRunCompleted: input.services.conversationDelivery.markAutomationRunCompleted,
-        markAutomationRunIgnored: input.services.conversationDelivery.markAutomationRunIgnored,
-        markAutomationRunFailed: input.services.conversationDelivery.markAutomationRunFailed,
+          input.services.automationConversationDelivery.acquireAutomationConnection,
+        deliverAutomationPayload:
+          input.services.automationConversationDelivery.deliverAutomationPayload,
+        markAutomationRunCompleted:
+          input.services.automationConversationDelivery.markAutomationRunCompleted,
+        markAutomationRunIgnored:
+          input.services.automationConversationDelivery.markAutomationRunIgnored,
+        markAutomationRunFailed:
+          input.services.automationConversationDelivery.markAutomationRunFailed,
         finalizeAutomationConversationDeliveryTask:
-          input.services.conversationDelivery.finalizeAutomationConversationDeliveryTask,
+          input.services.automationConversationDelivery.finalizeAutomationConversationDeliveryTask,
         resolveAutomationRunFailure:
-          input.services.conversationDelivery.resolveAutomationRunFailure,
+          input.services.automationConversationDelivery.resolveAutomationRunFailure,
       });
       input.openWorkflow.implementWorkflow(workflow.spec, workflow.fn);
       continue;

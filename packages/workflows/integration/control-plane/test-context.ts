@@ -90,7 +90,7 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
           maxConcurrentWorkflows: 1,
           enabledWorkflows: [
             ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_RUN,
-            ControlPlaneWorkerWorkflowIds.HANDLE_CONVERSATION_DELIVERY,
+            ControlPlaneWorkerWorkflowIds.HANDLE_AUTOMATION_CONVERSATION_DELIVERY,
             ControlPlaneWorkerWorkflowIds.HANDLE_INTEGRATION_WEBHOOK_EVENT,
             ControlPlaneWorkerWorkflowIds.SEND_ORGANIZATION_INVITATION,
             ControlPlaneWorkerWorkflowIds.SEND_VERIFICATION_OTP,
@@ -138,7 +138,7 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
                 };
               },
             },
-            conversationDelivery: {
+            automationConversationDelivery: {
               claimOrResumeAutomationConversationDeliveryTask: async () => null,
               resolveAutomationConversationDeliveryTaskAction: async () => "deliver",
               idleAutomationConversationDeliveryProcessorIfEmpty: async () => true,
@@ -163,7 +163,7 @@ export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
                 conversationId: "con_test",
                 webhookSourceOrderKey: "2026-01-01T00:00:00Z#0001",
               }),
-              resolveConversationDeliveryRoute: async () => ({
+              resolveAutomationConversationDeliveryRoute: async () => ({
                 conversationId: "con_test",
                 integrationFamilyId: "openai",
                 routeId: null,

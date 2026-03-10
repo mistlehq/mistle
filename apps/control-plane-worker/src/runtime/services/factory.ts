@@ -19,7 +19,7 @@ import {
   ignoreAutomationConversationDeliveryAutomationRun,
   idleAutomationConversationDeliveryProcessor,
   prepareConversationDeliveryAutomationRun,
-  resolveConversationDeliveryRoute,
+  resolveAutomationConversationDeliveryRoute,
   resolveAutomationConversationDeliveryActiveTaskAction,
   resolveAutomationRunFailure as resolveConversationDeliveryFailure,
 } from "./handle-automation-conversation-delivery.js";
@@ -98,7 +98,7 @@ export function createControlPlaneWorkerServices(
         return resolveAutomationRunFailure(error);
       },
     },
-    conversationDelivery: {
+    automationConversationDelivery: {
       claimOrResumeAutomationConversationDeliveryTask: async (
         workflowInput: HandleAutomationConversationDeliveryWorkflowInput,
       ) => {
@@ -140,8 +140,8 @@ export function createControlPlaneWorkerServices(
           },
         );
       },
-      resolveConversationDeliveryRoute: async ({ conversationId }) => {
-        return resolveConversationDeliveryRoute(
+      resolveAutomationConversationDeliveryRoute: async ({ conversationId }) => {
+        return resolveAutomationConversationDeliveryRoute(
           {
             db: input.db,
           },

@@ -58,7 +58,7 @@ export type CreateHandleAutomationConversationDeliveryWorkflowInput = {
     input: HandleAutomationConversationDeliveryWorkflowInput,
   ) => Promise<boolean>;
   prepareAutomationRun: (input: { automationRunId: string }) => Promise<PreparedAutomationRun>;
-  resolveConversationDeliveryRoute: (input: {
+  resolveAutomationConversationDeliveryRoute: (input: {
     conversationId: string;
   }) => Promise<ResolvedAutomationConversationDeliveryRoute>;
   ensureAutomationSandbox: (input: {
@@ -193,12 +193,12 @@ export function createHandleAutomationConversationDeliveryWorkflow(
           const resolvedAutomationConversationRoute = await step.run(
             {
               name: getConversationDeliveryStepName({
-                prefix: "resolve-conversation-delivery-route",
+                prefix: "resolve-automation-conversation-delivery-route",
                 taskId: activeTask.taskId,
               }),
             },
             async () =>
-              ctx.resolveConversationDeliveryRoute({
+              ctx.resolveAutomationConversationDeliveryRoute({
                 conversationId: preparedAutomationRun.conversationId,
               }),
           );

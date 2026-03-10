@@ -233,7 +233,7 @@ export async function prepareConversationDeliveryAutomationRun(
   );
 }
 
-export async function resolveConversationDeliveryRoute(
+export async function resolveAutomationConversationDeliveryRoute(
   deps: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
   input: {
     conversationId: string;

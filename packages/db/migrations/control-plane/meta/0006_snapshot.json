@@ -634,7 +634,7 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "control_plane.conversation_delivery_processors": {
+    "control_plane.automation_conversation_delivery_processors": {
       "name": "automation_conversation_delivery_processors",
       "schema": "control_plane",
       "columns": {
@@ -698,7 +698,7 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "control_plane.conversation_delivery_tasks": {
+    "control_plane.automation_conversation_delivery_tasks": {
       "name": "automation_conversation_delivery_tasks",
       "schema": "control_plane",
       "columns": {
@@ -936,7 +936,7 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "control_plane.conversation_routes": {
+    "control_plane.automation_conversation_routes": {
       "name": "automation_conversation_routes",
       "schema": "control_plane",
       "columns": {
