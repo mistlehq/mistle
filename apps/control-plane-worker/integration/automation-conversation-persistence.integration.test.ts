@@ -17,19 +17,17 @@ import {
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
 import {
+  activateAutomationConversationRoute,
   AutomationConversationPersistenceErrorCodes,
   claimAutomationConversation,
-} from "@mistle/workflows/control-plane/runtime";
-import { Pool } from "pg";
-import { describe, expect } from "vitest";
-
-import {
-  activateAutomationConversationRoute,
   createAutomationConversationRoute,
   rebindAutomationConversationSandbox,
   replaceAutomationConversationBinding,
   updateAutomationConversationExecution,
-} from "../src/runtime/automation-workflows/persistence/index.js";
+} from "@mistle/workflows/control-plane/runtime";
+import { Pool } from "pg";
+import { describe, expect } from "vitest";
+
 import { it } from "./test-context.js";
 
 async function createTestDatabase(input: { databaseUrl: string }) {

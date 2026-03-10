@@ -9,6 +9,7 @@ import {
   acquireConversationDeliveryConnection,
   claimOrResumeAutomationConversationDeliveryTask,
   completeConversationDeliveryAutomationRun,
+  deliverConversationAutomationPayload,
   ensureConversationDeliverySandbox,
   failConversationDeliveryAutomationRun,
   finalizeAutomationConversationDeliveryActiveTask,
@@ -24,7 +25,7 @@ import {
   transitionAutomationRunToRunning,
 } from "@mistle/workflows/control-plane/runtime";
 
-import { deliverConversationAutomationPayload } from "../automation-workflows/provider/deliver-conversation-automation-payload.js";
+import { executeConversationProviderDelivery } from "../automation-workflows/provider/execute-conversation-provider-delivery.js";
 import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";
@@ -190,6 +191,7 @@ export function createControlPlaneWorkerServices(
         await deliverConversationAutomationPayload(
           {
             db: input.db,
+            executeConversationProviderDelivery,
           },
           {
             taskId,
