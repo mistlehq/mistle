@@ -6,7 +6,7 @@ import {
   GetSandboxInstanceInputSchema,
   GetSandboxInstanceResponseSchema,
   StartSandboxInstanceAcceptedResponseSchema,
-  StartSandboxInstanceInputSchema,
+  StartSandboxInstanceInputValidationSchema,
   type GetSandboxInstanceInput,
   type GetSandboxInstanceResponse,
   type StartSandboxInstanceAcceptedResponse,
@@ -59,7 +59,7 @@ export function createDataPlaneSandboxInstancesClient(
 
   return {
     startSandboxInstance: async (startInput) => {
-      const parsedStartInput = StartSandboxInstanceInputSchema.parse(startInput);
+      const parsedStartInput = StartSandboxInstanceInputValidationSchema.parse(startInput);
       const response = await trpcClient.sandboxInstances.start.mutate(parsedStartInput);
 
       return StartSandboxInstanceAcceptedResponseSchema.parse(response);

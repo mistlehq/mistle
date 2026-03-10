@@ -44,8 +44,6 @@ export const StartSandboxInstanceInputValidationSchema = z
   })
   .strict();
 
-export const StartSandboxInstanceInputSchema = StartSandboxInstanceInputValidationSchema;
-
 export const StartSandboxInstanceAcceptedResponseSchema = z
   .object({
     status: z.literal("accepted"),

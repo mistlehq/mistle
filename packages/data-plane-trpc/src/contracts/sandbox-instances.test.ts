@@ -1,10 +1,7 @@
 import { CompiledRuntimePlanSchema, assembleCompiledRuntimePlan } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import {
-  StartSandboxInstanceInputSchema,
-  StartSandboxInstanceInputValidationSchema,
-} from "./index.js";
+import { StartSandboxInstanceInputValidationSchema } from "./index.js";
 
 function createRuntimePlan() {
   return assembleCompiledRuntimePlan({
@@ -70,7 +67,7 @@ function createRuntimePlan() {
   });
 }
 
-describe("StartSandboxInstanceInputSchema", () => {
+describe("StartSandboxInstanceInputValidationSchema", () => {
   it("reuses the shared compiled runtime plan schema", () => {
     expect(StartSandboxInstanceInputValidationSchema.shape.runtimePlan).toBe(
       CompiledRuntimePlanSchema,
@@ -96,7 +93,7 @@ describe("StartSandboxInstanceInputSchema", () => {
       },
     };
 
-    expect(StartSandboxInstanceInputSchema.parse(input)).toEqual(input);
+    expect(StartSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
   });
 
   it("reports nested runtime plan validation issues", () => {
