@@ -7,6 +7,7 @@ const (
 	MessageTypeConnect      = "connect"
 	MessageTypeConnectOK    = "connect.ok"
 	MessageTypeConnectError = "connect.error"
+	MessageTypeDisconnect   = "disconnect"
 	MessageTypePTYResize    = "pty.resize"
 	MessageTypePTYClose     = "pty.close"
 	MessageTypePTYCloseOK   = "pty.close.ok"
@@ -64,6 +65,13 @@ type ConnectError struct {
 	RequestID string `json:"requestId"`
 	Code      string `json:"code"`
 	Message   string `json:"message"`
+}
+
+// Disconnect reports that the opposite tunnel peer disconnected and the current
+// relay session should end while keeping the bootstrap tunnel alive.
+type Disconnect struct {
+	Type   string `json:"type" jsonschema:"enum=disconnect"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // PTYResize resizes the active PTY session.

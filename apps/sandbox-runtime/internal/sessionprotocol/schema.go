@@ -16,6 +16,7 @@ var controlMessageTypes = []reflect.Type{
 	reflect.TypeOf(PTYConnectRequest{}),
 	reflect.TypeOf(ConnectOK{}),
 	reflect.TypeOf(ConnectError{}),
+	reflect.TypeOf(Disconnect{}),
 	reflect.TypeOf(PTYResize{}),
 	reflect.TypeOf(PTYClose{}),
 	reflect.TypeOf(PTYCloseOK{}),
