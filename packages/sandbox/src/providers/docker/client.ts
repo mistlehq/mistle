@@ -139,41 +139,16 @@ function toDockerEnv(env: Record<string, string> | undefined): string[] | undefi
   return entries.map(([key, value]) => `${key}=${value}`);
 }
 
-type DestroyableReadWriteStream = NodeJS.ReadWriteStream & {
-  destroy: (error?: Error) => void;
-};
-
-function isDestroyableReadWriteStream(
-  stream: NodeJS.ReadWriteStream,
-): stream is DestroyableReadWriteStream {
-  return "destroy" in stream && typeof stream.destroy === "function";
-}
-
-function createAttachStdinOptions(): Docker.ContainerAttachOptions & {
-  _query: {
-    stdin: true;
-    stream: true;
-    stdout: false;
-    stderr: false;
-    logs: false;
-  };
-} {
+function createAttachStdinOptions(): Docker.ContainerAttachOptions {
   return {
-    // dockerode uses this field internally to request HTTP upgrade for stdin streaming.
+    // Docker attach requires the upgraded TCP stream for stdin writes, and the
+    // callback only resolves reliably when stdout/stderr are also attached.
     hijack: true,
     stdin: true,
     stream: true,
     logs: false,
-    stdout: false,
-    stderr: false,
-    // Ensure only daemon-supported attach query params are sent.
-    _query: {
-      stdin: true,
-      stream: true,
-      stdout: false,
-      stderr: false,
-      logs: false,
-    },
+    stdout: true,
+    stderr: true,
   };
 }
 
@@ -209,6 +184,7 @@ export class DockerApiClient implements DockerClient {
       DockerClientOperationIds.CREATE_CONTAINER,
       () => this.#docker.createContainer(createContainerOptions),
     );
+
     const attachedStdinStream = await this.#runDockerClientOperation(
       DockerClientOperationIds.ATTACH_STDIN,
       () => container.attach(createAttachStdinOptions()),
@@ -389,48 +365,12 @@ export class DockerApiClient implements DockerClient {
 
   async #closeAttachedStdinStream(attachedStdinStream: NodeJS.ReadWriteStream): Promise<void> {
     await new Promise<void>((resolve, reject) => {
-      let settled = false;
-
-      const finish = (error?: Error | null) => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-
-        attachedStdinStream.off("close", handleClose);
-        attachedStdinStream.off("error", handleError);
-
+      attachedStdinStream.end((error?: Error | null) => {
         if (error !== undefined && error !== null) {
           reject(error);
           return;
         }
-
         resolve();
-      };
-
-      const handleClose = () => {
-        finish();
-      };
-      const handleError = (error: Error) => {
-        finish(error);
-      };
-
-      attachedStdinStream.once("close", handleClose);
-      attachedStdinStream.once("error", handleError);
-
-      attachedStdinStream.end((error?: Error | null) => {
-        if (error !== undefined && error !== null) {
-          finish(error);
-          return;
-        }
-
-        // Docker closes container stdin on attach disconnect (StdinOnce), so ensure
-        // the hijacked stream is fully disconnected after writing EOF.
-        if (!isDestroyableReadWriteStream(attachedStdinStream)) {
-          finish(new Error("Attached stdin stream is not destroyable."));
-          return;
-        }
-        attachedStdinStream.destroy();
       });
     });
   }
