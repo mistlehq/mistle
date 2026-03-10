@@ -539,6 +539,11 @@ export type EgressCredentialRoute = {
   authInjection: {
     type: "bearer" | "basic" | "header" | "query";
     target: string;
+    /**
+     * Optional fixed username used when the upstream expects Basic auth in the
+     * form of username:secret rather than just a secret value.
+     */
+    username?: string;
   };
   credentialResolver: EgressCredentialResolverRef;
 };
@@ -701,10 +706,33 @@ export type CompiledAgentRuntime = CompileBindingAgentRuntime & {
   bindingId: string;
 };
 
+type GitCloneWorkspaceSourceBase<TRouteId> = {
+  sourceKind: "git-clone";
+  resourceKind: "repository";
+  path: string;
+  originUrl: string;
+  /**
+   * Route used to realize the source through mediated egress. Startup uses the
+   * route URL for the initial network operation and then restores originUrl as
+   * the canonical git remote.
+   */
+  routeId: TRouteId;
+};
+
+export type CompileBindingWorkspaceSource = GitCloneWorkspaceSourceBase<EgressUrlRef>;
+
+export type CompiledWorkspaceSource = GitCloneWorkspaceSourceBase<string>;
+
 export type CompileBindingResult = {
   egressRoutes: ReadonlyArray<CompileBindingEgressRoute>;
   artifacts: ReadonlyArray<RuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
+  /**
+   * Sources that should appear in the workspace before runtime clients start.
+   * Definitions describe them in binding-local terms and the compiler resolves
+   * any route references into concrete compiled route IDs.
+   */
+  workspaceSources?: ReadonlyArray<CompileBindingWorkspaceSource>;
   agentRuntimes?: ReadonlyArray<CompileBindingAgentRuntime>;
 };
 
@@ -712,6 +740,7 @@ export type CompiledBindingResult = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
+  workspaceSources: ReadonlyArray<CompiledWorkspaceSource>;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
 };
 
@@ -902,6 +931,7 @@ export type CompiledRuntimePlan = {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   artifactRemovals: ReadonlyArray<CompiledRuntimeArtifactRemovalSpec>;
+  workspaceSources: ReadonlyArray<CompiledWorkspaceSource>;
   runtimeClients: ReadonlyArray<RuntimeClient>;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
 };

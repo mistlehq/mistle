@@ -32,3 +32,16 @@ func TestParseListenAddr(t *testing.T) {
 		}
 	})
 }
+
+func TestResolveLoopbackEgressBaseURL(t *testing.T) {
+	t.Run("derives the loopback egress base url from the listen port", func(t *testing.T) {
+		egressBaseURL, err := resolveLoopbackEgressBaseURL(":8090")
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		if egressBaseURL != "http://127.0.0.1:8090/egress" {
+			t.Fatalf("expected loopback egress base url http://127.0.0.1:8090/egress, got %s", egressBaseURL)
+		}
+	})
+}

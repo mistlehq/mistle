@@ -44,6 +44,7 @@ const RuntimePlanSchema = z.object({
       authInjection: z.object({
         type: z.enum(["bearer", "basic", "header", "query"]),
         target: z.string().min(1),
+        username: z.string().min(1).optional(),
       }),
       credentialResolver: z.object({
         connectionId: z.string().min(1),
@@ -98,6 +99,17 @@ const RuntimePlanSchema = z.object({
         }),
       ),
     }),
+  ),
+  workspaceSources: z.array(
+    z.discriminatedUnion("sourceKind", [
+      z.object({
+        sourceKind: z.literal("git-clone"),
+        resourceKind: z.literal("repository"),
+        path: z.string().min(1),
+        originUrl: z.url(),
+        routeId: z.string().min(1),
+      }),
+    ]),
   ),
   runtimeClients: z.array(
     z.object({
@@ -221,6 +233,7 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
     ],
     artifacts: [],
     artifactRemovals: [],
+    workspaceSources: [],
     runtimeClients: [],
     agentRuntimes: [],
   };

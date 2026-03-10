@@ -642,6 +642,13 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         bindingId: bindingInput.binding.id,
       }),
       runtimeClients: compileBindingResult.runtimeClients,
+      // Workspace sources are authored against binding-local egress refs so
+      // integration definitions never have to guess compiled route IDs.
+      workspaceSources:
+        compileBindingResult.workspaceSources?.map((workspaceSource) => ({
+          ...workspaceSource,
+          routeId: workspaceSource.routeId.routeId,
+        })) ?? [],
       agentRuntimes:
         compileBindingResult.agentRuntimes?.map((agentRuntime) => ({
           ...agentRuntime,

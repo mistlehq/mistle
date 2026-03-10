@@ -8,6 +8,7 @@ import type {
   CompiledRuntimeArtifactRemovalSpec,
   CompiledRuntimeClient,
   CompiledRuntimePlan,
+  CompiledWorkspaceSource,
   RuntimeArtifactCommand,
   RuntimeClient,
   RuntimeClientEndpointSpec,
@@ -59,6 +60,18 @@ function flattenAgentRuntimes(
   }
 
   return agentRuntimes;
+}
+
+function flattenWorkspaceSources(
+  input: ReadonlyArray<CompiledBindingResult>,
+): ReadonlyArray<CompiledWorkspaceSource> {
+  const workspaceSources: CompiledWorkspaceSource[] = [];
+
+  for (const compiledBindingResult of input) {
+    workspaceSources.push(...compiledBindingResult.workspaceSources);
+  }
+
+  return workspaceSources;
 }
 
 function resolveRuntimeClients(input: {
@@ -456,6 +469,12 @@ export function assembleCompiledRuntimePlan(
       left.clientId.localeCompare(right.clientId) ||
       left.endpointKey.localeCompare(right.endpointKey),
   );
+  const workspaceSources = [...flattenWorkspaceSources(input.compiledBindingResults)].sort(
+    (left, right) =>
+      left.path.localeCompare(right.path) ||
+      left.originUrl.localeCompare(right.originUrl) ||
+      left.routeId.localeCompare(right.routeId),
+  );
 
   return {
     sandboxProfileId: input.sandboxProfileId,
@@ -464,6 +483,7 @@ export function assembleCompiledRuntimePlan(
     egressRoutes: routes,
     artifacts,
     artifactRemovals,
+    workspaceSources,
     runtimeClients,
     agentRuntimes,
   };

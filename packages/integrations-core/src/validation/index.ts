@@ -4,6 +4,7 @@ import type {
   CompiledRuntimeArtifactSpec,
   CompiledBindingResult,
   CompiledRuntimeClient,
+  CompiledWorkspaceSource,
   EgressCredentialRoute,
   EgressUrlRef,
   RuntimeArtifactCommand,
@@ -15,21 +16,25 @@ function flattenCompiledBindingResults(input: ReadonlyArray<CompiledBindingResul
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
+  workspaceSources: ReadonlyArray<CompiledWorkspaceSource>;
 } {
   const egressRoutes: EgressCredentialRoute[] = [];
   const artifacts: CompiledRuntimeArtifactSpec[] = [];
   const runtimeClients: CompiledRuntimeClient[] = [];
+  const workspaceSources: CompiledWorkspaceSource[] = [];
 
   for (const compiledBindingResult of input) {
     egressRoutes.push(...compiledBindingResult.egressRoutes);
     artifacts.push(...compiledBindingResult.artifacts);
     runtimeClients.push(...compiledBindingResult.runtimeClients);
+    workspaceSources.push(...compiledBindingResult.workspaceSources);
   }
 
   return {
     egressRoutes,
     artifacts,
     runtimeClients,
+    workspaceSources,
   };
 }
 
@@ -143,6 +148,46 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
         `Artifact key conflict detected for '${artifact.artifactKey}'.`,
       );
     }
+  }
+}
+
+function validateWorkspaceSources(
+  input: ReadonlyArray<CompiledWorkspaceSource>,
+  routeIds: ReadonlySet<string>,
+): void {
+  const sourceByPath = new Map<string, CompiledWorkspaceSource>();
+
+  for (const workspaceSource of input) {
+    if (workspaceSource.path.trim().length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+        "Workspace source path must be non-empty.",
+      );
+    }
+
+    if (workspaceSource.originUrl.trim().length === 0) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+        `Workspace source '${workspaceSource.path}' must define a non-empty originUrl.`,
+      );
+    }
+
+    if (!routeIds.has(workspaceSource.routeId)) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+        `Workspace source '${workspaceSource.path}' references missing route '${workspaceSource.routeId}'.`,
+      );
+    }
+
+    const existingSource = sourceByPath.get(workspaceSource.path);
+    if (existingSource !== undefined) {
+      throw new IntegrationCompilerError(
+        CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
+        `Workspace source path conflict detected for '${workspaceSource.path}'.`,
+      );
+    }
+
+    sourceByPath.set(workspaceSource.path, workspaceSource);
   }
 }
 
@@ -739,6 +784,10 @@ export function validateCompiledBindingResults(input: {
 
   validateRoutes(flattenedResults.egressRoutes);
   validateArtifacts(flattenedResults.artifacts);
+  validateWorkspaceSources(
+    flattenedResults.workspaceSources,
+    new Set(flattenedResults.egressRoutes.map((route) => route.routeId)),
+  );
   validateRuntimeClients(flattenedResults.runtimeClients);
   validateAgentRuntimes({
     compiledBindingResults: input.compiledBindingResults,

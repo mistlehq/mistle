@@ -15,6 +15,7 @@ type EgressRouteMetadata = {
   upstreamBaseUrl: string;
   authInjectionType: "bearer" | "basic" | "header" | "query";
   authInjectionTarget: string;
+  authInjectionUsername?: string;
   connectionId: string;
   secretType: string;
   purpose?: string;
@@ -60,12 +61,18 @@ function parseAuthInjectionType(value: string): EgressRouteMetadata["authInjecti
   throw new Error(`Unsupported auth injection type '${value}'.`);
 }
 
+// Route metadata is carried on internal headers by sandboxd so tokenizer-proxy
+// can stay stateless and enforce the exact policy compileBinding resolved.
 function resolveRouteMetadata(ctx: Context<AppContextBindings>): EgressRouteMetadata {
   const headers = ctx.req.raw.headers;
   const credentialPurpose = readOptionalHeader(headers, EgressRequestHeaders.CREDENTIAL_PURPOSE);
   const credentialResolverKey = readOptionalHeader(
     headers,
     EgressRequestHeaders.CREDENTIAL_RESOLVER_KEY,
+  );
+  const authInjectionUsername = readOptionalHeader(
+    headers,
+    EgressRequestHeaders.AUTH_INJECTION_USERNAME,
   );
 
   return {
@@ -74,6 +81,7 @@ function resolveRouteMetadata(ctx: Context<AppContextBindings>): EgressRouteMeta
       readRequiredHeader(headers, EgressRequestHeaders.AUTH_INJECTION_TYPE),
     ),
     authInjectionTarget: readRequiredHeader(headers, EgressRequestHeaders.AUTH_INJECTION_TARGET),
+    ...(authInjectionUsername === undefined ? {} : { authInjectionUsername }),
     connectionId: readRequiredHeader(headers, EgressRequestHeaders.CONNECTION_ID),
     secretType: readRequiredHeader(headers, EgressRequestHeaders.CREDENTIAL_SECRET_TYPE),
     ...(credentialPurpose === undefined ? {} : { purpose: credentialPurpose }),
@@ -137,6 +145,9 @@ function resolveForwardPath(basePath: string, targetPath: string): string {
   return joinPath(normalizedBasePath, normalizedTargetPath);
 }
 
+// The incoming request path is relative to the sandbox route URL, while the
+// upstream base URL still points at the canonical origin. This reattaches the
+// route-relative suffix to the canonical upstream path before forwarding.
 function createUpstreamUrl(ctx: Context<AppContextBindings>, upstreamBaseUrl: string): URL {
   const upstreamUrl = new URL(upstreamBaseUrl);
   const incomingUrl = new URL(ctx.req.url);
@@ -152,19 +163,27 @@ function createUpstreamUrl(ctx: Context<AppContextBindings>, upstreamBaseUrl: st
   return upstreamUrl;
 }
 
-function toBasicAuthorizationValue(secretValue: string): string {
-  return `Basic ${Buffer.from(secretValue, "utf8").toString("base64")}`;
+// Some upstreams expect Basic auth as username:secret rather than a bare secret.
+// GitHub App HTTP Git access is the motivating case: x-access-token:<token>.
+function toBasicAuthorizationValue(input: { secretValue: string; username?: string }): string {
+  const credentials =
+    input.username === undefined ? input.secretValue : `${input.username}:${input.secretValue}`;
+
+  return `Basic ${Buffer.from(credentials, "utf8").toString("base64")}`;
 }
 
 function toBearerAuthorizationValue(secretValue: string): string {
   return `Bearer ${secretValue}`;
 }
 
+// applyAuthInjection mutates the outgoing request in place because header- and
+// query-based auth schemes share the same forwarding pipeline.
 function applyAuthInjection(input: {
   upstreamUrl: URL;
   outgoingHeaders: Headers;
   authInjectionType: EgressRouteMetadata["authInjectionType"];
   authInjectionTarget: string;
+  authInjectionUsername?: string;
   secretValue: string;
 }): void {
   switch (input.authInjectionType) {
@@ -177,7 +196,12 @@ function applyAuthInjection(input: {
     case "basic":
       input.outgoingHeaders.set(
         input.authInjectionTarget,
-        toBasicAuthorizationValue(input.secretValue),
+        toBasicAuthorizationValue({
+          secretValue: input.secretValue,
+          ...(input.authInjectionUsername === undefined
+            ? {}
+            : { username: input.authInjectionUsername }),
+        }),
       );
       return;
     case "header":
@@ -307,6 +331,9 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
       outgoingHeaders,
       authInjectionType: routeMetadata.authInjectionType,
       authInjectionTarget: routeMetadata.authInjectionTarget,
+      ...(routeMetadata.authInjectionUsername === undefined
+        ? {}
+        : { authInjectionUsername: routeMetadata.authInjectionUsername }),
       secretValue: resolvedCredentialValue,
     });
 

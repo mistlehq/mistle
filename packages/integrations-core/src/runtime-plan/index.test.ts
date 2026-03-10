@@ -91,6 +91,7 @@ describe("assembleCompiledRuntimePlan", () => {
               ],
             },
           ],
+          workspaceSources: [],
           agentRuntimes: [
             {
               bindingId: "bind_b",
@@ -182,6 +183,7 @@ describe("assembleCompiledRuntimePlan", () => {
               ],
             },
           ],
+          workspaceSources: [],
           agentRuntimes: [
             {
               bindingId: "bind_a",
@@ -263,6 +265,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            workspaceSources: [],
             agentRuntimes: [],
           },
           {
@@ -281,6 +284,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            workspaceSources: [],
             agentRuntimes: [],
           },
         ],
@@ -315,6 +319,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            workspaceSources: [],
             agentRuntimes: [],
           },
           {
@@ -333,6 +338,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            workspaceSources: [],
             agentRuntimes: [],
           },
         ],
@@ -379,6 +385,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            workspaceSources: [],
             agentRuntimes: [],
           },
           {
@@ -402,6 +409,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            workspaceSources: [],
             agentRuntimes: [],
           },
         ],
@@ -441,6 +449,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            workspaceSources: [],
             agentRuntimes: [],
           },
           {
@@ -464,6 +473,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            workspaceSources: [],
             agentRuntimes: [],
           },
         ],
@@ -508,6 +518,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            workspaceSources: [],
             agentRuntimes: [],
           },
         ],
@@ -545,6 +556,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 endpoints: [],
               },
             ],
+            workspaceSources: [],
             agentRuntimes: [],
           },
         ],
@@ -583,6 +595,7 @@ describe("assembleCompiledRuntimePlan", () => {
             },
           ],
           runtimeClients: [],
+          workspaceSources: [],
           agentRuntimes: [],
         },
       ],
@@ -608,6 +621,7 @@ describe("assembleCompiledRuntimePlan", () => {
             },
           ],
           runtimeClients: [],
+          workspaceSources: [],
           agentRuntimes: [],
         },
       ],

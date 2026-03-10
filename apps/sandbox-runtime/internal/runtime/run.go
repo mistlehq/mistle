@@ -91,41 +91,26 @@ func Run(input RunInput) (runErr error) {
 		attribute.Int("mistle.sandbox.profile_version", startupInput.RuntimePlan.Version),
 	)
 
-	err = traceStep(runContext, tracingHandle.Tracer(), "sandbox.runtime.apply_runtime_plan", func(context.Context) error {
-		return runtimeplan.Apply(runtimeplan.ApplyInput{RuntimePlan: startupInput.RuntimePlan})
-	})
-	if err != nil {
-		runSpan.RecordError(err)
-		runSpan.SetStatus(codes.Error, err.Error())
-		return fmt.Errorf("failed to apply runtime plan: %w", err)
-	}
-
-	processManager, err := traceStepWithValue(
-		runContext,
-		tracingHandle.Tracer(),
-		"sandbox.runtime.start_runtime_client_processes",
-		func(context.Context) (*runtimeClientProcessManager, error) {
-			return startRuntimeClientProcesses(flattenRuntimeClientProcesses(startupInput.RuntimePlan.RuntimeClients))
-		},
-	)
-	if err != nil {
-		runSpan.RecordError(err)
-		runSpan.SetStatus(codes.Error, err.Error())
-		return fmt.Errorf("failed to start runtime client processes: %w", err)
-	}
-	defer func() {
-		stopErr := processManager.Stop()
-		if stopErr != nil && runErr == nil {
-			runErr = fmt.Errorf("failed to stop runtime client processes: %w", stopErr)
-		}
-	}()
-
 	listenAddr, err := traceStepWithValue(
 		runContext,
 		tracingHandle.Tracer(),
 		"sandbox.runtime.parse_listen_addr",
 		func(context.Context) (string, error) {
 			return parseListenAddr(cfg.ListenAddr)
+		},
+	)
+	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
+		return err
+	}
+
+	sandboxdLoopbackEgressBaseURL, err := traceStepWithValue(
+		runContext,
+		tracingHandle.Tracer(),
+		"sandbox.runtime.resolve_loopback_egress_base_url",
+		func(context.Context) (string, error) {
+			return resolveLoopbackEgressBaseURL(cfg.ListenAddr)
 		},
 	)
 	if err != nil {
@@ -174,6 +159,57 @@ func Run(input RunInput) (runErr error) {
 	httpServer := &http.Server{
 		Handler: otelhttp.NewHandler(router, "sandbox.runtime.http.server"),
 	}
+	defer func() {
+		_ = httpServer.Close()
+	}()
+
+	httpServerErrCh := make(chan error, 1)
+	go func() {
+		_, httpServerSpan := tracingHandle.Tracer().Start(
+			runContext,
+			"sandbox.runtime.http_server.serve",
+		)
+		defer httpServerSpan.End()
+
+		httpServerErr := httpServer.Serve(listener)
+		if httpServerErr != nil && !errors.Is(httpServerErr, http.ErrServerClosed) {
+			httpServerSpan.RecordError(httpServerErr)
+			httpServerSpan.SetStatus(codes.Error, httpServerErr.Error())
+		}
+		httpServerErrCh <- httpServerErr
+	}()
+
+	err = traceStep(runContext, tracingHandle.Tracer(), "sandbox.runtime.apply_runtime_plan", func(context.Context) error {
+		return runtimeplan.Apply(runtimeplan.ApplyInput{
+			RuntimePlan:           startupInput.RuntimePlan,
+			SandboxdEgressBaseURL: sandboxdLoopbackEgressBaseURL,
+		})
+	})
+	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
+		return fmt.Errorf("failed to apply runtime plan: %w", err)
+	}
+
+	processManager, err := traceStepWithValue(
+		runContext,
+		tracingHandle.Tracer(),
+		"sandbox.runtime.start_runtime_client_processes",
+		func(context.Context) (*runtimeClientProcessManager, error) {
+			return startRuntimeClientProcesses(flattenRuntimeClientProcesses(startupInput.RuntimePlan.RuntimeClients))
+		},
+	)
+	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
+		return fmt.Errorf("failed to start runtime client processes: %w", err)
+	}
+	defer func() {
+		stopErr := processManager.Stop()
+		if stopErr != nil && runErr == nil {
+			runErr = fmt.Errorf("failed to stop runtime client processes: %w", stopErr)
+		}
+	}()
 
 	tunnelCtx, cancelTunnel := context.WithCancel(runContext)
 	defer cancelTunnel()
@@ -195,22 +231,6 @@ func Run(input RunInput) (runErr error) {
 		}
 
 		tunnelErrCh <- tunnelErr
-	}()
-
-	httpServerErrCh := make(chan error, 1)
-	go func() {
-		_, httpServerSpan := tracingHandle.Tracer().Start(
-			runContext,
-			"sandbox.runtime.http_server.serve",
-		)
-		defer httpServerSpan.End()
-
-		httpServerErr := httpServer.Serve(listener)
-		if httpServerErr != nil && !errors.Is(httpServerErr, http.ErrServerClosed) {
-			httpServerSpan.RecordError(httpServerErr)
-			httpServerSpan.SetStatus(codes.Error, httpServerErr.Error())
-		}
-		httpServerErrCh <- httpServerErr
 	}()
 
 	select {
