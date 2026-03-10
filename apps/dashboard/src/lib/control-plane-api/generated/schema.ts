@@ -4,6 +4,536 @@
  */
 
 export interface paths {
+  "/v1/automations/webhooks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          after?: string;
+          before?: string;
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List webhook automations for the active organization. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              items: {
+                conversationKeyTemplate: string;
+                createdAt: string;
+                enabled: boolean;
+                eventTypes: string[] | null;
+                id: string;
+                idempotencyKeyTemplate: string | null;
+                inputTemplate: string;
+                integrationConnectionId: string;
+                /** @enum {string} */
+                kind: "webhook";
+                name: string;
+                payloadFilter: {
+                  [key: string]: unknown;
+                } | null;
+                target: {
+                  id: string;
+                  sandboxProfileId: string;
+                  sandboxProfileVersion: number | null;
+                };
+                updatedAt: string;
+              }[];
+              nextPage: {
+                after: string;
+                limit: number;
+              } | null;
+              previousPage: {
+                before: string;
+                limit: number;
+              } | null;
+              totalResults: number;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT"
+                    | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_CONNECTION_REFERENCE"
+                    | "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE"
+                    | "INVALID_SANDBOX_PROFILE_REFERENCE";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            conversationKeyTemplate: string;
+            enabled?: boolean;
+            eventTypes?: string[] | null;
+            idempotencyKeyTemplate?: string | null;
+            inputTemplate: string;
+            integrationConnectionId: string;
+            name: string;
+            payloadFilter?: {
+              [key: string]: unknown;
+            } | null;
+            target: {
+              sandboxProfileId: string;
+              sandboxProfileVersion?: number | null;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Create a webhook automation. */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              eventTypes: string[] | null;
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              integrationConnectionId: string;
+              /** @enum {string} */
+              kind: "webhook";
+              name: string;
+              payloadFilter: {
+                [key: string]: unknown;
+              } | null;
+              target: {
+                id: string;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number | null;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT"
+                    | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_CONNECTION_REFERENCE"
+                    | "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE"
+                    | "INVALID_SANDBOX_PROFILE_REFERENCE";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/automations/webhooks/{automationId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          automationId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Get a webhook automation. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              eventTypes: string[] | null;
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              integrationConnectionId: string;
+              /** @enum {string} */
+              kind: "webhook";
+              name: string;
+              payloadFilter: {
+                [key: string]: unknown;
+              } | null;
+              target: {
+                id: string;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number | null;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Webhook automation was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "AUTOMATION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          automationId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Delete a webhook automation. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              automationId: string;
+              /** @enum {string} */
+              status: "deleted";
+            };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Webhook automation was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "AUTOMATION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          automationId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            conversationKeyTemplate?: string;
+            enabled?: boolean;
+            eventTypes?: string[] | null;
+            idempotencyKeyTemplate?: string | null;
+            inputTemplate?: string;
+            integrationConnectionId?: string;
+            name?: string;
+            payloadFilter?: {
+              [key: string]: unknown;
+            } | null;
+            target?: {
+              sandboxProfileId?: string;
+              sandboxProfileVersion?: number | null;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Update a webhook automation. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              conversationKeyTemplate: string;
+              createdAt: string;
+              enabled: boolean;
+              eventTypes: string[] | null;
+              id: string;
+              idempotencyKeyTemplate: string | null;
+              inputTemplate: string;
+              integrationConnectionId: string;
+              /** @enum {string} */
+              kind: "webhook";
+              name: string;
+              payloadFilter: {
+                [key: string]: unknown;
+              } | null;
+              target: {
+                id: string;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number | null;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT"
+                    | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_CONNECTION_REFERENCE"
+                    | "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE"
+                    | "INVALID_SANDBOX_PROFILE_REFERENCE";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Webhook automation was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "AUTOMATION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
   "/v1/integration/connections": {
     parameters: {
       query?: never;
