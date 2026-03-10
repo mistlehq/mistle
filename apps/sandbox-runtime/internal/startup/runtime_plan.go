@@ -28,6 +28,7 @@ type RuntimePlan struct {
 	ArtifactRemovals []RuntimeArtifactRemovalSpec `json:"artifactRemovals"`
 	WorkspaceSources []WorkspaceSource            `json:"workspaceSources"`
 	RuntimeClients   []RuntimeClient              `json:"runtimeClients"`
+	AgentRuntimes    []AgentRuntime               `json:"agentRuntimes"`
 }
 
 type ResolvedSandboxImage struct {
@@ -152,6 +153,13 @@ type RuntimeFileSpec struct {
 	Content string `json:"content"`
 }
 
+type AgentRuntime struct {
+	BindingID  string `json:"bindingId"`
+	RuntimeKey string `json:"runtimeKey"`
+	ClientID   string `json:"clientId"`
+	EndpointKey string `json:"endpointKey"`
+}
+
 type WorkspaceSource struct {
 	SourceKind   string `json:"sourceKind"`
 	ResourceKind string `json:"resourceKind"`
@@ -184,6 +192,9 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 	}
 	if runtimePlan.RuntimeClients == nil {
 		return fmt.Errorf("runtime plan runtimeClients is required")
+	}
+	if runtimePlan.AgentRuntimes == nil {
+		return fmt.Errorf("runtime plan agentRuntimes is required")
 	}
 
 	if err := validateResolvedSandboxImage(runtimePlan.Image); err != nil {
@@ -218,8 +229,30 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 		}
 	}
 
+	endpointKeysByClientID := make(map[string]map[string]RuntimeClientEndpointSpec, len(runtimePlan.RuntimeClients))
 	for clientIndex, runtimeClient := range runtimePlan.RuntimeClients {
 		if err := validateRuntimeClient(runtimeClient, clientIndex); err != nil {
+			return err
+		}
+
+		if _, exists := endpointKeysByClientID[runtimeClient.ClientID]; exists {
+			return fmt.Errorf(
+				"runtime plan runtimeClients[%d].clientId '%s' is duplicated",
+				clientIndex,
+				runtimeClient.ClientID,
+			)
+		}
+
+		endpointsByKey := make(map[string]RuntimeClientEndpointSpec, len(runtimeClient.Endpoints))
+		for _, endpoint := range runtimeClient.Endpoints {
+			endpointsByKey[endpoint.EndpointKey] = endpoint
+		}
+		endpointKeysByClientID[runtimeClient.ClientID] = endpointsByKey
+	}
+
+	runtimeKeys := make(map[string]struct{}, len(runtimePlan.AgentRuntimes))
+	for agentRuntimeIndex, agentRuntime := range runtimePlan.AgentRuntimes {
+		if err := validateAgentRuntime(agentRuntime, agentRuntimeIndex, runtimeKeys, endpointKeysByClientID); err != nil {
 			return err
 		}
 	}
@@ -636,6 +669,55 @@ func validateRuntimeClientEndpoint(endpoint RuntimeClientEndpointSpec, clientInd
 		}
 	default:
 		return fmt.Errorf("%s.transport.type '%s' is not supported", location, endpoint.Transport.Type)
+	}
+
+	return nil
+}
+
+func validateAgentRuntime(
+	agentRuntime AgentRuntime,
+	agentRuntimeIndex int,
+	runtimeKeys map[string]struct{},
+	endpointKeysByClientID map[string]map[string]RuntimeClientEndpointSpec,
+) error {
+	location := fmt.Sprintf("runtime plan agentRuntimes[%d]", agentRuntimeIndex)
+
+	if strings.TrimSpace(agentRuntime.BindingID) == "" {
+		return fmt.Errorf("%s.bindingId is required", location)
+	}
+	if strings.TrimSpace(agentRuntime.RuntimeKey) == "" {
+		return fmt.Errorf("%s.runtimeKey is required", location)
+	}
+	if _, exists := runtimeKeys[agentRuntime.RuntimeKey]; exists {
+		return fmt.Errorf("%s.runtimeKey '%s' is duplicated", location, agentRuntime.RuntimeKey)
+	}
+	runtimeKeys[agentRuntime.RuntimeKey] = struct{}{}
+	if strings.TrimSpace(agentRuntime.ClientID) == "" {
+		return fmt.Errorf("%s.clientId is required", location)
+	}
+	endpointsByKey, exists := endpointKeysByClientID[agentRuntime.ClientID]
+	if !exists {
+		return fmt.Errorf("%s.clientId '%s' does not reference a declared runtime client", location, agentRuntime.ClientID)
+	}
+	if strings.TrimSpace(agentRuntime.EndpointKey) == "" {
+		return fmt.Errorf("%s.endpointKey is required", location)
+	}
+	endpoint, exists := endpointsByKey[agentRuntime.EndpointKey]
+	if !exists {
+		return fmt.Errorf(
+			"%s.endpointKey '%s' does not reference a declared endpoint on client '%s'",
+			location,
+			agentRuntime.EndpointKey,
+			agentRuntime.ClientID,
+		)
+	}
+	if endpoint.Transport.Type != "ws" {
+		return fmt.Errorf(
+			"%s.endpointKey '%s' on client '%s' must reference a websocket endpoint",
+			location,
+			agentRuntime.EndpointKey,
+			agentRuntime.ClientID,
+		)
 	}
 
 	return nil

@@ -17,7 +17,8 @@ const validRuntimePlanJSON = `{
 	"artifacts": [],
 	"artifactRemovals": [],
 	"runtimeClients": [],
-	"workspaceSources": []
+	"workspaceSources": [],
+	"agentRuntimes": []
 }`
 
 const validStartupInputJSON = `{
@@ -53,6 +54,9 @@ func TestReadStartupInput(t *testing.T) {
 				"expected runtime plan image source base, got %q",
 				startupInput.RuntimePlan.Image.Source,
 			)
+		}
+		if startupInput.RuntimePlan.AgentRuntimes == nil {
+			t.Fatal("expected runtime plan agentRuntimes to be populated")
 		}
 	})
 
@@ -200,6 +204,7 @@ func TestReadStartupInput(t *testing.T) {
 					"artifactRemovals": [],
 					"runtimeClients": [],
 					"workspaceSources": [],
+					"agentRuntimes": [],
 					"extra": "bad"
 				}
 			}`),
@@ -234,6 +239,43 @@ func TestReadStartupInput(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "egressRoutes") {
 			t.Fatalf("expected egressRoutes validation error, got %v", err)
+		}
+	})
+
+	t.Run("fails when agent runtime references missing runtime client", func(t *testing.T) {
+		_, err := ReadStartupInput(ReadStartupInputInput{
+			Reader: bytes.NewBufferString(`{
+				"bootstrapToken": "test-token",
+				"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+				"runtimePlan": {
+					"sandboxProfileId": "sbp_123",
+					"version": 1,
+					"image": {
+						"source": "base",
+						"imageRef": "mistle/sandbox-base:dev"
+					},
+					"egressRoutes": [],
+					"artifacts": [],
+					"artifactRemovals": [],
+					"runtimeClients": [],
+					"workspaceSources": [],
+					"agentRuntimes": [
+						{
+							"bindingId": "bind_openai",
+							"runtimeKey": "codex-app-server",
+							"clientId": "client_codex",
+							"endpointKey": "app-server"
+						}
+					]
+				}
+			}`),
+			MaxBytes: 4096,
+		})
+		if err == nil {
+			t.Fatal("expected error when agent runtime references a missing runtime client")
+		}
+		if !strings.Contains(err.Error(), "agentRuntimes[0].clientId") {
+			t.Fatalf("expected agent runtime clientId validation error, got %v", err)
 		}
 	})
 }

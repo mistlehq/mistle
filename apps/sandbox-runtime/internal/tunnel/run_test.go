@@ -227,6 +227,14 @@ func TestRun(t *testing.T) {
 			Context:        runCtx,
 			GatewayWSURL:   gatewayWSURL,
 			BootstrapToken: []byte("sandbox-bootstrap-token"),
+			AgentRuntimes: []startup.AgentRuntime{
+				{
+					BindingID:   "bind_openai",
+					RuntimeKey:  "codex-app-server",
+					ClientID:    "client_codex",
+					EndpointKey: "app-server",
+				},
+			},
 			RuntimeClients: []startup.RuntimeClient{
 				{
 					ClientID: "client_codex",
@@ -346,6 +354,7 @@ func TestRun(t *testing.T) {
 				Context:        runCtx,
 				GatewayWSURL:   gatewayWSURL,
 				BootstrapToken: []byte("sandbox-bootstrap-token"),
+				AgentRuntimes:  []startup.AgentRuntime{},
 				RuntimeClients: []startup.RuntimeClient{},
 			})
 		}()
