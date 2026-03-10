@@ -78,7 +78,7 @@ export function createControlPlaneWorkerServices(
                   generation: enqueueInput.generation,
                 },
                 {
-                  idempotencyKey: `conversation-delivery:${enqueueInput.conversationId}:${String(enqueueInput.generation)}`,
+                  idempotencyKey: `automation-conversation-delivery:${enqueueInput.conversationId}:${String(enqueueInput.generation)}`,
                 },
               );
             },
