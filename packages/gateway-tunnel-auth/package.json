@@ -25,6 +25,6 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "jose": "^6.1.3"
+    "jose": "^6.2.1"
   }
 }
