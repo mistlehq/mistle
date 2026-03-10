@@ -1,55 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import type { CodexFileChangeApprovalRequestEntry } from "../../codex-client/codex-server-requests-state.js";
-import type { ChatFileChangeEntry } from "../chat-types.js";
+import {
+  CodexStoryFileChangeApprovalRequest,
+  CodexStoryFileChangeBlock,
+} from "../../codex-client/codex-story-fixtures.js";
 import { ChatFileChangeBlock } from "./chat-file-change-block.js";
-
-const DemoBlock: ChatFileChangeEntry = {
-  id: "file-change-1",
-  turnId: "turn-3",
-  kind: "file-change",
-  changes: [
-    {
-      path: "packages/storybook/.storybook/preview.ts",
-      kind: "modified",
-      diff: [
-        "@@ -1,2 +1,3 @@",
-        ' import "../../../apps/dashboard/src/index.css";',
-        ' import "@mistle/ui/styles.css";',
-        '+import "./preview-overrides.css";',
-      ].join("\n"),
-    },
-    {
-      path: "apps/dashboard/src/features/chat/components/chat-thread.stories.tsx",
-      kind: "added",
-      diff: [
-        "@@ -0,0 +1,5 @@",
-        "+export const Default = {",
-        "+  args: {",
-        "+    entries: DemoEntries,",
-        "+  },",
-        "+};",
-      ].join("\n"),
-    },
-  ],
-  output: "Updated Storybook preview imports and added the initial chat thread story.",
-  fileChangeStatus: "completed",
-  status: "completed",
-};
-
-const DemoApprovalRequest: CodexFileChangeApprovalRequestEntry = {
-  requestId: "request-file-change-1",
-  method: "item/fileChange/requestApproval",
-  kind: "file-change-approval",
-  threadId: "thread-1",
-  turnId: "turn-4",
-  itemId: "file-change-approval-1",
-  reason: "The assistant wants to update shared Storybook config and dashboard chat stories.",
-  grantRoot: "/workspace/mistle",
-  availableDecisions: ["accept", "acceptForSession", "decline", "cancel"],
-  status: "pending",
-  responseErrorMessage: null,
-};
 
 const meta = {
   title: "Dashboard/Chat/ChatFileChangeBlock",
@@ -60,7 +15,7 @@ const meta = {
   },
   args: {
     approvalRequest: null,
-    block: DemoBlock,
+    block: CodexStoryFileChangeBlock,
     isRespondingToServerRequest: false,
     onRespondToServerRequest: function onRespondToServerRequest() {},
   },
@@ -75,7 +30,7 @@ export const Completed: Story = {};
 export const Streaming: Story = {
   args: {
     block: {
-      ...DemoBlock,
+      ...CodexStoryFileChangeBlock,
       output: "Applying the next patch to the dashboard chat view stories...",
       status: "streaming",
     },
@@ -84,9 +39,9 @@ export const Streaming: Story = {
 
 export const AwaitingApproval: Story = {
   args: {
-    approvalRequest: DemoApprovalRequest,
+    approvalRequest: CodexStoryFileChangeApprovalRequest,
     block: {
-      ...DemoBlock,
+      ...CodexStoryFileChangeBlock,
       output: null,
       status: "streaming",
     },
@@ -96,7 +51,7 @@ export const AwaitingApproval: Story = {
 export const ApprovalError: Story = {
   args: {
     approvalRequest: {
-      ...DemoApprovalRequest,
+      ...CodexStoryFileChangeApprovalRequest,
       responseErrorMessage: "The file change approval was declined for this session.",
     },
   },
