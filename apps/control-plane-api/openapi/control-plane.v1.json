@@ -9,6 +9,1150 @@
     "parameters": {}
   },
   "paths": {
+    "/v1/automations/webhooks": {
+      "get": {
+        "tags": ["Automations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "after",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "before",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List webhook automations for the active organization.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalResults": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": ["webhook"]
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "integrationConnectionId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "eventTypes": {
+                            "type": ["array", "null"],
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "payloadFilter": {
+                            "type": ["object", "null"],
+                            "additionalProperties": {}
+                          },
+                          "inputTemplate": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "conversationKeyTemplate": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "idempotencyKeyTemplate": {
+                            "type": ["string", "null"],
+                            "minLength": 1
+                          },
+                          "target": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "sandboxProfileId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "sandboxProfileVersion": {
+                                "type": ["integer", "null"],
+                                "minimum": 1
+                              }
+                            },
+                            "required": ["id", "sandboxProfileId", "sandboxProfileVersion"],
+                            "additionalProperties": false
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "name",
+                          "enabled",
+                          "integrationConnectionId",
+                          "eventTypes",
+                          "payloadFilter",
+                          "inputTemplate",
+                          "conversationKeyTemplate",
+                          "idempotencyKeyTemplate",
+                          "target",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "nextPage": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "after": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        }
+                      },
+                      "required": ["after", "limit"],
+                      "additionalProperties": false
+                    },
+                    "previousPage": {
+                      "type": ["object", "null"],
+                      "properties": {
+                        "before": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100
+                        }
+                      },
+                      "required": ["before", "limit"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["totalResults", "items", "nextPage", "previousPage"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT",
+                            "INVALID_PAGINATION_CURSOR",
+                            "INVALID_CONNECTION_REFERENCE",
+                            "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
+                            "INVALID_SANDBOX_PROFILE_REFERENCE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [false]
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["name", "message"],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": ["success", "error"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Automations"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "integrationConnectionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "eventTypes": {
+                    "type": ["array", "null"],
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "payloadFilter": {
+                    "type": ["object", "null"],
+                    "additionalProperties": {}
+                  },
+                  "inputTemplate": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "conversationKeyTemplate": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idempotencyKeyTemplate": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "sandboxProfileId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sandboxProfileVersion": {
+                        "type": ["integer", "null"],
+                        "minimum": 1
+                      }
+                    },
+                    "required": ["sandboxProfileId"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "name",
+                  "integrationConnectionId",
+                  "inputTemplate",
+                  "conversationKeyTemplate",
+                  "target"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Create a webhook automation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["webhook"]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "integrationConnectionId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "eventTypes": {
+                      "type": ["array", "null"],
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "payloadFilter": {
+                      "type": ["object", "null"],
+                      "additionalProperties": {}
+                    },
+                    "inputTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "conversationKeyTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "idempotencyKeyTemplate": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileVersion": {
+                          "type": ["integer", "null"],
+                          "minimum": 1
+                        }
+                      },
+                      "required": ["id", "sandboxProfileId", "sandboxProfileVersion"],
+                      "additionalProperties": false
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "name",
+                    "enabled",
+                    "integrationConnectionId",
+                    "eventTypes",
+                    "payloadFilter",
+                    "inputTemplate",
+                    "conversationKeyTemplate",
+                    "idempotencyKeyTemplate",
+                    "target",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT",
+                            "INVALID_PAGINATION_CURSOR",
+                            "INVALID_CONNECTION_REFERENCE",
+                            "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
+                            "INVALID_SANDBOX_PROFILE_REFERENCE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [false]
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["name", "message"],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": ["success", "error"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/automations/webhooks/{automationId}": {
+      "get": {
+        "tags": ["Automations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^atm_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "automationId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get a webhook automation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["webhook"]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "integrationConnectionId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "eventTypes": {
+                      "type": ["array", "null"],
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "payloadFilter": {
+                      "type": ["object", "null"],
+                      "additionalProperties": {}
+                    },
+                    "inputTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "conversationKeyTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "idempotencyKeyTemplate": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileVersion": {
+                          "type": ["integer", "null"],
+                          "minimum": 1
+                        }
+                      },
+                      "required": ["id", "sandboxProfileId", "sandboxProfileVersion"],
+                      "additionalProperties": false
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "name",
+                    "enabled",
+                    "integrationConnectionId",
+                    "eventTypes",
+                    "payloadFilter",
+                    "inputTemplate",
+                    "conversationKeyTemplate",
+                    "idempotencyKeyTemplate",
+                    "target",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook automation was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["AUTOMATION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": ["Automations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^atm_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "automationId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "integrationConnectionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "eventTypes": {
+                    "type": ["array", "null"],
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "payloadFilter": {
+                    "type": ["object", "null"],
+                    "additionalProperties": {}
+                  },
+                  "inputTemplate": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "conversationKeyTemplate": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idempotencyKeyTemplate": {
+                    "type": ["string", "null"],
+                    "minLength": 1
+                  },
+                  "target": {
+                    "type": "object",
+                    "properties": {
+                      "sandboxProfileId": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "sandboxProfileVersion": {
+                        "type": ["integer", "null"],
+                        "minimum": 1
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Update a webhook automation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["webhook"]
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "integrationConnectionId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "eventTypes": {
+                      "type": ["array", "null"],
+                      "items": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "payloadFilter": {
+                      "type": ["object", "null"],
+                      "additionalProperties": {}
+                    },
+                    "inputTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "conversationKeyTemplate": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "idempotencyKeyTemplate": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "target": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "sandboxProfileVersion": {
+                          "type": ["integer", "null"],
+                          "minimum": 1
+                        }
+                      },
+                      "required": ["id", "sandboxProfileId", "sandboxProfileVersion"],
+                      "additionalProperties": false
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "kind",
+                    "name",
+                    "enabled",
+                    "integrationConnectionId",
+                    "eventTypes",
+                    "payloadFilter",
+                    "inputTemplate",
+                    "conversationKeyTemplate",
+                    "idempotencyKeyTemplate",
+                    "target",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "enum": [
+                            "INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT",
+                            "INVALID_PAGINATION_CURSOR",
+                            "INVALID_CONNECTION_REFERENCE",
+                            "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
+                            "INVALID_SANDBOX_PROFILE_REFERENCE"
+                          ]
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [false]
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["name", "message"],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": ["success", "error"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook automation was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["AUTOMATION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Automations"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "^atm_[a-zA-Z0-9_-]+$"
+            },
+            "required": true,
+            "name": "automationId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delete a webhook automation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": ["deleted"]
+                    },
+                    "automationId": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["status", "automationId"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook automation was not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["AUTOMATION_NOT_FOUND"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/integration/connections": {
       "get": {
         "tags": ["Integrations"],
