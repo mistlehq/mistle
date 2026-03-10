@@ -1,7 +1,7 @@
 {
   "$schema": "../../node_modules/oxlint/configuration_schema.json",
   "extends": ["../../.oxlintrc.jsonc"],
-  "ignorePatterns": ["src/runtime/conversations/providers/generated/**"],
+  "ignorePatterns": ["src/runtime/automation-conversations/providers/generated/**"],
   "overrides": [
     {
       "files": ["integration/test-context.ts"],

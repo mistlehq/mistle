@@ -1,9 +1,9 @@
 import { index, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 import { typeid } from "typeid-js";
 
+import { automationConversations } from "./automation-conversations.js";
 import { automationTargets } from "./automation-targets.js";
 import { automations } from "./automations.js";
-import { conversations } from "./conversations.js";
 import { integrationWebhookEvents } from "./integration-webhook-events.js";
 import { controlPlaneSchema } from "./namespace.js";
 
@@ -37,7 +37,7 @@ export const automationRuns = controlPlaneSchema.table(
         onDelete: "set null",
       },
     ),
-    conversationId: text("conversation_id").references(() => conversations.id, {
+    conversationId: text("conversation_id").references(() => automationConversations.id, {
       onDelete: "set null",
     }),
     renderedInput: text("rendered_input"),

@@ -1,17 +1,17 @@
 import {
+  createHandleAutomationConversationDeliveryWorkflow,
+  type CreateHandleAutomationConversationDeliveryWorkflowInput,
+  HandleAutomationConversationDeliveryWorkflowSpec,
+  type HandleAutomationConversationDeliveryWorkflowInput,
+  type HandleAutomationConversationDeliveryWorkflowOutput,
+} from "./handle-automation-conversation-delivery/index.js";
+import {
   createHandleAutomationRunWorkflow,
   HandleAutomationRunWorkflowSpec,
   type CreateHandleAutomationRunWorkflowInput,
   type HandleAutomationRunWorkflowInput,
   type HandleAutomationRunWorkflowOutput,
 } from "./handle-automation-run/index.js";
-import {
-  createHandleConversationDeliveryWorkflow,
-  type CreateHandleConversationDeliveryWorkflowInput,
-  HandleConversationDeliveryWorkflowSpec,
-  type HandleConversationDeliveryWorkflowInput,
-  type HandleConversationDeliveryWorkflowOutput,
-} from "./handle-conversation-delivery/index.js";
 import {
   createHandleIntegrationWebhookEventWorkflow,
   HandleIntegrationWebhookEventWorkflowSpec,
@@ -52,7 +52,7 @@ import {
  */
 export type ControlPlaneWorkflowDefinition =
   | ReturnType<typeof createHandleAutomationRunWorkflow>
-  | ReturnType<typeof createHandleConversationDeliveryWorkflow>
+  | ReturnType<typeof createHandleAutomationConversationDeliveryWorkflow>
   | ReturnType<typeof createHandleIntegrationWebhookEventWorkflow>
   | ReturnType<typeof createSendOrganizationInvitationWorkflow>
   | ReturnType<typeof createSendVerificationOTPWorkflow>
@@ -62,7 +62,9 @@ export type ControlPlaneWorkflowDefinition =
 
 export type ControlPlaneWorkflowDefinitions = {
   handleAutomationRun: ReturnType<typeof createHandleAutomationRunWorkflow>;
-  handleConversationDelivery: ReturnType<typeof createHandleConversationDeliveryWorkflow>;
+  handleAutomationConversationDelivery: ReturnType<
+    typeof createHandleAutomationConversationDeliveryWorkflow
+  >;
   handleIntegrationWebhookEvent: ReturnType<typeof createHandleIntegrationWebhookEventWorkflow>;
   sendOrganizationInvitation: ReturnType<typeof createSendOrganizationInvitationWorkflow>;
   sendVerificationOTP: ReturnType<typeof createSendVerificationOTPWorkflow>;
@@ -75,7 +77,7 @@ export type ControlPlaneWorkflowDefinitions = {
 
 export type CreateControlPlaneWorkflowDefinitionsInput = {
   handleAutomationRun: CreateHandleAutomationRunWorkflowInput;
-  handleConversationDelivery: CreateHandleConversationDeliveryWorkflowInput;
+  handleAutomationConversationDelivery: CreateHandleAutomationConversationDeliveryWorkflowInput;
   handleIntegrationWebhookEvent: CreateHandleIntegrationWebhookEventWorkflowInput;
   sendOrganizationInvitation: CreateSendOrganizationInvitationWorkflowInput;
   sendVerificationOTP: CreateSendVerificationOTPWorkflowInput;
@@ -89,8 +91,8 @@ export function createControlPlaneWorkflowDefinitions(
 ): ControlPlaneWorkflowDefinitions {
   return {
     handleAutomationRun: createHandleAutomationRunWorkflow(ctx.handleAutomationRun),
-    handleConversationDelivery: createHandleConversationDeliveryWorkflow(
-      ctx.handleConversationDelivery,
+    handleAutomationConversationDelivery: createHandleAutomationConversationDeliveryWorkflow(
+      ctx.handleAutomationConversationDelivery,
     ),
     handleIntegrationWebhookEvent: createHandleIntegrationWebhookEventWorkflow(
       ctx.handleIntegrationWebhookEvent,
@@ -113,8 +115,11 @@ export function createControlPlaneWorkflowDefinitions(
 
 export { HandleAutomationRunWorkflowSpec };
 export type { HandleAutomationRunWorkflowInput, HandleAutomationRunWorkflowOutput };
-export { HandleConversationDeliveryWorkflowSpec };
-export type { HandleConversationDeliveryWorkflowInput, HandleConversationDeliveryWorkflowOutput };
+export { HandleAutomationConversationDeliveryWorkflowSpec };
+export type {
+  HandleAutomationConversationDeliveryWorkflowInput,
+  HandleAutomationConversationDeliveryWorkflowOutput,
+};
 export { HandleIntegrationWebhookEventWorkflowSpec };
 export type {
   HandleIntegrationWebhookEventWorkflowInput,

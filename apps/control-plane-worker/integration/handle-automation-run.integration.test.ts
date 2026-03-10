@@ -1,14 +1,14 @@
 import {
-  ConversationDeliveryProcessorStatuses,
-  ConversationDeliveryTaskStatuses,
+  AutomationConversationDeliveryProcessorStatuses,
+  AutomationConversationDeliveryTaskStatuses,
   automationRuns,
   AutomationRunStatuses,
   automationTargets,
   automations,
   AutomationKinds,
-  ConversationCreatedByKinds,
-  ConversationOwnerKinds,
-  ConversationStatuses,
+  AutomationConversationCreatedByKinds,
+  AutomationConversationOwnerKinds,
+  AutomationConversationStatuses,
   createControlPlaneDatabase,
   integrationConnections,
   IntegrationConnectionStatuses,
@@ -40,20 +40,20 @@ import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
 import {
+  claimOrResumeAutomationConversationDeliveryTask,
+  AutomationConversationDeliveryTaskActions,
+  finalizeAutomationConversationDeliveryActiveTask,
+  ignoreAutomationConversationDeliveryAutomationRun,
+  idleAutomationConversationDeliveryProcessor,
+  resolveAutomationConversationDeliveryActiveTaskAction,
+} from "../src/runtime/services/handle-automation-conversation-delivery.js";
+import {
   handoffAutomationRunDelivery,
   markAutomationRunFailed,
   prepareAutomationRun,
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
 } from "../src/runtime/services/handle-automation-run.js";
-import {
-  claimOrResumeConversationDeliveryTask,
-  ConversationDeliveryTaskActions,
-  finalizeConversationDeliveryActiveTask,
-  ignoreConversationDeliveryAutomationRun,
-  idleConversationDeliveryProcessor,
-  resolveConversationDeliveryActiveTaskAction,
-} from "../src/runtime/services/handle-conversation-delivery.js";
 import { it } from "./test-context.js";
 
 const TestTimeoutMs = 120_000;
@@ -298,9 +298,10 @@ describe("handleAutomationRun integration", () => {
         const persistedRun = await database.db.query.automationRuns.findFirst({
           where: (table, { eq }) => eq(table.id, automationRunId),
         });
-        const persistedConversation = await database.db.query.conversations.findFirst({
-          where: (table, { eq }) => eq(table.id, preparedRun.conversationId),
-        });
+        const persistedAutomationConversation =
+          await database.db.query.automationConversations.findFirst({
+            where: (table, { eq }) => eq(table.id, preparedRun.conversationId),
+          });
 
         expect(preparedRun).toMatchObject({
           automationRunId,
@@ -335,18 +336,18 @@ describe("handleAutomationRun integration", () => {
           renderedConversationKey: "issue-777",
           renderedIdempotencyKey: "delivery_prepare",
         });
-        expect(persistedConversation).toMatchObject({
+        expect(persistedAutomationConversation).toMatchObject({
           id: preparedRun.conversationId,
           organizationId,
-          ownerKind: ConversationOwnerKinds.AUTOMATION_TARGET,
+          ownerKind: AutomationConversationOwnerKinds.AUTOMATION_TARGET,
           ownerId: automationTargetId,
-          createdByKind: ConversationCreatedByKinds.WEBHOOK,
+          createdByKind: AutomationConversationCreatedByKinds.WEBHOOK,
           createdById: webhookEventId,
           sandboxProfileId,
           integrationFamilyId: OpenAiApiKeyDefinition.familyId,
           conversationKey: "issue-777",
           preview: "Handle @mistlebot prepare",
-          status: ConversationStatuses.PENDING,
+          status: AutomationConversationStatuses.PENDING,
         });
       } finally {
         await database.stop();
@@ -626,15 +627,16 @@ describe("handleAutomationRun integration", () => {
         const persistedRun = await database.db.query.automationRuns.findFirst({
           where: (table, { eq }) => eq(table.id, automationRunId),
         });
-        const persistedTask = await database.db.query.conversationDeliveryTasks.findFirst({
-          where: (table, { eq }) => eq(table.automationRunId, automationRunId),
-        });
-        const persistedProcessor = await database.db.query.conversationDeliveryProcessors.findFirst(
+        const persistedTask = await database.db.query.automationConversationDeliveryTasks.findFirst(
           {
-            where: (table, { eq }) => eq(table.conversationId, persistedRun?.conversationId ?? ""),
+            where: (table, { eq }) => eq(table.automationRunId, automationRunId),
           },
         );
-        const persistedRoute = await database.db.query.conversationRoutes.findFirst({
+        const persistedProcessor =
+          await database.db.query.automationConversationDeliveryProcessors.findFirst({
+            where: (table, { eq }) => eq(table.conversationId, persistedRun?.conversationId ?? ""),
+          });
+        const persistedRoute = await database.db.query.automationConversationRoutes.findFirst({
           where: (table, { eq }) => eq(table.conversationId, persistedRun?.conversationId ?? ""),
         });
         expect(persistedRun).toBeDefined();
@@ -648,12 +650,12 @@ describe("handleAutomationRun integration", () => {
         expect(persistedRun.failureCode).toBeNull();
         expect(persistedTask).toMatchObject({
           automationRunId,
-          status: ConversationDeliveryTaskStatuses.QUEUED,
+          status: AutomationConversationDeliveryTaskStatuses.QUEUED,
           failureCode: null,
         });
         expect(persistedProcessor).toMatchObject({
           conversationId: persistedRun.conversationId,
-          status: ConversationDeliveryProcessorStatuses.RUNNING,
+          status: AutomationConversationDeliveryProcessorStatuses.RUNNING,
         });
         expect(persistedRoute).toBeUndefined();
       } finally {
@@ -777,15 +779,16 @@ describe("handleAutomationRun integration", () => {
         const persistedRun = await database.db.query.automationRuns.findFirst({
           where: (table, { eq }) => eq(table.id, automationRunId),
         });
-        const persistedTask = await database.db.query.conversationDeliveryTasks.findFirst({
-          where: (table, { eq }) => eq(table.automationRunId, automationRunId),
-        });
-        const persistedProcessor = await database.db.query.conversationDeliveryProcessors.findFirst(
+        const persistedTask = await database.db.query.automationConversationDeliveryTasks.findFirst(
           {
-            where: (table, { eq }) => eq(table.conversationId, persistedRun?.conversationId ?? ""),
+            where: (table, { eq }) => eq(table.automationRunId, automationRunId),
           },
         );
-        const persistedRoute = await database.db.query.conversationRoutes.findFirst({
+        const persistedProcessor =
+          await database.db.query.automationConversationDeliveryProcessors.findFirst({
+            where: (table, { eq }) => eq(table.conversationId, persistedRun?.conversationId ?? ""),
+          });
+        const persistedRoute = await database.db.query.automationConversationRoutes.findFirst({
           where: (table, { eq }) => eq(table.conversationId, persistedRun?.conversationId ?? ""),
         });
         expect(persistedRun).toBeDefined();
@@ -798,12 +801,12 @@ describe("handleAutomationRun integration", () => {
         expect(persistedRun.failureCode).toBeNull();
         expect(persistedTask).toMatchObject({
           automationRunId,
-          status: ConversationDeliveryTaskStatuses.QUEUED,
+          status: AutomationConversationDeliveryTaskStatuses.QUEUED,
           failureCode: null,
         });
         expect(persistedProcessor).toMatchObject({
           conversationId: persistedRun.conversationId,
-          status: ConversationDeliveryProcessorStatuses.RUNNING,
+          status: AutomationConversationDeliveryProcessorStatuses.RUNNING,
         });
         expect(persistedRoute).toBeUndefined();
       } finally {
@@ -930,16 +933,15 @@ describe("handleAutomationRun integration", () => {
           throw new Error("Expected prepared automation run for stale ordering test.");
         }
 
-        const persistedProcessor = await database.db.query.conversationDeliveryProcessors.findFirst(
-          {
+        const persistedProcessor =
+          await database.db.query.automationConversationDeliveryProcessors.findFirst({
             where: (table, { eq }) => eq(table.conversationId, newerPreparedRun.conversationId),
-          },
-        );
+          });
         if (persistedProcessor === undefined) {
           throw new Error("Expected persisted conversation delivery processor.");
         }
 
-        const newerTask = await claimOrResumeConversationDeliveryTask(
+        const newerTask = await claimOrResumeAutomationConversationDeliveryTask(
           {
             db: database.db,
           },
@@ -952,7 +954,7 @@ describe("handleAutomationRun integration", () => {
           throw new Error("Expected newer task to be claimable.");
         }
         expect(
-          await resolveConversationDeliveryActiveTaskAction(
+          await resolveAutomationConversationDeliveryActiveTaskAction(
             {
               db: database.db,
             },
@@ -961,7 +963,7 @@ describe("handleAutomationRun integration", () => {
               generation: persistedProcessor.generation,
             },
           ),
-        ).toBe(ConversationDeliveryTaskActions.DELIVER);
+        ).toBe(AutomationConversationDeliveryTaskActions.DELIVER);
 
         await database.db
           .update(automationRuns)
@@ -969,7 +971,7 @@ describe("handleAutomationRun integration", () => {
             status: AutomationRunStatuses.COMPLETED,
           })
           .where(eq(automationRuns.id, newerAutomationRunId));
-        await finalizeConversationDeliveryActiveTask(
+        await finalizeAutomationConversationDeliveryActiveTask(
           {
             db: database.db,
           },
@@ -1017,7 +1019,7 @@ describe("handleAutomationRun integration", () => {
           throw new Error("Expected older prepared automation run for stale ordering test.");
         }
 
-        const claimedOlderTask = await claimOrResumeConversationDeliveryTask(
+        const claimedOlderTask = await claimOrResumeAutomationConversationDeliveryTask(
           {
             db: database.db,
           },
@@ -1030,7 +1032,7 @@ describe("handleAutomationRun integration", () => {
           throw new Error("Expected older task to be claimable.");
         }
         expect(
-          await resolveConversationDeliveryActiveTaskAction(
+          await resolveAutomationConversationDeliveryActiveTaskAction(
             {
               db: database.db,
             },
@@ -1039,8 +1041,8 @@ describe("handleAutomationRun integration", () => {
               generation: persistedProcessor.generation,
             },
           ),
-        ).toBe(ConversationDeliveryTaskActions.IGNORE);
-        await ignoreConversationDeliveryAutomationRun(
+        ).toBe(AutomationConversationDeliveryTaskActions.IGNORE);
+        await ignoreAutomationConversationDeliveryAutomationRun(
           {
             db: database.db,
           },
@@ -1048,7 +1050,7 @@ describe("handleAutomationRun integration", () => {
             automationRunId: claimedOlderTask.automationRunId,
           },
         );
-        await finalizeConversationDeliveryActiveTask(
+        await finalizeAutomationConversationDeliveryActiveTask(
           {
             db: database.db,
           },
@@ -1058,7 +1060,7 @@ describe("handleAutomationRun integration", () => {
             status: "ignored",
           },
         );
-        await idleConversationDeliveryProcessor(
+        await idleAutomationConversationDeliveryProcessor(
           {
             db: database.db,
           },
@@ -1074,7 +1076,7 @@ describe("handleAutomationRun integration", () => {
         const olderRun = await database.db.query.automationRuns.findFirst({
           where: (table, { eq }) => eq(table.id, olderAutomationRunId),
         });
-        const olderTask = await database.db.query.conversationDeliveryTasks.findFirst({
+        const olderTask = await database.db.query.automationConversationDeliveryTasks.findFirst({
           where: (table, { eq }) => eq(table.automationRunId, olderAutomationRunId),
         });
 
@@ -1084,7 +1086,7 @@ describe("handleAutomationRun integration", () => {
           throw new Error("Expected persisted automation runs.");
         }
 
-        const conversation = await database.db.query.conversations.findFirst({
+        const conversation = await database.db.query.automationConversations.findFirst({
           where: (table, { eq }) => eq(table.id, newerRun.conversationId ?? ""),
         });
 
@@ -1092,7 +1094,7 @@ describe("handleAutomationRun integration", () => {
         expect(olderRun.status).toBe(AutomationRunStatuses.IGNORED);
         expect(olderTask).toMatchObject({
           automationRunId: olderAutomationRunId,
-          status: ConversationDeliveryTaskStatuses.IGNORED,
+          status: AutomationConversationDeliveryTaskStatuses.IGNORED,
           failureCode: null,
           failureMessage: null,
         });
@@ -1223,9 +1225,11 @@ describe("handleAutomationRun integration", () => {
         const persistedRun = await database.db.query.automationRuns.findFirst({
           where: (table, { eq }) => eq(table.id, automationRunId),
         });
-        const persistedTasks = await database.db.query.conversationDeliveryTasks.findMany({
-          where: (table, { eq }) => eq(table.automationRunId, automationRunId),
-        });
+        const persistedTasks = await database.db.query.automationConversationDeliveryTasks.findMany(
+          {
+            where: (table, { eq }) => eq(table.automationRunId, automationRunId),
+          },
+        );
         expect(persistedRun).toBeDefined();
         if (persistedRun === undefined) {
           throw new Error("Expected persisted automation run.");

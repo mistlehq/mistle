@@ -2,20 +2,20 @@ import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/cl
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import type {
-  ActiveConversationDeliveryTask,
+  ActiveAutomationConversationDeliveryTask,
   AcquiredAutomationConnection,
-  ConversationDeliveryTaskAction,
+  AutomationConversationDeliveryTaskAction,
   ControlPlaneWorkerServices,
   EnsuredAutomationSandbox,
-  FinalConversationDeliveryTaskStatus,
+  FinalAutomationConversationDeliveryTaskStatus,
   HandoffAutomationRunDeliveryInput,
   HandleAutomationRunWorkflowInput,
-  HandleConversationDeliveryWorkflowInput,
-  HandleConversationDeliveryWorkflowOutput,
+  HandleAutomationConversationDeliveryWorkflowInput,
+  HandleAutomationConversationDeliveryWorkflowOutput,
   HandleIntegrationWebhookEventWorkflowInput,
   HandleIntegrationWebhookEventWorkflowOutput,
   PreparedAutomationRun,
-  ResolvedConversationDeliveryRoute,
+  ResolvedAutomationConversationDeliveryRoute,
   StartSandboxProfileInstanceWorkflowInput,
   StartSandboxProfileInstanceWorkflowOutput,
   SyncIntegrationConnectionResourcesWorkflowInput,
@@ -66,16 +66,20 @@ export type HandleAutomationRunResolveFailureServiceOutput = {
   message: string;
 };
 
-export type HandleConversationDeliveryServiceInput = HandleConversationDeliveryWorkflowInput;
-export type HandleConversationDeliveryServiceOutput = HandleConversationDeliveryWorkflowOutput;
-export type ClaimOrResumeConversationDeliveryTaskServiceOutput =
-  ActiveConversationDeliveryTask | null;
-export type ResolveConversationDeliveryTaskActionServiceOutput = ConversationDeliveryTaskAction;
-export type ResolveConversationDeliveryRouteServiceOutput = ResolvedConversationDeliveryRoute;
-export type FinalizeConversationDeliveryTaskServiceInput = {
+export type HandleAutomationConversationDeliveryServiceInput =
+  HandleAutomationConversationDeliveryWorkflowInput;
+export type HandleAutomationConversationDeliveryServiceOutput =
+  HandleAutomationConversationDeliveryWorkflowOutput;
+export type ClaimOrResumeAutomationConversationDeliveryTaskServiceOutput =
+  ActiveAutomationConversationDeliveryTask | null;
+export type ResolveAutomationConversationDeliveryTaskActionServiceOutput =
+  AutomationConversationDeliveryTaskAction;
+export type ResolveAutomationConversationDeliveryRouteServiceOutput =
+  ResolvedAutomationConversationDeliveryRoute;
+export type FinalizeAutomationConversationDeliveryTaskServiceInput = {
   taskId: string;
   generation: number;
-  status: FinalConversationDeliveryTaskStatus;
+  status: FinalAutomationConversationDeliveryTaskStatus;
   failureCode?: string | null;
   failureMessage?: string | null;
 };
@@ -102,9 +106,9 @@ export type EnsureAutomationSandboxServiceInput = {
 };
 
 export type EnsureAutomationSandboxServiceOutput = EnsuredAutomationSandbox;
-export type EnsureConversationDeliverySandboxServiceInput = {
+export type EnsureAutomationConversationDeliverySandboxServiceInput = {
   preparedAutomationRun: PreparedAutomationRun;
-  resolvedConversationRoute: ResolvedConversationDeliveryRoute;
+  resolvedAutomationConversationRoute: ResolvedAutomationConversationDeliveryRoute;
 };
 
 export type AcquireAutomationConnectionDependencies = {
@@ -134,9 +138,9 @@ export type DeliverAutomationPayloadServiceInput = {
   ensuredAutomationSandbox: EnsureAutomationSandboxServiceOutput;
   acquiredAutomationConnection: AcquireAutomationConnectionServiceOutput;
 };
-export type DeliverConversationAutomationPayloadServiceInput = {
+export type DeliverAutomationConversationPayloadServiceInput = {
   preparedAutomationRun: PreparedAutomationRun;
-  resolvedConversationRoute: ResolvedConversationDeliveryRoute;
+  resolvedAutomationConversationRoute: ResolvedAutomationConversationDeliveryRoute;
   ensuredAutomationSandbox: EnsureAutomationSandboxServiceOutput;
   acquiredAutomationConnection: AcquireAutomationConnectionServiceOutput;
 };

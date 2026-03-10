@@ -5,8 +5,8 @@ import {
   type AutomationRunStatus,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
-  ConversationCreatedByKinds,
-  ConversationOwnerKinds,
+  AutomationConversationCreatedByKinds,
+  AutomationConversationOwnerKinds,
   IntegrationBindingKinds,
 } from "@mistle/db/control-plane";
 import { systemSleeper } from "@mistle/time";
@@ -14,11 +14,11 @@ import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control
 import { and, eq, sql } from "drizzle-orm";
 
 import {
-  claimConversation,
-  enqueueConversationDeliveryTask,
-  ensureConversationDeliveryProcessor,
-  setConversationDeliveryProcessorIdle,
-} from "../conversations/index.js";
+  claimAutomationConversation,
+  enqueueAutomationConversationDeliveryTask,
+  ensureAutomationConversationDeliveryProcessor,
+  setAutomationConversationDeliveryProcessorIdle,
+} from "../automation-conversations/index.js";
 import {
   connectSandboxAgentConnection,
   sendSandboxAgentMessage,
@@ -580,15 +580,15 @@ export async function prepareAutomationRun(
       sandboxProfileVersion,
     });
 
-    const claimedConversation = await claimConversation(
+    const claimedAutomationConversation = await claimAutomationConversation(
       {
         db: tx,
       },
       {
         organizationId: automation.organizationId,
-        ownerKind: ConversationOwnerKinds.AUTOMATION_TARGET,
+        ownerKind: AutomationConversationOwnerKinds.AUTOMATION_TARGET,
         ownerId: automationTarget.id,
-        createdByKind: ConversationCreatedByKinds.WEBHOOK,
+        createdByKind: AutomationConversationCreatedByKinds.WEBHOOK,
         createdById: webhookEvent.id,
         conversationKey: compiledTemplates.renderedConversationKey,
         sandboxProfileId: automationTarget.sandboxProfileId,
@@ -600,7 +600,7 @@ export async function prepareAutomationRun(
     await tx
       .update(automationRuns)
       .set({
-        conversationId: claimedConversation.id,
+        conversationId: claimedAutomationConversation.id,
         renderedInput: compiledTemplates.renderedInput,
         renderedConversationKey: compiledTemplates.renderedConversationKey,
         renderedIdempotencyKey: compiledTemplates.renderedIdempotencyKey,
@@ -608,7 +608,7 @@ export async function prepareAutomationRun(
       })
       .where(eq(automationRuns.id, automationRun.id));
 
-    return claimedConversation.id;
+    return claimedAutomationConversation.id;
   });
 
   return {
@@ -637,7 +637,7 @@ export async function handoffAutomationRunDelivery(
   deps: HandoffAutomationRunDeliveryDependencies,
   input: HandoffAutomationRunDeliveryServiceInput,
 ): Promise<void> {
-  const enqueuedTask = await enqueueConversationDeliveryTask(
+  const enqueuedTask = await enqueueAutomationConversationDeliveryTask(
     {
       db: deps.db,
     },
@@ -649,7 +649,7 @@ export async function handoffAutomationRunDelivery(
     },
   );
 
-  const ensuredProcessor = await ensureConversationDeliveryProcessor(
+  const ensuredProcessor = await ensureAutomationConversationDeliveryProcessor(
     {
       db: deps.db,
     },
@@ -667,7 +667,7 @@ export async function handoffAutomationRunDelivery(
       generation: ensuredProcessor.generation,
     });
   } catch (error) {
-    await setConversationDeliveryProcessorIdle(
+    await setAutomationConversationDeliveryProcessorIdle(
       {
         db: deps.db,
       },
