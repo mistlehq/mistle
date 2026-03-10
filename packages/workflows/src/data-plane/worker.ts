@@ -1,9 +1,7 @@
 import type { OpenWorkflow, Worker } from "openworkflow";
 
-import {
-  createStartSandboxInstanceWorkflow,
-  type StartSandboxInstanceWorkflowServices,
-} from "./workflows/start-sandbox-instance/index.js";
+import { registerDataPlaneSandboxWorkflows } from "./register/index.js";
+import type { StartSandboxInstanceWorkflowServices } from "./workflows/start-sandbox-instance/index.js";
 
 export const DataPlaneWorkerWorkflowIds = {
   START_SANDBOX_INSTANCE: "startSandboxInstance",
@@ -32,19 +30,19 @@ function assertNever(value: never): never {
  */
 export function createDataPlaneWorker(input: CreateDataPlaneWorkerInput): Worker {
   for (const workflowId of input.enabledWorkflows) {
-    if (workflowId === DataPlaneWorkerWorkflowIds.START_SANDBOX_INSTANCE) {
-      const startSandboxInstanceWorkflow = createStartSandboxInstanceWorkflow(
-        input.services.startSandboxInstance,
-      );
-      input.openWorkflow.implementWorkflow(
-        startSandboxInstanceWorkflow.spec,
-        startSandboxInstanceWorkflow.fn,
-      );
-      continue;
+    switch (workflowId) {
+      case DataPlaneWorkerWorkflowIds.START_SANDBOX_INSTANCE:
+        continue;
     }
 
     return assertNever(workflowId);
   }
+
+  registerDataPlaneSandboxWorkflows({
+    openWorkflow: input.openWorkflow,
+    enabledWorkflows: input.enabledWorkflows,
+    services: input.services,
+  });
 
   return input.openWorkflow.newWorker({
     concurrency: input.maxConcurrentWorkflows,
