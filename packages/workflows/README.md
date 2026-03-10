@@ -25,21 +25,21 @@ Root export is also available:
 
 ### `@mistle/workflows/control-plane`
 
-| Export                                      | Type            | Purpose                                                                                                |
-| ------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------ |
-| `ControlPlaneOpenWorkflow.SCHEMA`           | `string`        | Dedicated OpenWorkflow schema name (`control_plane_openworkflow`).                                     |
-| `createControlPlaneBackend`                 | `function`      | Creates a Postgres backend configured to the control-plane schema.                                     |
-| `createControlPlaneOpenWorkflow`            | `function`      | Creates an OpenWorkflow client for producers and workers.                                              |
-| `createControlPlaneWorker`                  | `function`      | Registers control-plane workflows and returns a worker instance.                                       |
-| `ControlPlaneWorkerWorkflowIds`             | `const`         | Workflow id constants used by `createControlPlaneWorker` for explicit workflow registration selection. |
-| `SendOrganizationInvitationWorkflowSpec`    | `workflow spec` | Spec for invitation email delivery workflow (`control-plane.auth.send-organization-invitation`).       |
-| `SendVerificationOTPWorkflowSpec`           | `workflow spec` | Spec for OTP email delivery workflow (`control-plane.auth.send-verification-otp`).                     |
-| `RequestDeleteSandboxProfileWorkflowSpec`   | `workflow spec` | Spec for sandbox profile deletion workflow (`control-plane.sandbox-profiles.request-delete-profile`).  |
-| `StartSandboxProfileInstanceWorkflowSpec`   | `workflow spec` | Spec for sandbox instance startup (`control-plane.sandbox-instances.start-profile-instance`).          |
-| `HandleAutomationRunWorkflowSpec`           | `workflow spec` | Spec for queued automation run execution.                                                               |
-| `HandleAutomationConversationDeliveryWorkflowSpec` | `workflow spec` | Spec for automation conversation delivery processing.                                          |
-| `HandleIntegrationWebhookEventWorkflowSpec` | `workflow spec` | Spec for accepted integration webhook processing.                                                       |
-| `SyncIntegrationConnectionResourcesWorkflowSpec` | `workflow spec` | Spec for integration resource synchronization.                                                   |
+| Export                                             | Type            | Purpose                                                                                                |
+| -------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------ |
+| `ControlPlaneOpenWorkflow.SCHEMA`                  | `string`        | Dedicated OpenWorkflow schema name (`control_plane_openworkflow`).                                     |
+| `createControlPlaneBackend`                        | `function`      | Creates a Postgres backend configured to the control-plane schema.                                     |
+| `createControlPlaneOpenWorkflow`                   | `function`      | Creates an OpenWorkflow client for producers and workers.                                              |
+| `createControlPlaneWorker`                         | `function`      | Registers control-plane workflows and returns a worker instance.                                       |
+| `ControlPlaneWorkerWorkflowIds`                    | `const`         | Workflow id constants used by `createControlPlaneWorker` for explicit workflow registration selection. |
+| `SendOrganizationInvitationWorkflowSpec`           | `workflow spec` | Spec for invitation email delivery workflow (`control-plane.auth.send-organization-invitation`).       |
+| `SendVerificationOTPWorkflowSpec`                  | `workflow spec` | Spec for OTP email delivery workflow (`control-plane.auth.send-verification-otp`).                     |
+| `RequestDeleteSandboxProfileWorkflowSpec`          | `workflow spec` | Spec for sandbox profile deletion workflow (`control-plane.sandbox-profiles.request-delete-profile`).  |
+| `StartSandboxProfileInstanceWorkflowSpec`          | `workflow spec` | Spec for sandbox instance startup (`control-plane.sandbox-instances.start-profile-instance`).          |
+| `HandleAutomationRunWorkflowSpec`                  | `workflow spec` | Spec for queued automation run execution.                                                              |
+| `HandleAutomationConversationDeliveryWorkflowSpec` | `workflow spec` | Spec for automation conversation delivery processing.                                                  |
+| `HandleIntegrationWebhookEventWorkflowSpec`        | `workflow spec` | Spec for accepted integration webhook processing.                                                      |
+| `SyncIntegrationConnectionResourcesWorkflowSpec`   | `workflow spec` | Spec for integration resource synchronization.                                                         |
 
 ### `@mistle/workflows/data-plane`
 
