@@ -8,6 +8,11 @@ import {
   type ResolvedAutomationConversationDeliveryRoute,
 } from "@mistle/workflows/control-plane";
 
+import { getConversationProviderAdapter } from "../../automation-conversations/provider-adapter.js";
+import type {
+  DeliverAutomationConversationPayloadServiceInput,
+  EnsureAutomationConversationDeliverySandboxServiceInput,
+} from "../../services/types.js";
 import {
   activateAutomationConversationRoute,
   AutomationConversationDeliveryTaskActions,
@@ -17,16 +22,11 @@ import {
   createAutomationConversationRoute,
   finalizeAutomationConversationDeliveryTask,
   findActiveAutomationConversationDeliveryTask,
-  getConversationProviderAdapter,
   idleAutomationConversationDeliveryProcessorIfEmpty,
   markAutomationConversationDeliveryTaskDelivering,
   resolveAutomationConversationDeliveryTaskAction,
   updateAutomationConversationExecution,
-} from "../../automation-conversations/index.js";
-import type {
-  DeliverAutomationConversationPayloadServiceInput,
-  EnsureAutomationConversationDeliverySandboxServiceInput,
-} from "../../services/types.js";
+} from "../persistence/index.js";
 import {
   AutomationConversationRouteBindingActions,
   AutomationConversationDeliverySandboxActions,

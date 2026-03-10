@@ -27,7 +27,7 @@ import {
   rebindAutomationConversationSandbox,
   replaceAutomationConversationBinding,
   updateAutomationConversationExecution,
-} from "../src/runtime/automation-conversations/index.js";
+} from "../src/runtime/automation-workflows/persistence/index.js";
 import { it } from "./test-context.js";
 
 async function createTestDatabase(input: { databaseUrl: string }) {
