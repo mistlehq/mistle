@@ -51,38 +51,38 @@ export {
   type IntegrationConnectionStatus,
 } from "./integration-connections.js";
 export {
-  conversationDeliveryProcessors,
-  ConversationDeliveryProcessorStatuses,
-  type ConversationDeliveryProcessor,
-  type ConversationDeliveryProcessorStatus,
-  type InsertConversationDeliveryProcessor,
-} from "./conversation-delivery-processors.js";
+  automationConversationDeliveryProcessors,
+  AutomationConversationDeliveryProcessorStatuses,
+  type AutomationConversationDeliveryProcessor,
+  type AutomationConversationDeliveryProcessorStatus,
+  type InsertAutomationConversationDeliveryProcessor,
+} from "./automation-conversation-delivery-processors.js";
 export {
-  conversationDeliveryTasks,
-  ConversationDeliveryTaskStatuses,
-  type ConversationDeliveryTask,
-  type ConversationDeliveryTaskStatus,
-  type InsertConversationDeliveryTask,
-} from "./conversation-delivery-tasks.js";
+  automationConversationDeliveryTasks,
+  AutomationConversationDeliveryTaskStatuses,
+  type AutomationConversationDeliveryTask,
+  type AutomationConversationDeliveryTaskStatus,
+  type InsertAutomationConversationDeliveryTask,
+} from "./automation-conversation-delivery-tasks.js";
 export {
-  conversations,
-  ConversationCreatedByKinds,
-  ConversationOwnerKinds,
-  ConversationStatuses,
-  type Conversation,
-  type ConversationCreatedByKind,
-  type ConversationIntegrationFamilyId,
-  type ConversationOwnerKind,
-  type ConversationStatus,
-  type InsertConversation,
-} from "./conversations.js";
+  automationConversations,
+  AutomationConversationCreatedByKinds,
+  AutomationConversationOwnerKinds,
+  AutomationConversationStatuses,
+  type AutomationConversation,
+  type AutomationConversationCreatedByKind,
+  type AutomationConversationIntegrationFamilyId,
+  type AutomationConversationOwnerKind,
+  type AutomationConversationStatus,
+  type InsertAutomationConversation,
+} from "./automation-conversations.js";
 export {
-  conversationRoutes,
-  ConversationRouteStatuses,
-  type ConversationRoute,
-  type ConversationRouteStatus,
-  type InsertConversationRoute,
-} from "./conversation-routes.js";
+  automationConversationRoutes,
+  AutomationConversationRouteStatuses,
+  type AutomationConversationRoute,
+  type AutomationConversationRouteStatus,
+  type InsertAutomationConversationRoute,
+} from "./automation-conversation-routes.js";
 export {
   integrationCredentials,
   IntegrationCredentialSecretKinds,

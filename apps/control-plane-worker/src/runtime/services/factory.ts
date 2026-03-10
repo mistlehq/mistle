@@ -2,12 +2,27 @@ import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-clien
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import {
   HandleAutomationRunWorkflowSpec,
-  HandleConversationDeliveryWorkflowSpec,
-  type HandleConversationDeliveryWorkflowInput,
+  HandleAutomationConversationDeliveryWorkflowSpec,
+  type HandleAutomationConversationDeliveryWorkflowInput,
 } from "@mistle/workflows/control-plane";
 
 import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
+import {
+  acquireConversationDeliveryConnection,
+  claimOrResumeAutomationConversationDeliveryTask,
+  completeConversationDeliveryAutomationRun,
+  deliverConversationAutomationPayload,
+  ensureConversationDeliverySandbox,
+  failConversationDeliveryAutomationRun,
+  finalizeAutomationConversationDeliveryActiveTask,
+  ignoreAutomationConversationDeliveryAutomationRun,
+  idleAutomationConversationDeliveryProcessor,
+  prepareConversationDeliveryAutomationRun,
+  resolveConversationDeliveryRoute,
+  resolveAutomationConversationDeliveryActiveTaskAction,
+  resolveAutomationRunFailure as resolveConversationDeliveryFailure,
+} from "./handle-automation-conversation-delivery.js";
 import {
   handoffAutomationRunDelivery,
   markAutomationRunFailed,
@@ -15,21 +30,6 @@ import {
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
 } from "./handle-automation-run.js";
-import {
-  acquireConversationDeliveryConnection,
-  claimOrResumeConversationDeliveryTask,
-  completeConversationDeliveryAutomationRun,
-  deliverConversationAutomationPayload,
-  ensureConversationDeliverySandbox,
-  failConversationDeliveryAutomationRun,
-  finalizeConversationDeliveryActiveTask,
-  ignoreConversationDeliveryAutomationRun,
-  idleConversationDeliveryProcessor,
-  prepareConversationDeliveryAutomationRun,
-  resolveConversationDeliveryRoute,
-  resolveConversationDeliveryActiveTaskAction,
-  resolveAutomationRunFailure as resolveConversationDeliveryFailure,
-} from "./handle-conversation-delivery.js";
 import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";
 import { startSandboxProfileInstance } from "./start-sandbox-profile-instance.js";
 import { syncIntegrationConnectionResources } from "./sync-integration-connection-resources.js";
@@ -72,7 +72,7 @@ export function createControlPlaneWorkerServices(
             db: input.db,
             enqueueConversationDeliveryWorkflow: async (enqueueInput) => {
               await input.openWorkflow.runWorkflow(
-                HandleConversationDeliveryWorkflowSpec,
+                HandleAutomationConversationDeliveryWorkflowSpec,
                 {
                   conversationId: enqueueInput.conversationId,
                   generation: enqueueInput.generation,
@@ -99,18 +99,18 @@ export function createControlPlaneWorkerServices(
       },
     },
     conversationDelivery: {
-      claimOrResumeConversationDeliveryTask: async (
-        workflowInput: HandleConversationDeliveryWorkflowInput,
+      claimOrResumeAutomationConversationDeliveryTask: async (
+        workflowInput: HandleAutomationConversationDeliveryWorkflowInput,
       ) => {
-        return claimOrResumeConversationDeliveryTask(
+        return claimOrResumeAutomationConversationDeliveryTask(
           {
             db: input.db,
           },
           workflowInput,
         );
       },
-      resolveConversationDeliveryTaskAction: async ({ taskId, generation }) => {
-        return resolveConversationDeliveryActiveTaskAction(
+      resolveAutomationConversationDeliveryTaskAction: async ({ taskId, generation }) => {
+        return resolveAutomationConversationDeliveryActiveTaskAction(
           {
             db: input.db,
           },
@@ -120,10 +120,10 @@ export function createControlPlaneWorkerServices(
           },
         );
       },
-      idleConversationDeliveryProcessorIfEmpty: async (
-        workflowInput: HandleConversationDeliveryWorkflowInput,
+      idleAutomationConversationDeliveryProcessorIfEmpty: async (
+        workflowInput: HandleAutomationConversationDeliveryWorkflowInput,
       ) => {
-        return idleConversationDeliveryProcessor(
+        return idleAutomationConversationDeliveryProcessor(
           {
             db: input.db,
           },
@@ -150,7 +150,10 @@ export function createControlPlaneWorkerServices(
           },
         );
       },
-      ensureAutomationSandbox: async ({ preparedAutomationRun, resolvedConversationRoute }) => {
+      ensureAutomationSandbox: async ({
+        preparedAutomationRun,
+        resolvedAutomationConversationRoute,
+      }) => {
         return ensureConversationDeliverySandbox(
           {
             db: input.db,
@@ -161,7 +164,7 @@ export function createControlPlaneWorkerServices(
           },
           {
             preparedAutomationRun,
-            resolvedConversationRoute,
+            resolvedAutomationConversationRoute,
           },
         );
       },
@@ -183,7 +186,7 @@ export function createControlPlaneWorkerServices(
         taskId,
         generation,
         preparedAutomationRun,
-        resolvedConversationRoute,
+        resolvedAutomationConversationRoute,
         ensuredAutomationSandbox,
         acquiredAutomationConnection,
       }) => {
@@ -195,7 +198,7 @@ export function createControlPlaneWorkerServices(
             taskId,
             generation,
             preparedAutomationRun,
-            resolvedConversationRoute,
+            resolvedAutomationConversationRoute,
             ensuredAutomationSandbox,
             acquiredAutomationConnection,
           },
@@ -212,7 +215,7 @@ export function createControlPlaneWorkerServices(
         );
       },
       markAutomationRunIgnored: async ({ automationRunId }) => {
-        await ignoreConversationDeliveryAutomationRun(
+        await ignoreAutomationConversationDeliveryAutomationRun(
           {
             db: input.db,
           },
@@ -233,14 +236,14 @@ export function createControlPlaneWorkerServices(
           },
         );
       },
-      finalizeConversationDeliveryTask: async ({
+      finalizeAutomationConversationDeliveryTask: async ({
         taskId,
         generation,
         status,
         failureCode,
         failureMessage,
       }) => {
-        await finalizeConversationDeliveryActiveTask(
+        await finalizeAutomationConversationDeliveryActiveTask(
           {
             db: input.db,
           },

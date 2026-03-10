@@ -3,7 +3,7 @@ export { createControlPlaneOpenWorkflow } from "./client.js";
 export { ControlPlaneWorkerWorkflowIds, createControlPlaneWorker } from "./worker.js";
 export {
   HandleAutomationRunWorkflowSpec,
-  HandleConversationDeliveryWorkflowSpec,
+  HandleAutomationConversationDeliveryWorkflowSpec,
   HandleIntegrationWebhookEventWorkflowSpec,
   RequestDeleteSandboxProfileWorkflowSpec,
   StartSandboxProfileInstanceWorkflowSpec,
@@ -20,19 +20,19 @@ export {
   type PreparedAutomationRun,
 } from "./workflows/handle-automation-run/index.js";
 export {
-  createHandleConversationDeliveryWorkflow,
-  ActiveConversationDeliveryTaskStatuses,
-  type ActiveConversationDeliveryTask,
-  type ActiveConversationDeliveryTaskStatus,
+  createHandleAutomationConversationDeliveryWorkflow,
+  ActiveAutomationConversationDeliveryTaskStatuses,
+  type ActiveAutomationConversationDeliveryTask,
+  type ActiveAutomationConversationDeliveryTaskStatus,
   type AcquiredAutomationConnection,
-  type ConversationDeliveryTaskAction,
-  type CreateHandleConversationDeliveryWorkflowInput,
+  type AutomationConversationDeliveryTaskAction,
+  type CreateHandleAutomationConversationDeliveryWorkflowInput,
   type EnsuredAutomationSandbox,
-  type FinalConversationDeliveryTaskStatus,
-  type ResolvedConversationDeliveryRoute,
-  type HandleConversationDeliveryWorkflowInput,
-  type HandleConversationDeliveryWorkflowOutput,
-} from "./workflows/handle-conversation-delivery/index.js";
+  type FinalAutomationConversationDeliveryTaskStatus,
+  type ResolvedAutomationConversationDeliveryRoute,
+  type HandleAutomationConversationDeliveryWorkflowInput,
+  type HandleAutomationConversationDeliveryWorkflowOutput,
+} from "./workflows/handle-automation-conversation-delivery/index.js";
 export {
   createHandleIntegrationWebhookEventWorkflow,
   type CreateHandleIntegrationWebhookEventWorkflowInput,

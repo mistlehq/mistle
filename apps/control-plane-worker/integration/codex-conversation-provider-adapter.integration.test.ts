@@ -10,12 +10,12 @@ import { systemScheduler, systemSleeper, type TimerHandle } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 import WebSocket, { type RawData } from "ws";
 
-import type { ProviderConnection } from "../src/runtime/conversations/provider-adapter.js";
+import type { ProviderConnection } from "../src/runtime/automation-conversations/provider-adapter.js";
 import {
   ConversationProviderError,
   ConversationProviderErrorCodes,
-} from "../src/runtime/conversations/provider-errors.js";
-import { createCodexConversationProviderAdapter } from "../src/runtime/conversations/providers/codex-conversation-provider-adapter.js";
+} from "../src/runtime/automation-conversations/provider-errors.js";
+import { createCodexConversationProviderAdapter } from "../src/runtime/automation-conversations/providers/codex-conversation-provider-adapter.js";
 
 const OPENAI_API_KEY_ENV = "OPENAI_API_KEY";
 const PREFERRED_INTEGRATION_MODELS = ["gpt-5-codex-mini", "gpt-5.1-codex-mini"] as const;
@@ -916,13 +916,13 @@ describeCodexIntegration("codex conversation provider adapter integration", () =
 
       try {
         const integrationModel = await resolveIntegrationModel(firstConnection);
-        const createdConversation = await adapter.createConversation({
+        const createdAutomationConversation = await adapter.createAutomationConversation({
           connection: firstConnection,
           options: {
             model: integrationModel,
           },
         });
-        createdConversationId = createdConversation.providerConversationId;
+        createdConversationId = createdAutomationConversation.providerConversationId;
 
         const startedExecution = await adapter.startExecution({
           connection: firstConnection,
@@ -949,7 +949,7 @@ describeCodexIntegration("codex conversation provider adapter integration", () =
       const secondConnection = await connectInitializedCodexConnection(secondServer.wsUrl);
 
       try {
-        const restartedInspection = await adapter.inspectConversation({
+        const restartedInspection = await adapter.inspectAutomationConversation({
           connection: secondConnection,
           providerConversationId: createdConversationId,
         });
@@ -964,13 +964,13 @@ describeCodexIntegration("codex conversation provider adapter integration", () =
     }
   }, 180_000);
 
-  it("maps missing codex conversations to exists=false", async () => {
+  it("maps missing codex automationConversations to exists=false", async () => {
     const codexServer = await startCodexAppServer();
     const connection = await connectInitializedCodexConnection(codexServer.wsUrl);
     const adapter = createCodexConversationProviderAdapter();
 
     try {
-      const missingInspection = await adapter.inspectConversation({
+      const missingInspection = await adapter.inspectAutomationConversation({
         connection,
         providerConversationId: randomUUID(),
       });
@@ -993,7 +993,7 @@ describeCodexIntegration("codex conversation provider adapter integration", () =
 
     try {
       await expect(
-        adapter.resumeConversation({
+        adapter.resumeAutomationConversation({
           connection,
           providerConversationId: missingConversationId,
         }),
@@ -1038,7 +1038,7 @@ describeCodexIntegration("codex conversation provider adapter integration", () =
     try {
       const integrationModel = await resolveIntegrationModel(connection);
 
-      const createdConversation = await adapter.createConversation({
+      const createdAutomationConversation = await adapter.createAutomationConversation({
         connection,
         options: {
           model: integrationModel,
@@ -1051,7 +1051,7 @@ describeCodexIntegration("codex conversation provider adapter integration", () =
       await expect(
         adapter.steerExecution({
           connection,
-          providerConversationId: createdConversation.providerConversationId,
+          providerConversationId: createdAutomationConversation.providerConversationId,
           providerExecutionId: randomUUID(),
           inputText: "continue",
         }),
@@ -1073,25 +1073,25 @@ describeCodexIntegration("codex conversation provider adapter integration", () =
     try {
       const integrationModel = await resolveIntegrationModel(connection);
 
-      const createdConversation = await adapter.createConversation({
+      const createdAutomationConversation = await adapter.createAutomationConversation({
         connection,
         options: {
           model: integrationModel,
         },
       });
-      expect(createdConversation.providerConversationId.length).toBeGreaterThan(0);
+      expect(createdAutomationConversation.providerConversationId.length).toBeGreaterThan(0);
 
-      const inspectedConversation = await adapter.inspectConversation({
+      const inspectedAutomationConversation = await adapter.inspectAutomationConversation({
         connection,
-        providerConversationId: createdConversation.providerConversationId,
+        providerConversationId: createdAutomationConversation.providerConversationId,
       });
-      expect(inspectedConversation.exists).toBe(true);
-      expect(["idle", "active"]).toContain(inspectedConversation.status);
-      expect(inspectedConversation.activeExecutionId).toBeNull();
+      expect(inspectedAutomationConversation.exists).toBe(true);
+      expect(["idle", "active"]).toContain(inspectedAutomationConversation.status);
+      expect(inspectedAutomationConversation.activeExecutionId).toBeNull();
 
       const startedExecution = await adapter.startExecution({
         connection,
-        providerConversationId: createdConversation.providerConversationId,
+        providerConversationId: createdAutomationConversation.providerConversationId,
         inputText: EXECUTION_PROMPT,
       });
       expect(startedExecution.providerExecutionId).not.toBeNull();
@@ -1102,30 +1102,30 @@ describeCodexIntegration("codex conversation provider adapter integration", () =
 
       await waitForThreadToBecomeIdle({
         connection,
-        providerConversationId: createdConversation.providerConversationId,
+        providerConversationId: createdAutomationConversation.providerConversationId,
         getAppServerLogsTail: codexServer.getLogsTail,
       });
 
       await waitForPromptToPersistInTurnHistory({
         connection,
-        providerConversationId: createdConversation.providerConversationId,
+        providerConversationId: createdAutomationConversation.providerConversationId,
         expectedPrompt: EXECUTION_PROMPT,
       });
 
       await waitForAssistantReplyToPersistInTurnHistory({
         connection,
-        providerConversationId: createdConversation.providerConversationId,
+        providerConversationId: createdAutomationConversation.providerConversationId,
         expectedReply: EXPECTED_ASSISTANT_REPLY,
       });
 
-      await adapter.resumeConversation({
+      await adapter.resumeAutomationConversation({
         connection: resumeConnection,
-        providerConversationId: createdConversation.providerConversationId,
+        providerConversationId: createdAutomationConversation.providerConversationId,
       });
 
-      const resumedInspection = await adapter.inspectConversation({
+      const resumedInspection = await adapter.inspectAutomationConversation({
         connection: resumeConnection,
-        providerConversationId: createdConversation.providerConversationId,
+        providerConversationId: createdAutomationConversation.providerConversationId,
       });
       expect(resumedInspection.exists).toBe(true);
       expect(["idle", "active"]).toContain(resumedInspection.status);

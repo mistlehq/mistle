@@ -387,10 +387,10 @@
           "onDelete": "set null",
           "onUpdate": "no action"
         },
-        "automation_runs_conversation_id_conversations_id_fk": {
-          "name": "automation_runs_conversation_id_conversations_id_fk",
+        "automation_runs_automation_conversation_id_automation_conversations_id_fk": {
+          "name": "automation_runs_automation_conversation_id_automation_conversations_id_fk",
           "tableFrom": "automation_runs",
-          "tableTo": "conversations",
+          "tableTo": "automation_conversations",
           "schemaTo": "control_plane",
           "columnsFrom": ["conversation_id"],
           "columnsTo": ["id"],
@@ -635,7 +635,7 @@
       "isRLSEnabled": false
     },
     "control_plane.conversation_delivery_processors": {
-      "name": "conversation_delivery_processors",
+      "name": "automation_conversation_delivery_processors",
       "schema": "control_plane",
       "columns": {
         "conversation_id": {
@@ -681,10 +681,10 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "conversation_delivery_processors_conversation_id_conversations_id_fk": {
-          "name": "conversation_delivery_processors_conversation_id_conversations_id_fk",
-          "tableFrom": "conversation_delivery_processors",
-          "tableTo": "conversations",
+        "automation_conversation_delivery_processors_automation_conversation_id_automation_conversations_id_fk": {
+          "name": "automation_conversation_delivery_processors_automation_conversation_id_automation_conversations_id_fk",
+          "tableFrom": "automation_conversation_delivery_processors",
+          "tableTo": "automation_conversations",
           "schemaTo": "control_plane",
           "columnsFrom": ["conversation_id"],
           "columnsTo": ["id"],
@@ -699,7 +699,7 @@
       "isRLSEnabled": false
     },
     "control_plane.conversation_delivery_tasks": {
-      "name": "conversation_delivery_tasks",
+      "name": "automation_conversation_delivery_tasks",
       "schema": "control_plane",
       "columns": {
         "id": {
@@ -798,8 +798,8 @@
         }
       },
       "indexes": {
-        "conversation_delivery_tasks_automation_run_id_uidx": {
-          "name": "conversation_delivery_tasks_automation_run_id_uidx",
+        "automation_conversation_delivery_tasks_automation_run_id_uidx": {
+          "name": "automation_conversation_delivery_tasks_automation_run_id_uidx",
           "columns": [
             {
               "expression": "automation_run_id",
@@ -813,8 +813,8 @@
           "method": "btree",
           "with": {}
         },
-        "conversation_delivery_tasks_conversation_id_idx": {
-          "name": "conversation_delivery_tasks_conversation_id_idx",
+        "automation_conversation_delivery_tasks_automation_conversation_id_idx": {
+          "name": "automation_conversation_delivery_tasks_automation_conversation_id_idx",
           "columns": [
             {
               "expression": "conversation_id",
@@ -828,8 +828,8 @@
           "method": "btree",
           "with": {}
         },
-        "conversation_delivery_tasks_source_webhook_event_id_idx": {
-          "name": "conversation_delivery_tasks_source_webhook_event_id_idx",
+        "automation_conversation_delivery_tasks_source_webhook_event_id_idx": {
+          "name": "automation_conversation_delivery_tasks_source_webhook_event_id_idx",
           "columns": [
             {
               "expression": "source_webhook_event_id",
@@ -843,8 +843,8 @@
           "method": "btree",
           "with": {}
         },
-        "conversation_delivery_tasks_status_idx": {
-          "name": "conversation_delivery_tasks_status_idx",
+        "automation_conversation_delivery_tasks_status_idx": {
+          "name": "automation_conversation_delivery_tasks_status_idx",
           "columns": [
             {
               "expression": "status",
@@ -858,8 +858,8 @@
           "method": "btree",
           "with": {}
         },
-        "conversation_delivery_tasks_dequeue_idx": {
-          "name": "conversation_delivery_tasks_dequeue_idx",
+        "automation_conversation_delivery_tasks_dequeue_idx": {
+          "name": "automation_conversation_delivery_tasks_dequeue_idx",
           "columns": [
             {
               "expression": "conversation_id",
@@ -899,19 +899,19 @@
         }
       },
       "foreignKeys": {
-        "conversation_delivery_tasks_conversation_id_conversations_id_fk": {
-          "name": "conversation_delivery_tasks_conversation_id_conversations_id_fk",
-          "tableFrom": "conversation_delivery_tasks",
-          "tableTo": "conversations",
+        "automation_conversation_delivery_tasks_automation_conversation_id_automation_conversations_id_fk": {
+          "name": "automation_conversation_delivery_tasks_automation_conversation_id_automation_conversations_id_fk",
+          "tableFrom": "automation_conversation_delivery_tasks",
+          "tableTo": "automation_conversations",
           "schemaTo": "control_plane",
           "columnsFrom": ["conversation_id"],
           "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "conversation_delivery_tasks_automation_run_id_automation_runs_id_fk": {
-          "name": "conversation_delivery_tasks_automation_run_id_automation_runs_id_fk",
-          "tableFrom": "conversation_delivery_tasks",
+        "automation_conversation_delivery_tasks_automation_run_id_automation_runs_id_fk": {
+          "name": "automation_conversation_delivery_tasks_automation_run_id_automation_runs_id_fk",
+          "tableFrom": "automation_conversation_delivery_tasks",
           "tableTo": "automation_runs",
           "schemaTo": "control_plane",
           "columnsFrom": ["automation_run_id"],
@@ -919,9 +919,9 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "conversation_delivery_tasks_source_webhook_event_id_integration_webhook_events_id_fk": {
-          "name": "conversation_delivery_tasks_source_webhook_event_id_integration_webhook_events_id_fk",
-          "tableFrom": "conversation_delivery_tasks",
+        "automation_conversation_delivery_tasks_source_webhook_event_id_integration_webhook_events_id_fk": {
+          "name": "automation_conversation_delivery_tasks_source_webhook_event_id_integration_webhook_events_id_fk",
+          "tableFrom": "automation_conversation_delivery_tasks",
           "tableTo": "integration_webhook_events",
           "schemaTo": "control_plane",
           "columnsFrom": ["source_webhook_event_id"],
@@ -937,7 +937,7 @@
       "isRLSEnabled": false
     },
     "control_plane.conversation_routes": {
-      "name": "conversation_routes",
+      "name": "automation_conversation_routes",
       "schema": "control_plane",
       "columns": {
         "id": {
@@ -998,8 +998,8 @@
         }
       },
       "indexes": {
-        "conversation_routes_conversation_id_idx": {
-          "name": "conversation_routes_conversation_id_idx",
+        "automation_conversation_routes_automation_conversation_id_idx": {
+          "name": "automation_conversation_routes_automation_conversation_id_idx",
           "columns": [
             {
               "expression": "conversation_id",
@@ -1013,8 +1013,8 @@
           "method": "btree",
           "with": {}
         },
-        "conversation_routes_sandbox_instance_id_idx": {
-          "name": "conversation_routes_sandbox_instance_id_idx",
+        "automation_conversation_routes_sandbox_instance_id_idx": {
+          "name": "automation_conversation_routes_sandbox_instance_id_idx",
           "columns": [
             {
               "expression": "sandbox_instance_id",
@@ -1028,8 +1028,8 @@
           "method": "btree",
           "with": {}
         },
-        "conversation_routes_conversation_id_uidx": {
-          "name": "conversation_routes_conversation_id_uidx",
+        "automation_conversation_routes_automation_conversation_id_uidx": {
+          "name": "automation_conversation_routes_automation_conversation_id_uidx",
           "columns": [
             {
               "expression": "conversation_id",
@@ -1045,10 +1045,10 @@
         }
       },
       "foreignKeys": {
-        "conversation_routes_conversation_id_conversations_id_fk": {
-          "name": "conversation_routes_conversation_id_conversations_id_fk",
-          "tableFrom": "conversation_routes",
-          "tableTo": "conversations",
+        "automation_conversation_routes_automation_conversation_id_automation_conversations_id_fk": {
+          "name": "automation_conversation_routes_automation_conversation_id_automation_conversations_id_fk",
+          "tableFrom": "automation_conversation_routes",
+          "tableTo": "automation_conversations",
           "schemaTo": "control_plane",
           "columnsFrom": ["conversation_id"],
           "columnsTo": ["id"],
@@ -1062,8 +1062,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "control_plane.conversations": {
-      "name": "conversations",
+    "control_plane.automation_conversations": {
+      "name": "automation_conversations",
       "schema": "control_plane",
       "columns": {
         "id": {
@@ -1173,8 +1173,8 @@
         }
       },
       "indexes": {
-        "conversations_org_owner_key_uidx": {
-          "name": "conversations_org_owner_key_uidx",
+        "automation_conversations_org_owner_key_uidx": {
+          "name": "automation_conversations_org_owner_key_uidx",
           "columns": [
             {
               "expression": "organization_id",
@@ -1206,8 +1206,8 @@
           "method": "btree",
           "with": {}
         },
-        "conversations_organization_id_idx": {
-          "name": "conversations_organization_id_idx",
+        "automation_conversations_organization_id_idx": {
+          "name": "automation_conversations_organization_id_idx",
           "columns": [
             {
               "expression": "organization_id",
@@ -1221,8 +1221,8 @@
           "method": "btree",
           "with": {}
         },
-        "conversations_sandbox_profile_id_idx": {
-          "name": "conversations_sandbox_profile_id_idx",
+        "automation_conversations_sandbox_profile_id_idx": {
+          "name": "automation_conversations_sandbox_profile_id_idx",
           "columns": [
             {
               "expression": "sandbox_profile_id",
@@ -1236,8 +1236,8 @@
           "method": "btree",
           "with": {}
         },
-        "conversations_org_owner_idx": {
-          "name": "conversations_org_owner_idx",
+        "automation_conversations_org_owner_idx": {
+          "name": "automation_conversations_org_owner_idx",
           "columns": [
             {
               "expression": "organization_id",
@@ -1265,9 +1265,9 @@
         }
       },
       "foreignKeys": {
-        "conversations_organization_id_organizations_id_fk": {
-          "name": "conversations_organization_id_organizations_id_fk",
-          "tableFrom": "conversations",
+        "automation_conversations_organization_id_organizations_id_fk": {
+          "name": "automation_conversations_organization_id_organizations_id_fk",
+          "tableFrom": "automation_conversations",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
           "columnsFrom": ["organization_id"],
@@ -1275,9 +1275,9 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "conversations_sandbox_profile_id_sandbox_profiles_id_fk": {
-          "name": "conversations_sandbox_profile_id_sandbox_profiles_id_fk",
-          "tableFrom": "conversations",
+        "automation_conversations_sandbox_profile_id_sandbox_profiles_id_fk": {
+          "name": "automation_conversations_sandbox_profile_id_sandbox_profiles_id_fk",
+          "tableFrom": "automation_conversations",
           "tableTo": "sandbox_profiles",
           "schemaTo": "control_plane",
           "columnsFrom": ["sandbox_profile_id"],
@@ -1285,9 +1285,9 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "conversations_last_processed_webhook_event_id_integration_webhook_events_id_fk": {
-          "name": "conversations_last_processed_webhook_event_id_integration_webhook_events_id_fk",
-          "tableFrom": "conversations",
+        "automation_conversations_last_processed_webhook_event_id_integration_webhook_events_id_fk": {
+          "name": "automation_conversations_last_processed_webhook_event_id_integration_webhook_events_id_fk",
+          "tableFrom": "automation_conversations",
           "tableTo": "integration_webhook_events",
           "schemaTo": "control_plane",
           "columnsFrom": ["last_processed_webhook_event_id"],
