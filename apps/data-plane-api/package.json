@@ -20,6 +20,7 @@
     "@mistle/config": "workspace:*",
     "@mistle/data-plane-trpc": "workspace:*",
     "@mistle/db": "workspace:*",
+    "@mistle/integrations-core": "workspace:*",
     "@mistle/logging": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@mistle/workflows": "workspace:*",
