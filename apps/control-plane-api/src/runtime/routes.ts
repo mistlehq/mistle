@@ -2,6 +2,7 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
 import { createAuthApp } from "../auth/app.js";
+import { createAutomationWebhooksApp } from "../automation-webhooks/index.js";
 import { createIntegrationConnectionsApp } from "../integration-connections/index.js";
 import { createIntegrationTargetsApp } from "../integration-targets/index.js";
 import { createIntegrationWebhooksApp } from "../integration-webhooks/index.js";
@@ -64,6 +65,7 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
 
 export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const authApp = createAuthApp();
+  const automationWebhooksApp = withAuthSession(createAutomationWebhooksApp());
   const integrationConnectionsApp = withAuthSession(createIntegrationConnectionsApp());
   const integrationTargetsApp = withAuthSession(createIntegrationTargetsApp());
   const integrationWebhooksApp = createIntegrationWebhooksApp();
@@ -73,6 +75,7 @@ export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const sandboxInstancesApp = withAuthSession(createSandboxInstancesApp());
   const sandboxProfilesApp = withAuthSession(createSandboxProfilesApp());
   app.route(authApp.basePath, authApp.routes);
+  app.route(automationWebhooksApp.basePath, automationWebhooksApp.routes);
   app.route(integrationConnectionsApp.basePath, integrationConnectionsApp.routes);
   app.route(integrationTargetsApp.basePath, integrationTargetsApp.routes);
   app.route(integrationWebhooksApp.basePath, integrationWebhooksApp.routes);
