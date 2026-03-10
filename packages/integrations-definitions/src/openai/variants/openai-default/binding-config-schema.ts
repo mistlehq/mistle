@@ -9,6 +9,14 @@ export const OpenAiRuntimes: {
   CODEX_CLI: "codex-cli",
 };
 
+const OpenAiAdditionalInstructionsSchema = z.preprocess((value) => {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  return value.trim().length === 0 ? undefined : value;
+}, z.string().optional());
+
 export const OpenAiApiKeyBindingConfigSchema = z
   .object({
     runtime: z.literal(OpenAiRuntimes.CODEX_CLI),
@@ -19,6 +27,7 @@ export const OpenAiApiKeyBindingConfigSchema = z
       OpenAiReasoningEfforts.HIGH,
       OpenAiReasoningEfforts.XHIGH,
     ]),
+    additionalInstructions: OpenAiAdditionalInstructionsSchema,
   })
   .strict();
 

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -66,10 +66,80 @@ describe("SandboxProfileBindingConfigEditor", () => {
 
     expect(screen.getByText("Default model")).toBeDefined();
     expect(screen.getByText("Reasoning effort")).toBeDefined();
+    expect(screen.getByText("Additional instructions")).toBeDefined();
     expect(screen.getByLabelText("Default model")).toBeDefined();
     expect(screen.getByLabelText("Reasoning effort")).toBeDefined();
+    expect(screen.getByLabelText("Additional instructions")).toBeDefined();
     expect(container.querySelectorAll('[data-slot="select-trigger"]').length).toBe(2);
     expect(screen.getAllByText("*").length).toBe(2);
+    expect(container.querySelector("textarea")).not.toBeNull();
+  });
+
+  it("removes additional instructions from config when the textarea is cleared", () => {
+    const target: IntegrationTargetSummary = {
+      targetKey: "target-openai",
+      displayName: "OpenAI",
+      familyId: "openai",
+      variantId: "openai-default",
+      config: {
+        api_base_url: "https://api.openai.com",
+        binding_capabilities: createOpenAiRawBindingCapabilities(),
+      },
+      targetHealth: {
+        configStatus: "valid",
+      },
+    };
+    const connection: IntegrationConnectionSummary = {
+      id: "connection-openai",
+      displayName: "Primary OpenAI Workspace",
+      targetKey: target.targetKey,
+      status: "active",
+      config: {
+        auth_scheme: "api-key",
+      },
+    };
+    const row: SandboxProfileBindingEditorRow = {
+      clientId: "row-openai",
+      connectionId: connection.id,
+      kind: "agent",
+      config: {
+        runtime: "codex-cli",
+        defaultModel: "gpt-5.3-codex",
+        reasoningEffort: "medium",
+        additionalInstructions: "Prefer concise answers.",
+      },
+    };
+    const updates: Array<Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>> = [];
+
+    render(
+      <SandboxProfileBindingConfigEditor
+        availableConnections={[connection]}
+        availableTargets={[target]}
+        onIntegrationBindingRowChange={(_clientId, changes) => {
+          updates.push(changes);
+        }}
+        row={row}
+      />,
+    );
+
+    const additionalInstructionsField = screen
+      .getAllByRole("textbox", {
+        name: "Additional instructions",
+      })
+      .find((field) => field instanceof HTMLTextAreaElement && field.value.length > 0);
+    if (additionalInstructionsField === undefined) {
+      throw new Error("Expected Additional instructions textarea.");
+    }
+
+    fireEvent.change(additionalInstructionsField, {
+      target: { value: "   " },
+    });
+
+    expect(updates.at(-1)?.config).toEqual({
+      runtime: "codex-cli",
+      defaultModel: "gpt-5.3-codex",
+      reasoningEffort: "medium",
+    });
   });
 
   it("resolves GitHub binding config to a resource-backed repository widget", () => {

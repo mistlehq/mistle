@@ -120,6 +120,7 @@ describe("sandbox profile version put integration bindings service integration",
               runtime: "codex-cli",
               defaultModel: "gpt-5.3-codex",
               reasoningEffort: "medium",
+              additionalInstructions: "Prefer concise answers.",
             },
           },
           {
@@ -147,6 +148,7 @@ describe("sandbox profile version put integration bindings service integration",
       runtime: "codex-cli",
       defaultModel: "gpt-5.3-codex",
       reasoningEffort: "medium",
+      additionalInstructions: "Prefer concise answers.",
     });
 
     const insertedBinding = result.bindings.find(

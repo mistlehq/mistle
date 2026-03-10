@@ -173,23 +173,19 @@ describe("compileOpenAiApiKeyBinding", () => {
       OPENAI_MODEL: "gpt-5.3-codex",
       OPENAI_REASONING_EFFORT: "medium",
     });
-    expect(compiled.runtimeClients[0]?.setup.files).toEqual([
-      {
-        fileId: "codex_config",
-        path: "/home/sandbox/.codex/config.toml",
-        mode: 384,
-        content: `model = "gpt-5.3-codex"
-model_reasoning_effort = "medium"
-
-[projects."/"]
-trust_level = "trusted"
-`,
-      },
-    ]);
-    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).not.toContain("base_url =");
-    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).not.toContain(
-      "[model_providers.openai]",
-    );
+    expect(compiled.runtimeClients[0]?.setup.files).toHaveLength(1);
+    expect(compiled.runtimeClients[0]?.setup.files[0]).toMatchObject({
+      fileId: "codex_config",
+      path: "/home/sandbox/.codex/config.toml",
+      mode: 384,
+    });
+    const configContent = compiled.runtimeClients[0]?.setup.files[0]?.content;
+    expect(configContent).toContain('model = "gpt-5.3-codex"');
+    expect(configContent).toContain('model_reasoning_effort = "medium"');
+    expect(configContent).toContain('trust_level = "trusted"');
+    expect(configContent).not.toContain("developer_instructions");
+    expect(configContent).not.toContain("base_url =");
+    expect(configContent).not.toContain("[model_providers.openai]");
     expect(compiled.runtimeClients[0]?.processes).toEqual([
       {
         processKey: "codex-app-server",
@@ -226,6 +222,54 @@ trust_level = "trusted"
         endpointKey: "app-server",
       },
     ]);
+  });
+
+  it("renders additional instructions into codex developer_instructions", () => {
+    const compiled = compileOpenAiApiKeyBinding({
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "openai-default",
+      target: {
+        familyId: "openai",
+        variantId: "openai-default",
+        enabled: true,
+        secrets: {},
+        config: createOpenAiTargetConfig("https://api.openai.com/v1"),
+      },
+      connection: {
+        id: "icn_123",
+        status: "active",
+        config: {
+          auth_scheme: OpenAiApiKeyAuthScheme,
+        },
+      },
+      binding: {
+        id: "ibd_123",
+        kind: "agent",
+        config: {
+          runtime: "codex-cli",
+          defaultModel: "gpt-5.3-codex",
+          reasoningEffort: "medium",
+          additionalInstructions: "Prefer concise answers.\nAlways explain tradeoffs.",
+        },
+      },
+      refs: {
+        egressUrl: {
+          kind: "egress_url",
+          routeId: "route_ibd_123",
+        },
+        artifactBinPath,
+      },
+      runtimeContext: {
+        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
+      },
+    });
+
+    const configContent = compiled.runtimeClients[0]?.setup.files[0]?.content;
+    expect(configContent).toContain("developer_instructions");
+    expect(configContent).toContain("Prefer concise answers.");
+    expect(configContent).toContain("Always explain tradeoffs.");
   });
 
   it("uses target base-url host and path for custom upstreams", () => {

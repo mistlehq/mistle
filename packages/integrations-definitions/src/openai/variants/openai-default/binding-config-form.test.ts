@@ -70,9 +70,19 @@ describe("openai binding config forms", () => {
             },
           ],
         },
+        additionalInstructions: {
+          title: "Additional instructions",
+          description: "Added to the runtime's built-in agent instructions.",
+        },
       },
     });
     expect(resolvedForm.uiSchema).toEqual({
+      additionalInstructions: {
+        "ui:widget": "TextareaWidget",
+        "ui:options": {
+          rows: 8,
+        },
+      },
       defaultModel: {
         "ui:widget": "SelectWidget",
         "ui:options": {

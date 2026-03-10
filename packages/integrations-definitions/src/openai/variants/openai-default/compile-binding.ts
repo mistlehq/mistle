@@ -1,4 +1,5 @@
 import type { CompileBindingInput, CompileBindingResult } from "@mistle/integrations-core";
+import { stringify as stringifyToml } from "smol-toml";
 
 import { resolveOpenAiCredentialSecretType } from "./auth.js";
 import type { OpenAiApiKeyBindingConfig } from "./binding-config-schema.js";
@@ -30,15 +31,23 @@ const RuntimeClientProcessStopTimeoutMs = 10_000;
 const RuntimeClientProcessStopGracePeriodMs = 2_000;
 const OpenAiAllowedPathPrefix = "/";
 
-function renderCodexConfig(input: { model: string; reasoningEffort: string }): string {
-  return [
-    `model = "${input.model}"`,
-    `model_reasoning_effort = "${input.reasoningEffort}"`,
-    "",
-    `[projects."/"]`,
-    `trust_level = "trusted"`,
-    "",
-  ].join("\n");
+function renderCodexConfig(input: {
+  model: string;
+  reasoningEffort: string;
+  additionalInstructions?: string;
+}): string {
+  return stringifyToml({
+    model: input.model,
+    model_reasoning_effort: input.reasoningEffort,
+    ...(input.additionalInstructions === undefined
+      ? {}
+      : { developer_instructions: input.additionalInstructions }),
+    projects: {
+      "/": {
+        trust_level: "trusted",
+      },
+    },
+  });
 }
 
 export function compileOpenAiApiKeyBinding(
@@ -115,6 +124,11 @@ export function compileOpenAiApiKeyBinding(
               content: renderCodexConfig({
                 model: input.binding.config.defaultModel,
                 reasoningEffort: input.binding.config.reasoningEffort,
+                ...(input.binding.config.additionalInstructions === undefined
+                  ? {}
+                  : {
+                      additionalInstructions: input.binding.config.additionalInstructions,
+                    }),
               }),
             },
           ],

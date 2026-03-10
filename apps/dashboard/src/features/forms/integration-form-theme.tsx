@@ -11,6 +11,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Textarea,
   cn,
 } from "@mistle/ui";
 import type {
@@ -137,6 +138,50 @@ function SelectWidget(props: WidgetProps<JsonObject, RJSFSchema>): React.JSX.Ele
   );
 }
 
+function resolveTextareaWidgetOptions(
+  options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"],
+): {
+  placeholder: string | undefined;
+  rows: number | undefined;
+} {
+  const placeholder = typeof options.placeholder === "string" ? options.placeholder : undefined;
+  const rows = typeof options.rows === "number" ? options.rows : undefined;
+
+  return {
+    placeholder,
+    rows,
+  };
+}
+
+function TextareaWidget(
+  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): React.JSX.Element {
+  const { placeholder, rows } = resolveTextareaWidgetOptions(props.options);
+  const value = typeof props.value === "string" ? props.value : "";
+
+  return (
+    <Textarea
+      aria-label={props.label}
+      className="min-h-28 w-full resize-y"
+      disabled={props.disabled || props.readonly}
+      id={props.id}
+      onBlur={() => {
+        props.onBlur(props.id, value);
+      }}
+      onChange={(event) => {
+        const nextValue = event.currentTarget.value;
+        props.onChange(nextValue.trim().length === 0 ? undefined : nextValue);
+      }}
+      onFocus={() => {
+        props.onFocus(props.id, value);
+      }}
+      placeholder={placeholder}
+      rows={rows}
+      value={value}
+    />
+  );
+}
+
 function resolveFormLayout(input: IntegrationFormContext | undefined): "vertical" | "horizontal" {
   return input?.layout === "horizontal" ? "horizontal" : "vertical";
 }
@@ -219,6 +264,7 @@ export const IntegrationFormTemplates = {
 
 export const IntegrationFormWidgets = {
   SelectWidget,
+  TextareaWidget,
   "comma-separated-string-array": CommaSeparatedStringArrayWidget,
   "integration-resource-string-array": IntegrationResourceStringArrayWidget,
 };

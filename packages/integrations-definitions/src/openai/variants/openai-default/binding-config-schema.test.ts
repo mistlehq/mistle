@@ -31,6 +31,38 @@ describe("OpenAiApiKeyBindingConfigSchema", () => {
     });
   });
 
+  it("parses additional instructions when provided", () => {
+    const parsed = OpenAiApiKeyBindingConfigSchema.parse({
+      runtime: OpenAiRuntimes.CODEX_CLI,
+      defaultModel: "gpt-5.3-codex",
+      reasoningEffort: "medium",
+      additionalInstructions: "Prefer concise answers.",
+    });
+
+    expect(parsed).toEqual({
+      runtime: "codex-cli",
+      defaultModel: "gpt-5.3-codex",
+      reasoningEffort: "medium",
+      additionalInstructions: "Prefer concise answers.",
+    });
+  });
+
+  it("omits additional instructions when the input is blank", () => {
+    const parsed = OpenAiApiKeyBindingConfigSchema.parse({
+      runtime: OpenAiRuntimes.CODEX_CLI,
+      defaultModel: "gpt-5.3-codex",
+      reasoningEffort: "medium",
+      additionalInstructions: "   ",
+    });
+
+    expect(parsed).toEqual({
+      runtime: "codex-cli",
+      defaultModel: "gpt-5.3-codex",
+      reasoningEffort: "medium",
+      additionalInstructions: undefined,
+    });
+  });
+
   it("fails for unsupported default model", () => {
     expect(() =>
       OpenAiApiKeyBindingConfigSchema.parse({
