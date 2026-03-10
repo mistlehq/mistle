@@ -7,6 +7,7 @@ RUN go mod download
 COPY apps/sandbox-runtime/cmd ./cmd
 COPY apps/sandbox-runtime/internal ./internal
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/sandboxd ./cmd/sandboxd
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/sandbox-bootstrap ./cmd/sandbox-bootstrap
 
 FROM debian:bookworm-slim AS sandbox-base-prod
 
@@ -16,7 +17,8 @@ ARG SANDBOX_GID=10001
 ARG MISE_VERSION=2026.2.20
 
 ENV DEBIAN_FRONTEND=noninteractive \
-  SANDBOX_RUNTIME_LISTEN_ADDR=:8090
+  SANDBOX_RUNTIME_LISTEN_ADDR=:8090 \
+  SANDBOX_USER=${SANDBOX_USER}
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
@@ -35,17 +37,19 @@ RUN groupadd --gid "${SANDBOX_GID}" "${SANDBOX_USER}" \
 RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PATH="/usr/local/bin/mise" sh
 
 COPY --from=sandbox-runtime-builder /out/sandboxd /usr/local/bin/sandboxd
+COPY --from=sandbox-runtime-builder /out/sandbox-bootstrap /usr/local/bin/sandbox-bootstrap
 
 RUN chmod +x \
   /usr/local/bin/mise \
+  /usr/local/bin/sandbox-bootstrap \
   /usr/local/bin/sandboxd
 
 ENV PATH="/workspace/.mistle/bin:/home/${SANDBOX_USER}/.local/share/mise/shims:/usr/local/bin:${PATH}"
 
 WORKDIR /workspace
-USER ${SANDBOX_USER}
+USER root
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandboxd"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandbox-bootstrap"]
 
 FROM sandbox-base-prod AS sandbox-base-dev
 
@@ -56,4 +60,3 @@ RUN apt-get update \
     strace \
     vim \
   && rm -rf /var/lib/apt/lists/*
-USER ${SANDBOX_USER}
