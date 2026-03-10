@@ -1,19 +1,26 @@
+import { readTestContext } from "@mistle/test-harness";
 import { Client } from "pg";
 import { it as vitestIt } from "vitest";
+import { z } from "zod";
 
 import type { ControlPlaneWorkerConfig } from "../src/types.js";
 
 const WORKER_DATABASE_NAME_PREFIX = "mistle_control_plane_worker_it_worker_";
+const TestContextId = "control-plane-worker.integration";
 
-type SharedInfraConfig = {
-  databaseUsername: string;
-  databasePassword: string;
-  databaseDirectHost: string;
-  databaseDirectPort: number;
-  templateDatabaseName: string;
-  workflowNamespaceId: string;
-  internalAuthServiceToken: string;
-};
+const SharedInfraConfigSchema = z
+  .object({
+    databaseUsername: z.string().min(1),
+    databasePassword: z.string().min(1),
+    databaseDirectHost: z.string().min(1),
+    databaseDirectPort: z.number().int().min(1).max(65_535),
+    templateDatabaseName: z.string().min(1),
+    workflowNamespaceId: z.string().min(1),
+    internalAuthServiceToken: z.string().min(1),
+  })
+  .strict();
+
+type SharedInfraConfig = z.infer<typeof SharedInfraConfigSchema>;
 
 export type ControlPlaneWorkerIntegrationDatabaseStack = {
   directUrl: string;
@@ -26,37 +33,11 @@ export type ControlPlaneWorkerIntegrationFixture = {
   databaseStack: ControlPlaneWorkerIntegrationDatabaseStack;
 };
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (value === undefined || value.length === 0) {
-    throw new Error(`Missing required integration environment variable: ${name}`);
-  }
-
-  return value;
-}
-
-function parsePort(input: { value: string; variableName: string }): number {
-  const parsedPort = Number.parseInt(input.value, 10);
-  if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65_535) {
-    throw new Error(`Environment variable ${input.variableName} must be a valid TCP port.`);
-  }
-
-  return parsedPort;
-}
-
-function readSharedInfraConfig(): SharedInfraConfig {
-  return {
-    databaseUsername: requireEnv("MISTLE_CP_WORKER_IT_DB_USER"),
-    databasePassword: requireEnv("MISTLE_CP_WORKER_IT_DB_PASSWORD"),
-    databaseDirectHost: requireEnv("MISTLE_CP_WORKER_IT_DB_DIRECT_HOST"),
-    databaseDirectPort: parsePort({
-      value: requireEnv("MISTLE_CP_WORKER_IT_DB_DIRECT_PORT"),
-      variableName: "MISTLE_CP_WORKER_IT_DB_DIRECT_PORT",
-    }),
-    templateDatabaseName: requireEnv("MISTLE_CP_WORKER_IT_TEMPLATE_DB_NAME"),
-    workflowNamespaceId: requireEnv("MISTLE_CP_WORKER_IT_WORKFLOW_NAMESPACE_ID"),
-    internalAuthServiceToken: requireEnv("MISTLE_CP_WORKER_IT_INTERNAL_AUTH_SERVICE_TOKEN"),
-  };
+async function readSharedInfraConfig(): Promise<SharedInfraConfig> {
+  return readTestContext({
+    id: TestContextId,
+    schema: SharedInfraConfigSchema,
+  });
 }
 
 function assertSafeIdentifier(identifier: string, label: string): string {
@@ -132,7 +113,7 @@ async function resetWorkerDatabaseFromTemplate(input: {
 export const it = vitestIt.extend<{ fixture: ControlPlaneWorkerIntegrationFixture }>({
   fixture: [
     async ({}, use) => {
-      const sharedInfraConfig = readSharedInfraConfig();
+      const sharedInfraConfig = await readSharedInfraConfig();
       const workerScopedDatabaseName = createWorkerScopedDatabaseName(
         process.env.VITEST_POOL_ID ?? "0",
       );

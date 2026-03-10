@@ -6,9 +6,10 @@
 import { randomUUID } from "node:crypto";
 
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { createMailpitInbox } from "@mistle/test-harness";
+import { createMailpitInbox, readTestContext } from "@mistle/test-harness";
 import { Pool } from "pg";
 import { it as vitestIt } from "vitest";
+import { z } from "zod";
 
 import {
   createControlPlaneApiClient,
@@ -22,6 +23,12 @@ export type AuthenticatedSession = {
 };
 
 export type SystemTestFixture = {
+  controlPlaneApiBaseUrl: string;
+  controlPlaneWorkerBaseUrl: string;
+  dataPlaneApiBaseUrl: string;
+  dataPlaneWorkerBaseUrl: string;
+  dataPlaneGatewayBaseUrl: string;
+  tokenizerProxyBaseUrl: string;
   controlPlaneApiClient: ControlPlaneApiClient;
   db: ControlPlaneDatabase;
   request: (path: string, init?: RequestInit) => Promise<Response>;
@@ -35,6 +42,29 @@ export type SystemTestFixture = {
 
 const AUTH_OTP_LENGTH = 6;
 const AUTH_ORIGIN = "http://localhost:5100";
+const TestContextId = "system";
+
+export const SystemTestContextSchema = z
+  .object({
+    controlPlaneApiBaseUrl: z.url(),
+    controlPlaneWorkerBaseUrl: z.url(),
+    dataPlaneApiBaseUrl: z.url(),
+    dataPlaneWorkerBaseUrl: z.url(),
+    dataPlaneGatewayBaseUrl: z.url(),
+    tokenizerProxyBaseUrl: z.url(),
+    mailpitHttpBaseUrl: z.url(),
+    controlPlaneDatabaseUrl: z.string().min(1),
+  })
+  .strict();
+
+export type SystemTestContext = z.infer<typeof SystemTestContextSchema>;
+
+export async function readSystemTestContext(): Promise<SystemTestContext> {
+  return readTestContext({
+    id: TestContextId,
+    schema: SystemTestContextSchema,
+  });
+}
 
 function extractOTPCode(text: string): string | undefined {
   const pattern = new RegExp(`\\b(\\d{${String(AUTH_OTP_LENGTH)}})\\b`);
@@ -72,27 +102,19 @@ function createRequestFn(baseUrl: string): (path: string, init?: RequestInit) =>
   };
 }
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (value === undefined || value.length === 0) {
-    throw new Error(`Missing required system test environment variable: ${name}`);
-  }
-
-  return value;
-}
-
 export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
   fixture: [
     async ({}, use) => {
-      const controlPlaneApiBaseUrl = requireEnv("MISTLE_SYSTEM_CONTROL_PLANE_API_BASE_URL");
+      const systemTestContext = await readSystemTestContext();
+      const controlPlaneApiBaseUrl = systemTestContext.controlPlaneApiBaseUrl;
       const controlPlaneApiClient = createControlPlaneApiClient(controlPlaneApiBaseUrl);
       const request = createRequestFn(controlPlaneApiBaseUrl);
       const databasePool = new Pool({
-        connectionString: requireEnv("MISTLE_SYSTEM_CONTROL_PLANE_DB_URL"),
+        connectionString: systemTestContext.controlPlaneDatabaseUrl,
       });
       const db = createControlPlaneDatabase(databasePool);
       const mailpitInbox = createMailpitInbox({
-        httpBaseUrl: requireEnv("MISTLE_SYSTEM_MAILPIT_HTTP_BASE_URL"),
+        httpBaseUrl: systemTestContext.mailpitHttpBaseUrl,
       });
       const sendSignInOtp = async (input: { email: string }): Promise<Response> => {
         return request("/v1/auth/email-otp/send-verification-otp", {
@@ -181,6 +203,12 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
 
       try {
         await use({
+          controlPlaneApiBaseUrl: systemTestContext.controlPlaneApiBaseUrl,
+          controlPlaneWorkerBaseUrl: systemTestContext.controlPlaneWorkerBaseUrl,
+          dataPlaneApiBaseUrl: systemTestContext.dataPlaneApiBaseUrl,
+          dataPlaneWorkerBaseUrl: systemTestContext.dataPlaneWorkerBaseUrl,
+          dataPlaneGatewayBaseUrl: systemTestContext.dataPlaneGatewayBaseUrl,
+          tokenizerProxyBaseUrl: systemTestContext.tokenizerProxyBaseUrl,
           controlPlaneApiClient,
           db,
           request,

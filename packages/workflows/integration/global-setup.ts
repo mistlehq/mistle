@@ -1,15 +1,14 @@
 import {
   acquireSharedPostgresMailpitInfra,
   DEFAULT_SHARED_INTEGRATION_INFRA_KEY,
+  removeTestContext,
+  writeTestContext,
 } from "@mistle/test-harness";
 import postgres from "postgres";
 
 const SHARED_INFRA_KEY = DEFAULT_SHARED_INTEGRATION_INFRA_KEY;
 const TEMPLATE_DATABASE_NAME = "mistle_workflows_it_template";
-
-function setEnv(name: string, value: string): void {
-  process.env[name] = value;
-}
+const TestContextId = "workflows.integration";
 
 function assertSafeIdentifier(identifier: string, label: string): string {
   if (!/^[a-z0-9_]+$/u.test(identifier)) {
@@ -78,20 +77,27 @@ export default async function setup(): Promise<() => Promise<void>> {
       databaseName: TEMPLATE_DATABASE_NAME,
     });
 
-    setEnv("MISTLE_WF_IT_DB_USER", sharedInfraLease.infra.postgres.postgres.username);
-    setEnv("MISTLE_WF_IT_DB_PASSWORD", sharedInfraLease.infra.postgres.postgres.password);
-    setEnv("MISTLE_WF_IT_DB_DIRECT_HOST", sharedInfraLease.infra.postgres.postgres.host);
-    setEnv("MISTLE_WF_IT_DB_DIRECT_PORT", String(sharedInfraLease.infra.postgres.postgres.port));
-    setEnv("MISTLE_WF_IT_TEMPLATE_DB_NAME", TEMPLATE_DATABASE_NAME);
-    setEnv("MISTLE_WF_IT_MAILPIT_SMTP_HOST", sharedInfraLease.infra.mailpit.smtpHost);
-    setEnv("MISTLE_WF_IT_MAILPIT_SMTP_PORT", String(sharedInfraLease.infra.mailpit.smtpPort));
-    setEnv("MISTLE_WF_IT_MAILPIT_HTTP_BASE_URL", sharedInfraLease.infra.mailpit.httpBaseUrl);
+    await writeTestContext({
+      id: TestContextId,
+      value: {
+        databaseUsername: sharedInfraLease.infra.postgres.postgres.username,
+        databasePassword: sharedInfraLease.infra.postgres.postgres.password,
+        databaseDirectHost: sharedInfraLease.infra.postgres.postgres.host,
+        databaseDirectPort: sharedInfraLease.infra.postgres.postgres.port,
+        templateDatabaseName: TEMPLATE_DATABASE_NAME,
+        mailpitSmtpHost: sharedInfraLease.infra.mailpit.smtpHost,
+        mailpitSmtpPort: sharedInfraLease.infra.mailpit.smtpPort,
+        mailpitHttpBaseUrl: sharedInfraLease.infra.mailpit.httpBaseUrl,
+      },
+    });
   } catch (error) {
+    await removeTestContext(TestContextId);
     await sharedInfraLease.release();
     throw error;
   }
 
   return async () => {
+    await removeTestContext(TestContextId);
     await sharedInfraLease.release();
   };
 }

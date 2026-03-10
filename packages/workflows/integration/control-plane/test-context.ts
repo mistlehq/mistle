@@ -5,10 +5,16 @@ import {
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
 import { SMTPEmailSender } from "@mistle/emails";
-import { createMailpitInbox, runCleanupTasks, type MailpitService } from "@mistle/test-harness";
+import {
+  createMailpitInbox,
+  readTestContext,
+  runCleanupTasks,
+  type MailpitService,
+} from "@mistle/test-harness";
 import type { Worker } from "openworkflow";
 import type { BackendPostgres } from "openworkflow/postgres";
 import postgres from "postgres";
+import { z } from "zod";
 
 import {
   ControlPlaneWorkerWorkflowIds,
@@ -23,35 +29,21 @@ export type ControlPlaneWorkflowFixture = {
   sql: ReturnType<typeof postgres>;
   openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
 };
-
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (value === undefined || value.length === 0) {
-    throw new Error(`Missing required integration environment variable: ${name}`);
-  }
-
-  return value;
-}
-
-function parsePort(input: { value: string; variableName: string }): number {
-  const parsedPort = Number.parseInt(input.value, 10);
-  if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65_535) {
-    throw new Error(`Environment variable ${input.variableName} must be a valid TCP port.`);
-  }
-
-  return parsedPort;
-}
+const TestContextId = "workflows.integration";
+const MailpitIntegrationContextSchema = z.looseObject({
+  mailpitSmtpHost: z.string().min(1),
+  mailpitSmtpPort: z.number().int().min(1).max(65_535),
+  mailpitHttpBaseUrl: z.url(),
+});
 
 export const it = baseIt.extend<{ fixture: ControlPlaneWorkflowFixture }>({
   fixture: [
     async ({ databaseStack }, use) => {
       const cleanupTasks: Array<() => Promise<void>> = [];
-      const mailpitSmtpHost = requireEnv("MISTLE_WF_IT_MAILPIT_SMTP_HOST");
-      const mailpitSmtpPort = parsePort({
-        value: requireEnv("MISTLE_WF_IT_MAILPIT_SMTP_PORT"),
-        variableName: "MISTLE_WF_IT_MAILPIT_SMTP_PORT",
+      const { mailpitSmtpHost, mailpitSmtpPort, mailpitHttpBaseUrl } = await readTestContext({
+        id: TestContextId,
+        schema: MailpitIntegrationContextSchema,
       });
-      const mailpitHttpBaseUrl = requireEnv("MISTLE_WF_IT_MAILPIT_HTTP_BASE_URL");
 
       try {
         await runControlPlaneMigrations({

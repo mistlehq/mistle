@@ -1,51 +1,33 @@
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
-import { runCleanupTasks } from "@mistle/test-harness";
+import { readTestContext, runCleanupTasks } from "@mistle/test-harness";
 import { Client, Pool } from "pg";
 import { it as vitestIt } from "vitest";
+import { z } from "zod";
 
 const WORKER_DATABASE_NAME_PREFIX = "mistle_srpc_it_worker_";
+const TestContextId = "sandbox-runtime-plan-compiler.integration";
 
-type SharedInfraConfig = {
-  databaseUsername: string;
-  databasePassword: string;
-  databaseDirectHost: string;
-  databaseDirectPort: number;
-  templateDatabaseName: string;
-};
+const SharedInfraConfigSchema = z
+  .object({
+    databaseUsername: z.string().min(1),
+    databasePassword: z.string().min(1),
+    databaseDirectHost: z.string().min(1),
+    databaseDirectPort: z.number().int().min(1).max(65_535),
+    templateDatabaseName: z.string().min(1),
+  })
+  .strict();
+
+type SharedInfraConfig = z.infer<typeof SharedInfraConfigSchema>;
 
 export type SandboxRuntimePlanCompilerIntegrationFixture = {
   db: ControlPlaneDatabase;
 };
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (value === undefined || value.length === 0) {
-    throw new Error(`Missing required integration environment variable: ${name}`);
-  }
-
-  return value;
-}
-
-function parsePort(input: { value: string; variableName: string }): number {
-  const parsedPort = Number.parseInt(input.value, 10);
-  if (!Number.isInteger(parsedPort) || parsedPort < 1 || parsedPort > 65_535) {
-    throw new Error(`Environment variable ${input.variableName} must be a valid TCP port.`);
-  }
-
-  return parsedPort;
-}
-
-function readSharedInfraConfig(): SharedInfraConfig {
-  return {
-    databaseUsername: requireEnv("MISTLE_SRPC_IT_DB_USER"),
-    databasePassword: requireEnv("MISTLE_SRPC_IT_DB_PASSWORD"),
-    databaseDirectHost: requireEnv("MISTLE_SRPC_IT_DB_DIRECT_HOST"),
-    databaseDirectPort: parsePort({
-      value: requireEnv("MISTLE_SRPC_IT_DB_DIRECT_PORT"),
-      variableName: "MISTLE_SRPC_IT_DB_DIRECT_PORT",
-    }),
-    templateDatabaseName: requireEnv("MISTLE_SRPC_IT_TEMPLATE_DB_NAME"),
-  };
+async function readSharedInfraConfig(): Promise<SharedInfraConfig> {
+  return readTestContext({
+    id: TestContextId,
+    schema: SharedInfraConfigSchema,
+  });
 }
 
 function assertSafeIdentifier(identifier: string, label: string): string {
@@ -122,7 +104,7 @@ export const it = vitestIt.extend<{ fixture: SandboxRuntimePlanCompilerIntegrati
   fixture: [
     async ({}, use) => {
       const cleanupTasks: Array<() => Promise<void>> = [];
-      const sharedInfraConfig = readSharedInfraConfig();
+      const sharedInfraConfig = await readSharedInfraConfig();
       const workerScopedDatabaseName = createWorkerScopedDatabaseName(
         process.env.VITEST_POOL_ID ?? "0",
       );

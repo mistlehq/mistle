@@ -20,7 +20,7 @@ import {
   startCloudflaredTunnel,
   type StartedCloudflaredTunnel,
 } from "./helpers/cloudflared-tunnel.js";
-import { it } from "./system-test-context.js";
+import { it, readSystemTestContext } from "./system-test-context.js";
 
 const OpenAiTargetKey = "openai-default";
 const GitHubTargetKey = "github-cloud";
@@ -93,9 +93,7 @@ function hasRequiredEnv(): boolean {
   });
 }
 
-function requireEnv(
-  name: (typeof RequiredEnvNames)[number] | "MISTLE_SYSTEM_CONTROL_PLANE_API_BASE_URL",
-): string {
+function requireEnv(name: (typeof RequiredEnvNames)[number]): string {
   const value = process.env[name];
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(`Missing required environment variable: ${name}`);
@@ -124,13 +122,11 @@ function parseGitHubRepository(input: string): { owner: string; repo: string } {
   };
 }
 
-function resolveControlPlaneApiLocalPort(): number {
-  const baseUrl = new URL(requireEnv("MISTLE_SYSTEM_CONTROL_PLANE_API_BASE_URL"));
+function resolveControlPlaneApiLocalPort(controlPlaneApiBaseUrl: string): number {
+  const baseUrl = new URL(controlPlaneApiBaseUrl);
   const parsedPort = Number.parseInt(baseUrl.port, 10);
   if (!Number.isInteger(parsedPort) || parsedPort <= 0) {
-    throw new Error(
-      "MISTLE_SYSTEM_CONTROL_PLANE_API_BASE_URL must include a positive numeric port.",
-    );
+    throw new Error("Control plane API base URL must include a positive numeric port.");
   }
 
   return parsedPort;
@@ -313,10 +309,11 @@ describeIf("system GitHub webhook automation", () => {
   let tunnel: StartedCloudflaredTunnel | null = null;
 
   beforeAll(async () => {
+    const systemTestContext = await readSystemTestContext();
     tunnel = await startCloudflaredTunnel({
       tunnelToken: requireEnv("CLOUDFLARE_TUNNEL_TOKEN"),
       publicHostname: requireEnv("CONTROL_PLANE_API_TUNNEL_HOSTNAME"),
-      targetLocalPort: resolveControlPlaneApiLocalPort(),
+      targetLocalPort: resolveControlPlaneApiLocalPort(systemTestContext.controlPlaneApiBaseUrl),
       startupTimeoutMs: TunnelStartupTimeoutMs,
     });
   }, TunnelStartupTimeoutMs + 30_000);
@@ -334,12 +331,7 @@ describeIf("system GitHub webhook automation", () => {
       const githubToken = requireEnv("MISTLE_TEST_GITHUB_TOKEN");
       const githubInstallationId = requireEnv("MISTLE_TEST_GITHUB_INSTALLATION_ID");
       const openAiApiKey = requireEnv("MISTLE_TEST_OPENAI_API_KEY");
-      const dataPlaneGatewayBaseUrl = process.env.MISTLE_SYSTEM_DATA_PLANE_GATEWAY_BASE_URL;
-      if (typeof dataPlaneGatewayBaseUrl !== "string" || dataPlaneGatewayBaseUrl.length === 0) {
-        throw new Error(
-          "Missing required environment variable: MISTLE_SYSTEM_DATA_PLANE_GATEWAY_BASE_URL",
-        );
-      }
+      const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
 
       const payloadMarker = `mistle-system-webhook-${randomUUID()}`;
       const expectedInputSubstring = `GitHub issue comment webhook: ${payloadMarker}`;

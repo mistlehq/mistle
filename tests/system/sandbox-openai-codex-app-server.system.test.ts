@@ -14,7 +14,6 @@ import { it } from "./system-test-context.js";
 
 const OPENAI_TARGET_KEY = "openai-default";
 const OPENAI_API_KEY_ENV_NAME = "MISTLE_TEST_OPENAI_API_KEY";
-const DATA_PLANE_GATEWAY_BASE_URL_ENV_NAME = "MISTLE_SYSTEM_DATA_PLANE_GATEWAY_BASE_URL";
 const TEST_RESPONSE_MARKER = "SYSTEM_TEST_OK";
 const SYSTEM_TEST_TIMEOUT_MS = 5 * 60_000;
 const CREATE_CONNECTION_TIMEOUT_MS = 30_000;
@@ -1042,7 +1041,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
     async ({ fixture }) => {
       const stepTrace: StepTraceEntry[] = [];
       const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
-      const dataPlaneGatewayBaseUrl = requireEnv(DATA_PLANE_GATEWAY_BASE_URL_ENV_NAME);
+      const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
       const connectionDisplayName = `System OpenAI Connection ${randomUUID()}`;
       let websocketForCleanup: WebSocket | null = null;
       let detachWebSocketTrace: (() => void) | null = null;

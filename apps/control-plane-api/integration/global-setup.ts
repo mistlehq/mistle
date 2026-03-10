@@ -11,6 +11,8 @@ import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import {
   acquireSharedPostgresInfra,
   DEFAULT_SHARED_INTEGRATION_INFRA_KEY,
+  removeTestContext,
+  writeTestContext,
 } from "@mistle/test-harness";
 import { createControlPlaneBackend } from "@mistle/workflows/control-plane";
 import { Client as PgClient, Pool } from "pg";
@@ -29,10 +31,7 @@ const WORKFLOW_NAMESPACE_ID = "integration";
 const INTERNAL_AUTH_SERVICE_TOKEN = "integration-service-token";
 const INTEGRATIONS_MASTER_KEY_VERSION = 1;
 const INTEGRATIONS_MASTER_KEY_MATERIAL = "integration-master-key-testing";
-
-function setEnv(name: string, value: string): void {
-  process.env[name] = value;
-}
+const TestContextId = "control-plane-api.integration";
 
 function assertSafeIdentifier(identifier: string, label: string): string {
   if (!/^[a-z0-9_]+$/u.test(identifier)) {
@@ -155,19 +154,26 @@ export default async function setup(): Promise<() => Promise<void>> {
     });
     await workflowBackend.stop();
 
-    setEnv("MISTLE_CP_IT_DB_USER", postgresService.postgres.username);
-    setEnv("MISTLE_CP_IT_DB_PASSWORD", postgresService.postgres.password);
-    setEnv("MISTLE_CP_IT_DB_DIRECT_HOST", postgresService.postgres.host);
-    setEnv("MISTLE_CP_IT_DB_DIRECT_PORT", String(postgresService.postgres.port));
-    setEnv("MISTLE_CP_IT_TEMPLATE_DB_NAME", TEMPLATE_DATABASE_NAME);
-    setEnv("MISTLE_CP_IT_WORKFLOW_NAMESPACE_ID", WORKFLOW_NAMESPACE_ID);
-    setEnv("MISTLE_CP_IT_INTERNAL_AUTH_SERVICE_TOKEN", INTERNAL_AUTH_SERVICE_TOKEN);
+    await writeTestContext({
+      id: TestContextId,
+      value: {
+        databaseUsername: postgresService.postgres.username,
+        databasePassword: postgresService.postgres.password,
+        databaseDirectHost: postgresService.postgres.host,
+        databaseDirectPort: postgresService.postgres.port,
+        templateDatabaseName: TEMPLATE_DATABASE_NAME,
+        workflowNamespaceId: WORKFLOW_NAMESPACE_ID,
+        internalAuthServiceToken: INTERNAL_AUTH_SERVICE_TOKEN,
+      },
+    });
   } catch (error) {
+    await removeTestContext(TestContextId);
     await sharedInfraLease.release();
     throw error;
   }
 
   return async () => {
+    await removeTestContext(TestContextId);
     await sharedInfraLease.release();
   };
 }

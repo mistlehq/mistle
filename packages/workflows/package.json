@@ -57,6 +57,7 @@
     "typeid-js": "^1.2.0"
   },
   "devDependencies": {
-    "@mistle/test-harness": "workspace:*"
+    "@mistle/test-harness": "workspace:*",
+    "zod": "^4.3.6"
   }
 }
