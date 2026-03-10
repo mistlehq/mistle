@@ -33,7 +33,6 @@ export {
   type HandleIntegrationWebhookEventWorkflowInput,
   type HandleIntegrationWebhookEventWorkflowOutput,
 } from "./workflows/handle-integration-webhook-event/index.js";
-export {} from "./workflows/request-delete-sandbox-profile/index.js";
 export {
   type StartSandboxProfileInstanceWorkflowInput,
   type StartSandboxProfileInstanceWorkflowOutput,
