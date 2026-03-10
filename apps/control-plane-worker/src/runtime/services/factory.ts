@@ -24,7 +24,7 @@ import {
   transitionAutomationRunToRunning,
 } from "@mistle/workflows/control-plane/runtime";
 
-import { deliverConversationAutomationPayload } from "../automation-workflows/workflows/conversation-delivery.js";
+import { deliverConversationAutomationPayload } from "../automation-workflows/provider/deliver-conversation-automation-payload.js";
 import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";

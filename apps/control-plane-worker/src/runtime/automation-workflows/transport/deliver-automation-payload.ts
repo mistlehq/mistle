@@ -2,9 +2,7 @@ import type { DeliverAutomationPayloadServiceInput } from "../../services/types.
 import {
   connectSandboxAgentConnection,
   sendSandboxAgentMessage,
-} from "../transport/sandbox-agent-connection.js";
-
-export * from "@mistle/workflows/control-plane/runtime";
+} from "./sandbox-agent-connection.js";
 
 const AutomationRunDeliveryFailureCodes = {
   AUTOMATION_RUN_EXECUTION_FAILED: "automation_run_execution_failed",

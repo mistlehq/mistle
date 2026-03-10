@@ -3,12 +3,11 @@ import {
   AutomationConversationRouteStatuses,
   AutomationConversationStatuses,
 } from "@mistle/db/control-plane";
-
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
-} from "./errors.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
+  type AutomationConversationPersistenceDependencies,
+} from "@mistle/workflows/control-plane/runtime";
 
 export type CreateAutomationConversationRouteInput = {
   conversationId: string;

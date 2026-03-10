@@ -3,6 +3,8 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import {
+  AutomationConversationPersistenceError,
+  AutomationConversationPersistenceErrorCodes,
   AutomationConversationRouteBindingActions,
   resolveAutomationConversationRouteBindingAction,
 } from "@mistle/workflows/control-plane/runtime";
@@ -10,8 +12,6 @@ import {
 import type { DeliverAutomationConversationPayloadServiceInput } from "../../services/types.js";
 import {
   activateAutomationConversationRoute,
-  AutomationConversationPersistenceError,
-  AutomationConversationPersistenceErrorCodes,
   createAutomationConversationRoute,
   markAutomationConversationDeliveryTaskDelivering,
   updateAutomationConversationExecution,
@@ -23,7 +23,7 @@ import {
   resolveAutomationConversationExecutionAction,
   resolveAutomationConversationSteerRecoveryAction,
 } from "../planning/automation-conversation-delivery.js";
-import { getConversationProviderAdapter } from "../provider/provider-adapter.js";
+import { getConversationProviderAdapter } from "./provider-adapter.js";
 
 export type DeliverConversationAutomationPayloadDependencies = {
   db: ControlPlaneDatabase;

@@ -4,13 +4,12 @@ import {
   AutomationConversationRouteStatuses,
   AutomationConversationStatuses,
 } from "@mistle/db/control-plane";
-import { eq, sql } from "drizzle-orm";
-
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
-} from "./errors.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
+  type AutomationConversationPersistenceDependencies,
+} from "@mistle/workflows/control-plane/runtime";
+import { eq, sql } from "drizzle-orm";
 
 export type ReplaceAutomationConversationBindingInput = {
   routeId: string;
