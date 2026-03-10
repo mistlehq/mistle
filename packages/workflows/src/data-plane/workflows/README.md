@@ -2,6 +2,8 @@
 
 Reference catalog of data-plane workflows in `@mistle/workflows`.
 
+The data-plane package owns workflow orchestration. Runtime dependencies such as provider lifecycle operations and persistence adapters are supplied by the data-plane worker app.
+
 ## Workflows
 
 | Workflow               | Spec Export                        | Workflow Name                        | Input                                                                                                                                                                                                                          | Output                                                     | Purpose                                                                                                                                      |
@@ -10,7 +12,7 @@ Reference catalog of data-plane workflows in `@mistle/workflows`.
 
 ## Worker Services
 
-`createDataPlaneWorker(...)` currently requires:
+`createDataPlaneWorker(...)` registers workflows through `src/data-plane/register/` and currently requires:
 
 - `enabledWorkflows` with workflow ids from `DataPlaneWorkerWorkflowIds`
 - `services.startSandboxInstance.sandboxLifecycle`

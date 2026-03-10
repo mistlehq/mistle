@@ -1,7 +1,11 @@
 # @mistle/workflows
 
-Shared OpenWorkflow definitions and wiring for control-plane and data-plane.
-Both plane modules are thin wrappers over shared scaffolding in `src/core/`.
+Shared OpenWorkflow orchestration for control-plane and data-plane.
+
+Ownership rule:
+
+- `packages/workflows` owns workflow specs, orchestration, and plane-specific worker registration.
+- Worker apps own infrastructure adapters such as database access, provider clients, SMTP, and external HTTP clients.
 
 ## Public API
 
@@ -31,9 +35,11 @@ Root export is also available:
 | `SendOrganizationInvitationWorkflowSpec`    | `workflow spec` | Spec for invitation email delivery workflow (`control-plane.auth.send-organization-invitation`).       |
 | `SendVerificationOTPWorkflowSpec`           | `workflow spec` | Spec for OTP email delivery workflow (`control-plane.auth.send-verification-otp`).                     |
 | `RequestDeleteSandboxProfileWorkflowSpec`   | `workflow spec` | Spec for sandbox profile deletion workflow (`control-plane.sandbox-profiles.request-delete-profile`).  |
-| `createSendOrganizationInvitationWorkflow`  | `function`      | Creates the invitation email workflow implementation with injected email dependencies.                 |
-| `createSendVerificationOTPWorkflow`         | `function`      | Creates the OTP workflow implementation with injected email dependencies.                              |
-| `createRequestDeleteSandboxProfileWorkflow` | `function`      | Creates the sandbox profile deletion workflow implementation.                                          |
+| `StartSandboxProfileInstanceWorkflowSpec`   | `workflow spec` | Spec for sandbox instance startup (`control-plane.sandbox-instances.start-profile-instance`).          |
+| `HandleAutomationRunWorkflowSpec`           | `workflow spec` | Spec for queued automation run execution.                                                               |
+| `HandleAutomationConversationDeliveryWorkflowSpec` | `workflow spec` | Spec for automation conversation delivery processing.                                          |
+| `HandleIntegrationWebhookEventWorkflowSpec` | `workflow spec` | Spec for accepted integration webhook processing.                                                       |
+| `SyncIntegrationConnectionResourcesWorkflowSpec` | `workflow spec` | Spec for integration resource synchronization.                                                   |
 
 ### `@mistle/workflows/data-plane`
 
@@ -191,9 +197,13 @@ await worker.start();
 1. Create a workflow module under the target plane directory, for example `src/control-plane/workflows/send-verification-otp/`.
 2. Define the workflow spec in `spec.ts` and implementation in `workflow.ts`.
 3. Export it through `src/control-plane/workflows/index.ts` or `src/data-plane/workflows/index.ts`.
-4. Add worker service contracts to the plane worker factory so runtime wiring stays in one place.
-5. Export the workflow spec from the plane entrypoint (`src/control-plane/index.ts` or `src/data-plane/index.ts`) if producers in apps need to schedule it.
-6. Use the plane client in producers and call `runWorkflow(workflowSpec, input)`.
+4. Register it through the plane registrar directory:
+   - `src/control-plane/register/`
+   - `src/data-plane/register/`
+5. Add the worker service contract to the plane worker types.
+6. Export the workflow spec from the plane entrypoint (`src/control-plane/index.ts` or `src/data-plane/index.ts`) if producers in apps need to schedule it.
+7. Keep infrastructure details in the worker app. Pass cohesive services into the workflow instead of wiring provider or database calls directly inside the package.
+8. Use the plane client in producers and call `runWorkflow(workflowSpec, input)`.
 
 Example worker wiring:
 
