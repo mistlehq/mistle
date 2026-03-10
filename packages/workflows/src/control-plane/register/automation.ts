@@ -1,6 +1,9 @@
 import type { OpenWorkflow } from "openworkflow";
 
-import type { ControlPlaneWorkerServices } from "../worker.js";
+import type {
+  ControlPlaneAutomationConversationDeliveryServices,
+  ControlPlaneAutomationRunServices,
+} from "../worker.js";
 import { createHandleAutomationConversationDeliveryWorkflow } from "../workflows/handle-automation-conversation-delivery/index.js";
 import { createHandleAutomationRunWorkflow } from "../workflows/handle-automation-run/index.js";
 
@@ -10,7 +13,10 @@ const HANDLE_AUTOMATION_CONVERSATION_DELIVERY_WORKFLOW_ID = "handleAutomationCon
 export type RegisterControlPlaneAutomationWorkflowsInput = {
   openWorkflow: OpenWorkflow;
   enabledWorkflows: ReadonlyArray<string>;
-  services: Pick<ControlPlaneWorkerServices, "automationRuns" | "automationConversationDelivery">;
+  services: {
+    automationRuns?: ControlPlaneAutomationRunServices;
+    automationConversationDelivery?: ControlPlaneAutomationConversationDeliveryServices;
+  };
 };
 
 export function registerControlPlaneAutomationWorkflows(

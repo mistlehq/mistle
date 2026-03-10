@@ -1,6 +1,9 @@
 import type { OpenWorkflow } from "openworkflow";
 
-import type { ControlPlaneWorkerServices } from "../worker.js";
+import type {
+  ControlPlaneIntegrationConnectionResourceServices,
+  ControlPlaneIntegrationWebhookServices,
+} from "../worker.js";
 import { createHandleIntegrationWebhookEventWorkflow } from "../workflows/handle-integration-webhook-event/index.js";
 import { createSyncIntegrationConnectionResourcesWorkflow } from "../workflows/sync-integration-connection-resources/index.js";
 
@@ -10,10 +13,10 @@ const SYNC_INTEGRATION_CONNECTION_RESOURCES_WORKFLOW_ID = "syncIntegrationConnec
 export type RegisterControlPlaneIntegrationWorkflowsInput = {
   openWorkflow: OpenWorkflow;
   enabledWorkflows: ReadonlyArray<string>;
-  services: Pick<
-    ControlPlaneWorkerServices,
-    "integrationWebhooks" | "integrationConnectionResources"
-  >;
+  services: {
+    integrationWebhooks?: ControlPlaneIntegrationWebhookServices;
+    integrationConnectionResources?: ControlPlaneIntegrationConnectionResourceServices;
+  };
 };
 
 export function registerControlPlaneIntegrationWorkflows(

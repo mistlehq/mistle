@@ -1,6 +1,9 @@
 import type { OpenWorkflow } from "openworkflow";
 
-import type { ControlPlaneWorkerServices } from "../worker.js";
+import type {
+  ControlPlaneSandboxInstanceServices,
+  ControlPlaneSandboxProfileServices,
+} from "../worker.js";
 import { createRequestDeleteSandboxProfileWorkflow } from "../workflows/request-delete-sandbox-profile/index.js";
 import { createStartSandboxProfileInstanceWorkflow } from "../workflows/start-sandbox-profile-instance/index.js";
 
@@ -10,7 +13,10 @@ const START_SANDBOX_PROFILE_INSTANCE_WORKFLOW_ID = "startSandboxProfileInstance"
 export type RegisterControlPlaneSandboxWorkflowsInput = {
   openWorkflow: OpenWorkflow;
   enabledWorkflows: ReadonlyArray<string>;
-  services: Pick<ControlPlaneWorkerServices, "sandboxProfiles" | "sandboxInstances">;
+  services: {
+    sandboxProfiles?: ControlPlaneSandboxProfileServices;
+    sandboxInstances?: ControlPlaneSandboxInstanceServices;
+  };
 };
 
 export function registerControlPlaneSandboxWorkflows(

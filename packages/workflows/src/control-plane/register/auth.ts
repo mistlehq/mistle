@@ -1,6 +1,6 @@
 import type { OpenWorkflow } from "openworkflow";
 
-import type { ControlPlaneWorkerServices } from "../worker.js";
+import type { ControlPlaneWorkerEmailDelivery } from "../worker.js";
 import { createSendOrganizationInvitationWorkflow } from "../workflows/send-organization-invitation/index.js";
 import { createSendVerificationOTPWorkflow } from "../workflows/send-verification-otp/index.js";
 
@@ -10,7 +10,9 @@ const SEND_VERIFICATION_OTP_WORKFLOW_ID = "sendVerificationOTP";
 export type RegisterControlPlaneAuthWorkflowsInput = {
   openWorkflow: OpenWorkflow;
   enabledWorkflows: ReadonlyArray<string>;
-  services: Pick<ControlPlaneWorkerServices, "emailDelivery">;
+  services: {
+    emailDelivery?: ControlPlaneWorkerEmailDelivery;
+  };
 };
 
 export function registerControlPlaneAuthWorkflows(

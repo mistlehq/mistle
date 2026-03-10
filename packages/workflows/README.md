@@ -4,8 +4,9 @@ Shared OpenWorkflow orchestration for control-plane and data-plane.
 
 Ownership rule:
 
-- `packages/workflows` owns workflow specs, orchestration, and plane-specific worker registration.
-- Worker apps own infrastructure adapters such as database access, provider clients, SMTP, and external HTTP clients.
+- `packages/workflows` owns workflow specs, orchestration, shared runtime state transitions, and plane-specific worker registration.
+- Shared runtime modules may read and write persisted workflow state through injected database handles.
+- Worker apps own app-specific adapters such as provider clients, sandbox transport, SMTP delivery, and external/internal HTTP clients.
 
 ## Public API
 
@@ -202,7 +203,7 @@ await worker.start();
    - `src/data-plane/register/`
 5. Add the worker service contract to the plane worker types.
 6. Export the workflow spec from the plane entrypoint (`src/control-plane/index.ts` or `src/data-plane/index.ts`) if producers in apps need to schedule it.
-7. Keep infrastructure details in the worker app. Pass cohesive services into the workflow instead of wiring provider or database calls directly inside the package.
+7. Keep app-specific adapters in the worker app. Shared workflow runtime can use injected database handles for persisted workflow state, while provider and transport details should stay in the worker app.
 8. Use the plane client in producers and call `runWorkflow(workflowSpec, input)`.
 
 Example worker wiring:
