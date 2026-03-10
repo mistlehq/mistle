@@ -30,23 +30,13 @@ const CodexRepository = "openai/codex";
 const CodexLatestReleaseApiUrl = `https://api.github.com/repos/${CodexRepository}/releases/latest`;
 const ScriptDirectoryPath = dirname(fileURLToPath(import.meta.url));
 const AppRootPath = resolve(ScriptDirectoryPath, "..");
-const GeneratedTypesOutputPath = resolve(
-  AppRootPath,
-  "src",
-  "runtime",
-  "automation-conversations",
-  "providers",
-  "generated",
-  "codex-app-server-ts",
-);
+const GeneratedTypesOutputPath = resolve(AppRootPath, "src", "generated", "codex-app-server", "ts");
 const GeneratedJsonSchemaOutputPath = resolve(
   AppRootPath,
   "src",
-  "runtime",
-  "automation-conversations",
-  "providers",
   "generated",
-  "codex-app-server-json-schema",
+  "codex-app-server",
+  "json-schema",
 );
 const ScriptUserAgent = "mistle-codex-app-server-types-generator";
 
