@@ -151,6 +151,17 @@ describe("sandbox profile version put integration bindings service integration",
       additionalInstructions: "Prefer concise answers.",
     });
 
+    const persistedUpdatedBinding =
+      await fixture.db.query.sandboxProfileVersionIntegrationBindings.findFirst({
+        where: (table, { eq }) => eq(table.id, "ibd_put_bindings_existing_001"),
+      });
+    expect(persistedUpdatedBinding?.config).toEqual({
+      runtime: "codex-cli",
+      defaultModel: "gpt-5.3-codex",
+      reasoningEffort: "medium",
+      additionalInstructions: "Prefer concise answers.",
+    });
+
     const insertedBinding = result.bindings.find(
       (binding) =>
         binding.id !== "ibd_put_bindings_existing_001" && binding.connectionId === connectionA.id,
