@@ -1,13 +1,14 @@
 import { createNodeWebSocket } from "@hono/node-ws";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
-import { systemClock } from "@mistle/time";
+import { systemClock, systemScheduler } from "@mistle/time";
 import { typeid } from "typeid-js";
 
 import { createApp, stopApp } from "../app.js";
 import { startServer } from "../server.js";
 import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory-relay-coordinator.js";
 import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
+import { SandboxOwnerLeaseHeartbeat } from "../tunnel/ownership/sandbox-owner-lease-heartbeat.js";
 import { StoreBackedSandboxOwnerResolver } from "../tunnel/ownership/store-backed-sandbox-owner-resolver.js";
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
 import type {
@@ -15,6 +16,8 @@ import type {
   DataPlaneGatewayRuntimeConfig,
   StartedServer,
 } from "../types.js";
+
+const OwnerLeaseRenewIntervalMs = 10_000;
 
 export function createDataPlaneGatewayRuntime(
   config: DataPlaneGatewayRuntimeConfig,
@@ -25,6 +28,11 @@ export function createDataPlaneGatewayRuntime(
   const relayCoordinator = createInMemoryTunnelRelayCoordinator(nodeId);
   const sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
   const sandboxOwnerResolver = new StoreBackedSandboxOwnerResolver(nodeId, sandboxOwnerStore);
+  const sandboxOwnerLeaseHeartbeat = new SandboxOwnerLeaseHeartbeat(
+    sandboxOwnerStore,
+    systemScheduler,
+    OwnerLeaseRenewIntervalMs,
+  );
 
   registerSandboxTunnelRoute({
     app,
@@ -43,6 +51,7 @@ export function createDataPlaneGatewayRuntime(
     relayCoordinator,
     sandboxOwnerStore,
     sandboxOwnerResolver,
+    sandboxOwnerLeaseHeartbeat,
   });
 
   let startedServer: StartedServer | undefined;

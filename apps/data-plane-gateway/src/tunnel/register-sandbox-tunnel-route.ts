@@ -15,6 +15,7 @@ import { typeid } from "typeid-js";
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { insertSandboxTunnelConnectAck } from "./connect-ack.js";
+import type { SandboxOwnerLeaseHeartbeat } from "./ownership/sandbox-owner-lease-heartbeat.js";
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
 import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
@@ -31,6 +32,7 @@ type RegisterSandboxTunnelRouteInput = {
   relayCoordinator: TunnelRelayCoordinator;
   sandboxOwnerStore: SandboxOwnerStore;
   sandboxOwnerResolver: SandboxOwnerResolver;
+  sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat;
 };
 
 type TokenKind = "bootstrap" | "connection";
@@ -281,6 +283,9 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
           throw new Error("Expected sandbox relay session id for connection websocket request.");
         }
         let relayTarget: RelayTarget | undefined;
+        let sandboxOwnerLeaseHeartbeatHandle:
+          | ReturnType<SandboxOwnerLeaseHeartbeat["start"]>
+          | undefined;
 
         return {
           onOpen: (_event, ws) => {
@@ -293,6 +298,27 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                   : connectionRelaySessionId,
               socket: ws,
             });
+
+            if (requestedToken.kind === "bootstrap") {
+              sandboxOwnerLeaseHeartbeatHandle = input.sandboxOwnerLeaseHeartbeat.start({
+                sandboxInstanceId,
+                leaseId: bootstrapOwnerLeaseId,
+                ttlMs: OwnerLeaseTtlMs,
+                onLeaseLost: () => {
+                  logger.error(
+                    {
+                      sandboxInstanceId,
+                      leaseId: bootstrapOwnerLeaseId,
+                    },
+                    "Lost sandbox ownership while bootstrap websocket was still connected",
+                  );
+                  ws.close(
+                    CloseCodes.INTERNAL_ERROR,
+                    "Sandbox ownership lease could not be renewed.",
+                  );
+                },
+              });
+            }
           },
           onMessage: (event, ws) => {
             if (relayTarget === undefined) {
@@ -335,6 +361,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               });
           },
           onClose: () => {
+            sandboxOwnerLeaseHeartbeatHandle?.stop();
             if (requestedToken.kind === "bootstrap" && bootstrapOwnerLeaseId !== undefined) {
               void input.sandboxOwnerStore.releaseOwner({
                 sandboxInstanceId,
