@@ -2,18 +2,15 @@ package bootstrap
 
 import (
 	"fmt"
-	"path/filepath"
 	"strings"
 )
 
 const DefaultSandboxUser = "sandbox"
 const SandboxUserEnv = "SANDBOX_USER"
-const ProxyCACertPathEnv = "SANDBOX_RUNTIME_PROXY_CA_CERT_PATH"
 const ProxyCACertInstallPath = "/usr/local/share/ca-certificates/mistle-proxy-ca.crt"
 
 type Config struct {
-	SandboxUser     string
-	ProxyCACertPath string
+	SandboxUser string
 }
 
 func LoadConfig(lookupEnv func(string) (string, bool)) (Config, error) {
@@ -37,19 +34,7 @@ func LoadConfig(lookupEnv func(string) (string, bool)) (Config, error) {
 		sandboxUser = trimmedSandboxUser
 	}
 
-	proxyCACertPath := ""
-	if rawProxyCACertPath, ok := lookupEnv(ProxyCACertPathEnv); ok {
-		trimmedProxyCACertPath := strings.TrimSpace(rawProxyCACertPath)
-		if trimmedProxyCACertPath != "" {
-			if !filepath.IsAbs(trimmedProxyCACertPath) {
-				return Config{}, fmt.Errorf("%s must be an absolute path", ProxyCACertPathEnv)
-			}
-			proxyCACertPath = filepath.Clean(trimmedProxyCACertPath)
-		}
-	}
-
 	return Config{
-		SandboxUser:     sandboxUser,
-		ProxyCACertPath: proxyCACertPath,
+		SandboxUser: sandboxUser,
 	}, nil
 }

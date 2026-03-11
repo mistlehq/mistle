@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/bootstrap"
 )
@@ -19,8 +20,17 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	if err := bootstrap.InstallProxyCACertificate(config.ProxyCACertPath); err != nil {
+	proxyCA, err := bootstrap.GenerateProxyCA(time.Now().UTC())
+	if err != nil {
 		return err
 	}
-	return bootstrap.ExecSandboxdAsUser(config.SandboxUser)
+	if err := bootstrap.InstallProxyCACertificate(proxyCA.CertificatePEM); err != nil {
+		return err
+	}
+	proxyCAExecEnv, cleanup, err := bootstrap.PrepareProxyCAExecEnv(proxyCA)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
+	return bootstrap.ExecSandboxdAsUserWithEnv(config.SandboxUser, proxyCAExecEnv)
 }

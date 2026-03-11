@@ -6,7 +6,7 @@ The base image includes a single sandbox runtime entrypoint that every sandbox w
 
 - Build Go `sandboxd` from `apps/sandbox-runtime`
 - Start the root-owned bootstrap entrypoint under `tini`
-- Install an injected proxy CA certificate into the OS trust store when provided
+- Generate a fresh per-sandbox proxy CA, install its certificate into the OS trust store, and pass signer material to `sandboxd`
 - Drop privileges to the `sandbox` user before execing `sandboxd`
 - Install `mise` as the runtime manager at `/usr/local/bin/mise`
 
@@ -17,11 +17,11 @@ The base image includes a single sandbox runtime entrypoint that every sandbox w
 - Default listen address: `SANDBOX_RUNTIME_LISTEN_ADDR=:8090`
 - Sandbox user env: `SANDBOX_USER` is reserved and must remain `sandbox`
 - Tokenizer proxy egress base URL env: `SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL`
-- Optional proxy CA certificate path env: `SANDBOX_RUNTIME_PROXY_CA_CERT_PATH`
-  - when set, it must point to an absolute path readable by the root-owned bootstrap process
-  - the certificate is installed into `/usr/local/share/ca-certificates/mistle-proxy-ca.crt`
-  - when unset, any previously installed `mistle-proxy-ca.crt` file is removed before privileges are dropped
-  - `update-ca-certificates` is run after install or removal before privileges are dropped
+- Bootstrap-generated proxy CA install path: `/usr/local/share/ca-certificates/mistle-proxy-ca.crt`
+- Bootstrap passes the proxy CA signer into `sandboxd` through inherited file descriptors exposed as:
+  - `SANDBOX_RUNTIME_PROXY_CA_CERT_FD`
+  - `SANDBOX_RUNTIME_PROXY_CA_KEY_FD`
+- `update-ca-certificates` is run after writing the generated proxy CA certificate before privileges are dropped
 - Startup input: JSON must be provided via process `stdin` during startup with required fields:
   - `bootstrapToken`
   - `tunnelGatewayWsUrl`
