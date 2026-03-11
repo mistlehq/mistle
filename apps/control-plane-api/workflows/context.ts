@@ -1,4 +1,5 @@
 import { AppIds, loadConfig } from "@mistle/config";
+import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   createDataPlaneSandboxInstancesClient,
   type DataPlaneSandboxInstancesClient,
@@ -17,6 +18,10 @@ import type { ControlPlaneApiConfig } from "../src/types.js";
 
 export type WorkflowContext = {
   db: ControlPlaneDatabase;
+  controlPlaneInternalClient: Pick<
+    ControlPlaneInternalClient,
+    "getSandboxInstance" | "mintSandboxConnectionToken" | "startSandboxProfileInstance"
+  >;
   dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "startSandboxInstance">;
   integrationsConfig: ControlPlaneApiConfig["integrations"];
   integrationRegistry: IntegrationRegistry;
@@ -52,6 +57,10 @@ export function getWorkflowContext(): Promise<WorkflowContext> {
       throw new Error("Expected control-plane API global config for workflow context.");
     }
 
+    const controlPlaneInternalClient = new ControlPlaneInternalClient({
+      baseUrl: apiConfig.app.auth.baseUrl,
+      internalAuthServiceToken: apiConfig.global.internalAuth.serviceToken,
+    });
     const dbPool = new Pool({
       connectionString: apiConfig.app.database.url,
     });
@@ -63,6 +72,7 @@ export function getWorkflowContext(): Promise<WorkflowContext> {
 
     return {
       db: createControlPlaneDatabase(dbPool),
+      controlPlaneInternalClient,
       dataPlaneClient: createDataPlaneSandboxInstancesClient({
         baseUrl: apiConfig.app.dataPlaneApi.baseUrl,
         serviceToken: apiConfig.global.internalAuth.serviceToken,
