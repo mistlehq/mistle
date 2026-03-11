@@ -1,4 +1,5 @@
 export type CredentialCacheKeyInput = {
+  bindingId: string;
   connectionId: string;
   secretType: string;
   purpose?: string;
@@ -23,9 +24,13 @@ type CredentialCacheInput = {
 };
 
 function toCacheKey(input: CredentialCacheKeyInput): string {
-  return [input.connectionId, input.secretType, input.purpose ?? "", input.resolverKey ?? ""].join(
-    ":",
-  );
+  return [
+    input.bindingId,
+    input.connectionId,
+    input.secretType,
+    input.purpose ?? "",
+    input.resolverKey ?? "",
+  ].join(":");
 }
 
 function resolveExpiryMs(input: {

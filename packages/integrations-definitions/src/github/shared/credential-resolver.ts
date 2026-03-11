@@ -3,11 +3,12 @@ import {
   type IntegrationCredentialResolver,
   type IntegrationCredentialResolverInput,
 } from "@mistle/integrations-core";
-import { createAppAuth } from "@octokit/auth-app";
+import { createAppAuth, type InstallationAuthOptions } from "@octokit/auth-app";
 import { request } from "@octokit/request";
 import { z } from "zod";
 
 import { GitHubConnectionConfigSchema, GitHubCredentialSecretTypes } from "./auth.js";
+import { GitHubBindingConfigSchema } from "./binding-config-schema.js";
 
 export const GitHubCredentialResolverKeys: {
   GITHUB_APP_INSTALLATION_TOKEN: "github_app_installation_token";
@@ -20,6 +21,7 @@ type ResolvedGitHubAppCredentialContext = {
   appId: string;
   appPrivateKeyPem: string;
   installationId: number;
+  repositoryNames: ReadonlyArray<string>;
 };
 
 const ResolvedGitHubTargetConfigSchema = z
@@ -34,6 +36,19 @@ const ResolvedGitHubTargetSecretsSchema = z
     appPrivateKeyPem: z.string().min(1).optional(),
   })
   .loose();
+
+export function resolveGitHubInstallationRepositoryNames(
+  input: IntegrationCredentialResolverInput,
+): ReadonlyArray<string> {
+  if (input.binding === undefined) {
+    throw new Error("GitHub app installation resolver requires binding context.");
+  }
+
+  const parsedBindingConfig = GitHubBindingConfigSchema.parse(input.binding.config);
+  return [...new Set(parsedBindingConfig.repositories)].sort((left, right) =>
+    left.localeCompare(right),
+  );
+}
 
 function resolveGitHubAppCredentialContext(
   input: IntegrationCredentialResolverInput,
@@ -73,6 +88,21 @@ function resolveGitHubAppCredentialContext(
     appId,
     appPrivateKeyPem,
     installationId: numericInstallationId,
+    repositoryNames: resolveGitHubInstallationRepositoryNames(input),
+  };
+}
+
+export function createGitHubInstallationAuthInput(input: {
+  apiBaseUrl: string;
+  appId: string;
+  appPrivateKeyPem: string;
+  installationId: number;
+  repositoryNames: ReadonlyArray<string>;
+}): InstallationAuthOptions {
+  return {
+    type: "installation",
+    installationId: input.installationId,
+    repositoryNames: [...input.repositoryNames],
   };
 }
 
@@ -81,6 +111,7 @@ async function createGitHubInstallationAccessToken(input: {
   appId: string;
   appPrivateKeyPem: string;
   installationId: number;
+  repositoryNames: ReadonlyArray<string>;
 }): Promise<{ token: string; expiresAt?: string }> {
   const auth = createAppAuth({
     appId: input.appId,
@@ -89,10 +120,7 @@ async function createGitHubInstallationAccessToken(input: {
       baseUrl: input.apiBaseUrl,
     }),
   });
-  const authResult = await auth({
-    type: "installation",
-    installationId: input.installationId,
-  });
+  const authResult = await auth(createGitHubInstallationAuthInput(input));
 
   return {
     token: authResult.token,
@@ -108,6 +136,7 @@ export const GitHubAppInstallationCredentialResolver: IntegrationCredentialResol
       appId: resolvedContext.appId,
       appPrivateKeyPem: resolvedContext.appPrivateKeyPem,
       installationId: resolvedContext.installationId,
+      repositoryNames: resolvedContext.repositoryNames,
     });
 
     return {

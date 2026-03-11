@@ -16,6 +16,7 @@ type EgressRouteMetadata = {
   authInjectionType: "bearer" | "basic" | "header" | "query";
   authInjectionTarget: string;
   authInjectionUsername?: string;
+  bindingId: string;
   connectionId: string;
   secretType: string;
   purpose?: string;
@@ -82,6 +83,7 @@ function resolveRouteMetadata(ctx: Context<AppContextBindings>): EgressRouteMeta
     ),
     authInjectionTarget: readRequiredHeader(headers, EgressRequestHeaders.AUTH_INJECTION_TARGET),
     ...(authInjectionUsername === undefined ? {} : { authInjectionUsername }),
+    bindingId: readRequiredHeader(headers, EgressRequestHeaders.BINDING_ID),
     connectionId: readRequiredHeader(headers, EgressRequestHeaders.CONNECTION_ID),
     secretType: readRequiredHeader(headers, EgressRequestHeaders.CREDENTIAL_SECRET_TYPE),
     ...(credentialPurpose === undefined ? {} : { purpose: credentialPurpose }),
@@ -281,6 +283,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
     }
 
     const cacheKey = {
+      bindingId: routeMetadata.bindingId,
       connectionId: routeMetadata.connectionId,
       secretType: routeMetadata.secretType,
       ...(routeMetadata.purpose === undefined ? {} : { purpose: routeMetadata.purpose }),
@@ -296,6 +299,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
         const resolvedCredential =
           await input.controlPlaneInternalClient.resolveIntegrationCredential({
             connectionId: routeMetadata.connectionId,
+            bindingId: routeMetadata.bindingId,
             secretType: routeMetadata.secretType,
             ...(routeMetadata.purpose === undefined ? {} : { purpose: routeMetadata.purpose }),
             ...(routeMetadata.resolverKey === undefined

@@ -5,6 +5,7 @@ import { InternalIntegrationCredentialsErrorCodes } from "./services/errors.js";
 export const ResolveIntegrationCredentialRequestSchema = z
   .object({
     connectionId: z.string().min(1),
+    bindingId: z.string().min(1).optional(),
     secretType: z.string().min(1),
     purpose: z.string().min(1).optional(),
     resolverKey: z.string().min(1).optional(),

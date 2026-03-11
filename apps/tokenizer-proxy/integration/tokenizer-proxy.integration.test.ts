@@ -15,6 +15,7 @@ const ControlPlaneInternalAuthHeader = "x-mistle-service-token";
 
 type StartedControlPlaneCredentialServer = {
   baseUrl: string;
+  requests: ReadonlyArray<unknown>;
   stop: () => Promise<void>;
 };
 
@@ -50,8 +51,9 @@ async function startControlPlaneCredentialServer(input: {
   responseBody?: unknown;
 }): Promise<StartedControlPlaneCredentialServer> {
   const port = await reserveAvailablePort({ host: input.host });
+  const requests: unknown[] = [];
 
-  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+  const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
     if (request.method !== "POST" || request.url !== "/internal/integration-credentials/resolve") {
       response.statusCode = 404;
       response.end("not found");
@@ -65,6 +67,19 @@ async function startControlPlaneCredentialServer(input: {
       });
       return;
     }
+
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of request) {
+      if (typeof chunk === "string") {
+        chunks.push(Buffer.from(chunk));
+        continue;
+      }
+
+      chunks.push(chunk);
+    }
+
+    const bodyText = Buffer.concat(chunks).toString("utf8");
+    requests.push(bodyText.length === 0 ? undefined : JSON.parse(bodyText));
 
     writeJson(
       response,
@@ -85,6 +100,7 @@ async function startControlPlaneCredentialServer(input: {
 
   return {
     baseUrl: `http://${input.host}:${String(port)}`,
+    requests,
     stop: async () => {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {
@@ -144,6 +160,7 @@ describe("tokenizer proxy integration", () => {
           method: "POST",
           headers: {
             [EgressRequestHeaders.UPSTREAM_BASE_URL]: "https://api.example.com",
+            [EgressRequestHeaders.BINDING_ID]: "ibd_missing",
             [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "bearer",
             [EgressRequestHeaders.AUTH_INJECTION_TARGET]: "authorization",
             [EgressRequestHeaders.CONNECTION_ID]: "icn_missing",
@@ -194,6 +211,7 @@ describe("tokenizer proxy integration", () => {
           method: "GET",
           headers: {
             [EgressRequestHeaders.UPSTREAM_BASE_URL]: upstreamEchoService.baseUrl,
+            [EgressRequestHeaders.BINDING_ID]: "ibd_github",
             [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "basic",
             [EgressRequestHeaders.AUTH_INJECTION_TARGET]: "authorization",
             [EgressRequestHeaders.AUTH_INJECTION_USERNAME]: "x-access-token",
@@ -219,6 +237,14 @@ describe("tokenizer proxy integration", () => {
       expect(readHeaderValue(body.headers, "authorization")).toBe(
         "Basic eC1hY2Nlc3MtdG9rZW46Z2hzX3Rlc3RfdG9rZW4=",
       );
+      expect(controlPlaneServer.requests).toEqual([
+        {
+          bindingId: "ibd_github",
+          connectionId: "icn_github",
+          resolverKey: "github_app_installation_token",
+          secretType: "oauth_access_token",
+        },
+      ]);
     } finally {
       await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
     }
