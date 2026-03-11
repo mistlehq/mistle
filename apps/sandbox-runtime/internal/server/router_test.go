@@ -85,4 +85,33 @@ func TestNewRouter(t *testing.T) {
 			t.Fatalf("expected body {\"ok\":true}, got %s", recorder.Body.String())
 		}
 	})
+
+	t.Run("delegates unmatched requests to proxy handler", func(t *testing.T) {
+		proxyHandler := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if request.Method != http.MethodGet {
+				t.Fatalf("expected forwarded request method GET, got %s", request.Method)
+			}
+			if request.URL.Path != "/" {
+				t.Fatalf("unexpected forwarded path: %s", request.URL.Path)
+			}
+
+			writer.WriteHeader(http.StatusAccepted)
+			_, _ = io.WriteString(writer, `{"proxied":true}`)
+		})
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
+
+		NewRouter(RouterInput{
+			BootstrapTokenLoaded: true,
+			ProxyHandler:         proxyHandler,
+		}).ServeHTTP(recorder, request)
+
+		if recorder.Code != http.StatusAccepted {
+			t.Fatalf("expected status 202, got %d", recorder.Code)
+		}
+		if recorder.Body.String() != `{"proxied":true}` {
+			t.Fatalf("expected body {\"proxied\":true}, got %s", recorder.Body.String())
+		}
+	})
 }

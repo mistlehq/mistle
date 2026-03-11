@@ -11,6 +11,8 @@ import (
 
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/config"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/egress"
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/httpclient"
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/proxy"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/runtimeplan"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/server"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
@@ -69,6 +71,39 @@ func Run(input RunInput) (runErr error) {
 		runSpan.SetStatus(codes.Error, err.Error())
 		return err
 	}
+
+	proxyEnvironment, err := traceStepWithValue(
+		runContext,
+		tracingHandle.Tracer(),
+		"sandbox.runtime.resolve_proxy_environment",
+		func(context.Context) (map[string]string, error) {
+			return resolveBaselineProxyEnvironment(baselineProxyEnvironmentInput{
+				ListenAddr:                  cfg.ListenAddr,
+				TokenizerProxyEgressBaseURL: cfg.TokenizerProxyEgressBaseURL,
+			})
+		},
+	)
+	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
+		return err
+	}
+	var restoreProxyEnvironment func()
+	err = traceStep(runContext, tracingHandle.Tracer(), "sandbox.runtime.apply_proxy_environment", func(context.Context) error {
+		var applyErr error
+		restoreProxyEnvironment, applyErr = applyEnvironmentEntries(proxyEnvironment)
+		return applyErr
+	})
+	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
+		return err
+	}
+	defer func() {
+		if restoreProxyEnvironment != nil {
+			restoreProxyEnvironment()
+		}
+	}()
 
 	startupInput, err := traceStepWithValue(
 		runContext,
@@ -133,7 +168,8 @@ func Run(input RunInput) (runErr error) {
 		return fmt.Errorf("failed to bind listen addr %s: %w", cfg.ListenAddr, err)
 	}
 
-	egressHTTPClient := telemetry.NewHTTPClient(http.DefaultClient)
+	directHTTPClient := httpclient.NewDirectClient(http.DefaultClient)
+	egressHTTPClient := telemetry.NewHTTPClient(directHTTPClient)
 	egressHandler, err := traceStepWithValue(
 		runContext,
 		tracingHandle.Tracer(),
@@ -152,9 +188,26 @@ func Run(input RunInput) (runErr error) {
 		return fmt.Errorf("failed to construct egress handler: %w", err)
 	}
 
+	proxyHandler, err := traceStepWithValue(
+		runContext,
+		tracingHandle.Tracer(),
+		"sandbox.runtime.new_proxy_handler",
+		func(context.Context) (http.Handler, error) {
+			return proxy.NewHandler(proxy.NewHandlerInput{
+				HTTPClient: telemetry.NewHTTPClient(directHTTPClient),
+			})
+		},
+	)
+	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
+		return fmt.Errorf("failed to construct proxy handler: %w", err)
+	}
+
 	router := server.NewRouter(server.RouterInput{
 		BootstrapTokenLoaded: startupInput.BootstrapToken != "",
 		EgressHandler:        egressHandler,
+		ProxyHandler:         proxyHandler,
 	})
 	httpServer := &http.Server{
 		Handler: otelhttp.NewHandler(router, "sandbox.runtime.http.server"),
