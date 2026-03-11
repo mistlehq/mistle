@@ -1,0 +1,55 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Mistle Docs",
+  "colors": {
+    "primary": "#0D5F2E",
+    "light": "#07C983",
+    "dark": "#15803D"
+  },
+  "description": "Mistle is open source software for configuring engineering agents and their execution environments.",
+  "favicon": "/favicon.ico",
+  "icons": {
+    "library": "fontawesome"
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Overview",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": ["index"]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Integrations",
+            "pages": ["guides/github-integration-setup"]
+          }
+        ]
+      }
+    ],
+    "global": {
+      "anchors": []
+    }
+  },
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg",
+    "href": "https://mistle.dev"
+  },
+  "navbar": {
+    "links": []
+  },
+  "footer": {
+    "socials": {
+      "discord": "https://discord.gg/2RQ2gdtE8S",
+      "x": "https://x.com/mistledev",
+      "linkedin": "https://www.linkedin.com/company/mistlehq"
+    }
+  }
+}

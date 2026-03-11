@@ -1,0 +1,20 @@
+{
+  "name": "@mistle/docs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "mint dev --no-open --port 3333",
+    "dev": "mint dev --no-open --port 3333",
+    "lint": "node ./scripts/lint-strict.mjs",
+    "typecheck": "node -e \"process.stdout.write('apps/docs: no typecheck step\\n')\"",
+    "test": "node -e \"process.stdout.write('apps/docs: no test step\\n')\"",
+    "validate": "mint validate",
+    "broken-links": "mint broken-links",
+    "a11y": "mint a11y",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "devDependencies": {
+    "mint": "4.2.423"
+  }
+}

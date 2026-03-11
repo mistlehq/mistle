@@ -1,0 +1,197 @@
+---
+title: GitHub Integration Setup
+description: Operator guide for configuring GitHub integration targets in a self-hosted deployment
+---
+
+## Overview
+
+This guide is for operators running self-hosted Mistle.
+
+Use this guide to:
+
+1. Create and configure a GitHub App for connect and webhook flows.
+2. Sync integration targets into the control-plane database.
+3. Provision a GitHub target using the current `integration-targets.provision.json` manifest format.
+
+## Prerequisites
+
+Before configuring Mistle, create a new GitHub App dedicated to Mistle and collect:
+
+1. App ID
+2. App slug
+3. Client ID, if your deployment uses it
+4. App private key PEM
+5. Webhook secret
+6. GitHub base URLs:
+
+<CodeGroup>
+```txt GitHub.com
+API: https://api.github.com
+Web: https://github.com
+```
+
+```txt GHES
+API: https://<ghes-host>/api/v3
+Web: https://<ghes-host>
+```
+
+</CodeGroup>
+
+Helpful GitHub references:
+
+- [Registering a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app)
+- [Managing private keys for GitHub Apps](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/managing-private-keys-for-github-apps)
+
+## Create The GitHub App
+
+Create a new GitHub App from your account or organization settings:
+
+<CodeGroup>
+```txt Organization
+https://github.com/organizations/<org>/settings/apps/new
+```
+
+```txt Personal
+https://github.com/settings/apps/new
+```
+
+</CodeGroup>
+
+For GHES, substitute `github.com` with your GHES host.
+
+Configure these values:
+
+1. **GitHub App name** such as `Mistle GitHub App`
+2. **Homepage URL** as any valid URL for your organization
+3. **Callback URL** can be left unset for this flow.
+4. **Setup URL** should point at the frontend route in your deployment that receives the GitHub App installation callback and submits the returned query parameters to Mistle.
+5. **Webhook URL** should target the control-plane webhook route for the target key you plan to enable:
+
+<CodeGroup>
+```txt GitHub Cloud target
+https://<control-plane-base-url>/v1/integration/webhooks/github-cloud
+```
+
+```txt GHES target
+https://<control-plane-base-url>/v1/integration/webhooks/github-enterprise-server
+```
+
+</CodeGroup>
+
+6. **Webhook secret** must match the provisioned target secret in Mistle.
+7. **Repository permissions** should include at least:
+
+| Permission    | Access         | Enables                                                      |
+| ------------- | -------------- | ------------------------------------------------------------ |
+| Actions       | Read and write | Trigger and inspect workflow runs                            |
+| Contents      | Read and write | Clone, branch, commit, and push                              |
+| Issues        | Read and write | Create and update issues                                     |
+| Metadata      | Read-only      | Read repository metadata                                     |
+| Pull requests | Read and write | Open, update, review, and merge PRs subject to repo policies |
+
+8. Enable the webhook events you want Mistle to process.
+9. Generate and download a PEM private key.
+10. Copy the App ID, app slug, and optional client ID into your Mistle provision manifest.
+
+Mistle's current GitHub flow is GitHub App installation based, not a traditional OAuth authorization-code exchange. The backend starts the flow by generating an installation URL at `/apps/<app-slug>/installations/new?state=...` and completes it from callback query parameters such as `state`, `installation_id`, and `setup_action`.
+
+## Configure Mistle
+
+The current codebase uses integration targets instead of the older provider-instance config model.
+
+There are two setup steps:
+
+1. Sync definition-backed targets into the control-plane database.
+2. Provision config and secrets for the target key you want to enable.
+
+### 1. Sync integration targets
+
+Run the control-plane target sync script after database setup:
+
+```bash
+pnpm --filter @mistle/control-plane-api db:seed:integration-targets
+```
+
+This creates or updates built-in target records such as:
+
+- `github-cloud`
+- `github-enterprise-server`
+
+### 2. Provision a target manifest
+
+Create `integration-targets.provision.json` in the repository root. Start from [`integration-targets.provision.example.json`](https://github.com/mistledev/mistle/blob/main/integration-targets.provision.example.json) and keep only the targets you want to manage.
+
+GitHub.com example:
+
+```json
+{
+  "version": 1,
+  "targets": [
+    {
+      "targetKey": "github-cloud",
+      "enabled": true,
+      "config": {
+        "api_base_url": "https://api.github.com",
+        "web_base_url": "https://github.com",
+        "app_slug": "your-github-app-slug",
+        "app_id": "123456",
+        "client_id": "Iv1.yourclientid"
+      },
+      "secrets": {
+        "app_private_key_pem": "-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----",
+        "webhook_secret": "replace-with-random-webhook-secret"
+      }
+    }
+  ]
+}
+```
+
+GHES example:
+
+```json
+{
+  "version": 1,
+  "targets": [
+    {
+      "targetKey": "github-enterprise-server",
+      "enabled": true,
+      "config": {
+        "api_base_url": "https://ghe.example.com/api/v3",
+        "web_base_url": "https://ghe.example.com",
+        "app_slug": "your-ghe-app-slug",
+        "app_id": "7890",
+        "client_id": "Iv1.yourgheclientid"
+      },
+      "secrets": {
+        "app_private_key_pem": "-----BEGIN PRIVATE KEY-----\\n...\\n-----END PRIVATE KEY-----",
+        "webhook_secret": "replace-with-random-webhook-secret"
+      }
+    }
+  ]
+}
+```
+
+Apply the manifest with the control-plane provisioning workflow you use for your environment.
+
+## Config Field Reference
+
+For GitHub targets, the current schemas expect:
+
+| Field                 | Where   | Meaning                                        |
+| --------------------- | ------- | ---------------------------------------------- |
+| `api_base_url`        | config  | Base REST API URL                              |
+| `web_base_url`        | config  | Base web URL                                   |
+| `app_id`              | config  | GitHub App ID                                  |
+| `app_slug`            | config  | GitHub App slug                                |
+| `client_id`           | config  | Optional GitHub App client ID                  |
+| `app_private_key_pem` | secrets | GitHub App private key in PEM format           |
+| `webhook_secret`      | secrets | Shared secret for webhook signature validation |
+
+## GitHub.com vs GHES
+
+Choose the target key that matches your environment:
+
+1. `github-cloud` for GitHub.com
+2. `github-enterprise-server` for GHES
+
+Each target uses the same conceptual setup, but the base URLs and app registration live on different hosts.
