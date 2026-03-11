@@ -1,9 +1,12 @@
 package proxy
 
 import (
+	"bufio"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -207,6 +210,147 @@ func TestHandlerServeHTTP(t *testing.T) {
 		}
 		if response.Header.Get("Connection") != "" {
 			t.Fatalf("expected proxied Connection header to be stripped, got %s", response.Header.Get("Connection"))
+		}
+	})
+
+	t.Run("preserves upgraded https streams after switching protocols", func(t *testing.T) {
+		upstreamServer := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if request.Header.Get("Connection") != "Upgrade" {
+				t.Fatalf("expected upgrade connection header, got %q", request.Header.Get("Connection"))
+			}
+			if request.Header.Get("Upgrade") != "websocket" {
+				t.Fatalf("expected websocket upgrade header, got %q", request.Header.Get("Upgrade"))
+			}
+
+			hijacker, ok := writer.(http.Hijacker)
+			if !ok {
+				t.Fatal("expected tls test server writer to support hijacking")
+			}
+			hijackedConn, bufferedReadWriter, err := hijacker.Hijack()
+			if err != nil {
+				t.Fatalf("expected upstream hijack to succeed, got %v", err)
+			}
+			defer hijackedConn.Close()
+
+			_, _ = io.WriteString(bufferedReadWriter, "HTTP/1.1 101 Switching Protocols\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n")
+			_ = bufferedReadWriter.Flush()
+
+			payload, err := bufferedReadWriter.ReadString('\n')
+			if err != nil {
+				t.Fatalf("expected upgraded payload read to succeed, got %v", err)
+			}
+			if payload != "ping\n" {
+				t.Fatalf("expected upstream upgraded payload ping, got %q", payload)
+			}
+
+			_, _ = io.WriteString(bufferedReadWriter, "pong\n")
+			_ = bufferedReadWriter.Flush()
+		}))
+		defer upstreamServer.Close()
+
+		certificateAuthority, rootPool := mustProxyAuthorityAndRootPool(t)
+		handler, err := NewHandler(NewHandlerInput{
+			HTTPClient:           upstreamServer.Client(),
+			CertificateAuthority: certificateAuthority,
+		})
+		if err != nil {
+			t.Fatalf("expected handler creation to succeed, got %v", err)
+		}
+
+		proxyServer := httptest.NewServer(handler)
+		defer proxyServer.Close()
+
+		proxyURL, err := url.Parse(proxyServer.URL)
+		if err != nil {
+			t.Fatalf("expected proxy url parse to succeed, got %v", err)
+		}
+
+		proxyConn, err := net.Dial("tcp", proxyURL.Host)
+		if err != nil {
+			t.Fatalf("expected proxy dial to succeed, got %v", err)
+		}
+		defer proxyConn.Close()
+
+		upstreamTarget := strings.TrimPrefix(upstreamServer.URL, "https://")
+		_, err = io.WriteString(
+			proxyConn,
+			fmt.Sprintf("CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", upstreamTarget, upstreamTarget),
+		)
+		if err != nil {
+			t.Fatalf("expected connect request write to succeed, got %v", err)
+		}
+
+		proxyReader := bufio.NewReader(proxyConn)
+		statusLine, err := proxyReader.ReadString('\n')
+		if err != nil {
+			t.Fatalf("expected connect status read to succeed, got %v", err)
+		}
+		if !strings.Contains(statusLine, "200 Connection Established") {
+			t.Fatalf("expected connect success status, got %s", statusLine)
+		}
+		for {
+			headerLine, headerErr := proxyReader.ReadString('\n')
+			if headerErr != nil {
+				t.Fatalf("expected connect header read to succeed, got %v", headerErr)
+			}
+			if headerLine == "\r\n" {
+				break
+			}
+		}
+
+		tlsConn := tls.Client(
+			&bufferedConn{
+				Conn:   proxyConn,
+				reader: io.MultiReader(proxyReader, proxyConn),
+			},
+			&tls.Config{
+				RootCAs: rootPool,
+				ServerName: strings.Split(upstreamTarget, ":")[0],
+			},
+		)
+		defer tlsConn.Close()
+
+		if err := tlsConn.Handshake(); err != nil {
+			t.Fatalf("expected tls handshake with proxy to succeed, got %v", err)
+		}
+
+		_, err = io.WriteString(
+			tlsConn,
+			"GET /socket HTTP/1.1\r\nHost: "+upstreamTarget+"\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n",
+		)
+		if err != nil {
+			t.Fatalf("expected upgraded request write to succeed, got %v", err)
+		}
+
+		tlsReader := bufio.NewReader(tlsConn)
+		switchingProtocolsLine, err := tlsReader.ReadString('\n')
+		if err != nil {
+			t.Fatalf("expected switching protocols status read to succeed, got %v", err)
+		}
+		if !strings.Contains(switchingProtocolsLine, "101 Switching Protocols") {
+			t.Fatalf("expected 101 response, got %s", switchingProtocolsLine)
+		}
+		for {
+			headerLine, headerErr := tlsReader.ReadString('\n')
+			if headerErr != nil {
+				t.Fatalf("expected switching protocols header read to succeed, got %v", headerErr)
+			}
+			if headerLine == "\r\n" {
+				break
+			}
+		}
+
+		_, err = io.WriteString(tlsConn, "ping\n")
+		if err != nil {
+			t.Fatalf("expected upgraded payload write to succeed, got %v", err)
+		}
+
+		upgradedResponse, err := tlsReader.ReadString('\n')
+		if err != nil {
+			t.Fatalf("expected upgraded payload read to succeed, got %v", err)
+		}
+		if upgradedResponse != "pong\n" {
+			t.Fatalf("expected upgraded response pong, got %q", upgradedResponse)
 		}
 	})
 }

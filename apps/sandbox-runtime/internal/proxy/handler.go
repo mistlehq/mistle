@@ -37,6 +37,12 @@ func (conn *bufferedConn) Read(buffer []byte) (int, error) {
 	return conn.reader.Read(buffer)
 }
 
+type readWriteCloser interface {
+	io.Reader
+	io.Writer
+	io.Closer
+}
+
 func NewHandler(input NewHandlerInput) (http.Handler, error) {
 	if input.HTTPClient == nil {
 		return nil, fmt.Errorf("http client is required")
@@ -104,6 +110,11 @@ func writeConnectSuccess(conn net.Conn) error {
 	return err
 }
 
+func relayStream(dst io.Writer, src io.Reader, errCh chan<- error) {
+	_, err := io.Copy(dst, src)
+	errCh <- err
+}
+
 func (handler Handler) handleConnect(writer http.ResponseWriter, request *http.Request) {
 	hijacker, ok := writer.(http.Hijacker)
 	if !ok {
@@ -157,10 +168,31 @@ func (handler Handler) handleConnect(writer http.ResponseWriter, request *http.R
 			response = newProxyErrorResponse(http.StatusBadGateway, fmt.Sprintf("failed to forward https proxy request: %v", responseErr))
 		}
 
+		if response.StatusCode == http.StatusSwitchingProtocols {
+			if writeErr := writeProxySwitchingProtocolsResponse(tlsConn, response); writeErr != nil {
+				closeResponseBody(response)
+				return
+			}
+
+			upgradedBody, ok := response.Body.(readWriteCloser)
+			if !ok {
+				closeResponseBody(response)
+				return
+			}
+
+			relayErrCh := make(chan error, 2)
+			go relayStream(upgradedBody, tlsReader, relayErrCh)
+			go relayStream(tlsConn, upgradedBody, relayErrCh)
+			<-relayErrCh
+			closeResponseBody(response)
+			return
+		}
+
 		if writeErr := writeProxyResponse(tlsConn, response); writeErr != nil {
 			closeResponseBody(response)
 			return
 		}
+
 		closeResponseBody(response)
 		closeRequestBody(interceptedRequest)
 
@@ -191,6 +223,7 @@ func (handler Handler) handleInterceptedHTTPSRequest(
 	}
 
 	copyHeadersWithoutHopByHop(forwardRequest.Header, request.Header, true)
+	restoreUpgradeHeaders(forwardRequest.Header, request.Header)
 	forwardRequest.Host = classification.UpstreamHost
 
 	response, err := handler.httpClient.Do(forwardRequest)
@@ -307,6 +340,7 @@ func filterProxyResponse(response *http.Response) *http.Response {
 
 	copyHeadersWithoutHopByHop(filteredResponse.Header, response.Header, false)
 	copyHeadersWithoutHopByHop(filteredResponse.Trailer, response.Trailer, false)
+	restoreUpgradeHeaders(filteredResponse.Header, response.Header)
 
 	return filteredResponse
 }
@@ -330,6 +364,20 @@ func writeProxyResponse(writer io.Writer, response *http.Response) error {
 	return response.Write(writer)
 }
 
+func writeProxySwitchingProtocolsResponse(writer io.Writer, response *http.Response) error {
+	bufferedWriter := bufio.NewWriter(writer)
+	if _, err := fmt.Fprintf(bufferedWriter, "HTTP/%d.%d %s\r\n", response.ProtoMajor, response.ProtoMinor, response.Status); err != nil {
+		return err
+	}
+	if err := response.Header.Write(bufferedWriter); err != nil {
+		return err
+	}
+	if _, err := bufferedWriter.WriteString("\r\n"); err != nil {
+		return err
+	}
+	return bufferedWriter.Flush()
+}
+
 func closeResponseBody(response *http.Response) {
 	if response == nil || response.Body == nil {
 		return
@@ -351,4 +399,38 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func isUpgradeHeaders(header http.Header) bool {
+	if header == nil {
+		return false
+	}
+	if strings.TrimSpace(header.Get("Upgrade")) == "" {
+		return false
+	}
+
+	for _, connectionValue := range header.Values("Connection") {
+		for _, token := range strings.Split(connectionValue, ",") {
+			if strings.EqualFold(strings.TrimSpace(token), "upgrade") {
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func restoreUpgradeHeaders(target http.Header, source http.Header) {
+	if !isUpgradeHeaders(source) {
+		return
+	}
+
+	target.Del("Connection")
+	target.Del("Upgrade")
+	for _, value := range source.Values("Connection") {
+		target.Add("Connection", value)
+	}
+	for _, value := range source.Values("Upgrade") {
+		target.Add("Upgrade", value)
+	}
 }
