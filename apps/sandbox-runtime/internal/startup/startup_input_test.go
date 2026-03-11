@@ -60,6 +60,58 @@ func TestReadStartupInput(t *testing.T) {
 		}
 	})
 
+	t.Run("reads artifact env from runtime plan", func(t *testing.T) {
+		startupInput, err := ReadStartupInput(ReadStartupInputInput{
+			Reader: bytes.NewBufferString(`{
+				"bootstrapToken": "test-token",
+				"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+				"runtimePlan": {
+					"sandboxProfileId": "sbp_123",
+					"version": 1,
+					"image": {
+						"source": "base",
+						"imageRef": "mistle/sandbox-base:dev"
+					},
+					"egressRoutes": [],
+					"artifacts": [{
+						"artifactKey": "gh-cli",
+						"name": "GitHub CLI",
+						"env": {
+							"GH_TOKEN": "dummy-token"
+						},
+						"lifecycle": {
+							"install": [{
+								"args": ["/bin/true"],
+								"env": {},
+								"cwd": "",
+								"timeoutMs": 0
+							}],
+							"update": [],
+							"remove": [{
+								"args": ["/bin/true"],
+								"env": {},
+								"cwd": "",
+								"timeoutMs": 0
+							}]
+						}
+					}],
+					"artifactRemovals": [],
+					"runtimeClients": [],
+					"workspaceSources": [],
+					"agentRuntimes": []
+				}
+			}`),
+			MaxBytes: 4096,
+		})
+		if err != nil {
+			t.Fatalf("expected no error, got %v", err)
+		}
+
+		if startupInput.RuntimePlan.Artifacts[0].Env["GH_TOKEN"] != "dummy-token" {
+			t.Fatalf("expected artifact env to be decoded, got %#v", startupInput.RuntimePlan.Artifacts[0].Env)
+		}
+	})
+
 	t.Run("trims surrounding whitespace", func(t *testing.T) {
 		startupInput, err := ReadStartupInput(ReadStartupInputInput{
 			Reader: bytes.NewBufferString(`

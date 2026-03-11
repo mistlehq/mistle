@@ -78,6 +78,7 @@ type RuntimeArtifactSpec struct {
 	ArtifactKey string                   `json:"artifactKey"`
 	Name        string                   `json:"name"`
 	Description string                   `json:"description"`
+	Env         map[string]string        `json:"env"`
 	Lifecycle   RuntimeArtifactLifecycle `json:"lifecycle"`
 }
 
@@ -387,6 +388,11 @@ func validateArtifact(artifact RuntimeArtifactSpec, artifactIndex int) error {
 	}
 	if len(artifact.Lifecycle.Remove) == 0 {
 		return fmt.Errorf("runtime plan artifacts[%d] lifecycle.remove must not be empty", artifactIndex)
+	}
+	for envKey := range artifact.Env {
+		if strings.TrimSpace(envKey) == "" {
+			return fmt.Errorf("runtime plan artifacts[%d] env contains an empty key", artifactIndex)
+		}
 	}
 
 	for installIndex, command := range artifact.Lifecycle.Install {

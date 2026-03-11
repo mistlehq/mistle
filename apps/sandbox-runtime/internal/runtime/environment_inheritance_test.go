@@ -6,6 +6,7 @@ func TestMergedProcessEnvironment(t *testing.T) {
 	t.Setenv("HTTP_PROXY", "http://127.0.0.1:8090")
 	t.Setenv("HTTPS_PROXY", "http://127.0.0.1:8090")
 	t.Setenv("NO_PROXY", "127.0.0.1,localhost")
+	t.Setenv("GH_TOKEN", "dummy-token")
 
 	merged := mergedProcessEnvironment(map[string]string{
 		"PROCESS_ONLY": "enabled",
@@ -27,6 +28,9 @@ func TestMergedProcessEnvironment(t *testing.T) {
 	}
 	if mergedMap["NO_PROXY"] != "127.0.0.1,localhost" {
 		t.Fatalf("expected NO_PROXY to be inherited, got %s", mergedMap["NO_PROXY"])
+	}
+	if mergedMap["GH_TOKEN"] != "dummy-token" {
+		t.Fatalf("expected GH_TOKEN to be inherited, got %s", mergedMap["GH_TOKEN"])
 	}
 	if mergedMap["PROCESS_ONLY"] != "enabled" {
 		t.Fatalf("expected PROCESS_ONLY to be set, got %s", mergedMap["PROCESS_ONLY"])

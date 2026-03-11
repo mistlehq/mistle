@@ -126,6 +126,20 @@ func Run(input RunInput) (runErr error) {
 		attribute.Int("mistle.sandbox.profile_version", startupInput.RuntimePlan.Version),
 	)
 
+	artifactEnvironment, err := traceStepWithValue(
+		runContext,
+		tracingHandle.Tracer(),
+		"sandbox.runtime.aggregate_artifact_environment",
+		func(context.Context) (map[string]string, error) {
+			return aggregateArtifactEnvironment(startupInput.RuntimePlan.Artifacts)
+		},
+	)
+	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
+		return err
+	}
+
 	listenAddr, err := traceStepWithValue(
 		runContext,
 		tracingHandle.Tracer(),
@@ -268,6 +282,27 @@ func Run(input RunInput) (runErr error) {
 		runSpan.SetStatus(codes.Error, err.Error())
 		return fmt.Errorf("failed to apply runtime plan: %w", err)
 	}
+
+	var restoreArtifactEnvironment func()
+	err = traceStep(runContext, tracingHandle.Tracer(), "sandbox.runtime.apply_artifact_environment", func(context.Context) error {
+		if len(artifactEnvironment) == 0 {
+			return nil
+		}
+
+		var applyErr error
+		restoreArtifactEnvironment, applyErr = applyEnvironmentEntries(artifactEnvironment)
+		return applyErr
+	})
+	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
+		return err
+	}
+	defer func() {
+		if restoreArtifactEnvironment != nil {
+			restoreArtifactEnvironment()
+		}
+	}()
 
 	processManager, err := traceStepWithValue(
 		runContext,
