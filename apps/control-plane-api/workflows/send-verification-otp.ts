@@ -1,5 +1,5 @@
 import { EmailTemplateIds, sendEmail, type EmailTemplateInputById } from "@mistle/emails";
-import { defineWorkflow, defineWorkflowSpec } from "openworkflow";
+import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "./context.js";
 
@@ -16,11 +16,14 @@ export type SendVerificationOTPWorkflowOutput = {
   messageId: string;
 };
 
-export const SendVerificationOTPWorkflow = defineWorkflow(
-  defineWorkflowSpec<SendVerificationOTPWorkflowInput, SendVerificationOTPWorkflowOutput>({
+export const SendVerificationOTPWorkflow = defineWorkflow<
+  SendVerificationOTPWorkflowInput,
+  SendVerificationOTPWorkflowOutput
+>(
+  {
     name: "control-plane.auth.send-verification-otp",
     version: "1",
-  }),
+  },
   async ({ input: { email, expiresInSeconds, otp, type }, step }) => {
     const {
       email: { from, sender },
