@@ -98,6 +98,73 @@ func TestValidateRuntimePlan(t *testing.T) {
 			t.Fatalf("expected auth injection username validation error, got %v", err)
 		}
 	})
+
+	t.Run("accepts artifact env with non-empty keys", func(t *testing.T) {
+		err := ValidateRuntimePlan(RuntimePlan{
+			SandboxProfileID: "sbp_123",
+			Version:          1,
+			Image: ResolvedSandboxImage{
+				Source:   "base",
+				ImageRef: "mistle/sandbox-base:dev",
+			},
+			EgressRoutes: []EgressCredentialRoute{},
+			Artifacts: []RuntimeArtifactSpec{
+				{
+					ArtifactKey: "gh-cli",
+					Name:        "GitHub CLI",
+					Env: map[string]string{
+						"GH_TOKEN": "dummy-token",
+					},
+					Lifecycle: RuntimeArtifactLifecycle{
+						Install: []RuntimeArtifactCommand{{Args: []string{"/bin/true"}}},
+						Remove:  []RuntimeArtifactCommand{{Args: []string{"/bin/true"}}},
+					},
+				},
+			},
+			ArtifactRemovals: []RuntimeArtifactRemovalSpec{},
+			WorkspaceSources: []WorkspaceSource{},
+			RuntimeClients:   []RuntimeClient{},
+			AgentRuntimes:    []AgentRuntime{},
+		})
+		if err != nil {
+			t.Fatalf("expected artifact env validation to succeed, got %v", err)
+		}
+	})
+
+	t.Run("rejects artifact env with empty keys", func(t *testing.T) {
+		err := ValidateRuntimePlan(RuntimePlan{
+			SandboxProfileID: "sbp_123",
+			Version:          1,
+			Image: ResolvedSandboxImage{
+				Source:   "base",
+				ImageRef: "mistle/sandbox-base:dev",
+			},
+			EgressRoutes: []EgressCredentialRoute{},
+			Artifacts: []RuntimeArtifactSpec{
+				{
+					ArtifactKey: "gh-cli",
+					Name:        "GitHub CLI",
+					Env: map[string]string{
+						"": "dummy-token",
+					},
+					Lifecycle: RuntimeArtifactLifecycle{
+						Install: []RuntimeArtifactCommand{{Args: []string{"/bin/true"}}},
+						Remove:  []RuntimeArtifactCommand{{Args: []string{"/bin/true"}}},
+					},
+				},
+			},
+			ArtifactRemovals: []RuntimeArtifactRemovalSpec{},
+			WorkspaceSources: []WorkspaceSource{},
+			RuntimeClients:   []RuntimeClient{},
+			AgentRuntimes:    []AgentRuntime{},
+		})
+		if err == nil {
+			t.Fatal("expected empty artifact env key to fail validation")
+		}
+		if !strings.Contains(err.Error(), "env contains an empty key") {
+			t.Fatalf("expected empty env key validation error, got %v", err)
+		}
+	})
 }
 
 func TestValidateRuntimeClientProcessReadiness(t *testing.T) {
