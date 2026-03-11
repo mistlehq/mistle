@@ -21,7 +21,7 @@ type ResolvedGitHubAppCredentialContext = {
   appId: string;
   appPrivateKeyPem: string;
   installationId: number;
-  repositoryNames: ReadonlyArray<string>;
+  repositoryNames?: ReadonlyArray<string>;
 };
 
 const ResolvedGitHubTargetConfigSchema = z
@@ -39,15 +39,25 @@ const ResolvedGitHubTargetSecretsSchema = z
 
 export function resolveGitHubInstallationRepositoryNames(
   input: IntegrationCredentialResolverInput,
-): ReadonlyArray<string> {
+): ReadonlyArray<string> | undefined {
   if (input.binding === undefined) {
-    throw new Error("GitHub app installation resolver requires binding context.");
+    return undefined;
   }
 
   const parsedBindingConfig = GitHubBindingConfigSchema.parse(input.binding.config);
-  return [...new Set(parsedBindingConfig.repositories)].sort((left, right) =>
-    left.localeCompare(right),
-  );
+  const repositoryNames = parsedBindingConfig.repositories.map((repository) => {
+    const repositorySegments = repository.split("/");
+    const repositoryName = repositorySegments.at(-1);
+    if (repositoryName === undefined || repositoryName.length === 0) {
+      throw new Error(
+        `GitHub app installation resolver requires repository selections in 'owner/name' format. Received '${repository}'.`,
+      );
+    }
+
+    return repositoryName;
+  });
+
+  return [...new Set(repositoryNames)].sort((left, right) => left.localeCompare(right));
 }
 
 function resolveGitHubAppCredentialContext(
@@ -83,12 +93,14 @@ function resolveGitHubAppCredentialContext(
     throw new Error("GitHub app installation resolver requires numeric `installation_id`.");
   }
 
+  const repositoryNames = resolveGitHubInstallationRepositoryNames(input);
+
   return {
     apiBaseUrl: parsedTargetConfig.apiBaseUrl,
     appId,
     appPrivateKeyPem,
     installationId: numericInstallationId,
-    repositoryNames: resolveGitHubInstallationRepositoryNames(input),
+    ...(repositoryNames === undefined ? {} : { repositoryNames }),
   };
 }
 
@@ -97,12 +109,16 @@ export function createGitHubInstallationAuthInput(input: {
   appId: string;
   appPrivateKeyPem: string;
   installationId: number;
-  repositoryNames: ReadonlyArray<string>;
+  repositoryNames?: ReadonlyArray<string>;
 }): InstallationAuthOptions {
   return {
     type: "installation",
     installationId: input.installationId,
-    repositoryNames: [...input.repositoryNames],
+    ...(input.repositoryNames === undefined
+      ? {}
+      : {
+          repositoryNames: [...input.repositoryNames],
+        }),
   };
 }
 
@@ -111,7 +127,7 @@ async function createGitHubInstallationAccessToken(input: {
   appId: string;
   appPrivateKeyPem: string;
   installationId: number;
-  repositoryNames: ReadonlyArray<string>;
+  repositoryNames?: ReadonlyArray<string>;
 }): Promise<{ token: string; expiresAt?: string }> {
   const auth = createAppAuth({
     appId: input.appId,
@@ -136,7 +152,11 @@ export const GitHubAppInstallationCredentialResolver: IntegrationCredentialResol
       appId: resolvedContext.appId,
       appPrivateKeyPem: resolvedContext.appPrivateKeyPem,
       installationId: resolvedContext.installationId,
-      repositoryNames: resolvedContext.repositoryNames,
+      ...(resolvedContext.repositoryNames === undefined
+        ? {}
+        : {
+            repositoryNames: resolvedContext.repositoryNames,
+          }),
     });
 
     return {
