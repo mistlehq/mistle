@@ -2,6 +2,8 @@ import { LocalPeerRegistry } from "./local-peer-registry/index.js";
 import { RelayTransport } from "./relay-transport/index.js";
 import type {
   LocalPeerDescriptor,
+  RelayCloseEnvelope,
+  RelayFrameEnvelope,
   RelayPayload,
   RelayPeerSide,
   RelayPeerSocket,
@@ -33,6 +35,30 @@ function isSamePeerLocation(left: RelayTarget, right: RelayTarget): boolean {
   );
 }
 
+function toFrameEnvelope(input: {
+  target: RelayTarget;
+  payload: RelayPayload;
+}): RelayFrameEnvelope {
+  return {
+    kind: "frame",
+    target: input.target,
+    payload: input.payload,
+  };
+}
+
+function toCloseEnvelope(input: {
+  target: RelayTarget;
+  closeCode: number;
+  closeReason: string;
+}): RelayCloseEnvelope {
+  return {
+    kind: "close",
+    target: input.target,
+    closeCode: input.closeCode,
+    closeReason: input.closeReason,
+  };
+}
+
 export class TunnelRelayCoordinator {
   public constructor(
     private readonly nodeId: string,
@@ -60,11 +86,15 @@ export class TunnelRelayCoordinator {
 
     const replacedPeer = this.peerRegistry.setPeer(target);
     if (replacedPeer !== undefined) {
-      this.relayTransport.closePeer({
-        target: replacedPeer,
-        closeCode: CloseCodes.REPLACED,
-        closeReason: "Replaced by newer sandbox tunnel connection.",
-      });
+      void this.relayTransport
+        .deliverEnvelope(
+          toCloseEnvelope({
+            target: replacedPeer,
+            closeCode: CloseCodes.REPLACED,
+            closeReason: "Replaced by newer sandbox tunnel connection.",
+          }),
+        )
+        .catch(() => undefined);
     }
 
     return target;
@@ -95,10 +125,12 @@ export class TunnelRelayCoordinator {
       return;
     }
 
-    await this.relayTransport.forwardToPeer({
-      target,
-      payload: input.payload,
-    });
+    await this.relayTransport.deliverEnvelope(
+      toFrameEnvelope({
+        target,
+        payload: input.payload,
+      }),
+    );
   }
 
   public detachPeer(input: RelayTarget): void {
@@ -118,10 +150,12 @@ export class TunnelRelayCoordinator {
       });
       if (opposite !== undefined) {
         void this.relayTransport
-          .forwardToPeer({
-            target: opposite,
-            payload: PeerDisconnectedControlPayload,
-          })
+          .deliverEnvelope(
+            toFrameEnvelope({
+              target: opposite,
+              payload: PeerDisconnectedControlPayload,
+            }),
+          )
           .catch(() => undefined);
       }
       return;
@@ -135,11 +169,15 @@ export class TunnelRelayCoordinator {
       return;
     }
 
-    this.relayTransport.closePeer({
-      target: opposite,
-      closeCode: CloseCodes.PEER_DISCONNECTED,
-      closeReason: "Sandbox tunnel peer disconnected.",
-    });
+    void this.relayTransport
+      .deliverEnvelope(
+        toCloseEnvelope({
+          target: opposite,
+          closeCode: CloseCodes.PEER_DISCONNECTED,
+          closeReason: "Sandbox tunnel peer disconnected.",
+        }),
+      )
+      .catch(() => undefined);
   }
 
   public getPeer(input: LocalPeerDescriptor): RelayTarget | undefined {

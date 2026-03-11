@@ -1,4 +1,4 @@
-import type { RelayPayload, RelayPeerSocket, RelayTarget } from "../../types.js";
+import type { RelayEnvelope, RelayPeerSocket, RelayTarget } from "../../types.js";
 import type { RelayTransportAdapter } from "../relay-transport-adapter.js";
 
 export class InMemoryRelayTransportAdapter implements RelayTransportAdapter {
@@ -21,12 +21,12 @@ export class InMemoryRelayTransportAdapter implements RelayTransportAdapter {
     this.socketsBySessionId.delete(input.target.sessionId);
   }
 
-  public async forwardToPeer(input: { target: RelayTarget; payload: RelayPayload }): Promise<void> {
-    if (input.target.nodeId !== this.nodeId) {
-      throw new Error("Expected in-memory frame transport target to be local.");
+  public async deliverEnvelope(envelope: RelayEnvelope): Promise<void> {
+    if (envelope.target.nodeId !== this.nodeId) {
+      throw new Error("Expected in-memory relay transport target to be local.");
     }
 
-    const socket = this.socketsBySessionId.get(input.target.sessionId);
+    const socket = this.socketsBySessionId.get(envelope.target.sessionId);
     if (socket === undefined) {
       return;
     }
@@ -34,22 +34,11 @@ export class InMemoryRelayTransportAdapter implements RelayTransportAdapter {
       return;
     }
 
-    socket.send(input.payload);
-  }
-
-  public closePeer(input: { target: RelayTarget; closeCode: number; closeReason: string }): void {
-    if (input.target.nodeId !== this.nodeId) {
+    if (envelope.kind === "frame") {
+      socket.send(envelope.payload);
       return;
     }
 
-    const socket = this.socketsBySessionId.get(input.target.sessionId);
-    if (socket === undefined) {
-      return;
-    }
-    if (socket.readyState !== 1) {
-      return;
-    }
-
-    socket.close(input.closeCode, input.closeReason);
+    socket.close(envelope.closeCode, envelope.closeReason);
   }
 }
