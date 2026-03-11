@@ -101,6 +101,10 @@ describe("assembleCompiledRuntimePlan", () => {
             {
               artifactKey: "gh-cli",
               name: "GitHub CLI",
+              env: {
+                Z_VAR: "two",
+                A_VAR: "one",
+              },
               lifecycle: {
                 install: [{ args: ["mise", "install", "gh@latest"] }],
                 remove: [{ args: ["rm", "-f", "/usr/local/bin/gh"] }],
@@ -256,6 +260,10 @@ describe("assembleCompiledRuntimePlan", () => {
     expect(plan.egressRoutes[0]?.routeId).toBe("route_a");
     expect(plan.artifacts.map((artifact) => artifact.artifactKey)).toEqual(["codex-cli", "gh-cli"]);
     expect(plan.artifactRemovals).toEqual([]);
+    expect(plan.artifacts[1]?.env).toEqual({
+      A_VAR: "one",
+      Z_VAR: "two",
+    });
 
     const runtimeClient = plan.runtimeClients[0];
     expect(runtimeClient?.clientId).toBe("codex-cli");

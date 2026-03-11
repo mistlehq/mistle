@@ -62,6 +62,9 @@ function createOpenAiDefinition(): IntegrationDefinition<
         {
           artifactKey: "codex-cli",
           name: "Codex CLI",
+          env: {
+            GH_TOKEN: "dummy-token",
+          },
           lifecycle: {
             install: ({ refs }) => [
               refs.githubReleases.installLatestBinary({
@@ -417,6 +420,9 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.artifacts[0]?.lifecycle.install[0]?.timeoutMs).toBe(120_000);
     expect(runtimePlan.artifacts[0]?.lifecycle.install[1]).toEqual({
       args: ["echo", "binding:bind_openai_agent"],
+    });
+    expect(runtimePlan.artifacts[0]?.env).toEqual({
+      GH_TOKEN: "dummy-token",
     });
     expect(runtimePlan.runtimeClients).toHaveLength(1);
     expect(runtimePlan.runtimeClients[0]?.setup.env.OPENAI_BASE_URL).toBe("https://api.openai.com");

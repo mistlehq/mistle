@@ -47,6 +47,7 @@ function createCompiledBindingResult(input: {
   route: EgressCredentialRoute;
   artifactKey: string;
   artifactName?: string;
+  artifactEnv?: Readonly<Record<string, string>>;
   artifactInstallCommands?: ReadonlyArray<{
     args: ReadonlyArray<string>;
     env?: Record<string, string>;
@@ -86,6 +87,7 @@ function createCompiledBindingResult(input: {
       {
         artifactKey: input.artifactKey,
         name: input.artifactName ?? `${input.route.routeId} artifact`,
+        ...(input.artifactEnv === undefined ? {} : { env: input.artifactEnv }),
         lifecycle: {
           install: input.artifactInstallCommands ?? [
             { args: ["echo", "install", input.route.routeId] },
@@ -678,6 +680,40 @@ describe("validateCompiledBindingResults", () => {
     ).toThrowError(IntegrationCompilerError);
   });
 
+  it("fails on artifact key conflicts with different env specs", () => {
+    const resultA = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      artifactName: "Codex CLI",
+      artifactEnv: {
+        GH_TOKEN: "dummy-token-a",
+      },
+    });
+
+    const resultB = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_b",
+        bindingId: "bind_b",
+        hosts: ["api.github.com"],
+      }),
+      artifactKey: "codex-cli",
+      artifactName: "Codex CLI",
+      artifactEnv: {
+        GH_TOKEN: "dummy-token-b",
+      },
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [resultA, resultB],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+  });
+
   it("fails when an artifact has no install commands", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
@@ -723,6 +759,26 @@ describe("validateCompiledBindingResults", () => {
       }),
       artifactKey: "codex-cli",
       artifactInstallCommands: [{ args: [] }],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrowError(IntegrationCompilerError);
+  });
+
+  it("fails when an artifact defines a reserved proxy env key", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        routeId: "route_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      artifactEnv: {
+        HTTPS_PROXY: "http://127.0.0.1:8090",
+      },
     });
 
     expect(() =>

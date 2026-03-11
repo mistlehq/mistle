@@ -74,6 +74,7 @@ const CompiledRuntimeArtifactSpecSchema = z
     artifactKey: z.string().min(1),
     name: z.string().min(1),
     description: z.string().min(1).optional(),
+    env: z.record(z.string(), z.string()).optional(),
     lifecycle: z
       .object({
         install: z.array(RuntimeArtifactCommandSchema).readonly(),
@@ -222,6 +223,12 @@ type RuntimePlanRuntimeClientFile = RuntimePlanRuntimeClient["setup"]["files"][n
 type RuntimePlanWorkspaceSource = CompiledRuntimePlan["workspaceSources"][number];
 type RuntimePlanAgentRuntime = CompiledRuntimePlan["agentRuntimes"][number];
 
+function sortRecord(input: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(input).sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
+  );
+}
+
 function normalizeRuntimeArtifactCommand(
   command: z.output<typeof RuntimeArtifactCommandSchema>,
 ): RuntimePlanArtifactCommand {
@@ -272,6 +279,7 @@ function normalizeArtifact(
     artifactKey: artifact.artifactKey,
     name: artifact.name,
     ...(artifact.description === undefined ? {} : { description: artifact.description }),
+    ...(artifact.env === undefined ? {} : { env: sortRecord(artifact.env) }),
     lifecycle: {
       install: artifact.lifecycle.install.map(normalizeRuntimeArtifactCommand),
       ...(artifact.lifecycle.update === undefined

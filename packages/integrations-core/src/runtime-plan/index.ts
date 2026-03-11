@@ -396,7 +396,12 @@ function mergeRuntimeClients(input: ReadonlyArray<RuntimeClient>): ReadonlyArray
 function sortArtifacts(
   input: ReadonlyArray<CompiledRuntimeArtifactSpec>,
 ): ReadonlyArray<CompiledRuntimeArtifactSpec> {
-  return [...input].sort((left, right) => left.artifactKey.localeCompare(right.artifactKey));
+  return [...input]
+    .map((artifact) => ({
+      ...artifact,
+      ...(artifact.env === undefined ? {} : { env: sortRecord({ ...artifact.env }) }),
+    }))
+    .sort((left, right) => left.artifactKey.localeCompare(right.artifactKey));
 }
 
 function computeArtifactRemovals(input: {
