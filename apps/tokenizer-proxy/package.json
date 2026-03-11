@@ -20,6 +20,7 @@
     "@mistle/control-plane-internal-client": "workspace:*",
     "@mistle/logging": "workspace:*",
     "@mistle/telemetry": "workspace:*",
+    "@opentelemetry/api": "^1.9.0",
     "hono": "^4.12.5"
   },
   "devDependencies": {

@@ -1,10 +1,15 @@
 import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
+import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 import type { Context } from "hono";
 
 import { logger } from "../logger.js";
 import type { AppContextBindings } from "../types.js";
 import { EGRESS_ROUTE_BASE_PATH, EgressRequestHeaders } from "./constants.js";
 import { CredentialCache } from "./credential-cache.js";
+import {
+  createEgressTelemetryBaseAttributes,
+  createUpstreamTelemetryAttributes,
+} from "./telemetry.js";
 
 type CreateEgressProxyHandlerInput = {
   controlPlaneInternalClient: ControlPlaneInternalClient;
@@ -27,6 +32,8 @@ type ErrorResponse = {
   code: string;
   message: string;
 };
+
+const EgressTracer = trace.getTracer("@mistle/tokenizer-proxy");
 
 function createErrorResponse(input: ErrorResponse): ErrorResponse {
   return {
@@ -273,109 +280,206 @@ function copyResponseHeaders(source: Headers): Headers {
 
 export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
   return async (ctx: Context<AppContextBindings>) => {
-    let routeMetadata: EgressRouteMetadata;
-
-    try {
-      routeMetadata = resolveRouteMetadata(ctx);
-    } catch (error) {
-      return ctx.json(
-        createErrorResponse({
-          code: "INVALID_EGRESS_ROUTE_METADATA",
-          message: error instanceof Error ? error.message : "Egress route metadata is invalid.",
-        }),
-        400,
-      );
-    }
-
-    const cacheKey = {
-      bindingId: routeMetadata.bindingId,
-      connectionId: routeMetadata.connectionId,
-      secretType: routeMetadata.secretType,
-      ...(routeMetadata.purpose === undefined ? {} : { purpose: routeMetadata.purpose }),
-      ...(routeMetadata.resolverKey === undefined
-        ? {}
-        : { resolverKey: routeMetadata.resolverKey }),
-    };
-
-    let resolvedCredentialValue = input.credentialCache.get(cacheKey);
-
-    if (resolvedCredentialValue === undefined) {
-      try {
-        const resolvedCredential =
-          await input.controlPlaneInternalClient.resolveIntegrationCredential({
-            connectionId: routeMetadata.connectionId,
-            bindingId: routeMetadata.bindingId,
-            secretType: routeMetadata.secretType,
-            ...(routeMetadata.purpose === undefined ? {} : { purpose: routeMetadata.purpose }),
-            ...(routeMetadata.resolverKey === undefined
-              ? {}
-              : { resolverKey: routeMetadata.resolverKey }),
-          });
-
-        input.credentialCache.set(cacheKey, resolvedCredential);
-        resolvedCredentialValue = resolvedCredential.value;
-      } catch (error) {
-        logger.error(
-          {
-            err: error,
-            routeId: ctx.req.param("routeId"),
-          },
-          "Failed to resolve integration credential from control-plane-api",
-        );
-        return ctx.json(
-          createErrorResponse({
-            code: "CREDENTIAL_RESOLUTION_FAILED",
-            message: "Failed to resolve integration credential.",
-          }),
-          502,
-        );
-      }
-    }
-
-    const upstreamUrl = createUpstreamUrl(ctx, routeMetadata.upstreamBaseUrl);
-    const outgoingHeaders = buildOutgoingRequestHeaders(ctx);
-
-    applyAuthInjection({
-      upstreamUrl,
-      outgoingHeaders,
-      authInjectionType: routeMetadata.authInjectionType,
-      authInjectionTarget: routeMetadata.authInjectionTarget,
-      ...(routeMetadata.authInjectionUsername === undefined
-        ? {}
-        : { authInjectionUsername: routeMetadata.authInjectionUsername }),
-      secretValue: resolvedCredentialValue,
+    const routeId = ctx.req.param("routeId");
+    const span = EgressTracer.startSpan("tokenizer_proxy.egress.proxy_request", {
+      attributes: {
+        "mistle.egress.route_id": routeId,
+        "http.request.method": ctx.req.method,
+        "url.path": ctx.req.path,
+      },
     });
 
-    const outgoingBody = await readOutgoingRequestBody(ctx);
+    return await context.with(trace.setSpan(context.active(), span), async () => {
+      try {
+        let routeMetadata: EgressRouteMetadata;
 
-    let upstreamResponse: Response;
-    try {
-      upstreamResponse = await fetch(upstreamUrl, {
-        method: ctx.req.method,
-        headers: outgoingHeaders,
-        ...(outgoingBody === undefined ? {} : { body: outgoingBody }),
-      });
-    } catch (error) {
-      logger.error(
-        {
-          err: error,
-          routeId: ctx.req.param("routeId"),
-          upstreamBaseUrl: routeMetadata.upstreamBaseUrl,
-        },
-        "Failed to forward egress request to upstream",
-      );
-      return ctx.json(
-        createErrorResponse({
-          code: "UPSTREAM_REQUEST_FAILED",
-          message: "Failed to forward request to upstream.",
-        }),
-        502,
-      );
-    }
+        try {
+          routeMetadata = resolveRouteMetadata(ctx);
+        } catch (error) {
+          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: "invalid egress route metadata",
+          });
+          return ctx.json(
+            createErrorResponse({
+              code: "INVALID_EGRESS_ROUTE_METADATA",
+              message: error instanceof Error ? error.message : "Egress route metadata is invalid.",
+            }),
+            400,
+          );
+        }
 
-    return new Response(upstreamResponse.body, {
-      status: upstreamResponse.status,
-      headers: copyResponseHeaders(upstreamResponse.headers),
+        span.setAttributes(
+          createEgressTelemetryBaseAttributes({
+            method: ctx.req.method,
+            requestPath: ctx.req.path,
+            bindingId: routeMetadata.bindingId,
+            connectionId: routeMetadata.connectionId,
+            ...(routeId === undefined ? {} : { routeId }),
+          }),
+        );
+        span.setAttribute("mistle.auth.injection.type", routeMetadata.authInjectionType);
+        if (routeMetadata.resolverKey !== undefined) {
+          span.setAttribute("mistle.credential.resolver_key", routeMetadata.resolverKey);
+        }
+
+        const cacheKey = {
+          bindingId: routeMetadata.bindingId,
+          connectionId: routeMetadata.connectionId,
+          secretType: routeMetadata.secretType,
+          ...(routeMetadata.purpose === undefined ? {} : { purpose: routeMetadata.purpose }),
+          ...(routeMetadata.resolverKey === undefined
+            ? {}
+            : { resolverKey: routeMetadata.resolverKey }),
+        };
+
+        let resolvedCredentialValue = input.credentialCache.get(cacheKey);
+        span.setAttribute("mistle.credential.cache_hit", resolvedCredentialValue !== undefined);
+
+        if (resolvedCredentialValue === undefined) {
+          try {
+            const resolvedCredentialValueFromControlPlane = await EgressTracer.startActiveSpan(
+              "tokenizer_proxy.egress.resolve_credential",
+              async (credentialSpan) => {
+                credentialSpan.setAttributes(
+                  createEgressTelemetryBaseAttributes({
+                    method: ctx.req.method,
+                    requestPath: ctx.req.path,
+                    bindingId: routeMetadata.bindingId,
+                    connectionId: routeMetadata.connectionId,
+                    ...(routeId === undefined ? {} : { routeId }),
+                  }),
+                );
+                try {
+                  const resolvedCredential =
+                    await input.controlPlaneInternalClient.resolveIntegrationCredential({
+                      connectionId: routeMetadata.connectionId,
+                      bindingId: routeMetadata.bindingId,
+                      secretType: routeMetadata.secretType,
+                      ...(routeMetadata.purpose === undefined
+                        ? {}
+                        : { purpose: routeMetadata.purpose }),
+                      ...(routeMetadata.resolverKey === undefined
+                        ? {}
+                        : { resolverKey: routeMetadata.resolverKey }),
+                    });
+
+                  input.credentialCache.set(cacheKey, resolvedCredential);
+                  return resolvedCredential.value;
+                } catch (error) {
+                  credentialSpan.recordException(
+                    error instanceof Error ? error : new Error(String(error)),
+                  );
+                  credentialSpan.setStatus({
+                    code: SpanStatusCode.ERROR,
+                    message: "credential resolution failed",
+                  });
+                  throw error;
+                } finally {
+                  credentialSpan.end();
+                }
+              },
+            );
+            resolvedCredentialValue = resolvedCredentialValueFromControlPlane;
+          } catch (error) {
+            logger.error(
+              {
+                err: error,
+                routeId,
+              },
+              "Failed to resolve integration credential from control-plane-api",
+            );
+            span.recordException(error instanceof Error ? error : new Error(String(error)));
+            span.setStatus({
+              code: SpanStatusCode.ERROR,
+              message: "credential resolution failed",
+            });
+            return ctx.json(
+              createErrorResponse({
+                code: "CREDENTIAL_RESOLUTION_FAILED",
+                message: "Failed to resolve integration credential.",
+              }),
+              502,
+            );
+          }
+        }
+
+        const upstreamUrl = createUpstreamUrl(ctx, routeMetadata.upstreamBaseUrl);
+        span.setAttributes(createUpstreamTelemetryAttributes({ upstreamUrl }));
+        const outgoingHeaders = buildOutgoingRequestHeaders(ctx);
+
+        applyAuthInjection({
+          upstreamUrl,
+          outgoingHeaders,
+          authInjectionType: routeMetadata.authInjectionType,
+          authInjectionTarget: routeMetadata.authInjectionTarget,
+          ...(routeMetadata.authInjectionUsername === undefined
+            ? {}
+            : { authInjectionUsername: routeMetadata.authInjectionUsername }),
+          secretValue: resolvedCredentialValue,
+        });
+
+        const outgoingBody = await readOutgoingRequestBody(ctx);
+
+        let upstreamResponse: Response;
+        try {
+          upstreamResponse = await EgressTracer.startActiveSpan(
+            "tokenizer_proxy.egress.fetch_upstream",
+            async (upstreamSpan) => {
+              upstreamSpan.setAttributes(createUpstreamTelemetryAttributes({ upstreamUrl }));
+              upstreamSpan.setAttribute("http.request.method", ctx.req.method);
+              try {
+                return await fetch(upstreamUrl, {
+                  method: ctx.req.method,
+                  headers: outgoingHeaders,
+                  ...(outgoingBody === undefined ? {} : { body: outgoingBody }),
+                });
+              } catch (error) {
+                upstreamSpan.recordException(
+                  error instanceof Error ? error : new Error(String(error)),
+                );
+                upstreamSpan.setStatus({
+                  code: SpanStatusCode.ERROR,
+                  message: "upstream request failed",
+                });
+                throw error;
+              } finally {
+                upstreamSpan.end();
+              }
+            },
+          );
+        } catch (error) {
+          logger.error(
+            {
+              err: error,
+              routeId,
+              upstreamBaseUrl: routeMetadata.upstreamBaseUrl,
+            },
+            "Failed to forward egress request to upstream",
+          );
+          span.recordException(error instanceof Error ? error : new Error(String(error)));
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: "upstream request failed",
+          });
+          return ctx.json(
+            createErrorResponse({
+              code: "UPSTREAM_REQUEST_FAILED",
+              message: "Failed to forward request to upstream.",
+            }),
+            502,
+          );
+        }
+
+        span.setAttribute("http.response.status_code", upstreamResponse.status);
+        return new Response(upstreamResponse.body, {
+          status: upstreamResponse.status,
+          headers: copyResponseHeaders(upstreamResponse.headers),
+        });
+      } finally {
+        span.end();
+      }
     });
   };
 }
