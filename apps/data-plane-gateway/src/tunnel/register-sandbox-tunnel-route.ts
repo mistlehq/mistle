@@ -15,7 +15,7 @@ import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { insertSandboxTunnelConnectAck } from "./connect-ack.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
-import type { TunnelPeerLocation, TunnelPeerSide } from "./types.js";
+import type { RelayPeerSide, RelayTarget } from "./types.js";
 
 const SandboxTunnelRoutePath = "/tunnel/sandbox/:instanceId";
 
@@ -118,7 +118,7 @@ function toForwardPayload(data: WSMessageReceive): string | ArrayBuffer | undefi
   return undefined;
 }
 
-function toSourcePeerSide(tokenKind: TokenKind): TunnelPeerSide {
+function toSourcePeerSide(tokenKind: TokenKind): RelayPeerSide {
   return tokenKind;
 }
 
@@ -216,33 +216,33 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
           throw new Error("Sandbox tunnel websocket request is missing instanceId path parameter.");
         }
 
-        const instanceId = requestedInstanceId.trim();
+        const sandboxInstanceId = requestedInstanceId.trim();
         const requestedToken = readRequestedTokenFromRequestUrl(new URL(ctx.req.url));
         if (requestedToken.kind !== "bootstrap" && requestedToken.kind !== "connection") {
           throw new Error("Expected validated sandbox tunnel websocket request token.");
         }
 
         const sourcePeerSide = toSourcePeerSide(requestedToken.kind);
-        let peerLocation: TunnelPeerLocation | undefined;
+        let relayTarget: RelayTarget | undefined;
 
         return {
           onOpen: (_event, ws) => {
-            peerLocation = input.relayCoordinator.attachPeer({
-              instanceId,
+            relayTarget = input.relayCoordinator.attachPeer({
+              sandboxInstanceId,
               side: sourcePeerSide,
               socket: ws,
             });
           },
           onMessage: (event, ws) => {
-            if (peerLocation === undefined) {
+            if (relayTarget === undefined) {
               ws.close(
                 CloseCodes.INTERNAL_ERROR,
-                "Sandbox tunnel peer location was not initialized for websocket connection.",
+                "Sandbox tunnel relay target was not initialized for websocket connection.",
               );
               return;
             }
 
-            if (!input.relayCoordinator.isCurrentPeer(peerLocation)) {
+            if (!input.relayCoordinator.isCurrentPeer(relayTarget)) {
               return;
             }
 
@@ -254,7 +254,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
 
             void input.relayCoordinator
               .forwardPeerMessage({
-                instanceId,
+                sandboxInstanceId,
                 fromSide: sourcePeerSide,
                 payload,
               })
@@ -262,7 +262,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 logger.error(
                   {
                     err: error,
-                    instanceId,
+                    instanceId: sandboxInstanceId,
                     sourceTokenKind: requestedToken.kind,
                   },
                   "Failed forwarding sandbox tunnel websocket message to peer",
@@ -274,10 +274,10 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               });
           },
           onClose: () => {
-            if (peerLocation === undefined) {
+            if (relayTarget === undefined) {
               return;
             }
-            input.relayCoordinator.detachPeer(peerLocation);
+            input.relayCoordinator.detachPeer(relayTarget);
           },
         };
       },

@@ -5,8 +5,8 @@ import { WSContext } from "hono/ws";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
-import type { TunnelPeerLocation, TunnelPeerSocket } from "../../types.js";
-import { InMemoryTunnelFrameTransportAdapter } from "./in-memory-frame-transport-adapter.js";
+import type { RelayPeerSocket, RelayTarget } from "../../types.js";
+import { InMemoryRelayTransportAdapter } from "./in-memory-relay-transport-adapter.js";
 
 type ReceivedWebSocketMessage = {
   data: string | Buffer;
@@ -16,7 +16,7 @@ type ReceivedWebSocketMessage = {
 type WebSocketPair = {
   clientSocket: WebSocket;
   serverSocket: WebSocket;
-  peerSocket: TunnelPeerSocket;
+  peerSocket: RelayPeerSocket;
   closeAll: () => Promise<void>;
 };
 
@@ -130,7 +130,7 @@ function toWsReadyState(input: number): 0 | 1 | 2 | 3 {
   throw new Error(`Unexpected websocket ready state: ${String(input)}`);
 }
 
-function toPeerSocket(socket: WebSocket): TunnelPeerSocket {
+function toPeerSocket(socket: WebSocket): RelayPeerSocket {
   return new WSContext<WebSocket>({
     send: (data, options) => {
       socket.send(data, {
@@ -148,13 +148,13 @@ function toPeerSocket(socket: WebSocket): TunnelPeerSocket {
 }
 
 function createPeerLocation(input: {
-  instanceId: string;
-  side: TunnelPeerLocation["side"];
+  sandboxInstanceId: string;
+  side: RelayTarget["side"];
   nodeId: string;
   sessionId: string;
-}): TunnelPeerLocation {
+}): RelayTarget {
   return {
-    instanceId: input.instanceId,
+    sandboxInstanceId: input.sandboxInstanceId,
     side: input.side,
     nodeId: input.nodeId,
     sessionId: input.sessionId,
@@ -237,7 +237,7 @@ async function createWebSocketPair(): Promise<WebSocketPair> {
   };
 }
 
-describe("InMemoryTunnelFrameTransportAdapter", () => {
+describe("InMemoryRelayTransportAdapter", () => {
   const openPairs: WebSocketPair[] = [];
 
   afterEach(async () => {
@@ -247,16 +247,16 @@ describe("InMemoryTunnelFrameTransportAdapter", () => {
   it("forwards text payloads to the registered local peer socket", async () => {
     const pair = await createWebSocketPair();
     openPairs.push(pair);
-    const adapter = new InMemoryTunnelFrameTransportAdapter("dpg_local");
+    const adapter = new InMemoryRelayTransportAdapter("dpg_local");
     const target = createPeerLocation({
-      instanceId: "sbi_abc",
+      sandboxInstanceId: "sbi_abc",
       side: "connection",
       nodeId: "dpg_local",
       sessionId: "session_one",
     });
 
     adapter.registerLocalPeer({
-      location: target,
+      target,
       socket: pair.peerSocket,
     });
 
@@ -274,9 +274,9 @@ describe("InMemoryTunnelFrameTransportAdapter", () => {
   it("forwards binary payloads to the registered local peer socket", async () => {
     const pair = await createWebSocketPair();
     openPairs.push(pair);
-    const adapter = new InMemoryTunnelFrameTransportAdapter("dpg_local");
+    const adapter = new InMemoryRelayTransportAdapter("dpg_local");
     const target = createPeerLocation({
-      instanceId: "sbi_abc",
+      sandboxInstanceId: "sbi_abc",
       side: "connection",
       nodeId: "dpg_local",
       sessionId: "session_one",
@@ -284,7 +284,7 @@ describe("InMemoryTunnelFrameTransportAdapter", () => {
     const payload = Uint8Array.from([1, 2, 3]).buffer;
 
     adapter.registerLocalPeer({
-      location: target,
+      target,
       socket: pair.peerSocket,
     });
 
@@ -306,20 +306,20 @@ describe("InMemoryTunnelFrameTransportAdapter", () => {
   it("does not forward payloads after local peer is unregistered", async () => {
     const pair = await createWebSocketPair();
     openPairs.push(pair);
-    const adapter = new InMemoryTunnelFrameTransportAdapter("dpg_local");
+    const adapter = new InMemoryRelayTransportAdapter("dpg_local");
     const target = createPeerLocation({
-      instanceId: "sbi_abc",
+      sandboxInstanceId: "sbi_abc",
       side: "connection",
       nodeId: "dpg_local",
       sessionId: "session_one",
     });
 
     adapter.registerLocalPeer({
-      location: target,
+      target,
       socket: pair.peerSocket,
     });
     adapter.unregisterLocalPeer({
-      location: target,
+      target,
     });
 
     await adapter.forwardToPeer({
@@ -332,16 +332,16 @@ describe("InMemoryTunnelFrameTransportAdapter", () => {
   it("closes the local peer socket with the requested code and reason", async () => {
     const pair = await createWebSocketPair();
     openPairs.push(pair);
-    const adapter = new InMemoryTunnelFrameTransportAdapter("dpg_local");
+    const adapter = new InMemoryRelayTransportAdapter("dpg_local");
     const target = createPeerLocation({
-      instanceId: "sbi_abc",
+      sandboxInstanceId: "sbi_abc",
       side: "connection",
       nodeId: "dpg_local",
       sessionId: "session_one",
     });
 
     adapter.registerLocalPeer({
-      location: target,
+      target,
       socket: pair.peerSocket,
     });
 
@@ -360,9 +360,9 @@ describe("InMemoryTunnelFrameTransportAdapter", () => {
   it("throws when registering a peer for a different gateway node", async () => {
     const pair = await createWebSocketPair();
     openPairs.push(pair);
-    const adapter = new InMemoryTunnelFrameTransportAdapter("dpg_local");
+    const adapter = new InMemoryRelayTransportAdapter("dpg_local");
     const nonLocalTarget = createPeerLocation({
-      instanceId: "sbi_abc",
+      sandboxInstanceId: "sbi_abc",
       side: "connection",
       nodeId: "dpg_other",
       sessionId: "session_one",
@@ -370,16 +370,16 @@ describe("InMemoryTunnelFrameTransportAdapter", () => {
 
     expect(() =>
       adapter.registerLocalPeer({
-        location: nonLocalTarget,
+        target: nonLocalTarget,
         socket: pair.peerSocket,
       }),
     ).toThrow("Expected local peer registration to target current gateway node.");
   });
 
   it("throws when forwarding to a peer that belongs to a different gateway node", async () => {
-    const adapter = new InMemoryTunnelFrameTransportAdapter("dpg_local");
+    const adapter = new InMemoryRelayTransportAdapter("dpg_local");
     const nonLocalTarget = createPeerLocation({
-      instanceId: "sbi_abc",
+      sandboxInstanceId: "sbi_abc",
       side: "connection",
       nodeId: "dpg_other",
       sessionId: "session_one",
