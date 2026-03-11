@@ -1,5 +1,3 @@
-import { typeid } from "typeid-js";
-
 import { LocalPeerRegistry } from "./local-peer-registry/index.js";
 import { RelayTransport } from "./relay-transport/index.js";
 import type {
@@ -46,13 +44,13 @@ export class TunnelRelayCoordinator {
     sandboxInstanceId: string;
     side: RelayPeerSide;
     socket: RelayPeerSocket;
-    sessionId?: string;
+    sessionId: string;
   }): RelayTarget {
     const target: RelayTarget = {
       sandboxInstanceId: input.sandboxInstanceId,
       side: input.side,
       nodeId: this.nodeId,
-      sessionId: input.sessionId ?? typeid("dts").toString(),
+      sessionId: input.sessionId,
     };
 
     this.relayTransport.registerLocalPeer({

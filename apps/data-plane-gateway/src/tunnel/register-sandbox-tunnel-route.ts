@@ -269,11 +269,16 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
           requestedToken.kind === "bootstrap" ? ctx.get("sandboxRelaySessionId") : undefined;
         const bootstrapOwnerLeaseId =
           requestedToken.kind === "bootstrap" ? ctx.get("sandboxOwnerLeaseId") : undefined;
+        const connectionRelaySessionId =
+          requestedToken.kind === "connection" ? typeid("dts").toString() : undefined;
         if (requestedToken.kind === "bootstrap" && bootstrapRelaySessionId === undefined) {
           throw new Error("Expected sandbox relay session id for bootstrap websocket request.");
         }
         if (requestedToken.kind === "bootstrap" && bootstrapOwnerLeaseId === undefined) {
           throw new Error("Expected sandbox owner lease id for bootstrap websocket request.");
+        }
+        if (requestedToken.kind === "connection" && connectionRelaySessionId === undefined) {
+          throw new Error("Expected sandbox relay session id for connection websocket request.");
         }
         let relayTarget: RelayTarget | undefined;
 
@@ -282,7 +287,10 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             relayTarget = input.relayCoordinator.attachPeer({
               sandboxInstanceId,
               side: sourcePeerSide,
-              sessionId: bootstrapRelaySessionId,
+              sessionId:
+                requestedToken.kind === "bootstrap"
+                  ? bootstrapRelaySessionId
+                  : connectionRelaySessionId,
               socket: ws,
             });
           },
