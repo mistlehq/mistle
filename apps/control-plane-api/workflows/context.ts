@@ -5,11 +5,19 @@ import {
 } from "@mistle/data-plane-trpc/client";
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { SMTPEmailSender } from "@mistle/emails";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import {
+  createControlPlaneBackend,
+  createControlPlaneOpenWorkflow,
+} from "@mistle/workflows/control-plane";
 import { Pool } from "pg";
 
 export type WorkflowContext = {
   db: ControlPlaneDatabase;
   dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "startSandboxInstance">;
+  integrationRegistry: IntegrationRegistry;
+  openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
   email: {
     from: {
       email: string;
@@ -26,7 +34,7 @@ export function getWorkflowContext(): Promise<WorkflowContext> {
     return workflowContextPromise;
   }
 
-  workflowContextPromise = Promise.resolve().then(() => {
+  workflowContextPromise = Promise.resolve().then(async () => {
     const apiConfig = loadConfig({
       app: AppIds.CONTROL_PLANE_API,
       env: process.env,
@@ -44,12 +52,21 @@ export function getWorkflowContext(): Promise<WorkflowContext> {
     const dbPool = new Pool({
       connectionString: apiConfig.app.database.url,
     });
+    const workflowBackendPromise = createControlPlaneBackend({
+      url: apiConfig.app.workflow.databaseUrl,
+      namespaceId: apiConfig.app.workflow.namespaceId,
+      runMigrations: false,
+    });
 
     return {
       db: createControlPlaneDatabase(dbPool),
       dataPlaneClient: createDataPlaneSandboxInstancesClient({
         baseUrl: apiConfig.app.dataPlaneApi.baseUrl,
         serviceToken: apiConfig.global.internalAuth.serviceToken,
+      }),
+      integrationRegistry: createIntegrationRegistry(),
+      openWorkflow: createControlPlaneOpenWorkflow({
+        backend: await workflowBackendPromise,
       }),
       email: {
         from: {
