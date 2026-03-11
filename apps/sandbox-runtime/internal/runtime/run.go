@@ -222,9 +222,19 @@ func Run(input RunInput) (runErr error) {
 		tracingHandle.Tracer(),
 		"sandbox.runtime.new_proxy_handler",
 		func(context.Context) (http.Handler, error) {
+			proxyMediator, proxyMediatorErr := egress.NewProxyMediator(egress.NewProxyMediatorInput{
+				RuntimePlan:                 startupInput.RuntimePlan,
+				TokenizerProxyEgressBaseURL: cfg.TokenizerProxyEgressBaseURL,
+				HTTPClient:                  egressHTTPClient,
+			})
+			if proxyMediatorErr != nil {
+				return nil, proxyMediatorErr
+			}
+
 			return proxy.NewHandler(proxy.NewHandlerInput{
 				HTTPClient:           telemetry.NewHTTPClient(directHTTPClient),
 				CertificateAuthority: proxyCertificateAuthority,
+				IntegrationMediator:  proxyMediator,
 			})
 		},
 	)
