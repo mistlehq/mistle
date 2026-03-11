@@ -22,7 +22,7 @@ func TestLoadConfig(t *testing.T) {
 		config, err := LoadConfig(func(key string) (string, bool) {
 			switch key {
 			case SandboxUserEnv:
-				return " sandbox-user ", true
+				return " sandbox ", true
 			case ProxyCACertPathEnv:
 				return " /run/mistle/proxy-ca/ca.crt ", true
 			default:
@@ -32,7 +32,7 @@ func TestLoadConfig(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected no error, got %v", err)
 		}
-		if config.SandboxUser != "sandbox-user" {
+		if config.SandboxUser != DefaultSandboxUser {
 			t.Fatalf("expected trimmed sandbox user, got %q", config.SandboxUser)
 		}
 		if config.ProxyCACertPath != "/run/mistle/proxy-ca/ca.crt" {
@@ -49,6 +49,18 @@ func TestLoadConfig(t *testing.T) {
 		})
 		if err == nil {
 			t.Fatal("expected error for empty sandbox user")
+		}
+	})
+
+	t.Run("rejects a non-default sandbox user override", func(t *testing.T) {
+		_, err := LoadConfig(func(key string) (string, bool) {
+			if key == SandboxUserEnv {
+				return "root", true
+			}
+			return "", false
+		})
+		if err == nil {
+			t.Fatal("expected error for non-default sandbox user")
 		}
 	})
 

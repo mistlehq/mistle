@@ -27,6 +27,13 @@ func LoadConfig(lookupEnv func(string) (string, bool)) (Config, error) {
 		if trimmedSandboxUser == "" {
 			return Config{}, fmt.Errorf("%s must not be empty when set", SandboxUserEnv)
 		}
+		if trimmedSandboxUser != DefaultSandboxUser {
+			return Config{}, fmt.Errorf(
+				"%s is reserved and must be %q",
+				SandboxUserEnv,
+				DefaultSandboxUser,
+			)
+		}
 		sandboxUser = trimmedSandboxUser
 	}
 
