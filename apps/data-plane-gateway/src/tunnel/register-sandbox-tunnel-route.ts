@@ -14,11 +14,7 @@ import type { WSMessageReceive } from "hono/ws";
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { insertSandboxTunnelConnectAck } from "./connect-ack.js";
-import { InMemoryTunnelFrameTransportAdapter } from "./frame-transport/adapters/in-memory-frame-transport-adapter.js";
-import { TunnelFrameTransport } from "./frame-transport/index.js";
-import { InMemoryTunnelPeerRegistryAdapter } from "./peer-registry/adapters/in-memory-peer-registry-adapter.js";
-import { TunnelPeerRegistry } from "./peer-registry/index.js";
-import { TunnelRelayCoordinator } from "./relay-coordinator.js";
+import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
 import type { TunnelPeerLocation, TunnelPeerSide } from "./types.js";
 
 const SandboxTunnelRoutePath = "/tunnel/sandbox/:instanceId";
@@ -28,7 +24,7 @@ type RegisterSandboxTunnelRouteInput = {
   upgradeWebSocket: NodeWebSocket["upgradeWebSocket"];
   bootstrapTokenConfig: BootstrapTokenConfig;
   connectionTokenConfig: ConnectionTokenConfig;
-  nodeId: string;
+  relayCoordinator: TunnelRelayCoordinator;
 };
 
 type TokenKind = "bootstrap" | "connection";
@@ -127,12 +123,6 @@ function toSourcePeerSide(tokenKind: TokenKind): TunnelPeerSide {
 }
 
 export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInput): void {
-  const peerRegistryAdapter = new InMemoryTunnelPeerRegistryAdapter();
-  const peerRegistry = new TunnelPeerRegistry(peerRegistryAdapter);
-  const frameTransportAdapter = new InMemoryTunnelFrameTransportAdapter(input.nodeId);
-  const frameTransport = new TunnelFrameTransport(frameTransportAdapter);
-  const relayCoordinator = new TunnelRelayCoordinator(input.nodeId, peerRegistry, frameTransport);
-
   input.app.get(
     SandboxTunnelRoutePath,
     async (ctx, next) => {
@@ -237,7 +227,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
 
         return {
           onOpen: (_event, ws) => {
-            peerLocation = relayCoordinator.attachPeer({
+            peerLocation = input.relayCoordinator.attachPeer({
               instanceId,
               side: sourcePeerSide,
               socket: ws,
@@ -252,7 +242,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               return;
             }
 
-            if (!relayCoordinator.isCurrentPeer(peerLocation)) {
+            if (!input.relayCoordinator.isCurrentPeer(peerLocation)) {
               return;
             }
 
@@ -262,7 +252,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               return;
             }
 
-            void relayCoordinator
+            void input.relayCoordinator
               .forwardPeerMessage({
                 instanceId,
                 fromSide: sourcePeerSide,
@@ -287,7 +277,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             if (peerLocation === undefined) {
               return;
             }
-            relayCoordinator.detachPeer(peerLocation);
+            input.relayCoordinator.detachPeer(peerLocation);
           },
         };
       },
