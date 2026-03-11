@@ -196,6 +196,16 @@ describe("sandbox tunnel connect endpoint integration", () => {
     "rejects reconnect attempts that reuse an acknowledged connection token",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
       const jti = randomUUID();
       const token = await mintConnectionToken({
         config: {
@@ -207,6 +217,9 @@ describe("sandbox tunnel connect endpoint integration", () => {
         sandboxInstanceId,
         ttlSeconds: 120,
       });
+      const bootstrapSocket = await connectWebSocket(
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+      );
       const socket = await connectWebSocket(
         `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(token)}`,
       );
@@ -222,6 +235,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
       expect(failedConnect.error).toBeInstanceOf(Error);
       expect(failedConnect.responseStatusCode).toBe(409);
       expect(recordedAcks).toHaveLength(1);
+      await closeWebSocket(bootstrapSocket);
     },
     IntegrationTestTimeoutMs,
   );
