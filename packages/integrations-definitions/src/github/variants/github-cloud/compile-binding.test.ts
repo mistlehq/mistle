@@ -1,3 +1,4 @@
+import type { RuntimeArtifactCommand, RuntimeArtifactSpec } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { compileGitHubCloudBinding } from "./compile-binding.js";
@@ -6,8 +7,65 @@ function artifactBinPath(name: string): string {
   return `/workspace/.mistle/bin/${name}`;
 }
 
+function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
+  install: ReadonlyArray<RuntimeArtifactCommand>;
+  update?: ReadonlyArray<RuntimeArtifactCommand>;
+  remove: ReadonlyArray<RuntimeArtifactCommand>;
+} {
+  const refs = {
+    command: {
+      exec(input: RuntimeArtifactCommand): RuntimeArtifactCommand {
+        return input;
+      },
+    },
+    artifactBinPath,
+    mise: {
+      install(input: { tools: ReadonlyArray<string>; force?: boolean; timeoutMs?: number }) {
+        return {
+          args: ["mise", "install", ...input.tools],
+        };
+      },
+    },
+    githubReleases: {
+      installLatestBinary() {
+        return {
+          args: ["github-releases.installLatestBinary"],
+        };
+      },
+    },
+    compileContext: {
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      version: 1,
+      targetKey: "github_cloud",
+      bindingId: "ibd_123",
+    },
+  };
+
+  const install =
+    typeof artifact.lifecycle.install === "function"
+      ? artifact.lifecycle.install({ refs })
+      : artifact.lifecycle.install;
+  const update =
+    artifact.lifecycle.update === undefined
+      ? undefined
+      : typeof artifact.lifecycle.update === "function"
+        ? artifact.lifecycle.update({ refs })
+        : artifact.lifecycle.update;
+  const remove =
+    typeof artifact.lifecycle.remove === "function"
+      ? artifact.lifecycle.remove({ refs })
+      : artifact.lifecycle.remove;
+
+  return {
+    install,
+    ...(update === undefined ? {} : { update }),
+    remove,
+  };
+}
+
 describe("compileGitHubCloudBinding", () => {
-  it("builds expected repo-scoped egress routes and workspace sources", () => {
+  it("builds expected github egress routes, gh artifact, and workspace sources", () => {
     const compiled = compileGitHubCloudBinding({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
@@ -65,7 +123,7 @@ describe("compileGitHubCloudBinding", () => {
       {
         match: {
           hosts: ["api.github.com"],
-          pathPrefixes: ["/repos/acme/repo-a", "/repos/acme/repo-b"],
+          pathPrefixes: ["/"],
           methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
         },
         upstream: {
@@ -80,9 +138,63 @@ describe("compileGitHubCloudBinding", () => {
           secretType: "api_key",
         },
       },
+      {
+        match: {
+          hosts: ["uploads.github.com"],
+          pathPrefixes: ["/"],
+          methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+        },
+        upstream: {
+          baseUrl: "https://uploads.github.com",
+        },
+        authInjection: {
+          type: "bearer",
+          target: "authorization",
+        },
+        credentialResolver: {
+          connectionId: "icn_123",
+          secretType: "api_key",
+        },
+      },
     ]);
 
-    expect(compiled.artifacts).toEqual([]);
+    expect(compiled.artifacts).toHaveLength(1);
+    const artifact = compiled.artifacts[0];
+    expect(artifact?.artifactKey).toBe("gh-cli");
+    expect(artifact?.name).toBe("GitHub CLI");
+    expect(artifact?.env).toEqual({
+      GH_TOKEN: "dummy-value",
+    });
+    if (artifact === undefined) {
+      throw new Error("Expected compiled gh artifact.");
+    }
+    expect(resolveArtifactLifecycleCommands(artifact)).toEqual({
+      install: [
+        {
+          args: [
+            "sh",
+            "-euc",
+            expect.stringContaining("https://github.com/cli/cli/releases/latest"),
+          ],
+          timeoutMs: 120_000,
+        },
+      ],
+      update: [
+        {
+          args: [
+            "sh",
+            "-euc",
+            expect.stringContaining("https://github.com/cli/cli/releases/latest"),
+          ],
+          timeoutMs: 120_000,
+        },
+      ],
+      remove: [
+        {
+          args: ["rm", "-f", "/workspace/.mistle/bin/gh"],
+        },
+      ],
+    });
     expect(compiled.runtimeClients).toEqual([]);
     expect(compiled.workspaceSources).toEqual([
       {
@@ -138,8 +250,10 @@ describe("compileGitHubCloudBinding", () => {
     expect(compiled.egressRoutes[0]?.match.hosts).toEqual(["proxy.example.com"]);
     expect(compiled.egressRoutes[0]?.match.pathPrefixes).toEqual(["/github/acme/repo.git"]);
     expect(compiled.egressRoutes[1]?.match.pathPrefixes).toEqual([
-      "/github/api/v3/repos/acme/repo",
+      "/github/api/v3",
+      "/github/api/graphql",
     ]);
+    expect(compiled.egressRoutes).toHaveLength(2);
     expect(compiled.workspaceSources).toEqual([
       {
         sourceKind: "git-clone",
@@ -186,7 +300,7 @@ describe("compileGitHubCloudBinding", () => {
     });
 
     expect(compiled.egressRoutes[0]?.match.pathPrefixes).toEqual(["/acme/repo.git"]);
-    expect(compiled.egressRoutes[1]?.match.pathPrefixes).toEqual(["/repos/acme/repo"]);
+    expect(compiled.egressRoutes[1]?.match.pathPrefixes).toEqual(["/"]);
   });
 
   it("uses oauth access token secret type for github app-style oauth connections", () => {
@@ -231,6 +345,10 @@ describe("compileGitHubCloudBinding", () => {
     );
     expect(compiled.egressRoutes[1]?.credentialResolver.secretType).toBe("oauth_access_token");
     expect(compiled.egressRoutes[1]?.credentialResolver.resolverKey).toBe(
+      "github_app_installation_token",
+    );
+    expect(compiled.egressRoutes[2]?.credentialResolver.secretType).toBe("oauth_access_token");
+    expect(compiled.egressRoutes[2]?.credentialResolver.resolverKey).toBe(
       "github_app_installation_token",
     );
   });

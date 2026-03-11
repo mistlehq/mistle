@@ -2,6 +2,7 @@ import {
   joinRoutePathPrefixes,
   resolveRoutePathPrefixFromBaseUrl,
   IntegrationSupportedAuthSchemes,
+  type RuntimeArtifactCommand,
   type CompileBindingInput,
   type CompileBindingResult,
 } from "@mistle/integrations-core";
@@ -16,6 +17,55 @@ export type GitHubCompileBindingInput = CompileBindingInput<
   GitHubTargetConfig,
   GitHubBindingConfig
 >;
+type GitHubCompiledRoute = CompileBindingResult["egressRoutes"][number];
+
+const GitHubCliArtifactKey = "gh-cli";
+const GitHubCliArtifactName = "GitHub CLI";
+const GitHubCliArtifactEnv = {
+  GH_TOKEN: "dummy-value",
+};
+const GitHubCliRepository = "cli/cli";
+const ArtifactCommandTimeoutMs = 120_000;
+
+function renderInstallGitHubCliScript(installPath: string): string {
+  return [
+    'arch="$(uname -m)"',
+    'case "$arch" in',
+    "  x86_64)",
+    '    asset_suffix="linux_amd64"',
+    "    ;;",
+    "  aarch64|arm64)",
+    '    asset_suffix="linux_arm64"',
+    "    ;;",
+    "  *)",
+    '    echo "Unsupported architecture: $arch" >&2',
+    "    exit 1",
+    "    ;;",
+    "esac",
+    "",
+    `release_url="$(curl -fsSIL -o /dev/null -w '%{url_effective}' https://github.com/${GitHubCliRepository}/releases/latest)"`,
+    'tag_name="${release_url##*/}"',
+    'version="${tag_name#v}"',
+    'asset_name="gh_${version}_${asset_suffix}.tar.gz"',
+    'archive_root="gh_${version}_${asset_suffix}"',
+    `download_url="https://github.com/${GitHubCliRepository}/releases/download/\${tag_name}/\${asset_name}"`,
+    `install_path=${JSON.stringify(installPath)}`,
+    "",
+    'temp_dir="$(mktemp -d)"',
+    "trap 'rm -rf \"$temp_dir\"' EXIT",
+    "",
+    'curl -fsSL "$download_url" -o "$temp_dir/gh.tar.gz"',
+    'tar -xzf "$temp_dir/gh.tar.gz" -C "$temp_dir"',
+    'install -m 0755 "$temp_dir/$archive_root/bin/gh" "$install_path"',
+  ].join("\n");
+}
+
+function buildGitHubCliLifecycleCommand(input: { installPath: string }): RuntimeArtifactCommand {
+  return {
+    args: ["sh", "-euc", renderInstallGitHubCliScript(input.installPath)],
+    timeoutMs: ArtifactCommandTimeoutMs,
+  };
+}
 
 /**
  * Builds the canonical HTTPS origin that should remain visible inside the
@@ -35,6 +85,52 @@ function toRepositoryCloneOriginUrl(input: { webBaseUrl: string; repository: str
 
 function toRepositoryWorkspacePath(repository: string): string {
   return `/workspace/repos/${repository}`;
+}
+
+function resolveGitHubApiPathPrefixes(apiBaseUrl: string): ReadonlyArray<string> {
+  const apiPathPrefix = resolveRoutePathPrefixFromBaseUrl(apiBaseUrl);
+
+  if (!apiPathPrefix.endsWith("/v3")) {
+    return [apiPathPrefix];
+  }
+
+  return [apiPathPrefix, apiPathPrefix.replace(/\/v3$/, "/graphql")];
+}
+
+function resolveGitHubUploadRouteHost(input: GitHubCompileBindingInput): string | undefined {
+  if (input.target.variantId !== "github-cloud") {
+    return undefined;
+  }
+
+  const webHost = new URL(input.target.config.webBaseUrl).host;
+  const apiHost = new URL(input.target.config.apiBaseUrl).host;
+
+  if (webHost !== "github.com" || apiHost !== "api.github.com") {
+    return undefined;
+  }
+
+  return "uploads.github.com";
+}
+
+function buildGitHubUploadRoute(input: {
+  host: string;
+  credentialResolver: GitHubCompiledRoute["credentialResolver"];
+}): GitHubCompiledRoute {
+  return {
+    match: {
+      hosts: [input.host],
+      pathPrefixes: ["/"],
+      methods: GitHubApiMethods,
+    },
+    upstream: {
+      baseUrl: "https://uploads.github.com",
+    },
+    authInjection: {
+      type: "bearer",
+      target: "authorization",
+    },
+    credentialResolver: input.credentialResolver,
+  };
 }
 
 /**
@@ -60,12 +156,10 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
   const gitRouteHost = new URL(input.target.config.webBaseUrl).host;
   const gitPathPrefix = resolveRoutePathPrefixFromBaseUrl(input.target.config.webBaseUrl);
   const apiRouteHost = new URL(input.target.config.apiBaseUrl).host;
-  const apiPathPrefix = resolveRoutePathPrefixFromBaseUrl(input.target.config.apiBaseUrl);
+  const apiPathPrefixes = resolveGitHubApiPathPrefixes(input.target.config.apiBaseUrl);
+  const uploadRouteHost = resolveGitHubUploadRouteHost(input);
   const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(input.connection.config);
   const credentialSecretType = resolveGitHubCredentialSecretType(input.connection.config);
-  const apiRepositoryPathPrefixes = repositories.map((repository) =>
-    joinRoutePathPrefixes(apiPathPrefix, `/repos/${repository}`),
-  );
   const gitRepositoryPathPrefixes = repositories.map((repository) =>
     joinRoutePathPrefixes(gitPathPrefix, `/${repository}.git`),
   );
@@ -100,7 +194,7 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
       {
         match: {
           hosts: [apiRouteHost],
-          pathPrefixes: apiRepositoryPathPrefixes,
+          pathPrefixes: apiPathPrefixes,
           methods: GitHubApiMethods,
         },
         upstream: {
@@ -112,8 +206,39 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
         },
         credentialResolver,
       },
+      ...(uploadRouteHost === undefined
+        ? []
+        : [
+            buildGitHubUploadRoute({
+              host: uploadRouteHost,
+              credentialResolver,
+            }),
+          ]),
     ],
-    artifacts: [],
+    artifacts: [
+      {
+        artifactKey: GitHubCliArtifactKey,
+        name: GitHubCliArtifactName,
+        env: GitHubCliArtifactEnv,
+        lifecycle: {
+          install: ({ refs }) => [
+            buildGitHubCliLifecycleCommand({
+              installPath: refs.artifactBinPath("gh"),
+            }),
+          ],
+          update: ({ refs }) => [
+            buildGitHubCliLifecycleCommand({
+              installPath: refs.artifactBinPath("gh"),
+            }),
+          ],
+          remove: ({ refs }) => [
+            refs.command.exec({
+              args: ["rm", "-f", refs.artifactBinPath("gh")],
+            }),
+          ],
+        },
+      },
+    ],
     runtimeClients: [],
     workspaceSources: repositories.map((repository) => ({
       sourceKind: "git-clone",
