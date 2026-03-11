@@ -19,9 +19,7 @@ export type GitHubCompileBindingInput = CompileBindingInput<
 
 /**
  * Builds the canonical HTTPS origin that should remain visible inside the
- * cloned repository after startup. Startup traffic initially goes through the
- * sandbox route URL, but git config is rewritten back to this URL so users keep
- * working with normal GitHub remotes.
+ * cloned repository after startup.
  */
 function toRepositoryCloneOriginUrl(input: { webBaseUrl: string; repository: string }): string {
   const parsedBaseUrl = new URL(input.webBaseUrl);
@@ -43,8 +41,8 @@ function toRepositoryWorkspacePath(repository: string): string {
  * Compiles GitHub repository selections into one API route, one HTTPS Git route,
  * and one workspace source per selected repository. The Git route uses Basic
  * auth with the fixed username GitHub expects for installation-token Git
- * access, while workspace sources point startup at the same route so initial
- * clone and later in-sandbox git commands share one auth path.
+ * access, and startup clones canonical origins directly through the sandbox
+ * outbound proxy.
  */
 export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileBindingResult {
   const repositories = [...new Set(input.binding.config.repositories)].sort((left, right) =>
@@ -125,7 +123,6 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
         webBaseUrl: input.target.config.webBaseUrl,
         repository,
       }),
-      routeId: input.refs.egressUrl,
     })),
   };
 }

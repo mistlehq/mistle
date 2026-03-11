@@ -37,7 +37,7 @@ describe("workflow run input env keys regression integration", () => {
     const expectedInput: WorkflowRunEnvKeyRegressionInput = {
       env: {
         OPENAI_MODEL: "gpt-5.3-codex",
-        OPENAI_BASE_URL: "http://127.0.0.1:8090/egress/routes/route_123",
+        OPENAI_BASE_URL: "https://api.openai.com/v1",
         OPENAI_REASONING_EFFORT: "medium",
       },
     };

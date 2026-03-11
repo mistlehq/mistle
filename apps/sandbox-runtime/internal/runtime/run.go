@@ -140,20 +140,6 @@ func Run(input RunInput) (runErr error) {
 		return err
 	}
 
-	sandboxdLoopbackEgressBaseURL, err := traceStepWithValue(
-		runContext,
-		tracingHandle.Tracer(),
-		"sandbox.runtime.resolve_loopback_egress_base_url",
-		func(context.Context) (string, error) {
-			return resolveLoopbackEgressBaseURL(cfg.ListenAddr)
-		},
-	)
-	if err != nil {
-		runSpan.RecordError(err)
-		runSpan.SetStatus(codes.Error, err.Error())
-		return err
-	}
-
 	listener, err := traceStepWithValue(
 		runContext,
 		tracingHandle.Tracer(),
@@ -274,8 +260,7 @@ func Run(input RunInput) (runErr error) {
 
 	err = traceStep(runContext, tracingHandle.Tracer(), "sandbox.runtime.apply_runtime_plan", func(context.Context) error {
 		return runtimeplan.Apply(runtimeplan.ApplyInput{
-			RuntimePlan:           startupInput.RuntimePlan,
-			SandboxdEgressBaseURL: sandboxdLoopbackEgressBaseURL,
+			RuntimePlan: startupInput.RuntimePlan,
 		})
 	})
 	if err != nil {

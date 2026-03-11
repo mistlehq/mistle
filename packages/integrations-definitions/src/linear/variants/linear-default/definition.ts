@@ -33,11 +33,11 @@ export const LinearDefinition: LinearIntegrationDefinition = {
   connectionConfigSchema: LinearConnectionConfigSchema,
   connectionConfigForm: LinearConnectionConfigForm,
   supportedAuthSchemes: LinearSupportedAuthSchemes,
-  mcp: (input) => ({
+  mcp: () => ({
     serverId: "linear-default",
     serverName: "linear",
     transport: IntegrationMcpTransports.STREAMABLE_HTTP,
-    url: input.refs.egressUrl,
+    url: "https://mcp.linear.app/mcp",
     description: "Linear MCP",
   }),
   compileBinding: compileLinearBinding,

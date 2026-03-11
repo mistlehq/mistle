@@ -207,7 +207,6 @@ const CompiledWorkspaceSourceSchema = z.discriminatedUnion("sourceKind", [
       resourceKind: z.literal("repository"),
       path: z.string().min(1),
       originUrl: z.url(),
-      routeId: z.string().min(1),
     })
     .strict(),
 ]);
@@ -384,7 +383,6 @@ function normalizeWorkspaceSource(
     resourceKind: workspaceSource.resourceKind,
     path: workspaceSource.path,
     originUrl: workspaceSource.originUrl,
-    routeId: workspaceSource.routeId,
   };
 }
 

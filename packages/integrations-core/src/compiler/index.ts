@@ -1,14 +1,12 @@
 import { quote } from "shell-quote";
 
 import { runDefinitionBindingWriteValidation } from "../binding-validation/index.js";
-import { EgressUrlRefErrorCodes, resolveEgressUrlRef } from "../egress-url/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { applyMcpConfigToRuntimeClients } from "../mcp-config/index.js";
 import { assembleCompiledRuntimePlan } from "../runtime-plan/index.js";
 import {
   type AnyIntegrationDefinition,
   type CompileBindingInput,
-  egressUrlRef,
   IntegrationConnectionStatuses,
   IntegrationMcpTransports,
   type CompileRuntimePlanBindingInput,
@@ -238,28 +236,12 @@ function resolveRuntimeArtifacts(input: {
   });
 }
 
-function resolveMcpValue(input: {
-  value: IntegrationMcpValue;
-  routeIds: ReadonlySet<string>;
-  egressBaseUrl: string;
-}): string {
-  if (typeof input.value === "string") {
-    return input.value;
-  }
-
-  return resolveEgressUrlRef({
-    value: input.value,
-    routeIds: input.routeIds,
-    egressBaseUrl: input.egressBaseUrl,
-    invalidRefCode: EgressUrlRefErrorCodes.MCP_INVALID_REF,
-    refOwner: "MCP server",
-  });
+function resolveMcpValue(input: { value: IntegrationMcpValue }): string {
+  return input.value;
 }
 
 function resolveMcpRecord(input: {
   value: Readonly<Record<string, IntegrationMcpValue>> | undefined;
-  routeIds: ReadonlySet<string>;
-  egressBaseUrl: string;
 }): Readonly<Record<string, string>> | undefined {
   if (input.value === undefined) {
     return undefined;
@@ -270,8 +252,6 @@ function resolveMcpRecord(input: {
   for (const [key, value] of Object.entries(input.value)) {
     resolved[key] = resolveMcpValue({
       value,
-      routeIds: input.routeIds,
-      egressBaseUrl: input.egressBaseUrl,
     });
   }
 
@@ -341,16 +321,7 @@ type PreparedBindingContext = {
 
 function collectResolvedMcpServers(input: {
   preparedBindings: ReadonlyArray<PreparedBindingContext>;
-  egressBaseUrl: string;
 }): ReadonlyArray<ResolvedIntegrationMcpServer> {
-  const routeIds = new Set<string>();
-
-  for (const preparedBinding of input.preparedBindings) {
-    for (const route of preparedBinding.compiledBindingResult.egressRoutes) {
-      routeIds.add(route.routeId);
-    }
-  }
-
   const serverIds = new Set<string>();
   const serverNames = new Set<string>();
   const resolvedServers: ResolvedIntegrationMcpServer[] = [];
@@ -414,8 +385,6 @@ function collectResolvedMcpServers(input: {
       if (server.url !== undefined) {
         resolvedServer.url = resolveMcpValue({
           value: server.url,
-          routeIds,
-          egressBaseUrl: input.egressBaseUrl,
         });
       }
 
@@ -430,8 +399,6 @@ function collectResolvedMcpServers(input: {
       if (server.env !== undefined) {
         const resolvedEnv = resolveMcpRecord({
           value: server.env,
-          routeIds,
-          egressBaseUrl: input.egressBaseUrl,
         });
 
         if (resolvedEnv !== undefined) {
@@ -442,8 +409,6 @@ function collectResolvedMcpServers(input: {
       if (server.httpHeaders !== undefined) {
         const resolvedHttpHeaders = resolveMcpRecord({
           value: server.httpHeaders,
-          routeIds,
-          egressBaseUrl: input.egressBaseUrl,
         });
 
         if (resolvedHttpHeaders !== undefined) {
@@ -493,9 +458,6 @@ type CompileBindingsInput = {
   organizationId: string;
   sandboxProfileId: string;
   version: number;
-  runtimeContext: {
-    sandboxdEgressBaseUrl: string;
-  };
   registry: CompileRuntimePlanInput["registry"];
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
   enforceRuntimeEligibility: boolean;
@@ -615,10 +577,8 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         config: parsedBindingConfig,
       },
       refs: {
-        egressUrl: egressUrlRef(`route_${bindingInput.binding.id}`),
         artifactBinPath,
       },
-      runtimeContext: input.runtimeContext,
     };
 
     const compileBindingResult: CompileBindingResult =
@@ -642,13 +602,7 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         bindingId: bindingInput.binding.id,
       }),
       runtimeClients: compileBindingResult.runtimeClients,
-      // Workspace sources are authored against binding-local egress refs so
-      // integration definitions never have to guess compiled route IDs.
-      workspaceSources:
-        compileBindingResult.workspaceSources?.map((workspaceSource) => ({
-          ...workspaceSource,
-          routeId: workspaceSource.routeId.routeId,
-        })) ?? [],
+      workspaceSources: compileBindingResult.workspaceSources ?? [],
       agentRuntimes:
         compileBindingResult.agentRuntimes?.map((agentRuntime) => ({
           ...agentRuntime,
@@ -665,7 +619,6 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
 
   const resolvedMcpServers = collectResolvedMcpServers({
     preparedBindings,
-    egressBaseUrl: input.runtimeContext.sandboxdEgressBaseUrl,
   });
 
   return applyMcpMappings({
@@ -679,7 +632,6 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
     organizationId: input.organizationId,
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
-    runtimeContext: input.runtimeContext,
     registry: input.registry,
     bindings: input.bindings,
     enforceRuntimeEligibility: true,
@@ -696,7 +648,6 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
           organizationId: input.organizationId,
           sandboxProfileId: input.sandboxProfileId,
           version: input.version - 1,
-          runtimeContext: input.runtimeContext,
           registry: input.registry,
           bindings: input.previousBindings,
           enforceRuntimeEligibility: false,
@@ -706,7 +657,6 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     image: input.image,
-    runtimeContext: input.runtimeContext,
     compiledBindingResults,
     previousCompiledBindingResults,
   });

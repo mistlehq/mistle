@@ -30,7 +30,7 @@ function createCompileInput(input: {
   profileVersion: number;
 }): Pick<
   CompileSandboxRuntimePlanInput,
-  "organizationId" | "profileId" | "profileVersion" | "image" | "runtimeContext"
+  "organizationId" | "profileId" | "profileVersion" | "image"
 > {
   return {
     organizationId: input.organizationId,
@@ -39,9 +39,6 @@ function createCompileInput(input: {
     image: {
       source: "base",
       imageRef: "mistle/sandbox-base:dev",
-    },
-    runtimeContext: {
-      sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
     },
   };
 }
@@ -118,7 +115,7 @@ describe("compileSandboxRuntimePlan integration", () => {
     expect(runtimePlan.egressRoutes).toHaveLength(1);
     expect(runtimePlan.egressRoutes[0]?.routeId).toBe("route_ibd_srpc_compile_success");
     expect(runtimePlan.runtimeClients[0]?.setup.env.OPENAI_BASE_URL).toBe(
-      "http://sandboxd.internal/egress/routes/route_ibd_srpc_compile_success",
+      "https://api.openai.com/v1",
     );
   });
 

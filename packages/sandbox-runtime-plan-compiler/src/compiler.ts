@@ -44,9 +44,6 @@ export type CompileSandboxRuntimePlanInput = {
   profileId: string;
   profileVersion: number;
   image: ResolvedSandboxImage;
-  runtimeContext: {
-    sandboxdEgressBaseUrl: string;
-  };
 };
 
 function mapCompilerErrorCodeToSandboxRuntimePlanCompilerErrorCode(
@@ -289,7 +286,6 @@ export async function compileSandboxRuntimePlan(
       sandboxProfileId: input.profileId,
       version: input.profileVersion,
       image: input.image,
-      runtimeContext: input.runtimeContext,
       bindings: compileBindings,
       ...(previousCompileBindings.length === 0
         ? {}

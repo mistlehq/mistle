@@ -67,7 +67,7 @@ function createCompiledBindingResult(input: {
   }>;
   runtimeClientSetup?: {
     clientId: string;
-    env: Record<string, string | { kind: "egress_url"; routeId: string }>;
+    env: Record<string, string>;
     files: Array<{ fileId: string; path: string; mode: number; content: string }>;
   };
   runtimeClientProcesses?: ReadonlyArray<RuntimeClientProcessSpec>;
@@ -202,43 +202,6 @@ describe("validateCompiledBindingResults", () => {
     }
   });
 
-  it("fails when a workspace source references an unknown route", () => {
-    const result = createCompiledBindingResult({
-      route: createRoute({
-        routeId: "route_a",
-        bindingId: "bind_a",
-        hosts: ["github.com"],
-      }),
-      artifactKey: "artifact-a",
-      workspaceSources: [
-        {
-          sourceKind: "git-clone",
-          resourceKind: "repository",
-          path: "/workspace/repos/mistlehq/mistle",
-          originUrl: "https://github.com/mistlehq/mistle.git",
-          routeId: "route_missing",
-        },
-      ],
-    });
-
-    expect(() =>
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
-      }),
-    ).toThrowError(IntegrationCompilerError);
-
-    try {
-      validateCompiledBindingResults({
-        compiledBindingResults: [result],
-      });
-    } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
-      }
-    }
-  });
-
   it("fails on duplicate workspace source paths", () => {
     const resultA = createCompiledBindingResult({
       route: createRoute({
@@ -253,7 +216,6 @@ describe("validateCompiledBindingResults", () => {
           resourceKind: "repository",
           path: "/workspace/repos/mistlehq/mistle",
           originUrl: "https://github.com/mistlehq/mistle.git",
-          routeId: "route_a",
         },
       ],
     });
@@ -270,7 +232,6 @@ describe("validateCompiledBindingResults", () => {
           resourceKind: "repository",
           path: "/workspace/repos/mistlehq/mistle",
           originUrl: "https://github.example.com/mistlehq/mistle.git",
-          routeId: "route_b",
         },
       ],
     });
@@ -432,7 +393,7 @@ describe("validateCompiledBindingResults", () => {
     }
   });
 
-  it("accepts runtime client env refs that are structurally equivalent", () => {
+  it("accepts runtime client env values that are structurally equivalent", () => {
     const resultA = createCompiledBindingResult({
       route: createRoute({
         routeId: "route_a",
@@ -443,10 +404,7 @@ describe("validateCompiledBindingResults", () => {
       runtimeClientSetup: {
         clientId: "codex-cli",
         env: {
-          OPENAI_BASE_URL: {
-            kind: "egress_url",
-            routeId: "route_a",
-          },
+          OPENAI_BASE_URL: "https://api.openai.com",
         },
         files: [],
       },
@@ -462,10 +420,7 @@ describe("validateCompiledBindingResults", () => {
       runtimeClientSetup: {
         clientId: "codex-cli",
         env: {
-          OPENAI_BASE_URL: {
-            kind: "egress_url",
-            routeId: "route_a",
-          },
+          OPENAI_BASE_URL: "https://api.openai.com",
         },
         files: [],
       },

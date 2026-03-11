@@ -112,7 +112,7 @@ export function compileOpenAiApiKeyBinding(
         clientId: input.binding.config.runtime,
         setup: {
           env: {
-            OPENAI_BASE_URL: input.refs.egressUrl,
+            OPENAI_BASE_URL: input.target.config.apiBaseUrl,
             OPENAI_MODEL: input.binding.config.defaultModel,
             OPENAI_REASONING_EFFORT: input.binding.config.reasoningEffort,
           },

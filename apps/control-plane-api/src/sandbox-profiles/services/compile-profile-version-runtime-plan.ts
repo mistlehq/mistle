@@ -21,9 +21,6 @@ type CompileProfileVersionRuntimePlanInput = {
   profileId: string;
   profileVersion: number;
   image: ResolvedSandboxImage;
-  runtimeContext: {
-    sandboxdEgressBaseUrl: string;
-  };
 };
 
 const registry = createIntegrationRegistry();
@@ -101,7 +98,6 @@ export async function compileProfileVersionRuntimePlan(
       profileId: input.profileId,
       profileVersion: input.profileVersion,
       image: input.image,
-      runtimeContext: input.runtimeContext,
     });
   } catch (error) {
     if (error instanceof SandboxRuntimePlanCompilerError) {

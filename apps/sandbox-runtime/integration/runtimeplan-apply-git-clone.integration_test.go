@@ -9,38 +9,15 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/runtimeplan"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
 )
 
-const (
-	testGitRouteID         = "route_git"
-	testCanonicalOriginURL = "https://github.com/mistlehq/mistle.git"
-)
-
 type startedGitBackendServer struct {
-	baseURL               string
-	sandboxdEgressBaseURL string
-	sandboxRequestPaths   []string
-	mutex                 sync.Mutex
-	close                 func()
-}
-
-func (server *startedGitBackendServer) recordSandboxPath(path string) {
-	server.mutex.Lock()
-	defer server.mutex.Unlock()
-
-	server.sandboxRequestPaths = append(server.sandboxRequestPaths, path)
-}
-
-func (server *startedGitBackendServer) sandboxRequests() []string {
-	server.mutex.Lock()
-	defer server.mutex.Unlock()
-
-	return append([]string(nil), server.sandboxRequestPaths...)
+	baseURL string
+	close   func()
 }
 
 func TestRuntimePlanApplyGitClone(t *testing.T) {
@@ -51,6 +28,7 @@ func TestRuntimePlanApplyGitClone(t *testing.T) {
 	defer gitBackendServer.close()
 
 	clonePath := filepath.Join(t.TempDir(), "workspace", "repos", "mistlehq", "mistle")
+	canonicalOriginURL := gitBackendServer.baseURL + "/mistlehq/mistle.git"
 
 	err := runtimeplan.Apply(runtimeplan.ApplyInput{
 		RuntimePlan: startup.RuntimePlan{
@@ -65,12 +43,10 @@ func TestRuntimePlanApplyGitClone(t *testing.T) {
 					SourceKind:   "git-clone",
 					ResourceKind: "repository",
 					Path:         clonePath,
-					OriginURL:    testCanonicalOriginURL,
-					RouteID:      testGitRouteID,
+					OriginURL:    canonicalOriginURL,
 				},
 			},
 		},
-		SandboxdEgressBaseURL: gitBackendServer.sandboxdEgressBaseURL,
 	})
 	if err != nil {
 		t.Fatalf("expected runtime plan apply to succeed, got %v", err)
@@ -85,27 +61,8 @@ func TestRuntimePlanApplyGitClone(t *testing.T) {
 	}
 
 	remoteOriginURL := strings.TrimSpace(runGit(t, clonePath, "config", "--local", "--get", "remote.origin.url"))
-	if remoteOriginURL != testCanonicalOriginURL {
-		t.Fatalf("expected canonical origin URL %s, got %s", testCanonicalOriginURL, remoteOriginURL)
-	}
-
-	sandboxRouteOriginURL := fmt.Sprintf(
-		"%s/routes/%s/mistlehq/mistle.git",
-		gitBackendServer.sandboxdEgressBaseURL,
-		testGitRouteID,
-	)
-	rewriteOriginURL := strings.TrimSpace(
-		runGit(
-			t,
-			clonePath,
-			"config",
-			"--local",
-			"--get-all",
-			fmt.Sprintf("url.%s.insteadOf", sandboxRouteOriginURL),
-		),
-	)
-	if rewriteOriginURL != testCanonicalOriginURL {
-		t.Fatalf("expected git rewrite origin %s, got %s", testCanonicalOriginURL, rewriteOriginURL)
+	if remoteOriginURL != canonicalOriginURL {
+		t.Fatalf("expected canonical origin URL %s, got %s", canonicalOriginURL, remoteOriginURL)
 	}
 
 	nextCommitID := appendCommitAndPush(t, repoFixture.workTreeRoot, "next line\n")
@@ -115,11 +72,6 @@ func TestRuntimePlanApplyGitClone(t *testing.T) {
 	remoteHeadCommitID := strings.TrimSpace(runGit(t, clonePath, "rev-parse", "refs/remotes/origin/main"))
 	if remoteHeadCommitID != nextCommitID {
 		t.Fatalf("expected fetched origin/main commit %s, got %s", nextCommitID, remoteHeadCommitID)
-	}
-
-	sandboxRequests := gitBackendServer.sandboxRequests()
-	if len(sandboxRequests) == 0 {
-		t.Fatal("expected at least one sandbox-routed git request after fetch")
 	}
 }
 
@@ -196,8 +148,7 @@ func startGitBackendServer(t *testing.T, repoRoot string) *startedGitBackendServ
 	}
 
 	server := &startedGitBackendServer{}
-
-	newGitHTTPHandler := func(root string, recordSandbox bool) http.Handler {
+	gitHTTPHandler := func(root string) http.Handler {
 		cgiHandler := &cgi.Handler{
 			Path: gitBinaryPath,
 			Args: []string{"http-backend"},
@@ -209,20 +160,15 @@ func startGitBackendServer(t *testing.T, repoRoot string) *startedGitBackendServ
 		}
 
 		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			if recordSandbox {
-				server.recordSandboxPath(request.URL.Path)
-			}
-
 			cgiHandler.ServeHTTP(writer, request)
 		})
 	}
 
 	mux := http.NewServeMux()
-	mux.Handle("/sandbox/routes/"+testGitRouteID+"/", newGitHTTPHandler("/sandbox/routes/"+testGitRouteID, true))
+	mux.Handle("/", gitHTTPHandler(""))
 
 	httpServer := httptest.NewServer(mux)
 	server.baseURL = httpServer.URL
-	server.sandboxdEgressBaseURL = httpServer.URL + "/sandbox"
 	server.close = httpServer.Close
 
 	return server

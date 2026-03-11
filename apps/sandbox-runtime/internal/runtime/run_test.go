@@ -86,7 +86,7 @@ func TestFlattenRuntimeClientProcesses(t *testing.T) {
 				ClientID: "codex-cli",
 				Setup: startup.RuntimeClientSetup{
 					Env: map[string]string{
-						"OPENAI_BASE_URL": "http://127.0.0.1:8090/egress/routes/route_bind_openai",
+						"OPENAI_BASE_URL": "https://api.openai.com/v1",
 						"OPENAI_MODEL":    "gpt-5.3-codex",
 						"CONFLICT_KEY":    "setup-value",
 					},
@@ -114,7 +114,7 @@ func TestFlattenRuntimeClientProcesses(t *testing.T) {
 		}
 
 		expectedEnv := map[string]string{
-			"OPENAI_BASE_URL": "http://127.0.0.1:8090/egress/routes/route_bind_openai",
+			"OPENAI_BASE_URL": "https://api.openai.com/v1",
 			"OPENAI_MODEL":    "gpt-5.3-codex",
 			"PROCESS_ONLY":    "enabled",
 			"CONFLICT_KEY":    "process-value",

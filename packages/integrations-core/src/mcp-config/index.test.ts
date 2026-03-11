@@ -41,7 +41,7 @@ function createLinearMcpServer(): ResolvedIntegrationMcpServer {
       serverId: "linear-default",
       serverName: "linear",
       transport: "streamable-http",
-      url: "http://127.0.0.1:8090/egress/routes/route_bind_linear_connector",
+      url: "https://mcp.linear.app/mcp",
       httpHeaders: {
         Authorization: "Bearer test-token",
       },
@@ -75,7 +75,7 @@ trust_level = "trusted"
 
     expect(runtimeClients[0]?.setup.files[0]?.content).toContain("[mcp_servers.linear]");
     expect(runtimeClients[0]?.setup.files[0]?.content).toContain(
-      'url = "http://127.0.0.1:8090/egress/routes/route_bind_linear_connector"',
+      'url = "https://mcp.linear.app/mcp"',
     );
     expect(runtimeClients[0]?.setup.files[0]?.content).toContain(
       "[mcp_servers.linear.http_headers]",

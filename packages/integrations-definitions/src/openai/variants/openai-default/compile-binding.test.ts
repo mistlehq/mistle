@@ -106,14 +106,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         },
       },
       refs: {
-        egressUrl: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
         artifactBinPath,
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });
 
@@ -166,10 +159,7 @@ describe("compileOpenAiApiKeyBinding", () => {
 
     expect(compiled.runtimeClients).toHaveLength(1);
     expect(compiled.runtimeClients[0]?.setup.env).toEqual({
-      OPENAI_BASE_URL: {
-        kind: "egress_url",
-        routeId: "route_ibd_123",
-      },
+      OPENAI_BASE_URL: "https://api.openai.com/v1",
       OPENAI_MODEL: "gpt-5.3-codex",
       OPENAI_REASONING_EFFORT: "medium",
     });
@@ -255,14 +245,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         },
       },
       refs: {
-        egressUrl: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
         artifactBinPath,
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });
 
@@ -302,23 +285,15 @@ describe("compileOpenAiApiKeyBinding", () => {
         },
       },
       refs: {
-        egressUrl: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
         artifactBinPath,
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress/",
       },
     });
 
     expect(compiled.egressRoutes[0]?.match.hosts).toEqual(["proxy.example.com"]);
     expect(compiled.egressRoutes[0]?.match.pathPrefixes).toEqual(["/"]);
-    expect(compiled.runtimeClients[0]?.setup.env.OPENAI_BASE_URL).toEqual({
-      kind: "egress_url",
-      routeId: "route_ibd_123",
-    });
+    expect(compiled.runtimeClients[0]?.setup.env.OPENAI_BASE_URL).toEqual(
+      "https://proxy.example.com/openai-v2",
+    );
     expect(compiled.runtimeClients[0]?.processes).toHaveLength(1);
     expect(compiled.runtimeClients[0]?.processes[0]?.processKey).toBe("codex-app-server");
   });
@@ -353,14 +328,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         },
       },
       refs: {
-        egressUrl: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
         artifactBinPath,
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });
 
@@ -396,14 +364,7 @@ describe("compileOpenAiApiKeyBinding", () => {
           },
         },
         refs: {
-          egressUrl: {
-            kind: "egress_url",
-            routeId: "route_ibd_123",
-          },
           artifactBinPath,
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
         },
       }),
     ).toThrowError();
