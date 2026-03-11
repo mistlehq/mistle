@@ -21,6 +21,8 @@ export type AppContextBindings = {
 export type AppContextVariables = {
   config: DataPlaneGatewayConfig;
   db: DataPlaneDatabase;
+  sandboxOwnerLeaseId?: string;
+  sandboxRelaySessionId?: string;
 };
 
 export type AppContext = Context<AppContextBindings>;

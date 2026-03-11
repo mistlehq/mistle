@@ -1,11 +1,14 @@
 import { createNodeWebSocket } from "@hono/node-ws";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
+import { systemClock } from "@mistle/time";
 import { typeid } from "typeid-js";
 
 import { createApp, stopApp } from "../app.js";
 import { startServer } from "../server.js";
 import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory-relay-coordinator.js";
+import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
+import { StoreBackedSandboxOwnerResolver } from "../tunnel/ownership/store-backed-sandbox-owner-resolver.js";
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
 import type {
   DataPlaneGatewayRuntime,
@@ -20,10 +23,13 @@ export function createDataPlaneGatewayRuntime(
   const nodeWebSocket = createNodeWebSocket({ app });
   const nodeId = typeid("dpg").toString();
   const relayCoordinator = createInMemoryTunnelRelayCoordinator(nodeId);
+  const sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
+  const sandboxOwnerResolver = new StoreBackedSandboxOwnerResolver(nodeId, sandboxOwnerStore);
 
   registerSandboxTunnelRoute({
     app,
     upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
+    gatewayNodeId: nodeId,
     bootstrapTokenConfig: {
       bootstrapTokenSecret: config.sandbox.bootstrap.tokenSecret,
       tokenIssuer: config.sandbox.bootstrap.tokenIssuer,
@@ -35,6 +41,8 @@ export function createDataPlaneGatewayRuntime(
       tokenAudience: config.sandbox.connect.tokenAudience,
     } satisfies ConnectionTokenConfig,
     relayCoordinator,
+    sandboxOwnerStore,
+    sandboxOwnerResolver,
   });
 
   let startedServer: StartedServer | undefined;

@@ -53,6 +53,16 @@ describe("sandbox tunnel connect endpoint integration", () => {
     "accepts a valid connection token and records exactly one ack",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
       const jti = randomUUID();
       const token = await mintConnectionToken({
         config: {
@@ -64,6 +74,9 @@ describe("sandbox tunnel connect endpoint integration", () => {
         sandboxInstanceId,
         ttlSeconds: 120,
       });
+      const bootstrapSocket = await connectWebSocket(
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+      );
       const socket = await connectWebSocket(
         `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(token)}`,
       );
@@ -75,6 +88,37 @@ describe("sandbox tunnel connect endpoint integration", () => {
       expect(recordedAck?.bootstrapTokenJti).toBe(jti);
 
       await closeWebSocket(socket);
+      await closeWebSocket(bootstrapSocket);
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "rejects connection tokens when no bootstrap owner is connected and does not record an ack",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const jti = randomUUID();
+      const token = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti,
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      const failedConnect = await connectWebSocketExpectFailure(
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(token)}`,
+      );
+      const recordedAck = await fixture.db.query.sandboxTunnelConnectAcks.findFirst({
+        where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
+      });
+
+      expect(failedConnect.error).toBeInstanceOf(Error);
+      expect(failedConnect.responseStatusCode).toBe(409);
+      expect(recordedAck).toBeUndefined();
     },
     IntegrationTestTimeoutMs,
   );

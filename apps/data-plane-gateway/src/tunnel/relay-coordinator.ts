@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { LocalPeerRegistry } from "./local-peer-registry/index.js";
 import { RelayTransport } from "./relay-transport/index.js";
 import type {
@@ -46,12 +44,13 @@ export class TunnelRelayCoordinator {
     sandboxInstanceId: string;
     side: RelayPeerSide;
     socket: RelayPeerSocket;
+    sessionId: string;
   }): RelayTarget {
     const target: RelayTarget = {
       sandboxInstanceId: input.sandboxInstanceId,
       side: input.side,
       nodeId: this.nodeId,
-      sessionId: randomUUID(),
+      sessionId: input.sessionId,
     };
 
     this.relayTransport.registerLocalPeer({

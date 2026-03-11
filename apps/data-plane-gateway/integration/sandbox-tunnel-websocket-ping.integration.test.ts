@@ -63,14 +63,12 @@ describe("sandbox tunnel websocket ping integration", () => {
       let clientSocket: WebSocket | undefined;
 
       try {
-        [sandboxSocket, clientSocket] = await Promise.all([
-          connectWebSocket(
-            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
-          ),
-          connectWebSocket(
-            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
-          ),
-        ]);
+        sandboxSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
 
         await Promise.all([
           sendWebSocketPingAndExpectPong(sandboxSocket, Buffer.from("sandbox-ping", "utf8")),
@@ -115,14 +113,12 @@ describe("sandbox tunnel websocket ping integration", () => {
       let clientSocket: WebSocket | undefined;
 
       try {
-        [sandboxSocket, clientSocket] = await Promise.all([
-          connectWebSocket(
-            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
-          ),
-          connectWebSocket(
-            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
-          ),
-        ]);
+        sandboxSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
 
         const clientTextPayload = "hello from client";
         const forwardedToSandboxPromise = waitForWebSocketMessage(sandboxSocket);
@@ -256,14 +252,12 @@ describe("sandbox tunnel websocket ping integration", () => {
       let clientSocket: WebSocket | undefined;
 
       try {
-        [bootstrapSocket, clientSocket] = await Promise.all([
-          connectWebSocket(
-            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
-          ),
-          connectWebSocket(
-            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
-          ),
-        ]);
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
 
         const clientClosedPromise = waitForWebSocketClose(clientSocket);
         await closeWebSocket(bootstrapSocket);
@@ -321,14 +315,12 @@ describe("sandbox tunnel websocket ping integration", () => {
       let secondClientSocket: WebSocket | undefined;
 
       try {
-        [bootstrapSocket, firstClientSocket] = await Promise.all([
-          connectWebSocket(
-            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
-          ),
-          connectWebSocket(
-            `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(firstConnectionToken)}`,
-          ),
-        ]);
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        firstClientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(firstConnectionToken)}`,
+        );
 
         await closeWebSocket(firstClientSocket);
         firstClientSocket = undefined;

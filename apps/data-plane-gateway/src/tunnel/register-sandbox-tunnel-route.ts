@@ -10,10 +10,13 @@ import {
   verifyBootstrapToken,
 } from "@mistle/gateway-tunnel-auth";
 import type { WSMessageReceive } from "hono/ws";
+import { typeid } from "typeid-js";
 
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { insertSandboxTunnelConnectAck } from "./connect-ack.js";
+import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
+import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
 import type { RelayPeerSide, RelayTarget } from "./types.js";
 
@@ -22,9 +25,12 @@ const SandboxTunnelRoutePath = "/tunnel/sandbox/:instanceId";
 type RegisterSandboxTunnelRouteInput = {
   app: DataPlaneGatewayApp;
   upgradeWebSocket: NodeWebSocket["upgradeWebSocket"];
+  gatewayNodeId: string;
   bootstrapTokenConfig: BootstrapTokenConfig;
   connectionTokenConfig: ConnectionTokenConfig;
   relayCoordinator: TunnelRelayCoordinator;
+  sandboxOwnerStore: SandboxOwnerStore;
+  sandboxOwnerResolver: SandboxOwnerResolver;
 };
 
 type TokenKind = "bootstrap" | "connection";
@@ -45,6 +51,7 @@ const CloseCodes: {
 } = {
   INTERNAL_ERROR: 1011,
 };
+const OwnerLeaseTtlMs = 30_000;
 
 function toNormalizedTokenValue(token: string | null): string | undefined {
   const normalizedToken = token?.trim();
@@ -186,6 +193,18 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
         );
       }
 
+      if (verifiedTokenKind === "connection") {
+        const ownerResolution = await input.sandboxOwnerResolver.resolveOwner({
+          sandboxInstanceId: requestedInstanceId,
+        });
+        if (ownerResolution.kind === "missing") {
+          return ctx.json({ error: "Sandbox is not connected." }, 409);
+        }
+        if (ownerResolution.kind === "remote") {
+          return ctx.json({ error: "Sandbox is connected to a different gateway node." }, 503);
+        }
+      }
+
       try {
         const inserted = await insertSandboxTunnelConnectAck({
           db: ctx.get("db"),
@@ -207,6 +226,29 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
         return ctx.json({ error: "Failed to acknowledge sandbox tunnel token." }, 500);
       }
 
+      if (verifiedTokenKind === "bootstrap") {
+        const sandboxRelaySessionId = typeid("dts").toString();
+        try {
+          const owner = await input.sandboxOwnerStore.claimOwner({
+            sandboxInstanceId: requestedInstanceId,
+            nodeId: input.gatewayNodeId,
+            sessionId: sandboxRelaySessionId,
+            ttlMs: OwnerLeaseTtlMs,
+          });
+          ctx.set("sandboxRelaySessionId", sandboxRelaySessionId);
+          ctx.set("sandboxOwnerLeaseId", owner.leaseId);
+        } catch (error) {
+          logger.error(
+            {
+              err: error,
+              sandboxInstanceId: requestedInstanceId,
+            },
+            "Failed to claim sandbox ownership for bootstrap websocket",
+          );
+          return ctx.json({ error: "Failed to claim sandbox ownership." }, 500);
+        }
+      }
+
       await next();
     },
     input.upgradeWebSocket(
@@ -223,6 +265,21 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
         }
 
         const sourcePeerSide = toSourcePeerSide(requestedToken.kind);
+        const bootstrapRelaySessionId =
+          requestedToken.kind === "bootstrap" ? ctx.get("sandboxRelaySessionId") : undefined;
+        const bootstrapOwnerLeaseId =
+          requestedToken.kind === "bootstrap" ? ctx.get("sandboxOwnerLeaseId") : undefined;
+        const connectionRelaySessionId =
+          requestedToken.kind === "connection" ? typeid("dts").toString() : undefined;
+        if (requestedToken.kind === "bootstrap" && bootstrapRelaySessionId === undefined) {
+          throw new Error("Expected sandbox relay session id for bootstrap websocket request.");
+        }
+        if (requestedToken.kind === "bootstrap" && bootstrapOwnerLeaseId === undefined) {
+          throw new Error("Expected sandbox owner lease id for bootstrap websocket request.");
+        }
+        if (requestedToken.kind === "connection" && connectionRelaySessionId === undefined) {
+          throw new Error("Expected sandbox relay session id for connection websocket request.");
+        }
         let relayTarget: RelayTarget | undefined;
 
         return {
@@ -230,6 +287,10 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             relayTarget = input.relayCoordinator.attachPeer({
               sandboxInstanceId,
               side: sourcePeerSide,
+              sessionId:
+                requestedToken.kind === "bootstrap"
+                  ? bootstrapRelaySessionId
+                  : connectionRelaySessionId,
               socket: ws,
             });
           },
@@ -274,6 +335,12 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               });
           },
           onClose: () => {
+            if (requestedToken.kind === "bootstrap" && bootstrapOwnerLeaseId !== undefined) {
+              void input.sandboxOwnerStore.releaseOwner({
+                sandboxInstanceId,
+                leaseId: bootstrapOwnerLeaseId,
+              });
+            }
             if (relayTarget === undefined) {
               return;
             }
