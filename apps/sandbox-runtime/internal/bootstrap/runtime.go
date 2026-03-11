@@ -6,64 +6,24 @@ import (
 	"os/exec"
 	"os/user"
 	"strconv"
+	"strings"
 	"syscall"
+
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/config"
 )
 
 const SandboxdPath = "/usr/local/bin/sandboxd"
 const UpdateCACertificatesPath = "/usr/sbin/update-ca-certificates"
 
-type ProxyCACertificateAction string
-
-const (
-	ProxyCACertificateActionNoop    ProxyCACertificateAction = "noop"
-	ProxyCACertificateActionInstall ProxyCACertificateAction = "install"
-	ProxyCACertificateActionRemove  ProxyCACertificateAction = "remove"
-)
-
-func resolveProxyCACertificateAction(sourcePath string, installedCertificateExists bool) ProxyCACertificateAction {
-	if sourcePath != "" {
-		return ProxyCACertificateActionInstall
-	}
-	if installedCertificateExists {
-		return ProxyCACertificateActionRemove
-	}
-	return ProxyCACertificateActionNoop
-}
-
-func InstallProxyCACertificate(sourcePath string) error {
+func InstallProxyCACertificate(certificatePEM []byte) error {
 	if os.Geteuid() != 0 {
 		return fmt.Errorf("proxy ca certificate reconciliation requires root")
 	}
-
-	_, statErr := os.Stat(ProxyCACertInstallPath)
-	installedCertificateExists := statErr == nil
-	if statErr != nil && !os.IsNotExist(statErr) {
-		return fmt.Errorf("failed to stat installed proxy ca certificate %s: %w", ProxyCACertInstallPath, statErr)
+	if len(certificatePEM) == 0 {
+		return fmt.Errorf("proxy ca certificate pem is required")
 	}
 
-	switch resolveProxyCACertificateAction(sourcePath, installedCertificateExists) {
-	case ProxyCACertificateActionNoop:
-		return nil
-	case ProxyCACertificateActionRemove:
-		if err := os.Remove(ProxyCACertInstallPath); err != nil {
-			return fmt.Errorf(
-				"failed to remove installed proxy ca certificate %s: %w",
-				ProxyCACertInstallPath,
-				err,
-			)
-		}
-		return runUpdateCACertificates()
-	case ProxyCACertificateActionInstall:
-	default:
-		return fmt.Errorf("unexpected proxy ca certificate action")
-	}
-
-	certificateBytes, err := os.ReadFile(sourcePath)
-	if err != nil {
-		return fmt.Errorf("failed to read proxy ca certificate %s: %w", sourcePath, err)
-	}
-
-	if err := os.WriteFile(ProxyCACertInstallPath, certificateBytes, 0o644); err != nil {
+	if err := os.WriteFile(ProxyCACertInstallPath, certificatePEM, 0o644); err != nil {
 		return fmt.Errorf(
 			"failed to write installed proxy ca certificate %s: %w",
 			ProxyCACertInstallPath,
@@ -85,6 +45,10 @@ func runUpdateCACertificates() error {
 }
 
 func ExecSandboxdAsUser(sandboxUser string) error {
+	return ExecSandboxdAsUserWithEnv(sandboxUser, nil)
+}
+
+func ExecSandboxdAsUserWithEnv(sandboxUser string, additionalEnv map[string]string) error {
 	if os.Geteuid() != 0 {
 		return fmt.Errorf("sandbox bootstrap must start as root")
 	}
@@ -116,15 +80,33 @@ func ExecSandboxdAsUser(sandboxUser string) error {
 		return fmt.Errorf("failed to drop user privileges: %w", err)
 	}
 
-	environment := append(os.Environ(),
+	environment := append(filterBootstrapEnvironment(os.Environ()),
 		"HOME="+resolvedUser.HomeDir,
 		"LOGNAME="+resolvedUser.Username,
 		"USER="+resolvedUser.Username,
 	)
+	for envName, envValue := range additionalEnv {
+		environment = append(environment, envName+"="+envValue)
+	}
 
 	if err := syscall.Exec(SandboxdPath, []string{SandboxdPath}, environment); err != nil {
 		return fmt.Errorf("failed to exec sandboxd: %w", err)
 	}
 
 	return nil
+}
+
+func filterBootstrapEnvironment(environment []string) []string {
+	filteredEnvironment := make([]string, 0, len(environment))
+	for _, entry := range environment {
+		if strings.HasPrefix(entry, "HOME=") ||
+			strings.HasPrefix(entry, "LOGNAME=") ||
+			strings.HasPrefix(entry, "USER=") ||
+			strings.HasPrefix(entry, config.ProxyCACertFDEnv+"=") ||
+			strings.HasPrefix(entry, config.ProxyCAKeyFDEnv+"=") {
+			continue
+		}
+		filteredEnvironment = append(filteredEnvironment, entry)
+	}
+	return filteredEnvironment
 }

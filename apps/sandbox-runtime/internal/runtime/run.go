@@ -188,13 +188,28 @@ func Run(input RunInput) (runErr error) {
 		return fmt.Errorf("failed to construct egress handler: %w", err)
 	}
 
+	proxyCertificateAuthority, err := traceStepWithValue(
+		runContext,
+		tracingHandle.Tracer(),
+		"sandbox.runtime.load_proxy_certificate_authority",
+		func(context.Context) (*proxy.CertificateAuthority, error) {
+			return loadProxyCertificateAuthority(cfg)
+		},
+	)
+	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
+		return err
+	}
+
 	proxyHandler, err := traceStepWithValue(
 		runContext,
 		tracingHandle.Tracer(),
 		"sandbox.runtime.new_proxy_handler",
 		func(context.Context) (http.Handler, error) {
 			return proxy.NewHandler(proxy.NewHandlerInput{
-				HTTPClient: telemetry.NewHTTPClient(directHTTPClient),
+				HTTPClient:           telemetry.NewHTTPClient(directHTTPClient),
+				CertificateAuthority: proxyCertificateAuthority,
 			})
 		},
 	)
