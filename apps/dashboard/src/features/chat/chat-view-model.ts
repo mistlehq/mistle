@@ -2,6 +2,7 @@ import type {
   ChatAssistantEntry,
   ChatCommandEntry,
   ChatEntry,
+  ChatExploringGroupEntry,
   ChatFileChangeEntry,
   ChatGenericItemEntry,
   ChatPlanEntry,
@@ -15,7 +16,8 @@ export type ChatAssistantBlock =
   | ChatCommandEntry
   | ChatPlanEntry
   | ChatFileChangeEntry
-  | ChatGenericItemEntry;
+  | ChatGenericItemEntry
+  | ChatExploringGroupEntry;
 
 export type ChatTurnGroup = {
   turnId: string;

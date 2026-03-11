@@ -70,6 +70,25 @@ export type ChatGenericItemEntry = {
   status: "streaming" | "completed";
 };
 
+export type ChatExploringGroupEntry = {
+  id: string;
+  turnId: string;
+  kind: "exploring-group";
+  status: "streaming" | "completed";
+  counts: {
+    reads: number;
+    searches: number;
+    lists: number;
+  };
+  items: readonly {
+    id: string;
+    command: string | null;
+    cwd: string | null;
+    output: string | null;
+    status: "streaming" | "completed";
+  }[];
+};
+
 export type ChatEntry =
   | ChatUserEntry
   | ChatAssistantEntry
@@ -77,4 +96,5 @@ export type ChatEntry =
   | ChatReasoningEntry
   | ChatPlanEntry
   | ChatFileChangeEntry
-  | ChatGenericItemEntry;
+  | ChatGenericItemEntry
+  | ChatExploringGroupEntry;

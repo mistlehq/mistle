@@ -246,6 +246,101 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
+  it("groups adjacent exploring command executions into one exploring transcript block", () => {
+    const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_001",
+          status: "completed",
+          items: [
+            {
+              type: "userMessage",
+              id: "user_1",
+              content: [
+                {
+                  type: "text",
+                  text: "Inspect the codebase",
+                },
+              ],
+            },
+            {
+              type: "commandExecution",
+              id: "cmd_1",
+              command: "sed -n '1,120p' app.ts",
+              aggregatedOutput: "export const App = () => null;",
+              cwd: "/workspace",
+              exitCode: 0,
+              status: "completed",
+              commandActions: [
+                {
+                  type: "read",
+                  command: "sed -n '1,120p' app.ts",
+                  name: "app.ts",
+                  path: "app.ts",
+                },
+              ],
+            },
+            {
+              type: "commandExecution",
+              id: "cmd_2",
+              command: "rg App src",
+              aggregatedOutput: "src/app.ts",
+              cwd: "/workspace",
+              exitCode: 0,
+              status: "completed",
+              commandActions: [
+                {
+                  type: "search",
+                  command: "rg App src",
+                  query: "App",
+                  path: "src",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(hydrated.entries).toEqual([
+      {
+        id: "user_1",
+        turnId: "turn_001",
+        kind: "user-message",
+        text: "Inspect the codebase",
+        status: "completed",
+      },
+      {
+        id: "turn_001:exploring:cmd_1",
+        turnId: "turn_001",
+        kind: "exploring-group",
+        status: "completed",
+        counts: {
+          reads: 1,
+          searches: 1,
+          lists: 0,
+        },
+        items: [
+          {
+            id: "cmd_1",
+            command: "sed -n '1,120p' app.ts",
+            cwd: "/workspace",
+            output: "export const App = () => null;",
+            status: "completed",
+          },
+          {
+            id: "cmd_2",
+            command: "rg App src",
+            cwd: "/workspace",
+            output: "src/app.ts",
+            status: "completed",
+          },
+        ],
+      },
+    ]);
+  });
+
   it("updates completion status from turn/completed", () => {
     const started = reduceCodexChatState(
       reduceCodexChatState(createInitialCodexChatState(), {
@@ -685,7 +780,7 @@ describe("reduceCodexChatState", () => {
         output: "file-a\n",
         cwd: "/workspace",
         exitCode: null,
-        commandStatus: "in_progress",
+        commandStatus: "inProgress",
         reason: "Inspect repository",
         status: "streaming",
       },
@@ -731,7 +826,7 @@ describe("reduceCodexChatState", () => {
         kind: "generic-item",
         itemType: "dynamicToolCall",
         title: "Dynamic Tool Call",
-        body: "custom_tool",
+        body: "dynamic",
         detailsJson: JSON.stringify(
           {
             type: "dynamicToolCall",
@@ -771,7 +866,7 @@ describe("reduceCodexChatState", () => {
     expect(state.entries).toEqual([]);
   });
 
-  it("preserves empty reasoning content arrays in state so rendering can suppress them", () => {
+  it("omits empty reasoning content arrays from transcript state", () => {
     const state = reduceCodexChatState(createInitialCodexChatState(), {
       type: "notification_received",
       notification: {
@@ -795,14 +890,6 @@ describe("reduceCodexChatState", () => {
         kind: "reasoning",
         summary: "**Creating concise fantasy story**",
         source: "summary",
-        status: "completed",
-      },
-      {
-        id: "reasoning_1:content",
-        turnId: "turn_123",
-        kind: "reasoning",
-        summary: "[]",
-        source: "content",
         status: "completed",
       },
     ]);
@@ -839,14 +926,6 @@ describe("reduceCodexChatState", () => {
         source: "summary",
         status: "completed",
       },
-      {
-        id: "reasoning_1:content",
-        turnId: "turn_123",
-        kind: "reasoning",
-        summary: "[]",
-        source: "content",
-        status: "completed",
-      },
     ]);
   });
 
@@ -881,14 +960,6 @@ describe("reduceCodexChatState", () => {
         kind: "reasoning",
         summary: "**Creating concise fantasy story**",
         source: "summary",
-        status: "completed",
-      },
-      {
-        id: "reasoning_1:content",
-        turnId: "turn_123",
-        kind: "reasoning",
-        summary: "[]",
-        source: "content",
         status: "completed",
       },
     ]);
