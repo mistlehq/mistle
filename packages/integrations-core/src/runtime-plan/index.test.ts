@@ -12,9 +12,6 @@ describe("assembleCompiledRuntimePlan", () => {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
       },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
-      },
       compiledBindingResults: [
         {
           egressRoutes: [],
@@ -78,9 +75,6 @@ describe("assembleCompiledRuntimePlan", () => {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
       },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
-      },
       compiledBindingResults: [
         {
           egressRoutes: [
@@ -118,10 +112,7 @@ describe("assembleCompiledRuntimePlan", () => {
               clientId: "codex-cli",
               setup: {
                 env: {
-                  OPENAI_BASE_URL: {
-                    kind: "egress_url",
-                    routeId: "route_a",
-                  },
+                  OPENAI_BASE_URL: "https://api.openai.com",
                 },
                 files: [],
                 launchArgs: ["--sandbox", "workspace-write"],
@@ -269,7 +260,7 @@ describe("assembleCompiledRuntimePlan", () => {
     const runtimeClient = plan.runtimeClients[0];
     expect(runtimeClient?.clientId).toBe("codex-cli");
     expect(runtimeClient?.setup.env).toEqual({
-      OPENAI_BASE_URL: "http://sandboxd.internal/egress/routes/route_a",
+      OPENAI_BASE_URL: "https://api.openai.com",
       OPENAI_ORG: "org_abc",
     });
     expect(runtimeClient?.setup.launchArgs).toEqual([
@@ -310,9 +301,6 @@ describe("assembleCompiledRuntimePlan", () => {
         image: {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
         },
         compiledBindingResults: [
           {
@@ -364,9 +352,6 @@ describe("assembleCompiledRuntimePlan", () => {
         image: {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
         },
         compiledBindingResults: [
           {
@@ -426,9 +411,6 @@ describe("assembleCompiledRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
-        },
         compiledBindingResults: [
           {
             egressRoutes: [],
@@ -489,9 +471,6 @@ describe("assembleCompiledRuntimePlan", () => {
         image: {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
         },
         compiledBindingResults: [
           {
@@ -552,89 +531,6 @@ describe("assembleCompiledRuntimePlan", () => {
     }
   });
 
-  it("fails when runtime client setup references a missing egress route", () => {
-    expect(() =>
-      assembleCompiledRuntimePlan({
-        sandboxProfileId: "sbp_123",
-        version: 1,
-        image: {
-          source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
-        },
-        compiledBindingResults: [
-          {
-            egressRoutes: [],
-            artifacts: [],
-            runtimeClients: [
-              {
-                clientId: "codex-cli",
-                setup: {
-                  env: {
-                    OPENAI_BASE_URL: {
-                      kind: "egress_url",
-                      routeId: "route_missing",
-                    },
-                  },
-                  files: [],
-                },
-                processes: [],
-                endpoints: [],
-              },
-            ],
-            workspaceSources: [],
-            agentRuntimes: [],
-          },
-        ],
-      }),
-    ).toThrowError(IntegrationCompilerError);
-
-    try {
-      assembleCompiledRuntimePlan({
-        sandboxProfileId: "sbp_123",
-        version: 1,
-        image: {
-          source: "base",
-          imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
-        },
-        compiledBindingResults: [
-          {
-            egressRoutes: [],
-            artifacts: [],
-            runtimeClients: [
-              {
-                clientId: "codex-cli",
-                setup: {
-                  env: {
-                    OPENAI_BASE_URL: {
-                      kind: "egress_url",
-                      routeId: "route_missing",
-                    },
-                  },
-                  files: [],
-                },
-                processes: [],
-                endpoints: [],
-              },
-            ],
-            workspaceSources: [],
-            agentRuntimes: [],
-          },
-        ],
-      });
-    } catch (error) {
-      expect(error).toBeInstanceOf(IntegrationCompilerError);
-      if (error instanceof IntegrationCompilerError) {
-        expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_INVALID_REF);
-      }
-    }
-  });
-
   it("includes artifact removals from previous compiled bindings when artifact key is absent in current plan", () => {
     const plan = assembleCompiledRuntimePlan({
       sandboxProfileId: "sbp_123",
@@ -643,9 +539,6 @@ describe("assembleCompiledRuntimePlan", () => {
         source: "snapshot",
         imageRef: "127.0.0.1:5001/mistle/sandbox-snapshots@sha256:test",
         instanceId: "sbi_123",
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
       compiledBindingResults: [
         {

@@ -38,14 +38,7 @@ describe("compileGitHubCloudBinding", () => {
         },
       },
       refs: {
-        egressUrl: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
         artifactBinPath,
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });
 
@@ -97,20 +90,12 @@ describe("compileGitHubCloudBinding", () => {
         resourceKind: "repository",
         path: "/workspace/repos/acme/repo-a",
         originUrl: "https://github.com/acme/repo-a.git",
-        routeId: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
       },
       {
         sourceKind: "git-clone",
         resourceKind: "repository",
         path: "/workspace/repos/acme/repo-b",
         originUrl: "https://github.com/acme/repo-b.git",
-        routeId: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
       },
     ]);
   });
@@ -146,14 +131,7 @@ describe("compileGitHubCloudBinding", () => {
         },
       },
       refs: {
-        egressUrl: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
         artifactBinPath,
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });
 
@@ -168,10 +146,6 @@ describe("compileGitHubCloudBinding", () => {
         resourceKind: "repository",
         path: "/workspace/repos/acme/repo",
         originUrl: "https://proxy.example.com/github/acme/repo.git",
-        routeId: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
       },
     ]);
   });
@@ -207,14 +181,7 @@ describe("compileGitHubCloudBinding", () => {
         },
       },
       refs: {
-        egressUrl: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
         artifactBinPath,
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });
 
@@ -254,14 +221,7 @@ describe("compileGitHubCloudBinding", () => {
         },
       },
       refs: {
-        egressUrl: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
         artifactBinPath,
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });
 
@@ -305,14 +265,7 @@ describe("compileGitHubCloudBinding", () => {
           },
         },
         refs: {
-          egressUrl: {
-            kind: "egress_url",
-            routeId: "route_ibd_123",
-          },
           artifactBinPath,
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
         },
       }),
     ).toThrowError();

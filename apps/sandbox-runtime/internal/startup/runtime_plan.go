@@ -165,10 +165,6 @@ type WorkspaceSource struct {
 	ResourceKind string `json:"resourceKind"`
 	Path         string `json:"path"`
 	OriginURL    string `json:"originUrl"`
-	// RouteID identifies the mediated egress route that startup should use to
-	// realize the source. Startup uses the route URL for clone/fetch traffic and
-	// then restores OriginURL as the canonical remote.
-	RouteID      string `json:"routeId"`
 }
 
 func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
@@ -224,7 +220,7 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 		}
 	}
 	for sourceIndex, workspaceSource := range runtimePlan.WorkspaceSources {
-		if err := validateWorkspaceSource(workspaceSource, sourceIndex, routeIDs); err != nil {
+		if err := validateWorkspaceSource(workspaceSource, sourceIndex); err != nil {
 			return err
 		}
 	}
@@ -347,7 +343,6 @@ func validateEgressRoute(route EgressCredentialRoute, routeIndex int) error {
 func validateWorkspaceSource(
 	workspaceSource WorkspaceSource,
 	sourceIndex int,
-	routeIDs map[string]struct{},
 ) error {
 	if strings.TrimSpace(workspaceSource.SourceKind) == "" {
 		return fmt.Errorf("runtime plan workspaceSources[%d].sourceKind is required", sourceIndex)
@@ -371,13 +366,6 @@ func validateWorkspaceSource(
 	if parsedOriginURL.Scheme != "http" && parsedOriginURL.Scheme != "https" {
 		return fmt.Errorf("runtime plan workspaceSources[%d].originUrl must use http or https scheme", sourceIndex)
 	}
-	if strings.TrimSpace(workspaceSource.RouteID) == "" {
-		return fmt.Errorf("runtime plan workspaceSources[%d].routeId is required", sourceIndex)
-	}
-	if _, ok := routeIDs[workspaceSource.RouteID]; !ok {
-		return fmt.Errorf("runtime plan workspaceSources[%d].routeId '%s' does not reference a declared egress route", sourceIndex, workspaceSource.RouteID)
-	}
-
 	return nil
 }
 

@@ -227,7 +227,7 @@ This is the recommended workflow.
 - Set correct `credentialResolver` secret type/purpose/resolver key.
 - Add runtime artifacts and runtime clients only when required.
 - If the integration exposes its own MCP endpoint, define `mcp` with either a single server or an array of servers.
-- Prefer `EgressUrlRef` values inside MCP definitions when the final route URL is only known after compile.
+- Prefer canonical upstream MCP URLs in definitions. Route-shaped sandbox URLs are runtime transport details, not definition-authored config.
 
 7. If this is an agent integration and MCP should be auto-configured, define `mcpConfig`.
 

@@ -250,19 +250,7 @@ export type IntegrationResolvedTarget<
 
 type MaybePromise<TValue> = TValue | Promise<TValue>;
 
-export type EgressUrlRef = {
-  kind: "egress_url";
-  routeId: string;
-};
-
-export function egressUrlRef(routeId: string): EgressUrlRef {
-  return {
-    kind: "egress_url",
-    routeId,
-  };
-}
-
-export type IntegrationMcpValue = string | EgressUrlRef;
+export type IntegrationMcpValue = string;
 
 export type IntegrationMcpTransport = "streamable-http" | "stdio";
 
@@ -309,7 +297,6 @@ export type ResolvedIntegrationMcpServer = {
 };
 
 export type CompileBindingRefs = {
-  egressUrl: EgressUrlRef;
   artifactBinPath(name: string): string;
 };
 
@@ -326,9 +313,6 @@ export type CompileBindingInput<
   connection: IntegrationConnection;
   binding: Pick<IntegrationBinding, "id" | "kind"> & { config: TBindingConfig };
   refs: CompileBindingRefs;
-  runtimeContext: {
-    sandboxdEgressBaseUrl: string;
-  };
 };
 
 export type IntegrationCredentialResolverInput = {
@@ -634,7 +618,7 @@ type RuntimeClientSetupBase<TEnvValue> = {
   launchArgs?: ReadonlyArray<string>;
 };
 
-export type CompiledRuntimeClientSetup = RuntimeClientSetupBase<string | EgressUrlRef>;
+export type CompiledRuntimeClientSetup = RuntimeClientSetupBase<string>;
 
 export type RuntimeClientSetup = RuntimeClientSetupBase<string>;
 
@@ -692,7 +676,7 @@ type RuntimeClientBase<TEnvValue> = {
   endpoints: ReadonlyArray<RuntimeClientEndpointSpec>;
 };
 
-export type CompiledRuntimeClient = RuntimeClientBase<string | EgressUrlRef>;
+export type CompiledRuntimeClient = RuntimeClientBase<string>;
 
 export type RuntimeClient = RuntimeClientBase<string>;
 
@@ -708,22 +692,16 @@ export type CompiledAgentRuntime = CompileBindingAgentRuntime & {
   bindingId: string;
 };
 
-type GitCloneWorkspaceSourceBase<TRouteId> = {
+type GitCloneWorkspaceSourceBase = {
   sourceKind: "git-clone";
   resourceKind: "repository";
   path: string;
   originUrl: string;
-  /**
-   * Route used to realize the source through mediated egress. Startup uses the
-   * route URL for the initial network operation and then restores originUrl as
-   * the canonical git remote.
-   */
-  routeId: TRouteId;
 };
 
-export type CompileBindingWorkspaceSource = GitCloneWorkspaceSourceBase<EgressUrlRef>;
+export type CompileBindingWorkspaceSource = GitCloneWorkspaceSourceBase;
 
-export type CompiledWorkspaceSource = GitCloneWorkspaceSourceBase<string>;
+export type CompiledWorkspaceSource = GitCloneWorkspaceSourceBase;
 
 export type CompileBindingResult = {
   egressRoutes: ReadonlyArray<CompileBindingEgressRoute>;
@@ -963,9 +941,6 @@ export type CompileRuntimePlanInput = {
   sandboxProfileId: string;
   version: number;
   image: ResolvedSandboxImage;
-  runtimeContext: {
-    sandboxdEgressBaseUrl: string;
-  };
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
   previousBindings?: ReadonlyArray<CompileRuntimePlanBindingInput>;
   registry: IntegrationDefinitionResolver;

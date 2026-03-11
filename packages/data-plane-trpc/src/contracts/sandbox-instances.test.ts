@@ -11,9 +11,6 @@ function createRuntimePlan() {
       source: "base",
       imageRef: "img_base_123",
     },
-    runtimeContext: {
-      sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
-    },
     compiledBindingResults: [
       {
         egressRoutes: [],

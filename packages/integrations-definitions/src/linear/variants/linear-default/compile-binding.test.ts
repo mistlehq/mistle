@@ -29,14 +29,7 @@ describe("compileLinearBinding", () => {
         config: {},
       },
       refs: {
-        egressUrl: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
         artifactBinPath: (name) => `/workspace/.mistle/bin/${name}`,
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });
 

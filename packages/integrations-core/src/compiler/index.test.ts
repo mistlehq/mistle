@@ -96,7 +96,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
           clientId: "codex-cli",
           setup: {
             env: {
-              OPENAI_BASE_URL: input.refs.egressUrl,
+              OPENAI_BASE_URL: "https://api.openai.com",
               OPENAI_MODEL: input.binding.config.defaultModel,
             },
             files: [
@@ -220,11 +220,11 @@ function createLinearMcpDefinition(): IntegrationDefinition<
     targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
-    mcp: (input) => ({
+    mcp: () => ({
       serverId: "linear-default",
       serverName: "linear",
       transport: "streamable-http",
-      url: input.refs.egressUrl,
+      url: "https://linear.app/mcp",
     }),
     compileBinding: (input) => ({
       egressRoutes: [
@@ -370,9 +370,6 @@ describe("compileRuntimePlan", () => {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
       },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
-      },
       registry,
       bindings: [
         {
@@ -422,9 +419,7 @@ describe("compileRuntimePlan", () => {
       args: ["echo", "binding:bind_openai_agent"],
     });
     expect(runtimePlan.runtimeClients).toHaveLength(1);
-    expect(runtimePlan.runtimeClients[0]?.setup.env.OPENAI_BASE_URL).toBe(
-      "http://127.0.0.1:8090/egress/routes/route_bind_openai_agent",
-    );
+    expect(runtimePlan.runtimeClients[0]?.setup.env.OPENAI_BASE_URL).toBe("https://api.openai.com");
     expect(runtimePlan.runtimeClients[0]?.processes).toEqual([
       {
         processKey: "codex-app-server",
@@ -466,9 +461,6 @@ describe("compileRuntimePlan", () => {
       image: {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
       },
       registry,
       bindings: [
@@ -530,9 +522,6 @@ describe("compileRuntimePlan", () => {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
       },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
-      },
       registry,
       bindings: [
         {
@@ -592,7 +581,7 @@ describe("compileRuntimePlan", () => {
       "[mcp_servers.linear]",
     );
     expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
-      'url = "http://127.0.0.1:8090/egress/routes/route_bind_linear_connector"',
+      'url = "https://linear.app/mcp"',
     );
   });
 
@@ -608,9 +597,6 @@ describe("compileRuntimePlan", () => {
       image: {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
       },
       registry,
       bindings: [
@@ -671,7 +657,7 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain('"mcpServers"');
     expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain('"linear"');
     expect(runtimePlan.runtimeClients[0]?.setup.files[0]?.content).toContain(
-      '"url": "http://127.0.0.1:8090/egress/routes/route_bind_linear_connector"',
+      '"url": "https://linear.app/mcp"',
     );
   });
 
@@ -689,9 +675,6 @@ describe("compileRuntimePlan", () => {
         image: {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
         },
         registry,
         bindings: [
@@ -782,9 +765,6 @@ describe("compileRuntimePlan", () => {
         image: {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
         },
         registry,
         bindings: [
@@ -886,9 +866,6 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
-        },
         registry,
         bindings: [
           {
@@ -924,9 +901,6 @@ describe("compileRuntimePlan", () => {
         image: {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
         },
         registry,
         bindings: [
@@ -974,9 +948,6 @@ describe("compileRuntimePlan", () => {
         source: "snapshot",
         imageRef: "127.0.0.1:5001/mistle/sandbox-snapshots@sha256:test",
         instanceId: "sbi_123",
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
       },
       registry,
       bindings: [
@@ -1057,9 +1028,6 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
-        },
         registry,
         bindings: [
           {
@@ -1095,9 +1063,6 @@ describe("compileRuntimePlan", () => {
         image: {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
         },
         registry,
         bindings: [
@@ -1145,9 +1110,6 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
-        },
         registry,
         bindings: [
           {
@@ -1187,9 +1149,6 @@ describe("compileRuntimePlan", () => {
         image: {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
         },
         registry,
         bindings: [
@@ -1266,9 +1225,6 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
-        },
         registry,
         bindings: [
           {
@@ -1308,9 +1264,6 @@ describe("compileRuntimePlan", () => {
         image: {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
         },
         registry,
         bindings: [
@@ -1362,9 +1315,6 @@ describe("compileRuntimePlan", () => {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
         },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
-        },
         registry,
         bindings: [
           {
@@ -1404,9 +1354,6 @@ describe("compileRuntimePlan", () => {
         image: {
           source: "base",
           imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
         },
         registry,
         bindings: [
@@ -1485,7 +1432,7 @@ describe("compileRuntimePlan", () => {
               env: {
                 API_HOST: input.target.config.apiHost,
                 MODEL: input.binding.config.normalizedModel,
-                ROUTE_ID: input.refs.egressUrl.routeId,
+                BINDING_ID: input.binding.id,
               },
               files: [],
             },
@@ -1506,9 +1453,6 @@ describe("compileRuntimePlan", () => {
       image: {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
       },
       registry,
       bindings: [
@@ -1547,7 +1491,7 @@ describe("compileRuntimePlan", () => {
           env: {
             API_HOST: "api.openai.com",
             MODEL: "gpt-5.3-codex",
-            ROUTE_ID: "route_bind_openai_agent",
+            BINDING_ID: "bind_openai_agent",
           },
           files: [],
         },

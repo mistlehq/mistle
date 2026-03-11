@@ -1,4 +1,3 @@
-import { EgressUrlRefErrorCodes, resolveEgressUrlRef } from "../egress-url/index.js";
 import { orderRoutesForMatching } from "../egress/index.js";
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import type {
@@ -21,9 +20,6 @@ type AssembleCompiledRuntimePlanInput = {
   sandboxProfileId: string;
   version: number;
   image: CompiledRuntimePlan["image"];
-  runtimeContext: {
-    sandboxdEgressBaseUrl: string;
-  };
   compiledBindingResults: ReadonlyArray<CompiledBindingResult>;
   previousCompiledBindingResults?: ReadonlyArray<CompiledBindingResult>;
 };
@@ -78,8 +74,6 @@ function flattenWorkspaceSources(
 
 function resolveRuntimeClients(input: {
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
-  routeIds: ReadonlySet<string>;
-  egressBaseUrl: string;
 }): ReadonlyArray<RuntimeClient> {
   const resolvedClients: RuntimeClient[] = [];
 
@@ -87,18 +81,7 @@ function resolveRuntimeClients(input: {
     const env: Record<string, string> = {};
 
     for (const [key, value] of Object.entries(runtimeClient.setup.env)) {
-      if (typeof value === "string") {
-        env[key] = value;
-        continue;
-      }
-
-      env[key] = resolveEgressUrlRef({
-        value,
-        routeIds: input.routeIds,
-        egressBaseUrl: input.egressBaseUrl,
-        invalidRefCode: EgressUrlRefErrorCodes.RUNTIME_CLIENT_SETUP_INVALID_REF,
-        refOwner: "Runtime client setup",
-      });
+      env[key] = value;
     }
 
     resolvedClients.push({
@@ -451,7 +434,6 @@ export function assembleCompiledRuntimePlan(
       (compiledBindingResult) => compiledBindingResult.egressRoutes,
     ),
   );
-  const routeIds = new Set(routes.map((route) => route.routeId));
   const artifacts = sortArtifacts(flattenArtifacts(input.compiledBindingResults));
   const artifactRemovals = computeArtifactRemovals({
     artifacts,
@@ -460,8 +442,6 @@ export function assembleCompiledRuntimePlan(
   const runtimeClients = mergeRuntimeClients(
     resolveRuntimeClients({
       runtimeClients: flattenRuntimeClients(input.compiledBindingResults),
-      routeIds,
-      egressBaseUrl: input.runtimeContext.sandboxdEgressBaseUrl,
     }),
   );
   const agentRuntimes = [...flattenAgentRuntimes(input.compiledBindingResults)].sort(
@@ -473,9 +453,7 @@ export function assembleCompiledRuntimePlan(
   );
   const workspaceSources = [...flattenWorkspaceSources(input.compiledBindingResults)].sort(
     (left, right) =>
-      left.path.localeCompare(right.path) ||
-      left.originUrl.localeCompare(right.originUrl) ||
-      left.routeId.localeCompare(right.routeId),
+      left.path.localeCompare(right.path) || left.originUrl.localeCompare(right.originUrl),
   );
 
   return {

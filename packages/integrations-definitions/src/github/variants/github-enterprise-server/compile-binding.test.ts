@@ -38,14 +38,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         },
       },
       refs: {
-        egressUrl: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
         artifactBinPath,
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });
 
@@ -97,10 +90,6 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         resourceKind: "repository",
         path: "/workspace/repos/acme/repo",
         originUrl: "https://ghe.example.com/acme/repo.git",
-        routeId: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
       },
     ]);
   });
@@ -136,14 +125,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         },
       },
       refs: {
-        egressUrl: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
         artifactBinPath,
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });
 
@@ -189,14 +171,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         },
       },
       refs: {
-        egressUrl: {
-          kind: "egress_url",
-          routeId: "route_ibd_123",
-        },
         artifactBinPath,
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
       },
     });
 
@@ -242,14 +217,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
           },
         },
         refs: {
-          egressUrl: {
-            kind: "egress_url",
-            routeId: "route_ibd_123",
-          },
           artifactBinPath,
-        },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
         },
       }),
     ).toThrowError();

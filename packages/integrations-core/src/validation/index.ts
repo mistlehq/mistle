@@ -6,7 +6,6 @@ import type {
   CompiledRuntimeClient,
   CompiledWorkspaceSource,
   EgressCredentialRoute,
-  EgressUrlRef,
   RuntimeArtifactCommand,
   RuntimeClientEndpointSpec,
   RuntimeClientProcessSpec,
@@ -151,10 +150,7 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
   }
 }
 
-function validateWorkspaceSources(
-  input: ReadonlyArray<CompiledWorkspaceSource>,
-  routeIds: ReadonlySet<string>,
-): void {
+function validateWorkspaceSources(input: ReadonlyArray<CompiledWorkspaceSource>): void {
   const sourceByPath = new Map<string, CompiledWorkspaceSource>();
 
   for (const workspaceSource of input) {
@@ -169,13 +165,6 @@ function validateWorkspaceSources(
       throw new IntegrationCompilerError(
         CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
         `Workspace source '${workspaceSource.path}' must define a non-empty originUrl.`,
-      );
-    }
-
-    if (!routeIds.has(workspaceSource.routeId)) {
-      throw new IntegrationCompilerError(
-        CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
-        `Workspace source '${workspaceSource.path}' references missing route '${workspaceSource.routeId}'.`,
       );
     }
 
@@ -273,14 +262,6 @@ function artifactLifecycleEquals(
     artifactCommandsEqual(leftUpdate, rightUpdate) &&
     artifactCommandsEqual(left.remove, right.remove)
   );
-}
-
-function runtimeClientSetupValueEquals(left: string | EgressUrlRef, right: string | EgressUrlRef) {
-  if (typeof left === "string" || typeof right === "string") {
-    return left === right;
-  }
-
-  return left.kind === right.kind && left.routeId === right.routeId;
 }
 
 function runtimeArtifactCommandEquals(
@@ -550,7 +531,7 @@ function validateRuntimeClientEndpoint(input: {
 }
 
 function validateRuntimeClients(input: ReadonlyArray<CompiledRuntimeClient>): void {
-  const clientEnvByClientId = new Map<string, Map<string, string | EgressUrlRef>>();
+  const clientEnvByClientId = new Map<string, Map<string, string>>();
   const clientFilesByPathByClientId = new Map<
     string,
     Map<string, { fileId: string; mode: number; content: string }>
@@ -578,7 +559,7 @@ function validateRuntimeClients(input: ReadonlyArray<CompiledRuntimeClient>): vo
 
     for (const [envKey, envValue] of Object.entries(runtimeClient.setup.env)) {
       const existingValue = envByKey.get(envKey);
-      if (existingValue !== undefined && !runtimeClientSetupValueEquals(existingValue, envValue)) {
+      if (existingValue !== undefined && existingValue !== envValue) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
           `Runtime client env conflict for client '${runtimeClient.clientId}' and key '${envKey}'.`,
@@ -784,10 +765,7 @@ export function validateCompiledBindingResults(input: {
 
   validateRoutes(flattenedResults.egressRoutes);
   validateArtifacts(flattenedResults.artifacts);
-  validateWorkspaceSources(
-    flattenedResults.workspaceSources,
-    new Set(flattenedResults.egressRoutes.map((route) => route.routeId)),
-  );
+  validateWorkspaceSources(flattenedResults.workspaceSources);
   validateRuntimeClients(flattenedResults.runtimeClients);
   validateAgentRuntimes({
     compiledBindingResults: input.compiledBindingResults,

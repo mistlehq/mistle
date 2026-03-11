@@ -3,8 +3,6 @@ import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/
 import { compileProfileVersionRuntimePlan } from "./compile-profile-version-runtime-plan.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
-export const SandboxdEgressBaseUrl = "http://127.0.0.1:8090/egress";
-
 type StartProfileInstanceInput = {
   organizationId: string;
   profileId: string;
@@ -47,9 +45,6 @@ export async function startProfileInstance(
       image: {
         source: "base",
         imageRef: serviceInput.image.imageId,
-      },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: SandboxdEgressBaseUrl,
       },
     },
   );

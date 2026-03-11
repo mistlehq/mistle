@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -16,8 +15,7 @@ import (
 )
 
 type ApplyInput struct {
-	RuntimePlan           startup.RuntimePlan
-	SandboxdEgressBaseURL string
+	RuntimePlan startup.RuntimePlan
 }
 
 const (
@@ -34,18 +32,11 @@ const (
 )
 
 // Apply realizes the runtime plan on disk before runtime client processes are
-// launched. It owns filesystem mutations only; networked workspace sources must
-// go through sandboxd so later in-sandbox tool behavior matches startup
-// behavior.
+// launched. It owns filesystem mutations only.
 func Apply(input ApplyInput) error {
 	commandSet, err := resolveArtifactLifecycleCommandSet(input.RuntimePlan.Image.Source)
 	if err != nil {
 		return err
-	}
-	if len(input.RuntimePlan.WorkspaceSources) > 0 {
-		if strings.TrimSpace(input.SandboxdEgressBaseURL) == "" {
-			return fmt.Errorf("sandboxd egress base url is required when workspaceSources are declared")
-		}
 	}
 
 	if input.RuntimePlan.Image.Source == runtimeImageSourceSnapshot {
@@ -114,17 +105,17 @@ func Apply(input ApplyInput) error {
 func applyWorkspaceSource(workspaceSource startup.WorkspaceSource, input ApplyInput) error {
 	switch workspaceSource.SourceKind {
 	case "git-clone":
-		return applyGitCloneWorkspaceSource(workspaceSource, input)
+		return applyGitCloneWorkspaceSource(workspaceSource)
 	default:
 		return fmt.Errorf("workspace source kind '%s' is not supported", workspaceSource.SourceKind)
 	}
 }
 
-// applyGitCloneWorkspaceSource performs the initial clone through sandboxd's
-// route-based egress path, then restores the canonical origin URL and writes a
-// repo-local insteadOf rule so later git commands continue to use mediated
-// auth without storing credentials in the repository config.
-func applyGitCloneWorkspaceSource(workspaceSource startup.WorkspaceSource, input ApplyInput) error {
+// applyGitCloneWorkspaceSource clones the canonical origin directly. The
+// sandbox-wide outbound proxy is already active, so startup and later in-sandbox
+// git commands share the same mediated auth path without route-specific git
+// rewriting.
+func applyGitCloneWorkspaceSource(workspaceSource startup.WorkspaceSource) error {
 	if pathExists(workspaceSource.Path) {
 		return fmt.Errorf("workspace source path '%s' already exists", workspaceSource.Path)
 	}
@@ -134,81 +125,11 @@ func applyGitCloneWorkspaceSource(workspaceSource startup.WorkspaceSource, input
 		return fmt.Errorf("failed to create parent directory %s: %w", parentDirectory, err)
 	}
 
-	sandboxRouteURL, err := createWorkspaceSourceRouteURL(
-		input.SandboxdEgressBaseURL,
-		workspaceSource.RouteID,
-		workspaceSource.OriginURL,
-	)
-	if err != nil {
-		return fmt.Errorf("failed to resolve sandbox route URL: %w", err)
-	}
-
-	if err := runGitCommand([]string{"clone", "--origin", "origin", sandboxRouteURL, workspaceSource.Path}); err != nil {
+	if err := runGitCommand([]string{"clone", "--origin", "origin", workspaceSource.OriginURL, workspaceSource.Path}); err != nil {
 		return fmt.Errorf("failed to clone repository: %w", err)
 	}
 
-	if err := runGitCommand([]string{"-C", workspaceSource.Path, "remote", "set-url", "origin", workspaceSource.OriginURL}); err != nil {
-		return fmt.Errorf("failed to restore canonical origin URL: %w", err)
-	}
-
-	if err := runGitCommand([]string{
-		"-C",
-		workspaceSource.Path,
-		"config",
-		"--local",
-		"--replace-all",
-		fmt.Sprintf("url.%s.insteadOf", sandboxRouteURL),
-		workspaceSource.OriginURL,
-	}); err != nil {
-		return fmt.Errorf("failed to configure git url rewrite: %w", err)
-	}
-
 	return nil
-}
-
-// createWorkspaceSourceRouteURL maps a canonical origin URL onto the sandboxd
-// route URL that tokenizer-proxy can authorize. The origin path is preserved so
-// git still requests the expected repository endpoint after the route prefix is
-// added.
-func createWorkspaceSourceRouteURL(baseURL string, routeID string, originURL string) (string, error) {
-	parsedBaseURL, err := url.Parse(strings.TrimSpace(baseURL))
-	if err != nil {
-		return "", fmt.Errorf("failed to parse base URL: %w", err)
-	}
-	parsedOriginURL, err := url.Parse(strings.TrimSpace(originURL))
-	if err != nil {
-		return "", fmt.Errorf("failed to parse origin URL: %w", err)
-	}
-	if strings.TrimSpace(parsedOriginURL.Path) == "" {
-		return "", fmt.Errorf("origin URL path is required")
-	}
-
-	routedURL := *parsedBaseURL
-	routedURL.Path = joinURLPath(routedURL.Path, "routes/"+url.PathEscape(routeID))
-	routedURL.Path = joinURLPath(routedURL.Path, parsedOriginURL.Path)
-	routedURL.RawQuery = ""
-	routedURL.Fragment = ""
-
-	return routedURL.String(), nil
-}
-
-func joinURLPath(basePath string, suffixPath string) string {
-	normalizedBasePath := strings.TrimSuffix(basePath, "/")
-	normalizedSuffixPath := strings.TrimPrefix(suffixPath, "/")
-
-	if normalizedBasePath == "" || normalizedBasePath == "/" {
-		if normalizedSuffixPath == "" {
-			return "/"
-		}
-
-		return "/" + normalizedSuffixPath
-	}
-
-	if normalizedSuffixPath == "" {
-		return normalizedBasePath
-	}
-
-	return normalizedBasePath + "/" + normalizedSuffixPath
 }
 
 func pathExists(path string) bool {

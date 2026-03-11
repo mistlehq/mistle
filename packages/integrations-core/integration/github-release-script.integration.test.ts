@@ -90,9 +90,6 @@ describe("renderInstallLatestGithubReleaseBinaryScript integration", () => {
         source: "base",
         imageRef: "127.0.0.1:5001/mistle/sandbox-base:dev",
       },
-      runtimeContext: {
-        sandboxdEgressBaseUrl: "http://127.0.0.1:8090/egress",
-      },
       registry,
       bindings: [
         {

@@ -89,9 +89,6 @@ describe("sandbox profile compile runtime plan integration", () => {
           source: "base",
           imageRef: "mistle/sandbox-base:dev",
         },
-        runtimeContext: {
-          sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
-        },
       },
     );
 
@@ -126,7 +123,7 @@ describe("sandbox profile compile runtime plan integration", () => {
         clientId: "codex-cli",
         setup: {
           env: {
-            OPENAI_BASE_URL: "http://sandboxd.internal/egress/routes/route_ibd_compile_success",
+            OPENAI_BASE_URL: "https://api.openai.com/v1",
             OPENAI_MODEL: "gpt-5.3-codex",
             OPENAI_REASONING_EFFORT: "medium",
           },
@@ -202,9 +199,6 @@ trust_level = "trusted"
             source: "base",
             imageRef: "mistle/sandbox-base:dev",
           },
-          runtimeContext: {
-            sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
-          },
         },
       );
       throw new Error("Expected compileProfileVersionRuntimePlan to throw.");
@@ -242,9 +236,6 @@ trust_level = "trusted"
           image: {
             source: "base",
             imageRef: "mistle/sandbox-base:dev",
-          },
-          runtimeContext: {
-            sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
         },
       );
@@ -323,9 +314,6 @@ trust_level = "trusted"
           image: {
             source: "base",
             imageRef: "mistle/sandbox-base:dev",
-          },
-          runtimeContext: {
-            sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
         },
       );
@@ -406,9 +394,6 @@ trust_level = "trusted"
           image: {
             source: "base",
             imageRef: "mistle/sandbox-base:dev",
-          },
-          runtimeContext: {
-            sandboxdEgressBaseUrl: "http://sandboxd.internal/egress",
           },
         },
       );

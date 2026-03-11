@@ -31,7 +31,7 @@ func TestApply(t *testing.T) {
 									FileID:  "file_codex_config",
 									Path:    firstFilePath,
 									Mode:    0o600,
-									Content: "api_base_url = \"http://127.0.0.1:8090/egress/routes/route_openai\"",
+									Content: "api_base_url = \"https://api.openai.com/v1\"",
 								},
 							},
 						},
@@ -65,7 +65,7 @@ func TestApply(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected first runtime file to exist, got %v", err)
 		}
-		if string(firstFileBytes) != "api_base_url = \"http://127.0.0.1:8090/egress/routes/route_openai\"" {
+		if string(firstFileBytes) != "api_base_url = \"https://api.openai.com/v1\"" {
 			t.Fatalf("unexpected first runtime file content: %s", string(firstFileBytes))
 		}
 
