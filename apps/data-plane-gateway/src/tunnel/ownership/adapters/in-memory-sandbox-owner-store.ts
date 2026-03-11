@@ -1,6 +1,5 @@
-import { randomUUID } from "node:crypto";
-
 import type { Clock } from "@mistle/time";
+import { typeid } from "typeid-js";
 
 import type { SandboxOwnerStore } from "../sandbox-owner-store.js";
 import type { SandboxOwner } from "../types.js";
@@ -24,7 +23,7 @@ export class InMemorySandboxOwnerStore implements SandboxOwnerStore {
       sandboxInstanceId: input.sandboxInstanceId,
       nodeId: input.nodeId,
       sessionId: input.sessionId,
-      leaseId: randomUUID(),
+      leaseId: typeid("dtl").toString(),
       expiresAt: new Date(this.clock.nowMs() + input.ttlMs),
     };
 

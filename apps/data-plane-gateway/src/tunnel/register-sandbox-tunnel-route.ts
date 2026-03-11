@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import type { NodeWebSocket } from "@hono/node-ws";
 import {
   ConnectionTokenError,
@@ -12,6 +10,7 @@ import {
   verifyBootstrapToken,
 } from "@mistle/gateway-tunnel-auth";
 import type { WSMessageReceive } from "hono/ws";
+import { typeid } from "typeid-js";
 
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
@@ -228,7 +227,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
       }
 
       if (verifiedTokenKind === "bootstrap") {
-        const sandboxRelaySessionId = randomUUID();
+        const sandboxRelaySessionId = typeid("dts").toString();
         try {
           const owner = await input.sandboxOwnerStore.claimOwner({
             sandboxInstanceId: requestedInstanceId,

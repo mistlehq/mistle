@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { typeid } from "typeid-js";
 
 import { LocalPeerRegistry } from "./local-peer-registry/index.js";
 import { RelayTransport } from "./relay-transport/index.js";
@@ -52,7 +52,7 @@ export class TunnelRelayCoordinator {
       sandboxInstanceId: input.sandboxInstanceId,
       side: input.side,
       nodeId: this.nodeId,
-      sessionId: input.sessionId ?? randomUUID(),
+      sessionId: input.sessionId ?? typeid("dts").toString(),
     };
 
     this.relayTransport.registerLocalPeer({
