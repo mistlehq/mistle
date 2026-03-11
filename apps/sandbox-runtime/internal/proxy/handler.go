@@ -58,7 +58,7 @@ func NewHandler(input NewHandlerInput) (http.Handler, error) {
 	}
 
 	return Handler{
-		httpClient:           input.HTTPClient,
+		httpClient:           newRedirectPreservingClient(input.HTTPClient),
 		certificateAuthority: input.CertificateAuthority,
 		integrationMediator:  input.IntegrationMediator,
 	}, nil
@@ -473,6 +473,14 @@ func closeRequestBody(request *http.Request) {
 		return
 	}
 	_ = request.Body.Close()
+}
+
+func newRedirectPreservingClient(baseClient *http.Client) *http.Client {
+	clonedClient := *baseClient
+	clonedClient.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return &clonedClient
 }
 
 func firstNonEmpty(values ...string) string {

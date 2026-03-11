@@ -35,7 +35,14 @@ func InstallProxyCACertificate(certificatePEM []byte) error {
 }
 
 func runUpdateCACertificates() error {
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		return fmt.Errorf("failed to open %s for update-ca-certificates stdin: %w", os.DevNull, err)
+	}
+	defer devNull.Close()
+
 	command := exec.Command(UpdateCACertificatesPath)
+	command.Stdin = devNull
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
 	if err := command.Run(); err != nil {

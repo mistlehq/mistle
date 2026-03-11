@@ -213,6 +213,64 @@ func TestHandlerServeHTTP(t *testing.T) {
 		}
 	})
 
+	t.Run("preserves upstream redirects for intercepted https requests", func(t *testing.T) {
+		upstreamServer := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			switch request.URL.Path {
+			case "/releases/latest":
+				http.Redirect(writer, request, "/releases/tag/v2.88.0", http.StatusFound)
+			case "/releases/tag/v2.88.0":
+				writer.WriteHeader(http.StatusOK)
+				_, _ = io.WriteString(writer, "ok")
+			default:
+				http.NotFound(writer, request)
+			}
+		}))
+		defer upstreamServer.Close()
+
+		certificateAuthority, rootPool := mustProxyAuthorityAndRootPool(t)
+		upstreamTransport, ok := upstreamServer.Client().Transport.(*http.Transport)
+		if !ok {
+			t.Fatal("expected upstream tls server transport to be *http.Transport")
+		}
+		handler, err := NewHandler(NewHandlerInput{
+			HTTPClient: &http.Client{
+				Transport: upstreamTransport.Clone(),
+			},
+			CertificateAuthority: certificateAuthority,
+		})
+		if err != nil {
+			t.Fatalf("expected handler creation to succeed, got %v", err)
+		}
+
+		proxyServer := httptest.NewServer(handler)
+		defer proxyServer.Close()
+
+		client := &http.Client{
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+			Transport: &http.Transport{
+				Proxy: mustProxyURL(t, proxyServer.URL),
+				TLSClientConfig: &tls.Config{
+					RootCAs: rootPool,
+				},
+			},
+		}
+
+		response, err := client.Head(upstreamServer.URL + "/releases/latest")
+		if err != nil {
+			t.Fatalf("expected intercepted https head request to succeed, got %v", err)
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusFound {
+			t.Fatalf("expected upstream redirect status 302, got %d", response.StatusCode)
+		}
+		if response.Header.Get("Location") != "/releases/tag/v2.88.0" {
+			t.Fatalf("expected upstream redirect location to be preserved, got %q", response.Header.Get("Location"))
+		}
+	})
+
 	t.Run("preserves upgraded https streams after switching protocols", func(t *testing.T) {
 		upstreamServer := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			if request.Header.Get("Connection") != "Upgrade" {
