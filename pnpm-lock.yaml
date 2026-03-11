@@ -270,13 +270,13 @@ importers:
         version: 1.0.11(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@rjsf/core':
         specifier: ~6.3.1
-        version: 6.3.1(@rjsf/utils@6.3.1(react@19.2.4))(react@19.2.4)
+        version: 6.3.1(@rjsf/utils@6.4.1(react@19.2.4))(react@19.2.4)
       '@rjsf/utils':
-        specifier: ~6.3.1
-        version: 6.3.1(react@19.2.4)
+        specifier: ~6.4.1
+        version: 6.4.1(react@19.2.4)
       '@rjsf/validator-ajv8':
         specifier: ~6.3.1
-        version: 6.3.1(@rjsf/utils@6.3.1(react@19.2.4))
+        version: 6.3.1(@rjsf/utils@6.4.1(react@19.2.4))
       '@streamdown/code':
         specifier: ^1.1.0
         version: 1.1.0(react@19.2.4)
@@ -4420,8 +4420,8 @@ packages:
       '@rjsf/utils': ^6.3.x
       react: '>=18'
 
-  '@rjsf/utils@6.3.1':
-    resolution: {integrity: sha512-ve2KHl1ITYG8QIonnuK83/T1k/5NuxP4D1egVqP9Hz2ub28kgl0rNMwmRSxXs3WIbCcMW9g3ox+daVrbSNc4Mw==}
+  '@rjsf/utils@6.4.1':
+    resolution: {integrity: sha512-5NL3jwt3rIS5/WRTrKt++y40FS/ScKGVwYJ3jIrHSQHSwBdLnd4cHf2zcnA97L1Klj8I6tvS/ugh+blf/Diwuw==}
     engines: {node: '>=20'}
     peerDependencies:
       react: '>=18'
@@ -14960,16 +14960,16 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@rjsf/core@6.3.1(@rjsf/utils@6.3.1(react@19.2.4))(react@19.2.4)':
+  '@rjsf/core@6.3.1(@rjsf/utils@6.4.1(react@19.2.4))(react@19.2.4)':
     dependencies:
-      '@rjsf/utils': 6.3.1(react@19.2.4)
+      '@rjsf/utils': 6.4.1(react@19.2.4)
       lodash: 4.17.23
       lodash-es: 4.17.23
       markdown-to-jsx: 8.0.0(react@19.2.4)
       prop-types: 15.8.1
       react: 19.2.4
 
-  '@rjsf/utils@6.3.1(react@19.2.4)':
+  '@rjsf/utils@6.4.1(react@19.2.4)':
     dependencies:
       '@x0k/json-schema-merge': 1.0.2
       fast-uri: 3.1.0
@@ -14979,9 +14979,9 @@ snapshots:
       react: 19.2.4
       react-is: 18.3.1
 
-  '@rjsf/validator-ajv8@6.3.1(@rjsf/utils@6.3.1(react@19.2.4))':
+  '@rjsf/validator-ajv8@6.3.1(@rjsf/utils@6.4.1(react@19.2.4))':
     dependencies:
-      '@rjsf/utils': 6.3.1(react@19.2.4)
+      '@rjsf/utils': 6.4.1(react@19.2.4)
       ajv: 8.18.0
       ajv-formats: 2.1.1(ajv@8.18.0)
       lodash: 4.17.23
