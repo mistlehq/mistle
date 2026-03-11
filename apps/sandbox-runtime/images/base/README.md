@@ -15,12 +15,13 @@ The base image includes a single sandbox runtime entrypoint that every sandbox w
 - Entry point: `/usr/local/bin/sandbox-bootstrap`
 - Bootstrap exec target: `/usr/local/bin/sandboxd`
 - Default listen address: `SANDBOX_RUNTIME_LISTEN_ADDR=:8090`
-- Sandbox user env: `SANDBOX_USER` defaults to `sandbox`
+- Sandbox user env: `SANDBOX_USER` is reserved and must remain `sandbox`
 - Tokenizer proxy egress base URL env: `SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL`
 - Optional proxy CA certificate path env: `SANDBOX_RUNTIME_PROXY_CA_CERT_PATH`
   - when set, it must point to an absolute path readable by the root-owned bootstrap process
   - the certificate is installed into `/usr/local/share/ca-certificates/mistle-proxy-ca.crt`
-  - `update-ca-certificates` is run before privileges are dropped
+  - when unset, any previously installed `mistle-proxy-ca.crt` file is removed before privileges are dropped
+  - `update-ca-certificates` is run after install or removal before privileges are dropped
 - Startup input: JSON must be provided via process `stdin` during startup with required fields:
   - `bootstrapToken`
   - `tunnelGatewayWsUrl`
