@@ -1,17 +1,14 @@
 export {
-  HandleAutomationConversationDeliveryWorkflowSpec,
-  type HandleAutomationConversationDeliveryWorkflowInput,
-  type HandleAutomationConversationDeliveryWorkflowOutput,
-} from "./spec.js";
-export {
-  createHandleAutomationConversationDeliveryWorkflow,
   ActiveAutomationConversationDeliveryTaskStatuses,
+  HandleAutomationConversationDeliveryWorkflow,
+  HandleAutomationConversationDeliveryWorkflowSpec,
   type ActiveAutomationConversationDeliveryTask,
   type ActiveAutomationConversationDeliveryTaskStatus,
   type AcquiredAutomationConnection,
   type AutomationConversationDeliveryTaskAction,
-  type CreateHandleAutomationConversationDeliveryWorkflowInput,
   type EnsuredAutomationSandbox,
   type FinalAutomationConversationDeliveryTaskStatus,
+  type HandleAutomationConversationDeliveryWorkflowInput,
+  type HandleAutomationConversationDeliveryWorkflowOutput,
   type ResolvedAutomationConversationDeliveryRoute,
 } from "./workflow.js";

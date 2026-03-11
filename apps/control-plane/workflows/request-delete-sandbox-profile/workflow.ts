@@ -1,38 +1,46 @@
-import { defineWorkflow, type Workflow } from "openworkflow";
+import { defineWorkflow, defineWorkflowSpec } from "openworkflow";
 
-import {
-  RequestDeleteSandboxProfileWorkflowSpec,
-  type RequestDeleteSandboxProfileWorkflowInput,
-  type RequestDeleteSandboxProfileWorkflowOutput,
-} from "./spec.js";
+import { deleteSandboxProfile } from "../../src/worker/runtime/services/delete-sandbox-profile.js";
+import { getControlPlaneWorkflowRuntime } from "../runtime-context.js";
 
-export type CreateRequestDeleteSandboxProfileWorkflowInput = {
-  deleteSandboxProfile: (input: { organizationId: string; profileId: string }) => Promise<void>;
+export type RequestDeleteSandboxProfileWorkflowInput = {
+  organizationId: string;
+  profileId: string;
+};
+
+export type RequestDeleteSandboxProfileWorkflowOutput = {
+  profileId: string;
 };
 
 /**
  * Creates the sandbox profile deletion workflow implementation.
  */
-export function createRequestDeleteSandboxProfileWorkflow(
-  ctx: CreateRequestDeleteSandboxProfileWorkflowInput,
-): Workflow<
-  RequestDeleteSandboxProfileWorkflowInput,
-  RequestDeleteSandboxProfileWorkflowOutput,
-  RequestDeleteSandboxProfileWorkflowInput
-> {
-  return defineWorkflow(
-    RequestDeleteSandboxProfileWorkflowSpec,
-    async ({ input: workflowInput, step }) => {
-      await step.run({ name: "delete-sandbox-profile" }, async () => {
-        await ctx.deleteSandboxProfile({
+export const RequestDeleteSandboxProfileWorkflow = defineWorkflow(
+  defineWorkflowSpec<
+    RequestDeleteSandboxProfileWorkflowInput,
+    RequestDeleteSandboxProfileWorkflowOutput
+  >({
+    name: "control-plane.sandbox-profiles.request-delete-profile",
+    version: "1",
+  }),
+  async ({ input: workflowInput, step }) => {
+    const runtime = await getControlPlaneWorkflowRuntime();
+    await step.run({ name: "delete-sandbox-profile" }, async () => {
+      await deleteSandboxProfile(
+        {
+          db: runtime.db,
+        },
+        {
           organizationId: workflowInput.organizationId,
           profileId: workflowInput.profileId,
-        });
-      });
+        },
+      );
+    });
 
-      return {
-        profileId: workflowInput.profileId,
-      };
-    },
-  );
-}
+    return {
+      profileId: workflowInput.profileId,
+    };
+  },
+);
+
+export const RequestDeleteSandboxProfileWorkflowSpec = RequestDeleteSandboxProfileWorkflow.spec;

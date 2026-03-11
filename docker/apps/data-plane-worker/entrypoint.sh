@@ -6,9 +6,9 @@ if [ -z "${MISTLE_CONFIG_PATH:-}" ]; then
   exit 1
 fi
 
-if [ ! -f "apps/data-plane/dist/src/worker/index.js" ]; then
-  echo "Expected prebuilt apps/data-plane/dist artifacts in image." >&2
+if [ ! -f "apps/data-plane/openworkflow.config.ts" ]; then
+  echo "Expected apps/data-plane/openworkflow.config.ts in image." >&2
   exit 1
 fi
 
-exec node apps/data-plane/dist/src/worker/index.js
+exec pnpm --dir apps/data-plane worker

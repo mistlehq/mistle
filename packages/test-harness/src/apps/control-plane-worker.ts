@@ -1,24 +1,72 @@
-import type { StartDockerHttpAppInput, DockerHttpAppDefinition } from "./http-app.js";
-import { startDockerHttpApp } from "./http-app.js";
-import type { StartedWorkspaceApp } from "./shared.js";
+import type { StartedNetwork } from "testcontainers";
 
-const ControlPlaneWorkerDefinition: DockerHttpAppDefinition = {
-  appName: "control-plane-worker",
-  distEntrypointRelativePath: "apps/control-plane/dist/src/worker/index.js",
-  dockerfileRelativePath: "Dockerfile.test",
-  dockerTarget: "control-plane-worker-test-runtime",
-  containerPort: 5101,
-  networkAlias: "control-plane-worker",
-  healthPath: "/__healthz",
-  hostEnvVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_HOST",
-  portEnvVar: "MISTLE_APPS_CONTROL_PLANE_WORKER_PORT",
+import { startDockerTargetApp, type StartedWorkspaceApp } from "./shared.js";
+
+const DEFAULT_DOCKER_TEST_OTLP_TRACES_ENDPOINT =
+  "http://host.testcontainers.internal:4318/v1/traces";
+const DEFAULT_DOCKER_TEST_OTLP_LOGS_ENDPOINT = "http://host.testcontainers.internal:4318/v1/logs";
+const DEFAULT_DOCKER_TEST_OTLP_METRICS_ENDPOINT =
+  "http://host.testcontainers.internal:4318/v1/metrics";
+const DEFAULT_DOCKER_TEST_RESOURCE_ATTRIBUTES = "deployment.environment=test";
+
+export type StartControlPlaneWorkerInput = {
+  buildContextHostPath: string;
+  configPathInContainer: string;
+  startupTimeoutMs: number;
+  cacheBustKey?: string;
+  environment: Record<string, string>;
+  network?: StartedNetwork;
 };
 
-export type StartControlPlaneWorkerInput = StartDockerHttpAppInput;
 export type ControlPlaneWorkerService = StartedWorkspaceApp;
+
+function createDefaultTelemetryEnvironment(): Record<string, string> {
+  return {
+    MISTLE_GLOBAL_TELEMETRY_ENABLED: process.env.MISTLE_GLOBAL_TELEMETRY_ENABLED ?? "true",
+    MISTLE_GLOBAL_TELEMETRY_DEBUG: process.env.MISTLE_GLOBAL_TELEMETRY_DEBUG ?? "false",
+    MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT:
+      process.env.MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT ??
+      DEFAULT_DOCKER_TEST_OTLP_TRACES_ENDPOINT,
+    MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT:
+      process.env.MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT ?? DEFAULT_DOCKER_TEST_OTLP_LOGS_ENDPOINT,
+    MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT:
+      process.env.MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT ??
+      DEFAULT_DOCKER_TEST_OTLP_METRICS_ENDPOINT,
+    MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES:
+      process.env.MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES ??
+      DEFAULT_DOCKER_TEST_RESOURCE_ATTRIBUTES,
+  };
+}
 
 export async function startControlPlaneWorker(
   input: StartControlPlaneWorkerInput,
 ): Promise<ControlPlaneWorkerService> {
-  return startDockerHttpApp(ControlPlaneWorkerDefinition, input);
+  return startDockerTargetApp({
+    buildContextHostPath: input.buildContextHostPath,
+    dockerfileRelativePath: "Dockerfile.test",
+    dockerTarget: "control-plane-worker-test-runtime",
+    startupTimeoutMs: input.startupTimeoutMs,
+    containerPort: 5101,
+    networkAlias: "control-plane-worker",
+    readiness: {
+      kind: "log",
+      pattern: /Worker started\./,
+      times: 1,
+    },
+    environment: {
+      ...createDefaultTelemetryEnvironment(),
+      ...input.environment,
+      MISTLE_CONFIG_PATH: input.configPathInContainer,
+    },
+    ...(input.cacheBustKey === undefined
+      ? {}
+      : {
+          cacheBustKey: input.cacheBustKey,
+        }),
+    ...(input.network === undefined
+      ? {}
+      : {
+          network: input.network,
+        }),
+  });
 }

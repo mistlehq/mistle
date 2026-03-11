@@ -1,4 +1,4 @@
-import type { StartSandboxInstanceWorkflowInput } from "@data-plane/workflows";
+import type { StartSandboxInstanceWorkflowInput } from "../../../../workflows/start-sandbox-instance/index.js";
 
 const Encoder = new TextEncoder();
 

@@ -1,11 +1,4 @@
-import type {
-  DataPlaneWorkerServices,
-  StartSandboxInstanceWorkflowServices,
-} from "@data-plane/workflows";
-import type { DataPlaneDatabase } from "@mistle/db/data-plane";
-import type { SandboxAdapter } from "@mistle/sandbox";
-import type { Clock, Sleeper } from "@mistle/time";
-
+import type { StartSandboxInstanceWorkflowInput } from "../../../../workflows/start-sandbox-instance/index.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
 
 export type TunnelConnectAckPolicy = {
@@ -13,39 +6,55 @@ export type TunnelConnectAckPolicy = {
   pollIntervalMs: number;
 };
 
-export type SandboxLifecycleService = StartSandboxInstanceWorkflowServices["sandboxLifecycle"];
-export type SandboxInstanceStoreService = StartSandboxInstanceWorkflowServices["sandboxInstances"];
-export type TunnelConnectAckService = StartSandboxInstanceWorkflowServices["tunnelConnectAcks"];
-
-export type StartSandboxInput = Parameters<SandboxLifecycleService["startSandbox"]>[0];
-export type StartSandboxOutput = Awaited<ReturnType<SandboxLifecycleService["startSandbox"]>>;
-export type StopSandboxInput = Parameters<SandboxLifecycleService["stopSandbox"]>[0];
-export type EnsureSandboxInstanceInput = Parameters<
-  SandboxInstanceStoreService["ensureSandboxInstance"]
->[0];
-export type EnsureSandboxInstanceOutput = Awaited<
-  ReturnType<SandboxInstanceStoreService["ensureSandboxInstance"]>
->;
-export type PersistSandboxInstanceProvisioningInput = Parameters<
-  SandboxInstanceStoreService["persistSandboxInstanceProvisioning"]
->[0];
-export type MarkSandboxInstanceRunningInput = Parameters<
-  SandboxInstanceStoreService["markSandboxInstanceRunning"]
->[0];
-export type MarkSandboxInstanceFailedInput = Parameters<
-  SandboxInstanceStoreService["markSandboxInstanceFailed"]
->[0];
-export type WaitForSandboxTunnelConnectAckInput = Parameters<
-  TunnelConnectAckService["waitForSandboxTunnelConnectAck"]
->[0];
-
-export type CreateDataPlaneWorkerServicesInput = {
-  config: DataPlaneWorkerRuntimeConfig;
-  db: DataPlaneDatabase;
-  sandboxAdapter: SandboxAdapter;
-  tunnelConnectAckPolicy: TunnelConnectAckPolicy;
-  clock: Clock;
-  sleeper: Sleeper;
+export type StartSandboxInput = {
+  sandboxInstanceId: string;
+  image: StartSandboxInstanceWorkflowInput["image"];
+  runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
 };
 
-export type { DataPlaneWorkerServices };
+export type StartSandboxOutput = {
+  sandboxInstanceId: string;
+  provider: DataPlaneWorkerRuntimeConfig["sandbox"]["provider"];
+  providerSandboxId: string;
+  bootstrapTokenJti: string;
+};
+
+export type StopSandboxInput = {
+  provider: DataPlaneWorkerRuntimeConfig["sandbox"]["provider"];
+  providerSandboxId: string;
+};
+
+export type EnsureSandboxInstanceInput = {
+  sandboxInstanceId: string;
+  organizationId: string;
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  startedBy: StartSandboxInstanceWorkflowInput["startedBy"];
+  source: StartSandboxInstanceWorkflowInput["source"];
+};
+
+export type EnsureSandboxInstanceOutput = {
+  sandboxInstanceId: string;
+};
+
+export type PersistSandboxInstanceProvisioningInput = {
+  sandboxInstanceId: string;
+  runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+  sandboxProfileId: string;
+  sandboxProfileVersion: number;
+  providerSandboxId: string;
+};
+
+export type MarkSandboxInstanceRunningInput = {
+  sandboxInstanceId: string;
+};
+
+export type MarkSandboxInstanceFailedInput = {
+  sandboxInstanceId: string;
+  failureCode: string;
+  failureMessage: string;
+};
+
+export type WaitForSandboxTunnelConnectAckInput = {
+  bootstrapTokenJti: string;
+};

@@ -1,33 +1,61 @@
-import { defineWorkflow, type Workflow } from "openworkflow";
+import { defineWorkflow, defineWorkflowSpec } from "openworkflow";
 
-import {
-  HandleIntegrationWebhookEventWorkflowSpec,
-  type HandleIntegrationWebhookEventWorkflowInput,
-  type HandleIntegrationWebhookEventWorkflowOutput,
-} from "./spec.js";
+import { handleIntegrationWebhookEvent } from "../../src/worker/runtime/services/handle-integration-webhook-event.js";
+import { HandleAutomationRunWorkflow } from "../handle-automation-run/index.js";
+import { getControlPlaneWorkflowRuntime } from "../runtime-context.js";
 
-export type CreateHandleIntegrationWebhookEventWorkflowInput = {
-  handleWebhookEvent: (
-    input: HandleIntegrationWebhookEventWorkflowInput,
-  ) => Promise<HandleIntegrationWebhookEventWorkflowOutput>;
+export type HandleIntegrationWebhookEventWorkflowInput = {
+  webhookEventId: string;
+};
+
+export type HandleIntegrationWebhookEventWorkflowOutput = {
+  webhookEventId: string;
 };
 
 /**
  * Creates the control-plane webhook handling workflow.
  */
-export function createHandleIntegrationWebhookEventWorkflow(
-  input: CreateHandleIntegrationWebhookEventWorkflowInput,
-): Workflow<
-  HandleIntegrationWebhookEventWorkflowInput,
-  HandleIntegrationWebhookEventWorkflowOutput,
-  HandleIntegrationWebhookEventWorkflowInput
-> {
-  return defineWorkflow(
-    HandleIntegrationWebhookEventWorkflowSpec,
-    async ({ input: workflowInput, step }) => {
-      return step.run({ name: "handle-webhook-event" }, async () =>
-        input.handleWebhookEvent(workflowInput),
-      );
-    },
-  );
-}
+export const HandleIntegrationWebhookEventWorkflow = defineWorkflow(
+  defineWorkflowSpec<
+    HandleIntegrationWebhookEventWorkflowInput,
+    HandleIntegrationWebhookEventWorkflowOutput
+  >({
+    name: "control-plane.integration-webhooks.handle-event",
+    version: "1",
+  }),
+  async ({ input: workflowInput, step }) => {
+    const runtime = await getControlPlaneWorkflowRuntime();
+
+    return step.run({ name: "handle-webhook-event" }, async () =>
+      handleIntegrationWebhookEvent(
+        {
+          db: runtime.db,
+          integrationRegistry: runtime.integrationRegistry,
+          enqueueAutomationRuns: async ({ automationRunIds }) => {
+            for (const automationRunId of automationRunIds) {
+              await runtime.openWorkflow.runWorkflow(
+                HandleAutomationRunWorkflow.spec,
+                {
+                  automationRunId,
+                },
+                {
+                  idempotencyKey: automationRunId,
+                },
+              );
+            }
+          },
+          enqueueResourceSync: async ({ organizationId, connectionId, kind }) => {
+            await runtime.controlPlaneInternalClient.requestIntegrationConnectionResourceRefresh({
+              organizationId,
+              connectionId,
+              kind,
+            });
+          },
+        },
+        workflowInput,
+      ),
+    );
+  },
+);
+
+export const HandleIntegrationWebhookEventWorkflowSpec = HandleIntegrationWebhookEventWorkflow.spec;

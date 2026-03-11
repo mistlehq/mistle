@@ -2,7 +2,7 @@
 
 Reference catalog of control-plane workflows in `apps/control-plane/workflows`.
 
-`apps/control-plane/workflows` owns the workflow definitions, orchestration, and shared runtime state transitions. The worker runtime under `apps/control-plane/src/worker` supplies app-specific runtime services such as provider adapters, sandbox transport, SMTP, and internal APIs.
+`apps/control-plane/workflows` owns the workflow definitions, orchestration, and shared runtime state transitions. Worker-only adapters still live under `apps/control-plane/src/worker`, but the worker process itself now starts via `openworkflow worker start` with [`openworkflow.config.ts`](../openworkflow.config.ts).
 
 ## Workflows
 
@@ -16,39 +16,6 @@ Reference catalog of control-plane workflows in `apps/control-plane/workflows`.
 | Request Delete Sandbox Profile          | `RequestDeleteSandboxProfileWorkflowSpec`          | `control-plane.sandbox-profiles.request-delete-profile`  | `{ organizationId: string; profileId: string }`                                                                                                                                                             | `{ profileId: string }`                                                           | Deletes a sandbox profile in background worker context.                                                          |
 | Start Sandbox Profile Instance          | `StartSandboxProfileInstanceWorkflowSpec`          | `control-plane.sandbox-instances.start-profile-instance` | `{ organizationId: string; sandboxProfileId: string; sandboxProfileVersion: number; startedBy: { kind: string; id: string }; source: string; image: { imageId: string; kind: string; createdAt: string } }` | `{ workflowRunId: string; sandboxInstanceId: string; providerSandboxId: string }` | Starts a sandbox via the configured sandbox instances service with caller-resolved image and runtime plan input. |
 
-## Worker Services
+## Runtime Boundary
 
-`createControlPlaneWorker(...)` registers workflows through `src/control-plane/register/` and expects named service ports grouped by domain:
-
-- `enabledWorkflows` with workflow ids from `ControlPlaneWorkerWorkflowIds`
-- `services.automationConversationDelivery` (`ControlPlaneAutomationConversationDeliveryServices`):
-  - `claimOrResumeAutomationConversationDeliveryTask`
-  - `resolveAutomationConversationDeliveryTaskAction`
-  - `idleAutomationConversationDeliveryProcessorIfEmpty`
-  - `prepareAutomationRun`
-  - `resolveAutomationConversationDeliveryRoute`
-  - `ensureAutomationSandbox`
-  - `acquireAutomationConnection`
-  - `deliverAutomationPayload`
-  - `markAutomationRunCompleted`
-  - `markAutomationRunIgnored`
-  - `markAutomationRunFailed`
-  - `finalizeAutomationConversationDeliveryTask`
-  - `resolveAutomationRunFailure`
-- `services.automationRuns` (`ControlPlaneAutomationRunServices`):
-  - `transitionAutomationRunToRunning`
-  - `prepareAutomationRun`
-  - `handoffAutomationRunDelivery`
-  - `markAutomationRunFailed`
-  - `resolveAutomationRunFailure`
-- `services.integrationWebhooks` (`ControlPlaneIntegrationWebhookServices`):
-  - `handleWebhookEvent`
-- `services.emailDelivery` (`ControlPlaneWorkerEmailDelivery`):
-  - `emailSender`
-  - `from`
-- `services.sandboxProfiles` (`ControlPlaneSandboxProfileServices`):
-  - `deleteSandboxProfile`
-- `services.sandboxInstances` (`ControlPlaneSandboxInstanceServices`):
-  - `startSandboxProfileInstance`
-
-When adding a new workflow, keep orchestration and persisted workflow-state transitions in this package. Put app-specific provider, transport, SMTP, and HTTP adapter code in the worker app.
+Each workflow file exports a direct `defineWorkflow(...)` object. Those workflow modules pull the concrete runtime dependencies they need from [`runtime-context.ts`](./runtime-context.ts), while the low-level provider, transport, SMTP, and HTTP adapter implementations remain in `apps/control-plane/src/worker`.

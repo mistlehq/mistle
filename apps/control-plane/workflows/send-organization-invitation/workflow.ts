@@ -1,20 +1,19 @@
-import type { EmailSender } from "@mistle/emails";
-import { defineWorkflow, type Workflow } from "openworkflow";
+import { defineWorkflow, defineWorkflowSpec } from "openworkflow";
 
-import {
-  SendOrganizationInvitationWorkflowSpec,
-  type SendOrganizationInvitationWorkflowInput,
-  type SendOrganizationInvitationWorkflowOutput,
-} from "./spec.js";
+import { getControlPlaneWorkflowRuntime } from "../runtime-context.js";
 
 const INVITATION_SUBJECT_PREFIX = "You're invited to join";
 
-export type CreateSendOrganizationInvitationWorkflowInput = {
-  emailSender: EmailSender;
-  from: {
-    email: string;
-    name: string;
-  };
+export type SendOrganizationInvitationWorkflowInput = {
+  email: string;
+  organizationName: string;
+  inviterDisplayName: string;
+  role: string;
+  invitationUrl: string;
+};
+
+export type SendOrganizationInvitationWorkflowOutput = {
+  messageId: string;
 };
 
 function escapeHtml(value: string): string {
@@ -62,48 +61,49 @@ function buildMessage(input: {
   };
 }
 
-export function createSendOrganizationInvitationWorkflow(
-  input: CreateSendOrganizationInvitationWorkflowInput,
-): Workflow<
-  SendOrganizationInvitationWorkflowInput,
-  SendOrganizationInvitationWorkflowOutput,
-  SendOrganizationInvitationWorkflowInput
-> {
-  return defineWorkflow(
-    SendOrganizationInvitationWorkflowSpec,
-    async ({ input: workflowInput, step }) => {
-      const message = buildMessage({
-        from: input.from,
-        toEmail: workflowInput.email,
-        organizationName: workflowInput.organizationName,
-        inviterDisplayName: workflowInput.inviterDisplayName,
-        role: workflowInput.role,
-        invitationUrl: workflowInput.invitationUrl,
-      });
-      const sendResult = await step.run({ name: "send-organization-invitation-email" }, async () =>
-        input.emailSender.send({
-          from: message.from,
-          to: [
-            {
-              email: message.toEmail,
-            },
-          ],
-          subject: message.subject,
-          html: message.html,
-          text: message.text,
-        }),
+export const SendOrganizationInvitationWorkflow = defineWorkflow(
+  defineWorkflowSpec<
+    SendOrganizationInvitationWorkflowInput,
+    SendOrganizationInvitationWorkflowOutput
+  >({
+    name: "control-plane.auth.send-organization-invitation",
+    version: "1",
+  }),
+  async ({ input: workflowInput, step }) => {
+    const runtime = await getControlPlaneWorkflowRuntime();
+    const message = buildMessage({
+      from: runtime.emailFrom,
+      toEmail: workflowInput.email,
+      organizationName: workflowInput.organizationName,
+      inviterDisplayName: workflowInput.inviterDisplayName,
+      role: workflowInput.role,
+      invitationUrl: workflowInput.invitationUrl,
+    });
+    const sendResult = await step.run({ name: "send-organization-invitation-email" }, async () =>
+      runtime.emailSender.send({
+        from: message.from,
+        to: [
+          {
+            email: message.toEmail,
+          },
+        ],
+        subject: message.subject,
+        html: message.html,
+        text: message.text,
+      }),
+    );
+
+    if (!sendResult.ok) {
+      const codeSuffix = sendResult.code === undefined ? "" : ` (${sendResult.code})`;
+      throw new Error(
+        `Failed to send organization invitation email${codeSuffix}: ${sendResult.message}`,
       );
+    }
 
-      if (!sendResult.ok) {
-        const codeSuffix = sendResult.code === undefined ? "" : ` (${sendResult.code})`;
-        throw new Error(
-          `Failed to send organization invitation email${codeSuffix}: ${sendResult.message}`,
-        );
-      }
+    return {
+      messageId: sendResult.messageId,
+    };
+  },
+);
 
-      return {
-        messageId: sendResult.messageId,
-      };
-    },
-  );
-}
+export const SendOrganizationInvitationWorkflowSpec = SendOrganizationInvitationWorkflow.spec;

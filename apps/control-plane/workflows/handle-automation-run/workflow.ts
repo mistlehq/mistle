@@ -1,10 +1,14 @@
-import { defineWorkflow, type Workflow } from "openworkflow";
+import { defineWorkflow, defineWorkflowSpec } from "openworkflow";
 
+import { HandleAutomationConversationDeliveryWorkflow } from "../handle-automation-conversation-delivery/index.js";
+import { getControlPlaneWorkflowRuntime } from "../runtime-context.js";
 import {
-  HandleAutomationRunWorkflowSpec,
-  type HandleAutomationRunWorkflowInput,
-  type HandleAutomationRunWorkflowOutput,
-} from "./spec.js";
+  handoffAutomationRunDelivery,
+  markAutomationRunFailed,
+  prepareAutomationRun,
+  resolveAutomationRunFailure,
+  transitionAutomationRunToRunning,
+} from "../runtime/index.js";
 
 export type HandleAutomationRunTransitionResult = {
   shouldProcess: boolean;
@@ -46,27 +50,30 @@ export type MarkAutomationRunFailedInput = {
   failureMessage: string;
 };
 
-export type CreateHandleAutomationRunWorkflowInput = {
-  transitionAutomationRunToRunning: (
-    input: HandleAutomationRunWorkflowInput,
-  ) => Promise<HandleAutomationRunTransitionResult>;
-  prepareAutomationRun: (input: HandleAutomationRunWorkflowInput) => Promise<PreparedAutomationRun>;
-  handoffAutomationRunDelivery: (input: HandoffAutomationRunDeliveryInput) => Promise<void>;
-  markAutomationRunFailed: (input: MarkAutomationRunFailedInput) => Promise<void>;
-  resolveAutomationRunFailure: (input: { error: unknown }) => HandleAutomationRunFailure;
+export type HandleAutomationRunWorkflowInput = {
+  automationRunId: string;
 };
 
-export function createHandleAutomationRunWorkflow(
-  ctx: CreateHandleAutomationRunWorkflowInput,
-): Workflow<
-  HandleAutomationRunWorkflowInput,
-  HandleAutomationRunWorkflowOutput,
-  HandleAutomationRunWorkflowInput
-> {
-  return defineWorkflow(HandleAutomationRunWorkflowSpec, async ({ input: workflowInput, step }) => {
+export type HandleAutomationRunWorkflowOutput = {
+  automationRunId: string;
+};
+
+export const HandleAutomationRunWorkflow = defineWorkflow(
+  defineWorkflowSpec<HandleAutomationRunWorkflowInput, HandleAutomationRunWorkflowOutput>({
+    name: "control-plane.automations.handle-run",
+    version: "1",
+  }),
+  async ({ input: workflowInput, step }) => {
+    const runtime = await getControlPlaneWorkflowRuntime();
     const transitionResult = await step.run(
       { name: "transition-automation-run-to-running" },
-      async () => ctx.transitionAutomationRunToRunning(workflowInput),
+      async () =>
+        transitionAutomationRunToRunning(
+          {
+            db: runtime.db,
+          },
+          workflowInput,
+        ),
     );
     if (!transitionResult.shouldProcess) {
       return {
@@ -76,24 +83,49 @@ export function createHandleAutomationRunWorkflow(
 
     try {
       const preparedAutomationRun = await step.run({ name: "prepare-automation-run" }, async () =>
-        ctx.prepareAutomationRun(workflowInput),
+        prepareAutomationRun(
+          {
+            db: runtime.db,
+          },
+          workflowInput,
+        ),
       );
 
       await step.run({ name: "handoff-automation-run-delivery" }, async () =>
-        ctx.handoffAutomationRunDelivery({
-          preparedAutomationRun,
-        }),
+        handoffAutomationRunDelivery(
+          {
+            db: runtime.db,
+            enqueueConversationDeliveryWorkflow: async (enqueueInput) => {
+              await runtime.openWorkflow.runWorkflow(
+                HandleAutomationConversationDeliveryWorkflow.spec,
+                {
+                  conversationId: enqueueInput.conversationId,
+                  generation: enqueueInput.generation,
+                },
+                {
+                  idempotencyKey: `automation-conversation-delivery:${enqueueInput.conversationId}:${String(enqueueInput.generation)}`,
+                },
+              );
+            },
+          },
+          {
+            preparedAutomationRun,
+          },
+        ),
       );
     } catch (error) {
-      const failure = ctx.resolveAutomationRunFailure({
-        error,
-      });
+      const failure = resolveAutomationRunFailure(error);
       await step.run({ name: "mark-automation-run-failed" }, async () =>
-        ctx.markAutomationRunFailed({
-          automationRunId: workflowInput.automationRunId,
-          failureCode: failure.code,
-          failureMessage: failure.message,
-        }),
+        markAutomationRunFailed(
+          {
+            db: runtime.db,
+          },
+          {
+            automationRunId: workflowInput.automationRunId,
+            failureCode: failure.code,
+            failureMessage: failure.message,
+          },
+        ),
       );
       throw error;
     }
@@ -101,5 +133,7 @@ export function createHandleAutomationRunWorkflow(
     return {
       automationRunId: workflowInput.automationRunId,
     };
-  });
-}
+  },
+);
+
+export const HandleAutomationRunWorkflowSpec = HandleAutomationRunWorkflow.spec;
