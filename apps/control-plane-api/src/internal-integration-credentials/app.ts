@@ -55,7 +55,17 @@ export function createInternalIntegrationCredentialsApp(): AppRoutes<
         ctx.get("db"),
         ctx.get("integrationRegistry"),
         ctx.get("config").integrations,
-        parsedInput.data,
+        {
+          connectionId: parsedInput.data.connectionId,
+          secretType: parsedInput.data.secretType,
+          ...(parsedInput.data.bindingId === undefined
+            ? {}
+            : { bindingId: parsedInput.data.bindingId }),
+          ...(parsedInput.data.purpose === undefined ? {} : { purpose: parsedInput.data.purpose }),
+          ...(parsedInput.data.resolverKey === undefined
+            ? {}
+            : { resolverKey: parsedInput.data.resolverKey }),
+        },
       );
 
       const responseBody: z.infer<typeof ResolveIntegrationCredentialResponseSchema> = {

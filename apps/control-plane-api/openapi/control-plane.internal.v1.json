@@ -210,6 +210,10 @@
                     "type": "string",
                     "minLength": 1
                   },
+                  "bindingId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
                   "secretType": {
                     "type": "string",
                     "minLength": 1

@@ -146,6 +146,7 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
+            bindingId?: string;
             connectionId: string;
             purpose?: string;
             resolverKey?: string;

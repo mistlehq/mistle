@@ -337,6 +337,7 @@ export type IntegrationCredentialResolverInput = {
   connectionId: string;
   target: IntegrationResolvedTarget;
   connection: IntegrationConnection;
+  binding?: Pick<IntegrationBinding, "id" | "kind"> & { config: Record<string, unknown> };
   secretType: string;
   purpose?: string;
 };

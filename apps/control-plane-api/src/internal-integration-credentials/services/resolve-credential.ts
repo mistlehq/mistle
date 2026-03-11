@@ -1,9 +1,12 @@
 import {
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
+  type IntegrationBindingKind,
   type IntegrationTarget,
   type IntegrationCredentialSecretKind,
+  sandboxProfileVersionIntegrationBindings,
 } from "@mistle/db/control-plane";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import {
@@ -20,6 +23,7 @@ import {
 
 export type ResolveIntegrationCredentialInput = {
   connectionId: string;
+  bindingId?: string;
   secretType: string;
   purpose?: string | undefined;
   resolverKey?: string | undefined;
@@ -52,6 +56,12 @@ type ResolverContextTarget = {
   enabled: boolean;
   config: Record<string, unknown>;
   secrets: Record<string, string>;
+};
+
+type ResolverContextBinding = {
+  id: string;
+  kind: IntegrationBindingKind;
+  config: Record<string, unknown>;
 };
 
 const UnknownRecordSchema = z.record(z.string(), z.unknown());
@@ -133,6 +143,37 @@ function resolveResolverContextTarget(input: {
     enabled: input.target.enabled,
     config: parsedTargetConfig.data,
     secrets: parsedTargetSecrets.data,
+  };
+}
+
+function resolveResolverContextBinding(input: {
+  binding: {
+    id: string;
+    kind: IntegrationBindingKind;
+    config: unknown;
+  };
+  definition: {
+    bindingConfigSchema: {
+      parse: (input: unknown) => unknown;
+    };
+  };
+}): ResolverContextBinding {
+  const parsedBindingConfigOutput = input.definition.bindingConfigSchema.parse(
+    input.binding.config,
+  );
+  const parsedBindingConfig = UnknownRecordSchema.safeParse(parsedBindingConfigOutput);
+  if (!parsedBindingConfig.success) {
+    throw new InternalIntegrationCredentialsError(
+      InternalIntegrationCredentialsErrorCodes.INVALID_BINDING_CONFIG,
+      400,
+      `Integration binding '${input.binding.id}' has invalid parsed binding config.`,
+    );
+  }
+
+  return {
+    id: input.binding.id,
+    kind: input.binding.kind,
+    config: parsedBindingConfig.data,
   };
 }
 
@@ -331,6 +372,53 @@ export async function resolveIntegrationCredential(
     );
   }
 
+  if (input.resolverKey !== undefined && input.bindingId === undefined) {
+    throw new InternalIntegrationCredentialsError(
+      InternalIntegrationCredentialsErrorCodes.BINDING_REQUIRED,
+      400,
+      "Binding id is required for custom credential resolution.",
+    );
+  }
+
+  let bindingResolverContext: ResolverContextBinding | undefined;
+  if (input.bindingId !== undefined) {
+    const [binding] = await db
+      .select({
+        id: sandboxProfileVersionIntegrationBindings.id,
+        kind: sandboxProfileVersionIntegrationBindings.kind,
+        connectionId: sandboxProfileVersionIntegrationBindings.connectionId,
+        config: sandboxProfileVersionIntegrationBindings.config,
+      })
+      .from(sandboxProfileVersionIntegrationBindings)
+      .where(eq(sandboxProfileVersionIntegrationBindings.id, input.bindingId))
+      .limit(1);
+
+    if (binding === undefined) {
+      throw new InternalIntegrationCredentialsError(
+        InternalIntegrationCredentialsErrorCodes.BINDING_NOT_FOUND,
+        404,
+        `Integration binding '${input.bindingId}' was not found.`,
+      );
+    }
+
+    if (binding.connectionId !== connection.id) {
+      throw new InternalIntegrationCredentialsError(
+        InternalIntegrationCredentialsErrorCodes.BINDING_CONNECTION_MISMATCH,
+        400,
+        `Integration binding '${binding.id}' does not belong to connection '${connection.id}'.`,
+      );
+    }
+
+    bindingResolverContext = resolveResolverContextBinding({
+      binding: {
+        id: binding.id,
+        kind: binding.kind,
+        config: binding.config,
+      },
+      definition,
+    });
+  }
+
   if (input.resolverKey !== undefined) {
     const customResolver = definition.credentialResolvers?.custom?.[input.resolverKey];
     if (customResolver === undefined) {
@@ -359,6 +447,7 @@ export async function resolveIntegrationCredential(
       connectionId: connection.id,
       target: targetResolverContext,
       connection: connectionResolverContext,
+      ...(bindingResolverContext === undefined ? {} : { binding: bindingResolverContext }),
       secretType: input.secretType,
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     });
@@ -384,6 +473,7 @@ export async function resolveIntegrationCredential(
       connectionId: connection.id,
       target: targetResolverContext,
       connection: connectionResolverContext,
+      ...(bindingResolverContext === undefined ? {} : { binding: bindingResolverContext }),
       secretType: input.secretType,
       ...(input.purpose === undefined ? {} : { purpose: input.purpose }),
     });
