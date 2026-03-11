@@ -1,0 +1,28 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "paths": {
+      "@control-plane/*": ["./src/*"],
+      "@control-plane/workflows": ["./workflows/index.ts"],
+      "@control-plane/workflows/*": ["./workflows/*"],
+      "@control-plane/workflows/runtime": ["./workflows/runtime/index.ts"],
+      "@control-plane/workflows/runtime/*": ["./workflows/runtime/*"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "workflows/**/*.ts",
+    "workflows/**/*.tsx",
+    "scripts/**/*.ts",
+    "integration/**/*.ts",
+    "integration/**/*.tsx",
+    "integration-worker/**/*.ts",
+    "integration-worker/**/*.tsx",
+    "vitest.config.ts",
+    "vitest.integration.config.ts",
+    "vitest.worker.config.ts",
+    "vitest.worker.integration.config.ts"
+  ]
+}

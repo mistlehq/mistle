@@ -335,14 +335,14 @@ function start(): void {
   console.log("Running control-plane DB migrations...");
   runOrThrow({
     command: "pnpm",
-    args: ["--filter", "@mistle/control-plane-api", "db:migrate"],
+    args: ["--filter", "@mistle/control-plane", "db:migrate"],
     env: sharedDevEnv,
   });
 
   console.log("Running data-plane DB migrations...");
   runOrThrow({
     command: "pnpm",
-    args: ["--filter", "@mistle/data-plane-api", "db:migrate"],
+    args: ["--filter", "@mistle/data-plane", "db:migrate"],
     env: sharedDevEnv,
   });
 

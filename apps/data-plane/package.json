@@ -1,0 +1,46 @@
+{
+  "name": "@mistle/data-plane",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --import ./src/instrument.ts src/index.ts",
+    "dev:worker": "tsx watch --import ./src/worker/instrument.ts src/worker/index.ts",
+    "db:migrate": "tsx src/scripts/run-data-plane-migrations.ts",
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "start": "node --import ./dist/src/instrument.js dist/src/index.js",
+    "start:worker": "node --import ./dist/src/worker/instrument.js dist/src/worker/index.js",
+    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run -c vitest.config.ts --passWithNoTests",
+    "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",
+    "test:property": "vitest run --passWithNoTests",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.19.11",
+    "@mistle/config": "workspace:*",
+    "@mistle/data-plane-trpc": "workspace:*",
+    "@mistle/db": "workspace:*",
+    "@mistle/gateway-tunnel-auth": "workspace:*",
+    "@mistle/integrations-core": "workspace:*",
+    "@mistle/logging": "workspace:*",
+    "@mistle/sandbox": "workspace:*",
+    "@mistle/telemetry": "workspace:*",
+    "@mistle/time": "workspace:*",
+    "@trpc/server": "^11.12.0",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.12.5",
+    "openworkflow": "^0.8.1",
+    "pg": "^8.19.0",
+    "postgres": "^3.4.8",
+    "typeid-js": "^1.2.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@mistle/test-harness": "workspace:*",
+    "@trpc/client": "^11.11.0",
+    "@types/pg": "^8.18.0",
+    "vite-tsconfig-paths": "^6.1.0"
+  }
+}

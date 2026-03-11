@@ -17,7 +17,7 @@ function resolvePaths(): {
   return {
     controlPlaneInternalSpecPath: resolve(
       workspaceRoot,
-      "apps/control-plane-api/openapi/control-plane.internal.v1.json",
+      "apps/control-plane/openapi/control-plane.internal.v1.json",
     ),
     generatedSchemaPath: resolve(packageRoot, "src/generated/schema.ts"),
   };

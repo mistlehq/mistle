@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@data-plane/*": ["./src/*"],
+      "@data-plane/workflows": ["./workflows/index.ts"],
+      "@data-plane/workflows/*": ["./workflows/*"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "workflows/**/*.ts",
+    "workflows/**/*.tsx",
+    "integration/**/*.ts",
+    "integration/**/*.tsx",
+    "vitest.config.ts",
+    "vitest.integration.config.ts"
+  ]
+}

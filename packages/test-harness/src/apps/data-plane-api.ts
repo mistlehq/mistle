@@ -4,7 +4,7 @@ import type { StartedWorkspaceApp } from "./shared.js";
 
 const DataPlaneApiDefinition: DockerHttpAppDefinition = {
   appName: "data-plane-api",
-  distEntrypointRelativePath: "apps/data-plane-api/dist/index.js",
+  distEntrypointRelativePath: "apps/data-plane/dist/src/index.js",
   dockerfileRelativePath: "Dockerfile.test",
   dockerTarget: "data-plane-api-test-runtime",
   containerPort: 5200,

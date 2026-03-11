@@ -78,7 +78,7 @@ importers:
         specifier: ^4.0.18
         version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@24.12.0)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  apps/control-plane-api:
+  apps/control-plane:
     dependencies:
       '@better-auth/drizzle-adapter':
         specifier: 1.5.3
@@ -95,6 +95,9 @@ importers:
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@mistle/control-plane-internal-client':
+        specifier: workspace:*
+        version: link:../../packages/control-plane-internal-client
       '@mistle/data-plane-trpc':
         specifier: workspace:*
         version: link:../../packages/data-plane-trpc
@@ -119,18 +122,21 @@ importers:
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@mistle/sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox
       '@mistle/sandbox-runtime-plan-compiler':
         specifier: workspace:*
         version: link:../../packages/sandbox-runtime-plan-compiler
+      '@mistle/sandbox-session-protocol':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-session-protocol
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
       '@mistle/time':
         specifier: workspace:*
         version: link:../../packages/time
-      '@mistle/workflows':
-        specifier: workspace:*
-        version: link:../../packages/workflows
       better-auth:
         specifier: 1.5.3
         version: 1.5.3(76fcfc4fb8cb40aa2e9b9fb2a4b3bb10)
@@ -143,76 +149,15 @@ importers:
       hono:
         specifier: ^4.12.5
         version: 4.12.5
+      openworkflow:
+        specifier: ^0.8.1
+        version: 0.8.1(postgres@3.4.8)
       pg:
         specifier: ^8.19.0
         version: 8.19.0
-      typeid-js:
-        specifier: ^1.2.0
-        version: 1.2.0
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
-    devDependencies:
-      '@mistle/test-harness':
-        specifier: workspace:*
-        version: link:../../packages/test-harness
-      '@types/pg':
-        specifier: ^8.18.0
-        version: 8.18.0
-
-  apps/control-plane-worker:
-    dependencies:
-      '@hono/node-server':
-        specifier: ^1.19.11
-        version: 1.19.11(hono@4.12.5)
-      '@mistle/automations':
-        specifier: workspace:*
-        version: link:../../packages/automations
-      '@mistle/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      '@mistle/control-plane-internal-client':
-        specifier: workspace:*
-        version: link:../../packages/control-plane-internal-client
-      '@mistle/data-plane-trpc':
-        specifier: workspace:*
-        version: link:../../packages/data-plane-trpc
-      '@mistle/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@mistle/emails':
-        specifier: workspace:*
-        version: link:../../packages/emails
-      '@mistle/integrations-core':
-        specifier: workspace:*
-        version: link:../../packages/integrations-core
-      '@mistle/integrations-definitions':
-        specifier: workspace:*
-        version: link:../../packages/integrations-definitions
-      '@mistle/logging':
-        specifier: workspace:*
-        version: link:../../packages/logging
-      '@mistle/sandbox-session-protocol':
-        specifier: workspace:*
-        version: link:../../packages/sandbox-session-protocol
-      '@mistle/telemetry':
-        specifier: workspace:*
-        version: link:../../packages/telemetry
-      '@mistle/time':
-        specifier: workspace:*
-        version: link:../../packages/time
-      '@mistle/workflows':
-        specifier: workspace:*
-        version: link:../../packages/workflows
-      drizzle-orm:
-        specifier: ^0.45.1
-        version: 0.45.1(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.0)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.18.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.19.0)(postgres@3.4.8)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))
-      hono:
-        specifier: ^4.12.5
-        version: 4.12.5
-      pg:
-        specifier: ^8.19.0
-        version: 8.19.0
+      postgres:
+        specifier: ^3.4.8
+        version: 3.4.8
       typeid-js:
         specifier: ^1.2.0
         version: 1.2.0
@@ -342,7 +287,7 @@ importers:
         specifier: ^4.1.12
         version: 4.3.6
 
-  apps/data-plane-api:
+  apps/data-plane:
     dependencies:
       '@hono/node-server':
         specifier: ^1.19.11
@@ -356,27 +301,42 @@ importers:
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@mistle/gateway-tunnel-auth':
+        specifier: workspace:*
+        version: link:../../packages/gateway-tunnel-auth
       '@mistle/integrations-core':
         specifier: workspace:*
         version: link:../../packages/integrations-core
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@mistle/sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
-      '@mistle/workflows':
+      '@mistle/time':
         specifier: workspace:*
-        version: link:../../packages/workflows
+        version: link:../../packages/time
       '@trpc/server':
         specifier: ^11.12.0
         version: 11.12.0(typescript@5.9.3)
+      drizzle-orm:
+        specifier: ^0.45.1
+        version: 0.45.1(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.0)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.18.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.19.0)(postgres@3.4.8)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))
       hono:
         specifier: ^4.12.5
         version: 4.12.5
+      openworkflow:
+        specifier: ^0.8.1
+        version: 0.8.1(postgres@3.4.8)
       pg:
         specifier: ^8.19.0
         version: 8.19.0
+      postgres:
+        specifier: ^3.4.8
+        version: 3.4.8
       typeid-js:
         specifier: ^1.2.0
         version: 1.2.0
@@ -387,15 +347,15 @@ importers:
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
-      '@mistle/time':
-        specifier: workspace:*
-        version: link:../../packages/time
       '@trpc/client':
         specifier: ^11.11.0
         version: 11.11.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
+      vite-tsconfig-paths:
+        specifier: ^6.1.0
+        version: 6.1.1(typescript@5.9.3)(vite@7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
 
   apps/data-plane-gateway:
     dependencies:
@@ -451,55 +411,6 @@ importers:
       zod:
         specifier: ^4.3.6
         version: 4.3.6
-
-  apps/data-plane-worker:
-    dependencies:
-      '@hono/node-server':
-        specifier: ^1.19.11
-        version: 1.19.11(hono@4.12.5)
-      '@mistle/config':
-        specifier: workspace:*
-        version: link:../../packages/config
-      '@mistle/db':
-        specifier: workspace:*
-        version: link:../../packages/db
-      '@mistle/gateway-tunnel-auth':
-        specifier: workspace:*
-        version: link:../../packages/gateway-tunnel-auth
-      '@mistle/logging':
-        specifier: workspace:*
-        version: link:../../packages/logging
-      '@mistle/sandbox':
-        specifier: workspace:*
-        version: link:../../packages/sandbox
-      '@mistle/telemetry':
-        specifier: workspace:*
-        version: link:../../packages/telemetry
-      '@mistle/time':
-        specifier: workspace:*
-        version: link:../../packages/time
-      '@mistle/workflows':
-        specifier: workspace:*
-        version: link:../../packages/workflows
-      drizzle-orm:
-        specifier: ^0.45.1
-        version: 0.45.1(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.0)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.18.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.19.0)(postgres@3.4.8)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))
-      hono:
-        specifier: ^4.12.5
-        version: 4.12.5
-      pg:
-        specifier: ^8.19.0
-        version: 8.19.0
-      typeid-js:
-        specifier: ^1.2.0
-        version: 1.2.0
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
-    devDependencies:
-      '@types/pg':
-        specifier: ^8.18.0
-        version: 8.18.0
 
   apps/sandbox-runtime: {}
 
@@ -586,9 +497,6 @@ importers:
       '@mistle/sandbox':
         specifier: workspace:*
         version: link:../sandbox
-      '@mistle/workflows':
-        specifier: workspace:*
-        version: link:../workflows
       '@trpc/client':
         specifier: ^11.11.0
         version: 11.11.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)
@@ -971,46 +879,6 @@ importers:
       vitest:
         specifier: ^4.0.18
         version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@25.3.5)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
-
-  packages/workflows:
-    dependencies:
-      '@mistle/automations':
-        specifier: workspace:*
-        version: link:../automations
-      '@mistle/db':
-        specifier: workspace:*
-        version: link:../db
-      '@mistle/emails':
-        specifier: workspace:*
-        version: link:../emails
-      '@mistle/integrations-core':
-        specifier: workspace:*
-        version: link:../integrations-core
-      '@mistle/sandbox':
-        specifier: workspace:*
-        version: link:../sandbox
-      '@mistle/time':
-        specifier: workspace:*
-        version: link:../time
-      drizzle-orm:
-        specifier: ^0.45.1
-        version: 0.45.1(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.0)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.18.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.19.0)(postgres@3.4.8)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))
-      openworkflow:
-        specifier: ^0.8.1
-        version: 0.8.1(postgres@3.4.8)
-      postgres:
-        specifier: ^3.4.8
-        version: 3.4.8
-      typeid-js:
-        specifier: ^1.2.0
-        version: 1.2.0
-    devDependencies:
-      '@mistle/test-harness':
-        specifier: workspace:*
-        version: link:../test-harness
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
 
   tests:
     devDependencies:

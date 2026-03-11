@@ -13,7 +13,7 @@ FROM base AS source
 COPY . .
 
 FROM source AS control-plane-api-test-deps
-RUN pnpm install --frozen-lockfile --prod --filter @mistle/control-plane-api...
+RUN pnpm install --frozen-lockfile --prod --filter @mistle/control-plane...
 
 FROM base AS control-plane-api-test-runtime
 COPY --from=control-plane-api-test-deps /workspace /workspace
@@ -24,7 +24,7 @@ EXPOSE 5100
 ENTRYPOINT ["/usr/local/bin/mistle-control-plane-api-entrypoint"]
 
 FROM source AS control-plane-worker-test-deps
-RUN pnpm install --frozen-lockfile --prod --filter @mistle/control-plane-worker...
+RUN pnpm install --frozen-lockfile --prod --filter @mistle/control-plane...
 
 FROM base AS control-plane-worker-test-runtime
 COPY --from=control-plane-worker-test-deps /workspace /workspace
@@ -35,7 +35,7 @@ EXPOSE 5101
 ENTRYPOINT ["/usr/local/bin/mistle-control-plane-worker-entrypoint"]
 
 FROM source AS data-plane-api-test-deps
-RUN pnpm install --frozen-lockfile --prod --filter @mistle/data-plane-api...
+RUN pnpm install --frozen-lockfile --prod --filter @mistle/data-plane...
 
 FROM base AS data-plane-api-test-runtime
 COPY --from=data-plane-api-test-deps /workspace /workspace
@@ -46,7 +46,7 @@ EXPOSE 5200
 ENTRYPOINT ["/usr/local/bin/mistle-data-plane-api-entrypoint"]
 
 FROM source AS data-plane-worker-test-deps
-RUN pnpm install --frozen-lockfile --prod --filter @mistle/data-plane-worker...
+RUN pnpm install --frozen-lockfile --prod --filter @mistle/data-plane...
 
 FROM base AS data-plane-worker-test-runtime
 COPY --from=data-plane-worker-test-deps /workspace /workspace

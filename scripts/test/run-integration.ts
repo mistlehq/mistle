@@ -249,7 +249,7 @@ async function main(): Promise<void> {
     );
     if (unknownTargets.length > 0) {
       throw new Error(
-        `Unknown integration targets: ${unknownTargets.join(", ")}. Use package names (for example: @mistle/control-plane-api).`,
+        `Unknown integration targets: ${unknownTargets.join(", ")}. Use package names (for example: @mistle/control-plane).`,
       );
     }
   }

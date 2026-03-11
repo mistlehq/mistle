@@ -6,12 +6,12 @@ if [ -z "${MISTLE_CONFIG_PATH:-}" ]; then
   exit 1
 fi
 
-if [ ! -f "apps/data-plane-api/dist/index.js" ]; then
-  echo "Expected prebuilt apps/data-plane-api/dist artifacts in image." >&2
+if [ ! -f "apps/data-plane/dist/src/index.js" ]; then
+  echo "Expected prebuilt apps/data-plane/dist artifacts in image." >&2
   exit 1
 fi
 
-node apps/data-plane-api/dist/scripts/run-data-plane-migrations.js
-node apps/data-plane-api/dist/scripts/run-data-plane-workflow-migrations.js
+node apps/data-plane/dist/src/scripts/run-data-plane-migrations.js
+node apps/data-plane/dist/src/scripts/run-data-plane-workflow-migrations.js
 
-exec node apps/data-plane-api/dist/index.js
+exec node apps/data-plane/dist/src/index.js

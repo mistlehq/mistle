@@ -6,9 +6,9 @@ if [ -z "${MISTLE_CONFIG_PATH:-}" ]; then
   exit 1
 fi
 
-if [ ! -f "apps/control-plane-worker/dist/index.js" ]; then
-  echo "Expected prebuilt apps/control-plane-worker/dist artifacts in image." >&2
+if [ ! -f "apps/control-plane/dist/src/worker/index.js" ]; then
+  echo "Expected prebuilt apps/control-plane/dist artifacts in image." >&2
   exit 1
 fi
 
-exec node apps/control-plane-worker/dist/index.js
+exec node apps/control-plane/dist/src/worker/index.js

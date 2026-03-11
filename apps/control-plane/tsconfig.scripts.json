@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@mistle/*": ["../../packages/*/src/index.ts", "../../apps/*/src/index.ts"],
+      "@mistle/db/*": ["../../packages/db/src/*/index.ts"],
+      "@mistle/http/*": ["../../packages/http/src/*/index.ts"],
+      "@mistle/data-plane-trpc/client": ["../../packages/data-plane-trpc/src/client.ts"],
+      "@mistle/data-plane-trpc/contracts": [
+        "../../packages/data-plane-trpc/src/contracts/index.ts"
+      ],
+      "@control-plane/workflows": ["./workflows/index.ts"],
+      "@control-plane/workflows/*": ["./workflows/*"],
+      "@control-plane/workflows/runtime": ["./workflows/runtime/index.ts"],
+      "@control-plane/workflows/runtime/*": ["./workflows/runtime/*"],
+      "@mistle/config": ["../../packages/config/src/index.ts"]
+    }
+  },
+  "include": ["src/openapi/**/*.ts"]
+}

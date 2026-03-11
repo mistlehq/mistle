@@ -10,7 +10,7 @@ const IntegrationTargetsProvisionManifestContainerPath = `/workspace/${Integrati
 
 const ControlPlaneApiDefinition: DockerHttpAppDefinition = {
   appName: "control-plane-api",
-  distEntrypointRelativePath: "apps/control-plane-api/dist/index.js",
+  distEntrypointRelativePath: "apps/control-plane/dist/src/index.js",
   dockerfileRelativePath: "Dockerfile.test",
   dockerTarget: "control-plane-api-test-runtime",
   containerPort: 5100,
