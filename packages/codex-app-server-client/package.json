@@ -21,6 +21,12 @@
       "import": "./src/node.ts",
       "default": "./src/node.ts"
     },
+    "./thread-items.js": {
+      "types": "./src/thread-items.ts",
+      "node": "./dist/thread-items.js",
+      "import": "./src/thread-items.ts",
+      "default": "./src/thread-items.ts"
+    },
     "./*.js": {
       "types": "./src/*.ts",
       "node": "./dist/*.js",
