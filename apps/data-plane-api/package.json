@@ -22,17 +22,20 @@
     "@mistle/db": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/logging": "workspace:*",
+    "@mistle/sandbox": "workspace:*",
     "@mistle/telemetry": "workspace:*",
+    "@mistle/time": "workspace:*",
     "@mistle/workflows": "workspace:*",
+    "@openworkflow/cli": "^0.4.3",
     "@trpc/server": "^11.12.0",
     "hono": "^4.12.5",
+    "openworkflow": "^0.8.1",
     "pg": "^8.19.0",
     "typeid-js": "^1.2.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@mistle/test-harness": "workspace:*",
-    "@mistle/time": "workspace:*",
     "@trpc/client": "^11.11.0",
     "@types/pg": "^8.18.0"
   }

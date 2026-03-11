@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["src/**/*.test.ts"],
-    exclude: ["src/**/*.property.test.ts"],
+    include: ["src/**/*.test.ts", "workflows/**/*.test.ts"],
+    exclude: ["src/**/*.property.test.ts", "workflows/**/*.property.test.ts"],
   },
 });
