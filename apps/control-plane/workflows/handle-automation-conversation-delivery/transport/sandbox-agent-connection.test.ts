@@ -2,12 +2,12 @@ import { systemSleeper } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
 
-import type { DeliverAutomationPayloadServiceInput } from "../../services/types.js";
 import { deliverAutomationPayload } from "./deliver-automation-payload.js";
 import {
   connectSandboxAgentConnection,
   sendSandboxAgentMessage,
 } from "./sandbox-agent-connection.js";
+import type { DeliverAutomationPayloadInput } from "./types.js";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -200,7 +200,7 @@ async function startAgentTestServer(mode: AgentTestServerMode): Promise<AgentTes
   };
 }
 
-function createDeliverInput(connectionUrl: string): DeliverAutomationPayloadServiceInput {
+function createDeliverInput(connectionUrl: string): DeliverAutomationPayloadInput {
   return {
     preparedAutomationRun: {
       automationRunId: "aru_test_001",

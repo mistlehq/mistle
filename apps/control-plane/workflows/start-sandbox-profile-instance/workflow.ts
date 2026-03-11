@@ -3,8 +3,8 @@ import type { CompiledRuntimePlan } from "@mistle/integrations-core";
 import type { SandboxImageHandle } from "@mistle/sandbox";
 import { defineWorkflow, defineWorkflowSpec } from "openworkflow";
 
-import { startSandboxProfileInstance } from "../../src/worker/runtime/services/start-sandbox-profile-instance.js";
 import { getControlPlaneWorkflowRuntime } from "../runtime-context.js";
+import { startSandboxProfileInstance } from "./service.js";
 
 export type StartSandboxProfileInstanceWorkflowImageInput = Pick<
   SandboxImageHandle,

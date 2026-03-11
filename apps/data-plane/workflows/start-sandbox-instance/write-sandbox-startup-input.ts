@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import type { SandboxAdapter, SandboxHandle } from "@mistle/sandbox";
 
-import type { StartSandboxInstanceWorkflowInput } from "../../../../workflows/start-sandbox-instance/index.js";
-import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
+import type { DataPlaneWorkerRuntimeConfig } from "../../src/worker/types.js";
+import type { StartSandboxInstanceWorkflowInput } from "./index.js";
 import {
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxStartupInput,

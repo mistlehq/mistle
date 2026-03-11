@@ -1,7 +1,7 @@
 import { defineWorkflow, defineWorkflowSpec } from "openworkflow";
 
-import { syncIntegrationConnectionResources } from "../../src/worker/runtime/services/sync-integration-connection-resources.js";
 import { getControlPlaneWorkflowRuntime } from "../runtime-context.js";
+import { syncIntegrationConnectionResources } from "./service.js";
 
 export type SyncIntegrationConnectionResourcesWorkflowInput = {
   organizationId: string;

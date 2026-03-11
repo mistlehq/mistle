@@ -1,6 +1,6 @@
 import { SMTPEmailSender } from "@mistle/emails";
 
-import type { ControlPlaneWorkerConfig } from "../../types.js";
+import type { ControlPlaneWorkerConfig } from "../types.js";
 
 export function createEmailSender(config: ControlPlaneWorkerConfig): SMTPEmailSender {
   return SMTPEmailSender.fromTransportOptions({

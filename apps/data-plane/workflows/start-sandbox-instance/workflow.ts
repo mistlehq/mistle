@@ -4,18 +4,18 @@ import type { SandboxImageHandle } from "@mistle/sandbox";
 import { systemClock, systemSleeper } from "@mistle/time";
 import { defineWorkflow, defineWorkflowSpec } from "openworkflow";
 
+import { getDataPlaneWorkflowRuntime } from "../runtime-context.js";
 import {
   ensureSandboxInstance,
   persistSandboxInstanceProvisioning,
-} from "../../src/worker/runtime/services/insert-sandbox-instance.js";
-import { startSandbox } from "../../src/worker/runtime/services/start-sandbox.js";
-import { stopSandbox } from "../../src/worker/runtime/services/stop-sandbox.js";
+} from "./insert-sandbox-instance.js";
+import { startSandbox } from "./start-sandbox.js";
+import { stopSandbox } from "./stop-sandbox.js";
 import {
   markSandboxInstanceFailed,
   markSandboxInstanceRunning,
-} from "../../src/worker/runtime/services/update-sandbox-instance-status.js";
-import { waitForSandboxTunnelConnectAck } from "../../src/worker/runtime/services/wait-for-sandbox-tunnel-connect-ack.js";
-import { getDataPlaneWorkflowRuntime } from "../runtime-context.js";
+} from "./update-sandbox-instance-status.js";
+import { waitForSandboxTunnelConnectAck } from "./wait-for-sandbox-tunnel-connect-ack.js";
 
 const StartSandboxFailureCodes = {
   SANDBOX_START_FAILED: "sandbox_start_failed",

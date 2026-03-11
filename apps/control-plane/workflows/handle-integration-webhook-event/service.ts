@@ -1,7 +1,3 @@
-import type {
-  HandleIntegrationWebhookEventWorkflowInput,
-  HandleIntegrationWebhookEventWorkflowOutput,
-} from "@control-plane/workflows";
 import {
   automationRuns,
   AutomationRunStatuses,
@@ -13,6 +9,10 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
 
 import { resolveWebhookAutomationTargets } from "./resolve-webhook-automation-targets.js";
+import type {
+  HandleIntegrationWebhookEventWorkflowInput,
+  HandleIntegrationWebhookEventWorkflowOutput,
+} from "./workflow.js";
 
 type HandleIntegrationWebhookEventDependencies = {
   db: ControlPlaneDatabase;

@@ -1,6 +1,5 @@
 import { defineWorkflow, defineWorkflowSpec } from "openworkflow";
 
-import { executeConversationProviderDelivery } from "../../src/worker/runtime/automation-workflows/provider/execute-conversation-provider-delivery.js";
 import { getControlPlaneWorkflowRuntime } from "../runtime-context.js";
 import {
   acquireConversationDeliveryConnection,
@@ -17,6 +16,7 @@ import {
   resolveAutomationConversationDeliveryRoute,
   resolveAutomationRunFailure,
 } from "../runtime/index.js";
+import { executeConversationProviderDelivery } from "./provider/execute-conversation-provider-delivery.js";
 
 export const ActiveAutomationConversationDeliveryTaskStatuses = {
   CLAIMED: "claimed",

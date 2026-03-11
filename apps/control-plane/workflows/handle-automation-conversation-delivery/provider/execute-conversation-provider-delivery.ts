@@ -1,7 +1,7 @@
 import {
   type ExecutedConversationProviderDelivery,
   type ExecuteConversationProviderDeliveryInput,
-} from "../../../../../workflows/runtime/index.js";
+} from "../../runtime/index.js";
 import {
   AutomationConversationExecutionActions,
   AutomationConversationSteerRecoveryActions,

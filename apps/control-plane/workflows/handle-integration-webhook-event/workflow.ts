@@ -1,8 +1,8 @@
 import { defineWorkflow, defineWorkflowSpec } from "openworkflow";
 
-import { handleIntegrationWebhookEvent } from "../../src/worker/runtime/services/handle-integration-webhook-event.js";
 import { HandleAutomationRunWorkflow } from "../handle-automation-run/index.js";
 import { getControlPlaneWorkflowRuntime } from "../runtime-context.js";
+import { handleIntegrationWebhookEvent } from "./service.js";
 
 export type HandleIntegrationWebhookEventWorkflowInput = {
   webhookEventId: string;

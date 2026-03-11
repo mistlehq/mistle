@@ -5,7 +5,7 @@ import {
   AutomationConversationRouteBindingActions,
   resolveAutomationConversationDeliverySandboxAction,
   resolveAutomationConversationRouteBindingAction,
-} from "../../../../../workflows/runtime/index.js";
+} from "../../runtime/index.js";
 import {
   AutomationConversationExecutionActions,
   AutomationConversationSteerRecoveryActions,

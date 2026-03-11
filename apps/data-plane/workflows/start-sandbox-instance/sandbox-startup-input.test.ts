@@ -1,7 +1,7 @@
-import type { StartSandboxInstanceWorkflowInput } from "@data-plane/workflows";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import type { StartSandboxInstanceWorkflowInput } from "./index.js";
 import {
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxStartupInput,

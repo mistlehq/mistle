@@ -18,7 +18,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "workflows/**/*.test.ts"],
     exclude: ["src/**/*.property.test.ts"],
   },
 });

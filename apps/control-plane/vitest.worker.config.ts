@@ -12,6 +12,6 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["src/worker/**/*.test.ts"],
+    include: ["src/worker/**/*.test.ts", "workflows/**/*.test.ts"],
   },
 });

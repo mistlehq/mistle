@@ -1,5 +1,5 @@
-import type { StartSandboxInstanceWorkflowInput } from "../../../../workflows/start-sandbox-instance/index.js";
-import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
+import type { DataPlaneWorkerRuntimeConfig } from "../../src/worker/types.js";
+import type { StartSandboxInstanceWorkflowInput } from "./index.js";
 
 export type TunnelConnectAckPolicy = {
   timeoutMs: number;

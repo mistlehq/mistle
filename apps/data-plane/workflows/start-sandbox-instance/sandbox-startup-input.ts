@@ -1,4 +1,4 @@
-import type { StartSandboxInstanceWorkflowInput } from "../../../../workflows/start-sandbox-instance/index.js";
+import type { StartSandboxInstanceWorkflowInput } from "./index.js";
 
 const Encoder = new TextEncoder();
 

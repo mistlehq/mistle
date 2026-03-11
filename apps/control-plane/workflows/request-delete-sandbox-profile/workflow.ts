@@ -1,7 +1,7 @@
 import { defineWorkflow, defineWorkflowSpec } from "openworkflow";
 
-import { deleteSandboxProfile } from "../../src/worker/runtime/services/delete-sandbox-profile.js";
 import { getControlPlaneWorkflowRuntime } from "../runtime-context.js";
+import { deleteSandboxProfile } from "./service.js";
 
 export type RequestDeleteSandboxProfileWorkflowInput = {
   organizationId: string;

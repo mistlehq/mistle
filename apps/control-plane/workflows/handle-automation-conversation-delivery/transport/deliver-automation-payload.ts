@@ -1,8 +1,8 @@
-import type { DeliverAutomationPayloadServiceInput } from "../../services/types.js";
 import {
   connectSandboxAgentConnection,
   sendSandboxAgentMessage,
 } from "./sandbox-agent-connection.js";
+import type { DeliverAutomationPayloadInput } from "./types.js";
 
 const AutomationRunDeliveryFailureCodes = {
   AUTOMATION_RUN_EXECUTION_FAILED: "automation_run_execution_failed",
@@ -21,7 +21,7 @@ class AutomationRunDeliveryError extends Error {
 }
 
 export async function deliverAutomationPayload(
-  input: DeliverAutomationPayloadServiceInput,
+  input: DeliverAutomationPayloadInput,
 ): Promise<void> {
   if (input.preparedAutomationRun.renderedInput.trim().length === 0) {
     throw new AutomationRunDeliveryError({

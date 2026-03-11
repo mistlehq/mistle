@@ -1,6 +1,6 @@
 import type { SandboxAdapter } from "@mistle/sandbox";
 
-import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
+import type { DataPlaneWorkerRuntimeConfig } from "../../src/worker/types.js";
 import type { StopSandboxInput } from "./types.js";
 
 export async function stopSandbox(

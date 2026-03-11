@@ -32,7 +32,7 @@ import {
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
-import { handleIntegrationWebhookEvent } from "../src/worker/runtime/services/handle-integration-webhook-event.js";
+import { handleIntegrationWebhookEvent } from "../workflows/handle-integration-webhook-event/service.js";
 import {
   markAutomationRunCompleted,
   markAutomationRunFailed,
