@@ -136,29 +136,20 @@ async function runCommand(input: { command: string; args: string[]; cwd: string 
 }
 
 async function ensureSandboxBaseImageLocal(buildContextHostPath: string): Promise<void> {
-  try {
-    await runCommand({
-      command: "docker",
-      args: ["image", "inspect", SANDBOX_BASE_IMAGE_LOCAL_REFERENCE],
-      cwd: buildContextHostPath,
-    });
-    return;
-  } catch {
-    await runCommand({
-      command: "docker",
-      args: [
-        "build",
-        "--target",
-        SANDBOX_BASE_IMAGE_DOCKER_TARGET,
-        "-f",
-        SANDBOX_BASE_IMAGE_DOCKERFILE_PATH,
-        "-t",
-        SANDBOX_BASE_IMAGE_LOCAL_REFERENCE,
-        ".",
-      ],
-      cwd: buildContextHostPath,
-    });
-  }
+  await runCommand({
+    command: "docker",
+    args: [
+      "build",
+      "--target",
+      SANDBOX_BASE_IMAGE_DOCKER_TARGET,
+      "-f",
+      SANDBOX_BASE_IMAGE_DOCKERFILE_PATH,
+      "-t",
+      SANDBOX_BASE_IMAGE_LOCAL_REFERENCE,
+      ".",
+    ],
+    cwd: buildContextHostPath,
+  });
 }
 
 async function publishSandboxBaseImage(input: {
