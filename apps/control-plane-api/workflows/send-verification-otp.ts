@@ -57,5 +57,3 @@ export const SendVerificationOTPWorkflow = defineWorkflow<
     );
   },
 );
-
-export const SendVerificationOTPWorkflowSpec = SendVerificationOTPWorkflow.spec;
