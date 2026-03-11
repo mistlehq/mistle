@@ -46,12 +46,13 @@ export class TunnelRelayCoordinator {
     sandboxInstanceId: string;
     side: RelayPeerSide;
     socket: RelayPeerSocket;
+    sessionId?: string;
   }): RelayTarget {
     const target: RelayTarget = {
       sandboxInstanceId: input.sandboxInstanceId,
       side: input.side,
       nodeId: this.nodeId,
-      sessionId: randomUUID(),
+      sessionId: input.sessionId ?? randomUUID(),
     };
 
     this.relayTransport.registerLocalPeer({
