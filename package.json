@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "tsx ./scripts/dev/start.ts",
     "dev:nix": "nix develop --command pnpm dev",
-    "dev:workspace": "turbo watch dev --ui=tui --filter=!@mistle/sandbox-runtime",
+    "dev:workspace": "turbo watch dev --ui=tui --filter=!@mistle/sandbox-runtime --filter=!@mistle/docs",
     "storybook": "pnpm --filter @mistle/storybook storybook",
     "storybook:build": "pnpm --filter @mistle/storybook build-storybook",
     "dev:down": "tsx ./scripts/dev/down.ts",
