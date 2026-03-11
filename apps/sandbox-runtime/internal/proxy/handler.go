@@ -15,17 +15,26 @@ import (
 type Handler struct {
 	httpClient           *http.Client
 	certificateAuthority *CertificateAuthority
+	integrationMediator  IntegrationMediator
 }
 
 type NewHandlerInput struct {
 	HTTPClient           *http.Client
 	CertificateAuthority *CertificateAuthority
+	IntegrationMediator  IntegrationMediator
 }
 
 type RequestClassification struct {
 	Host   string
 	Method string
 	Path   string
+}
+
+type IntegrationMediator interface {
+	ForwardIfMatch(
+		request *http.Request,
+		classification RequestClassification,
+	) (*http.Response, bool, error)
 }
 
 type bufferedConn struct {
@@ -51,6 +60,7 @@ func NewHandler(input NewHandlerInput) (http.Handler, error) {
 	return Handler{
 		httpClient:           input.HTTPClient,
 		certificateAuthority: input.CertificateAuthority,
+		integrationMediator:  input.IntegrationMediator,
 	}, nil
 }
 
@@ -211,6 +221,18 @@ func (handler Handler) handleInterceptedHTTPSRequest(
 	if err != nil {
 		return nil, err
 	}
+	if handler.integrationMediator != nil {
+		response, matched, mediationErr := handler.integrationMediator.ForwardIfMatch(
+			request,
+			classification.RequestClassification,
+		)
+		if mediationErr != nil {
+			return nil, mediationErr
+		}
+		if matched {
+			return filterProxyResponse(response), nil
+		}
+	}
 
 	forwardRequest, err := http.NewRequestWithContext(
 		context,
@@ -244,10 +266,40 @@ func (handler Handler) handleForward(writer http.ResponseWriter, request *http.R
 		return
 	}
 
+	classification, err := classifyForwardRequest(request)
+	if err != nil {
+		http.Error(writer, fmt.Sprintf("failed to classify proxy request: %v", err), http.StatusBadRequest)
+		return
+	}
+	if handler.integrationMediator != nil {
+		response, matched, mediationErr := handler.integrationMediator.ForwardIfMatch(
+			request,
+			classification.RequestClassification,
+		)
+		if mediationErr != nil {
+			http.Error(
+				writer,
+				fmt.Sprintf("failed to mediate integration proxy request: %v", mediationErr),
+				http.StatusBadGateway,
+			)
+			return
+		}
+		if matched {
+			filteredResponse := filterProxyResponse(response)
+			defer filteredResponse.Body.Close()
+
+			copyHeadersWithoutHopByHop(writer.Header(), filteredResponse.Header, false)
+			restoreUpgradeHeaders(writer.Header(), filteredResponse.Header)
+			writer.WriteHeader(filteredResponse.StatusCode)
+			_, _ = io.Copy(writer, filteredResponse.Body)
+			return
+		}
+	}
+
 	forwardRequest, err := http.NewRequestWithContext(
 		request.Context(),
-		request.Method,
-		request.URL.String(),
+		classification.Method,
+		classification.UpstreamURL.String(),
 		request.Body,
 	)
 	if err != nil {
@@ -256,7 +308,7 @@ func (handler Handler) handleForward(writer http.ResponseWriter, request *http.R
 	}
 
 	copyHeadersWithoutHopByHop(forwardRequest.Header, request.Header, true)
-	forwardRequest.Host = request.URL.Host
+	forwardRequest.Host = classification.UpstreamHost
 
 	response, err := handler.httpClient.Do(forwardRequest)
 	if err != nil {
@@ -283,6 +335,37 @@ type interceptedRequestClassification struct {
 	RequestClassification
 	UpstreamURL  *url.URL
 	UpstreamHost string
+}
+
+func classifyForwardRequest(request *http.Request) (interceptedRequestClassification, error) {
+	if request.URL == nil {
+		return interceptedRequestClassification{}, fmt.Errorf("http proxy request url is required")
+	}
+	if !request.URL.IsAbs() {
+		return interceptedRequestClassification{}, fmt.Errorf("http proxy request must use an absolute url")
+	}
+
+	upstreamURL := *request.URL
+	return interceptedRequestClassification{
+		RequestClassification: RequestClassification{
+			Host:   normalizeCertificateHost(upstreamURL.Host),
+			Method: request.Method,
+			Path:   normalizeForwardPath(upstreamURL.Path),
+		},
+		UpstreamURL:  &upstreamURL,
+		UpstreamHost: firstNonEmpty(request.Host, upstreamURL.Host),
+	}, nil
+}
+
+func normalizeForwardPath(path string) string {
+	if path == "" {
+		return "/"
+	}
+	if strings.HasPrefix(path, "/") {
+		return path
+	}
+
+	return "/" + path
 }
 
 func classifyInterceptedRequest(connectTarget string, request *http.Request) (interceptedRequestClassification, error) {
