@@ -371,18 +371,30 @@ importers:
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@mistle/sandbox':
+        specifier: workspace:*
+        version: link:../../packages/sandbox
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
+      '@mistle/time':
+        specifier: workspace:*
+        version: link:../../packages/time
       '@mistle/workflows':
         specifier: workspace:*
         version: link:../../packages/workflows
+      '@openworkflow/cli':
+        specifier: ^0.4.3
+        version: 0.4.3(openworkflow@0.8.1(postgres@3.4.8))
       '@trpc/server':
         specifier: ^11.12.0
         version: 11.12.0(typescript@5.9.3)
       hono:
         specifier: ^4.12.5
         version: 4.12.5
+      openworkflow:
+        specifier: ^0.8.1
+        version: 0.8.1(postgres@3.4.8)
       pg:
         specifier: ^8.19.0
         version: 8.19.0
@@ -396,9 +408,6 @@ importers:
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
-      '@mistle/time':
-        specifier: workspace:*
-        version: link:../../packages/time
       '@trpc/client':
         specifier: ^11.11.0
         version: 11.11.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)
