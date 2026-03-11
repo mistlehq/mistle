@@ -5,6 +5,9 @@ import { systemClock } from "@mistle/time";
 import { typeid } from "typeid-js";
 
 import { createApp, stopApp } from "../app.js";
+import { RejectingGatewayHttpForwarder } from "../owner-forwarding/adapters/rejecting-gateway-http-forwarder.js";
+import { RejectingGatewayWebSocketForwarder } from "../owner-forwarding/adapters/rejecting-gateway-websocket-forwarder.js";
+import { registerInternalGatewayForwardingRoutes } from "../owner-forwarding/register-internal-gateway-forwarding-routes.js";
 import { startServer } from "../server.js";
 import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory-relay-coordinator.js";
 import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
@@ -19,12 +22,19 @@ import type {
 export function createDataPlaneGatewayRuntime(
   config: DataPlaneGatewayRuntimeConfig,
 ): DataPlaneGatewayRuntime {
+  const rejectingForwardingReason = "Internal gateway forwarding is not enabled.";
   const app = createApp(config.app);
   const nodeWebSocket = createNodeWebSocket({ app });
   const nodeId = typeid("dpg").toString();
   const relayCoordinator = createInMemoryTunnelRelayCoordinator(nodeId);
   const sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
   const sandboxOwnerResolver = new StoreBackedSandboxOwnerResolver(nodeId, sandboxOwnerStore);
+  const gatewayHttpForwarder = RejectingGatewayHttpForwarder.create({
+    reason: rejectingForwardingReason,
+  });
+  const gatewayWebSocketForwarder = RejectingGatewayWebSocketForwarder.create({
+    reason: rejectingForwardingReason,
+  });
 
   registerSandboxTunnelRoute({
     app,
@@ -43,6 +53,13 @@ export function createDataPlaneGatewayRuntime(
     relayCoordinator,
     sandboxOwnerStore,
     sandboxOwnerResolver,
+  });
+  registerInternalGatewayForwardingRoutes({
+    app,
+    upgradeWebSocket: nodeWebSocket.upgradeWebSocket,
+    internalServiceToken: config.internalAuth.serviceToken,
+    gatewayHttpForwarder,
+    gatewayWebSocketForwarder,
   });
 
   let startedServer: StartedServer | undefined;

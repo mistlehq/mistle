@@ -10,10 +10,18 @@ export type FailedWebSocketConnectResult = {
   responseStatusCode: number | undefined;
 };
 
-export function connectWebSocket(url: string): Promise<WebSocket> {
+type WebSocketConnectOptions = {
+  headers?: Record<string, string>;
+};
+
+export function connectWebSocket(
+  url: string,
+  options?: WebSocketConnectOptions,
+): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(url, {
       handshakeTimeout: ConnectTimeoutMs,
+      headers: options?.headers,
     });
 
     const onOpen = (): void => {
@@ -44,10 +52,14 @@ export function connectWebSocket(url: string): Promise<WebSocket> {
   });
 }
 
-export function connectWebSocketExpectFailure(url: string): Promise<FailedWebSocketConnectResult> {
+export function connectWebSocketExpectFailure(
+  url: string,
+  options?: WebSocketConnectOptions,
+): Promise<FailedWebSocketConnectResult> {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(url, {
       handshakeTimeout: ConnectTimeoutMs,
+      headers: options?.headers,
     });
 
     socket.once("open", () => {

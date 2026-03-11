@@ -165,6 +165,9 @@ export const it = vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture 
               url: runtimeDatabaseUrl,
             },
           },
+          internalAuth: {
+            serviceToken: "integration-internal-service-token",
+          },
           sandbox: {
             provider: "docker",
             defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
