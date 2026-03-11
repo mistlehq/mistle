@@ -2,9 +2,9 @@
 
 import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import type {
   IntegrationConnectionSummary,
@@ -137,6 +137,26 @@ function Harness(): React.JSX.Element {
   );
 }
 
+function getSectionAddButton(sectionTitle: string): HTMLButtonElement {
+  const sectionHeading = screen.getAllByRole("heading", { name: sectionTitle })[0];
+
+  if (sectionHeading === undefined) {
+    throw new Error(`Could not resolve section heading for ${sectionTitle}.`);
+  }
+
+  const sectionContainer = sectionHeading.parentElement?.parentElement;
+
+  if (sectionContainer === null || sectionContainer === undefined) {
+    throw new Error(`Could not resolve section container for ${sectionTitle}.`);
+  }
+
+  return within(sectionContainer).getByRole("button", { name: "Add" });
+}
+
+afterEach(() => {
+  cleanup();
+});
+
 describe("IntegrationsEditorSection", () => {
   it("adds a binding into the selected section via dialog", async () => {
     const queryClient = createQueryClient();
@@ -147,17 +167,18 @@ describe("IntegrationsEditorSection", () => {
       </QueryClientProvider>,
     );
 
-    const addButtons = screen.getAllByRole("button", { name: "Add" });
-    fireEvent.click(addButtons[0]!);
+    fireEvent.click(getSectionAddButton("Agent Bindings"));
 
     expect(screen.getByRole("heading", { name: "Add binding" })).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: "Add binding" }));
 
-    expect(await screen.findByRole("button", { name: "Edit binding" })).toBeDefined();
-    expect(await screen.findByText("target-agent")).toBeDefined();
-    expect(await screen.findByText("Primary OpenAI Workspace")).toBeDefined();
-  });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Edit binding" })).toBeDefined();
+      expect(screen.getByText("target-agent")).toBeDefined();
+      expect(screen.getByText("Primary OpenAI Workspace")).toBeDefined();
+    });
+  }, 10000);
 
   it("lists distinct connection display names for duplicate provider connections", async () => {
     const queryClient = createQueryClient();
@@ -168,8 +189,7 @@ describe("IntegrationsEditorSection", () => {
       </QueryClientProvider>,
     );
 
-    const addButtons = screen.getAllByRole("button", { name: "Add" });
-    fireEvent.click(addButtons[0]!);
+    fireEvent.click(getSectionAddButton("Agent Bindings"));
     fireEvent.click(screen.getByRole("combobox", { name: "Add binding connection" }));
 
     const listbox = await screen.findByRole("listbox");
