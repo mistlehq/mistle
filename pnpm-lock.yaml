@@ -137,6 +137,9 @@ importers:
       '@mistle/time':
         specifier: workspace:*
         version: link:../../packages/time
+      '@openworkflow/cli':
+        specifier: ^0.4.3
+        version: 0.4.3(openworkflow@0.8.1(postgres@3.4.8))
       better-auth:
         specifier: 1.5.3
         version: 1.5.3(76fcfc4fb8cb40aa2e9b9fb2a4b3bb10)
@@ -319,6 +322,9 @@ importers:
       '@mistle/time':
         specifier: workspace:*
         version: link:../../packages/time
+      '@openworkflow/cli':
+        specifier: ^0.4.3
+        version: 0.4.3(openworkflow@0.8.1(postgres@3.4.8))
       '@trpc/server':
         specifier: ^11.12.0
         version: 11.12.0(typescript@5.9.3)
@@ -1167,6 +1173,12 @@ packages:
 
   '@chevrotain/utils@11.1.2':
     resolution: {integrity: sha512-4mudFAQ6H+MqBTfqLmU7G1ZwRzCLfJEooL/fsF6rCX5eePMbGhoy5n4g+G4vlh2muDcsCTJtL+uKbOzWxs5LHA==}
+
+  '@clack/core@1.1.0':
+    resolution: {integrity: sha512-SVcm4Dqm2ukn64/8Gub2wnlA5nS2iWJyCkdNHcvNHPIeBTGojpdJ+9cZKwLfmqy7irD4N5qLteSilJlE0WLAtA==}
+
+  '@clack/prompts@1.1.0':
+    resolution: {integrity: sha512-pkqbPGtohJAvm4Dphs2M8xE29ggupihHdy1x84HNojZuMtFsHiUlRvqD24tM2+XmI+61LlfNceM3Wr7U5QES5g==}
 
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
@@ -2684,6 +2696,12 @@ packages:
     engines: {node: ^18.19.0 || >=20.6.0}
     peerDependencies:
       '@opentelemetry/api': ^1.1.0
+
+  '@openworkflow/cli@0.4.3':
+    resolution: {integrity: sha512-gJ++1IAOc1EE5NO7LQ7p3TEQSjXs4iDPvSAgbwokrXwYmY2h2yUmVkloLaSSCS+XXwsJgIwWgsil1Ek7bq7Czg==}
+    hasBin: true
+    peerDependencies:
+      openworkflow: ^0.6.0 || ^0.7.0 || ^0.8.0
 
   '@oxc-resolver/binding-android-arm-eabi@11.18.0':
     resolution: {integrity: sha512-EhwJNzbfLwQQIeyak3n08EB3UHknMnjy1dFyL98r3xlorje2uzHOT2vkB5nB1zqtTtzT31uSot3oGZFfODbGUg==}
@@ -5737,6 +5755,10 @@ packages:
     resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
     engines: {node: '>=12'}
 
+  dotenv@17.3.1:
+    resolution: {integrity: sha512-IO8C/dzEb6O3F9/twg6ZLXz164a2fhTnEWb95H23Dm4OuN+92NmEAlTrupP9VW6Jm3sO26tQlqyvyi4CsnY9GA==}
+    engines: {node: '>=12'}
+
   drizzle-kit@0.31.9:
     resolution: {integrity: sha512-GViD3IgsXn7trFyBUUHyTFBpH/FsHTxYJ66qdbVggxef4UBPHRYxQaRzYLTuekYnk9i5FIEL9pbBIwMqX/Uwrg==}
     hasBin: true
@@ -8249,6 +8271,9 @@ packages:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
 
+  sisteransi@1.0.5:
+    resolution: {integrity: sha512-bLGGlR1QxBcynn2d5YmDX4MGjlZvy2MRBDRNHLJ8VI6l6+9FUiyTFNJ0IveOSP0bcXgVDPRcfGqA0pjaqUpfVg==}
+
   slash@3.0.0:
     resolution: {integrity: sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q==}
     engines: {node: '>=8'}
@@ -9336,6 +9361,15 @@ snapshots:
     optional: true
 
   '@chevrotain/utils@11.1.2': {}
+
+  '@clack/core@1.1.0':
+    dependencies:
+      sisteransi: 1.0.5
+
+  '@clack/prompts@1.1.0':
+    dependencies:
+      '@clack/core': 1.1.0
+      sisteransi: 1.0.5
 
   '@colors/colors@1.5.0':
     optional: true
@@ -10915,6 +10949,16 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 2.6.0(@opentelemetry/api@1.9.0)
+
+  '@openworkflow/cli@0.4.3(openworkflow@0.8.1(postgres@3.4.8))':
+    dependencies:
+      '@clack/prompts': 1.1.0
+      commander: 14.0.3
+      consola: 3.4.2
+      dotenv: 17.3.1
+      jiti: 2.6.1
+      nypm: 0.6.5
+      openworkflow: 0.8.1(postgres@3.4.8)
 
   '@oxc-resolver/binding-android-arm-eabi@11.18.0':
     optional: true
@@ -13250,8 +13294,7 @@ snapshots:
       consola: 3.4.2
     optional: true
 
-  citty@0.2.1:
-    optional: true
+  citty@0.2.1: {}
 
   cjs-module-lexer@2.2.0: {}
 
@@ -13363,8 +13406,7 @@ snapshots:
       ini: 1.3.8
       proto-list: 1.2.4
 
-  consola@3.4.2:
-    optional: true
+  consola@3.4.2: {}
 
   constantinople@4.0.1:
     dependencies:
@@ -13794,6 +13836,8 @@ snapshots:
 
   dotenv@16.6.1:
     optional: true
+
+  dotenv@17.3.1: {}
 
   drizzle-kit@0.31.9:
     dependencies:
@@ -15734,7 +15778,6 @@ snapshots:
       citty: 0.2.1
       pathe: 2.0.3
       tinyexec: 1.0.2
-    optional: true
 
   object-assign@4.1.1: {}
 
@@ -16873,6 +16916,8 @@ snapshots:
   signal-exit@3.0.7: {}
 
   signal-exit@4.1.0: {}
+
+  sisteransi@1.0.5: {}
 
   slash@3.0.0: {}
 
