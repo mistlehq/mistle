@@ -595,6 +595,7 @@ export type RuntimeArtifactSpec = {
   artifactKey: string;
   name: string;
   description?: string;
+  env?: Readonly<Record<string, string>>;
   lifecycle: RuntimeArtifactLifecycle<
     ReadonlyArray<RuntimeArtifactCommand> | RuntimeArtifactLifecycleBuilder
   >;
@@ -604,6 +605,7 @@ export type CompiledRuntimeArtifactSpec = {
   artifactKey: string;
   name: string;
   description?: string;
+  env?: Readonly<Record<string, string>>;
   lifecycle: RuntimeArtifactLifecycle<ReadonlyArray<RuntimeArtifactCommand>>;
 };
 

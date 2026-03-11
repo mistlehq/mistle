@@ -227,6 +227,7 @@ function resolveRuntimeArtifacts(input: {
       artifactKey: artifact.artifactKey,
       name: artifact.name,
       ...(artifact.description === undefined ? {} : { description: artifact.description }),
+      ...(artifact.env === undefined ? {} : { env: { ...artifact.env } }),
       lifecycle: {
         install,
         ...(update === undefined ? {} : { update }),

@@ -11,6 +11,15 @@ import type {
   RuntimeClientProcessSpec,
 } from "../types/index.js";
 
+const ReservedArtifactEnvKeys = new Set([
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "no_proxy",
+]);
+
 function flattenCompiledBindingResults(input: ReadonlyArray<CompiledBindingResult>): {
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
@@ -94,6 +103,31 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
   const artifactByKey = new Map<string, CompiledRuntimeArtifactSpec>();
 
   for (const artifact of input) {
+    if (artifact.env !== undefined) {
+      for (const key of Object.keys(artifact.env)) {
+        if (key.trim().length === 0) {
+          throw new IntegrationCompilerError(
+            CompilerErrorCodes.ARTIFACT_CONFLICT,
+            `Artifact '${artifact.artifactKey}' contains an empty env key.`,
+          );
+        }
+
+        if (key.includes("=")) {
+          throw new IntegrationCompilerError(
+            CompilerErrorCodes.ARTIFACT_CONFLICT,
+            `Artifact '${artifact.artifactKey}' contains an invalid env key '${key}'.`,
+          );
+        }
+
+        if (ReservedArtifactEnvKeys.has(key)) {
+          throw new IntegrationCompilerError(
+            CompilerErrorCodes.ARTIFACT_CONFLICT,
+            `Artifact '${artifact.artifactKey}' may not define reserved env key '${key}'.`,
+          );
+        }
+      }
+    }
+
     if (artifact.lifecycle.install.length === 0) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.ARTIFACT_CONFLICT,
@@ -139,6 +173,7 @@ function validateArtifacts(input: ReadonlyArray<CompiledRuntimeArtifactSpec>): v
     const hasEquivalentSpec =
       existingArtifact.name === artifact.name &&
       existingArtifact.description === artifact.description &&
+      stringRecordEquals(existingArtifact.env, artifact.env) &&
       artifactLifecycleEquals(existingArtifact.lifecycle, artifact.lifecycle);
 
     if (!hasEquivalentSpec) {
