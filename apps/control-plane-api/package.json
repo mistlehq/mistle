@@ -37,7 +37,7 @@
     "@mistle/time": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "@openworkflow/cli": "^0.4.3",
-    "better-auth": "1.5.3",
+    "better-auth": "1.5.4",
     "drizzle-orm": "^0.45.1",
     "drizzle-zod": "^0.8.3",
     "hono": "^4.12.5",
