@@ -263,6 +263,11 @@ function buildOutgoingRequestHeaders(ctx: Context<AppContextBindings>): Headers 
 function copyResponseHeaders(source: Headers): Headers {
   const copiedHeaders = new Headers(source);
   removeHopByHopHeaders(copiedHeaders);
+  // Node's fetch transparently decompresses gzip/br/deflate response bodies
+  // before exposing them here, so the original encoding and byte-length
+  // headers no longer describe the forwarded body stream.
+  copiedHeaders.delete("content-encoding");
+  copiedHeaders.delete("content-length");
   return copiedHeaders;
 }
 
