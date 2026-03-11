@@ -4,8 +4,11 @@
     "jsx": "react-jsx"
   },
   "include": [
+    "openworkflow.config.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
+    "workflows/**/*.ts",
+    "workflows/**/*.tsx",
     "scripts/**/*.ts",
     "integration/**/*.ts",
     "integration/**/*.tsx",
