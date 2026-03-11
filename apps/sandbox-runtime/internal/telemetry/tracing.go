@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/httpclient"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -80,6 +81,7 @@ func Initialize(input InitializeInput) (Handle, error) {
 	traceExporter, err := otlptracehttp.New(
 		context.Background(),
 		otlptracehttp.WithEndpointURL(tracesEndpoint),
+		otlptracehttp.WithHTTPClient(httpclient.NewDirectClient(http.DefaultClient)),
 	)
 	if err != nil {
 		return Handle{}, fmt.Errorf("failed to create OTLP traces exporter: %w", err)

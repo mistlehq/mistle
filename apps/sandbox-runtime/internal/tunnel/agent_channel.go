@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/httpclient"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/sessionprotocol"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
 )
@@ -157,7 +159,9 @@ func dialAgentEndpoint(ctx context.Context, transportURL string) (*websocket.Con
 	dialContext, cancel := context.WithTimeout(ctx, agentEndpointDialTimeout)
 	defer cancel()
 
-	conn, _, err := websocket.Dial(dialContext, transportURL, nil)
+	conn, _, err := websocket.Dial(dialContext, transportURL, &websocket.DialOptions{
+		HTTPClient: httpclient.NewDirectClient(http.DefaultClient),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial websocket endpoint %s: %w", transportURL, err)
 	}

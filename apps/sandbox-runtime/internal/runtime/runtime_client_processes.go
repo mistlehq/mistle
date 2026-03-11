@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/httpclient"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
 )
 
@@ -266,7 +267,7 @@ func waitForRuntimeClientProcessHTTPReadiness(
 	process *runtimeClientProcess,
 	readiness startup.RuntimeClientProcessReadiness,
 ) error {
-	httpClient := &http.Client{Timeout: 500 * time.Millisecond}
+	httpClient := httpclient.NewDirectClient(&http.Client{Timeout: 500 * time.Millisecond})
 
 	check := func() error {
 		response, err := httpClient.Get(readiness.URL)
@@ -298,7 +299,9 @@ func waitForRuntimeClientProcessWSReadiness(
 		dialContext, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 		defer cancel()
 
-		connection, _, err := websocket.Dial(dialContext, readiness.URL, nil)
+		connection, _, err := websocket.Dial(dialContext, readiness.URL, &websocket.DialOptions{
+			HTTPClient: httpclient.NewDirectClient(&http.Client{Timeout: 500 * time.Millisecond}),
+		})
 		if err != nil {
 			return err
 		}

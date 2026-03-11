@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
 
 	"github.com/coder/websocket"
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/httpclient"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/sessionprotocol"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
 	"go.opentelemetry.io/otel"
@@ -80,7 +82,9 @@ func Run(input RunInput) error {
 	parsedGatewayURL.RawQuery = query.Encode()
 
 	connectContext, connectSpan := tracer.Start(runContext, "sandbox.tunnel.connect")
-	conn, _, err := websocket.Dial(connectContext, parsedGatewayURL.String(), nil)
+	conn, _, err := websocket.Dial(connectContext, parsedGatewayURL.String(), &websocket.DialOptions{
+		HTTPClient: httpclient.NewDirectClient(http.DefaultClient),
+	})
 	if err != nil {
 		connectSpan.RecordError(err)
 		connectSpan.SetStatus(codes.Error, err.Error())
