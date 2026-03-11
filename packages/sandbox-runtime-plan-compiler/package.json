@@ -33,7 +33,7 @@
     "@mistle/integrations-definitions": "workspace:*",
     "@mistle/test-harness": "workspace:*",
     "@types/pg": "^8.18.0",
-    "pg": "^8.19.0",
+    "pg": "^8.20.0",
     "zod": "^4.3.6"
   }
 }
