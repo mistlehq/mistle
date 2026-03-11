@@ -7,9 +7,9 @@ import type { BackendPostgres } from "openworkflow/postgres";
 import { Pool } from "pg";
 
 import { getControlPlaneWorkerConfig } from "../src/worker/config.js";
-import { createEmailSender } from "../src/worker/services/create-email-sender.js";
 import { createControlPlaneBackend } from "./backend.js";
 import { createControlPlaneOpenWorkflow } from "./client.js";
+import { createEmailSender } from "./services/create-email-sender.js";
 
 export type ControlPlaneWorkflowRuntime = {
   controlPlaneInternalClient: ControlPlaneInternalClient;
