@@ -261,7 +261,8 @@ describe("InMemoryRelayTransportAdapter", () => {
     });
 
     const receivedPromise = waitForWebSocketMessage(pair.clientSocket);
-    await adapter.forwardToPeer({
+    await adapter.deliverEnvelope({
+      kind: "frame",
       target,
       payload: "hello from adapter",
     });
@@ -289,7 +290,8 @@ describe("InMemoryRelayTransportAdapter", () => {
     });
 
     const receivedPromise = waitForWebSocketMessage(pair.clientSocket);
-    await adapter.forwardToPeer({
+    await adapter.deliverEnvelope({
+      kind: "frame",
       target,
       payload,
     });
@@ -322,7 +324,8 @@ describe("InMemoryRelayTransportAdapter", () => {
       target,
     });
 
-    await adapter.forwardToPeer({
+    await adapter.deliverEnvelope({
+      kind: "frame",
       target,
       payload: "not delivered",
     });
@@ -346,7 +349,8 @@ describe("InMemoryRelayTransportAdapter", () => {
     });
 
     const closedPromise = waitForWebSocketClose(pair.clientSocket);
-    adapter.closePeer({
+    await adapter.deliverEnvelope({
+      kind: "close",
       target,
       closeCode: 1012,
       closeReason: "Closed by adapter",
@@ -386,10 +390,11 @@ describe("InMemoryRelayTransportAdapter", () => {
     });
 
     await expect(
-      adapter.forwardToPeer({
+      adapter.deliverEnvelope({
+        kind: "frame",
         target: nonLocalTarget,
         payload: "hello",
       }),
-    ).rejects.toThrow("Expected in-memory frame transport target to be local.");
+    ).rejects.toThrow("Expected in-memory relay transport target to be local.");
   });
 });
