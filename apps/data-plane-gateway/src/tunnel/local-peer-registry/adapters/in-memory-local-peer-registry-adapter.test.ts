@@ -1,33 +1,33 @@
 import { describe, expect, it } from "vitest";
 
-import type { TunnelPeerLocation } from "../../types.js";
-import { InMemoryTunnelPeerRegistryAdapter } from "./in-memory-peer-registry-adapter.js";
+import type { RelayTarget } from "../../types.js";
+import { InMemoryLocalPeerRegistryAdapter } from "./in-memory-local-peer-registry-adapter.js";
 
 function createPeerLocation(input: {
-  instanceId: string;
-  side: TunnelPeerLocation["side"];
+  sandboxInstanceId: string;
+  side: RelayTarget["side"];
   nodeId: string;
   sessionId: string;
-}): TunnelPeerLocation {
+}): RelayTarget {
   return {
-    instanceId: input.instanceId,
+    sandboxInstanceId: input.sandboxInstanceId,
     side: input.side,
     nodeId: input.nodeId,
     sessionId: input.sessionId,
   };
 }
 
-describe("InMemoryTunnelPeerRegistryAdapter", () => {
+describe("InMemoryLocalPeerRegistryAdapter", () => {
   it("stores and retrieves peers by instance id and side", () => {
-    const adapter = new InMemoryTunnelPeerRegistryAdapter();
+    const adapter = new InMemoryLocalPeerRegistryAdapter();
     const bootstrapLocation = createPeerLocation({
-      instanceId: "sbi_abc",
+      sandboxInstanceId: "sbi_abc",
       side: "bootstrap",
       nodeId: "dpg_1",
       sessionId: "session_bootstrap",
     });
     const connectionLocation = createPeerLocation({
-      instanceId: "sbi_abc",
+      sandboxInstanceId: "sbi_abc",
       side: "connection",
       nodeId: "dpg_1",
       sessionId: "session_connection",
@@ -38,28 +38,28 @@ describe("InMemoryTunnelPeerRegistryAdapter", () => {
 
     expect(
       adapter.getPeer({
-        instanceId: "sbi_abc",
+        sandboxInstanceId: "sbi_abc",
         side: "bootstrap",
       }),
     ).toEqual(bootstrapLocation);
     expect(
       adapter.getPeer({
-        instanceId: "sbi_abc",
+        sandboxInstanceId: "sbi_abc",
         side: "connection",
       }),
     ).toEqual(connectionLocation);
   });
 
   it("returns the previous peer when replacing an existing key", () => {
-    const adapter = new InMemoryTunnelPeerRegistryAdapter();
+    const adapter = new InMemoryLocalPeerRegistryAdapter();
     const previousLocation = createPeerLocation({
-      instanceId: "sbi_abc",
+      sandboxInstanceId: "sbi_abc",
       side: "connection",
       nodeId: "dpg_1",
       sessionId: "session_one",
     });
     const nextLocation = createPeerLocation({
-      instanceId: "sbi_abc",
+      sandboxInstanceId: "sbi_abc",
       side: "connection",
       nodeId: "dpg_2",
       sessionId: "session_two",
@@ -69,16 +69,16 @@ describe("InMemoryTunnelPeerRegistryAdapter", () => {
     expect(adapter.setPeer(nextLocation)).toEqual(previousLocation);
     expect(
       adapter.getPeer({
-        instanceId: "sbi_abc",
+        sandboxInstanceId: "sbi_abc",
         side: "connection",
       }),
     ).toEqual(nextLocation);
   });
 
   it("only removes the peer when node id and session id match", () => {
-    const adapter = new InMemoryTunnelPeerRegistryAdapter();
+    const adapter = new InMemoryLocalPeerRegistryAdapter();
     const storedLocation = createPeerLocation({
-      instanceId: "sbi_abc",
+      sandboxInstanceId: "sbi_abc",
       side: "bootstrap",
       nodeId: "dpg_1",
       sessionId: "session_one",
@@ -88,7 +88,7 @@ describe("InMemoryTunnelPeerRegistryAdapter", () => {
 
     const removeWithWrongNodeId = adapter.removePeer(
       createPeerLocation({
-        instanceId: "sbi_abc",
+        sandboxInstanceId: "sbi_abc",
         side: "bootstrap",
         nodeId: "dpg_2",
         sessionId: "session_one",
@@ -96,7 +96,7 @@ describe("InMemoryTunnelPeerRegistryAdapter", () => {
     );
     const removeWithWrongSessionId = adapter.removePeer(
       createPeerLocation({
-        instanceId: "sbi_abc",
+        sandboxInstanceId: "sbi_abc",
         side: "bootstrap",
         nodeId: "dpg_1",
         sessionId: "session_two",
@@ -109,7 +109,7 @@ describe("InMemoryTunnelPeerRegistryAdapter", () => {
     expect(removeWithMatchingIdentity).toBe(true);
     expect(
       adapter.getPeer({
-        instanceId: "sbi_abc",
+        sandboxInstanceId: "sbi_abc",
         side: "bootstrap",
       }),
     ).toBeUndefined();
