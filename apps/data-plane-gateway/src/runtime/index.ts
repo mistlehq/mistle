@@ -5,6 +5,7 @@ import { typeid } from "typeid-js";
 
 import { createApp, stopApp } from "../app.js";
 import { startServer } from "../server.js";
+import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory-relay-coordinator.js";
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
 import type {
   DataPlaneGatewayRuntime,
@@ -18,6 +19,7 @@ export function createDataPlaneGatewayRuntime(
   const app = createApp(config.app);
   const nodeWebSocket = createNodeWebSocket({ app });
   const nodeId = typeid("dpg").toString();
+  const relayCoordinator = createInMemoryTunnelRelayCoordinator(nodeId);
 
   registerSandboxTunnelRoute({
     app,
@@ -32,7 +34,7 @@ export function createDataPlaneGatewayRuntime(
       tokenIssuer: config.sandbox.connect.tokenIssuer,
       tokenAudience: config.sandbox.connect.tokenAudience,
     } satisfies ConnectionTokenConfig,
-    nodeId,
+    relayCoordinator,
   });
 
   let startedServer: StartedServer | undefined;
