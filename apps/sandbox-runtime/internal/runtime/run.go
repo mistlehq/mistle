@@ -201,6 +201,21 @@ func Run(input RunInput) (runErr error) {
 		runSpan.SetStatus(codes.Error, err.Error())
 		return err
 	}
+	if proxyCertificateAuthority != nil {
+		err = traceStep(
+			runContext,
+			tracingHandle.Tracer(),
+			"sandbox.runtime.mark_process_non_dumpable",
+			func(context.Context) error {
+				return markCurrentProcessNonDumpable()
+			},
+		)
+		if err != nil {
+			runSpan.RecordError(err)
+			runSpan.SetStatus(codes.Error, err.Error())
+			return err
+		}
+	}
 
 	proxyHandler, err := traceStepWithValue(
 		runContext,
