@@ -13,9 +13,12 @@ import {
 } from "@mistle/workflows/control-plane";
 import { Pool } from "pg";
 
+import type { ControlPlaneApiConfig } from "../src/types.js";
+
 export type WorkflowContext = {
   db: ControlPlaneDatabase;
   dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "startSandboxInstance">;
+  integrationsConfig: ControlPlaneApiConfig["integrations"];
   integrationRegistry: IntegrationRegistry;
   openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
   email: {
@@ -64,6 +67,7 @@ export function getWorkflowContext(): Promise<WorkflowContext> {
         baseUrl: apiConfig.app.dataPlaneApi.baseUrl,
         serviceToken: apiConfig.global.internalAuth.serviceToken,
       }),
+      integrationsConfig: apiConfig.app.integrations,
       integrationRegistry: createIntegrationRegistry(),
       openWorkflow: createControlPlaneOpenWorkflow({
         backend: await workflowBackendPromise,
