@@ -25,7 +25,6 @@ export class DockerSandboxAdapter implements SandboxAdapter {
 
     const response = await this.#client.startSandbox({
       imageRef: request.image.imageId,
-      ...(request.extraHosts === undefined ? {} : { extraHosts: [...request.extraHosts] }),
       ...(request.env === undefined ? {} : { env: request.env }),
     });
     const sandboxId = response.sandboxId;

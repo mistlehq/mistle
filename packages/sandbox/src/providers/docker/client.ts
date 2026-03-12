@@ -158,7 +158,6 @@ export class DockerApiClient implements DockerClient {
     await this.#pullImage(parsedRequest.imageRef);
 
     const hostConfig: Docker.HostConfig = {
-      ...(parsedRequest.extraHosts === undefined ? {} : { ExtraHosts: parsedRequest.extraHosts }),
       ...(this.#config.networkName === undefined ? {} : { NetworkMode: this.#config.networkName }),
     };
     const createContainerOptions: Docker.ContainerCreateOptions = {
