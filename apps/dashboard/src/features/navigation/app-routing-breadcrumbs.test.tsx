@@ -47,6 +47,11 @@ describe("app routing breadcrumb integration", () => {
             <Route element={<PageHarness />} index />
             <Route
               element={<PageHarness />}
+              handle={ROUTE_HANDLES.settingsOrganizationIntegrationDetail}
+              path=":targetKey"
+            />
+            <Route
+              element={<PageHarness />}
               handle={ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult}
               path=":targetKey/callback-result"
             />
@@ -100,6 +105,15 @@ describe("app routing breadcrumb integration", () => {
 
     await router.navigate("/settings/organization/integrations");
     expect(router.state.location.pathname).toBe("/settings/organization/integrations");
+
+    await router.navigate("/settings/organization/integrations/github");
+    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+
+    expect(markup).toContain('href="/settings/organization/general"');
+    expect(markup).toContain('href="/settings/organization/integrations"');
+    expect(markup).toContain("Github");
+    expect(markup).toContain("Integration connection");
+    expect(markup).toContain("Inspect an existing integration connection and resource readiness.");
   });
 
   it("enforces breadcrumb and page metadata coverage for settings destinations", () => {
@@ -108,6 +122,7 @@ describe("app routing breadcrumb integration", () => {
       "/settings/organization/general",
       "/settings/organization/members",
       "/settings/organization/integrations",
+      "/settings/organization/integrations/github",
       "/settings/organization/integrations/github/callback-result",
     ];
 

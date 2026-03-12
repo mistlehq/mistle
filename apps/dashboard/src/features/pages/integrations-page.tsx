@@ -1,19 +1,22 @@
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import {
+  formatConnectionAuthMethodLabel,
+  resolveConnectionAuthScheme,
+} from "../integrations/connection-auth.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import { formatConnectionCount } from "../integrations/format-connection-count.js";
+import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import {
   IntegrationConnectionDialog,
   IntegrationConnectionMethodIds,
   type IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-dialog.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
-import {
-  type ViewDialogState,
-  ViewConnectionsDialog,
-} from "../integrations/view-connections-dialog.js";
+import { refreshIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import {
   OrganizationIntegrationsSettingsPageView,
   type OrganizationIntegrationsSettingsPageCard,
@@ -41,7 +44,11 @@ function toConnectionMethods(
 }
 
 export function IntegrationsPage() {
-  const [viewDialog, setViewDialog] = useState<ViewDialogState | null>(null);
+  const navigate = useNavigate();
+  const params = useParams();
+  const queryClient = useQueryClient();
+  const detailTargetKey = params["targetKey"] ?? null;
+  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
 
   const connectionDialogState = useIntegrationConnectionDialogState({
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
@@ -61,24 +68,61 @@ export function IntegrationsPage() {
     return buildIntegrationCards(integrationsQuery.data);
   }, [integrationsQuery.data]);
 
-  const selectedViewConnections = useMemo(() => {
-    if (viewDialog === null) {
-      return [];
-    }
-
-    const selectedCard = cards.find((card) => card.target.targetKey === viewDialog.targetKey);
-    if (selectedCard === undefined) {
-      throw new Error(`Integration card was not found for target '${viewDialog.targetKey}'.`);
-    }
-
-    return selectedCard.connections.filter((connection) => connection.status === "active");
-  }, [cards, viewDialog]);
-
   const activeIntegrationCards = useMemo(
     () =>
       cards.filter((card) => card.connections.some((connection) => connection.status === "active")),
     [cards],
   );
+
+  const selectedDetailCard = useMemo(() => {
+    if (detailTargetKey === null) {
+      return null;
+    }
+
+    return cards.find((card) => card.target.targetKey === detailTargetKey) ?? null;
+  }, [cards, detailTargetKey]);
+
+  const selectedDetailConnections = useMemo(() => {
+    if (selectedDetailCard === null) {
+      return [];
+    }
+
+    return selectedDetailCard.connections.filter((connection) => connection.status === "active");
+  }, [selectedDetailCard]);
+
+  useEffect(() => {
+    const defaultConnection = selectedDetailConnections[0] ?? null;
+    if (defaultConnection === null) {
+      setSelectedConnectionId(null);
+      return;
+    }
+
+    const selectedStillExists = selectedDetailConnections.some(
+      (connection) => connection.id === selectedConnectionId,
+    );
+    if (!selectedStillExists) {
+      setSelectedConnectionId(defaultConnection.id);
+    }
+  }, [selectedConnectionId, selectedDetailConnections]);
+
+  if (
+    detailTargetKey !== null &&
+    !integrationsQuery.isPending &&
+    !integrationsQuery.isError &&
+    selectedDetailCard === null
+  ) {
+    throw new Error(`Integration target '${detailTargetKey}' was not found.`);
+  }
+
+  const refreshResourceMutation = useMutation({
+    mutationFn: async (input: { connectionId: string; kind: string }) =>
+      refreshIntegrationConnectionResources(input),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
+      });
+    },
+  });
 
   const connectedViewCards = useMemo<readonly OrganizationIntegrationsSettingsPageCard[]>(
     () =>
@@ -90,13 +134,10 @@ export function IntegrationsPage() {
         ...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey }),
         actionLabel: "View",
         onAction: () => {
-          setViewDialog({
-            targetKey: card.target.targetKey,
-            displayName: card.displayName,
-          });
+          void navigate(`/settings/organization/integrations/${card.target.targetKey}`);
         },
       })),
-    [activeIntegrationCards],
+    [activeIntegrationCards, navigate],
   );
 
   const availableViewCards = useMemo<readonly OrganizationIntegrationsSettingsPageCard[]>(
@@ -125,6 +166,83 @@ export function IntegrationsPage() {
     [cards, connectionDialogState],
   );
 
+  const detailSurface = useMemo(() => {
+    if (detailTargetKey === null || selectedDetailCard === null) {
+      return null;
+    }
+
+    return (
+      <IntegrationConnectionDetailView
+        connections={selectedDetailConnections.map((connection) => {
+          const authScheme = resolveConnectionAuthScheme(connection.config ?? null);
+
+          return {
+            id: connection.id,
+            displayName: connection.displayName,
+            status: connection.status,
+            ...(authScheme === null
+              ? {}
+              : { authMethodLabel: formatConnectionAuthMethodLabel(authScheme) }),
+            ...(connection.externalSubjectId === undefined
+              ? {}
+              : { externalSubjectId: connection.externalSubjectId }),
+            createdAt: connection.createdAt,
+            updatedAt: connection.updatedAt,
+            resources: (connection.resources ?? []).map((resource) => ({
+              kind: resource.kind,
+              selectionMode: resource.selectionMode,
+              count: resource.count,
+              syncState: resource.syncState,
+              ...(resource.lastSyncedAt === undefined
+                ? {}
+                : { lastSyncedAt: resource.lastSyncedAt }),
+              isRefreshing:
+                refreshResourceMutation.isPending &&
+                refreshResourceMutation.variables?.connectionId === connection.id &&
+                refreshResourceMutation.variables.kind === resource.kind,
+            })),
+          };
+        })}
+        {...(selectedDetailCard.target.logoKey === undefined
+          ? {}
+          : { logoKey: selectedDetailCard.target.logoKey })}
+        onEditConnection={(connectionId) => {
+          const selectedConnection = selectedDetailConnections.find(
+            (connection) => connection.id === connectionId,
+          );
+          if (selectedConnection === undefined) {
+            throw new Error(`Integration connection '${connectionId}' was not found.`);
+          }
+
+          const authScheme = resolveConnectionAuthScheme(selectedConnection.config ?? null);
+          connectionDialogState.openDialog({
+            targetKey: selectedDetailCard.target.targetKey,
+            targetDisplayName: selectedDetailCard.displayName,
+            mode: "update",
+            connectionId: selectedConnection.id,
+            connectionDisplayName: selectedConnection.displayName,
+            currentMethodId:
+              authScheme === null ? IntegrationConnectionMethodIds.API_KEY : authScheme,
+          });
+        }}
+        onRefreshResource={(input) => {
+          refreshResourceMutation.mutate(input);
+        }}
+        onSelectConnection={setSelectedConnectionId}
+        selectedConnectionId={selectedConnectionId}
+        targetDisplayName={selectedDetailCard.displayName}
+        targetKey={selectedDetailCard.target.targetKey}
+      />
+    );
+  }, [
+    connectionDialogState,
+    detailTargetKey,
+    refreshResourceMutation,
+    selectedConnectionId,
+    selectedDetailCard,
+    selectedDetailConnections,
+  ]);
+
   return (
     <OrganizationIntegrationsSettingsPageView
       availableCards={availableViewCards}
@@ -148,37 +266,7 @@ export function IntegrationsPage() {
           pending={connectionDialogState.pending}
         />
       }
-      detailSurface={
-        <ViewConnectionsDialog
-          connections={selectedViewConnections}
-          dialog={viewDialog}
-          onClose={() => {
-            setViewDialog(null);
-          }}
-          onOpenEditConnectionDialog={({
-            connectionId,
-            connectionDisplayName,
-            connectionMethodId,
-          }) => {
-            if (viewDialog === null) {
-              throw new Error("View dialog state is required to open edit connection dialog.");
-            }
-
-            setViewDialog(null);
-            connectionDialogState.openDialog({
-              targetKey: viewDialog.targetKey,
-              targetDisplayName: viewDialog.displayName,
-              mode: "update",
-              connectionId,
-              connectionDisplayName,
-              currentMethodId:
-                connectionMethodId === null
-                  ? IntegrationConnectionMethodIds.API_KEY
-                  : connectionMethodId,
-            });
-          }}
-        />
-      }
+      detailSurface={detailSurface}
       isLoading={integrationsQuery.isPending}
       loadErrorMessage={
         integrationsQuery.isError

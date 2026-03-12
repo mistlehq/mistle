@@ -9,6 +9,7 @@ export type SettingsRouteElements = {
   organizationGeneral: React.JSX.Element;
   organizationMembers: React.JSX.Element;
   organizationIntegrations: React.JSX.Element;
+  organizationIntegrationDetail: React.JSX.Element;
   organizationIntegrationCallbackResult: React.JSX.Element;
 };
 
@@ -42,6 +43,11 @@ export function createSettingsRoutes(elements: SettingsRouteElements): React.JSX
           path="integrations"
         >
           <Route element={elements.organizationIntegrations} index />
+          <Route
+            element={elements.organizationIntegrationDetail}
+            handle={ROUTE_HANDLES.settingsOrganizationIntegrationDetail}
+            path=":targetKey"
+          />
           <Route
             element={elements.organizationIntegrationCallbackResult}
             handle={ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult}
