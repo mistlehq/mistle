@@ -429,6 +429,82 @@ export const CodexStoryRunningCommandsGroupEntry: ChatSemanticGroupEntry = {
   ],
 };
 
+export const CodexStoryRunningCommandsLongOutputGroupEntry: ChatSemanticGroupEntry = {
+  id: "running-commands-group-long-1",
+  turnId: "turn-running-commands-long",
+  kind: "semantic-group",
+  semanticKind: "running-commands",
+  status: "completed",
+  displayKeys: StorySemanticDisplayKeys["running-commands"],
+  counts: null,
+  items: [
+    {
+      id: "running-command-short-1",
+      label: "Command",
+      detail: "pnpm --filter @mistle/dashboard lint",
+      detailKind: "code",
+      command: "pnpm --filter @mistle/dashboard lint",
+      output: ["Found 0 warnings and 0 errors.", "Finished in 1.9s."].join("\n"),
+      status: "completed",
+    },
+    {
+      id: "running-command-short-2",
+      label: "Command",
+      detail:
+        "pnpm exec vitest run apps/dashboard/src/features/chat/components/chat-thread.test.tsx",
+      detailKind: "code",
+      command:
+        "pnpm exec vitest run apps/dashboard/src/features/chat/components/chat-thread.test.tsx",
+      output: [
+        "✓ apps/dashboard/src/features/chat/components/chat-thread.test.tsx (3 tests) 78ms",
+      ].join("\n"),
+      status: "completed",
+    },
+    {
+      id: "running-command-long-1",
+      label: "Command",
+      detail: "pnpm test",
+      detailKind: "code",
+      command: "pnpm test",
+      output: [
+        "RUN  v4.0.18 /Users/jonathanlow/mistle-projects/mistle-codex-semantic-spec",
+        "",
+        "✓ apps/dashboard/src/features/chat/components/chat-semantic-group.test.tsx (8 tests) 217ms",
+        "✓ apps/dashboard/src/features/chat/components/chat-thread.test.tsx (3 tests) 92ms",
+        "✓ apps/dashboard/src/features/codex-client/codex-chat-state.test.ts (20 tests) 21ms",
+        "✓ packages/codex-app-server-client/src/thread-items/thread-items.test.ts (14 tests) 35ms",
+        "",
+        "stdout | tests/system/codex-session-render.system.test.ts",
+        "Rebuilding dashboard transcript fixtures...",
+        "Loading semantic group snapshots...",
+        "",
+        "stderr | tests/system/codex-session-render.system.test.ts",
+        "Warning: skipped network-dependent verification for local Storybook run",
+        "",
+        "✓ tests/system/codex-session-render.system.test.ts (5 tests) 421ms",
+        "✓ tests/e2e/dashboard-semantic-group.e2e.test.ts (3 tests) 1.24s",
+        "",
+        " Test Files  6 passed (6)",
+        "      Tests  53 passed (53)",
+        "   Start at  15:02:14",
+        "   Duration  8.31s (transform 2.11s, setup 0ms, import 6.21s, tests 2.03s, environment 1.42s)",
+        "",
+        "Coverage summary:",
+        "  chat-semantic-group.tsx          98.4%",
+        "  codex-chat-state.ts              97.1%",
+        "  build-thread-timeline.ts         99.2%",
+        "  classify-thread-item-semantics.ts 100.0%",
+        "",
+        "Artifacts:",
+        "  storybook-static/index.html",
+        "  reports/vitest/junit.xml",
+        "  reports/vitest/coverage-final.json",
+      ].join("\n"),
+      status: "completed",
+    },
+  ],
+};
+
 export const CodexStorySessionEntries: readonly ChatEntry[] = [
   {
     id: "user-1",

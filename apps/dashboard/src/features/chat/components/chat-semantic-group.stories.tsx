@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   CodexStoryExploringGroupEntry,
   CodexStoryMakingEditsGroupEntry,
-  CodexStoryRunningCommandsGroupEntry,
+  CodexStoryRunningCommandsLongOutputGroupEntry,
   CodexStorySearchingWebGroupEntry,
   CodexStoryThinkingGroupEntry,
   CodexStoryToolCallGroupEntry,
@@ -55,6 +55,6 @@ export const ToolCall: Story = {
 
 export const RunningCommands: Story = {
   args: {
-    block: CodexStoryRunningCommandsGroupEntry,
+    block: CodexStoryRunningCommandsLongOutputGroupEntry,
   },
 };

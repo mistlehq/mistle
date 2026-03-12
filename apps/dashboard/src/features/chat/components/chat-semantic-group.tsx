@@ -265,7 +265,7 @@ function renderSemanticGroupItemOutput(input: {
   if (input.semanticKind === "running-commands") {
     return (
       <pre
-        className="bg-muted/25 mt-1 overflow-x-auto rounded-md px-2 py-2 text-[13px] leading-5 whitespace-pre-wrap opacity-85"
+        className="bg-muted/25 mt-1 max-h-64 overflow-auto rounded-md px-2 py-2 text-[13px] leading-5 whitespace-pre-wrap opacity-85"
         data-semantic-output="command-log"
       >
         {input.item.output}
