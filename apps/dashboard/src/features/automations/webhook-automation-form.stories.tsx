@@ -39,7 +39,6 @@ const CreateValues: WebhookAutomationFormValues = {
   name: "GitHub pushes to repo triage",
   integrationConnectionId: "conn_github_prod",
   sandboxProfileId: "sbp_repo_maintainer",
-  sandboxProfileVersion: "",
   enabled: true,
   inputTemplate: '{\n  "repo": "{{payload.repository.full_name}}",\n  "ref": "{{payload.ref}}"\n}',
   conversationKeyTemplate: "{{payload.repository.full_name}}:{{payload.ref}}",
@@ -109,7 +108,6 @@ export const Edit: Story = {
     onDelete: function onDelete() {},
     values: {
       ...CreateValues,
-      sandboxProfileVersion: "12",
       enabled: false,
       eventTypesText: "payout.failed",
       name: "Stripe payouts incident intake",

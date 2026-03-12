@@ -32,7 +32,6 @@ export type WebhookAutomationFormValues = {
   name: string;
   integrationConnectionId: string;
   sandboxProfileId: string;
-  sandboxProfileVersion: string;
   enabled: boolean;
   inputTemplate: string;
   conversationKeyTemplate: string;
@@ -191,21 +190,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
               value={input.values.sandboxProfileId}
             />
           </div>
-
-          <Field>
-            <FieldLabel htmlFor="sandbox-profile-version">Sandbox profile version</FieldLabel>
-            <FieldContent>
-              <Input
-                id="sandbox-profile-version"
-                onChange={(event) => {
-                  input.onValueChange("sandboxProfileVersion", event.currentTarget.value);
-                }}
-                placeholder="Leave blank to use the latest compatible version"
-                value={input.values.sandboxProfileVersion}
-              />
-              <FieldError message={input.fieldErrors.sandboxProfileVersion} />
-            </FieldContent>
-          </Field>
 
           <div className="bg-muted/40 flex items-start gap-3 rounded-lg border p-4">
             <Checkbox
