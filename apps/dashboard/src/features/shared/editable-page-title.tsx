@@ -25,7 +25,7 @@ export function EditablePageTitle(input: {
         <Input
           aria-label={input.ariaLabel}
           autoFocus
-          className="h-11 w-full text-xl font-semibold leading-none"
+          className="h-10 py-0 w-full text-xl font-semibold leading-none"
           onBlur={input.onCommit}
           onChange={(event) => {
             input.onDraftValueChange(event.currentTarget.value);
@@ -52,8 +52,8 @@ export function EditablePageTitle(input: {
 
   return (
     <div className={containerClassName}>
-      <div className="inline-flex items-center gap-1">
-        <h1 className="text-xl font-semibold">{input.title}</h1>
+      <div className="inline-flex h-10 items-center gap-1">
+        <h1 className="text-xl font-semibold leading-none">{input.title}</h1>
         <Button
           aria-label={input.editButtonLabel}
           disabled={input.saveDisabled}
