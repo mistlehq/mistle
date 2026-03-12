@@ -52,7 +52,7 @@ export function CodexSessionPage(): React.JSX.Element {
   );
   useAppShellHeaderActions(headerActions);
 
-  const transcriptItemIds = new Set(
+  const chatItemIds = new Set(
     chatState.entries.flatMap((entry) => {
       if (entry.kind === "semantic-group") {
         return entry.items.map((item) => item.id);
@@ -70,7 +70,7 @@ export function CodexSessionPage(): React.JSX.Element {
       return true;
     }
 
-    return !transcriptItemIds.has(entry.itemId);
+    return !chatItemIds.has(entry.itemId);
   });
 
   if (sandboxInstanceId === null) {
