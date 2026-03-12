@@ -1,27 +1,34 @@
-import {
-  type HandleAutomationConversationDeliveryWorkflowInput,
-  type HandleAutomationConversationDeliveryWorkflowOutput,
-} from "@mistle/workflows/control-plane";
-import {
-  acquireConversationDeliveryConnection,
-  AutomationConversationDeliveryTaskActions,
-  claimOrResumeAutomationConversationDeliveryTask,
-  completeConversationDeliveryAutomationRun,
-  deliverConversationAutomationPayload,
-  ensureConversationDeliverySandbox,
-  failConversationDeliveryAutomationRun,
-  finalizeAutomationConversationDeliveryActiveTask,
-  idleAutomationConversationDeliveryProcessor,
-  ignoreAutomationConversationDeliveryAutomationRun,
-  prepareConversationDeliveryAutomationRun,
-  resolveAutomationConversationDeliveryActiveTaskAction,
-  resolveAutomationConversationDeliveryRoute,
-  resolveAutomationRunFailure,
-} from "@mistle/workflows/control-plane/runtime";
 import { defineWorkflow } from "openworkflow";
 
-import { executeConversationProviderDelivery } from "../../control-plane-worker/src/runtime/automation-workflows/provider/execute-conversation-provider-delivery.js";
-import { getWorkflowContext } from "./context.js";
+import { executeConversationProviderDelivery } from "../../../control-plane-worker/src/runtime/automation-workflows/provider/execute-conversation-provider-delivery.js";
+import { getWorkflowContext } from "../context.js";
+import {
+  acquireAutomationConnection,
+  type AcquireAutomationConnectionDependencies,
+  type EnsureAutomationSandboxDependencies,
+  type PreparedAutomationRun,
+  markAutomationRunCompleted,
+  markAutomationRunFailed,
+  markAutomationRunIgnored,
+  prepareAutomationRun,
+  resolveAutomationRunFailure,
+} from "../shared/automation/index.js";
+import {
+  claimOrResumeAutomationConversationDeliveryTask,
+  deliverConversationAutomationPayload,
+  ensureConversationDeliverySandbox,
+  resolveAutomationConversationDeliveryRoute,
+} from "./conversation-delivery.js";
+import { idleAutomationConversationDeliveryProcessorIfEmpty } from "./delivery-processor.js";
+import {
+  finalizeAutomationConversationDeliveryTask,
+  resolveAutomationConversationDeliveryTaskAction,
+} from "./delivery-tasks.js";
+import { AutomationConversationDeliveryTaskActions } from "./types.js";
+import type {
+  HandleAutomationConversationDeliveryWorkflowInput,
+  HandleAutomationConversationDeliveryWorkflowOutput,
+} from "./types.js";
 
 function getConversationDeliveryStepName(input: { prefix: string; taskId: string }) {
   return `${input.prefix}:${input.taskId}`;
@@ -55,7 +62,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow<
         const didIdleProcessor = await step.run(
           { name: `idle-conversation-delivery-processor-if-empty:${String(iteration)}` },
           async () =>
-            idleAutomationConversationDeliveryProcessor(
+            idleAutomationConversationDeliveryProcessorIfEmpty(
               {
                 db: ctx.db,
               },
@@ -81,7 +88,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow<
           }),
         },
         async () =>
-          resolveAutomationConversationDeliveryActiveTaskAction(
+          resolveAutomationConversationDeliveryTaskAction(
             {
               db: ctx.db,
             },
@@ -101,7 +108,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow<
             }),
           },
           async () =>
-            ignoreAutomationConversationDeliveryAutomationRun(
+            markAutomationRunIgnored(
               {
                 db: ctx.db,
               },
@@ -119,7 +126,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow<
             }),
           },
           async () =>
-            finalizeAutomationConversationDeliveryActiveTask(
+            finalizeAutomationConversationDeliveryTask(
               {
                 db: ctx.db,
               },
@@ -138,7 +145,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow<
       }
 
       try {
-        const preparedAutomationRun = await step.run(
+        const preparedAutomationRun: PreparedAutomationRun = await step.run(
           {
             name: getConversationDeliveryStepName({
               prefix: "prepare-automation-run",
@@ -146,7 +153,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow<
             }),
           },
           async () =>
-            prepareConversationDeliveryAutomationRun(
+            prepareAutomationRun(
               {
                 db: ctx.db,
               },
@@ -185,10 +192,16 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow<
             ensureConversationDeliverySandbox(
               {
                 db: ctx.db,
-                getSandboxInstance: (sandboxInput) =>
-                  ctx.controlPlaneInternalClient.getSandboxInstance(sandboxInput),
-                startSandboxProfileInstance: (startInput) =>
-                  ctx.controlPlaneInternalClient.startSandboxProfileInstance(startInput),
+                getSandboxInstance: (
+                  sandboxInput: Parameters<
+                    AcquireAutomationConnectionDependencies["getSandboxInstance"]
+                  >[0],
+                ) => ctx.controlPlaneInternalClient.getSandboxInstance(sandboxInput),
+                startSandboxProfileInstance: (
+                  startInput: Parameters<
+                    EnsureAutomationSandboxDependencies["startSandboxProfileInstance"]
+                  >[0],
+                ) => ctx.controlPlaneInternalClient.startSandboxProfileInstance(startInput),
               },
               {
                 preparedAutomationRun,
@@ -205,7 +218,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow<
             }),
           },
           async () =>
-            acquireConversationDeliveryConnection(
+            acquireAutomationConnection(
               {
                 getSandboxInstance: (sandboxInput) =>
                   ctx.controlPlaneInternalClient.getSandboxInstance(sandboxInput),
@@ -251,7 +264,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow<
             }),
           },
           async () =>
-            completeConversationDeliveryAutomationRun(
+            markAutomationRunCompleted(
               {
                 db: ctx.db,
               },
@@ -269,7 +282,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow<
             }),
           },
           async () =>
-            finalizeAutomationConversationDeliveryActiveTask(
+            finalizeAutomationConversationDeliveryTask(
               {
                 db: ctx.db,
               },
@@ -293,7 +306,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow<
             }),
           },
           async () =>
-            failConversationDeliveryAutomationRun(
+            markAutomationRunFailed(
               {
                 db: ctx.db,
               },
@@ -313,7 +326,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow<
             }),
           },
           async () =>
-            finalizeAutomationConversationDeliveryActiveTask(
+            finalizeAutomationConversationDeliveryTask(
               {
                 db: ctx.db,
               },

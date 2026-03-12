@@ -1,17 +1,15 @@
-import {
-  HandleAutomationConversationDeliveryWorkflowSpec,
-  type HandleAutomationConversationDeliveryWorkflowInput,
-} from "@mistle/workflows/control-plane";
+import { defineWorkflow } from "openworkflow";
+
+import { getWorkflowContext } from "./context.js";
+import type { HandleAutomationConversationDeliveryWorkflowInput } from "./handle-automation-conversation-delivery/types.js";
+import { HandleAutomationConversationDeliveryWorkflow } from "./handle-automation-conversation-delivery/workflow.js";
 import {
   handoffAutomationRunDelivery,
   markAutomationRunFailed,
   prepareAutomationRun,
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
-} from "@mistle/workflows/control-plane/runtime";
-import { defineWorkflow } from "openworkflow";
-
-import { getWorkflowContext } from "./context.js";
+} from "./shared/automation/index.js";
 
 export type HandleAutomationRunWorkflowInput = {
   automationRunId: string;
@@ -67,7 +65,7 @@ export const HandleAutomationRunWorkflow = defineWorkflow<
               workflowInput: HandleAutomationConversationDeliveryWorkflowInput,
             ) => {
               await ctx.openWorkflow.runWorkflow(
-                HandleAutomationConversationDeliveryWorkflowSpec,
+                HandleAutomationConversationDeliveryWorkflow.spec,
                 workflowInput,
                 {
                   idempotencyKey: `automation-conversation-delivery:${workflowInput.conversationId}:${String(workflowInput.generation)}`,

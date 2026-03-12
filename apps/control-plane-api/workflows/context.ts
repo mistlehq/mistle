@@ -8,13 +8,12 @@ import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/d
 import { SMTPEmailSender } from "@mistle/emails";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
-import {
-  createControlPlaneBackend,
-  createControlPlaneOpenWorkflow,
-} from "@mistle/workflows/control-plane";
+import { OpenWorkflow } from "openworkflow";
+import { BackendPostgres } from "openworkflow/postgres";
 import { Pool } from "pg";
 
 import type { ControlPlaneApiConfig } from "../src/types.js";
+import { ControlPlaneOpenWorkflowSchema } from "./constants.js";
 
 export type WorkflowContext = {
   db: ControlPlaneDatabase;
@@ -25,7 +24,7 @@ export type WorkflowContext = {
   dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "startSandboxInstance">;
   integrationsConfig: ControlPlaneApiConfig["integrations"];
   integrationRegistry: IntegrationRegistry;
-  openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
+  openWorkflow: OpenWorkflow;
   email: {
     from: {
       email: string;
@@ -64,10 +63,10 @@ export function getWorkflowContext(): Promise<WorkflowContext> {
     const dbPool = new Pool({
       connectionString: apiConfig.app.database.url,
     });
-    const workflowBackendPromise = createControlPlaneBackend({
-      url: apiConfig.app.workflow.databaseUrl,
+    const workflowBackendPromise = BackendPostgres.connect(apiConfig.app.workflow.databaseUrl, {
       namespaceId: apiConfig.app.workflow.namespaceId,
       runMigrations: false,
+      schema: ControlPlaneOpenWorkflowSchema,
     });
 
     return {
@@ -79,7 +78,7 @@ export function getWorkflowContext(): Promise<WorkflowContext> {
       }),
       integrationsConfig: apiConfig.app.integrations,
       integrationRegistry: createIntegrationRegistry(),
-      openWorkflow: createControlPlaneOpenWorkflow({
+      openWorkflow: new OpenWorkflow({
         backend: await workflowBackendPromise,
       }),
       email: {

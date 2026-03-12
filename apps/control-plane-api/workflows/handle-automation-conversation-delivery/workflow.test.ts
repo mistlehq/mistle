@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 
-import { HandleAutomationConversationDeliveryWorkflow } from "./handle-automation-conversation-delivery.js";
+import { HandleAutomationConversationDeliveryWorkflow } from "./workflow.js";
 
 test("HandleAutomationConversationDeliveryWorkflow preserves the existing workflow identity", () => {
   expect(HandleAutomationConversationDeliveryWorkflow.spec.name).toBe(

@@ -7,12 +7,12 @@ import {
   IntegrationWebhookEventStatuses,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
-import { HandleAutomationRunWorkflowSpec } from "@mistle/workflows/control-plane";
 import { eq, sql } from "drizzle-orm";
 import { defineWorkflow } from "openworkflow";
 
 import { requestIntegrationConnectionResourceRefresh } from "../src/integration-connections/services/request-resource-refresh.js";
 import { getWorkflowContext } from "./context.js";
+import { HandleAutomationRunWorkflow } from "./handle-automation-run.js";
 
 export type HandleIntegrationWebhookEventWorkflowInput = {
   webhookEventId: string;
@@ -314,7 +314,7 @@ export const HandleIntegrationWebhookEventWorkflow = defineWorkflow<
 
             for (const queuedAutomationRun of queuedAutomationRuns) {
               await ctx.openWorkflow.runWorkflow(
-                HandleAutomationRunWorkflowSpec,
+                HandleAutomationRunWorkflow.spec,
                 {
                   automationRunId: queuedAutomationRun.id,
                 },
