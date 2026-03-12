@@ -27,6 +27,7 @@ export const dataPlaneWorkerDevelopmentPreset = {
             socket_path: "/var/run/docker.sock",
             snapshot_repository: "localhost:5001/mistle/snapshots",
             network_name: "mistle-sandbox-dev",
+            traces_endpoint: "http://otel-lgtm:4318/v1/traces",
           },
         },
       },

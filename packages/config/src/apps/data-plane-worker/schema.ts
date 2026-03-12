@@ -44,6 +44,7 @@ export const DataPlaneWorkerSandboxDockerConfigSchema = z
     socketPath: z.string().min(1),
     snapshotRepository: z.string().min(1),
     networkName: z.string().min(1).optional(),
+    tracesEndpoint: z.url().optional(),
   })
   .strict();
 

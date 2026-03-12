@@ -35,6 +35,7 @@ export function loadDataPlaneWorkerFromToml(
       socketPath: sandboxDocker.socket_path,
       snapshotRepository: sandboxDocker.snapshot_repository,
       networkName: sandboxDocker.network_name,
+      tracesEndpoint: sandboxDocker.traces_endpoint,
     };
   }
 
