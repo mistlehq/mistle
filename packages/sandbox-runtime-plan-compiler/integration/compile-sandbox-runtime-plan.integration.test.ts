@@ -113,7 +113,7 @@ describe("compileSandboxRuntimePlan integration", () => {
     expect(runtimePlan.runtimeClients).toHaveLength(1);
     expect(runtimePlan.artifacts).toHaveLength(1);
     expect(runtimePlan.egressRoutes).toHaveLength(1);
-    expect(runtimePlan.egressRoutes[0]?.routeId).toBe("route_ibd_srpc_compile_success");
+    expect(runtimePlan.egressRoutes[0]?.egressRuleId).toBe("egress_rule_ibd_srpc_compile_success");
     expect(runtimePlan.runtimeClients[0]?.setup.env.OPENAI_BASE_URL).toBe(
       "https://api.openai.com/v1",
     );

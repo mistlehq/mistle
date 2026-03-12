@@ -134,8 +134,8 @@ function resolveRequestTargetPath(ctx: Context<AppContextBindings>): string {
   );
 }
 
-function resolveRouteId(ctx: Context<AppContextBindings>): string | undefined {
-  return readOptionalHeader(ctx.req.raw.headers, EgressRequestHeaders.ROUTE_ID);
+function resolveEgressRuleId(ctx: Context<AppContextBindings>): string | undefined {
+  return readOptionalHeader(ctx.req.raw.headers, EgressRequestHeaders.EGRESS_RULE_ID);
 }
 
 function normalizePath(path: string): string {
@@ -291,12 +291,12 @@ function copyResponseHeaders(source: Headers): Headers {
 
 export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
   return async (ctx: Context<AppContextBindings>) => {
-    const routeId = resolveRouteId(ctx);
+    const egressRuleId = resolveEgressRuleId(ctx);
     const span = EgressTracer.startSpan("tokenizer_proxy.egress.proxy_request", {
       attributes: {
         "http.request.method": ctx.req.method,
         "url.path": ctx.req.path,
-        ...(routeId === undefined ? {} : { "mistle.egress.route_id": routeId }),
+        ...(egressRuleId === undefined ? {} : { "mistle.egress.rule_id": egressRuleId }),
       },
     });
 
@@ -327,7 +327,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             requestPath: ctx.req.path,
             bindingId: routeMetadata.bindingId,
             connectionId: routeMetadata.connectionId,
-            ...(routeId === undefined ? {} : { routeId }),
+            ...(egressRuleId === undefined ? {} : { egressRuleId }),
           }),
         );
         span.setAttribute("mistle.auth.injection.type", routeMetadata.authInjectionType);
@@ -359,7 +359,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
                     requestPath: ctx.req.path,
                     bindingId: routeMetadata.bindingId,
                     connectionId: routeMetadata.connectionId,
-                    ...(routeId === undefined ? {} : { routeId }),
+                    ...(egressRuleId === undefined ? {} : { egressRuleId }),
                   }),
                 );
                 try {
@@ -397,7 +397,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
             logger.error(
               {
                 err: error,
-                routeId,
+                egressRuleId,
               },
               "Failed to resolve integration credential from control-plane-api",
             );
@@ -464,7 +464,7 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
           logger.error(
             {
               err: error,
-              routeId,
+              egressRuleId,
               upstreamBaseUrl: routeMetadata.upstreamBaseUrl,
             },
             "Failed to forward egress request to upstream",

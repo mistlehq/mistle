@@ -70,7 +70,7 @@ func (mediator ProxyMediator) ForwardIfMatch(
 	}
 	forwardSpan.SetAttributes(
 		attribute.Bool("mistle.egress.matched", true),
-		attribute.String("mistle.egress.route_id", route.RouteID),
+		attribute.String("mistle.egress.rule_id", route.EgressRuleID),
 		attribute.String("mistle.egress.binding_id", route.BindingID),
 	)
 

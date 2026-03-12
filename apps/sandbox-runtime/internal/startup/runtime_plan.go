@@ -40,7 +40,7 @@ type ResolvedSandboxImage struct {
 }
 
 type EgressCredentialRoute struct {
-	RouteID            string                   `json:"routeId"`
+	EgressRuleID       string                   `json:"egressRuleId"`
 	BindingID          string                   `json:"bindingId"`
 	Match              EgressRouteMatch         `json:"match"`
 	Upstream           EgressRouteUpstream      `json:"upstream"`
@@ -198,16 +198,16 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 		return err
 	}
 
-	routeIDs := make(map[string]struct{}, len(runtimePlan.EgressRoutes))
+	egressRuleIDs := make(map[string]struct{}, len(runtimePlan.EgressRoutes))
 	for routeIndex, route := range runtimePlan.EgressRoutes {
 		if err := validateEgressRoute(route, routeIndex); err != nil {
 			return err
 		}
 
-		if _, exists := routeIDs[route.RouteID]; exists {
-			return fmt.Errorf("runtime plan egressRoutes[%d] routeId '%s' is duplicated", routeIndex, route.RouteID)
+		if _, exists := egressRuleIDs[route.EgressRuleID]; exists {
+			return fmt.Errorf("runtime plan egressRoutes[%d] egressRuleId '%s' is duplicated", routeIndex, route.EgressRuleID)
 		}
-		routeIDs[route.RouteID] = struct{}{}
+		egressRuleIDs[route.EgressRuleID] = struct{}{}
 	}
 
 	for artifactIndex, artifact := range runtimePlan.Artifacts {
@@ -287,8 +287,8 @@ func validateResolvedSandboxImage(image ResolvedSandboxImage) error {
 }
 
 func validateEgressRoute(route EgressCredentialRoute, routeIndex int) error {
-	if strings.TrimSpace(route.RouteID) == "" {
-		return fmt.Errorf("runtime plan egressRoutes[%d] routeId is required", routeIndex)
+	if strings.TrimSpace(route.EgressRuleID) == "" {
+		return fmt.Errorf("runtime plan egressRoutes[%d] egressRuleId is required", routeIndex)
 	}
 	if strings.TrimSpace(route.BindingID) == "" {
 		return fmt.Errorf("runtime plan egressRoutes[%d] bindingId is required", routeIndex)

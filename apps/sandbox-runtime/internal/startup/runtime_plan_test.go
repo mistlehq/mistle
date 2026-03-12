@@ -16,7 +16,7 @@ func TestValidateRuntimePlan(t *testing.T) {
 			},
 			EgressRoutes: []EgressCredentialRoute{
 				{
-					RouteID:   "route_github_git",
+					EgressRuleID: "egress_rule_github_git",
 					BindingID: "bind_github",
 					Match: EgressRouteMatch{
 						Hosts:        []string{"github.com"},
@@ -66,7 +66,7 @@ func TestValidateRuntimePlan(t *testing.T) {
 			},
 			EgressRoutes: []EgressCredentialRoute{
 				{
-					RouteID:   "route_github_api",
+					EgressRuleID: "egress_rule_github_api",
 					BindingID: "bind_github",
 					Match: EgressRouteMatch{
 						Hosts: []string{"api.github.com"},

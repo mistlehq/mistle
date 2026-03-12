@@ -407,7 +407,7 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.version).toBe(12);
     expect(runtimePlan.egressRoutes).toHaveLength(1);
     expect(runtimePlan.egressRoutes[0]).toMatchObject({
-      routeId: "route_bind_openai_agent",
+      egressRuleId: "egress_rule_bind_openai_agent",
       bindingId: "bind_openai_agent",
     });
     expect(runtimePlan.artifacts).toHaveLength(1);

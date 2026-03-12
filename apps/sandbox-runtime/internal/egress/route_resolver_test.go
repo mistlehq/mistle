@@ -16,7 +16,7 @@ func buildRuntimePlanForResolverTests() startup.RuntimePlan {
 		},
 		EgressRoutes: []startup.EgressCredentialRoute{
 			{
-				RouteID:   "route_openai",
+				EgressRuleID: "egress_rule_openai",
 				BindingID: "ibd_openai",
 				Match: startup.EgressRouteMatch{
 					Hosts:        []string{"api.openai.com"},
@@ -54,8 +54,8 @@ func TestResolverResolveMatchingRoute(t *testing.T) {
 		if !matched {
 			t.Fatal("expected route to match")
 		}
-		if route.RouteID != "route_openai" {
-			t.Fatalf("expected route_openai, got %s", route.RouteID)
+		if route.EgressRuleID != "egress_rule_openai" {
+			t.Fatalf("expected egress_rule_openai, got %s", route.EgressRuleID)
 		}
 	})
 
@@ -78,7 +78,7 @@ func TestResolverResolveMatchingRoute(t *testing.T) {
 	t.Run("fails closed when multiple routes match", func(t *testing.T) {
 		runtimePlan := buildRuntimePlanForResolverTests()
 		runtimePlan.EgressRoutes = append(runtimePlan.EgressRoutes, startup.EgressCredentialRoute{
-			RouteID:   "route_openai_secondary",
+			EgressRuleID: "egress_rule_openai_secondary",
 			BindingID: "ibd_openai_secondary",
 			Match: startup.EgressRouteMatch{
 				Hosts:        []string{"api.openai.com"},

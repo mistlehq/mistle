@@ -28,7 +28,7 @@ const ResolvedSandboxImageSchema = z.discriminatedUnion("source", [
 
 const EgressCredentialRouteSchema = z
   .object({
-    routeId: z.string().min(1),
+    egressRuleId: z.string().min(1),
     bindingId: z.string().min(1),
     match: z
       .object({
@@ -242,7 +242,7 @@ function normalizeRuntimeArtifactCommand(
 
 function normalizeRoute(route: z.output<typeof EgressCredentialRouteSchema>): RuntimePlanRoute {
   return {
-    routeId: route.routeId,
+    egressRuleId: route.egressRuleId,
     bindingId: route.bindingId,
     match: {
       hosts: route.match.hosts,

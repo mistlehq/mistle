@@ -79,7 +79,7 @@ describe("assembleCompiledRuntimePlan", () => {
         {
           egressRoutes: [
             {
-              routeId: "route_b",
+              egressRuleId: "egress_rule_b",
               bindingId: "bind_b",
               match: {
                 hosts: ["api.github.com", "github.com"],
@@ -165,7 +165,7 @@ describe("assembleCompiledRuntimePlan", () => {
         {
           egressRoutes: [
             {
-              routeId: "route_a",
+              egressRuleId: "egress_rule_a",
               bindingId: "bind_a",
               match: {
                 hosts: ["api.openai.com"],
@@ -257,7 +257,7 @@ describe("assembleCompiledRuntimePlan", () => {
       ],
     });
 
-    expect(plan.egressRoutes[0]?.routeId).toBe("route_a");
+    expect(plan.egressRoutes[0]?.egressRuleId).toBe("egress_rule_a");
     expect(plan.artifacts.map((artifact) => artifact.artifactKey)).toEqual(["codex-cli", "gh-cli"]);
     expect(plan.artifactRemovals).toEqual([]);
     expect(plan.artifacts[1]?.env).toEqual({

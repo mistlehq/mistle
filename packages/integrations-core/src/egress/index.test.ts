@@ -11,7 +11,7 @@ import {
 } from "./index.js";
 
 function createRoute(input: {
-  routeId: string;
+  egressRuleId: string;
   bindingId: string;
   hosts: string[];
   methods?: string[];
@@ -30,7 +30,7 @@ function createRoute(input: {
   }
 
   return {
-    routeId: input.routeId,
+    egressRuleId: input.egressRuleId,
     bindingId: input.bindingId,
     match,
     upstream: {
@@ -69,7 +69,7 @@ describe("egress route matching", () => {
 
   it("matches by host, path prefix, and method", () => {
     const route = createRoute({
-      routeId: "route_a",
+      egressRuleId: "egress_rule_a",
       bindingId: "bind_openai",
       hosts: ["api.openai.com"],
       methods: ["POST"],
@@ -90,14 +90,14 @@ describe("egress route matching", () => {
 
   it("detects overlapping routes", () => {
     const left = createRoute({
-      routeId: "route_openai_v1",
+      egressRuleId: "egress_rule_openai_v1",
       bindingId: "bind_openai_a",
       hosts: ["api.openai.com"],
       methods: ["POST"],
       pathPrefixes: ["/v1"],
     });
     const right = createRoute({
-      routeId: "route_openai_responses",
+      egressRuleId: "egress_rule_openai_responses",
       bindingId: "bind_openai_b",
       hosts: ["api.openai.com"],
       methods: ["POST"],
@@ -114,12 +114,12 @@ describe("egress route matching", () => {
 
   it("orders routes by specificity for deterministic matching", () => {
     const genericRoute = createRoute({
-      routeId: "route_generic",
+      egressRuleId: "egress_rule_generic",
       bindingId: "bind_generic",
       hosts: ["api.github.com", "github.com"],
     });
     const specificRoute = createRoute({
-      routeId: "route_specific",
+      egressRuleId: "egress_rule_specific",
       bindingId: "bind_specific",
       hosts: ["api.github.com"],
       methods: ["GET"],
@@ -127,7 +127,7 @@ describe("egress route matching", () => {
     });
 
     const orderedRoutes = orderRoutesForMatching([genericRoute, specificRoute]);
-    expect(orderedRoutes[0]?.routeId).toBe("route_specific");
+    expect(orderedRoutes[0]?.egressRuleId).toBe("egress_rule_specific");
 
     const resolvedRoute = resolveRouteForRequest({
       routes: [genericRoute, specificRoute],
@@ -138,6 +138,6 @@ describe("egress route matching", () => {
       },
     });
 
-    expect(resolvedRoute?.routeId).toBe("route_specific");
+    expect(resolvedRoute?.egressRuleId).toBe("egress_rule_specific");
   });
 });

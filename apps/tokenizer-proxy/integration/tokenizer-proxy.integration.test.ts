@@ -207,7 +207,7 @@ describe("tokenizer proxy integration", () => {
         {
           method: "POST",
           headers: {
-            [EgressRequestHeaders.ROUTE_ID]: "route_123",
+            [EgressRequestHeaders.EGRESS_RULE_ID]: "egress_rule_123",
             [EgressRequestHeaders.UPSTREAM_BASE_URL]: "https://api.example.com",
             [EgressRequestHeaders.BINDING_ID]: "ibd_missing",
             [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "bearer",
@@ -259,7 +259,7 @@ describe("tokenizer proxy integration", () => {
         {
           method: "GET",
           headers: {
-            [EgressRequestHeaders.ROUTE_ID]: "route_git",
+            [EgressRequestHeaders.EGRESS_RULE_ID]: "egress_rule_git",
             [EgressRequestHeaders.UPSTREAM_BASE_URL]: upstreamEchoService.baseUrl,
             [EgressRequestHeaders.BINDING_ID]: "ibd_github",
             [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "basic",
@@ -330,7 +330,7 @@ describe("tokenizer proxy integration", () => {
         {
           method: "GET",
           headers: {
-            [EgressRequestHeaders.ROUTE_ID]: "route_git",
+            [EgressRequestHeaders.EGRESS_RULE_ID]: "egress_rule_git",
             [EgressRequestHeaders.UPSTREAM_BASE_URL]: upstreamEchoService.baseUrl,
             [EgressRequestHeaders.BINDING_ID]: "ibd_github",
             [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "basic",
@@ -405,7 +405,7 @@ describe("tokenizer proxy integration", () => {
         {
           method: "POST",
           headers: {
-            [EgressRequestHeaders.ROUTE_ID]: "route_graphql",
+            [EgressRequestHeaders.EGRESS_RULE_ID]: "egress_rule_graphql",
             [EgressRequestHeaders.UPSTREAM_BASE_URL]: upstreamService.baseUrl,
             [EgressRequestHeaders.BINDING_ID]: "ibd_github",
             [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "bearer",

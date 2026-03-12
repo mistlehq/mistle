@@ -34,7 +34,7 @@ func TestForwarderBuildForwardRequestUsesHeaderAddressedTokenizerPath(t *testing
 	}{
 		incomingRequest: incomingRequest,
 		route: startup.EgressCredentialRoute{
-			RouteID:   "route_openai",
+			EgressRuleID: "egress_rule_openai",
 			BindingID: "ibd_openai",
 			Upstream: startup.EgressRouteUpstream{
 				BaseURL: "https://api.openai.com/v1",
@@ -62,8 +62,8 @@ func TestForwarderBuildForwardRequestUsesHeaderAddressedTokenizerPath(t *testing
 	if forwardRequest.URL.RawQuery != "stream=true" {
 		t.Fatalf("expected tokenizer proxy query stream=true, got %s", forwardRequest.URL.RawQuery)
 	}
-	if forwardRequest.Header.Get(HeaderEgressRouteID) != "route_openai" {
-		t.Fatalf("expected route id header to be preserved")
+	if forwardRequest.Header.Get(HeaderEgressRuleID) != "egress_rule_openai" {
+		t.Fatalf("expected egress rule id header to be preserved")
 	}
 }
 

@@ -34,12 +34,12 @@ function artifactBinPath(name: string): string {
   return `${RuntimeArtifactBinDirectory}/${name}`;
 }
 
-function resolveRouteId(input: { bindingId: string; routeIndex: number }): string {
+function resolveEgressRuleId(input: { bindingId: string; routeIndex: number }): string {
   if (input.routeIndex === 0) {
-    return `route_${input.bindingId}`;
+    return `egress_rule_${input.bindingId}`;
   }
 
-  return `route_${input.bindingId}_${input.routeIndex + 1}`;
+  return `egress_rule_${input.bindingId}_${input.routeIndex + 1}`;
 }
 
 function renderInstallLatestGithubReleaseBinaryScript(
@@ -588,7 +588,7 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
     const compiledBindingResult: CompiledBindingResult = {
       egressRoutes: compileBindingResult.egressRoutes.map((route, routeIndex) => ({
         ...route,
-        routeId: resolveRouteId({
+        egressRuleId: resolveEgressRuleId({
           bindingId: bindingInput.binding.id,
           routeIndex,
         }),
