@@ -7,6 +7,7 @@ import { StartSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data
 import { typeid } from "typeid-js";
 import { z } from "zod";
 
+import { DataPlaneOpenWorkflowSchema } from "../../openworkflow/index.js";
 import { createDataPlaneTrpcRouter } from "../base.js";
 import { dataPlaneTrpcProcedure } from "../base.js";
 
@@ -46,7 +47,7 @@ async function resolveWorkflowSandboxInstanceId(input: {
   const result = await input.workflowDbPool.query(
     `
       select input
-      from data_plane_openworkflow.workflow_runs
+      from ${DataPlaneOpenWorkflowSchema}.workflow_runs
       where namespace_id = $1 and id = $2
       limit 1
     `,

@@ -1,8 +1,10 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { Pool } from "pg";
+
+import { createControlPlaneWorkerServices } from "../runtime/services/index.js";
 import {
-  createControlPlaneOpenWorkflow,
   type ControlPlaneAutomationConversationDeliveryServices,
   type ControlPlaneAutomationRunServices,
   type ControlPlaneIntegrationConnectionResourceServices,
@@ -10,10 +12,8 @@ import {
   type ControlPlaneSandboxInstanceServices,
   type ControlPlaneSandboxProfileServices,
   type ControlPlaneWorkerEmailDelivery,
-} from "@mistle/workflows/control-plane";
-import { Pool } from "pg";
-
-import { createControlPlaneWorkerServices } from "../runtime/services/index.js";
+} from "../runtime/workflow-types.js";
+import { createControlPlaneOpenWorkflow } from "./client.js";
 import { getOpenWorkflowRuntime } from "./runtime.js";
 
 type RequiredWorkflowServices = {

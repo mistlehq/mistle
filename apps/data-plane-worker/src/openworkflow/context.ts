@@ -1,6 +1,5 @@
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
 import { systemClock, systemSleeper } from "@mistle/time";
-import type { DataPlaneWorkerServices } from "@mistle/workflows/data-plane";
 import { Pool } from "pg";
 
 import { createSandboxRuntimeAdapter } from "../runtime/resources.js";
@@ -8,6 +7,7 @@ import {
   createDataPlaneWorkerServices,
   createDefaultTunnelConnectAckPolicy,
 } from "../runtime/services/index.js";
+import type { DataPlaneWorkerServices } from "../runtime/workflow-types.js";
 import { getOpenWorkflowRuntime } from "./runtime.js";
 
 type RequiredWorkflowServices = {

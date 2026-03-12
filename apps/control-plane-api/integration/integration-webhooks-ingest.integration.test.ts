@@ -5,7 +5,6 @@ import {
   IntegrationConnectionStatuses,
   integrationTargets,
 } from "@mistle/db/control-plane";
-import { ControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
@@ -18,6 +17,7 @@ import {
   IntegrationWebhooksBadRequestResponseSchema,
   IntegrationWebhooksNotFoundResponseSchema,
 } from "../src/integration-webhooks/contracts.js";
+import { ControlPlaneOpenWorkflowSchema } from "../src/openworkflow/index.js";
 import { it } from "./test-context.js";
 
 const GitHubEventTypeHeader = "issue_comment";
@@ -77,7 +77,7 @@ async function listWebhookWorkflowRuns(input: {
           wr.id,
           wr.workflow_name,
           wr.idempotency_key
-        from ${ControlPlaneOpenWorkflow.SCHEMA}.workflow_runs wr
+        from ${ControlPlaneOpenWorkflowSchema}.workflow_runs wr
         where wr.namespace_id = $1
           and wr.workflow_name = $2
           and wr.input ->> 'webhookEventId' = $3

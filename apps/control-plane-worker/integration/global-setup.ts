@@ -4,8 +4,9 @@ import {
   removeTestContext,
   writeTestContext,
 } from "@mistle/test-harness";
-import { createControlPlaneBackend } from "@mistle/workflows/control-plane";
 import { Client as PgClient } from "pg";
+
+import { createControlPlaneBackend } from "../src/openworkflow/client.js";
 
 const SHARED_INFRA_KEY = DEFAULT_SHARED_INTEGRATION_INFRA_KEY;
 const TEMPLATE_DATABASE_NAME = "mistle_control_plane_worker_it_template";
