@@ -7,9 +7,8 @@ import {
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import { buildDashboardUrl } from "../src/dashboard-url.js";
 import {
-  CompleteOAuthConnectionBodySchema,
-  IntegrationConnectionSchema,
   IntegrationConnectionsBadRequestResponseSchema,
   StartOAuthConnectionResponseSchema,
 } from "../src/integration-connections/contracts.js";
@@ -72,7 +71,21 @@ async function ensureOpenAiDefaultTarget(
     });
 }
 
+function createDashboardOrganizationIntegrationsUrl(
+  fixture: ControlPlaneApiIntegrationFixture,
+): string {
+  return buildDashboardUrl(fixture.config.dashboard.baseUrl, "/settings/organization/integrations");
+}
+
 describe("integration connections oauth integration", () => {
+  function createOAuthCompletePath(input: {
+    targetKey: string;
+    query: Record<string, string>;
+  }): string {
+    const searchParams = new URLSearchParams(input.query);
+    return `/v1/integration/connections/${input.targetKey}/oauth/complete?${searchParams.toString()}`;
+  }
+
   it("creates an oauth authorization URL and persists oauth session state", async ({ fixture }) => {
     await ensureGithubCloudTarget(fixture);
 
@@ -117,7 +130,9 @@ describe("integration connections oauth integration", () => {
     expect(oauthSession.usedAt).toBeNull();
   });
 
-  it("creates an oauth-backed connection and marks oauth state as used", async ({ fixture }) => {
+  it("creates an oauth-backed connection without requiring auth and marks oauth state as used", async ({
+    fixture,
+  }) => {
     await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
@@ -142,44 +157,32 @@ describe("integration connections oauth integration", () => {
       throw new Error("Expected oauth state in authorization URL.");
     }
 
-    const requestBody = CompleteOAuthConnectionBodySchema.parse({
-      query: {
-        state,
-        installation_id: "12345",
-        setup_action: "install",
-      },
-    });
-
     const completeResponse = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/complete",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
+      createOAuthCompletePath({
+        targetKey: "github-cloud",
+        query: {
+          state,
+          installation_id: "12345",
+          setup_action: "install",
         },
-        body: JSON.stringify(requestBody),
+      }),
+      {
+        method: "GET",
+        redirect: "manual",
       },
     );
 
-    expect(completeResponse.status).toBe(201);
-    const completeBody = IntegrationConnectionSchema.parse(await completeResponse.json());
-
-    expect(completeBody.targetKey).toBe("github-cloud");
-    expect(completeBody.displayName).toBe("12345");
-    expect(completeBody.status).toBe("active");
-    expect(completeBody.externalSubjectId).toBe("12345");
-    expect(completeBody.config).toEqual({
-      auth_scheme: "oauth",
-      installation_id: "12345",
-      setup_action: "install",
-    });
+    expect(completeResponse.status).toBe(302);
+    expect(completeResponse.headers.get("location")).toBe(
+      createDashboardOrganizationIntegrationsUrl(fixture),
+    );
 
     const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
       where: (table, { and, eq }) =>
         and(
-          eq(table.id, completeBody.id),
           eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.targetKey, "github-cloud"),
+          eq(table.externalSubjectId, "12345"),
         ),
     });
     expect(persistedConnection).toBeDefined();
@@ -187,6 +190,14 @@ describe("integration connections oauth integration", () => {
       throw new Error("Expected persisted oauth-backed connection.");
     }
 
+    expect(persistedConnection.displayName).toBe("12345");
+    expect(persistedConnection.status).toBe("active");
+    expect(persistedConnection.externalSubjectId).toBe("12345");
+    expect(persistedConnection.config).toEqual({
+      auth_scheme: "oauth",
+      installation_id: "12345",
+      setup_action: "install",
+    });
     expect(persistedConnection.targetSnapshotConfig).toEqual({
       apiBaseUrl: "https://api.github.com",
       webBaseUrl: "https://github.com",
@@ -214,7 +225,7 @@ describe("integration connections oauth integration", () => {
         connectionId: integrationConnectionCredentials.connectionId,
       })
       .from(integrationConnectionCredentials)
-      .where(eq(integrationConnectionCredentials.connectionId, completeBody.id));
+      .where(eq(integrationConnectionCredentials.connectionId, persistedConnection.id));
     expect(linkedCredentials).toHaveLength(0);
   });
 
@@ -250,49 +261,54 @@ describe("integration connections oauth integration", () => {
     }
 
     const completeResponse = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/complete",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
+      createOAuthCompletePath({
+        targetKey: "github-cloud",
+        query: {
+          state,
+          installation_id: "12345",
+          setup_action: "install",
         },
-        body: JSON.stringify({
-          query: {
-            state,
-            installation_id: "12345",
-            setup_action: "install",
-          },
-        }),
+      }),
+      {
+        method: "GET",
+        redirect: "manual",
       },
     );
 
-    expect(completeResponse.status).toBe(201);
-    const completeBody = IntegrationConnectionSchema.parse(await completeResponse.json());
-    expect(completeBody.displayName).toBe("GitHub Prod");
-    expect(completeBody.externalSubjectId).toBe("12345");
+    expect(completeResponse.status).toBe(302);
+    expect(completeResponse.headers.get("location")).toBe(
+      createDashboardOrganizationIntegrationsUrl(fixture),
+    );
+
+    const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.targetKey, "github-cloud"),
+          eq(table.externalSubjectId, "12345"),
+        ),
+    });
+    expect(persistedConnection).toBeDefined();
+    if (persistedConnection === undefined) {
+      throw new Error("Expected persisted oauth-backed connection.");
+    }
+
+    expect(persistedConnection.displayName).toBe("GitHub Prod");
+    expect(persistedConnection.externalSubjectId).toBe("12345");
   });
 
   it("returns 400 when oauth completion state is missing", async ({ fixture }) => {
     await ensureGithubCloudTarget(fixture);
 
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth-complete-missing-state@example.com",
-    });
-
     const response = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/complete",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
+      createOAuthCompletePath({
+        targetKey: "github-cloud",
+        query: {
+          installation_id: "12345",
         },
-        body: JSON.stringify({
-          query: {
-            installation_id: "12345",
-          },
-        }),
+      }),
+      {
+        method: "GET",
       },
     );
 
@@ -306,24 +322,16 @@ describe("integration connections oauth integration", () => {
   it("returns 400 when oauth completion state is invalid", async ({ fixture }) => {
     await ensureGithubCloudTarget(fixture);
 
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth-complete-invalid-state@example.com",
-    });
-
     const response = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/complete",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
+      createOAuthCompletePath({
+        targetKey: "github-cloud",
+        query: {
+          state: "ios_nonexistent",
+          installation_id: "12345",
         },
-        body: JSON.stringify({
-          query: {
-            state: "ios_nonexistent",
-            installation_id: "12345",
-          },
-        }),
+      }),
+      {
+        method: "GET",
       },
     );
 
@@ -349,19 +357,15 @@ describe("integration connections oauth integration", () => {
     });
 
     const response = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/complete",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
+      createOAuthCompletePath({
+        targetKey: "github-cloud",
+        query: {
+          state: "oauth_state_expired",
+          installation_id: "12345",
         },
-        body: JSON.stringify({
-          query: {
-            state: "oauth_state_expired",
-            installation_id: "12345",
-          },
-        }),
+      }),
+      {
+        method: "GET",
       },
     );
 
@@ -396,19 +400,15 @@ describe("integration connections oauth integration", () => {
     });
 
     const response = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/complete",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
+      createOAuthCompletePath({
+        targetKey: "github-cloud",
+        query: {
+          state: "oauth_state_used",
+          installation_id: "12345",
         },
-        body: JSON.stringify({
-          query: {
-            state: "oauth_state_used",
-            installation_id: "12345",
-          },
-        }),
+      }),
+      {
+        method: "GET",
       },
     );
 

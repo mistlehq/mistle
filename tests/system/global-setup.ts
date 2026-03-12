@@ -24,7 +24,7 @@ export default async function setup(): Promise<() => Promise<void>> {
     controlPlaneWorkflowNamespaceId: `system_cp_${randomUUID().replaceAll("-", "_")}`,
     dataPlaneWorkflowNamespaceId: `system_dp_${randomUUID().replaceAll("-", "_")}`,
     authBaseUrl: AUTH_ORIGIN,
-    authInvitationAcceptBaseUrl: "http://localhost:5173/invitations/accept",
+    dashboardBaseUrl: "http://localhost:5173",
     authTrustedOrigins:
       "http://localhost:5100,http://127.0.0.1:5100,http://localhost:5173,http://127.0.0.1:5173",
   });

@@ -939,32 +939,6 @@ export interface paths {
                 };
           };
         };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
-              message: string;
-            };
-          };
-        };
         /** @description Integration connection was not found. */
         404: {
           headers: {
@@ -1244,32 +1218,6 @@ export interface paths {
                 };
           };
         };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
-              message: string;
-            };
-          };
-        };
         /** @description Integration target was not found. */
         404: {
           headers: {
@@ -1307,59 +1255,32 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    get?: never;
-    put?: never;
-    post: {
+    get: {
       parameters: {
-        query?: never;
+        query?: {
+          code?: string;
+          error?: string;
+          error_description?: string;
+          error_uri?: string;
+          installation_id?: string;
+          setup_action?: string;
+          state?: string;
+        };
         header?: never;
         path: {
           targetKey: string;
         };
         cookie?: never;
       };
-      requestBody: {
-        content: {
-          "application/json": {
-            query: {
-              [key: string]: string;
-            };
-          };
-        };
-      };
+      requestBody?: never;
       responses: {
-        /** @description Create an OAuth-backed integration connection from callback query params. */
-        201: {
+        /** @description Complete OAuth connection creation and redirect to dashboard integrations. */
+        302: {
           headers: {
+            Location: string;
             [name: string]: unknown;
           };
-          content: {
-            "application/json": {
-              config?: {
-                [key: string]: unknown;
-              };
-              createdAt: string;
-              displayName: string;
-              externalSubjectId?: string;
-              id: string;
-              resources?: {
-                count: number;
-                kind: string;
-                lastSyncedAt?: string;
-                /** @enum {string} */
-                selectionMode: "single" | "multi";
-                /** @enum {string} */
-                syncState: "never-synced" | "syncing" | "ready" | "error";
-              }[];
-              /** @enum {string} */
-              status: "active" | "error" | "revoked";
-              targetKey: string;
-              targetSnapshotConfig?: {
-                [key: string]: unknown;
-              };
-              updatedAt: string;
-            };
-          };
+          content?: never;
         };
         /** @description Invalid request. */
         400: {
@@ -1401,32 +1322,6 @@ export interface paths {
                 };
           };
         };
-        /** @description Authentication is required. */
-        401: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "UNAUTHORIZED";
-              message: string;
-            };
-          };
-        };
-        /** @description Active organization is required. */
-        403: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
-              message: string;
-            };
-          };
-        };
         /** @description Integration target was not found. */
         404: {
           headers: {
@@ -1451,6 +1346,8 @@ export interface paths {
         };
       };
     };
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -2799,7 +2696,9 @@ export interface paths {
       };
       requestBody?: {
         content: {
-          "application/json": Record<string, never>;
+          "application/json": {
+            idempotencyKey?: string;
+          };
         };
       };
       responses: {

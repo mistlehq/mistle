@@ -15,7 +15,6 @@ export const controlPlaneApiDevelopmentPreset = {
         },
         auth: {
           base_url: "http://localhost:5100",
-          invitation_accept_base_url: "http://localhost:5173/invitations/accept",
           trusted_origins: [
             "http://127.0.0.1:3000",
             "http://localhost:3000",
@@ -25,6 +24,9 @@ export const controlPlaneApiDevelopmentPreset = {
           otp_length: 6,
           otp_expires_in_seconds: 300,
           otp_allowed_attempts: 3,
+        },
+        dashboard: {
+          base_url: "http://localhost:5173",
         },
         email: {
           from_address: "no-reply@mistle.local",

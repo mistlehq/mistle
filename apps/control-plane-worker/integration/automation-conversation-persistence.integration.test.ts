@@ -16,6 +16,9 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
+import { Pool } from "pg";
+import { describe, expect } from "vitest";
+
 import {
   activateAutomationConversationRoute,
   AutomationConversationPersistenceErrorCodes,
@@ -24,10 +27,7 @@ import {
   rebindAutomationConversationSandbox,
   replaceAutomationConversationBinding,
   updateAutomationConversationExecution,
-} from "@mistle/workflows/control-plane/runtime";
-import { Pool } from "pg";
-import { describe, expect } from "vitest";
-
+} from "../src/runtime/workflows/index.js";
 import { it } from "./test-context.js";
 
 async function createTestDatabase(input: { databaseUrl: string }) {

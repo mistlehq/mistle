@@ -1690,50 +1690,6 @@
               }
             }
           },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
           "404": {
             "description": "Integration connection was not found.",
             "content": {
@@ -2196,50 +2152,6 @@
                       "additionalProperties": false
                     }
                   ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
                 }
               }
             }
@@ -2754,7 +2666,7 @@
       }
     },
     "/v1/integration/connections/:targetKey/oauth/complete": {
-      "post": {
+      "get": {
         "tags": ["Integrations"],
         "parameters": [
           {
@@ -2765,113 +2677,81 @@
             "required": true,
             "name": "targetKey",
             "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "state",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "code",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "error",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "error_description",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "error_uri",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "installation_id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "setup_action",
+            "in": "query"
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "query": {
-                    "type": "object",
-                    "additionalProperties": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "required": ["query"],
-                "additionalProperties": false
-              }
-            }
-          }
-        },
         "responses": {
-          "201": {
-            "description": "Create an OAuth-backed integration connection from callback query params.",
-            "content": {
-              "application/json": {
+          "302": {
+            "description": "Complete OAuth connection creation and redirect to dashboard integrations.",
+            "headers": {
+              "Location": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "targetKey": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "displayName": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": ["active", "error", "revoked"]
-                    },
-                    "externalSubjectId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "config": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    },
-                    "targetSnapshotConfig": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    },
-                    "resources": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "selectionMode": {
-                            "type": "string",
-                            "enum": ["single", "multi"]
-                          },
-                          "count": {
-                            "type": "integer",
-                            "minimum": 0
-                          },
-                          "syncState": {
-                            "type": "string",
-                            "enum": ["never-synced", "syncing", "ready", "error"]
-                          },
-                          "lastSyncedAt": {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        },
-                        "required": ["kind", "selectionMode", "count", "syncState"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "targetKey",
-                    "displayName",
-                    "status",
-                    "createdAt",
-                    "updatedAt"
-                  ],
-                  "additionalProperties": false
-                }
+                  "type": "string",
+                  "minLength": 1
+                },
+                "required": true
               }
             }
           },
@@ -2940,50 +2820,6 @@
                       "additionalProperties": false
                     }
                   ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
                 }
               }
             }
@@ -5625,7 +5461,13 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "properties": {},
+                "properties": {
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
                 "additionalProperties": false
               }
             }

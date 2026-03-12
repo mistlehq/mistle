@@ -61,7 +61,7 @@ export type StartFullSystemEnvironmentInput = {
   controlPlaneWorkflowNamespaceId: string;
   dataPlaneWorkflowNamespaceId: string;
   authBaseUrl: string;
-  authInvitationAcceptBaseUrl: string;
+  dashboardBaseUrl: string;
   authTrustedOrigins: string;
   cacheBustKey?: string;
   controlPlaneApiEnvironment?: Record<string, string>;
@@ -290,8 +290,7 @@ export async function startFullSystemEnvironment(
         MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
         MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: input.controlPlaneWorkflowNamespaceId,
         MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL: input.authBaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_API_AUTH_INVITATION_ACCEPT_BASE_URL:
-          input.authInvitationAcceptBaseUrl,
+        MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL: input.dashboardBaseUrl,
         MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: input.authTrustedOrigins,
         MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL: DATA_PLANE_API_CONTAINER_BASE_URL,
         MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE: sandboxBaseImageReference,

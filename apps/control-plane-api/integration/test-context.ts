@@ -166,9 +166,11 @@ export const it = vitestIt.extend<{ fixture: ControlPlaneApiIntegrationFixture }
               "1": "integration-master-key-testing",
             },
           },
+          dashboard: {
+            baseUrl: "http://localhost:5173",
+          },
           auth: {
             baseUrl: "http://localhost:3000",
-            invitationAcceptBaseUrl: "http://localhost:5173/invitations/accept",
             secret: "integration-auth-secret",
             trustedOrigins: ["http://localhost:3000"],
             otpLength: 6,

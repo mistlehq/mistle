@@ -1,7 +1,7 @@
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
-import { createDataPlaneBackend, createDataPlaneOpenWorkflow } from "@mistle/workflows/data-plane";
 import { Pool } from "pg";
 
+import { createDataPlaneBackend, createDataPlaneOpenWorkflow } from "../openworkflow/index.js";
 import type { DataPlaneApiConfig, DataPlaneApp } from "../types.js";
 
 export type AppRuntimeResources = {

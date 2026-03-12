@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { type StartSandboxInstanceInput } from "@mistle/data-plane-trpc/contracts";
 import { createDataPlaneSandboxInstancesTrpcRouter } from "@mistle/data-plane-trpc/router";
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
@@ -5,6 +7,7 @@ import { StartSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data
 import { typeid } from "typeid-js";
 import { z } from "zod";
 
+import { DataPlaneOpenWorkflowSchema } from "../../openworkflow/index.js";
 import { createDataPlaneTrpcRouter } from "../base.js";
 import { dataPlaneTrpcProcedure } from "../base.js";
 
@@ -15,17 +18,15 @@ const WorkflowRunInputSchema = z
   .loose();
 
 function createStartSandboxIdempotencyKey(input: StartSandboxInstanceInput): string {
+  const idempotencyKey = input.idempotencyKey ?? randomUUID();
+
   return JSON.stringify({
+    version: 1,
     organizationId: input.organizationId,
     sandboxProfileId: input.sandboxProfileId,
     sandboxProfileVersion: input.sandboxProfileVersion,
-    startedBy: {
-      kind: input.startedBy.kind,
-      id: input.startedBy.id,
-    },
     source: input.source,
-    image: input.image,
-    runtimePlan: input.runtimePlan,
+    idempotencyKey,
   });
 }
 
@@ -46,7 +47,7 @@ async function resolveWorkflowSandboxInstanceId(input: {
   const result = await input.workflowDbPool.query(
     `
       select input
-      from data_plane_openworkflow.workflow_runs
+      from ${DataPlaneOpenWorkflowSchema}.workflow_runs
       where namespace_id = $1 and id = $2
       limit 1
     `,

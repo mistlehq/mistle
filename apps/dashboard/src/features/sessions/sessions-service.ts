@@ -52,6 +52,7 @@ export type MintSandboxConnectionTokenResult = {
 export async function startSandboxInstanceFromProfileVersion(input: {
   profileId: string;
   profileVersion: number;
+  idempotencyKey?: string;
   signal?: AbortSignal;
 }): Promise<StartSandboxInstanceResult> {
   try {
@@ -59,7 +60,12 @@ export async function startSandboxInstanceFromProfileVersion(input: {
       operation: "startSandboxInstanceFromProfileVersion",
       method: "POST",
       pathname: `/v1/sandbox/profiles/${encodeURIComponent(input.profileId)}/versions/${String(input.profileVersion)}/instances`,
-      body: {},
+      body:
+        input.idempotencyKey === undefined
+          ? {}
+          : {
+              idempotencyKey: input.idempotencyKey,
+            },
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       fallbackMessage: "Could not start sandbox session.",
     });

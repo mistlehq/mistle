@@ -77,7 +77,29 @@ describe("StartSandboxInstanceInputValidationSchema", () => {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       sandboxProfileVersion: 1,
+      idempotencyKey: "req_123",
       runtimePlan,
+      startedBy: {
+        kind: "user",
+        id: "usr_123",
+      },
+      source: "dashboard",
+      image: {
+        imageId: "img_123",
+        kind: "base",
+        createdAt: "2026-03-10T00:00:00.000Z",
+      },
+    };
+
+    expect(StartSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
+  });
+
+  it("accepts omitted start request ids for server-generated fallbacks", () => {
+    const input = {
+      organizationId: "org_123",
+      sandboxProfileId: "sbp_123",
+      sandboxProfileVersion: 1,
+      runtimePlan: createRuntimePlan(),
       startedBy: {
         kind: "user",
         id: "usr_123",

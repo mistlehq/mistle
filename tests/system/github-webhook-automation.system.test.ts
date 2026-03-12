@@ -122,6 +122,14 @@ function parseGitHubRepository(input: string): { owner: string; repo: string } {
   };
 }
 
+function createOAuthCompletePath(input: {
+  targetKey: string;
+  query: Record<string, string>;
+}): string {
+  const searchParams = new URLSearchParams(input.query);
+  return `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth/complete?${searchParams.toString()}`;
+}
+
 function resolveControlPlaneApiLocalPort(controlPlaneApiBaseUrl: string): number {
   const baseUrl = new URL(controlPlaneApiBaseUrl);
   const parsedPort = Number.parseInt(baseUrl.port, 10);
@@ -425,25 +433,43 @@ describeIf("system GitHub webhook automation", () => {
         throw new Error("Expected GitHub OAuth start response to include a non-empty state.");
       }
 
-      const githubConnection = await requestJsonOrThrow({
-        request: fixture.request,
-        path: `/v1/integration/connections/${encodeURIComponent(GitHubTargetKey)}/oauth/complete`,
-        expectedStatus: 201,
-        description: "GitHub OAuth connection completion",
-        schema: IntegrationConnectionResponseSchema,
-        init: {
-          method: "POST",
+      const githubOAuthCompleteResponse = await fixture.request(
+        createOAuthCompletePath({
+          targetKey: GitHubTargetKey,
+          query: {
+            state: githubOauthState,
+            installation_id: githubInstallationId,
+            setup_action: "install",
+          },
+        }),
+        {
+          method: "GET",
           headers: {
-            "content-type": "application/json",
             cookie: session.cookie,
           },
-          body: JSON.stringify({
-            query: {
-              state: githubOauthState,
-              installation_id: githubInstallationId,
-              setup_action: "install",
-            },
-          }),
+          redirect: "manual",
+        },
+      );
+      if (githubOAuthCompleteResponse.status !== 302) {
+        const errorBody = await githubOAuthCompleteResponse.text().catch(() => "");
+        throw new Error(
+          `GitHub OAuth connection completion expected status 302, got ${String(githubOAuthCompleteResponse.status)}. Response body: ${errorBody}`,
+        );
+      }
+      const githubConnection = await waitForCondition({
+        description: "persisted GitHub connection to be created",
+        timeoutMs: AutomationRunTimeoutMs,
+        evaluate: async () => {
+          return (
+            (await fixture.db.query.integrationConnections.findFirst({
+              where: (table, { and, eq }) =>
+                and(
+                  eq(table.organizationId, session.organizationId),
+                  eq(table.targetKey, GitHubTargetKey),
+                  eq(table.externalSubjectId, githubInstallationId),
+                ),
+            })) ?? null
+          );
         },
       });
 
