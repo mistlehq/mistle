@@ -26,6 +26,7 @@ RUN apt-get update \
     curl \
     git \
     jq \
+    ripgrep \
     tini \
   && rm -rf /var/lib/apt/lists/*
 
@@ -38,8 +39,10 @@ RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PA
 
 COPY --from=sandbox-runtime-builder /out/sandboxd /usr/local/bin/sandboxd
 COPY --from=sandbox-runtime-builder /out/sandbox-bootstrap /usr/local/bin/sandbox-bootstrap
+COPY apps/sandbox-runtime/images/base/mistle-path.sh /etc/profile.d/mistle-path.sh
 
 RUN chmod +x \
+  /etc/profile.d/mistle-path.sh \
   /usr/local/bin/mise \
   /usr/local/bin/sandbox-bootstrap \
   /usr/local/bin/sandboxd

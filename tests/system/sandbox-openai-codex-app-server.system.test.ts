@@ -13,8 +13,13 @@ import { z } from "zod";
 import { it } from "./system-test-context.js";
 
 const OPENAI_TARGET_KEY = "openai-default";
+const GITHUB_TARGET_KEY = "github-cloud";
 const OPENAI_API_KEY_ENV_NAME = "MISTLE_TEST_OPENAI_API_KEY";
+const GITHUB_TEST_REPOSITORY_ENV_NAME = "MISTLE_TEST_GITHUB_TEST_REPOSITORY";
+const GITHUB_INSTALLATION_ID_ENV_NAME = "MISTLE_TEST_GITHUB_INSTALLATION_ID";
 const TEST_RESPONSE_MARKER = "SYSTEM_TEST_OK";
+const GITHUB_TEST_RESPONSE_MARKER = "GH_FOUND";
+const GITHUB_BINARY_PATH = "/workspace/.mistle/bin/gh";
 const SYSTEM_TEST_TIMEOUT_MS = 5 * 60_000;
 const CREATE_CONNECTION_TIMEOUT_MS = 30_000;
 const CREATE_PROFILE_TIMEOUT_MS = 30_000;
@@ -24,6 +29,7 @@ const MINT_CONNECTION_TOKEN_TIMEOUT_MS = 30_000;
 const WEBSOCKET_CONNECT_TIMEOUT_MS = 30_000;
 const WEBSOCKET_MESSAGE_TIMEOUT_MS = 30_000;
 const TURN_COMPLETION_TIMEOUT_MS = 90_000;
+const RESOURCE_SYNC_TIMEOUT_MS = 2 * 60_000;
 const WEBSOCKET_TRACE_EVENT_LIMIT = 300;
 const WEBSOCKET_TRACE_TAIL_COUNT = 40;
 const DOCKER_DIAGNOSTIC_TIMEOUT_MS = 10_000;
@@ -87,6 +93,35 @@ const TurnStartResultSchema = z.looseObject({
   }),
 });
 
+const ThreadReadResultSchema = z.looseObject({
+  thread: z.looseObject({
+    id: z.string().min(1),
+    turns: z
+      .array(
+        z.looseObject({
+          id: z.string().min(1),
+          items: z.array(z.unknown()).optional(),
+        }),
+      )
+      .optional(),
+  }),
+});
+
+const StartOAuthConnectionResponseSchema = z
+  .object({
+    authorizationUrl: z.url(),
+  })
+  .strict();
+
+const RefreshIntegrationConnectionResourcesResponseSchema = z
+  .object({
+    connectionId: z.string().min(1),
+    familyId: z.string().min(1),
+    kind: z.literal("repository"),
+    syncState: z.enum(["syncing", "ready", "error"]),
+  })
+  .strict();
+
 const StartSandboxInstanceResponseSchema = z
   .object({
     status: z.literal("accepted"),
@@ -110,6 +145,18 @@ type TurnCompletion = {
   turnId: string;
   status: string;
   errorMessage: string | null;
+};
+
+type GitHubRepository = {
+  owner: string;
+  repo: string;
+};
+
+type CommandExecutionItem = {
+  command: string;
+  aggregatedOutput: string | null;
+  exitCode: number | null;
+  status: string | null;
 };
 
 type JsonRpcNotification = {
@@ -153,6 +200,13 @@ type WebSocketJsonMessagePump = {
 
 const WebSocketJsonMessagePumps = new WeakMap<WebSocket, WebSocketJsonMessagePump>();
 
+function hasRequiredGitHubEnv(): boolean {
+  return [GITHUB_TEST_REPOSITORY_ENV_NAME, GITHUB_INSTALLATION_ID_ENV_NAME].every((name) => {
+    const value = process.env[name];
+    return typeof value === "string" && value.length > 0;
+  });
+}
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (value === undefined || value.length === 0) {
@@ -182,6 +236,39 @@ function readOptionalStringField(record: Record<string, unknown>, key: string): 
   }
 
   return value;
+}
+
+function readOptionalNumberField(record: Record<string, unknown>, key: string): number | null {
+  const value = record[key];
+  return typeof value === "number" ? value : null;
+}
+
+function parseGitHubRepository(input: string): GitHubRepository {
+  const [owner, repo, ...rest] = input.split("/");
+  if (
+    owner === undefined ||
+    owner.length === 0 ||
+    repo === undefined ||
+    repo.length === 0 ||
+    rest.length > 0
+  ) {
+    throw new Error(
+      `${GITHUB_TEST_REPOSITORY_ENV_NAME} must be 'owner/repo'. Received '${input}'.`,
+    );
+  }
+
+  return {
+    owner,
+    repo,
+  };
+}
+
+function createOAuthCompletePath(input: {
+  targetKey: string;
+  query: Record<string, string>;
+}): string {
+  const searchParams = new URLSearchParams(input.query);
+  return `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth/complete?${searchParams.toString()}`;
 }
 
 async function expectStatusJson(input: {
@@ -720,6 +807,25 @@ async function collectSandboxContainerListDiagnostics(): Promise<string> {
   return truncateForDiagnostics(output, DIAGNOSTIC_OUTPUT_MAX_CHARS);
 }
 
+async function waitForCondition<T>(input: {
+  description: string;
+  timeoutMs: number;
+  evaluate: () => Promise<T | null>;
+}): Promise<T> {
+  const deadlineEpochMs = Date.now() + input.timeoutMs;
+
+  while (Date.now() < deadlineEpochMs) {
+    const result = await input.evaluate();
+    if (result !== null) {
+      return result;
+    }
+
+    await systemSleeper.sleep(2_000);
+  }
+
+  throw new Error(`Timed out waiting for ${input.description} after ${String(input.timeoutMs)}ms.`);
+}
+
 async function runStep<T>(input: {
   stepTrace: StepTraceEntry[];
   stepName: string;
@@ -931,11 +1037,39 @@ function parseTurnCompletedNotification(message: unknown): TurnCompletion | null
   };
 }
 
+function collectCommandExecutionItem(input: {
+  method: string;
+  params: unknown;
+  sink: CommandExecutionItem[];
+}): void {
+  if (input.method !== "item/completed" || !isRecord(input.params)) {
+    return;
+  }
+
+  const item = input.params.item;
+  if (!isRecord(item)) {
+    return;
+  }
+
+  const itemType = readOptionalStringField(item, "type");
+  if (itemType !== "commandExecution") {
+    return;
+  }
+
+  input.sink.push({
+    command: readNonEmptyStringField(item, "command"),
+    aggregatedOutput: readOptionalStringField(item, "aggregatedOutput"),
+    exitCode: readOptionalNumberField(item, "exitCode"),
+    status: readOptionalStringField(item, "status"),
+  });
+}
+
 async function waitForTurnCompletion(input: {
   socket: WebSocket;
   turnId: string;
   timeoutMs: number;
   agentTextSink: string[];
+  commandExecutionSink?: CommandExecutionItem[];
 }): Promise<TurnCompletion> {
   const deadline = Date.now() + input.timeoutMs;
 
@@ -973,6 +1107,13 @@ async function waitForTurnCompletion(input: {
       params: notification.data.params,
       sink: input.agentTextSink,
     });
+    if (input.commandExecutionSink !== undefined) {
+      collectCommandExecutionItem({
+        method: notification.data.method,
+        params: notification.data.params,
+        sink: input.commandExecutionSink,
+      });
+    }
 
     const completion = parseTurnCompletedNotification(nextMessage);
     if (completion !== null && completion.turnId === input.turnId) {
@@ -983,6 +1124,46 @@ async function waitForTurnCompletion(input: {
       throw new Error(`Timed out waiting for turn/completed for turn '${input.turnId}'.`);
     }
   }
+}
+
+function readCommandExecutionItemsForTurn(input: {
+  threadReadResult: unknown;
+  turnId: string;
+}): CommandExecutionItem[] {
+  const parsedThreadReadResult = ThreadReadResultSchema.safeParse(input.threadReadResult);
+  if (!parsedThreadReadResult.success) {
+    throw new Error(
+      `thread/read result did not match expected schema: ${formatJsonForError(input.threadReadResult)}`,
+    );
+  }
+
+  const turn = (parsedThreadReadResult.data.thread.turns ?? []).find(
+    (candidateTurn) => candidateTurn.id === input.turnId,
+  );
+  if (turn === undefined) {
+    throw new Error(`thread/read result did not include target turn '${input.turnId}'.`);
+  }
+
+  const items = turn.items ?? [];
+  const commandExecutions: CommandExecutionItem[] = [];
+  for (const item of items) {
+    if (!isRecord(item)) {
+      continue;
+    }
+    const itemType = readOptionalStringField(item, "type");
+    if (itemType !== "commandExecution") {
+      continue;
+    }
+
+    commandExecutions.push({
+      command: readNonEmptyStringField(item, "command"),
+      aggregatedOutput: readOptionalStringField(item, "aggregatedOutput"),
+      exitCode: readOptionalNumberField(item, "exitCode"),
+      status: readOptionalStringField(item, "status"),
+    });
+  }
+
+  return commandExecutions;
 }
 
 async function waitForSandboxInstanceRunning(input: {
@@ -1331,6 +1512,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
         });
 
         const notificationsWhileStartingTurn: JsonRpcNotification[] = [];
+        const observedCommandExecutions: CommandExecutionItem[] = [];
         const turnId = await runStep({
           stepTrace,
           stepName: "json-rpc turn/start",
@@ -1373,6 +1555,11 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
             params: notification.params,
             sink: agentTextParts,
           });
+          collectCommandExecutionItem({
+            method: notification.method,
+            params: notification.params,
+            sink: observedCommandExecutions,
+          });
           const completion = parseTurnCompletedNotification(notification);
           if (completion !== null && completion.turnId === turnId) {
             preBufferedTurnCompletion = completion;
@@ -1390,6 +1577,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
                 turnId,
                 timeoutMs: TURN_COMPLETION_TIMEOUT_MS,
                 agentTextSink: agentTextParts,
+                commandExecutionSink: observedCommandExecutions,
               }))
             );
           },
@@ -1416,5 +1604,596 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
       }
     },
     SYSTEM_TEST_TIMEOUT_MS,
+  );
+});
+
+const describeIfGitHubEnv = hasRequiredGitHubEnv() ? describe : describe.skip;
+
+describeIfGitHubEnv("system sandbox openai codex app-server with github binding", () => {
+  it(
+    "lets Codex detect the GitHub CLI binary through a shell tool call",
+    async ({ fixture }) => {
+      const stepTrace: StepTraceEntry[] = [];
+      const openAiApiKey = requireEnv(OPENAI_API_KEY_ENV_NAME);
+      const repository = parseGitHubRepository(requireEnv(GITHUB_TEST_REPOSITORY_ENV_NAME));
+      const githubInstallationId = requireEnv(GITHUB_INSTALLATION_ID_ENV_NAME);
+      const dataPlaneGatewayBaseUrl = fixture.dataPlaneGatewayBaseUrl;
+      let websocketForCleanup: WebSocket | null = null;
+      let detachWebSocketTrace: (() => void) | null = null;
+      const websocketTraceEntries: WebSocketTraceEntry[] = [];
+
+      try {
+        const authenticatedSession = await runStep({
+          stepTrace,
+          stepName: "create authenticated session",
+          action: async () => {
+            return await fixture.authSession();
+          },
+        });
+
+        const openAiConnectionId = await runStep({
+          stepTrace,
+          stepName: "create OpenAI connection",
+          action: async () => {
+            const response = await requestWithTimeout({
+              request: fixture.request,
+              path: `/v1/integration/connections/${encodeURIComponent(OPENAI_TARGET_KEY)}/api-key`,
+              timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
+              description: "OpenAI API-key connection creation",
+              init: {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  cookie: authenticatedSession.cookie,
+                },
+                body: JSON.stringify({
+                  displayName: `System OpenAI Connection ${randomUUID()}`,
+                  apiKey: openAiApiKey,
+                }),
+              },
+            });
+            const payload = await expectStatusJson({
+              response,
+              status: 201,
+              description: "OpenAI API-key connection creation",
+            });
+            if (!isRecord(payload)) {
+              throw new Error("Expected OpenAI API-key connection response to be an object.");
+            }
+
+            return readNonEmptyStringField(payload, "id");
+          },
+        });
+
+        const githubConnectionId = await runStep({
+          stepTrace,
+          stepName: "create GitHub connection",
+          action: async () => {
+            const startResponse = await requestWithTimeout({
+              request: fixture.request,
+              path: `/v1/integration/connections/${encodeURIComponent(GITHUB_TARGET_KEY)}/oauth/start`,
+              timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
+              description: "GitHub OAuth connection start",
+              init: {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  cookie: authenticatedSession.cookie,
+                },
+                body: JSON.stringify({
+                  displayName: `GitHub Codex System Test ${randomUUID()}`,
+                }),
+              },
+            });
+            const startPayload = await expectStatusJson({
+              response: startResponse,
+              status: 200,
+              description: "GitHub OAuth connection start",
+            });
+            const parsedStartPayload = StartOAuthConnectionResponseSchema.safeParse(startPayload);
+            if (!parsedStartPayload.success) {
+              throw new Error(
+                `GitHub OAuth start response did not match schema: ${formatJsonForError(startPayload)}`,
+              );
+            }
+
+            const githubOauthState = new URL(
+              parsedStartPayload.data.authorizationUrl,
+            ).searchParams.get("state");
+            if (githubOauthState === null || githubOauthState.length === 0) {
+              throw new Error("Expected GitHub OAuth start response to include a non-empty state.");
+            }
+
+            const completeResponse = await requestWithTimeout({
+              request: fixture.request,
+              path: createOAuthCompletePath({
+                targetKey: GITHUB_TARGET_KEY,
+                query: {
+                  state: githubOauthState,
+                  installation_id: githubInstallationId,
+                  setup_action: "install",
+                },
+              }),
+              timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
+              description: "GitHub OAuth connection completion",
+              init: {
+                method: "GET",
+                headers: {
+                  cookie: authenticatedSession.cookie,
+                },
+                redirect: "manual",
+              },
+            });
+            if (completeResponse.status !== 302) {
+              const responseBody = await completeResponse.text().catch(() => "");
+              throw new Error(
+                `GitHub OAuth connection completion expected status 302, got ${String(completeResponse.status)}. Response body: ${responseBody}`,
+              );
+            }
+
+            const connection = await waitForCondition({
+              description: "persisted GitHub connection to be created",
+              timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
+              evaluate: async () => {
+                return (
+                  (await fixture.db.query.integrationConnections.findFirst({
+                    where: (table, { and, eq }) =>
+                      and(
+                        eq(table.organizationId, authenticatedSession.organizationId),
+                        eq(table.targetKey, GITHUB_TARGET_KEY),
+                        eq(table.externalSubjectId, githubInstallationId),
+                      ),
+                  })) ?? null
+                );
+              },
+            });
+
+            return connection.id;
+          },
+        });
+
+        await runStep({
+          stepTrace,
+          stepName: "refresh GitHub repository resources",
+          action: async () => {
+            const response = await requestWithTimeout({
+              request: fixture.request,
+              path: `/v1/integration/connections/${encodeURIComponent(githubConnectionId)}/resources/repository/refresh`,
+              timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
+              description: "GitHub repository resource refresh",
+              init: {
+                method: "POST",
+                headers: {
+                  cookie: authenticatedSession.cookie,
+                },
+              },
+            });
+            const payload = await expectStatusJson({
+              response,
+              status: 202,
+              description: "GitHub repository resource refresh",
+            });
+            const parsedPayload =
+              RefreshIntegrationConnectionResourcesResponseSchema.safeParse(payload);
+            if (!parsedPayload.success) {
+              throw new Error(
+                `GitHub repository refresh response did not match schema: ${formatJsonForError(payload)}`,
+              );
+            }
+          },
+        });
+
+        await runStep({
+          stepTrace,
+          stepName: "wait for GitHub repository resource sync",
+          action: async () => {
+            await waitForCondition({
+              description: "GitHub repository resource sync to reach ready",
+              timeoutMs: RESOURCE_SYNC_TIMEOUT_MS,
+              evaluate: async () => {
+                const resourceState =
+                  await fixture.db.query.integrationConnectionResourceStates.findFirst({
+                    where: (table, { and, eq }) =>
+                      and(eq(table.connectionId, githubConnectionId), eq(table.kind, "repository")),
+                  });
+
+                if (resourceState === undefined) {
+                  return null;
+                }
+
+                if (resourceState.syncState === "error") {
+                  throw new Error(
+                    `GitHub resource sync failed: ${resourceState.lastErrorCode ?? "unknown"} ${resourceState.lastErrorMessage ?? ""}`,
+                  );
+                }
+
+                if (resourceState.syncState !== "ready") {
+                  return null;
+                }
+
+                const resource = await fixture.db.query.integrationConnectionResources.findFirst({
+                  where: (table, { and, eq }) =>
+                    and(
+                      eq(table.connectionId, githubConnectionId),
+                      eq(table.kind, "repository"),
+                      eq(table.handle, `${repository.owner}/${repository.repo}`),
+                    ),
+                });
+
+                return resource === undefined ? null : resource;
+              },
+            });
+          },
+        });
+
+        const profileId = await runStep({
+          stepTrace,
+          stepName: "create sandbox profile",
+          action: async () => {
+            const response = await requestWithTimeout({
+              request: fixture.request,
+              path: "/v1/sandbox/profiles",
+              timeoutMs: CREATE_PROFILE_TIMEOUT_MS,
+              description: "sandbox profile creation",
+              init: {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  cookie: authenticatedSession.cookie,
+                },
+                body: JSON.stringify({
+                  displayName: `System OpenAI App-Server GitHub ${randomUUID()}`,
+                }),
+              },
+            });
+            const payload = await expectStatusJson({
+              response,
+              status: 201,
+              description: "sandbox profile creation",
+            });
+            if (!isRecord(payload)) {
+              throw new Error("Expected sandbox profile creation response to be an object.");
+            }
+
+            return readNonEmptyStringField(payload, "id");
+          },
+        });
+
+        await runStep({
+          stepTrace,
+          stepName: "bind OpenAI and GitHub integrations",
+          action: async () => {
+            const response = await requestWithTimeout({
+              request: fixture.request,
+              path: `/v1/sandbox/profiles/${encodeURIComponent(profileId)}/versions/1/integration-bindings`,
+              timeoutMs: PUT_BINDINGS_TIMEOUT_MS,
+              description: "sandbox profile integration binding update",
+              init: {
+                method: "PUT",
+                headers: {
+                  "content-type": "application/json",
+                  cookie: authenticatedSession.cookie,
+                },
+                body: JSON.stringify({
+                  bindings: [
+                    {
+                      connectionId: openAiConnectionId,
+                      kind: "agent",
+                      config: {
+                        runtime: "codex-cli",
+                        defaultModel: "gpt-5.3-codex",
+                        reasoningEffort: "medium",
+                      },
+                    },
+                    {
+                      connectionId: githubConnectionId,
+                      kind: "git",
+                      config: {
+                        repositories: [`${repository.owner}/${repository.repo}`],
+                      },
+                    },
+                  ],
+                }),
+              },
+            });
+            await expectStatusJson({
+              response,
+              status: 200,
+              description: "sandbox profile integration binding update",
+            });
+          },
+        });
+
+        const sandboxInstanceId = await runStep({
+          stepTrace,
+          stepName: "start sandbox instance",
+          action: async () => {
+            const response = await requestWithTimeout({
+              request: fixture.request,
+              path: `/v1/sandbox/profiles/${encodeURIComponent(profileId)}/versions/1/instances`,
+              timeoutMs: START_INSTANCE_TIMEOUT_MS,
+              description: "sandbox profile start instance",
+              init: {
+                method: "POST",
+                headers: {
+                  cookie: authenticatedSession.cookie,
+                },
+              },
+            });
+            const payload = await expectStatusJson({
+              response,
+              status: 201,
+              description: "sandbox profile start instance",
+            });
+            const parsedPayload = StartSandboxInstanceResponseSchema.safeParse(payload);
+            if (!parsedPayload.success) {
+              throw new Error("Expected sandbox instance start response to match the API schema.");
+            }
+
+            return parsedPayload.data.sandboxInstanceId;
+          },
+        });
+
+        await runStep({
+          stepTrace,
+          stepName: "wait for sandbox instance to reach running",
+          action: async () => {
+            await waitForSandboxInstanceRunning({
+              request: fixture.request,
+              cookie: authenticatedSession.cookie,
+              sandboxInstanceId,
+              timeoutMs: START_INSTANCE_TIMEOUT_MS,
+            });
+          },
+        });
+
+        const websocket = await runStep({
+          stepTrace,
+          stepName: "connect websocket tunnel",
+          action: async () => {
+            const mintConnectionTokenResponse = await requestWithTimeout({
+              request: fixture.request,
+              path: `/v1/sandbox/instances/${encodeURIComponent(sandboxInstanceId)}/connection-tokens`,
+              timeoutMs: MINT_CONNECTION_TOKEN_TIMEOUT_MS,
+              description: "sandbox connection token minting",
+              init: {
+                method: "POST",
+                headers: {
+                  cookie: authenticatedSession.cookie,
+                },
+              },
+            });
+            const mintConnectionTokenPayload = await expectStatusJson({
+              response: mintConnectionTokenResponse,
+              status: 201,
+              description: "sandbox connection token minting",
+            });
+            if (!isRecord(mintConnectionTokenPayload)) {
+              throw new Error("Expected sandbox connection token response to be an object.");
+            }
+            const mintedUrl = readNonEmptyStringField(mintConnectionTokenPayload, "url");
+            const websocketUrl = resolveGatewayWebSocketUrl({
+              mintedUrl,
+              gatewayBaseUrl: dataPlaneGatewayBaseUrl,
+            });
+
+            return await connectWebSocket(websocketUrl, WEBSOCKET_CONNECT_TIMEOUT_MS);
+          },
+        });
+        websocketForCleanup = websocket;
+        detachWebSocketTrace = attachWebSocketTrace({
+          socket: websocket,
+          sink: websocketTraceEntries,
+        });
+
+        await runStep({
+          stepTrace,
+          stepName: "connect and initialize Codex app-server",
+          action: async () => {
+            const handshakeRequestId = `connect-${randomUUID()}`;
+            sendJson(websocket, {
+              type: "connect",
+              v: 1,
+              requestId: handshakeRequestId,
+              channel: {
+                kind: "agent",
+              },
+            });
+            await waitForTunnelHandshakeAck({
+              socket: websocket,
+              requestId: handshakeRequestId,
+              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+            });
+
+            sendJson(websocket, {
+              method: "initialize",
+              id: 0,
+              params: {
+                clientInfo: {
+                  name: "mistle_system_test",
+                  title: "Mistle System Test",
+                  version: "0.1.0",
+                },
+              },
+            });
+            await waitForJsonRpcResult({
+              socket: websocket,
+              requestId: 0,
+              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+            });
+
+            sendJson(websocket, {
+              method: "initialized",
+              params: {},
+            });
+          },
+        });
+
+        const threadId = await runStep({
+          stepTrace,
+          stepName: "json-rpc thread/start",
+          action: async () => {
+            sendJson(websocket, {
+              method: "thread/start",
+              id: 1,
+              params: {
+                model: "gpt-5.3-codex",
+              },
+            });
+            const threadStartResult = await waitForJsonRpcResult({
+              socket: websocket,
+              requestId: 1,
+              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+            });
+            const parsedThreadStartResult = ThreadStartResultSchema.safeParse(threadStartResult);
+            if (!parsedThreadStartResult.success) {
+              throw new Error(
+                `thread/start result did not contain thread.id: ${formatJsonForError(threadStartResult)}`,
+              );
+            }
+
+            return parsedThreadStartResult.data.thread.id;
+          },
+        });
+
+        const notificationsWhileStartingTurn: JsonRpcNotification[] = [];
+        const observedCommandExecutions: CommandExecutionItem[] = [];
+        const turnId = await runStep({
+          stepTrace,
+          stepName: "json-rpc turn/start",
+          action: async () => {
+            sendJson(websocket, {
+              method: "turn/start",
+              id: 2,
+              params: {
+                threadId,
+                input: [
+                  {
+                    type: "text",
+                    text: [
+                      "Use the shell tool to run exactly `command -v gh`.",
+                      `If it prints exactly ${GITHUB_BINARY_PATH}, reply with exactly ${GITHUB_TEST_RESPONSE_MARKER}.`,
+                      "If it does not, reply with exactly GH_MISSING.",
+                      "Do not use any other tool and do not add extra text.",
+                    ].join(" "),
+                  },
+                ],
+              },
+            });
+            const turnStartResult = await waitForJsonRpcResult({
+              socket: websocket,
+              requestId: 2,
+              timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+              notificationSink: notificationsWhileStartingTurn,
+            });
+            const parsedTurnStartResult = TurnStartResultSchema.safeParse(turnStartResult);
+            if (!parsedTurnStartResult.success) {
+              throw new Error(
+                `turn/start result did not contain turn.id: ${formatJsonForError(turnStartResult)}`,
+              );
+            }
+
+            return parsedTurnStartResult.data.turn.id;
+          },
+        });
+
+        const agentTextParts: string[] = [];
+        let preBufferedTurnCompletion: TurnCompletion | null = null;
+        for (const notification of notificationsWhileStartingTurn) {
+          collectAgentMessageText({
+            method: notification.method,
+            params: notification.params,
+            sink: agentTextParts,
+          });
+          collectCommandExecutionItem({
+            method: notification.method,
+            params: notification.params,
+            sink: observedCommandExecutions,
+          });
+          const completion = parseTurnCompletedNotification(notification);
+          if (completion !== null && completion.turnId === turnId) {
+            preBufferedTurnCompletion = completion;
+          }
+        }
+
+        const turnCompletion = await runStep({
+          stepTrace,
+          stepName: "wait for turn/completed",
+          action: async () => {
+            return (
+              preBufferedTurnCompletion ??
+              (await waitForTurnCompletion({
+                socket: websocket,
+                turnId,
+                timeoutMs: TURN_COMPLETION_TIMEOUT_MS,
+                agentTextSink: agentTextParts,
+                commandExecutionSink: observedCommandExecutions,
+              }))
+            );
+          },
+        });
+        expect(turnCompletion.status).toBe("completed");
+        expect(turnCompletion.errorMessage).toBeNull();
+
+        const combinedAgentText = agentTextParts.join("");
+        expect(combinedAgentText).toContain(GITHUB_TEST_RESPONSE_MARKER);
+
+        const commandExecutionItems: CommandExecutionItem[] =
+          observedCommandExecutions.length > 0
+            ? observedCommandExecutions
+            : readCommandExecutionItemsForTurn({
+                threadReadResult: await runStep({
+                  stepTrace,
+                  stepName: "json-rpc thread/read",
+                  action: async () => {
+                    sendJson(websocket, {
+                      method: "thread/read",
+                      id: 3,
+                      params: {
+                        threadId,
+                        includeTurns: true,
+                      },
+                    });
+                    return await waitForJsonRpcResult({
+                      socket: websocket,
+                      requestId: 3,
+                      timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
+                    });
+                  },
+                }),
+                turnId,
+              });
+        expect(commandExecutionItems.length).toBeGreaterThan(0);
+
+        const ghDetectionCommand = commandExecutionItems.find((item: CommandExecutionItem) =>
+          item.command.includes("command -v gh"),
+        );
+        expect(ghDetectionCommand).toBeDefined();
+        if (ghDetectionCommand === undefined) {
+          throw new Error(
+            `Expected Codex to execute 'command -v gh'. Commands: ${formatJsonForError(commandExecutionItems)}`,
+          );
+        }
+
+        expect(ghDetectionCommand.status).toBe("completed");
+        expect(ghDetectionCommand.exitCode).toBe(0);
+        expect(ghDetectionCommand.aggregatedOutput).not.toBeNull();
+        expect(ghDetectionCommand.aggregatedOutput?.trim()).toBe(GITHUB_BINARY_PATH);
+      } catch (error) {
+        let diagnostics = `Websocket trace (tail):\n${formatWebSocketTrace(websocketTraceEntries)}`;
+        const sandboxListDiagnostics = await collectSandboxContainerListDiagnostics();
+        diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\nproviderSandboxId unavailable\n\nKnown sandbox containers:\n${sandboxListDiagnostics}`;
+
+        throw new Error(
+          `System test failed. Step trace: ${formatStepTrace(stepTrace)}. Cause: ${describeUnknownError(error)}\n\nDiagnostics:\n${diagnostics}`,
+        );
+      } finally {
+        detachWebSocketTrace?.();
+        if (websocketForCleanup !== null) {
+          await closeWebSocket(websocketForCleanup);
+        }
+      }
+    },
+    SYSTEM_TEST_TIMEOUT_MS * 2,
   );
 });

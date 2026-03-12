@@ -13,6 +13,6 @@ fi
 
 exec node \
   --import ./apps/data-plane-worker/dist/instrument.js \
-  ./node_modules/@openworkflow/cli/dist/cli.js \
+  ./apps/data-plane-worker/node_modules/@openworkflow/cli/dist/cli.js \
   worker start \
   --config ./apps/data-plane-worker/dist/openworkflow.config.js
