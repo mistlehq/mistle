@@ -174,8 +174,7 @@ export function IntegrationResourceStringArrayWidgetView(
                     type="checkbox"
                   />
                   <div className="min-w-0 flex-1">
-                    <div className="font-medium text-sm">{resource.displayName}</div>
-                    <div className="text-muted-foreground truncate text-xs">{resource.handle}</div>
+                    <div className="truncate font-medium text-sm">{resource.handle}</div>
                   </div>
                 </label>
               );
