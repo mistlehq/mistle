@@ -1,7 +1,5 @@
-import {
-  SendVerificationOTPWorkflowSpec,
-  type createControlPlaneOpenWorkflow,
-} from "@mistle/workflows/control-plane";
+import { SendVerificationOTPWorkflowSpec } from "@mistle/workflow-registry/control-plane";
+import { type createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 import type { EmailOTPOptions } from "better-auth/plugins";
 
 type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;

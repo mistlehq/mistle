@@ -5,7 +5,7 @@ import {
   integrationTargets,
   organizations,
 } from "@mistle/db/control-plane";
-import { SyncIntegrationConnectionResourcesWorkflowSpec } from "@mistle/workflows/control-plane";
+import { SyncIntegrationConnectionResourcesWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { describe, expect } from "vitest";
 
 import { RefreshIntegrationConnectionResourcesResponseSchema } from "../src/integration-connections/contracts.js";

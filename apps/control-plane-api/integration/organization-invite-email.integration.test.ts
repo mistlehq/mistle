@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { SendOrganizationInvitationWorkflowSpec } from "@mistle/workflows/control-plane";
+import { SendOrganizationInvitationWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { describe, expect } from "vitest";
 
 import { countControlPlaneWorkflowRuns } from "./helpers/workflow-runs.js";

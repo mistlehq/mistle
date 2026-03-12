@@ -8,6 +8,9 @@
       "@mistle/http/pagination": ["../../packages/http/src/pagination/index.ts"],
       "@mistle/logging": ["../../packages/logging/src/index.ts"],
       "@mistle/time": ["../../packages/time/src/index.ts"],
+      "@mistle/workflow-registry/control-plane": [
+        "../../packages/workflow-registry/src/control-plane.ts"
+      ],
       "@mistle/workflows/control-plane": ["../../packages/workflows/src/control-plane/index.ts"],
       "@mistle/*": ["../../packages/*/src/index.ts"]
     }

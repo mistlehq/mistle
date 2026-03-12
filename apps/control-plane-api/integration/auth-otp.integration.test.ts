@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { MemberRoles, members, verifications } from "@mistle/db/control-plane";
-import { SendVerificationOTPWorkflowSpec } from "@mistle/workflows/control-plane";
+import { SendVerificationOTPWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 

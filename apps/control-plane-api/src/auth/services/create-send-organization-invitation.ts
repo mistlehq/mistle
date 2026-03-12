@@ -1,7 +1,5 @@
-import {
-  SendOrganizationInvitationWorkflowSpec,
-  type createControlPlaneOpenWorkflow,
-} from "@mistle/workflows/control-plane";
+import { SendOrganizationInvitationWorkflowSpec } from "@mistle/workflow-registry/control-plane";
+import { type createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 
 type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
 

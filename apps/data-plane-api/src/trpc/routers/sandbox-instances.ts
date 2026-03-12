@@ -1,7 +1,7 @@
 import { type StartSandboxInstanceInput } from "@mistle/data-plane-trpc/contracts";
 import { createDataPlaneSandboxInstancesTrpcRouter } from "@mistle/data-plane-trpc/router";
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
-import { StartSandboxInstanceWorkflowSpec } from "@mistle/workflows/data-plane";
+import { StartSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
 import { typeid } from "typeid-js";
 import { z } from "zod";
 

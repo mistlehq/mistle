@@ -1,4 +1,4 @@
-import { RequestDeleteSandboxProfileWorkflowSpec } from "@mistle/workflows/control-plane";
+import { RequestDeleteSandboxProfileWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 
 import { SandboxProfilesNotFoundCodes, SandboxProfilesNotFoundError } from "./errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";

@@ -5,7 +5,7 @@ import {
 } from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
-import { SyncIntegrationConnectionResourcesWorkflowSpec } from "@mistle/workflows/control-plane";
+import { SyncIntegrationConnectionResourcesWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 

@@ -1,5 +1,5 @@
 import { SandboxProfileStatuses, sandboxProfiles } from "@mistle/db/control-plane";
-import { RequestDeleteSandboxProfileWorkflowSpec } from "@mistle/workflows/control-plane";
+import { RequestDeleteSandboxProfileWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { describe, expect } from "vitest";
 
 import {
