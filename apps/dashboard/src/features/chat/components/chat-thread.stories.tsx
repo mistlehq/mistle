@@ -3,6 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   CodexStoryChatThreadEntries,
   CodexStoryChatThreadEntriesWithExploringGroup,
+  CodexStoryChatThreadEntriesWithGenericItem,
   CodexStoryChatThreadEntriesWithStructuredPlan,
   CodexStoryChatThreadEntriesWithThinkingGroup,
 } from "../../codex-client/codex-story-fixtures.js";
@@ -51,6 +52,15 @@ export const WithThinkingGroup: Story = {
 export const WithStructuredPlan: Story = {
   args: {
     entries: CodexStoryChatThreadEntriesWithStructuredPlan,
+    isRespondingToServerRequest: false,
+    onRespondToServerRequest: function onRespondToServerRequest() {},
+    pendingServerRequests: [],
+  },
+};
+
+export const WithGenericItem: Story = {
+  args: {
+    entries: CodexStoryChatThreadEntriesWithGenericItem,
     isRespondingToServerRequest: false,
     onRespondToServerRequest: function onRespondToServerRequest() {},
     pendingServerRequests: [],

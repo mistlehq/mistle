@@ -165,4 +165,52 @@ describe("ChatThread", () => {
     expect(screen.getAllByText("Toggle results")).toHaveLength(2);
     expect(container.textContent?.includes("cwd: /workspace")).toBe(false);
   });
+
+  it("renders generic items collapsed by default and expands their content on demand", () => {
+    render(
+      <ChatThread
+        entries={[
+          {
+            id: "user_1",
+            turnId: "turn_1",
+            kind: "user-message",
+            text: "Show the fallback activity",
+            status: "completed",
+          },
+          {
+            id: "generic_1",
+            turnId: "turn_1",
+            kind: "generic-item",
+            itemType: "contextCompaction",
+            title: "Context compaction",
+            body: "Compacted the current session context before continuing.",
+            detailsJson: JSON.stringify(
+              {
+                strategy: "drop-superseded-read-output",
+              },
+              null,
+              2,
+            ),
+            status: "streaming",
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
+
+    expect(screen.getByText("Context compaction")).toBeTruthy();
+    expect(screen.getByText("Running")).toBeTruthy();
+    const genericDisclosure = screen.getByText("Context compaction").closest("details");
+    expect(genericDisclosure?.hasAttribute("open")).toBe(false);
+
+    fireEvent.click(screen.getByText("Context compaction"));
+
+    expect(genericDisclosure?.hasAttribute("open")).toBe(true);
+    expect(
+      screen.getByText("Compacted the current session context before continuing."),
+    ).toBeTruthy();
+    expect(screen.getByText(/drop-superseded-read-output/)).toBeTruthy();
+  });
 });

@@ -8,6 +8,7 @@ import { buildChatTurnGroups } from "../chat-view-model.js";
 import { ChatAssistantMessage } from "./chat-assistant-message.js";
 import { ChatCommandBlock } from "./chat-command-block.js";
 import { ChatFileChangeBlock } from "./chat-file-change-block.js";
+import { ChatGenericItem } from "./chat-generic-item.js";
 import { ChatPlanEntry } from "./chat-plan-entry.js";
 import { ChatSemanticGroup } from "./chat-semantic-group.js";
 import { ChatUserMessage } from "./chat-user-message.js";
@@ -118,24 +119,7 @@ export function ChatThread({
                 }
 
                 if (block.kind === "generic-item") {
-                  return (
-                    <div className="space-y-3 rounded-xl border p-3" key={block.id}>
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="font-medium text-sm">{block.title}</p>
-                        <p className="text-muted-foreground text-xs">
-                          {block.status === "streaming" ? "Running" : "Completed"}
-                        </p>
-                      </div>
-                      {block.body === null ? null : (
-                        <p className="text-sm leading-6 whitespace-pre-wrap">{block.body}</p>
-                      )}
-                      {block.detailsJson === null ? null : (
-                        <pre className="bg-muted overflow-x-auto rounded-md p-3 text-xs leading-5 whitespace-pre-wrap">
-                          {block.detailsJson}
-                        </pre>
-                      )}
-                    </div>
-                  );
+                  return <ChatGenericItem block={block} key={block.id} />;
                 }
 
                 const approvalRequest = findCommandApprovalRequest(pendingServerRequests, block.id);

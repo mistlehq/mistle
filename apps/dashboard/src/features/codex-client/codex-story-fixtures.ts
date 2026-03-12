@@ -294,6 +294,42 @@ export const CodexStoryChatThreadEntriesWithStructuredPlan: readonly ChatEntry[]
   },
 ];
 
+export const CodexStoryChatThreadEntriesWithGenericItem: readonly ChatEntry[] = [
+  {
+    id: "user-generic-1",
+    turnId: "turn-generic",
+    kind: "user-message",
+    status: "completed",
+    text: "Show me how an unsupported Codex activity would appear in the chat thread.",
+  },
+  {
+    id: "generic-1",
+    turnId: "turn-generic",
+    kind: "generic-item",
+    itemType: "contextCompaction",
+    title: "Context compaction",
+    body: "Compacted the current session context before continuing the turn.",
+    detailsJson: JSON.stringify(
+      {
+        itemType: "contextCompaction",
+        window: "turn-generic",
+        strategy: "drop-superseded-read-output",
+      },
+      null,
+      2,
+    ),
+    status: "streaming",
+  },
+  {
+    id: "assistant-generic-1",
+    turnId: "turn-generic",
+    kind: "assistant-message",
+    phase: null,
+    status: "completed",
+    text: "This is the fallback standalone activity UI for generic items that do not map into a richer semantic kind.",
+  },
+];
+
 export const CodexStoryMakingEditsGroupEntry: ChatSemanticGroupEntry = {
   id: "making-edits-group-1",
   turnId: "turn-making-edits",
