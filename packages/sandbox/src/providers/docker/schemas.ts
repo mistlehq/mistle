@@ -8,6 +8,7 @@ export const DockerSandboxConfigSchema = z
     snapshotRepository: z.string().trim().min(1, {
       message: "Docker config field `snapshotRepository` is required.",
     }),
+    networkName: z.string().trim().min(1).optional(),
   })
   .strict();
 

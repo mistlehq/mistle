@@ -8,6 +8,7 @@ Docker implementation for `@mistle/sandbox`.
 
 - `socketPath`: Docker daemon socket path (for example `/var/run/docker.sock`)
 - `snapshotRepository`: OCI repository used for snapshot push/pull by digest
+- `networkName` (optional): Docker network name that started sandbox containers should join
 
 All config fields are validated with Zod and fail fast when invalid.
 
@@ -21,6 +22,7 @@ const adapter = createSandboxAdapter({
   docker: {
     socketPath: "/var/run/docker.sock",
     snapshotRepository: "localhost:5001/mistle/snapshots",
+    networkName: "mistle-sandbox-dev",
   },
 });
 ```

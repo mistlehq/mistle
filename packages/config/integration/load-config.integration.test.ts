@@ -316,6 +316,7 @@ const dataPlaneWorkerDockerFixtureConfig = {
     docker: {
       socketPath: "/var/run/docker.sock",
       snapshotRepository: "localhost:5001/mistle/snapshots",
+      networkName: "mistle-sandbox-dev",
     },
   },
 } as const;
@@ -653,6 +654,7 @@ describe("loadConfig integrations", () => {
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY:
           "localhost:5001/mistle/snapshots",
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: "mistle-sandbox-dev",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID: undefined,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET: undefined,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_APP_NAME: undefined,

@@ -298,6 +298,7 @@ describe("parseConfigRecord", () => {
             docker: {
               socketPath: "/var/run/docker.sock",
               snapshotRepository: "localhost:5001/mistle/snapshots",
+              networkName: "mistle-sandbox-dev",
             },
           },
         },

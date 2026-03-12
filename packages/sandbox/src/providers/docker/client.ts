@@ -157,19 +157,17 @@ export class DockerApiClient implements DockerClient {
 
     await this.#pullImage(parsedRequest.imageRef);
 
+    const hostConfig: Docker.HostConfig = {
+      ...(parsedRequest.extraHosts === undefined ? {} : { ExtraHosts: parsedRequest.extraHosts }),
+      ...(this.#config.networkName === undefined ? {} : { NetworkMode: this.#config.networkName }),
+    };
     const createContainerOptions: Docker.ContainerCreateOptions = {
       Image: parsedRequest.imageRef,
       OpenStdin: true,
       AttachStdin: true,
       StdinOnce: true,
       ...(parsedRequest.env === undefined ? {} : { Env: toDockerEnv(parsedRequest.env) }),
-      ...(parsedRequest.extraHosts === undefined
-        ? {}
-        : {
-            HostConfig: {
-              ExtraHosts: parsedRequest.extraHosts,
-            },
-          }),
+      ...(Object.keys(hostConfig).length === 0 ? {} : { HostConfig: hostConfig }),
       Labels: {
         "mistle.sandbox.provider": "docker",
       },

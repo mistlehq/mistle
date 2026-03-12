@@ -23,6 +23,7 @@ Namespace in final config:
 | `sandbox.modal.environmentName`       | `string` (optional)   | Optional Modal environment override.                           | None    | `[apps.data_plane_worker.sandbox.modal].environment_name`          | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME`                |
 | `sandbox.docker.socketPath`           | `string`              | Docker daemon socket path used when provider is docker.        | None    | `[apps.data_plane_worker.sandbox.docker].socket_path`              | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH`                    |
 | `sandbox.docker.snapshotRepository`   | `string`              | OCI repository used for docker snapshot push/pull by digest.   | None    | `[apps.data_plane_worker.sandbox.docker].snapshot_repository`      | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY`            |
+| `sandbox.docker.networkName`          | `string` (optional)   | Optional Docker network name that sandbox containers join.     | None    | `[apps.data_plane_worker.sandbox.docker].network_name`             | `MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME`                   |
 
 Notes:
 
