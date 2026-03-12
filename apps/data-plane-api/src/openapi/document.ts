@@ -1,6 +1,6 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
 
-import { INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "../internal-sandbox-instances/index.js";
+import { INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "../internal-sandbox-instances/constants.js";
 import type { AppContextBindings } from "../types.js";
 import { DATA_PLANE_INTERNAL_OPENAPI_INFO } from "./constants.js";
 
