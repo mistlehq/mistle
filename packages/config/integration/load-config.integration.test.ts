@@ -119,12 +119,14 @@ const controlPlaneApiEnvConfig = {
   },
   auth: {
     baseUrl: "http://127.0.0.1:5000",
-    invitationAcceptBaseUrl: "http://127.0.0.1:5173/invitations/accept",
     secret: "test-secret",
     trustedOrigins: ["http://127.0.0.1:3000"],
     otpLength: 6,
     otpExpiresInSeconds: 300,
     otpAllowedAttempts: 3,
+  },
+  dashboard: {
+    baseUrl: "http://127.0.0.1:5173",
   },
   workflow: {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",

@@ -16,12 +16,17 @@ export const ControlPlaneApiDatabaseConfigSchema = z
 export const ControlPlaneApiAuthConfigSchema = z
   .object({
     baseUrl: z.string().min(1),
-    invitationAcceptBaseUrl: z.string().min(1),
     secret: z.string().min(1),
     trustedOrigins: z.array(z.string().min(1)).min(1),
     otpLength: z.number().int().min(4).max(12),
     otpExpiresInSeconds: z.number().int().min(30),
     otpAllowedAttempts: z.number().int().min(1).max(10),
+  })
+  .strict();
+
+export const ControlPlaneApiDashboardConfigSchema = z
+  .object({
+    baseUrl: z.string().min(1),
   })
   .strict();
 
@@ -69,6 +74,7 @@ export const ControlPlaneApiConfigSchema = z
     server: ControlPlaneApiServerConfigSchema,
     database: ControlPlaneApiDatabaseConfigSchema,
     auth: ControlPlaneApiAuthConfigSchema,
+    dashboard: ControlPlaneApiDashboardConfigSchema,
     workflow: ControlPlaneApiWorkflowConfigSchema,
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema,
     integrations: ControlPlaneApiIntegrationsConfigSchema,
@@ -80,6 +86,7 @@ export const PartialControlPlaneApiConfigSchema = z
     server: ControlPlaneApiServerConfigSchema.partial().optional(),
     database: ControlPlaneApiDatabaseConfigSchema.partial().optional(),
     auth: ControlPlaneApiAuthConfigSchema.partial().optional(),
+    dashboard: ControlPlaneApiDashboardConfigSchema.partial().optional(),
     workflow: ControlPlaneApiWorkflowConfigSchema.partial().optional(),
     dataPlaneApi: ControlPlaneApiDataPlaneApiConfigSchema.partial().optional(),
     integrations: ControlPlaneApiIntegrationsConfigObjectSchema.partial().optional(),

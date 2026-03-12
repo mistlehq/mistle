@@ -3,6 +3,7 @@ import { asObjectRecord } from "../../core/record.js";
 import {
   type PartialControlPlaneApiConfigInput,
   ControlPlaneApiAuthConfigSchema,
+  ControlPlaneApiDashboardConfigSchema,
   ControlPlaneApiDataPlaneApiConfigSchema,
   ControlPlaneApiDatabaseConfigSchema,
   ControlPlaneApiIntegrationsConfigSchema,
@@ -36,10 +37,6 @@ const loadAuthEnv = createEnvLoader<typeof ControlPlaneApiAuthConfigSchema>([
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL",
   },
   {
-    key: "invitationAcceptBaseUrl",
-    envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_INVITATION_ACCEPT_BASE_URL",
-  },
-  {
     key: "secret",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_SECRET",
   },
@@ -66,6 +63,13 @@ const loadAuthEnv = createEnvLoader<typeof ControlPlaneApiAuthConfigSchema>([
     key: "otpAllowedAttempts",
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_ALLOWED_ATTEMPTS",
     parse: Number,
+  },
+]);
+
+const loadDashboardEnv = createEnvLoader<typeof ControlPlaneApiDashboardConfigSchema>([
+  {
+    key: "baseUrl",
+    envVar: "MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL",
   },
 ]);
 
@@ -141,6 +145,11 @@ export function loadControlPlaneApiFromEnv(
   const auth = loadAuthEnv(env);
   if (hasEntries(auth)) {
     partialConfig.auth = auth;
+  }
+
+  const dashboard = loadDashboardEnv(env);
+  if (hasEntries(dashboard)) {
+    partialConfig.dashboard = dashboard;
   }
 
   const workflow = loadWorkflowEnv(env);

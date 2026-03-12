@@ -46,12 +46,14 @@ url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 
 [apps.control_plane_api.auth]
 base_url = "https://api.mistle.example"
-invitation_accept_base_url = "https://app.mistle.example/invitations/accept"
 secret = "replace-with-strong-secret"
 trusted_origins = ["https://app.mistle.example"]
 otp_length = 6
 otp_expires_in_seconds = 300
 otp_allowed_attempts = 3
+
+[apps.control_plane_api.dashboard]
+base_url = "https://app.mistle.example"
 
 [apps.control_plane_api.workflow]
 database_url = "postgresql://mistle:replace-with-password@db:6432/mistle"

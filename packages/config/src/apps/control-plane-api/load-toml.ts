@@ -13,6 +13,7 @@ export function loadControlPlaneApiFromToml(
   const server = asObjectRecord(controlPlaneApi.server);
   const database = asObjectRecord(controlPlaneApi.database);
   const auth = asObjectRecord(controlPlaneApi.auth);
+  const dashboard = asObjectRecord(controlPlaneApi.dashboard);
   const workflow = asObjectRecord(controlPlaneApi.workflow);
   const dataPlaneApi = asObjectRecord(controlPlaneApi.data_plane_api);
   const integrations = asObjectRecord(controlPlaneApi.integrations);
@@ -27,12 +28,14 @@ export function loadControlPlaneApiFromToml(
     },
     auth: {
       baseUrl: auth.base_url,
-      invitationAcceptBaseUrl: auth.invitation_accept_base_url,
       secret: auth.secret,
       trustedOrigins: auth.trusted_origins,
       otpLength: auth.otp_length,
       otpExpiresInSeconds: auth.otp_expires_in_seconds,
       otpAllowedAttempts: auth.otp_allowed_attempts,
+    },
+    dashboard: {
+      baseUrl: dashboard.base_url,
     },
     workflow: {
       databaseUrl: workflow.database_url,

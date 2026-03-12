@@ -46,7 +46,7 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
     auth: createControlPlaneAuth({
       config: {
         authBaseUrl: config.auth.baseUrl,
-        authInvitationAcceptBaseUrl: config.auth.invitationAcceptBaseUrl,
+        dashboardBaseUrl: config.dashboard.baseUrl,
         authSecret: config.auth.secret,
         authTrustedOrigins: config.auth.trustedOrigins,
         authOTPLength: config.auth.otpLength,
