@@ -82,48 +82,39 @@ export function OrganizationIntegrationsSettingsPageView(
         cards={props.connectedCards}
         emptyStateMessage="No active integration connections yet. Add one from the integrations list below."
         getCardKey={(card) => card.targetKey}
-        renderTile={(card) => {
-          return (
-            <IntegrationTile
-              actionLabel={card.actionLabel}
-              actionVariant="outline"
-              description={card.description}
-              displayName={card.displayName}
-              {...(card.actionDisabled === undefined
-                ? {}
-                : { actionDisabled: card.actionDisabled })}
-              {...(card.logoKey === undefined ? {} : { logoKey: card.logoKey })}
-              {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
-              onAction={card.onAction}
-            />
-          );
-        }}
+        renderTile={(card) => renderIntegrationSettingsTile(card, { actionVariant: "outline" })}
         title="Connected"
       />
 
       <IntegrationSection
         cards={props.availableCards}
         getCardKey={(card) => card.targetKey}
-        renderTile={(card) => {
-          return (
-            <IntegrationTile
-              actionLabel={card.actionLabel}
-              description={card.description}
-              displayName={card.displayName}
-              {...(card.actionDisabled === undefined
-                ? {}
-                : { actionDisabled: card.actionDisabled })}
-              {...(card.logoKey === undefined ? {} : { logoKey: card.logoKey })}
-              {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
-              onAction={card.onAction}
-            />
-          );
-        }}
+        renderTile={(card) => renderIntegrationSettingsTile(card)}
         title="Available Integrations"
       />
 
       {props.connectionDialog ?? null}
       {props.detailSurface ?? null}
     </div>
+  );
+}
+
+function renderIntegrationSettingsTile(
+  card: OrganizationIntegrationsSettingsPageCard,
+  options?: {
+    actionVariant?: "default" | "outline";
+  },
+): React.JSX.Element {
+  return (
+    <IntegrationTile
+      actionLabel={card.actionLabel}
+      description={card.description}
+      displayName={card.displayName}
+      {...(options?.actionVariant === undefined ? {} : { actionVariant: options.actionVariant })}
+      {...(card.actionDisabled === undefined ? {} : { actionDisabled: card.actionDisabled })}
+      {...(card.logoKey === undefined ? {} : { logoKey: card.logoKey })}
+      {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
+      onAction={card.onAction}
+    />
   );
 }
