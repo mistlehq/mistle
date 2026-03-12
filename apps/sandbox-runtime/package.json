@@ -10,9 +10,9 @@
     "start": "./dist/bin/sandboxd",
     "lint": "go vet ./...",
     "typecheck": "go test -run '^$' ./...",
-    "test": "go test ./...",
-    "test:integration": "go test ./...",
-    "format": "gofmt -w ./cmd ./internal",
-    "format:check": "formatted_files=$(gofmt -l ./cmd ./internal) && test -z \"$formatted_files\" || (echo \"$formatted_files\"; exit 1)"
+    "test": "go test ./cmd/... ./internal/...",
+    "test:integration": "go test ./integration/...",
+    "format": "gofmt -w ./cmd ./internal ./integration",
+    "format:check": "formatted_files=$(gofmt -l ./cmd ./internal ./integration) && test -z \"$formatted_files\" || (echo \"$formatted_files\"; exit 1)"
   }
 }
