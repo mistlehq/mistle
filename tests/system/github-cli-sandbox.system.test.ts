@@ -28,10 +28,6 @@ const RequiredEnvNames = [
   "MISTLE_TEST_GITHUB_INSTALLATION_ID",
 ] as const;
 
-const IntegrationConnectionResponseSchema = z.looseObject({
-  id: z.string().min(1),
-});
-
 const StartOAuthConnectionResponseSchema = z
   .object({
     authorizationUrl: z.url(),
@@ -187,6 +183,14 @@ function parseGitHubRepository(input: string): { owner: string; repo: string } {
     owner,
     repo,
   };
+}
+
+function createOAuthCompletePath(input: {
+  targetKey: string;
+  query: Record<string, string>;
+}): string {
+  const searchParams = new URLSearchParams(input.query);
+  return `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth/complete?${searchParams.toString()}`;
 }
 
 function escapeRegex(input: string): string {
@@ -740,25 +744,43 @@ describeIf("system github cli sandbox", () => {
       if (githubOauthState === null || githubOauthState.length === 0) {
         throw new Error("Expected GitHub OAuth start response to include a non-empty state.");
       }
-      const githubConnection = await requestJsonOrThrow({
-        request: fixture.request,
-        path: `/v1/integration/connections/${encodeURIComponent(GitHubTargetKey)}/oauth/complete`,
-        expectedStatus: 201,
-        description: "GitHub OAuth connection completion",
-        schema: IntegrationConnectionResponseSchema,
-        init: {
-          method: "POST",
+      const githubOAuthCompleteResponse = await fixture.request(
+        createOAuthCompletePath({
+          targetKey: GitHubTargetKey,
+          query: {
+            state: githubOauthState,
+            installation_id: githubInstallationId,
+            setup_action: "install",
+          },
+        }),
+        {
+          method: "GET",
           headers: {
-            "content-type": "application/json",
             cookie: session.cookie,
           },
-          body: JSON.stringify({
-            query: {
-              state: githubOauthState,
-              installation_id: githubInstallationId,
-              setup_action: "install",
-            },
-          }),
+          redirect: "manual",
+        },
+      );
+      if (githubOAuthCompleteResponse.status !== 302) {
+        const errorBody = await githubOAuthCompleteResponse.text().catch(() => "");
+        throw new Error(
+          `GitHub OAuth connection completion expected status 302, got ${String(githubOAuthCompleteResponse.status)}. Response body: ${errorBody}`,
+        );
+      }
+      const githubConnection = await waitForCondition({
+        description: "persisted GitHub connection to be created",
+        timeoutMs: ResourceSyncTimeoutMs,
+        evaluate: async () => {
+          return (
+            (await fixture.db.query.integrationConnections.findFirst({
+              where: (table, { and, eq }) =>
+                and(
+                  eq(table.organizationId, session.organizationId),
+                  eq(table.targetKey, GitHubTargetKey),
+                  eq(table.externalSubjectId, githubInstallationId),
+                ),
+            })) ?? null
+          );
         },
       });
       await requestJsonOrThrow({
@@ -905,8 +927,9 @@ describeIf("system github cli sandbox", () => {
         const ghAvailabilityOutput = await expectSuccessfulPtyCommand({
           socket: websocket,
           pump,
-          description: "gh binary and GH_TOKEN availability",
-          command: 'command -v gh >/dev/null && test -n "$GH_TOKEN" && printf "GH_READY\\n"',
+          description: "gh and rg binaries plus GH_TOKEN availability",
+          command:
+            'command -v gh >/dev/null && command -v rg >/dev/null && test -n "$GH_TOKEN" && printf "GH_READY\\n"',
         });
         expect(ghAvailabilityOutput).toContain("GH_READY");
 

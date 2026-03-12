@@ -13,6 +13,6 @@ fi
 
 exec node \
   --import ./apps/control-plane-worker/dist/instrument.js \
-  ./node_modules/@openworkflow/cli/dist/cli.js \
+  ./apps/control-plane-worker/node_modules/@openworkflow/cli/dist/cli.js \
   worker start \
   --config ./apps/control-plane-worker/dist/openworkflow.config.js
