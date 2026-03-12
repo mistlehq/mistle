@@ -1,4 +1,4 @@
-import { Badge, Button, Input, ScrollArea } from "@mistle/ui";
+import { Button, Input, ScrollArea } from "@mistle/ui";
 import { ArrowClockwiseIcon } from "@phosphor-icons/react";
 
 import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
@@ -105,16 +105,6 @@ export function IntegrationResourceStringArrayWidgetView(
           />
         </Button>
       </div>
-      {props.selectedHandles.length === 0 ? null : (
-        <div className="gap-2 flex flex-wrap">
-          {props.selectedHandles.map((handle) => (
-            <Badge key={handle} variant="outline">
-              {handle}
-            </Badge>
-          ))}
-        </div>
-      )}
-
       {props.refreshErrorMessage === null &&
       props.unavailableSelectedHandles.length === 0 &&
       (hasVisibleItems || props.listState.mode === "loading") ? null : (
