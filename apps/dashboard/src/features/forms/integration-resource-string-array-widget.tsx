@@ -6,12 +6,10 @@ import { z } from "zod";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
-  type IntegrationConnectionResourceSummary,
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
 import { formatDateTime } from "../shared/date-formatters.js";
-import { isRecord } from "../shared/is-record.js";
 import type { IntegrationFormContext } from "./integration-form-context.js";
 import { buildIntegrationResourceWidgetViewModel } from "./integration-resource-string-array-widget-view-model.js";
 import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
