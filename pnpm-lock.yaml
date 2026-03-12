@@ -272,8 +272,8 @@ importers:
         specifier: ^1.0.11
         version: 1.0.11(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@rjsf/core':
-        specifier: ~6.3.1
-        version: 6.3.1(@rjsf/utils@6.4.1(react@19.2.4))(react@19.2.4)
+        specifier: ~6.4.1
+        version: 6.4.1(@rjsf/utils@6.4.1(react@19.2.4))(react@19.2.4)
       '@rjsf/utils':
         specifier: ~6.4.1
         version: 6.4.1(react@19.2.4)
@@ -4394,11 +4394,11 @@ packages:
     resolution: {integrity: sha512-/oy8sXi5xK4+HvcFR7xS1A74zJ5aS6rtacNEr91SczLqvtxz79opxp7yYpdYtfGQAp6igx9eU9alwSC/R/X3Cg==}
     engines: {node: '>=18.17.0', npm: '>=9.5.0'}
 
-  '@rjsf/core@6.3.1':
-    resolution: {integrity: sha512-LTjFz5Fk3FlbgFPJ+OJi1JdWJyiap9dSpx8W6u7JHNB7K5VbwzJe8gIU45XWLHzWFGDHKPm89VrUzjOs07TPtg==}
+  '@rjsf/core@6.4.1':
+    resolution: {integrity: sha512-+QaiSgQnOuO6ghIsohH2u/QcylkN+Da2968a75g/i4oARYJRYVxXDm2u3JR5aXndpMb4t4jTFrYyG8cNIv6oEg==}
     engines: {node: '>=20'}
     peerDependencies:
-      '@rjsf/utils': ^6.3.x
+      '@rjsf/utils': ^6.4.x
       react: '>=18'
 
   '@rjsf/utils@6.4.1':
@@ -14969,7 +14969,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@rjsf/core@6.3.1(@rjsf/utils@6.4.1(react@19.2.4))(react@19.2.4)':
+  '@rjsf/core@6.4.1(@rjsf/utils@6.4.1(react@19.2.4))(react@19.2.4)':
     dependencies:
       '@rjsf/utils': 6.4.1(react@19.2.4)
       lodash: 4.17.23
