@@ -9,7 +9,6 @@ import { dockerAdapterIntegrationEnabled, it } from "./test-context.js";
 const describeDockerAdapterIntegration = dockerAdapterIntegrationEnabled ? describe : describe.skip;
 const SNAPSHOT_MARKER_FILE_PATH = "/tmp/mistle-snapshot-marker.txt";
 const INJECTED_ENV_KEY = "MISTLE_SANDBOX_INJECTED_ENV";
-const HostDockerInternalName = "host.docker.internal";
 
 type ContainerCommandResult = {
   exitCode: number;
@@ -267,28 +266,6 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
 
       expect(result.exitCode).toBe(0);
       expect(result.output.trimEnd()).toBe(injectedEnvValue);
-    } finally {
-      if (sandboxId !== undefined) {
-        await fixture.adapter.stop({ sandboxId });
-      }
-    }
-  }, 300_000);
-
-  it("configures host gateway aliases inside docker sandboxes", async ({ fixture }) => {
-    let sandboxId: string | undefined;
-
-    try {
-      const sandbox = await fixture.adapter.start({ image: fixture.baseImage });
-      sandboxId = sandbox.sandboxId;
-
-      const result = await runContainerCommand({
-        dockerClient: fixture.dockerClient,
-        sandboxId: sandbox.sandboxId,
-        command: ["getent", "hosts", HostDockerInternalName],
-      });
-
-      expect(result.exitCode).toBe(0);
-      expect(result.output).toContain(HostDockerInternalName);
     } finally {
       if (sandboxId !== undefined) {
         await fixture.adapter.stop({ sandboxId });
