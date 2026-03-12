@@ -89,9 +89,6 @@ importers:
       '@hono/zod-openapi':
         specifier: ^1.2.2
         version: 1.2.2(hono@4.12.5)(zod@4.3.6)
-      '@mistle/automations':
-        specifier: workspace:*
-        version: link:../../packages/automations
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -174,9 +171,6 @@ importers:
 
   apps/control-plane-worker:
     dependencies:
-      '@mistle/automations':
-        specifier: workspace:*
-        version: link:../../packages/automations
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -219,6 +213,9 @@ importers:
       drizzle-orm:
         specifier: ^0.45.1
         version: 0.45.1(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.0)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.18.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.20.0)(postgres@3.4.8)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))
+      liquidjs:
+        specifier: ^10.25.0
+        version: 10.25.0
       openworkflow:
         specifier: ^0.8.1
         version: 0.8.1(postgres@3.4.8)
@@ -551,15 +548,6 @@ importers:
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
-
-  packages/automations:
-    dependencies:
-      liquidjs:
-        specifier: ^10.25.0
-        version: 10.25.0
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
 
   packages/codex-app-server-client:
     dependencies:
@@ -16068,14 +16056,6 @@ snapshots:
     optionalDependencies:
       vite: 7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
 
-  '@vitest/mocker@4.0.18(vite@7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))':
-    dependencies:
-      '@vitest/spy': 4.0.18
-      estree-walker: 3.0.3
-      magic-string: 0.30.21
-    optionalDependencies:
-      vite: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
-
   '@vitest/pretty-format@3.2.4':
     dependencies:
       tinyrainbow: 2.0.0
@@ -22939,7 +22919,7 @@ snapshots:
   vitest@4.0.18(@opentelemetry/api@1.9.0)(@types/node@25.3.5)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2):
     dependencies:
       '@vitest/expect': 4.0.18
-      '@vitest/mocker': 4.0.18(vite@7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
+      '@vitest/mocker': 4.0.18(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2))
       '@vitest/pretty-format': 4.0.18
       '@vitest/runner': 4.0.18
       '@vitest/snapshot': 4.0.18

@@ -1,4 +1,3 @@
-import { renderTemplateString } from "@mistle/automations";
 import {
   automationRuns,
   AutomationRunStatuses,
@@ -12,6 +11,7 @@ import {
 import { systemSleeper } from "@mistle/time";
 import { and, eq, sql } from "drizzle-orm";
 
+import { renderTemplateString } from "../automations/index.js";
 import type {
   AcquiredAutomationConnection,
   EnsuredAutomationSandbox,

@@ -22,7 +22,6 @@
     "@better-auth/drizzle-adapter": "1.5.3",
     "@hono/node-server": "^1.19.11",
     "@hono/zod-openapi": "^1.2.2",
-    "@mistle/automations": "workspace:*",
     "@mistle/config": "workspace:*",
     "@mistle/control-plane-internal-client": "workspace:*",
     "@mistle/data-plane-trpc": "workspace:*",
