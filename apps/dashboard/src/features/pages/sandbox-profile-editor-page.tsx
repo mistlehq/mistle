@@ -610,14 +610,14 @@ export function IntegrationsEditorSection(
         open={integrationDialogState !== null}
       >
         {integrationDialogState ? (
-          <DialogContent>
+          <DialogContent className="sm:max-w-2xl">
             <DialogHeader variant="sectioned">
               <DialogTitle>
                 {integrationDialogState.mode === "add" ? "Add binding" : "Edit binding"}
               </DialogTitle>
             </DialogHeader>
             <div className={IntegrationHorizontalFieldGroupClassName}>
-              <Field className={IntegrationHorizontalFieldLayoutClassName} orientation="horizontal">
+              <Field className={IntegrationHorizontalFieldLayoutClassName} orientation="vertical">
                 <FieldLabel htmlFor="add-binding-connection">Connection</FieldLabel>
                 <FieldContent>
                   <Select
@@ -629,16 +629,22 @@ export function IntegrationsEditorSection(
                     }}
                     value={integrationDialogState.row.connectionId}
                   >
-                    <SelectTrigger
-                      aria-label="Add binding connection"
-                      className="w-full"
-                      id="add-binding-connection"
+                    <div className="md:flex md:justify-end">
+                      <SelectTrigger
+                        aria-label="Add binding connection"
+                        className="w-full md:w-auto md:min-w-fit md:max-w-full"
+                        id="add-binding-connection"
+                      >
+                        <SelectValue placeholder="Select integration connection">
+                          {props.resolveSelectedConnectionDisplayName(integrationDialogState.row)}
+                        </SelectValue>
+                      </SelectTrigger>
+                    </div>
+                    <SelectContent
+                      align="end"
+                      alignItemWithTrigger={false}
+                      className={IntegrationSelectContentClassName}
                     >
-                      <SelectValue placeholder="Select integration connection">
-                        {props.resolveSelectedConnectionDisplayName(integrationDialogState.row)}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className={IntegrationSelectContentClassName}>
                       {availableConnectionsByKind[integrationDialogState.row.kind].map(
                         (connection) => (
                           <SelectItem key={connection.id} value={connection.id}>

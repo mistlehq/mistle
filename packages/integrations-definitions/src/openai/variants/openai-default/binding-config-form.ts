@@ -1,5 +1,6 @@
 import type { IntegrationFormContext, ResolvedIntegrationForm } from "@mistle/integrations-core";
 
+import { createStackedFieldUiOptions } from "../../../forms/ui-options.js";
 import { OpenAiConnectionConfigSchema } from "./auth.js";
 import { OpenAiRuntimes } from "./binding-config-schema.js";
 import { OpenAiConnectionAuthSchemes } from "./model-capabilities.js";
@@ -126,9 +127,9 @@ export function resolveOpenAiBindingConfigForm(
       },
       additionalInstructions: {
         "ui:widget": "TextareaWidget",
-        "ui:options": {
+        "ui:options": createStackedFieldUiOptions({
           rows: 8,
-        },
+        }),
       },
     },
   };
