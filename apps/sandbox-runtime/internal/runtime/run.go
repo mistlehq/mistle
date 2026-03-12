@@ -170,23 +170,6 @@ func Run(input RunInput) (runErr error) {
 
 	directHTTPClient := httpclient.NewDirectClient(http.DefaultClient)
 	egressHTTPClient := telemetry.NewHTTPClient(directHTTPClient)
-	egressHandler, err := traceStepWithValue(
-		runContext,
-		tracingHandle.Tracer(),
-		"sandbox.runtime.new_egress_handler",
-		func(context.Context) (http.Handler, error) {
-			return egress.NewHandler(egress.NewHandlerInput{
-				RuntimePlan:                 startupInput.RuntimePlan,
-				TokenizerProxyEgressBaseURL: cfg.TokenizerProxyEgressBaseURL,
-				HTTPClient:                  egressHTTPClient,
-			})
-		},
-	)
-	if err != nil {
-		runSpan.RecordError(err)
-		runSpan.SetStatus(codes.Error, err.Error())
-		return fmt.Errorf("failed to construct egress handler: %w", err)
-	}
 
 	proxyCertificateAuthority, err := traceStepWithValue(
 		runContext,
@@ -246,7 +229,6 @@ func Run(input RunInput) (runErr error) {
 
 	router := server.NewRouter(server.RouterInput{
 		BootstrapTokenLoaded: startupInput.BootstrapToken != "",
-		EgressHandler:        egressHandler,
 		ProxyHandler:         proxyHandler,
 	})
 	httpServer := &http.Server{

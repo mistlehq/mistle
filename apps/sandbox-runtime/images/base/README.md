@@ -27,5 +27,5 @@ The base image includes a single sandbox runtime entrypoint that every sandbox w
   - `tunnelGatewayWsUrl`
   - `runtimePlan`
 - Health endpoint: `GET /__healthz` returns 200 only after bootstrap token is loaded
-- Egress endpoint: `/egress/routes/{routeId}` forwards requests to tokenizer proxy egress endpoint
+- Egress behavior: `sandboxd` acts as an outbound HTTP(S) proxy and forwards matched integration traffic to tokenizer proxy egress
 - `PATH` includes `mise` shims at `/home/sandbox/.local/share/mise/shims`
