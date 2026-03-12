@@ -12,6 +12,7 @@ import {
 } from "../forms/integration-form-theme.js";
 import type { IntegrationConnectionResourceSummary } from "../integrations/integrations-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { isRecord } from "../shared/is-record.js";
 
 const IntegrationRegistry = createIntegrationFormRegistry();
 
@@ -74,10 +75,6 @@ type ResolvedBindingEditorContext = {
   parsedTargetConfig: Record<string, unknown>;
   parsedConnectionConfig: Record<string, unknown>;
 };
-
-function isRecord(value: unknown): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function resolveRecord(value: unknown): Record<string, unknown> {
   if (!isRecord(value)) {

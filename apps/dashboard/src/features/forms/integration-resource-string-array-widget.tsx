@@ -2,6 +2,7 @@ import { Input } from "@mistle/ui";
 import type { RJSFSchema, WidgetProps } from "@rjsf/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDeferredValue, useState } from "react";
+import { z } from "zod";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
@@ -10,111 +11,52 @@ import {
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
 import { formatDateTime } from "../shared/date-formatters.js";
+import { isRecord } from "../shared/is-record.js";
 import type { IntegrationFormContext } from "./integration-form-context.js";
 import { buildIntegrationResourceWidgetViewModel } from "./integration-resource-string-array-widget-view-model.js";
 import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
 
 type JsonObject = Record<string, unknown>;
+const IntegrationResourceSummaryOptionSchema = z
+  .object({
+    kind: z.string().min(1),
+    selectionMode: z.enum(["single", "multi"]),
+    count: z.number().int().min(0),
+    syncState: z.enum(["never-synced", "syncing", "ready", "error"]),
+    lastSyncedAt: z.string().min(1).optional(),
+  })
+  .strict();
 
-type IntegrationResourceStringArrayWidgetOptions = {
-  connectionId: string;
-  kind: string;
-  title?: string | undefined;
-  searchPlaceholder?: string | undefined;
-  emptyMessage?: string | undefined;
-  refreshLabel?: string | undefined;
-  resourceSummary?: IntegrationConnectionResourceSummary | undefined;
-};
+const IntegrationResourceStringArrayWidgetOptionsSchema = z
+  .object({
+    connectionId: z.string().min(1),
+    kind: z.string().min(1),
+    title: z.string().min(1).optional(),
+    searchPlaceholder: z.string().min(1).optional(),
+    emptyMessage: z.string().min(1).optional(),
+    refreshLabel: z.string().min(1).optional(),
+    resourceSummary: IntegrationResourceSummaryOptionSchema.optional(),
+  })
+  .passthrough();
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readStringOption(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function resolveResourceSummary(value: unknown): IntegrationConnectionResourceSummary | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-
-  if (
-    value.selectionMode !== "single" &&
-    value.selectionMode !== "multi" &&
-    value.selectionMode !== undefined
-  ) {
-    throw new Error("Integration resource widget received an invalid resource summary.");
-  }
-
-  if (
-    value.syncState !== "never-synced" &&
-    value.syncState !== "syncing" &&
-    value.syncState !== "ready" &&
-    value.syncState !== "error" &&
-    value.syncState !== undefined
-  ) {
-    throw new Error("Integration resource widget received an invalid resource summary.");
-  }
-
-  const kind = readStringOption(value.kind);
-  const selectionMode = value.selectionMode;
-  const syncState = value.syncState;
-  const count = typeof value.count === "number" && Number.isInteger(value.count) ? value.count : 0;
-  if (kind === undefined || selectionMode === undefined || syncState === undefined) {
-    throw new Error("Integration resource widget received an incomplete resource summary.");
-  }
-
-  return {
-    kind,
-    selectionMode,
-    count,
-    syncState,
-    ...(readStringOption(value.lastSyncedAt) === undefined
-      ? {}
-      : { lastSyncedAt: readStringOption(value.lastSyncedAt) }),
-  };
-}
+type IntegrationResourceStringArrayWidgetOptions = z.infer<
+  typeof IntegrationResourceStringArrayWidgetOptionsSchema
+>;
 
 function resolveWidgetOptions(
   options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"],
 ): IntegrationResourceStringArrayWidgetOptions {
-  if (!isRecord(options)) {
-    throw new Error("Integration resource widget options must be an object.");
+  const parsedOptions = IntegrationResourceStringArrayWidgetOptionsSchema.safeParse(options);
+  if (!parsedOptions.success) {
+    throw new Error("Integration resource widget received invalid options.");
   }
 
-  const connectionId = readStringOption(options.connectionId);
-  if (connectionId === undefined) {
-    throw new Error("Integration resource widget requires a connectionId option.");
-  }
-
-  const kind = readStringOption(options.kind);
-  if (kind === undefined) {
-    throw new Error("Integration resource widget requires a kind option.");
-  }
-
-  const resourceSummary = resolveResourceSummary(options.resourceSummary);
+  const resourceSummary = parsedOptions.data.resourceSummary;
   if (resourceSummary?.selectionMode === "single") {
     throw new Error("Integration resource widget currently supports only multi selection.");
   }
 
-  return {
-    connectionId,
-    kind,
-    ...(readStringOption(options.title) === undefined
-      ? {}
-      : { title: readStringOption(options.title) }),
-    ...(readStringOption(options.searchPlaceholder) === undefined
-      ? {}
-      : { searchPlaceholder: readStringOption(options.searchPlaceholder) }),
-    ...(readStringOption(options.emptyMessage) === undefined
-      ? {}
-      : { emptyMessage: readStringOption(options.emptyMessage) }),
-    ...(readStringOption(options.refreshLabel) === undefined
-      ? {}
-      : { refreshLabel: readStringOption(options.refreshLabel) }),
-    ...(resourceSummary === undefined ? {} : { resourceSummary }),
-  };
+  return parsedOptions.data;
 }
 
 function resolveSelectedHandles(value: unknown): string[] {

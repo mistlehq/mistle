@@ -1,3 +1,4 @@
+import { isRecord } from "../shared/is-record.js";
 import {
   resolveBindingConfigUiModel,
   type IntegrationConnectionSummary,
@@ -9,10 +10,6 @@ export type SandboxProfileBindingSummaryItem = {
   label: string;
   value: string;
 };
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function resolvePropertyTitle(input: {
   schema: Record<string, unknown>;

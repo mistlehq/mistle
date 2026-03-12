@@ -21,15 +21,12 @@ import type {
   WidgetProps,
 } from "@rjsf/utils";
 
+import { isRecord } from "../shared/is-record.js";
 import type { IntegrationFormContext } from "./integration-form-context.js";
 import { IntegrationResourceStringArrayWidget } from "./integration-resource-string-array-widget.js";
 
 type JsonObject = Record<string, unknown>;
 type IntegrationFieldLayout = "horizontal" | "vertical";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function resolveSelectWidgetOptions(input: {
   options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"];
