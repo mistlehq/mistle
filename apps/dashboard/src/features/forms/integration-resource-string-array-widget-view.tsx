@@ -74,6 +74,10 @@ export function IntegrationResourceStringArrayWidgetView(
   props: IntegrationResourceStringArrayWidgetViewProps,
 ): React.JSX.Element {
   const hasVisibleItems = props.visibleItems.length > 0;
+  const selectedCountLabel =
+    props.selectedHandles.length === 1
+      ? "1 selected"
+      : `${String(props.selectedHandles.length)} selected`;
 
   return (
     <div className="gap-3 flex flex-col">
@@ -145,8 +149,13 @@ export function IntegrationResourceStringArrayWidgetView(
       )}
 
       {hasVisibleItems ? (
-        <ScrollArea className="h-56 overflow-hidden rounded-md border">
-          <div className="divide-y">
+        <div className="overflow-hidden rounded-md border">
+          {props.selectedHandles.length > 0 ? (
+            <div className="text-muted-foreground border-b px-3 py-2 text-xs">
+              {selectedCountLabel}
+            </div>
+          ) : null}
+          <ScrollArea className="h-56">
             {props.visibleItems.map((resource) => {
               const isSelected = props.selectedHandles.includes(resource.handle);
 
@@ -169,8 +178,8 @@ export function IntegrationResourceStringArrayWidgetView(
                 </label>
               );
             })}
-          </div>
-        </ScrollArea>
+          </ScrollArea>
+        </div>
       ) : null}
     </div>
   );
