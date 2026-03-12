@@ -11,7 +11,7 @@ import (
 )
 
 func TestLoadProxyCertificateAuthority(t *testing.T) {
-	proxyCA, err := bootstrap.GenerateProxyCA(time.Date(2026, time.March, 11, 0, 0, 0, 0, time.UTC))
+	proxyCA, err := bootstrap.GenerateProxyCA(time.Now().UTC().Add(-time.Hour))
 	if err != nil {
 		t.Fatalf("expected proxy ca generation to succeed, got %v", err)
 	}

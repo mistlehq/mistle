@@ -12,8 +12,12 @@ import (
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/config"
 )
 
+func proxyCATestNow() time.Time {
+	return time.Now().UTC().Add(-time.Hour)
+}
+
 func TestGenerateProxyCA(t *testing.T) {
-	proxyCA, err := GenerateProxyCA(time.Date(2026, time.March, 11, 0, 0, 0, 0, time.UTC))
+	proxyCA, err := GenerateProxyCA(proxyCATestNow())
 	if err != nil {
 		t.Fatalf("expected proxy ca generation to succeed, got %v", err)
 	}
@@ -40,7 +44,7 @@ func TestGenerateProxyCA(t *testing.T) {
 }
 
 func TestPrepareProxyCAExecEnv(t *testing.T) {
-	proxyCA, err := GenerateProxyCA(time.Date(2026, time.March, 11, 0, 0, 0, 0, time.UTC))
+	proxyCA, err := GenerateProxyCA(proxyCATestNow())
 	if err != nil {
 		t.Fatalf("expected proxy ca generation to succeed, got %v", err)
 	}

@@ -380,7 +380,7 @@ func mustProxyURL(t *testing.T, rawURL string) func(*http.Request) (*url.URL, er
 func mustProxyAuthorityAndRootPool(t *testing.T) (*proxy.CertificateAuthority, *x509.CertPool) {
 	t.Helper()
 
-	proxyCA, err := bootstrap.GenerateProxyCA(time.Date(2026, time.March, 11, 0, 0, 0, 0, time.UTC))
+	proxyCA, err := bootstrap.GenerateProxyCA(time.Now().UTC().Add(-time.Hour))
 	if err != nil {
 		t.Fatalf("expected proxy ca generation to succeed, got %v", err)
 	}
