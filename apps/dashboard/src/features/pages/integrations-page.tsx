@@ -1,15 +1,3 @@
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Skeleton,
-} from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
@@ -21,13 +9,15 @@ import {
   IntegrationConnectionMethodIds,
   type IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-dialog.js";
-import { IntegrationSection } from "../integrations/integration-section.js";
-import { IntegrationTile } from "../integrations/integration-tile.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import {
   type ViewDialogState,
   ViewConnectionsDialog,
 } from "../integrations/view-connections-dialog.js";
+import {
+  OrganizationIntegrationsSettingsPageView,
+  type OrganizationIntegrationsSettingsPageCard,
+} from "./organization-integrations-settings-page-view.js";
 import { useIntegrationConnectionDialogState } from "./use-integration-connection-dialog-state.js";
 
 const SETTINGS_INTEGRATIONS_QUERY_KEY: readonly ["settings", "integrations", "directory"] = [
@@ -90,156 +80,117 @@ export function IntegrationsPage() {
     [cards],
   );
 
-  if (integrationsQuery.isPending) {
-    return (
-      <div className="gap-3 flex flex-col">
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-      </div>
-    );
-  }
+  const connectedViewCards = useMemo<readonly OrganizationIntegrationsSettingsPageCard[]>(
+    () =>
+      activeIntegrationCards.map((card) => ({
+        targetKey: card.target.targetKey,
+        displayName: card.displayName,
+        description: formatConnectionCount(card.connections.length),
+        configStatus: card.configStatus,
+        ...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey }),
+        actionLabel: "View",
+        onAction: () => {
+          setViewDialog({
+            targetKey: card.target.targetKey,
+            displayName: card.displayName,
+          });
+        },
+      })),
+    [activeIntegrationCards],
+  );
 
-  if (integrationsQuery.isError) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>Could not load integrations</AlertTitle>
-        <AlertDescription className="gap-3 flex flex-col items-start">
-          <span>
-            {resolveApiErrorMessage({
-              error: integrationsQuery.error,
-              fallbackMessage: "Could not load integrations.",
-            })}
-          </span>
-          <Button
-            onClick={() => {
-              void integrationsQuery.refetch();
-            }}
-            type="button"
-            variant="outline"
-          >
-            Retry
-          </Button>
-        </AlertDescription>
-      </Alert>
-    );
-  }
+  const availableViewCards = useMemo<readonly OrganizationIntegrationsSettingsPageCard[]>(
+    () =>
+      cards.map((card) => {
+        const methods = toConnectionMethods(card.target.supportedAuthSchemes);
 
-  if (cards.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>No integrations available</CardTitle>
-          <CardDescription>
-            No integration targets are currently configured for this environment. Seed integration
-            targets in the control-plane database to populate this page.
-          </CardDescription>
-        </CardHeader>
-        <CardContent />
-      </Card>
-    );
-  }
+        return {
+          targetKey: card.target.targetKey,
+          displayName: card.displayName,
+          description: card.description,
+          configStatus: card.configStatus,
+          ...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey }),
+          actionDisabled: methods.length === 0,
+          actionLabel: "Add",
+          onAction: () => {
+            connectionDialogState.openDialog({
+              targetKey: card.target.targetKey,
+              targetDisplayName: card.displayName,
+              methods,
+              mode: "create",
+            });
+          },
+        };
+      }),
+    [cards, connectionDialogState],
+  );
 
   return (
-    <div className="w-full gap-4 flex flex-col">
-      <IntegrationSection
-        cards={activeIntegrationCards}
-        emptyStateMessage="No active integration connections yet. Add one from the integrations list below."
-        renderTile={(card) => {
-          return (
-            <IntegrationTile
-              actionLabel="View"
-              actionVariant="outline"
-              description={formatConnectionCount(card.connections.length)}
-              displayName={card.displayName}
-              {...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey })}
-              {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
-              onAction={() => {
-                setViewDialog({
-                  targetKey: card.target.targetKey,
-                  displayName: card.displayName,
-                });
-              }}
-            />
-          );
-        }}
-        title="Connected"
-      />
-
-      <IntegrationSection
-        cards={cards}
-        renderTile={(card) => {
-          const methods = toConnectionMethods(card.target.supportedAuthSchemes);
-
-          return (
-            <IntegrationTile
-              actionDisabled={methods.length === 0}
-              actionLabel={methods.length === 0 ? "N/A" : "Add"}
-              description={card.description}
-              displayName={card.displayName}
-              {...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey })}
-              {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
-              onAction={() => {
-                connectionDialogState.openDialog({
-                  targetKey: card.target.targetKey,
-                  targetDisplayName: card.displayName,
-                  methods,
-                  mode: "create",
-                });
-              }}
-            />
-          );
-        }}
-        title="Available Integrations"
-      />
-
-      <IntegrationConnectionDialog
-        apiKeyValue={connectionDialogState.apiKeyValue}
-        connectionDisplayNamePlaceholder={connectionDialogState.connectionDisplayNamePlaceholder}
-        connectionDisplayNameValue={connectionDialogState.connectionDisplayNameValue}
-        connectError={connectionDialogState.error}
-        connectMethodId={connectionDialogState.methodId}
-        dialog={connectionDialogState.dialog}
-        hasChanges={connectionDialogState.hasChanges}
-        isApiKeyChanged={connectionDialogState.isApiKeyChanged}
-        isConnectionDisplayNameChanged={connectionDialogState.isConnectionDisplayNameChanged}
-        onApiKeyChange={connectionDialogState.onApiKeyChange}
-        onConnectionDisplayNameChange={connectionDialogState.onConnectionDisplayNameChange}
-        onClose={connectionDialogState.closeDialog}
-        onMethodChange={connectionDialogState.onMethodChange}
-        onSubmit={connectionDialogState.submitDialog}
-        pending={connectionDialogState.pending}
-      />
-
-      <ViewConnectionsDialog
-        connections={selectedViewConnections}
-        dialog={viewDialog}
-        onClose={() => {
-          setViewDialog(null);
-        }}
-        onOpenEditConnectionDialog={({
-          connectionId,
-          connectionDisplayName,
-          connectionMethodId,
-        }) => {
-          if (viewDialog === null) {
-            throw new Error("View dialog state is required to open edit connection dialog.");
-          }
-
-          setViewDialog(null);
-          connectionDialogState.openDialog({
-            targetKey: viewDialog.targetKey,
-            targetDisplayName: viewDialog.displayName,
-            mode: "update",
+    <OrganizationIntegrationsSettingsPageView
+      availableCards={availableViewCards}
+      connectedCards={connectedViewCards}
+      connectionDialog={
+        <IntegrationConnectionDialog
+          apiKeyValue={connectionDialogState.apiKeyValue}
+          connectionDisplayNamePlaceholder={connectionDialogState.connectionDisplayNamePlaceholder}
+          connectionDisplayNameValue={connectionDialogState.connectionDisplayNameValue}
+          connectError={connectionDialogState.error}
+          connectMethodId={connectionDialogState.methodId}
+          dialog={connectionDialogState.dialog}
+          hasChanges={connectionDialogState.hasChanges}
+          isApiKeyChanged={connectionDialogState.isApiKeyChanged}
+          isConnectionDisplayNameChanged={connectionDialogState.isConnectionDisplayNameChanged}
+          onApiKeyChange={connectionDialogState.onApiKeyChange}
+          onConnectionDisplayNameChange={connectionDialogState.onConnectionDisplayNameChange}
+          onClose={connectionDialogState.closeDialog}
+          onMethodChange={connectionDialogState.onMethodChange}
+          onSubmit={connectionDialogState.submitDialog}
+          pending={connectionDialogState.pending}
+        />
+      }
+      detailSurface={
+        <ViewConnectionsDialog
+          connections={selectedViewConnections}
+          dialog={viewDialog}
+          onClose={() => {
+            setViewDialog(null);
+          }}
+          onOpenEditConnectionDialog={({
             connectionId,
             connectionDisplayName,
-            currentMethodId:
-              connectionMethodId === null
-                ? IntegrationConnectionMethodIds.API_KEY
-                : connectionMethodId,
-          });
-        }}
-      />
-    </div>
+            connectionMethodId,
+          }) => {
+            if (viewDialog === null) {
+              throw new Error("View dialog state is required to open edit connection dialog.");
+            }
+
+            setViewDialog(null);
+            connectionDialogState.openDialog({
+              targetKey: viewDialog.targetKey,
+              targetDisplayName: viewDialog.displayName,
+              mode: "update",
+              connectionId,
+              connectionDisplayName,
+              currentMethodId:
+                connectionMethodId === null
+                  ? IntegrationConnectionMethodIds.API_KEY
+                  : connectionMethodId,
+            });
+          }}
+        />
+      }
+      isLoading={integrationsQuery.isPending}
+      loadErrorMessage={
+        integrationsQuery.isError
+          ? resolveApiErrorMessage({
+              error: integrationsQuery.error,
+              fallbackMessage: "Could not load integrations.",
+            })
+          : null
+      }
+      onRetryLoad={() => {
+        void integrationsQuery.refetch();
+      }}
+    />
   );
 }

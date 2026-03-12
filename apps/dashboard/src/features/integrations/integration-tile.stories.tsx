@@ -17,7 +17,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Connected: Story = {
   args: {
-    actionLabel: "Manage",
+    actionLabel: "View",
     actionVariant: "outline",
     description: "Connected to the organization and ready for sandbox bindings.",
     displayName: "GitHub",
@@ -30,7 +30,7 @@ export const Connected: Story = {
 export const InvalidConfig: Story = {
   args: {
     actionDisabled: false,
-    actionLabel: "Fix config",
+    actionLabel: "Add",
     description: "The target exists, but required credentials or scopes are missing.",
     displayName: "OpenAI",
     logoKey: "openai",

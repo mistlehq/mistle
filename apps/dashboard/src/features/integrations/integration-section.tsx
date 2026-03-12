@@ -1,16 +1,15 @@
 import { SectionHeader } from "@mistle/ui";
 import type { ReactNode } from "react";
 
-import type { IntegrationCardViewModel } from "./directory-model.js";
-
-type IntegrationSectionProps = {
-  cards: readonly IntegrationCardViewModel[];
+type IntegrationSectionProps<Card> = {
+  cards: readonly Card[];
   emptyStateMessage?: string;
-  renderTile: (card: IntegrationCardViewModel) => ReactNode;
+  getCardKey: (card: Card) => string;
+  renderTile: (card: Card) => ReactNode;
   title: string;
 };
 
-export function IntegrationSection(props: IntegrationSectionProps) {
+export function IntegrationSection<Card>(props: IntegrationSectionProps<Card>) {
   return (
     <div className="gap-2 flex flex-col">
       <SectionHeader title={props.title} />
@@ -21,7 +20,7 @@ export function IntegrationSection(props: IntegrationSectionProps) {
         {props.cards.length > 0 ? (
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {props.cards.map((card) => (
-              <div key={card.target.targetKey}>{props.renderTile(card)}</div>
+              <div key={props.getCardKey(card)}>{props.renderTile(card)}</div>
             ))}
           </div>
         ) : null}
