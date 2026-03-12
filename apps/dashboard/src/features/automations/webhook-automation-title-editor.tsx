@@ -33,16 +33,14 @@ export function WebhookAutomationTitleEditor(input: {
         ariaLabel="Automation name"
         autoFocus={true}
         className="text-base font-medium"
-        errorMessage={input.errorMessage}
         fieldId="automation-name"
         label="Automation name"
         maxWidthClassName="max-w-4xl"
-        onBlur={undefined}
         onChange={input.onCommit}
-        onKeyDown={undefined}
         placeholder="Automation name"
         showLabel={true}
         value={input.title}
+        {...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage })}
       />
     );
   }

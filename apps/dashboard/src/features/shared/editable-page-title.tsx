@@ -26,10 +26,8 @@ export function EditablePageTitle(input: {
       <PageTitleField
         ariaLabel={input.ariaLabel}
         autoFocus={true}
-        errorMessage={input.errorMessage}
         fieldId="editable-page-title-input"
         label={input.ariaLabel}
-        maxWidthClassName={input.maxWidthClassName}
         onBlur={input.onCommit}
         onChange={input.onDraftValueChange}
         onKeyDown={(event) => {
@@ -42,9 +40,13 @@ export function EditablePageTitle(input: {
             input.onCancel();
           }
         }}
-        placeholder={input.placeholder}
         showLabel={false}
         value={input.draftValue}
+        {...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage })}
+        {...(input.maxWidthClassName === undefined
+          ? {}
+          : { maxWidthClassName: input.maxWidthClassName })}
+        {...(input.placeholder === undefined ? {} : { placeholder: input.placeholder })}
       />
     );
   }

@@ -3,17 +3,17 @@ import { Input } from "@mistle/ui";
 export function PageTitleField(input: {
   fieldId: string;
   label: string;
-  showLabel: boolean | undefined;
+  showLabel?: boolean;
   ariaLabel: string;
   value: string;
-  placeholder: string | undefined;
-  errorMessage: string | undefined;
-  maxWidthClassName: string | undefined;
-  className: string | undefined;
-  autoFocus: boolean | undefined;
-  onBlur: (() => void) | undefined;
+  placeholder?: string;
+  errorMessage?: string;
+  maxWidthClassName?: string;
+  className?: string;
+  autoFocus?: boolean;
+  onBlur?: () => void;
   onChange: (nextValue: string) => void;
-  onKeyDown: ((event: React.KeyboardEvent<HTMLInputElement>) => void) | undefined;
+  onKeyDown?: (event: React.KeyboardEvent<HTMLInputElement>) => void;
 }): React.JSX.Element {
   const containerClassName = `w-full ${input.maxWidthClassName ?? "max-w-2xl"} space-y-2`;
 
