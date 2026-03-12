@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 
 import { compileProfileVersionRuntimePlan } from "./compile-profile-version-runtime-plan.js";
@@ -7,6 +9,7 @@ type StartProfileInstanceInput = {
   organizationId: string;
   profileId: string;
   profileVersion: number;
+  idempotencyKey?: string;
   startedBy: {
     kind: SandboxInstanceStarterKind;
     id: string;
@@ -33,6 +36,7 @@ export async function startProfileInstance(
   }: Pick<CreateSandboxProfilesServiceInput, "db" | "integrationsConfig" | "dataPlaneClient">,
   serviceInput: StartProfileInstanceInput,
 ): Promise<StartProfileInstanceOutput> {
+  const idempotencyKey = serviceInput.idempotencyKey ?? randomUUID();
   const runtimePlan = await compileProfileVersionRuntimePlan(
     {
       db,
@@ -53,6 +57,7 @@ export async function startProfileInstance(
     organizationId: serviceInput.organizationId,
     sandboxProfileId: serviceInput.profileId,
     sandboxProfileVersion: serviceInput.profileVersion,
+    idempotencyKey,
     runtimePlan,
     startedBy: serviceInput.startedBy,
     source: serviceInput.source,

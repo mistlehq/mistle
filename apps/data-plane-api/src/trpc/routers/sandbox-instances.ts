@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { type StartSandboxInstanceInput } from "@mistle/data-plane-trpc/contracts";
 import { createDataPlaneSandboxInstancesTrpcRouter } from "@mistle/data-plane-trpc/router";
 import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
@@ -15,17 +17,15 @@ const WorkflowRunInputSchema = z
   .loose();
 
 function createStartSandboxIdempotencyKey(input: StartSandboxInstanceInput): string {
+  const idempotencyKey = input.idempotencyKey ?? randomUUID();
+
   return JSON.stringify({
+    version: 1,
     organizationId: input.organizationId,
     sandboxProfileId: input.sandboxProfileId,
     sandboxProfileVersion: input.sandboxProfileVersion,
-    startedBy: {
-      kind: input.startedBy.kind,
-      id: input.startedBy.id,
-    },
     source: input.source,
-    image: input.image,
-    runtimePlan: input.runtimePlan,
+    idempotencyKey,
   });
 }
 
