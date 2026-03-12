@@ -5,7 +5,12 @@ import { useState } from "react";
 import type React from "react";
 
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
-import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
+import {
+  createGithubRepositoryResources,
+  filterRepositoryItems,
+  RepositoryItems,
+  resolveRepositorySearchTerms,
+} from "../forms/integration-resource-string-array-widget-story-support.js";
 import type {
   IntegrationConnectionSummary,
   IntegrationTargetSummary,
@@ -22,21 +27,6 @@ function createQueryClient(): QueryClient {
       },
     },
   });
-}
-
-function filterGithubResources(search: string): IntegrationConnectionResources {
-  const normalizedSearch = search.trim().toLowerCase();
-  const items =
-    normalizedSearch.length === 0
-      ? GithubResources.items
-      : GithubResources.items.filter((item) =>
-          item.handle.toLowerCase().includes(normalizedSearch),
-        );
-
-  return {
-    ...GithubResources,
-    items,
-  };
 }
 
 const OpenAiTarget: IntegrationTargetSummary = {
@@ -96,67 +86,31 @@ const GithubConnection: IntegrationConnectionSummary = {
   },
 };
 
-const GithubResources: IntegrationConnectionResources = {
+const GithubResources = createGithubRepositoryResources({
   connectionId: GithubConnection.id,
-  familyId: "github",
-  kind: "repository",
-  syncState: "ready",
-  lastSyncedAt: "2026-03-09T12:00:00.000Z",
-  items: [
-    {
-      id: "repo_1",
-      familyId: "github",
-      kind: "repository",
-      handle: "mistle/main-dashboard",
-      displayName: "main-dashboard",
-      status: "accessible",
-      metadata: {},
-    },
-    {
-      id: "repo_2",
-      familyId: "github",
-      kind: "repository",
-      handle: "mistle/control-plane-api",
-      displayName: "control-plane-api",
-      status: "accessible",
-      metadata: {},
-    },
-    {
-      id: "repo_3",
-      familyId: "github",
-      kind: "repository",
-      handle: "mistle/sandbox-runtime",
-      displayName: "sandbox-runtime",
-      status: "accessible",
-      metadata: {},
-    },
-  ],
-};
+  items: RepositoryItems,
+});
 
 function IntegrationsEditorSectionStory(): React.JSX.Element {
   const [queryClient] = useState(() => {
     const client = createQueryClient();
-    client.setQueryDefaults(
-      ["integration-connections", GithubResources.connectionId, "resources", GithubResources.kind],
-      {
-        queryFn: async ({ queryKey }) => {
-          const searchKey = queryKey.at(-1);
-          const search = typeof searchKey === "string" ? searchKey : "";
 
-          return filterGithubResources(search);
-        },
-      },
-    );
-    client.setQueryData(
-      [
-        "integration-connections",
-        GithubResources.connectionId,
-        "resources",
-        GithubResources.kind,
-        "",
-      ],
-      GithubResources,
-    );
+    for (const searchTerm of resolveRepositorySearchTerms(RepositoryItems)) {
+      client.setQueryData(
+        [
+          "integration-connections",
+          GithubResources.connectionId,
+          "resources",
+          GithubResources.kind,
+          searchTerm,
+        ],
+        createGithubRepositoryResources({
+          connectionId: GithubConnection.id,
+          items: filterRepositoryItems(RepositoryItems, searchTerm),
+        }),
+      );
+    }
+
     return client;
   });
   const [rows, setRows] = useState<readonly SandboxProfileBindingEditorRow[]>([]);

@@ -5,48 +5,13 @@ import type React from "react";
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
 import {
+  RepositoryItems,
+  filterRepositoryItems,
+} from "./integration-resource-string-array-widget-story-support.js";
+import {
   IntegrationResourceStringArrayWidgetView,
   type IntegrationResourceListViewState,
 } from "./integration-resource-string-array-widget-view.js";
-
-function createRepositoryResource(input: {
-  id: string;
-  handle: string;
-  displayName: string;
-}): IntegrationConnectionResource {
-  return {
-    id: input.id,
-    familyId: "github",
-    kind: "repository",
-    handle: input.handle,
-    displayName: input.displayName,
-    status: "accessible",
-    metadata: {},
-  };
-}
-
-const RepositoryItems = [
-  createRepositoryResource({
-    id: "repo_1",
-    handle: "mistle/main-dashboard",
-    displayName: "main-dashboard",
-  }),
-  createRepositoryResource({
-    id: "repo_2",
-    handle: "mistle/control-plane-api",
-    displayName: "control-plane-api",
-  }),
-  createRepositoryResource({
-    id: "repo_3",
-    handle: "mistle/sandbox-runtime",
-    displayName: "sandbox-runtime",
-  }),
-  createRepositoryResource({
-    id: "repo_4",
-    handle: "mistle/codex-bridge",
-    displayName: "codex-bridge",
-  }),
-] as const satisfies readonly IntegrationConnectionResource[];
 
 function createReadyState(
   items: readonly IntegrationConnectionResource[],
@@ -97,15 +62,7 @@ export const InteractiveSelection: Story = {
       "mistle/control-plane-api",
     ]);
 
-    const normalizedSearch = search.trim().toLowerCase();
-    const visibleItems =
-      normalizedSearch.length === 0
-        ? RepositoryItems
-        : RepositoryItems.filter((item) => {
-            const displayName = item.displayName.toLowerCase();
-            const handle = item.handle.toLowerCase();
-            return displayName.includes(normalizedSearch) || handle.includes(normalizedSearch);
-          });
+    const visibleItems = filterRepositoryItems(RepositoryItems, search);
 
     return (
       <IntegrationResourceStringArrayWidgetView
