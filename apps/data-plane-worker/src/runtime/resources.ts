@@ -17,7 +17,7 @@ function assertUnreachable(_value: never): never {
   throw new Error("Unsupported sandbox provider.");
 }
 
-function createSandboxRuntimeAdapter(config: DataPlaneWorkerRuntimeConfig): SandboxAdapter {
+export function createSandboxRuntimeAdapter(config: DataPlaneWorkerRuntimeConfig): SandboxAdapter {
   if (config.sandbox.provider === SandboxProvider.MODAL) {
     if (config.app.sandbox.modal === undefined) {
       throw new Error("Expected data-plane worker modal sandbox config for global provider modal.");
