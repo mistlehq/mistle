@@ -7,6 +7,7 @@ import {
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import { buildDashboardUrl } from "../src/dashboard-url.js";
 import {
   IntegrationConnectionsBadRequestResponseSchema,
   StartOAuthConnectionResponseSchema,
@@ -73,10 +74,7 @@ async function ensureOpenAiDefaultTarget(
 function createDashboardOrganizationIntegrationsUrl(
   fixture: ControlPlaneApiIntegrationFixture,
 ): string {
-  return new URL(
-    "/settings/organization/integrations",
-    fixture.config.auth.invitationAcceptBaseUrl,
-  ).toString();
+  return buildDashboardUrl(fixture.config.dashboard.baseUrl, "/settings/organization/integrations");
 }
 
 describe("integration connections oauth integration", () => {

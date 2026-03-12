@@ -14,7 +14,7 @@ import { createSendVerificationOTPService } from "./create-send-verification-otp
 
 export type ControlPlaneAuthConfig = {
   authBaseUrl: string;
-  authInvitationAcceptBaseUrl: string;
+  dashboardBaseUrl: string;
   authSecret: string;
   authTrustedOrigins: string[];
   authOTPLength: number;
@@ -40,7 +40,7 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
   });
   const sendOrganizationInvitation = createSendOrganizationInvitationService({
     openWorkflow,
-    invitationAcceptBaseUrl: config.authInvitationAcceptBaseUrl,
+    dashboardBaseUrl: config.dashboardBaseUrl,
   });
 
   return betterAuth({

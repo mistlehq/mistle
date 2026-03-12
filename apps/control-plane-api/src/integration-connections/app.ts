@@ -1,6 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { z } from "zod";
 
+import { buildDashboardUrl } from "../dashboard-url.js";
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 import { INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH } from "./constants.js";
 import {
@@ -189,10 +190,7 @@ export function createIntegrationConnectionsApp(): AppRoutes<
         query,
       });
 
-      return ctx.redirect(
-        buildDashboardIntegrationsUrl(ctx.get("config").auth.invitationAcceptBaseUrl),
-        302,
-      );
+      return ctx.redirect(buildDashboardIntegrationsUrl(ctx.get("config").dashboard.baseUrl), 302);
     } catch (error) {
       return handleIntegrationConnectionMutationError(ctx, error);
     }
@@ -217,12 +215,8 @@ function handleListIntegrationConnectionsError(ctx: AppContext, error: unknown) 
   throw error;
 }
 
-function buildDashboardIntegrationsUrl(invitationAcceptBaseUrl: string): string {
-  const url = new URL(invitationAcceptBaseUrl);
-  url.pathname = DashboardOrganizationIntegrationsPath;
-  url.search = "";
-  url.hash = "";
-  return url.toString();
+function buildDashboardIntegrationsUrl(dashboardBaseUrl: string): string {
+  return buildDashboardUrl(dashboardBaseUrl, DashboardOrganizationIntegrationsPath);
 }
 
 function handleIntegrationConnectionMutationError(ctx: AppContext, error: unknown) {
