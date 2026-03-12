@@ -95,9 +95,9 @@ importers:
       '@mistle/control-plane-internal-client':
         specifier: workspace:*
         version: link:../../packages/control-plane-internal-client
-      '@mistle/data-plane-trpc':
+      '@mistle/data-plane-internal-client':
         specifier: workspace:*
-        version: link:../../packages/data-plane-trpc
+        version: link:../../packages/data-plane-internal-client
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -174,9 +174,9 @@ importers:
       '@mistle/control-plane-internal-client':
         specifier: workspace:*
         version: link:../../packages/control-plane-internal-client
-      '@mistle/data-plane-trpc':
+      '@mistle/data-plane-internal-client':
         specifier: workspace:*
-        version: link:../../packages/data-plane-trpc
+        version: link:../../packages/data-plane-internal-client
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -353,12 +353,12 @@ importers:
       '@hono/node-server':
         specifier: ^1.19.11
         version: 1.19.11(hono@4.12.5)
+      '@hono/zod-openapi':
+        specifier: ^1.2.2
+        version: 1.2.2(hono@4.12.5)(zod@4.3.6)
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@mistle/data-plane-trpc':
-        specifier: workspace:*
-        version: link:../../packages/data-plane-trpc
       '@mistle/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -383,9 +383,6 @@ importers:
       '@openworkflow/cli':
         specifier: ^0.4.3
         version: 0.4.3(openworkflow@0.8.1(postgres@3.4.8))
-      '@trpc/server':
-        specifier: ^11.12.0
-        version: 11.12.0(typescript@5.9.3)
       hono:
         specifier: ^4.12.5
         version: 4.12.5
@@ -402,12 +399,12 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
+      '@mistle/data-plane-internal-client':
+        specifier: workspace:*
+        version: link:../../packages/data-plane-internal-client
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
-      '@trpc/client':
-        specifier: ^11.12.0
-        version: 11.12.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
@@ -584,29 +581,18 @@ importers:
         specifier: ^7.13.0
         version: 7.13.0(typescript@5.9.3)
 
-  packages/data-plane-trpc:
+  packages/data-plane-internal-client:
     dependencies:
-      '@mistle/db':
-        specifier: workspace:*
-        version: link:../db
-      '@mistle/integrations-core':
-        specifier: workspace:*
-        version: link:../integrations-core
-      '@mistle/sandbox':
-        specifier: workspace:*
-        version: link:../sandbox
-      '@mistle/workflow-registry':
-        specifier: workspace:*
-        version: link:../workflow-registry
-      '@trpc/client':
-        specifier: ^11.12.0
-        version: 11.12.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)
-      '@trpc/server':
-        specifier: ^11.12.0
-        version: 11.12.0(typescript@5.9.3)
+      openapi-fetch:
+        specifier: ^0.17.0
+        version: 0.17.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6
+    devDependencies:
+      openapi-typescript:
+        specifier: ^7.13.0
+        version: 7.13.0(typescript@5.9.3)
 
   packages/db:
     dependencies:
@@ -4943,17 +4929,6 @@ packages:
 
   '@tootallnate/quickjs-emscripten@0.23.0':
     resolution: {integrity: sha512-C5Mc6rdnsaJDjO3UpGW/CQTHtCKaYlScZTly4JIu97Jxo/odCiH0ITnDXSJPTOrEKk/ycSZ0AOgTmkDtkOsvIA==}
-
-  '@trpc/client@11.12.0':
-    resolution: {integrity: sha512-zTwFKQdE99pvNm7kXFdHo5xIQpGqpQJHtqVkT9o+i8h/0fbDOUBEEbFVICiMsNA+GiXskoaDRX2l+z6ir+Ug3w==}
-    peerDependencies:
-      '@trpc/server': 11.12.0
-      typescript: '>=5.7.2'
-
-  '@trpc/server@11.12.0':
-    resolution: {integrity: sha512-rpZnf5FUjNndE/AjGIy+FvEHR52iBd0u0wySqWCwXj67wraj3qCuBr5Opcf0Te/g67C/YztqceFkLoG0r4mp4Q==}
-    peerDependencies:
-      typescript: '>=5.7.2'
 
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
@@ -15548,15 +15523,6 @@ snapshots:
       '@testing-library/dom': 10.4.1
 
   '@tootallnate/quickjs-emscripten@0.23.0': {}
-
-  '@trpc/client@11.12.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)':
-    dependencies:
-      '@trpc/server': 11.12.0(typescript@5.9.3)
-      typescript: 5.9.3
-
-  '@trpc/server@11.12.0(typescript@5.9.3)':
-    dependencies:
-      typescript: 5.9.3
 
   '@tybys/wasm-util@0.10.1':
     dependencies:

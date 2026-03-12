@@ -1,5 +1,7 @@
-import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
-import { DataPlaneSandboxInstanceStatuses } from "@mistle/data-plane-trpc/contracts";
+import type {
+  DataPlaneSandboxInstancesClient,
+  GetSandboxInstanceResponse,
+} from "@mistle/data-plane-internal-client";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 
 export type CreateSandboxInstancesServiceInput = {
@@ -28,7 +30,7 @@ export type SandboxInstanceConnectionToken = {
 
 export type SandboxInstanceStatus = {
   id: string;
-  status: (typeof DataPlaneSandboxInstanceStatuses)[keyof typeof DataPlaneSandboxInstanceStatuses];
+  status: NonNullable<GetSandboxInstanceResponse>["status"];
   failureCode: string | null;
   failureMessage: string | null;
 };
