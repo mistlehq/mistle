@@ -32,6 +32,8 @@ export const CodexStoryChatThreadEntries: readonly ChatEntry[] = [
     id: "plan-1",
     turnId: "turn-1",
     kind: "plan",
+    explanation: null,
+    steps: null,
     status: "completed",
     text: [
       "1. Validate the shared Storybook package",
@@ -245,6 +247,50 @@ export const CodexStoryChatThreadEntriesWithThinkingGroup: readonly ChatEntry[] 
     phase: null,
     status: "completed",
     text: "Grouping is now generic by semantic kind, with `plan`, user, assistant, and fallback generic items still remaining standalone.",
+  },
+];
+
+export const CodexStoryChatThreadEntriesWithStructuredPlan: readonly ChatEntry[] = [
+  {
+    id: "user-plan-1",
+    turnId: "turn-plan",
+    kind: "user-message",
+    status: "completed",
+    text: "Update the implementation plan while you work.",
+  },
+  {
+    id: "plan-structured-1",
+    turnId: "turn-plan",
+    kind: "plan",
+    text: null,
+    explanation: "Tracking the current implementation status before moving to tests.",
+    steps: [
+      {
+        step: "Normalize thread items",
+        status: "completed",
+      },
+      {
+        step: "Classify and group semantic actions",
+        status: "completed",
+      },
+      {
+        step: "Wire structured plan updates into the dashboard transcript",
+        status: "inProgress",
+      },
+      {
+        step: "Add reducer and Storybook coverage",
+        status: "pending",
+      },
+    ],
+    status: "streaming",
+  },
+  {
+    id: "assistant-plan-1",
+    turnId: "turn-plan",
+    kind: "assistant-message",
+    phase: null,
+    status: "streaming",
+    text: "The transcript can now switch to a structured plan block when turn/plan/updated arrives.",
   },
 ];
 
@@ -537,17 +583,6 @@ export const CodexStorySessionEntriesWithExploringGroup: readonly ChatEntry[] = 
     status: "completed",
     text: "Trace how the transcript UI renders the new exploring group.",
   },
-  {
-    id: "plan-session-exploring-1",
-    turnId: "turn-session-exploring",
-    kind: "plan",
-    status: "completed",
-    text: [
-      "1. Read the shared semantic timeline builder",
-      "2. Inspect the chat thread component",
-      "3. Confirm the page layout still scans well",
-    ].join("\n"),
-  },
   CodexStoryExploringGroupEntry,
   {
     id: "assistant-session-exploring-1",
@@ -712,40 +747,34 @@ export const CodexStoryPanelEntries: readonly CodexServerRequestEntry[] = [
     responseErrorMessage: null,
   },
   {
-    requestId: "generic-request-1",
-    method: "tool/reportStatus",
-    kind: "generic",
-    paramsJson: JSON.stringify(
+    requestId: "tool-user-input-request-2",
+    method: "tool/requestUserInput",
+    kind: "tool-user-input",
+    questions: [
       {
-        area: "storybook",
-        status: "phase-1",
-        storiesAdded: 28,
+        header: "Status",
+        id: "story-status",
+        options: [
+          {
+            label: "Ready for review",
+            description: "The Storybook pass is ready to hand off.",
+            isOther: false,
+          },
+          {
+            label: "Needs changes",
+            description: "There are still UI issues to address.",
+            isOther: false,
+          },
+        ],
+        question: "What is the current Storybook review status?",
       },
-      null,
-      2,
-    ),
+    ],
     status: "pending",
     responseErrorMessage: null,
   },
 ];
 
-export const CodexStorySessionServerRequests: readonly CodexServerRequestEntry[] = [
-  {
-    requestId: "generic-request-1",
-    method: "tool/reportStatus",
-    kind: "generic",
-    paramsJson: JSON.stringify(
-      {
-        storybook: "phase-2",
-        area: "codex-session-page-view",
-      },
-      null,
-      2,
-    ),
-    status: "pending",
-    responseErrorMessage: null,
-  },
-];
+export const CodexStorySessionServerRequests: readonly CodexServerRequestEntry[] = [];
 
 export const CodexStorySessionComposerProps: CodexSessionPageComposerProps = {
   composerText: "Focus on dashboard asset ownership next.",
@@ -771,13 +800,6 @@ export const CodexStorySessionComposerProps: CodexSessionPageComposerProps = {
 
 export function createCodexStoryPanelEntriesWithResponseErrors(): readonly CodexServerRequestEntry[] {
   return CodexStoryPanelEntries.map((entry) => {
-    if (entry.kind === "generic") {
-      return {
-        ...entry,
-        responseErrorMessage: "The JSON payload was rejected by the server.",
-      };
-    }
-
     return {
       ...entry,
       responseErrorMessage: "The request response was not accepted. Try again.",

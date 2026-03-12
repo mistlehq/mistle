@@ -417,24 +417,24 @@ This intermediate type preserves the original normalized item and adds only the 
 
 The table below defines the mapping from raw Codex `ThreadItem` values to the normalized semantic-layer model.
 
-| Raw `ThreadItem.type`       | Required raw fields                                                                              | Normalized `kind`   | Notes                                                                                                                                             |
-| --------------------------- | ------------------------------------------------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `userMessage`               | `id`, `content`                                                                                  | `user-message`      | Normalize textual user input into a displayable text form.                                                                                        |
-| `agentMessage`              | `id`, `text`, `phase`                                                                            | `assistant-message` | Preserve `phase`; map active lifecycle to `streaming` and finalized lifecycle to `completed`.                                                     |
-| `plan`                      | `id`, `text`                                                                                     | `plan`              | Preserve plan content as a dedicated normalized item. It remains a standalone transcript entry and is never part of semantic action grouping.     |
-| `reasoning`                 | `id`, `summary`, `content`                                                                       | `reasoning`         | Emit one normalized reasoning item for summary content and one for full content when both are present. Preserve source as `summary` or `content`. |
-| `commandExecution`          | `id`, `command`, `cwd`, `status`, `commandActions`, `aggregatedOutput`, `exitCode`, `durationMs` | `command-execution` | Preserve `commandActions` exactly; do not reparse shell locally.                                                                                  |
-| `fileChange`                | `id`, `changes`, `status`                                                                        | `file-change`       | Preserve change list and item status.                                                                                                             |
-| `mcpToolCall`               | `id`, `server`, `tool`, `status`, `arguments`, `result`, `error`, `durationMs`                   | `tool-call`         | Set `toolType` to `mcp`.                                                                                                                          |
-| `dynamicToolCall`           | `id`, `tool`, `arguments`, `status`, `contentItems`, `success`, `durationMs`                     | `tool-call`         | Set `toolType` to `dynamic`.                                                                                                                      |
-| `collabAgentToolCall`       | `id`, `tool`, `status`, `senderThreadId`, `receiverThreadIds`, `prompt`, `agentsStates`          | `tool-call`         | Set `toolType` to `collab`.                                                                                                                       |
-| `webSearch`                 | `id`, `query`, `action`                                                                          | `web-search`        | Preserve raw query and any structured action/details.                                                                                             |
-| `imageView`                 | `id`, `path`                                                                                     | `generic-item`      | Preserve raw detail; out of semantic scope for grouped action summaries.                                                                          |
-| `imageGeneration`           | `id`, `status`, `revisedPrompt`, `result`                                                        | `generic-item`      | Preserve raw detail; out of semantic scope for grouped action summaries.                                                                          |
-| `enteredReviewMode`         | `id`, `review`                                                                                   | `generic-item`      | Preserve raw detail; do not force into action-group semantics.                                                                                    |
-| `exitedReviewMode`          | `id`, `review`                                                                                   | `generic-item`      | Preserve raw detail; do not force into action-group semantics.                                                                                    |
-| `contextCompaction`         | `id`                                                                                             | `generic-item`      | Preserve raw detail; do not guess intent beyond compaction event identity.                                                                        |
-| any unsupported future item | `id`, `type`                                                                                     | `generic-item`      | Preserve enough raw detail for debugging, but do not guess semantics.                                                                             |
+| Raw `ThreadItem.type`                   | Required raw fields                                                                              | Normalized `kind`   | Notes                                                                                                                                                         |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `userMessage`                           | `id`, `content`                                                                                  | `user-message`      | Normalize textual user input into a displayable text form.                                                                                                    |
+| `agentMessage`                          | `id`, `text`, `phase`                                                                            | `assistant-message` | Preserve `phase`; map active lifecycle to `streaming` and finalized lifecycle to `completed`.                                                                 |
+| `plan`                                  | `id`, `text`                                                                                     | `plan`              | Preserve plan content as a dedicated normalized item. It remains a standalone transcript entry and is never part of semantic action grouping.                 |
+| `reasoning`                             | `id`, `summary`, `content`                                                                       | `reasoning`         | Emit one normalized reasoning item for summary content and one for full content when both are present. Preserve source as `summary` or `content`.             |
+| `commandExecution`                      | `id`, `command`, `cwd`, `status`, `commandActions`, `aggregatedOutput`, `exitCode`, `durationMs` | `command-execution` | Preserve `commandActions` exactly; do not reparse shell locally.                                                                                              |
+| `fileChange`                            | `id`, `changes`, `status`                                                                        | `file-change`       | Preserve change list and item status.                                                                                                                         |
+| `mcpToolCall`                           | `id`, `server`, `tool`, `status`, `arguments`, `result`, `error`, `durationMs`                   | `tool-call`         | Set `toolType` to `mcp`.                                                                                                                                      |
+| `dynamicToolCall`                       | `id`, `tool`, `arguments`, `status`, `contentItems`, `success`, `durationMs`                     | `tool-call`         | Set `toolType` to `dynamic`.                                                                                                                                  |
+| `collabAgentToolCall`                   | `id`, `tool`, `status`, `senderThreadId`, `receiverThreadIds`, `prompt`, `agentsStates`          | `tool-call`         | Set `toolType` to `collab`.                                                                                                                                   |
+| `webSearch`                             | `id`, `query`, `action`                                                                          | `web-search`        | Preserve raw query and any structured action/details.                                                                                                         |
+| `imageView`                             | `id`, `path`                                                                                     | `generic-item`      | Preserve raw detail; out of semantic scope for grouped action summaries.                                                                                      |
+| `imageGeneration`                       | `id`, `status`, `revisedPrompt`, `result`                                                        | `generic-item`      | Preserve raw detail; out of semantic scope for grouped action summaries.                                                                                      |
+| `enteredReviewMode`                     | `id`, `review`                                                                                   | `generic-item`      | Preserve raw detail; do not force into action-group semantics.                                                                                                |
+| `exitedReviewMode`                      | `id`, `review`                                                                                   | `generic-item`      | Preserve raw detail; do not force into action-group semantics.                                                                                                |
+| `contextCompaction`                     | `id`                                                                                             | `generic-item`      | Preserve raw detail; do not guess intent beyond compaction event identity.                                                                                    |
+| any unsupported future action-like item | `id`, `type`                                                                                     | `tool-call`         | Preserve enough raw detail for debugging, and keep unknown action/tool activity inside the semantic action layer rather than surfacing raw protocol taxonomy. |
 
 ### Exact `ThreadItem` Field Mapping
 
@@ -823,10 +823,11 @@ Classify all `web-search` items as `searching-web`.
 ### Tool calls
 
 Classify MCP, dynamic, and collab tool calls as `tool-call`.
+Also classify unsupported but action-like future items as `tool-call` when they do not match a more specific semantic kind.
 
 ### Generic fallback
 
-Anything not mapped more specifically becomes `generic`.
+Explicit non-action fallback items remain `generic`.
 
 ## Behavior Rules
 
@@ -850,6 +851,7 @@ These rules remove ambiguity during implementation.
 - `file-change` is always `making-edits`
 - `reasoning` is always `thinking`
 - `web-search` is always `searching-web`
+- unsupported but action-like future items are `tool-call`
 
 ### Grouping rules
 
@@ -1603,7 +1605,7 @@ The implementation is complete when all of the following are true:
 - unknown command actions produce `running-commands`, not `exploring`
 - grouped status is `streaming` while any child item is active and `completed` only when all children are complete
 - live output deltas update the existing item, preserve the existing group ID when the first grouped item is unchanged, and then regroup the turn
-- unsupported but valid raw item types appear as `generic-item` entries instead of being dropped
+- unsupported but action-like raw item types appear as `tool-call` entries instead of being dropped
 - dashboard integration no longer discards `commandActions`
 - `plan`, `user-message`, `assistant-message`, and fallback `generic-item` remain standalone and never merge into semantic action groups
 

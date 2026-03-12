@@ -1,5 +1,11 @@
 import type { ClassifiedCodexThreadItem, NormalizedCodexThreadItem } from "./types.js";
 
+function isFutureToolLikeGenericItem(
+  item: Extract<NormalizedCodexThreadItem, { kind: "generic-item" }>,
+): boolean {
+  return item.itemType.toLowerCase().includes("tool");
+}
+
 function classifyCommandExecution(
   item: Extract<NormalizedCodexThreadItem, { kind: "command-execution" }>,
 ): ClassifiedCodexThreadItem {
@@ -87,6 +93,19 @@ export function classifyCodexThreadItemSemantics(
   }
 
   if (item.kind === "tool-call") {
+    return {
+      item,
+      semanticKind: "tool-call",
+      displayKeys: {
+        active: "tool-call.active",
+        completed: "tool-call.done",
+      },
+      status: item.status,
+      summaryCounts: null,
+    };
+  }
+
+  if (item.kind === "generic-item" && isFutureToolLikeGenericItem(item)) {
     return {
       item,
       semanticKind: "tool-call",

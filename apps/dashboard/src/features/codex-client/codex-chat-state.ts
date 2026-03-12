@@ -21,6 +21,8 @@ import type {
   ChatSemanticGroupEntry,
   ChatUserEntry,
 } from "../chat/chat-types.js";
+import { parseTurnPlanSnapshot } from "./codex-session-events.js";
+import type { CodexTurnPlanSnapshot } from "./codex-session-types.js";
 
 const TurnStartedNotificationSchema = z.object({
   method: z.literal("turn/started"),
@@ -81,6 +83,7 @@ type CodexRawTurnState = {
   status: string | null;
   completedStatus: string | null;
   completedErrorMessage: string | null;
+  planSnapshot: CodexTurnPlanSnapshot | null;
   userEntry: ChatUserEntry | null;
   itemOrder: readonly string[];
   rawItemsById: Readonly<Record<string, unknown>>;
@@ -140,6 +143,7 @@ function createTurnState(turnId: string): CodexRawTurnState {
     status: null,
     completedStatus: null,
     completedErrorMessage: null,
+    planSnapshot: null,
     userEntry: null,
     itemOrder: [],
     rawItemsById: {},
@@ -207,6 +211,51 @@ function createGenericEntry(input: {
     title: input.title,
     body: input.body,
     detailsJson: input.detailsJson,
+    status: input.status,
+  };
+}
+
+function isChatPlanStepStatus(value: string): value is "pending" | "inProgress" | "completed" {
+  return value === "pending" || value === "inProgress" || value === "completed";
+}
+
+function buildPlanEntry(input: {
+  id: string;
+  turnId: string;
+  text: string | null;
+  status: "streaming" | "completed";
+  planSnapshot: CodexTurnPlanSnapshot | null;
+}): ChatPlanEntry {
+  if (input.planSnapshot === null) {
+    return {
+      id: input.id,
+      turnId: input.turnId,
+      kind: "plan",
+      text: input.text,
+      explanation: null,
+      steps: null,
+      status: input.status,
+    };
+  }
+
+  const steps = input.planSnapshot.steps.map((step) => {
+    if (!isChatPlanStepStatus(step.status)) {
+      throw new Error(`Unsupported plan step status '${step.status}'.`);
+    }
+
+    return {
+      step: step.step,
+      status: step.status,
+    };
+  });
+
+  return {
+    id: input.id,
+    turnId: input.turnId,
+    kind: "plan",
+    text: input.text,
+    explanation: input.planSnapshot.explanation,
+    steps,
     status: input.status,
   };
 }
@@ -411,7 +460,11 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
   };
 }
 
-function mapTimelineEntryToChatEntries(entry: CodexTimelineEntry): readonly ChatEntry[] {
+function mapTimelineEntryToChatEntries(input: {
+  entry: CodexTimelineEntry;
+  planSnapshot: CodexTurnPlanSnapshot | null;
+}): readonly ChatEntry[] {
+  const { entry } = input;
   if (!("item" in entry)) {
     return [
       {
@@ -455,13 +508,13 @@ function mapTimelineEntryToChatEntries(entry: CodexTimelineEntry): readonly Chat
 
   if (item.kind === "plan") {
     return [
-      {
+      buildPlanEntry({
         id: item.id,
         turnId: item.turnId,
-        kind: "plan",
         text: item.text,
         status: item.status,
-      } satisfies ChatPlanEntry,
+        planSnapshot: input.planSnapshot,
+      }),
     ];
   }
 
@@ -584,8 +637,30 @@ function buildEntries(input: {
       turnId,
       items: buildNormalizedItems(turn),
     });
+    let renderedPlanEntry = false;
     for (const timelineEntry of timeline) {
-      entries.push(...mapTimelineEntryToChatEntries(timelineEntry));
+      if ("item" in timelineEntry && timelineEntry.item.kind === "plan") {
+        renderedPlanEntry = true;
+      }
+
+      entries.push(
+        ...mapTimelineEntryToChatEntries({
+          entry: timelineEntry,
+          planSnapshot: turn.planSnapshot,
+        }),
+      );
+    }
+
+    if (!renderedPlanEntry && turn.planSnapshot !== null) {
+      entries.push(
+        buildPlanEntry({
+          id: `${turn.id}:plan-snapshot`,
+          turnId: turn.id,
+          text: null,
+          status: turn.status === "inProgress" ? "streaming" : "completed",
+          planSnapshot: turn.planSnapshot,
+        }),
+      );
     }
   }
 
@@ -780,6 +855,7 @@ function hydrateTurns(turns: readonly CodexThreadReadTurn[]): CodexChatState {
       status: turn.status,
       completedStatus: isTerminalTurnStatus(turn.status) ? turn.status : null,
       completedErrorMessage: null,
+      planSnapshot: null,
       userEntry,
       itemOrder,
       rawItemsById,
@@ -820,6 +896,7 @@ export function reduceCodexChatState(
           status: "starting",
           completedStatus: null,
           completedErrorMessage: null,
+          planSnapshot: null,
           userEntry: buildUserEntry(action.clientTurnId, action.prompt),
           itemOrder: [],
           rawItemsById: {},
@@ -860,6 +937,7 @@ export function reduceCodexChatState(
       status: action.status,
       completedStatus: null,
       completedErrorMessage: null,
+      planSnapshot: pendingTurn.planSnapshot ?? existingTurn.planSnapshot,
       userEntry:
         pendingTurn.userEntry === null
           ? existingTurn.userEntry
@@ -984,6 +1062,25 @@ export function reduceCodexChatState(
         delta,
       });
     }
+  }
+
+  const turnPlanSnapshot = parseTurnPlanSnapshot(action.notification);
+  if (turnPlanSnapshot !== null) {
+    const ensured = ensureTurn(state.turnsById, state.turnOrder, turnPlanSnapshot.turnId);
+    const turn =
+      ensured.turnsById[turnPlanSnapshot.turnId] ?? createTurnState(turnPlanSnapshot.turnId);
+
+    return buildState({
+      pendingTurnId: state.pendingTurnId,
+      turnOrder: ensured.turnOrder,
+      turnsById: {
+        ...ensured.turnsById,
+        [turnPlanSnapshot.turnId]: {
+          ...turn,
+          planSnapshot: turnPlanSnapshot,
+        },
+      },
+    });
   }
 
   const lifecycleNotification = ItemLifecycleNotificationSchema.safeParse(action.notification);

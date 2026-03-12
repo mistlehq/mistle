@@ -76,12 +76,6 @@ const ToolRequestUserInputSchema = z.object({
   }),
 });
 
-const GenericServerRequestSchema = z.object({
-  id: z.union([z.number(), z.string()]),
-  method: z.string().min(1),
-  params: z.unknown().optional(),
-});
-
 const ServerRequestResolvedNotificationSchema = z.object({
   method: z.literal("serverRequest/resolved"),
   params: z.looseObject({
@@ -122,15 +116,6 @@ export type CodexFileChangeApprovalRequestEntry = {
   responseErrorMessage: string | null;
 };
 
-export type CodexGenericServerRequestEntry = {
-  requestId: CodexJsonRpcId;
-  method: string;
-  kind: "generic";
-  paramsJson: string;
-  status: "pending" | "responding";
-  responseErrorMessage: string | null;
-};
-
 export type CodexToolRequestUserInputEntry = {
   requestId: CodexJsonRpcId;
   method: "tool/requestUserInput";
@@ -152,7 +137,6 @@ export type CodexToolRequestUserInputEntry = {
 export type CodexServerRequestEntry =
   | CodexCommandApprovalRequestEntry
   | CodexFileChangeApprovalRequestEntry
-  | CodexGenericServerRequestEntry
   | CodexToolRequestUserInputEntry;
 
 export type CodexServerRequestsState = {
@@ -316,19 +300,7 @@ function toServerRequestEntry(request: CodexJsonRpcServerRequest): CodexServerRe
     };
   }
 
-  const genericRequest = GenericServerRequestSchema.safeParse(request);
-  if (!genericRequest.success) {
-    return null;
-  }
-
-  return {
-    requestId: genericRequest.data.id,
-    method: genericRequest.data.method,
-    kind: "generic",
-    paramsJson: JSON.stringify(genericRequest.data.params ?? {}, null, 2),
-    status: "pending",
-    responseErrorMessage: null,
-  };
+  return null;
 }
 
 function resolveNotificationRequestId(

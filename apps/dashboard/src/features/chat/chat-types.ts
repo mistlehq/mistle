@@ -41,7 +41,14 @@ export type ChatPlanEntry = {
   id: string;
   turnId: string;
   kind: "plan";
-  text: string;
+  text: string | null;
+  explanation: string | null;
+  steps:
+    | readonly {
+        step: string;
+        status: "pending" | "inProgress" | "completed";
+      }[]
+    | null;
   status: "streaming" | "completed";
 };
 

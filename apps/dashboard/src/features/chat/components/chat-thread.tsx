@@ -8,6 +8,7 @@ import { buildChatTurnGroups } from "../chat-view-model.js";
 import { ChatAssistantMessage } from "./chat-assistant-message.js";
 import { ChatCommandBlock } from "./chat-command-block.js";
 import { ChatFileChangeBlock } from "./chat-file-change-block.js";
+import { ChatPlanEntry } from "./chat-plan-entry.js";
 import { ChatSemanticGroup } from "./chat-semantic-group.js";
 import { ChatUserMessage } from "./chat-user-message.js";
 
@@ -97,12 +98,7 @@ export function ChatThread({
                 }
 
                 if (block.kind === "plan") {
-                  return (
-                    <div className="space-y-3 rounded-xl border p-3" key={block.id}>
-                      <p className="font-medium text-sm">Plan</p>
-                      <p className="text-sm leading-6 whitespace-pre-wrap">{block.text}</p>
-                    </div>
-                  );
+                  return <ChatPlanEntry block={block} key={block.id} />;
                 }
 
                 if (block.kind === "file-change") {

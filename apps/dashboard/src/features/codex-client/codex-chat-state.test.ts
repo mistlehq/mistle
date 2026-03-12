@@ -441,6 +441,217 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
+  it("rebuilds the same exploring transcript shape from hydration and live notifications", () => {
+    const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_003",
+          status: "completed",
+          items: [
+            {
+              type: "commandExecution",
+              id: "cmd_1",
+              command: "sed -n '1,80p' app.ts",
+              aggregatedOutput: "export const App = () => null;",
+              cwd: "/workspace",
+              exitCode: 0,
+              status: "completed",
+              commandActions: [
+                {
+                  type: "read",
+                  command: "sed -n '1,80p' app.ts",
+                  name: "app.ts",
+                  path: "app.ts",
+                },
+              ],
+            },
+            {
+              type: "commandExecution",
+              id: "cmd_2",
+              command: "rg App src",
+              aggregatedOutput: "src/app.ts",
+              cwd: "/workspace",
+              exitCode: 0,
+              status: "completed",
+              commandActions: [
+                {
+                  type: "search",
+                  command: "rg App src",
+                  query: "App",
+                  path: "src",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const live = reduceCodexChatState(
+      reduceCodexChatState(
+        reduceCodexChatState(createInitialCodexChatState(), {
+          type: "notification_received",
+          notification: {
+            method: "turn/started",
+            params: {
+              turn: {
+                id: "turn_003",
+                status: "inProgress",
+              },
+            },
+          },
+        }),
+        {
+          type: "notification_received",
+          notification: {
+            method: "item/completed",
+            params: {
+              turnId: "turn_003",
+              item: {
+                type: "commandExecution",
+                id: "cmd_1",
+                command: "sed -n '1,80p' app.ts",
+                aggregatedOutput: "export const App = () => null;",
+                cwd: "/workspace",
+                exitCode: 0,
+                status: "completed",
+                commandActions: [
+                  {
+                    type: "read",
+                    command: "sed -n '1,80p' app.ts",
+                    name: "app.ts",
+                    path: "app.ts",
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ),
+      {
+        type: "notification_received",
+        notification: {
+          method: "item/completed",
+          params: {
+            turnId: "turn_003",
+            item: {
+              type: "commandExecution",
+              id: "cmd_2",
+              command: "rg App src",
+              aggregatedOutput: "src/app.ts",
+              cwd: "/workspace",
+              exitCode: 0,
+              status: "completed",
+              commandActions: [
+                {
+                  type: "search",
+                  command: "rg App src",
+                  query: "App",
+                  path: "src",
+                },
+              ],
+            },
+          },
+        },
+      },
+    );
+
+    expect(live.entries).toEqual(hydrated.entries);
+  });
+
+  it("rebuilds the same thinking and standalone plan shape from hydration and live notifications", () => {
+    const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_004",
+          status: "completed",
+          items: [
+            {
+              type: "reasoning",
+              id: "reasoning_1",
+              summary: [{ type: "text", text: "Inspect files" }],
+              content: [{ type: "text", text: "Detailed chain" }],
+              status: "completed",
+            },
+            {
+              type: "plan",
+              id: "plan_1",
+              text: "1. Inspect files",
+              status: "completed",
+            },
+          ],
+        },
+      ],
+    });
+
+    const live = reduceCodexChatState(
+      reduceCodexChatState(
+        reduceCodexChatState(
+          reduceCodexChatState(createInitialCodexChatState(), {
+            type: "notification_received",
+            notification: {
+              method: "turn/started",
+              params: {
+                turn: {
+                  id: "turn_004",
+                  status: "inProgress",
+                },
+              },
+            },
+          }),
+          {
+            type: "notification_received",
+            notification: {
+              method: "item/completed",
+              params: {
+                turnId: "turn_004",
+                item: {
+                  type: "reasoning",
+                  id: "reasoning_1",
+                  summary: [{ type: "text", text: "Inspect files" }],
+                  content: [{ type: "text", text: "Detailed chain" }],
+                  status: "completed",
+                },
+              },
+            },
+          },
+        ),
+        {
+          type: "notification_received",
+          notification: {
+            method: "item/completed",
+            params: {
+              turnId: "turn_004",
+              item: {
+                type: "plan",
+                id: "plan_1",
+                text: "1. Inspect files",
+                status: "completed",
+              },
+            },
+          },
+        },
+      ),
+      {
+        type: "notification_received",
+        notification: {
+          method: "turn/completed",
+          params: {
+            turn: {
+              id: "turn_004",
+              status: "completed",
+              error: null,
+            },
+          },
+        },
+      },
+    );
+
+    expect(live.entries).toEqual(hydrated.entries);
+  });
+
   it("updates completion status from turn/completed", () => {
     const started = reduceCodexChatState(
       reduceCodexChatState(createInitialCodexChatState(), {
@@ -855,6 +1066,74 @@ describe("reduceCodexChatState", () => {
         turnId: "turn_123",
         kind: "plan",
         text: "1. Inspect files",
+        explanation: null,
+        steps: null,
+        status: "streaming",
+      },
+    ]);
+  });
+
+  it("renders structured plan updates from turn/plan/updated as a standalone checklist entry", () => {
+    const started = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "notification_received",
+      notification: {
+        method: "turn/started",
+        params: {
+          turn: {
+            id: "turn_300",
+            status: "inProgress",
+          },
+        },
+      },
+    });
+
+    const updated = reduceCodexChatState(started, {
+      type: "notification_received",
+      notification: {
+        method: "turn/plan/updated",
+        params: {
+          threadId: "thread_1",
+          turnId: "turn_300",
+          explanation: "Refining rollout sequence",
+          plan: [
+            {
+              step: "Audit coverage",
+              status: "completed",
+            },
+            {
+              step: "Add parity tests",
+              status: "inProgress",
+            },
+            {
+              step: "Polish Storybook",
+              status: "pending",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(updated.entries).toEqual([
+      {
+        id: "turn_300:plan-snapshot",
+        turnId: "turn_300",
+        kind: "plan",
+        text: null,
+        explanation: "Refining rollout sequence",
+        steps: [
+          {
+            step: "Audit coverage",
+            status: "completed",
+          },
+          {
+            step: "Add parity tests",
+            status: "inProgress",
+          },
+          {
+            step: "Polish Storybook",
+            status: "pending",
+          },
+        ],
         status: "streaming",
       },
     ]);
@@ -959,6 +1238,118 @@ describe("reduceCodexChatState", () => {
             status: "completed",
           },
         ],
+      },
+    ]);
+  });
+
+  it("preserves the semantic group id when live deltas update a later grouped item", () => {
+    const started = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "notification_received",
+      notification: {
+        method: "turn/started",
+        params: {
+          turn: {
+            id: "turn_200",
+            status: "inProgress",
+          },
+        },
+      },
+    });
+
+    const withFirstItem = reduceCodexChatState(started, {
+      type: "notification_received",
+      notification: {
+        method: "item/completed",
+        params: {
+          turnId: "turn_200",
+          item: {
+            type: "commandExecution",
+            id: "cmd_1",
+            command: "sed -n '1,40p' app.ts",
+            aggregatedOutput: "export const App = () => null;",
+            cwd: "/workspace",
+            exitCode: 0,
+            status: "completed",
+            commandActions: [
+              {
+                type: "read",
+                command: "sed -n '1,40p' app.ts",
+                name: "app.ts",
+                path: "app.ts",
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const withSecondItemStarted = reduceCodexChatState(withFirstItem, {
+      type: "notification_received",
+      notification: {
+        method: "item/started",
+        params: {
+          turnId: "turn_200",
+          item: {
+            type: "commandExecution",
+            id: "cmd_2",
+            command: "rg App src",
+            cwd: "/workspace",
+            status: "inProgress",
+            commandActions: [
+              {
+                type: "search",
+                command: "rg App src",
+                query: "App",
+                path: "src",
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const initialGroup = withSecondItemStarted.entries[0];
+    if (initialGroup === undefined || initialGroup.kind !== "semantic-group") {
+      throw new Error("Expected an exploring semantic group.");
+    }
+
+    const withSecondItemDelta = reduceCodexChatState(withSecondItemStarted, {
+      type: "notification_received",
+      notification: {
+        method: "item/commandExecution/outputDelta",
+        params: {
+          turnId: "turn_200",
+          itemId: "cmd_2",
+          delta: "src/app.ts\n",
+        },
+      },
+    });
+
+    const updatedGroup = withSecondItemDelta.entries[0];
+    if (updatedGroup === undefined || updatedGroup.kind !== "semantic-group") {
+      throw new Error("Expected an exploring semantic group after delta.");
+    }
+
+    expect(initialGroup.id).toBe("turn_200:exploring:cmd_1");
+    expect(updatedGroup.id).toBe(initialGroup.id);
+    expect(updatedGroup.items).toEqual([
+      {
+        id: "cmd_1",
+        label: "Read",
+        detail: "app.ts",
+        detailKind: "code",
+        command: "sed -n '1,40p' app.ts",
+        output: "export const App = () => null;",
+        status: "completed",
+      },
+      {
+        id: "cmd_2",
+        label: "Search",
+        detail: "App",
+        detailKind: "plain",
+        command: "rg App src",
+        output: "src/app.ts\n",
+        status: "streaming",
       },
     ]);
   });

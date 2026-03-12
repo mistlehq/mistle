@@ -5,6 +5,7 @@ import {
   CodexStorySessionComposerProps,
   CodexStorySessionEntries,
   CodexStorySessionEntriesWithExploringGroup,
+  CodexStoryChatThreadEntriesWithStructuredPlan,
   CodexStoryChatThreadEntriesWithThinkingGroup,
   CodexStorySessionServerRequests,
 } from "../codex-client/codex-story-fixtures.js";
@@ -74,5 +75,11 @@ export const WithExploringGroup: Story = {
 export const WithThinkingGroup: Story = {
   args: {
     chatEntries: CodexStoryChatThreadEntriesWithThinkingGroup,
+  },
+};
+
+export const WithStructuredPlan: Story = {
+  args: {
+    chatEntries: CodexStoryChatThreadEntriesWithStructuredPlan,
   },
 };
