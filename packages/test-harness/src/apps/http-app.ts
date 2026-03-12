@@ -54,7 +54,7 @@ function traceHttpAppStartup(message: string): void {
   console.info(`[test-harness:http-app] ${message}`);
 }
 
-function createDefaultTelemetryEnvironment(): Record<string, string> {
+export function createDefaultTelemetryEnvironment(): Record<string, string> {
   return {
     MISTLE_GLOBAL_TELEMETRY_ENABLED: process.env.MISTLE_GLOBAL_TELEMETRY_ENABLED ?? "true",
     MISTLE_GLOBAL_TELEMETRY_DEBUG: process.env.MISTLE_GLOBAL_TELEMETRY_DEBUG ?? "false",

@@ -10,6 +10,7 @@ export type OpenWorkflowRuntime = {
 };
 
 let openWorkflowRuntimePromise: Promise<OpenWorkflowRuntime> | undefined;
+let closeOpenWorkflowRuntimePromise: Promise<void> | undefined;
 
 export function getOpenWorkflowRuntime(): Promise<OpenWorkflowRuntime> {
   if (openWorkflowRuntimePromise !== undefined) {
@@ -43,4 +44,28 @@ export function getOpenWorkflowRuntime(): Promise<OpenWorkflowRuntime> {
     });
 
   return openWorkflowRuntimePromise;
+}
+
+export async function closeOpenWorkflowRuntime(): Promise<void> {
+  const runtimePromise = openWorkflowRuntimePromise;
+  if (runtimePromise === undefined) {
+    return;
+  }
+
+  if (closeOpenWorkflowRuntimePromise !== undefined) {
+    await closeOpenWorkflowRuntimePromise;
+    return;
+  }
+
+  closeOpenWorkflowRuntimePromise = (async () => {
+    const runtime = await runtimePromise;
+    await runtime.backend.stop();
+    openWorkflowRuntimePromise = undefined;
+    closeOpenWorkflowRuntimePromise = undefined;
+  })().catch((error: unknown) => {
+    closeOpenWorkflowRuntimePromise = undefined;
+    throw error;
+  });
+
+  await closeOpenWorkflowRuntimePromise;
 }
