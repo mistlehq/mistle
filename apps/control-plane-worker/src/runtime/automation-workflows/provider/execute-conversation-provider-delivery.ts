@@ -1,8 +1,7 @@
 import {
   type ExecutedConversationProviderDelivery,
   type ExecuteConversationProviderDeliveryInput,
-} from "@mistle/workflows/control-plane/runtime";
-
+} from "../../workflow-types.js";
 import {
   AutomationConversationExecutionActions,
   AutomationConversationSteerRecoveryActions,

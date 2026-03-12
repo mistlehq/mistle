@@ -11,6 +11,7 @@ import {
 } from "@mistle/http/pagination";
 import { IntegrationResourceSelectionModes } from "@mistle/integrations-core";
 
+import { createRequireAuthSessionMiddleware } from "../middleware/require-auth-session.js";
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsConflictCodes,
@@ -240,6 +241,12 @@ export const IntegrationConnectionsForbiddenResponseSchema = z
   })
   .strict();
 
+const RedirectLocationHeaderSchema = z
+  .object({
+    Location: z.string().min(1),
+  })
+  .strict();
+
 export const CreateApiKeyConnectionParamsSchema = z
   .object({
     targetKey: z.string().min(1),
@@ -294,16 +301,27 @@ export const CompleteOAuthConnectionParamsSchema = z
   })
   .strict();
 
-export const CompleteOAuthConnectionBodySchema = z
+export const CompleteOAuthConnectionQuerySchema = z
   .object({
-    query: z.record(z.string(), z.string()),
+    state: z.string().min(1).optional(),
+    code: z.string().min(1).optional(),
+    error: z.string().min(1).optional(),
+    error_description: z.string().min(1).optional(),
+    error_uri: z.string().min(1).optional(),
+    installation_id: z.string().min(1).optional(),
+    setup_action: z.string().min(1).optional(),
   })
-  .strict();
+  .catchall(z.string());
+
+const ProtectedIntegrationConnectionsRouteMiddleware = [
+  createRequireAuthSessionMiddleware(),
+] satisfies [ReturnType<typeof createRequireAuthSessionMiddleware>];
 
 export const listIntegrationConnectionsRoute = createRoute({
   method: "get",
   path: "/",
   tags: ["Integrations"],
+  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
   request: {
     query: ListIntegrationConnectionsQuerySchema,
   },
@@ -355,6 +373,7 @@ export const listIntegrationConnectionResourcesRoute = createRoute({
   method: "get",
   path: "/:connectionId/resources",
   tags: ["Integrations"],
+  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
   request: {
     params: ListIntegrationConnectionResourcesParamsSchema,
     query: ListIntegrationConnectionResourcesQuerySchema,
@@ -373,22 +392,6 @@ export const listIntegrationConnectionResourcesRoute = createRoute({
       content: {
         "application/json": {
           schema: ListIntegrationConnectionsBadRequestResponseSchema,
-        },
-      },
-    },
-    401: {
-      description: "Authentication is required.",
-      content: {
-        "application/json": {
-          schema: IntegrationConnectionsUnauthorizedResponseSchema,
-        },
-      },
-    },
-    403: {
-      description: "Active organization is required.",
-      content: {
-        "application/json": {
-          schema: IntegrationConnectionsForbiddenResponseSchema,
         },
       },
     },
@@ -423,6 +426,7 @@ export const refreshIntegrationConnectionResourcesRoute = createRoute({
   method: "post",
   path: "/:connectionId/resources/:kind/refresh",
   tags: ["Integrations"],
+  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
   request: {
     params: RefreshIntegrationConnectionResourcesParamsSchema,
   },
@@ -482,6 +486,7 @@ export const createApiKeyConnectionRoute = createRoute({
   method: "post",
   path: "/:targetKey/api-key",
   tags: ["Integrations"],
+  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
   request: {
     params: CreateApiKeyConnectionParamsSchema,
     body: {
@@ -510,22 +515,6 @@ export const createApiKeyConnectionRoute = createRoute({
         },
       },
     },
-    401: {
-      description: "Authentication is required.",
-      content: {
-        "application/json": {
-          schema: IntegrationConnectionsUnauthorizedResponseSchema,
-        },
-      },
-    },
-    403: {
-      description: "Active organization is required.",
-      content: {
-        "application/json": {
-          schema: IntegrationConnectionsForbiddenResponseSchema,
-        },
-      },
-    },
     404: {
       description: "Integration target was not found.",
       content: {
@@ -549,6 +538,7 @@ export const updateIntegrationConnectionRoute = createRoute({
   method: "put",
   path: "/:connectionId",
   tags: ["Integrations"],
+  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
   request: {
     params: UpdateApiKeyConnectionParamsSchema,
     body: {
@@ -616,6 +606,7 @@ export const startOAuthConnectionRoute = createRoute({
   method: "post",
   path: "/:targetKey/oauth/start",
   tags: ["Integrations"],
+  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
   request: {
     params: StartOAuthConnectionParamsSchema,
     body: {
@@ -680,50 +671,23 @@ export const startOAuthConnectionRoute = createRoute({
 });
 
 export const completeOAuthConnectionRoute = createRoute({
-  method: "post",
+  method: "get",
   path: "/:targetKey/oauth/complete",
   tags: ["Integrations"],
   request: {
     params: CompleteOAuthConnectionParamsSchema,
-    body: {
-      required: true,
-      content: {
-        "application/json": {
-          schema: CompleteOAuthConnectionBodySchema,
-        },
-      },
-    },
+    query: CompleteOAuthConnectionQuerySchema,
   },
   responses: {
-    201: {
-      description: "Create an OAuth-backed integration connection from callback query params.",
-      content: {
-        "application/json": {
-          schema: IntegrationConnectionSchema,
-        },
-      },
+    302: {
+      description: "Complete OAuth connection creation and redirect to dashboard integrations.",
+      headers: RedirectLocationHeaderSchema,
     },
     400: {
       description: "Invalid request.",
       content: {
         "application/json": {
           schema: ListIntegrationConnectionsBadRequestResponseSchema,
-        },
-      },
-    },
-    401: {
-      description: "Authentication is required.",
-      content: {
-        "application/json": {
-          schema: IntegrationConnectionsUnauthorizedResponseSchema,
-        },
-      },
-    },
-    403: {
-      description: "Active organization is required.",
-      content: {
-        "application/json": {
-          schema: IntegrationConnectionsForbiddenResponseSchema,
         },
       },
     },

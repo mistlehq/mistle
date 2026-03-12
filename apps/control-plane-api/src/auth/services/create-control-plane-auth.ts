@@ -1,11 +1,11 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { ControlPlaneDbSchema } from "@mistle/db/control-plane";
-import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP, organization } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 
+import type { createControlPlaneOpenWorkflow } from "../../openworkflow/index.js";
 import { AUTH_ROUTE_BASE_PATH } from "../constants.js";
 import { applyActiveOrganizationToSession } from "./apply-active-organization-to-session.js";
 import { createInitialOrganizationCredentialKey } from "./create-initial-organization-credential-key.js";
@@ -14,7 +14,7 @@ import { createSendVerificationOTPService } from "./create-send-verification-otp
 
 export type ControlPlaneAuthConfig = {
   authBaseUrl: string;
-  authInvitationAcceptBaseUrl: string;
+  dashboardBaseUrl: string;
   authSecret: string;
   authTrustedOrigins: string[];
   authOTPLength: number;
@@ -40,7 +40,7 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
   });
   const sendOrganizationInvitation = createSendOrganizationInvitationService({
     openWorkflow,
-    invitationAcceptBaseUrl: config.authInvitationAcceptBaseUrl,
+    dashboardBaseUrl: config.dashboardBaseUrl,
   });
 
   return betterAuth({

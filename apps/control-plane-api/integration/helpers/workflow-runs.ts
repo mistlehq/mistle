@@ -1,5 +1,6 @@
-import { ControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 import { Pool } from "pg";
+
+import { ControlPlaneOpenWorkflowSchema } from "../../src/openworkflow/index.js";
 
 type CountControlPlaneWorkflowRunsInput = {
   databaseUrl: string;
@@ -37,7 +38,7 @@ export async function countControlPlaneWorkflowRuns(
     const queryResult = await pool.query<{ run_count: number | string }>(
       `
         select count(*)::int as run_count
-        from ${ControlPlaneOpenWorkflow.SCHEMA}.workflow_runs wr
+        from ${ControlPlaneOpenWorkflowSchema}.workflow_runs wr
         where ${whereClauses.join(" and ")}
       `,
       values,

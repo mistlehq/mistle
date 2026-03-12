@@ -1,7 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
   "include": [
-    "openworkflow.config.ts",
     "src/**/*.ts",
     "src/**/*.tsx",
     "workflows/**/*.ts",

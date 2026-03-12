@@ -9,7 +9,7 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import type {
   HandleIntegrationWebhookEventWorkflowInput,
   HandleIntegrationWebhookEventWorkflowOutput,
-} from "@mistle/workflows/control-plane";
+} from "@mistle/workflow-registry/control-plane";
 import { eq, sql } from "drizzle-orm";
 
 import { resolveWebhookAutomationTargets } from "./resolve-webhook-automation-targets.js";

@@ -26,6 +26,10 @@ import {
   MigrationTracking,
   runControlPlaneMigrations,
 } from "@mistle/db/migrator";
+import { eq } from "drizzle-orm";
+import { Pool } from "pg";
+import { describe, expect } from "vitest";
+
 import {
   AutomationConversationPersistenceErrorCodes,
   claimAutomationConversation,
@@ -37,11 +41,7 @@ import {
   idleAutomationConversationDeliveryProcessorIfEmpty,
   markAutomationConversationDeliveryTaskDelivering,
   resolveAutomationConversationDeliveryTaskAction,
-} from "@mistle/workflows/control-plane/runtime";
-import { eq } from "drizzle-orm";
-import { Pool } from "pg";
-import { describe, expect } from "vitest";
-
+} from "../src/runtime/workflows/index.js";
 import { it } from "./test-context.js";
 
 async function createTestDatabase(input: { databaseUrl: string }) {

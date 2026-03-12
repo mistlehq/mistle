@@ -212,6 +212,7 @@ describe("sandboxInstances.start integration", () => {
       organizationId: "org_dp_api_integration_idempotent",
       sandboxProfileId,
       sandboxProfileVersion: 11,
+      idempotencyKey: "dashboard-start-001",
       runtimePlan: createRuntimePlan({
         sandboxProfileId,
         version: 11,

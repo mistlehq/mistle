@@ -115,7 +115,11 @@ export const SandboxProfileVersionParamsSchema = z
   })
   .strict();
 
-export const StartSandboxProfileInstanceBodySchema = z.object({}).strict();
+export const StartSandboxProfileInstanceBodySchema = z
+  .object({
+    idempotencyKey: z.string().min(1).max(255).optional(),
+  })
+  .strict();
 
 const BadRequestCodeSchema = z.enum([
   SandboxProfilesBadRequestCodes.INVALID_LIST_PROFILES_INPUT,

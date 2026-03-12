@@ -1,11 +1,11 @@
+import { describe, expect, it } from "vitest";
+
 import {
   AutomationConversationDeliverySandboxActions,
   AutomationConversationRouteBindingActions,
   resolveAutomationConversationDeliverySandboxAction,
   resolveAutomationConversationRouteBindingAction,
-} from "@mistle/workflows/control-plane/runtime";
-import { describe, expect, it } from "vitest";
-
+} from "../../workflows/index.js";
 import {
   AutomationConversationExecutionActions,
   AutomationConversationSteerRecoveryActions,

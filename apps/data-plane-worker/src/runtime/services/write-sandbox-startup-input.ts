@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import type { SandboxAdapter, SandboxHandle } from "@mistle/sandbox";
-import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflows/data-plane";
+import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
 import {

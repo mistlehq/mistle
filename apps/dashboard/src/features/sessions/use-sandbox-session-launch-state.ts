@@ -112,6 +112,7 @@ export function useSandboxSessionLaunchState(): UseSandboxSessionLaunchStateResu
         return await startSandboxInstanceFromProfileVersion({
           profileId: input.profileId,
           profileVersion: input.profileVersion,
+          idempotencyKey: crypto.randomUUID(),
         });
       } catch (error) {
         throw describeStepError("Starting sandbox instance", error);

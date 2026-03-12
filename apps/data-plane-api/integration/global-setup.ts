@@ -9,8 +9,9 @@ import {
   removeTestContext,
   writeTestContext,
 } from "@mistle/test-harness";
-import { createDataPlaneBackend } from "@mistle/workflows/data-plane";
 import { Client as PgClient } from "pg";
+
+import { createDataPlaneBackend } from "../src/openworkflow/index.js";
 
 const SHARED_INFRA_KEY = DEFAULT_SHARED_INTEGRATION_INFRA_KEY;
 const TEMPLATE_DATABASE_NAME = "mistle_data_plane_api_it_template";

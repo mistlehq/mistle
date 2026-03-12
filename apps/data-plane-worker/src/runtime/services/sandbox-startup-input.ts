@@ -1,4 +1,4 @@
-import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflows/data-plane";
+import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
 const Encoder = new TextEncoder();
 
