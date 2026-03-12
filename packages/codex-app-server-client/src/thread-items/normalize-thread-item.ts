@@ -1,12 +1,9 @@
+import { isRecord } from "../shared/is-record.js";
 import type {
   NormalizedCodexThreadItem,
   NormalizedCommandAction,
   NormalizedFileChange,
 } from "./types.js";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function readOptionalString(record: Record<string, unknown>, key: string): string | null {
   const value = record[key];
