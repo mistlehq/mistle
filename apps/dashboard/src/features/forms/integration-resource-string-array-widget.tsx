@@ -11,6 +11,7 @@ import {
 } from "../integrations/integrations-service.js";
 import { formatDateTime } from "../shared/date-formatters.js";
 import type { IntegrationFormContext } from "./integration-form-context.js";
+import { buildIntegrationResourceWidgetViewModel } from "./integration-resource-string-array-widget-view-model.js";
 import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
 
 type JsonObject = Record<string, unknown>;
@@ -138,54 +139,6 @@ function formatSyncMetadata(input: {
   }
 
   return `Last synced ${input.lastSyncedAt}`;
-}
-
-function formatSearchPlaceholder(input: {
-  title: string | undefined;
-  availableCount: number | undefined;
-}): string {
-  if (input.availableCount === undefined) {
-    return `Search ${input.title ?? "resources"}`;
-  }
-
-  const pluralLabel = input.title ?? "resources";
-  const singularLabel =
-    pluralLabel === "Repositories"
-      ? "Repository"
-      : pluralLabel === "repositories"
-        ? "repository"
-        : pluralLabel === "Resources"
-          ? "Resource"
-          : pluralLabel === "resources"
-            ? "resource"
-            : pluralLabel;
-  const resourceLabel = input.availableCount === 1 ? singularLabel : pluralLabel;
-
-  return `Search ${input.availableCount} ${resourceLabel.toLowerCase()}`;
-}
-
-function formatRefreshTooltip(input: {
-  refreshLabel: string;
-  syncMetadata: string | null;
-}): string {
-  return input.syncMetadata === null
-    ? input.refreshLabel
-    : `${input.refreshLabel}\n${input.syncMetadata}`;
-}
-
-function resolveEmptyMessage(input: {
-  syncState: string | undefined;
-  emptyMessage: string | undefined;
-}): string {
-  if (input.emptyMessage !== undefined) {
-    return input.emptyMessage;
-  }
-
-  if (input.syncState === "never-synced") {
-    return "Connection has not been synced yet. Use refresh to sync.";
-  }
-
-  return "No accessible resources found for this connection.";
 }
 
 function resolveResourceOverride(input: {
@@ -340,20 +293,42 @@ export function IntegrationResourceStringArrayWidget(
     resourceOverride?.items.length ??
     resourceQuery.data?.items.length ??
     options.resourceSummary?.count;
-  const searchPlaceholder =
-    options.searchPlaceholder ?? formatSearchPlaceholder({ title: options.title, availableCount });
-  const emptyMessage = resolveEmptyMessage({
-    syncState,
-    emptyMessage: options.emptyMessage,
-  });
-  const refreshTooltip = formatRefreshTooltip({
+  const widgetViewModel = buildIntegrationResourceWidgetViewModel({
+    title: options.title,
+    availableCount,
     refreshLabel,
     syncMetadata: formattedSyncMetadata,
+    syncState,
+    emptyMessage: options.emptyMessage,
+    search,
+    selectedCount: selectedHandles.length,
+    refreshErrorMessage,
+    unavailableSelectedHandles,
+    unavailableSelectedHandlesCount: unavailableSelectedHandles.length,
+    listState:
+      resourceOverride !== undefined
+        ? {
+            mode: "ready",
+          }
+        : resourceQuery.isPending
+          ? {
+              mode: "loading",
+            }
+          : resourceQuery.isError
+            ? {
+                mode: "error",
+                message:
+                  resourceListErrorMessage ?? "Could not load resources for this connection.",
+              }
+            : {
+                mode: "ready",
+              },
+    visibleItemsCount: visibleItems.length,
   });
 
   return (
     <IntegrationResourceStringArrayWidgetView
-      emptyMessage={emptyMessage}
+      emptyMessage={widgetViewModel.emptyMessage}
       id={props.id}
       isRefreshing={refreshMutation.isPending}
       label={props.label}
@@ -389,9 +364,9 @@ export function IntegrationResourceStringArrayWidget(
       onToggleHandle={toggleHandle}
       refreshErrorMessage={refreshErrorMessage}
       refreshLabel={refreshLabel}
-      refreshTooltip={refreshTooltip}
+      refreshTooltip={widgetViewModel.refreshTooltip}
       search={search}
-      searchPlaceholder={searchPlaceholder}
+      searchPlaceholder={widgetViewModel.searchPlaceholder}
       selectedHandles={selectedHandles}
       unavailableSelectedHandles={unavailableSelectedHandles}
       visibleItems={visibleItems}

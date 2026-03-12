@@ -2,19 +2,10 @@ import { Button, Input, ScrollArea } from "@mistle/ui";
 import { ArrowClockwiseIcon } from "@phosphor-icons/react";
 
 import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
-
-export type IntegrationResourceListViewState =
-  | {
-      mode: "loading";
-    }
-  | {
-      mode: "error";
-      message: string;
-    }
-  | {
-      mode: "ready";
-      items: readonly IntegrationConnectionResource[];
-    };
+import {
+  buildIntegrationResourceWidgetViewModel,
+  type IntegrationResourceListViewState,
+} from "./integration-resource-string-array-widget-view-model.js";
 
 export type IntegrationResourceStringArrayWidgetViewProps = {
   id: string;
@@ -73,11 +64,26 @@ function IntegrationResourceMessageSection(input: {
 export function IntegrationResourceStringArrayWidgetView(
   props: IntegrationResourceStringArrayWidgetViewProps,
 ): React.JSX.Element {
-  const hasVisibleItems = props.visibleItems.length > 0;
-  const selectedCountLabel =
-    props.selectedHandles.length === 1
-      ? "1 selected"
-      : `${String(props.selectedHandles.length)} selected`;
+  const viewModel = buildIntegrationResourceWidgetViewModel({
+    title: undefined,
+    availableCount: undefined,
+    refreshLabel: props.refreshLabel,
+    syncMetadata: null,
+    syncState: undefined,
+    emptyMessage: props.emptyMessage,
+    search: props.search,
+    selectedCount: props.selectedHandles.length,
+    refreshErrorMessage: props.refreshErrorMessage,
+    unavailableSelectedHandles: props.unavailableSelectedHandles,
+    unavailableSelectedHandlesCount: props.unavailableSelectedHandles.length,
+    listState:
+      props.listState.mode === "ready"
+        ? { mode: "ready" }
+        : props.listState.mode === "loading"
+          ? { mode: "loading" }
+          : { mode: "error", message: props.listState.message },
+    visibleItemsCount: props.visibleItems.length,
+  });
 
   return (
     <div className="gap-3 flex flex-col">
@@ -109,52 +115,36 @@ export function IntegrationResourceStringArrayWidgetView(
           />
         </Button>
       </div>
-      {props.refreshErrorMessage === null &&
-      props.unavailableSelectedHandles.length === 0 &&
-      (hasVisibleItems || props.listState.mode === "loading") ? null : (
+      {viewModel.messageSections.length > 0 ? (
         <div className="overflow-hidden rounded-md border">
           <div className="divide-y">
-            {props.refreshErrorMessage === null ? null : (
+            {viewModel.messageSections.map((section) => (
               <IntegrationResourceMessageSection
-                detail="Please try again."
-                message="Refresh failed."
-                tone="destructive"
-              />
-            )}
-
-            {props.unavailableSelectedHandles.length === 0 ? null : (
-              <IntegrationResourceMessageSection
-                message="The selected resources are no longer available:"
-                tone="destructive"
+                detail={section.detail}
+                key={`${section.tone}:${section.message}`}
+                message={section.message}
+                tone={section.tone}
               >
-                <ul className="text-destructive/80 list-disc pl-5 text-sm">
-                  {props.unavailableSelectedHandles.map((handle) => (
-                    <li key={handle}>{handle}</li>
-                  ))}
-                </ul>
+                {section.items === undefined ? null : (
+                  <ul className="text-destructive/80 list-disc pl-5 text-sm">
+                    {section.items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                )}
               </IntegrationResourceMessageSection>
-            )}
-
-            {props.listState.mode === "error" ? (
-              <IntegrationResourceMessageSection
-                detail="Try again. If this keeps failing, reconnect the integration."
-                message="Sync failed. Only showing last synced results."
-                tone="destructive"
-              />
-            ) : props.visibleItems.length === 0 ? (
-              <IntegrationResourceMessageSection message={props.emptyMessage} tone="default" />
-            ) : null}
+            ))}
           </div>
         </div>
-      )}
+      ) : null}
 
-      {hasVisibleItems ? (
+      {viewModel.hasVisibleItems ? (
         <div className="overflow-hidden rounded-md border">
-          {props.selectedHandles.length > 0 ? (
+          {viewModel.selectedCountLabel === null ? null : (
             <div className="text-muted-foreground border-b px-3 py-2 text-xs">
-              {selectedCountLabel}
+              {viewModel.selectedCountLabel}
             </div>
-          ) : null}
+          )}
           <ScrollArea className="h-56">
             {props.visibleItems.map((resource) => {
               const isSelected = props.selectedHandles.includes(resource.handle);

@@ -1,17 +1,15 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
 import type React from "react";
 
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
+import { useIntegrationResourceStringArrayWidgetStoryState } from "./integration-resource-string-array-widget-story-harness.js";
+import { RepositoryItems } from "./integration-resource-string-array-widget-story-support.js";
 import {
-  RepositoryItems,
-  filterRepositoryItems,
-} from "./integration-resource-string-array-widget-story-support.js";
-import {
-  IntegrationResourceStringArrayWidgetView,
+  buildIntegrationResourceWidgetViewModel,
   type IntegrationResourceListViewState,
-} from "./integration-resource-string-array-widget-view.js";
+} from "./integration-resource-string-array-widget-view-model.js";
+import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
 
 function createReadyState(
   items: readonly IntegrationConnectionResource[],
@@ -56,29 +54,27 @@ export const Ready: Story = {};
 
 export const InteractiveSelection: Story = {
   render: function RenderStory(args): React.JSX.Element {
-    const [search, setSearch] = useState("");
-    const [selectedHandles, setSelectedHandles] = useState<readonly string[]>([
-      "mistle/main-dashboard",
-      "mistle/control-plane-api",
-    ]);
-
-    const visibleItems = filterRepositoryItems(RepositoryItems, search);
+    const storyState = useIntegrationResourceStringArrayWidgetStoryState({
+      items: RepositoryItems,
+      title: "Repositories",
+      refreshLabel: args.refreshLabel,
+      syncMetadata: "Last synced Mar 9, 2026, 12:00 PM",
+      emptyMessage: "No repositories available for this connection.",
+      initialSelectedHandles: ["mistle/main-dashboard", "mistle/control-plane-api"],
+    });
 
     return (
       <IntegrationResourceStringArrayWidgetView
         {...args}
-        listState={createReadyState(visibleItems)}
-        onSearchChange={setSearch}
-        onToggleHandle={(handle) => {
-          setSelectedHandles((current) =>
-            current.includes(handle)
-              ? current.filter((selectedHandle) => selectedHandle !== handle)
-              : [...current, handle],
-          );
-        }}
-        search={search}
-        selectedHandles={selectedHandles}
-        visibleItems={visibleItems}
+        emptyMessage={storyState.viewModel.emptyMessage}
+        listState={createReadyState(storyState.visibleItems)}
+        onSearchChange={storyState.setSearch}
+        onToggleHandle={storyState.toggleHandle}
+        search={storyState.search}
+        searchPlaceholder={storyState.viewModel.searchPlaceholder}
+        selectedHandles={storyState.selectedHandles}
+        visibleItems={storyState.visibleItems}
+        refreshTooltip={storyState.viewModel.refreshTooltip}
       />
     );
   },

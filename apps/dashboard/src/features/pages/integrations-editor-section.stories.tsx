@@ -1,97 +1,23 @@
-import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
 import type React from "react";
 
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
 import {
-  createGithubRepositoryResources,
-  RepositoryItems,
-} from "../forms/integration-resource-string-array-widget-story-support.js";
-import type {
-  IntegrationConnectionSummary,
-  IntegrationTargetSummary,
-  SandboxProfileBindingEditorRow,
-} from "./sandbox-profile-binding-config-editor.js";
+  createIntegrationsEditorSectionStoryQueryClient,
+  StoryGithubConnection,
+  StoryGithubResources,
+  StoryIntegrationConnections,
+  StoryIntegrationTargets,
+  StoryOpenAiConnection,
+} from "./integrations-editor-section-story-support.js";
+import type { SandboxProfileBindingEditorRow } from "./sandbox-profile-binding-config-editor.js";
 import { IntegrationsEditorSection } from "./sandbox-profile-editor-page.js";
-
-function createQueryClient(): QueryClient {
-  return new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-        staleTime: Number.POSITIVE_INFINITY,
-      },
-    },
-  });
-}
-
-const OpenAiTarget: IntegrationTargetSummary = {
-  targetKey: "target-openai",
-  displayName: "OpenAI",
-  familyId: "openai",
-  variantId: "openai-default",
-  config: {
-    api_base_url: "https://api.openai.com",
-    binding_capabilities: createOpenAiRawBindingCapabilities(),
-  },
-  targetHealth: {
-    configStatus: "valid",
-  },
-};
-
-const OpenAiConnection: IntegrationConnectionSummary = {
-  id: "connection-openai",
-  displayName: "Primary OpenAI Workspace",
-  targetKey: OpenAiTarget.targetKey,
-  status: "active",
-  config: {
-    auth_scheme: "api-key",
-  },
-};
-
-const GithubTarget: IntegrationTargetSummary = {
-  targetKey: "target-github",
-  displayName: "GitHub",
-  familyId: "github",
-  variantId: "github-cloud",
-  config: {
-    api_base_url: "https://api.github.com",
-    web_base_url: "https://github.com",
-  },
-  targetHealth: {
-    configStatus: "valid",
-  },
-};
-
-const GithubConnection: IntegrationConnectionSummary = {
-  id: "connection-github",
-  displayName: "GitHub Production",
-  targetKey: GithubTarget.targetKey,
-  status: "active",
-  resources: [
-    {
-      kind: "repository",
-      selectionMode: "multi",
-      count: 24,
-      syncState: "ready",
-      lastSyncedAt: "2026-03-09T12:00:00.000Z",
-    },
-  ],
-  config: {
-    auth_scheme: "oauth",
-  },
-};
-
-const GithubResources = createGithubRepositoryResources({
-  connectionId: GithubConnection.id,
-  items: RepositoryItems,
-});
 
 function IntegrationsEditorSectionStory(): React.JSX.Element {
   const [queryClient] = useState(() => {
-    const client = createQueryClient();
+    const client = createIntegrationsEditorSectionStoryQueryClient();
     return client;
   });
   const [rows, setRows] = useState<readonly SandboxProfileBindingEditorRow[]>([]);
@@ -99,8 +25,8 @@ function IntegrationsEditorSectionStory(): React.JSX.Element {
   return (
     <QueryClientProvider client={queryClient}>
       <IntegrationsEditorSection
-        availableConnections={[OpenAiConnection, GithubConnection]}
-        availableTargets={[OpenAiTarget, GithubTarget]}
+        availableConnections={StoryIntegrationConnections}
+        availableTargets={StoryIntegrationTargets}
         integrationBindingsQuery={{
           isError: false,
           error: null,
@@ -117,7 +43,7 @@ function IntegrationsEditorSectionStory(): React.JSX.Element {
         integrationSaveSuccess={false}
         isSavingIntegrationBindings={false}
         bindingFormContext={{
-          resourceOverrides: [GithubResources],
+          resourceOverrides: [StoryGithubResources],
         }}
         onAddIntegrationBindingRow={async (input) => {
           setRows((currentRows) => [
@@ -140,7 +66,7 @@ function IntegrationsEditorSectionStory(): React.JSX.Element {
           setRows((currentRows) => currentRows.filter((row) => row.clientId !== clientId));
         }}
         resolveSelectedConnectionDisplayName={(row) =>
-          [OpenAiConnection, GithubConnection].find(
+          [StoryOpenAiConnection, StoryGithubConnection].find(
             (connection) => connection.id === row.connectionId,
           )?.displayName
         }
