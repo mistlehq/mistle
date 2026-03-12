@@ -203,10 +203,11 @@ describe("tokenizer proxy integration", () => {
 
     try {
       const response = await fetch(
-        `http://${host}:${String(port)}/tokenizer-proxy/egress/routes/route_123/v1/responses`,
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/v1/responses`,
         {
           method: "POST",
           headers: {
+            [EgressRequestHeaders.ROUTE_ID]: "route_123",
             [EgressRequestHeaders.UPSTREAM_BASE_URL]: "https://api.example.com",
             [EgressRequestHeaders.BINDING_ID]: "ibd_missing",
             [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "bearer",
@@ -254,10 +255,11 @@ describe("tokenizer proxy integration", () => {
 
     try {
       const response = await fetch(
-        `http://${host}:${String(port)}/tokenizer-proxy/egress/routes/route_git/mistlehq/mistle.git/info/refs?service=git-upload-pack`,
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/mistlehq/mistle.git/info/refs?service=git-upload-pack`,
         {
           method: "GET",
           headers: {
+            [EgressRequestHeaders.ROUTE_ID]: "route_git",
             [EgressRequestHeaders.UPSTREAM_BASE_URL]: upstreamEchoService.baseUrl,
             [EgressRequestHeaders.BINDING_ID]: "ibd_github",
             [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "basic",
@@ -298,7 +300,7 @@ describe("tokenizer proxy integration", () => {
     }
   });
 
-  it("supports the header-addressed egress endpoint without a route-shaped request path", async () => {
+  it("supports the header-addressed egress endpoint", async () => {
     const upstreamEchoService = await startHttpEcho();
     const controlPlaneServer = await startControlPlaneCredentialServer({
       host: "127.0.0.1",
@@ -399,10 +401,11 @@ describe("tokenizer proxy integration", () => {
 
     try {
       const response = await fetch(
-        `http://${host}:${String(port)}/tokenizer-proxy/egress/routes/route_graphql/graphql`,
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/graphql`,
         {
           method: "POST",
           headers: {
+            [EgressRequestHeaders.ROUTE_ID]: "route_graphql",
             [EgressRequestHeaders.UPSTREAM_BASE_URL]: upstreamService.baseUrl,
             [EgressRequestHeaders.BINDING_ID]: "ibd_github",
             [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "bearer",

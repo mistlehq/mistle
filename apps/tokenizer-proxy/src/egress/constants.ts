@@ -1,6 +1,5 @@
 export const EGRESS_BASE_PATH = "/tokenizer-proxy/egress";
 export const EGRESS_WILDCARD_BASE_PATH = "/tokenizer-proxy/egress/*";
-export const LEGACY_EGRESS_ROUTE_BASE_PATH = "/tokenizer-proxy/egress/routes/:routeId/*";
 
 export const EgressRequestHeaders = {
   ROUTE_ID: "X-Mistle-Egress-Route-Id",

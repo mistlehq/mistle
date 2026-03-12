@@ -11,7 +11,7 @@ describe("tokenizer proxy egress telemetry helpers", () => {
       createEgressTelemetryBaseAttributes({
         routeId: "ert_github_graphql",
         method: "POST",
-        requestPath: "/tokenizer-proxy/egress/routes/ert_github_graphql/graphql",
+        requestPath: "/tokenizer-proxy/egress/graphql",
         bindingId: "ibd_github",
         connectionId: "icn_github",
       }),
@@ -20,7 +20,7 @@ describe("tokenizer proxy egress telemetry helpers", () => {
       "mistle.integration.binding_id": "ibd_github",
       "mistle.integration.connection_id": "icn_github",
       "http.request.method": "POST",
-      "url.path": "/tokenizer-proxy/egress/routes/ert_github_graphql/graphql",
+      "url.path": "/tokenizer-proxy/egress/graphql",
     });
   });
 
