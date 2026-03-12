@@ -1,6 +1,7 @@
 package integration
 
 import (
+	"compress/gzip"
 	"crypto/tls"
 	"crypto/x509"
 	"io"
@@ -240,6 +241,81 @@ func TestProxyMediation(t *testing.T) {
 		}
 	})
 
+	t.Run("re-originates unmatched compressed https traffic without stale encoding headers", func(t *testing.T) {
+		tokenizerProxyRequests := 0
+		tokenizerProxyServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			tokenizerProxyRequests++
+			writer.WriteHeader(http.StatusInternalServerError)
+		}))
+		defer tokenizerProxyServer.Close()
+
+		upstreamServer := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if request.URL.Path != "/packages/mistle" {
+				t.Fatalf("expected upstream path /packages/mistle, got %s", request.URL.Path)
+			}
+
+			writer.Header().Set("Content-Type", "application/json")
+			writer.Header().Set("Content-Encoding", "gzip")
+			writer.WriteHeader(http.StatusOK)
+
+			gzipWriter := gzip.NewWriter(writer)
+			if _, err := io.WriteString(gzipWriter, `{"name":"mistle"}`); err != nil {
+				t.Fatalf("expected gzip body write to succeed, got %v", err)
+			}
+			if err := gzipWriter.Close(); err != nil {
+				t.Fatalf("expected gzip writer close to succeed, got %v", err)
+			}
+		}))
+		defer upstreamServer.Close()
+
+		certificateAuthority, rootPool := mustProxyAuthorityAndRootPool(t)
+		handler := mustProxyHandler(
+			t,
+			mustProxyHandlerInput{
+				runtimePlan:                 buildProxyMediationRuntimePlan(),
+				tokenizerProxyEgressBaseURL: tokenizerProxyServer.URL + "/tokenizer-proxy/egress",
+				certificateAuthority:        certificateAuthority,
+				httpClient:                  httpclient.NewDirectClient(upstreamServer.Client()),
+			},
+		)
+
+		proxyServer := httptest.NewServer(handler)
+		defer proxyServer.Close()
+
+		client := &http.Client{
+			Transport: &http.Transport{
+				Proxy: mustProxyURL(t, proxyServer.URL),
+				TLSClientConfig: &tls.Config{
+					RootCAs: rootPool,
+				},
+			},
+		}
+
+		response, err := client.Get(upstreamServer.URL + "/packages/mistle")
+		if err != nil {
+			t.Fatalf("expected unmatched https request to succeed, got %v", err)
+		}
+		defer response.Body.Close()
+
+		responseBody, err := io.ReadAll(response.Body)
+		if err != nil {
+			t.Fatalf("expected unmatched https response body read to succeed, got %v", err)
+		}
+
+		if tokenizerProxyRequests != 0 {
+			t.Fatalf("expected unmatched https request to bypass tokenizer proxy, got %d tokenizer requests", tokenizerProxyRequests)
+		}
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("expected upstream status 200, got %d", response.StatusCode)
+		}
+		if response.Header.Get("Content-Encoding") != "" {
+			t.Fatalf("expected transparently decompressed response to omit content-encoding, got %q", response.Header.Get("Content-Encoding"))
+		}
+		if string(responseBody) != `{"name":"mistle"}` {
+			t.Fatalf("unexpected upstream body %s", string(responseBody))
+		}
+	})
+
 	t.Run("fails closed when multiple routes match the same request", func(t *testing.T) {
 		runtimePlan := buildProxyMediationRuntimePlan()
 		runtimePlan.EgressRoutes = append(runtimePlan.EgressRoutes, startup.EgressCredentialRoute{
@@ -305,22 +381,28 @@ type mustProxyHandlerInput struct {
 	runtimePlan                 startup.RuntimePlan
 	tokenizerProxyEgressBaseURL string
 	certificateAuthority        *proxy.CertificateAuthority
+	httpClient                  *http.Client
 }
 
 func mustProxyHandler(t *testing.T, input mustProxyHandlerInput) http.Handler {
 	t.Helper()
 
+	handlerHTTPClient := input.httpClient
+	if handlerHTTPClient == nil {
+		handlerHTTPClient = httpclient.NewDirectClient(http.DefaultClient)
+	}
+
 	integrationMediator, err := egress.NewProxyMediator(egress.NewProxyMediatorInput{
 		RuntimePlan:                 input.runtimePlan,
 		TokenizerProxyEgressBaseURL: input.tokenizerProxyEgressBaseURL,
-		HTTPClient:                  httpclient.NewDirectClient(http.DefaultClient),
+		HTTPClient:                  handlerHTTPClient,
 	})
 	if err != nil {
 		t.Fatalf("expected proxy mediator creation to succeed, got %v", err)
 	}
 
 	handler, err := proxy.NewHandler(proxy.NewHandlerInput{
-		HTTPClient:           httpclient.NewDirectClient(http.DefaultClient),
+		HTTPClient:           handlerHTTPClient,
 		CertificateAuthority: input.certificateAuthority,
 		IntegrationMediator:  integrationMediator,
 	})
