@@ -24,7 +24,7 @@
     "@hono/zod-openapi": "^1.2.2",
     "@mistle/config": "workspace:*",
     "@mistle/control-plane-internal-client": "workspace:*",
-    "@mistle/data-plane-trpc": "workspace:*",
+    "@mistle/data-plane-internal-client": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/emails": "workspace:*",
     "@mistle/gateway-connection-auth": "workspace:*",

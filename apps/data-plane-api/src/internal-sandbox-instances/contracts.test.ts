@@ -1,7 +1,7 @@
 import { CompiledRuntimePlanSchema, assembleCompiledRuntimePlan } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { StartSandboxInstanceInputValidationSchema } from "./index.js";
+import { StartSandboxInstanceInputValidationSchema } from "./contracts.js";
 
 function createRuntimePlan() {
   return assembleCompiledRuntimePlan({
@@ -94,7 +94,7 @@ describe("StartSandboxInstanceInputValidationSchema", () => {
     expect(StartSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
   });
 
-  it("accepts omitted start request ids for server-generated fallbacks", () => {
+  it("accepts omitted start request ids for server-generated defaults", () => {
     const input = {
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",

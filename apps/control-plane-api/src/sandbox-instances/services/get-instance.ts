@@ -1,4 +1,4 @@
-import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 
 import { SandboxInstancesNotFoundCodes, SandboxInstancesNotFoundError } from "./errors.js";
 import type { SandboxInstanceStatus } from "./types.js";

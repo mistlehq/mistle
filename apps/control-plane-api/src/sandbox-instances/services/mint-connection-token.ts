@@ -1,9 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import {
-  DataPlaneSandboxInstanceStatuses,
-  type DataPlaneSandboxInstancesClient,
-} from "@mistle/data-plane-trpc";
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { mintConnectionToken as mintGatewayConnectionToken } from "@mistle/gateway-connection-auth";
 
 import {
@@ -62,7 +59,7 @@ export async function mintConnectionToken(
     );
   }
 
-  if (sandboxInstance.status !== DataPlaneSandboxInstanceStatuses.RUNNING) {
+  if (sandboxInstance.status !== "running") {
     throw new SandboxInstancesConflictError(
       SandboxInstancesConflictCodes.INSTANCE_NOT_RUNNING,
       `Sandbox instance '${sandboxInstance.id}' is not running.`,

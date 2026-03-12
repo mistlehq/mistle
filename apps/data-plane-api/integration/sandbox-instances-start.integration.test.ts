@@ -1,9 +1,9 @@
-import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
-import { DATA_PLANE_INTERNAL_AUTH_HEADER } from "@mistle/data-plane-trpc/constants";
-import type { StartSandboxInstanceInput } from "@mistle/data-plane-trpc/contracts";
+import {
+  createDataPlaneSandboxInstancesClient,
+  type StartSandboxInstanceInput,
+} from "@mistle/data-plane-internal-client";
 import { SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { systemSleeper } from "@mistle/time";
-import { httpBatchLink } from "@trpc/client";
 import { describe, expect } from "vitest";
 import { z } from "zod";
 
@@ -53,58 +53,10 @@ function createRuntimePlan(input: {
 function createSandboxInstancesClient(
   baseUrl: string,
   serviceToken: string,
-  requestTimeoutMs?: number,
 ): ReturnType<typeof createDataPlaneSandboxInstancesClient> {
   return createDataPlaneSandboxInstancesClient({
     baseUrl,
     serviceToken,
-    ...(requestTimeoutMs === undefined
-      ? {}
-      : {
-          links: [
-            httpBatchLink({
-              url: new URL("/trpc", baseUrl).toString(),
-              headers: {
-                [DATA_PLANE_INTERNAL_AUTH_HEADER]: serviceToken,
-              },
-              fetch: async (url, options) => {
-                const controller = new AbortController();
-                let requestCompleted = false;
-
-                void systemSleeper.sleep(requestTimeoutMs).then(() => {
-                  if (!requestCompleted) {
-                    controller.abort();
-                  }
-                });
-
-                const requestInit: RequestInit = {
-                  ...(options?.body === undefined
-                    ? {}
-                    : {
-                        body: options.body,
-                      }),
-                  ...(options?.headers === undefined
-                    ? {}
-                    : {
-                        headers: options.headers,
-                      }),
-                  ...(options?.method === undefined
-                    ? {}
-                    : {
-                        method: options.method,
-                      }),
-                  signal: controller.signal,
-                };
-
-                try {
-                  return await fetch(url, requestInit);
-                } finally {
-                  requestCompleted = true;
-                }
-              },
-            }),
-          ],
-        }),
   });
 }
 
@@ -131,11 +83,7 @@ async function waitForWorkflowRuns(input: {
 
 describe("sandboxInstances.start integration", () => {
   it("returns an accepted start response and queues a workflow run", async ({ fixture }) => {
-    const client = createSandboxInstancesClient(
-      fixture.baseUrl,
-      fixture.internalAuthServiceToken,
-      1_000,
-    );
+    const client = createSandboxInstancesClient(fixture.baseUrl, fixture.internalAuthServiceToken);
     const sandboxProfileId = "sbp_dp_api_integration_001";
     const workflowInput: StartSandboxInstanceInput = {
       organizationId: "org_dp_api_integration_001",
@@ -202,11 +150,7 @@ describe("sandboxInstances.start integration", () => {
   }, 60_000);
 
   it("deduplicates duplicate start requests by idempotency key", async ({ fixture }) => {
-    const client = createSandboxInstancesClient(
-      fixture.baseUrl,
-      fixture.internalAuthServiceToken,
-      1_000,
-    );
+    const client = createSandboxInstancesClient(fixture.baseUrl, fixture.internalAuthServiceToken);
     const sandboxProfileId = "sbp_dp_api_integration_idempotent";
     const workflowInput: StartSandboxInstanceInput = {
       organizationId: "org_dp_api_integration_idempotent",
@@ -262,11 +206,7 @@ describe("sandboxInstances.start integration", () => {
   it("creates a starting sandbox instance row immediately after start is accepted", async ({
     fixture,
   }) => {
-    const client = createSandboxInstancesClient(
-      fixture.baseUrl,
-      fixture.internalAuthServiceToken,
-      1_000,
-    );
+    const client = createSandboxInstancesClient(fixture.baseUrl, fixture.internalAuthServiceToken);
     const sandboxProfileId = "sbp_dp_api_sync_insert";
     const workflowInput: StartSandboxInstanceInput = {
       organizationId: "org_dp_api_sync_insert",

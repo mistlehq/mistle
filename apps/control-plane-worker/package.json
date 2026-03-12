@@ -18,7 +18,7 @@
   "dependencies": {
     "@mistle/config": "workspace:*",
     "@mistle/control-plane-internal-client": "workspace:*",
-    "@mistle/data-plane-trpc": "workspace:*",
+    "@mistle/data-plane-internal-client": "workspace:*",
     "@mistle/db": "workspace:*",
     "@mistle/emails": "workspace:*",
     "@mistle/integrations-core": "workspace:*",

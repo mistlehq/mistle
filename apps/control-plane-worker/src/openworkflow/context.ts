@@ -1,5 +1,5 @@
-import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
-import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
+import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { Pool } from "pg";
 
