@@ -295,11 +295,17 @@ export const CompleteOAuthConnectionParamsSchema = z
   })
   .strict();
 
-export const CompleteOAuthConnectionBodySchema = z
+export const CompleteOAuthConnectionQuerySchema = z
   .object({
-    query: z.record(z.string(), z.string()),
+    state: z.string().min(1).optional(),
+    code: z.string().min(1).optional(),
+    error: z.string().min(1).optional(),
+    error_description: z.string().min(1).optional(),
+    error_uri: z.string().min(1).optional(),
+    installation_id: z.string().min(1).optional(),
+    setup_action: z.string().min(1).optional(),
   })
-  .strict();
+  .catchall(z.string());
 
 const ProtectedIntegrationConnectionsRouteMiddleware = [
   createRequireAuthSessionMiddleware(),
@@ -659,19 +665,12 @@ export const startOAuthConnectionRoute = createRoute({
 });
 
 export const completeOAuthConnectionRoute = createRoute({
-  method: "post",
+  method: "get",
   path: "/:targetKey/oauth/complete",
   tags: ["Integrations"],
   request: {
     params: CompleteOAuthConnectionParamsSchema,
-    body: {
-      required: true,
-      content: {
-        "application/json": {
-          schema: CompleteOAuthConnectionBodySchema,
-        },
-      },
-    },
+    query: CompleteOAuthConnectionQuerySchema,
   },
   responses: {
     201: {
