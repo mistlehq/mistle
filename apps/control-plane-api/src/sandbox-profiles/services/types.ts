@@ -67,6 +67,7 @@ export type SandboxProfilesService = {
     organizationId: string;
     profileId: string;
     profileVersion: number;
+    idempotencyKey?: string;
     startedBy: {
       kind: SandboxInstanceStarterKind;
       id: string;

@@ -1,6 +1,5 @@
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import { SandboxImageKind } from "@mistle/sandbox";
-import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 import { z } from "zod";
 
 const DataPlaneSandboxImageKinds = SandboxImageKind;
@@ -32,6 +31,7 @@ export const StartSandboxInstanceInputValidationSchema = z
     organizationId: z.string().min(1),
     sandboxProfileId: z.string().min(1),
     sandboxProfileVersion: z.number().int().min(1),
+    idempotencyKey: z.string().min(1).max(255).optional(),
     runtimePlan: CompiledRuntimePlanSchema,
     startedBy: z
       .object({
@@ -69,10 +69,7 @@ export const GetSandboxInstanceResponseSchema = z
   .strict()
   .nullable();
 
-export type StartSandboxInstanceInput = Omit<
-  StartSandboxInstanceWorkflowInput,
-  "sandboxInstanceId"
->;
+export type StartSandboxInstanceInput = z.infer<typeof StartSandboxInstanceInputValidationSchema>;
 export type StartSandboxInstanceAcceptedResponse = z.infer<
   typeof StartSandboxInstanceAcceptedResponseSchema
 >;

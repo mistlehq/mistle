@@ -2696,7 +2696,9 @@ export interface paths {
       };
       requestBody?: {
         content: {
-          "application/json": Record<string, never>;
+          "application/json": {
+            idempotencyKey?: string;
+          };
         };
       };
       responses: {
