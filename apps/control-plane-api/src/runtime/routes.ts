@@ -66,7 +66,7 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
 export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
   const authApp = createAuthApp();
   const automationWebhooksApp = withAuthSession(createAutomationWebhooksApp());
-  const integrationConnectionsApp = withAuthSession(createIntegrationConnectionsApp());
+  const integrationConnectionsApp = createIntegrationConnectionsApp();
   const integrationTargetsApp = withAuthSession(createIntegrationTargetsApp());
   const integrationWebhooksApp = createIntegrationWebhooksApp();
   const organizationMembershipCapabilitiesApp = withAuthSession(

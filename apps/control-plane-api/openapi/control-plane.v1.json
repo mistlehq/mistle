@@ -1690,50 +1690,6 @@
               }
             }
           },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
           "404": {
             "description": "Integration connection was not found.",
             "content": {
@@ -2196,50 +2152,6 @@
                       "additionalProperties": false
                     }
                   ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
                 }
               }
             }
@@ -2940,50 +2852,6 @@
                       "additionalProperties": false
                     }
                   ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["UNAUTHORIZED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Active organization is required.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
-                    },
-                    "message": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": ["code", "message"],
-                  "additionalProperties": false
                 }
               }
             }

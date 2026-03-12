@@ -181,16 +181,11 @@ export function createIntegrationConnectionsApp(): AppRoutes<
     try {
       const params = ctx.req.valid("param");
       const body = ctx.req.valid("json");
-      const session = ctx.get("session");
-      if (session === null) {
-        throw new Error("Expected authenticated session to be available.");
-      }
 
       const completedConnection = await completeOAuthConnection(
         ctx.get("db"),
         ctx.get("config").integrations,
         {
-          organizationId: session.session.activeOrganizationId,
           targetKey: params.targetKey,
           query: body.query,
         },
