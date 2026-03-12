@@ -5,10 +5,7 @@ import { withDashboardPageWidth } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
 import { useIntegrationResourceStringArrayWidgetStoryState } from "./integration-resource-string-array-widget-story-harness.js";
 import { RepositoryItems } from "./integration-resource-string-array-widget-story-support.js";
-import {
-  buildIntegrationResourceWidgetViewModel,
-  type IntegrationResourceListViewState,
-} from "./integration-resource-string-array-widget-view-model.js";
+import { type IntegrationResourceListViewState } from "./integration-resource-string-array-widget-view-model.js";
 import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
 
 function createReadyState(
