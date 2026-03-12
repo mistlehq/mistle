@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   CodexStoryExploringGroupEntry,
   CodexStoryMakingEditsGroupEntry,
+  CodexStoryRunningCommandsGroupEntry,
   CodexStorySearchingWebGroupEntry,
   CodexStoryThinkingGroupEntry,
 } from "../../codex-client/codex-story-fixtures.js";
@@ -151,5 +152,26 @@ describe("ChatSemanticGroup", () => {
         "https://github.com/anomalyco/opencode/blob/dev/packages/web/src/components/Share.tsx",
       ),
     ).toBeTruthy();
+  });
+
+  it("renders running-commands output with the subdued command log treatment", () => {
+    const { container } = render(<ChatSemanticGroup block={CodexStoryRunningCommandsGroupEntry} />);
+
+    const toggleResultsButtons = screen.getAllByText("Toggle results");
+    const firstToggleResultsButton = toggleResultsButtons.at(0);
+    if (firstToggleResultsButton === undefined) {
+      throw new Error("Expected a semantic group result toggle");
+    }
+
+    const disclosureSummary = firstToggleResultsButton.closest("summary");
+    if (disclosureSummary === null) {
+      throw new Error("Expected a semantic group disclosure summary");
+    }
+
+    fireEvent.click(disclosureSummary);
+
+    const commandLog = container.querySelector('[data-semantic-output="command-log"]');
+    expect(commandLog).toBeTruthy();
+    expect(commandLog?.textContent?.length).toBeGreaterThan(0);
   });
 });

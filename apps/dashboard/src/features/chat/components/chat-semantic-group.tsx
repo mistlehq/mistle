@@ -262,6 +262,17 @@ function renderSemanticGroupItemOutput(input: {
     return <ChatDiffView diff={input.item.output} path={input.item.detail} />;
   }
 
+  if (input.semanticKind === "running-commands") {
+    return (
+      <pre
+        className="bg-muted/25 mt-1 overflow-x-auto rounded-md px-2 py-2 text-[13px] leading-5 whitespace-pre-wrap opacity-85"
+        data-semantic-output="command-log"
+      >
+        {input.item.output}
+      </pre>
+    );
+  }
+
   return (
     <pre className="bg-muted mt-1 overflow-x-auto rounded-md p-3 text-xs leading-5 whitespace-pre-wrap">
       {input.item.output}
