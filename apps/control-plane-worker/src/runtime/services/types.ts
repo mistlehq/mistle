@@ -1,11 +1,13 @@
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
+
+import type { createControlPlaneOpenWorkflow } from "../../openworkflow/client.js";
+import type { ControlPlaneWorkerConfig } from "../../types.js";
 import type {
   ActiveAutomationConversationDeliveryTask,
   AcquiredAutomationConnection,
   AutomationConversationDeliveryTaskAction,
-  ControlPlaneWorkerServices,
   EnsuredAutomationSandbox,
   FinalAutomationConversationDeliveryTaskStatus,
   HandoffAutomationRunDeliveryInput,
@@ -20,10 +22,8 @@ import type {
   StartSandboxProfileInstanceWorkflowOutput,
   SyncIntegrationConnectionResourcesWorkflowInput,
   SyncIntegrationConnectionResourcesWorkflowOutput,
-  createControlPlaneOpenWorkflow,
-} from "@mistle/workflows/control-plane";
-
-import type { ControlPlaneWorkerConfig } from "../../types.js";
+  ControlPlaneWorkerServices,
+} from "../workflow-types.js";
 
 export type CreateControlPlaneWorkerServicesInput = {
   config: ControlPlaneWorkerConfig;

@@ -9,8 +9,8 @@ import type {
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
-import type { createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 
+import type { createControlPlaneOpenWorkflow } from "../../openworkflow/index.js";
 import type { ListProfilesInput } from "./list-profiles.js";
 
 export type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;

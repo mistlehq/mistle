@@ -1,7 +1,7 @@
 import { AppIds, loadConfig } from "@mistle/config";
-import { createDataPlaneBackend } from "@mistle/workflows/data-plane";
 
 import type { DataPlaneWorkerConfig, DataPlaneWorkerGlobalConfig } from "../types.js";
+import { createDataPlaneBackend } from "./client.js";
 
 export type OpenWorkflowRuntime = {
   backend: Awaited<ReturnType<typeof createDataPlaneBackend>>;

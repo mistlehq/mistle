@@ -1,7 +1,7 @@
 import { SendOrganizationInvitationWorkflowSpec } from "@mistle/workflow-registry/control-plane";
-import { type createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
 
 import { buildDashboardUrl } from "../../dashboard-url.js";
+import { type createControlPlaneOpenWorkflow } from "../../openworkflow/index.js";
 
 type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
 const DashboardInvitationAcceptPath = "/invitations/accept";

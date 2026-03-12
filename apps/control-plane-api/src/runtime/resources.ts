@@ -1,12 +1,12 @@
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import { Pool } from "pg";
+
 import {
   createControlPlaneBackend,
   createControlPlaneOpenWorkflow,
-} from "@mistle/workflows/control-plane";
-import { Pool } from "pg";
-
+} from "../openworkflow/index.js";
 import type { ControlPlaneApiConfig, ControlPlaneApp } from "../types.js";
 
 export type AppRuntimeResources = {
