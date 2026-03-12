@@ -1,5 +1,6 @@
-import { evaluateWebhookPayloadFilter, parseWebhookPayloadFilter } from "@mistle/automations";
 import { AutomationKinds, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+
+import { evaluateWebhookPayloadFilter, parseWebhookPayloadFilter } from "../automations/index.js";
 
 type ResolveWebhookAutomationTargetsInput = {
   organizationId: string;

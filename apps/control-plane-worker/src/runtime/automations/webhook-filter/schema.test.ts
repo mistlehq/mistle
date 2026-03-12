@@ -21,12 +21,11 @@ describe("webhook filter schema", () => {
     });
 
     expect(parsedFilter.op).toBe("and");
-    if (parsedFilter.op === "and") {
-      expect(parsedFilter.filters).toHaveLength(2);
-      return;
+    if (parsedFilter.op !== "and") {
+      throw new Error("Expected op to be and");
     }
 
-    throw new Error("Expected op to be and");
+    expect(parsedFilter.filters).toHaveLength(2);
   });
 
   it("normalizes legacy all and any aliases to and and or", () => {
