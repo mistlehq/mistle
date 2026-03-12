@@ -65,6 +65,17 @@ services:
       - "${DEV_OTEL_GRAFANA_PORT:-3000}:3000"
       - "${DEV_OTEL_OTLP_GRPC_PORT:-4317}:4317"
       - "${DEV_OTEL_OTLP_HTTP_PORT:-4318}:4318"
+    networks:
+      - sandbox-dev
+
+  tokenizer-proxy-relay:
+    image: nginx:1.27-alpine
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - "./tokenizer-proxy-relay.nginx.conf:/etc/nginx/conf.d/default.conf:ro"
+    networks:
+      - sandbox-dev
 
   tunnel:
     image: "${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}"
@@ -83,3 +94,7 @@ services:
 volumes:
   mistle_local_postgres_data:
   mistle_local_registry_data:
+
+networks:
+  sandbox-dev:
+    name: mistle-sandbox-dev

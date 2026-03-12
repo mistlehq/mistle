@@ -21,10 +21,12 @@ export const dataPlaneWorkerDevelopmentPreset = {
           bootstrap_token_ttl_seconds: 120,
         },
         sandbox: {
-          tokenizer_proxy_egress_base_url: "http://localhost:5205/tokenizer-proxy/egress",
+          tokenizer_proxy_egress_base_url:
+            "http://tokenizer-proxy-relay:5205/tokenizer-proxy/egress",
           docker: {
             socket_path: "/var/run/docker.sock",
             snapshot_repository: "localhost:5001/mistle/snapshots",
+            network_name: "mistle-sandbox-dev",
           },
         },
       },
