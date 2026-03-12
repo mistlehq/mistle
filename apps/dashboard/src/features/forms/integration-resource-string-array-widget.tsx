@@ -1,4 +1,4 @@
-import { Alert, AlertDescription, Badge, Button, Input, ScrollArea } from "@mistle/ui";
+import { Input } from "@mistle/ui";
 import type { RJSFSchema, WidgetProps } from "@rjsf/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDeferredValue, useState } from "react";
@@ -9,6 +9,8 @@ import {
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
+import { formatDateTime } from "../shared/date-formatters.js";
+import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
 
 type JsonObject = Record<string, unknown>;
 type IntegrationFormContext = {
@@ -124,19 +126,6 @@ function resolveSelectedHandles(value: unknown): string[] {
   return value.filter((entry): entry is string => typeof entry === "string");
 }
 
-function formatSyncStateLabel(syncState: string): string {
-  switch (syncState) {
-    case "never-synced":
-      return "Never synced";
-    case "syncing":
-      return "Syncing";
-    case "error":
-      return "Sync failed";
-    default:
-      return "Ready";
-  }
-}
-
 function formatSyncMetadata(input: {
   syncState: string;
   lastSyncedAt?: string;
@@ -153,35 +142,37 @@ function formatSyncMetadata(input: {
   return `Last synced ${input.lastSyncedAt}`;
 }
 
-function IntegrationResourceListError(input: {
-  error: unknown;
-  onRefresh: () => void;
-  isRefreshing: boolean;
-  refreshLabel: string;
-}): React.JSX.Element {
-  const message = resolveApiErrorMessage({
-    error: input.error,
-    fallbackMessage: "Could not load resources for this connection.",
-  });
+function formatSearchPlaceholder(input: {
+  title: string | undefined;
+  availableCount: number | undefined;
+}): string {
+  if (input.availableCount === undefined) {
+    return `Search ${input.title ?? "resources"}`;
+  }
 
-  return (
-    <Alert variant="destructive">
-      <AlertDescription className="gap-3 flex flex-col">
-        <span>{message}</span>
-        <div>
-          <Button
-            disabled={input.isRefreshing}
-            onClick={input.onRefresh}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            {input.isRefreshing ? "Refreshing..." : input.refreshLabel}
-          </Button>
-        </div>
-      </AlertDescription>
-    </Alert>
-  );
+  const pluralLabel = input.title ?? "resources";
+  const singularLabel =
+    pluralLabel === "Repositories"
+      ? "Repository"
+      : pluralLabel === "repositories"
+        ? "repository"
+        : pluralLabel === "Resources"
+          ? "Resource"
+          : pluralLabel === "resources"
+            ? "resource"
+            : pluralLabel;
+  const resourceLabel = input.availableCount === 1 ? singularLabel : pluralLabel;
+
+  return `Search ${input.availableCount} ${resourceLabel.toLowerCase()}`;
+}
+
+function formatRefreshTooltip(input: {
+  refreshLabel: string;
+  syncMetadata: string | null;
+}): string {
+  return input.syncMetadata === null
+    ? input.refreshLabel
+    : `${input.refreshLabel}\n${input.syncMetadata}`;
 }
 
 export function IntegrationResourceStringArrayWidget(
@@ -271,6 +262,12 @@ export function IntegrationResourceStringArrayWidget(
             ? {}
             : { lastErrorMessage: resourceQuery.data.lastErrorMessage }),
         });
+  const formattedSyncMetadata =
+    syncMetadata === null
+      ? null
+      : syncMetadata.startsWith("Last synced ")
+        ? `Last synced ${formatDateTime(syncMetadata.slice("Last synced ".length))}`
+        : syncMetadata;
   const refreshErrorMessage =
     refreshMutation.error === null || refreshMutation.error === undefined
       ? null
@@ -278,122 +275,59 @@ export function IntegrationResourceStringArrayWidget(
           error: refreshMutation.error,
           fallbackMessage: "Could not refresh resources for this connection.",
         });
+  const resourceListErrorMessage = !resourceQuery.isError
+    ? null
+    : resolveApiErrorMessage({
+        error: resourceQuery.error,
+        fallbackMessage: "Could not load resources for this connection.",
+      });
+  const availableCount = resourceQuery.data?.items.length ?? options.resourceSummary?.count;
+  const searchPlaceholder =
+    options.searchPlaceholder ?? formatSearchPlaceholder({ title: options.title, availableCount });
+  const emptyMessage = options.emptyMessage ?? "No accessible resources found for this connection.";
+  const refreshTooltip = formatRefreshTooltip({
+    refreshLabel,
+    syncMetadata: formattedSyncMetadata,
+  });
 
   return (
-    <div className="gap-3 flex flex-col">
-      <div className="gap-2 flex items-center">
-        <Input
-          aria-label={props.label}
-          className="w-full"
-          id={props.id}
-          onBlur={() => {
-            props.onBlur(props.id, selectedHandles);
-          }}
-          onChange={(event) => {
-            setSearch(event.currentTarget.value);
-          }}
-          onFocus={() => {
-            props.onFocus(props.id, selectedHandles);
-          }}
-          placeholder={options.searchPlaceholder ?? `Search ${options.title ?? "resources"}`}
-          value={search}
-        />
-        <Button
-          disabled={refreshMutation.isPending}
-          onClick={triggerRefresh}
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          {refreshMutation.isPending ? "Refreshing..." : refreshLabel}
-        </Button>
-      </div>
-
-      <div className="gap-2 flex flex-wrap items-center">
-        {syncState === undefined ? null : (
-          <Badge variant="secondary">{formatSyncStateLabel(syncState)}</Badge>
-        )}
-        {syncMetadata === null ? null : (
-          <span className="text-muted-foreground text-xs">{syncMetadata}</span>
-        )}
-        {options.resourceSummary === undefined ? null : (
-          <span className="text-muted-foreground text-xs">
-            {options.resourceSummary.count} available
-          </span>
-        )}
-      </div>
-
-      {refreshErrorMessage === null ? null : (
-        <Alert variant="destructive">
-          <AlertDescription>{refreshErrorMessage}</AlertDescription>
-        </Alert>
-      )}
-
-      {unavailableSelectedHandles.length === 0 ? null : (
-        <Alert variant="destructive">
-          <AlertDescription>
-            Selected resources are no longer accessible on this connection:{" "}
-            {unavailableSelectedHandles.join(", ")}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {selectedHandles.length === 0 ? null : (
-        <div className="gap-2 flex flex-wrap">
-          {selectedHandles.map((handle) => (
-            <Badge key={handle} variant="outline">
-              {handle}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {resourceQuery.isPending ? (
-        <div className="border rounded-md p-3 text-sm">Loading resources...</div>
-      ) : resourceQuery.isError ? (
-        <IntegrationResourceListError
-          error={resourceQuery.error}
-          isRefreshing={refreshMutation.isPending}
-          onRefresh={triggerRefresh}
-          refreshLabel={refreshLabel}
-        />
-      ) : (
-        <ScrollArea className="h-56 border rounded-md">
-          <div className="divide-y">
-            {resourceQuery.data.items.length === 0 ? (
-              <p className="text-muted-foreground p-3 text-sm">
-                {options.emptyMessage ?? "No accessible resources found for this connection."}
-              </p>
-            ) : (
-              resourceQuery.data.items.map((resource) => {
-                const isSelected = selectedHandles.includes(resource.handle);
-
-                return (
-                  <label
-                    className="hover:bg-muted/40 gap-3 flex cursor-pointer items-start p-3"
-                    key={resource.id}
-                  >
-                    <input
-                      checked={isSelected}
-                      className="mt-0.5"
-                      onChange={() => {
-                        toggleHandle(resource.handle);
-                      }}
-                      type="checkbox"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-sm">{resource.displayName}</div>
-                      <div className="text-muted-foreground truncate text-xs">
-                        {resource.handle}
-                      </div>
-                    </div>
-                  </label>
-                );
-              })
-            )}
-          </div>
-        </ScrollArea>
-      )}
-    </div>
+    <IntegrationResourceStringArrayWidgetView
+      emptyMessage={emptyMessage}
+      id={props.id}
+      isRefreshing={refreshMutation.isPending}
+      label={props.label}
+      listState={
+        resourceQuery.isPending
+          ? {
+              mode: "loading",
+            }
+          : resourceQuery.isError
+            ? {
+                mode: "error",
+                message:
+                  resourceListErrorMessage ?? "Could not load resources for this connection.",
+              }
+            : {
+                mode: "ready",
+                items: resourceQuery.data.items,
+              }
+      }
+      onBlur={() => {
+        props.onBlur(props.id, selectedHandles);
+      }}
+      onFocus={() => {
+        props.onFocus(props.id, selectedHandles);
+      }}
+      onRefresh={triggerRefresh}
+      onSearchChange={setSearch}
+      onToggleHandle={toggleHandle}
+      refreshErrorMessage={refreshErrorMessage}
+      refreshLabel={refreshLabel}
+      refreshTooltip={refreshTooltip}
+      search={search}
+      searchPlaceholder={searchPlaceholder}
+      selectedHandles={selectedHandles}
+      unavailableSelectedHandles={unavailableSelectedHandles}
+    />
   );
 }
