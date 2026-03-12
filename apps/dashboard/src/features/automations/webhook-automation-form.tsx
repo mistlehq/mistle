@@ -3,11 +3,6 @@ import {
   AlertDescription,
   AlertTitle,
   Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   Checkbox,
   Field,
   FieldContent,
@@ -110,6 +105,22 @@ function SelectField(input: {
   );
 }
 
+function FormSection(input: {
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  return (
+    <section className="space-y-5 border-t pt-6 first:border-t-0 first:pt-0">
+      <div className="space-y-1">
+        <h2 className="text-base font-semibold">{input.title}</h2>
+        <p className="text-muted-foreground text-sm">{input.description}</p>
+      </div>
+      {input.children}
+    </section>
+  );
+}
+
 export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.JSX.Element {
   const submitLabel = input.mode === "create" ? "Create automation" : "Save changes";
 
@@ -149,14 +160,11 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         </Alert>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Basics</CardTitle>
-          <CardDescription>
-            Choose the integration connection and sandbox profile this automation should target.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
+      <FormSection
+        description="Choose the integration connection and sandbox profile this automation should target."
+        title="Basics"
+      >
+        <div className="space-y-5">
           <div className="grid gap-5 md:grid-cols-2">
             <SelectField
               error={input.fieldErrors.integrationConnectionId}
@@ -196,18 +204,14 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
               </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </FormSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Templates</CardTitle>
-          <CardDescription>
-            These values are sent directly to the backend contract. Keep them aligned with the
-            integration payload shape you expect.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
+      <FormSection
+        description="These values are sent directly to the backend contract. Keep them aligned with the integration payload shape you expect."
+        title="Templates"
+      >
+        <div className="space-y-5">
           <Field>
             <FieldLabel htmlFor="conversation-key-template">Conversation key template</FieldLabel>
             <FieldContent>
@@ -251,18 +255,14 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
               <FieldError message={input.fieldErrors.idempotencyKeyTemplate} />
             </FieldContent>
           </Field>
-        </CardContent>
-      </Card>
+        </div>
+      </FormSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Advanced filters</CardTitle>
-          <CardDescription>
-            Use these optional fields to narrow which events trigger the automation and what subset
-            of the payload gets accepted.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
+      <FormSection
+        description="Use these optional fields to narrow which events trigger the automation and what subset of the payload gets accepted."
+        title="Advanced filters"
+      >
+        <div className="space-y-5">
           <Field>
             <FieldLabel htmlFor="event-types">Event types</FieldLabel>
             <FieldContent>
@@ -293,8 +293,8 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
               <FieldError message={input.fieldErrors.payloadFilterText} />
             </FieldContent>
           </Field>
-        </CardContent>
-      </Card>
+        </div>
+      </FormSection>
 
       <div className="flex justify-end">
         <Button
