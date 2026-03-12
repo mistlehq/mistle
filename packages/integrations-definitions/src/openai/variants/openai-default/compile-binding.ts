@@ -39,6 +39,8 @@ function renderCodexConfig(input: {
   return stringifyToml({
     model: input.model,
     model_reasoning_effort: input.reasoningEffort,
+    approval_policy: "never",
+    sandbox_mode: "danger-full-access",
     ...(input.additionalInstructions === undefined
       ? {}
       : { developer_instructions: input.additionalInstructions }),
