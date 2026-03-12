@@ -1,12 +1,12 @@
 import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+
+import { resolveIntegrationTargetSecrets } from "../../integration-targets/services/resolve-target-secrets.js";
 import {
   SandboxRuntimePlanCompilerError,
   SandboxRuntimePlanCompilerErrorCodes,
   compileSandboxRuntimePlan,
-} from "@mistle/sandbox-runtime-plan-compiler";
-
-import { resolveIntegrationTargetSecrets } from "../../integration-targets/services/resolve-target-secrets.js";
+} from "./compile-sandbox-runtime-plan.js";
 import {
   SandboxProfilesCompileError,
   type SandboxProfilesCompileErrorCode,
