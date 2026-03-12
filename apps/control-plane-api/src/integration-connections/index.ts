@@ -6,7 +6,7 @@ export type {
 } from "./services/factory.js";
 export {
   completeOAuthConnectionRoute,
-  CompleteOAuthConnectionBodySchema,
+  CompleteOAuthConnectionQuerySchema,
   IntegrationConnectionSchema,
   createApiKeyConnectionRoute,
   listIntegrationConnectionsRoute,

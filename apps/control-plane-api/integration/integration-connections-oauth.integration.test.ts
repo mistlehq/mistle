@@ -8,7 +8,6 @@ import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import {
-  CompleteOAuthConnectionBodySchema,
   IntegrationConnectionSchema,
   IntegrationConnectionsBadRequestResponseSchema,
   StartOAuthConnectionResponseSchema,
@@ -73,6 +72,14 @@ async function ensureOpenAiDefaultTarget(
 }
 
 describe("integration connections oauth integration", () => {
+  function createOAuthCompletePath(input: {
+    targetKey: string;
+    query: Record<string, string>;
+  }): string {
+    const searchParams = new URLSearchParams(input.query);
+    return `/v1/integration/connections/${input.targetKey}/oauth/complete?${searchParams.toString()}`;
+  }
+
   it("creates an oauth authorization URL and persists oauth session state", async ({ fixture }) => {
     await ensureGithubCloudTarget(fixture);
 
@@ -144,22 +151,17 @@ describe("integration connections oauth integration", () => {
       throw new Error("Expected oauth state in authorization URL.");
     }
 
-    const requestBody = CompleteOAuthConnectionBodySchema.parse({
-      query: {
-        state,
-        installation_id: "12345",
-        setup_action: "install",
-      },
-    });
-
     const completeResponse = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/complete",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      createOAuthCompletePath({
+        targetKey: "github-cloud",
+        query: {
+          state,
+          installation_id: "12345",
+          setup_action: "install",
         },
-        body: JSON.stringify(requestBody),
+      }),
+      {
+        method: "GET",
       },
     );
 
@@ -251,19 +253,16 @@ describe("integration connections oauth integration", () => {
     }
 
     const completeResponse = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/complete",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      createOAuthCompletePath({
+        targetKey: "github-cloud",
+        query: {
+          state,
+          installation_id: "12345",
+          setup_action: "install",
         },
-        body: JSON.stringify({
-          query: {
-            state,
-            installation_id: "12345",
-            setup_action: "install",
-          },
-        }),
+      }),
+      {
+        method: "GET",
       },
     );
 
@@ -277,17 +276,14 @@ describe("integration connections oauth integration", () => {
     await ensureGithubCloudTarget(fixture);
 
     const response = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/complete",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      createOAuthCompletePath({
+        targetKey: "github-cloud",
+        query: {
+          installation_id: "12345",
         },
-        body: JSON.stringify({
-          query: {
-            installation_id: "12345",
-          },
-        }),
+      }),
+      {
+        method: "GET",
       },
     );
 
@@ -302,18 +298,15 @@ describe("integration connections oauth integration", () => {
     await ensureGithubCloudTarget(fixture);
 
     const response = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/complete",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      createOAuthCompletePath({
+        targetKey: "github-cloud",
+        query: {
+          state: "ios_nonexistent",
+          installation_id: "12345",
         },
-        body: JSON.stringify({
-          query: {
-            state: "ios_nonexistent",
-            installation_id: "12345",
-          },
-        }),
+      }),
+      {
+        method: "GET",
       },
     );
 
@@ -339,18 +332,15 @@ describe("integration connections oauth integration", () => {
     });
 
     const response = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/complete",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      createOAuthCompletePath({
+        targetKey: "github-cloud",
+        query: {
+          state: "oauth_state_expired",
+          installation_id: "12345",
         },
-        body: JSON.stringify({
-          query: {
-            state: "oauth_state_expired",
-            installation_id: "12345",
-          },
-        }),
+      }),
+      {
+        method: "GET",
       },
     );
 
@@ -385,18 +375,15 @@ describe("integration connections oauth integration", () => {
     });
 
     const response = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/complete",
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
+      createOAuthCompletePath({
+        targetKey: "github-cloud",
+        query: {
+          state: "oauth_state_used",
+          installation_id: "12345",
         },
-        body: JSON.stringify({
-          query: {
-            state: "oauth_state_used",
-            installation_id: "12345",
-          },
-        }),
+      }),
+      {
+        method: "GET",
       },
     );
 

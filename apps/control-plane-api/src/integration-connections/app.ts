@@ -180,14 +180,14 @@ export function createIntegrationConnectionsApp(): AppRoutes<
   routes.openapi(completeOAuthConnectionRoute, async (ctx) => {
     try {
       const params = ctx.req.valid("param");
-      const body = ctx.req.valid("json");
+      const query = ctx.req.valid("query");
 
       const completedConnection = await completeOAuthConnection(
         ctx.get("db"),
         ctx.get("config").integrations,
         {
           targetKey: params.targetKey,
-          query: body.query,
+          query,
         },
       );
 
