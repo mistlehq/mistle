@@ -71,6 +71,7 @@ const meta = {
     selectedHandles: [],
     unavailableSelectedHandles: [],
     listState: createReadyState(RepositoryItems),
+    visibleItems: RepositoryItems,
     isRefreshing: false,
     refreshErrorMessage: null,
     emptyMessage: "No repositories available for this connection.",
@@ -120,6 +121,7 @@ export const InteractiveSelection: Story = {
         }}
         search={search}
         selectedHandles={selectedHandles}
+        visibleItems={visibleItems}
       />
     );
   },
@@ -130,6 +132,8 @@ export const NeverSyncedEmpty: Story = {
     listState: createReadyState([]),
     searchPlaceholder: "Search 0 repositories",
     refreshTooltip: "Refresh repositories",
+    emptyMessage: "Connection has not been synced yet. Use refresh to sync.",
+    visibleItems: [],
   },
 };
 
@@ -140,6 +144,16 @@ export const Syncing: Story = {
   },
 };
 
+export const EmptyAfterSync: Story = {
+  args: {
+    listState: createReadyState([]),
+    searchPlaceholder: "Search 0 repositories",
+    refreshTooltip: "Refresh repositories\nLast synced Mar 9, 2026, 12:00 PM",
+    emptyMessage: "No repositories are available for this connection.",
+    visibleItems: [],
+  },
+};
+
 export const SyncFailed: Story = {
   args: {
     listState: {
@@ -147,12 +161,14 @@ export const SyncFailed: Story = {
       message: "GitHub rejected the resource sync for this connection.",
     },
     refreshTooltip: "Refresh repositories\nGitHub rejected the resource sync for this connection.",
+    visibleItems: RepositoryItems.slice(0, 3),
   },
 };
 
 export const RefreshFailed: Story = {
   args: {
     refreshErrorMessage: "Could not refresh resources for this connection.",
+    visibleItems: RepositoryItems,
   },
 };
 
@@ -161,6 +177,7 @@ export const StaleSelectedRepositories: Story = {
     selectedHandles: ["mistle/main-dashboard", "mistle/private-internal-tools"],
     unavailableSelectedHandles: ["mistle/private-internal-tools"],
     listState: createReadyState(RepositoryItems.slice(0, 3)),
+    visibleItems: RepositoryItems.slice(0, 3),
   },
 };
 
@@ -170,5 +187,6 @@ export const Loading: Story = {
       mode: "loading",
     },
     refreshTooltip: "Refresh repositories",
+    visibleItems: [],
   },
 };

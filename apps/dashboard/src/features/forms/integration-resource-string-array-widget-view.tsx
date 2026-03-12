@@ -26,6 +26,7 @@ export type IntegrationResourceStringArrayWidgetViewProps = {
   selectedHandles: readonly string[];
   unavailableSelectedHandles: readonly string[];
   listState: IntegrationResourceListViewState;
+  visibleItems: readonly IntegrationConnectionResource[];
   isRefreshing: boolean;
   refreshErrorMessage: string | null;
   emptyMessage: string;
@@ -72,8 +73,7 @@ function IntegrationResourceMessageSection(input: {
 export function IntegrationResourceStringArrayWidgetView(
   props: IntegrationResourceStringArrayWidgetViewProps,
 ): React.JSX.Element {
-  const readyItems = props.listState.mode === "ready" ? props.listState.items : null;
-  const hasVisibleItems = readyItems !== null && readyItems.length > 0;
+  const hasVisibleItems = props.visibleItems.length > 0;
 
   return (
     <div className="gap-3 flex flex-col">
@@ -122,7 +122,7 @@ export function IntegrationResourceStringArrayWidgetView(
           <div className="divide-y">
             {props.refreshErrorMessage === null ? null : (
               <IntegrationResourceMessageSection
-                detail="Check your connection and try again."
+                detail="Please try again."
                 message="Refresh failed."
                 tone="destructive"
               />
@@ -147,7 +147,7 @@ export function IntegrationResourceStringArrayWidgetView(
                 message="Sync failed. Only showing last synced results."
                 tone="destructive"
               />
-            ) : readyItems !== null && readyItems.length === 0 ? (
+            ) : props.visibleItems.length === 0 ? (
               <IntegrationResourceMessageSection message={props.emptyMessage} tone="default" />
             ) : null}
           </div>
@@ -157,7 +157,7 @@ export function IntegrationResourceStringArrayWidgetView(
       {hasVisibleItems ? (
         <ScrollArea className="h-56 overflow-hidden rounded-md border">
           <div className="divide-y">
-            {readyItems.map((resource) => {
+            {props.visibleItems.map((resource) => {
               const isSelected = props.selectedHandles.includes(resource.handle);
 
               return (

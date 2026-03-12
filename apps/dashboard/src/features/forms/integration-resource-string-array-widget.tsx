@@ -175,6 +175,21 @@ function formatRefreshTooltip(input: {
     : `${input.refreshLabel}\n${input.syncMetadata}`;
 }
 
+function resolveEmptyMessage(input: {
+  syncState: string | undefined;
+  emptyMessage: string | undefined;
+}): string {
+  if (input.emptyMessage !== undefined) {
+    return input.emptyMessage;
+  }
+
+  if (input.syncState === "never-synced") {
+    return "Connection has not been synced yet. Use refresh to sync.";
+  }
+
+  return "No accessible resources found for this connection.";
+}
+
 export function IntegrationResourceStringArrayWidget(
   props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
@@ -224,7 +239,8 @@ export function IntegrationResourceStringArrayWidget(
     return <Input disabled id={props.id} value={selectedHandles.join(", ")} />;
   }
 
-  const availableHandles = new Set(resourceQuery.data?.items.map((item) => item.handle) ?? []);
+  const visibleItems = resourceQuery.data?.items ?? [];
+  const availableHandles = new Set(visibleItems.map((item) => item.handle));
   const unavailableSelectedHandles =
     resourceQuery.data === undefined || deferredSearch.length > 0
       ? []
@@ -284,7 +300,10 @@ export function IntegrationResourceStringArrayWidget(
   const availableCount = resourceQuery.data?.items.length ?? options.resourceSummary?.count;
   const searchPlaceholder =
     options.searchPlaceholder ?? formatSearchPlaceholder({ title: options.title, availableCount });
-  const emptyMessage = options.emptyMessage ?? "No accessible resources found for this connection.";
+  const emptyMessage = resolveEmptyMessage({
+    syncState,
+    emptyMessage: options.emptyMessage,
+  });
   const refreshTooltip = formatRefreshTooltip({
     refreshLabel,
     syncMetadata: formattedSyncMetadata,
@@ -328,6 +347,7 @@ export function IntegrationResourceStringArrayWidget(
       searchPlaceholder={searchPlaceholder}
       selectedHandles={selectedHandles}
       unavailableSelectedHandles={unavailableSelectedHandles}
+      visibleItems={visibleItems}
     />
   );
 }
