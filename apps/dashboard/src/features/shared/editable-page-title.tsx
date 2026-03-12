@@ -1,5 +1,7 @@
-import { Button, Input } from "@mistle/ui";
+import { Button } from "@mistle/ui";
 import { PencilSimpleIcon } from "@phosphor-icons/react";
+
+import { PageTitleField } from "./page-title-field.js";
 
 export function EditablePageTitle(input: {
   title: string;
@@ -21,32 +23,29 @@ export function EditablePageTitle(input: {
 
   if (input.isEditing) {
     return (
-      <div className={containerClassName}>
-        <Input
-          aria-label={input.ariaLabel}
-          autoFocus
-          className="h-10 py-0 w-full text-xl font-semibold leading-none"
-          onBlur={input.onCommit}
-          onChange={(event) => {
-            input.onDraftValueChange(event.currentTarget.value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") {
-              event.currentTarget.blur();
-              return;
-            }
+      <PageTitleField
+        ariaLabel={input.ariaLabel}
+        autoFocus={true}
+        errorMessage={input.errorMessage}
+        fieldId="editable-page-title-input"
+        label={input.ariaLabel}
+        maxWidthClassName={input.maxWidthClassName}
+        onBlur={input.onCommit}
+        onChange={input.onDraftValueChange}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+            return;
+          }
 
-            if (event.key === "Escape" && (input.cancelOnEscape ?? true)) {
-              input.onCancel();
-            }
-          }}
-          placeholder={input.placeholder}
-          value={input.draftValue}
-        />
-        {input.errorMessage === undefined ? null : (
-          <p className="text-destructive text-sm">{input.errorMessage}</p>
-        )}
-      </div>
+          if (event.key === "Escape" && (input.cancelOnEscape ?? true)) {
+            input.onCancel();
+          }
+        }}
+        placeholder={input.placeholder}
+        showLabel={false}
+        value={input.draftValue}
+      />
     );
   }
 

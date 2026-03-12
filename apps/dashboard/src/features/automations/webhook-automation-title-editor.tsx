@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { EditablePageTitle } from "../shared/editable-page-title.js";
+import { PageTitleField } from "../shared/page-title-field.js";
 
 export function WebhookAutomationTitleEditor(input: {
   mode: "create" | "edit";
@@ -26,10 +27,30 @@ export function WebhookAutomationTitleEditor(input: {
     setIsEditing(input.mode === "create");
   }
 
+  if (input.mode === "create") {
+    return (
+      <PageTitleField
+        ariaLabel="Automation name"
+        autoFocus={true}
+        className="text-base font-medium"
+        errorMessage={input.errorMessage}
+        fieldId="automation-name"
+        label="Automation name"
+        maxWidthClassName="max-w-4xl"
+        onBlur={undefined}
+        onChange={input.onCommit}
+        onKeyDown={undefined}
+        placeholder="Automation name"
+        showLabel={true}
+        value={input.title}
+      />
+    );
+  }
+
   return (
     <EditablePageTitle
       ariaLabel="Automation name"
-      cancelOnEscape={input.mode === "edit"}
+      cancelOnEscape={true}
       draftValue={draftValue}
       editButtonLabel="Edit automation name"
       errorMessage={input.errorMessage}

@@ -114,7 +114,9 @@ function FormSection(input: {
     <section className="space-y-5 border-t pt-6 first:border-t-0 first:pt-0">
       <div className="space-y-1">
         <h2 className="text-base font-semibold">{input.title}</h2>
-        <p className="text-muted-foreground text-sm">{input.description}</p>
+        {input.description === "" ? null : (
+          <p className="text-muted-foreground text-sm">{input.description}</p>
+        )}
       </div>
       {input.children}
     </section>
@@ -127,17 +129,23 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <WebhookAutomationTitleEditor
-            errorMessage={input.fieldErrors.name}
-            mode={input.mode}
-            onCommit={(nextValue) => {
-              input.onValueChange("name", nextValue);
-            }}
-            saveDisabled={input.isDeleting || input.isSaving}
-            title={input.values.name}
-          />
-        </div>
+        {input.mode === "edit" ? (
+          <div className="min-w-0 flex-1">
+            <WebhookAutomationTitleEditor
+              errorMessage={input.fieldErrors.name}
+              mode={input.mode}
+              onCommit={(nextValue) => {
+                input.onValueChange("name", nextValue);
+              }}
+              saveDisabled={input.isDeleting || input.isSaving}
+              title={input.values.name}
+            />
+          </div>
+        ) : (
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl font-semibold">Create Automation</h1>
+          </div>
+        )}
 
         {input.onDelete === null ? null : (
           <Button
@@ -160,12 +168,21 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         </Alert>
       )}
 
-      <FormSection
-        description="Choose the integration connection and sandbox profile this automation should target."
-        title="Basics"
-      >
+      <FormSection description="" title="Basics">
         <div className="space-y-5">
           <div className="grid gap-5 md:grid-cols-2">
+            {input.mode === "create" ? (
+              <WebhookAutomationTitleEditor
+                errorMessage={input.fieldErrors.name}
+                mode={input.mode}
+                onCommit={(nextValue) => {
+                  input.onValueChange("name", nextValue);
+                }}
+                saveDisabled={input.isDeleting || input.isSaving}
+                title={input.values.name}
+              />
+            ) : null}
+
             <SelectField
               error={input.fieldErrors.integrationConnectionId}
               label="Integration connection"
@@ -199,9 +216,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             />
             <div className="space-y-1">
               <FieldLabel htmlFor="automation-enabled">Automation enabled</FieldLabel>
-              <p className="text-muted-foreground text-sm">
-                Disable the automation without deleting the configuration.
-              </p>
             </div>
           </div>
         </div>
