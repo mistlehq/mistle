@@ -1,3 +1,4 @@
+import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import {
@@ -28,6 +29,7 @@ type RequiredWorkflowServices = {
 export type WorkflowContext = {
   db: ControlPlaneDatabase;
   dbPool: Pool;
+  dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "startSandboxInstance">;
   openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
   services: RequiredWorkflowServices;
 };
@@ -83,7 +85,7 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
     const openWorkflow = createControlPlaneOpenWorkflow({
       backend,
     });
-    const dataPlaneSandboxInstancesClient = createDataPlaneSandboxInstancesClient({
+    const dataPlaneClient = createDataPlaneSandboxInstancesClient({
       baseUrl: workerConfig.dataPlaneApi.baseUrl,
       serviceToken: globalConfig.internalAuth.serviceToken,
     });
@@ -92,12 +94,13 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
       internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
       db,
       openWorkflow,
-      dataPlaneSandboxInstancesClient,
+      dataPlaneSandboxInstancesClient: dataPlaneClient,
     });
 
     return {
       db,
       dbPool,
+      dataPlaneClient,
       openWorkflow,
       services: requireWorkflowServices(services),
     };

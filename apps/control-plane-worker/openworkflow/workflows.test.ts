@@ -7,7 +7,7 @@ import {
   SendVerificationOTPWorkflowSpec,
   StartSandboxProfileInstanceWorkflowSpec,
   SyncIntegrationConnectionResourcesWorkflowSpec,
-} from "@mistle/workflows/control-plane";
+} from "@mistle/workflow-registry/control-plane";
 import { describe, expect, it } from "vitest";
 
 import { HandleAutomationConversationDeliveryWorkflow } from "./handle-automation-conversation-delivery.js";

@@ -213,6 +213,9 @@ importers:
       '@mistle/time':
         specifier: workspace:*
         version: link:../../packages/time
+      '@mistle/workflow-registry':
+        specifier: workspace:*
+        version: link:../../packages/workflow-registry
       '@mistle/workflows':
         specifier: workspace:*
         version: link:../../packages/workflows
