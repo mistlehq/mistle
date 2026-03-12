@@ -46,6 +46,9 @@ function createSandboxRuntimeAdapter(config: DataPlaneWorkerRuntimeConfig): Sand
       docker: {
         socketPath: config.app.sandbox.docker.socketPath,
         snapshotRepository: config.app.sandbox.docker.snapshotRepository,
+        ...(config.app.sandbox.docker.networkName === undefined
+          ? {}
+          : { networkName: config.app.sandbox.docker.networkName }),
       },
     });
   }

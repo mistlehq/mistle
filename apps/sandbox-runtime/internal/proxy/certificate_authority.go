@@ -95,8 +95,8 @@ func (certificateAuthority *CertificateAuthority) issueLeafCertificateLocked(ser
 			CommonName: serverName,
 		},
 		NotBefore: now.Add(-1 * time.Minute),
-		NotAfter: minTime(certificateAuthority.certificate.NotAfter, now.Add(issuedLeafValidity)),
-		KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		NotAfter:  minTime(certificateAuthority.certificate.NotAfter, now.Add(issuedLeafValidity)),
+		KeyUsage:  x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
 		ExtKeyUsage: []x509.ExtKeyUsage{
 			x509.ExtKeyUsageServerAuth,
 		},

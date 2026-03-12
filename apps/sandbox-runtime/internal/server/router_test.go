@@ -114,4 +114,30 @@ func TestNewRouter(t *testing.T) {
 			t.Fatalf("expected body {\"proxied\":true}, got %s", recorder.Body.String())
 		}
 	})
+
+	t.Run("delegates connect requests directly to proxy handler", func(t *testing.T) {
+		proxyHandler := http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if request.Method != http.MethodConnect {
+				t.Fatalf("expected forwarded request method CONNECT, got %s", request.Method)
+			}
+			if request.Host != "github.com:443" {
+				t.Fatalf("unexpected forwarded host: %s", request.Host)
+			}
+
+			writer.WriteHeader(http.StatusOK)
+		})
+
+		recorder := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodConnect, "http://github.com:443", nil)
+		request.Host = "github.com:443"
+
+		NewRouter(RouterInput{
+			BootstrapTokenLoaded: true,
+			ProxyHandler:         proxyHandler,
+		}).ServeHTTP(recorder, request)
+
+		if recorder.Code != http.StatusOK {
+			t.Fatalf("expected status 200, got %d", recorder.Code)
+		}
+	})
 }

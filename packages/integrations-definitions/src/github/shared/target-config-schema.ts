@@ -2,16 +2,17 @@ import { z } from "zod";
 
 const GitHubUrlSchema = z.url().transform((input) => {
   const parsedUrl = new URL(input);
+  const pathnameWithoutTrailingSlash = parsedUrl.pathname.endsWith("/")
+    ? parsedUrl.pathname.slice(0, -1)
+    : parsedUrl.pathname;
   const normalizedPathname =
-    parsedUrl.pathname.endsWith("/") && parsedUrl.pathname !== "/"
-      ? parsedUrl.pathname.slice(0, -1)
-      : parsedUrl.pathname;
+    pathnameWithoutTrailingSlash.length === 0 ? "/" : pathnameWithoutTrailingSlash;
 
   parsedUrl.pathname = normalizedPathname;
   parsedUrl.search = "";
   parsedUrl.hash = "";
 
-  return parsedUrl.toString();
+  return normalizedPathname === "/" ? parsedUrl.origin : parsedUrl.toString();
 });
 
 export const GitHubTargetConfigSchema = z

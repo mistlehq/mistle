@@ -9,31 +9,6 @@ const SandboxRuntimeTokenizerProxyEgressBaseURLEnv =
 const SandboxRuntimeTelemetryTracesEndpointEnv = "SANDBOX_RUNTIME_TELEMETRY_TRACES_ENDPOINT";
 const SandboxRuntimeSandboxInstanceIDEnv = "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID";
 
-type ResolveSandboxRuntimeTracesEndpointInput = {
-  sandboxProvider: DataPlaneWorkerRuntimeConfig["sandbox"]["provider"];
-  telemetryConfig: DataPlaneWorkerRuntimeConfig["telemetry"];
-};
-
-function isLoopbackHostname(hostname: string): boolean {
-  return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
-}
-
-export function resolveSandboxRuntimeTracesEndpoint(
-  input: ResolveSandboxRuntimeTracesEndpointInput,
-): string | undefined {
-  if (!input.telemetryConfig.enabled) {
-    return undefined;
-  }
-
-  const parsedURL = new URL(input.telemetryConfig.traces.endpoint);
-
-  if (input.sandboxProvider === "docker" && isLoopbackHostname(parsedURL.hostname)) {
-    parsedURL.hostname = "host.docker.internal";
-  }
-
-  return parsedURL.toString();
-}
-
 export async function startSandbox(
   deps: {
     config: DataPlaneWorkerRuntimeConfig;
@@ -41,10 +16,10 @@ export async function startSandbox(
   },
   input: StartSandboxInput,
 ): Promise<StartSandboxOutput> {
-  const sandboxRuntimeTracesEndpoint = resolveSandboxRuntimeTracesEndpoint({
-    sandboxProvider: deps.config.sandbox.provider,
-    telemetryConfig: deps.config.telemetry,
-  });
+  const sandboxRuntimeTracesEndpoint =
+    deps.config.telemetry.enabled && deps.config.sandbox.provider === "docker"
+      ? deps.config.app.sandbox.docker?.tracesEndpoint
+      : undefined;
 
   const startedSandbox = await deps.sandboxAdapter.start({
     image: {

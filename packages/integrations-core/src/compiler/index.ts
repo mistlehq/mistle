@@ -72,7 +72,7 @@ function renderInstallLatestGithubReleaseBinaryScript(
     'temp_dir="$(mktemp -d)"',
     "trap 'rm -rf \"$temp_dir\"' EXIT",
     "",
-    'curl -fsSL "https://github.com/$repo/releases/latest/download/$asset_name" -o "$temp_dir/artifact"',
+    'curl --noproxy "*" -fsSL "https://github.com/$repo/releases/latest/download/$asset_name" -o "$temp_dir/artifact"',
     'case "$asset_format" in',
     "  tar.gz)",
     '    tar -xzf "$temp_dir/artifact" -C "$temp_dir"',

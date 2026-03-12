@@ -188,8 +188,8 @@ describe("integration connections oauth integration", () => {
     }
 
     expect(persistedConnection.targetSnapshotConfig).toEqual({
-      apiBaseUrl: "https://api.github.com/",
-      webBaseUrl: "https://github.com/",
+      apiBaseUrl: "https://api.github.com",
+      webBaseUrl: "https://github.com",
       appSlug: "mistle-github-app",
     });
     expect(persistedConnection.secrets).toBeNull();

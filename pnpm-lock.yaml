@@ -444,6 +444,9 @@ importers:
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
+      '@mistle/time':
+        specifier: workspace:*
+        version: link:../../packages/time
       hono:
         specifier: ^4.12.5
         version: 4.12.5
@@ -457,9 +460,6 @@ importers:
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
-      '@mistle/time':
-        specifier: workspace:*
-        version: link:../../packages/time
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0

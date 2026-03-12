@@ -18,6 +18,10 @@ export async function writeSandboxStartupInput(input: {
   sandbox: SandboxHandle;
 }): Promise<string> {
   const bootstrapTokenJti = randomUUID();
+  const tunnelGatewayWsUrl = createSandboxTunnelGatewayWsUrl({
+    gatewayWebsocketUrl: input.config.sandbox.internalGatewayWsUrl,
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
   const bootstrapToken = await mintBootstrapToken({
     config: {
       bootstrapTokenSecret: input.config.sandbox.bootstrap.tokenSecret,
@@ -33,10 +37,7 @@ export async function writeSandboxStartupInput(input: {
     await input.sandbox.writeStdin({
       payload: encodeSandboxStartupInput({
         bootstrapToken,
-        tunnelGatewayWsUrl: createSandboxTunnelGatewayWsUrl({
-          gatewayWebsocketUrl: input.config.sandbox.internalGatewayWsUrl,
-          sandboxInstanceId: input.sandboxInstanceId,
-        }),
+        tunnelGatewayWsUrl,
         runtimePlan: input.runtimePlan,
       }),
     });

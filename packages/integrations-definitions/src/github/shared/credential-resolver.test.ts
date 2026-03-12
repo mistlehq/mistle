@@ -62,20 +62,18 @@ function createResolverInput(
 }
 
 describe("github credential resolver helpers", () => {
-  it("deduplicates and sorts binding repositories for installation token narrowing", () => {
+  it("deduplicates, strips owners, and sorts binding repositories for installation token narrowing", () => {
     expect(resolveGitHubInstallationRepositoryNames(createResolverInput())).toEqual([
-      "acme/repo-a",
-      "acme/repo-b",
+      "repo-a",
+      "repo-b",
     ]);
   });
 
-  it("requires binding context to derive installation token narrowing", () => {
+  it("omits installation token narrowing when binding context is absent", () => {
     const resolverInput = createResolverInput();
     delete resolverInput.binding;
 
-    expect(() => resolveGitHubInstallationRepositoryNames(resolverInput)).toThrowError(
-      "GitHub app installation resolver requires binding context.",
-    );
+    expect(resolveGitHubInstallationRepositoryNames(resolverInput)).toBeUndefined();
   });
 
   it("includes repository names in the installation auth request input", () => {
@@ -85,12 +83,26 @@ describe("github credential resolver helpers", () => {
         appId: "123",
         appPrivateKeyPem: "pem",
         installationId: 12345,
-        repositoryNames: ["acme/repo-a", "acme/repo-b"],
+        repositoryNames: ["repo-a", "repo-b"],
       }),
     ).toEqual({
       type: "installation",
       installationId: 12345,
-      repositoryNames: ["acme/repo-a", "acme/repo-b"],
+      repositoryNames: ["repo-a", "repo-b"],
+    });
+  });
+
+  it("omits repository names from the installation auth request input when binding context is absent", () => {
+    expect(
+      createGitHubInstallationAuthInput({
+        apiBaseUrl: "https://api.github.com",
+        appId: "123",
+        appPrivateKeyPem: "pem",
+        installationId: 12345,
+      }),
+    ).toEqual({
+      type: "installation",
+      installationId: 12345,
     });
   });
 });

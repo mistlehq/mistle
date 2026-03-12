@@ -372,14 +372,6 @@ export async function resolveIntegrationCredential(
     );
   }
 
-  if (input.resolverKey !== undefined && input.bindingId === undefined) {
-    throw new InternalIntegrationCredentialsError(
-      InternalIntegrationCredentialsErrorCodes.BINDING_REQUIRED,
-      400,
-      "Binding id is required for custom credential resolution.",
-    );
-  }
-
   let bindingResolverContext: ResolverContextBinding | undefined;
   if (input.bindingId !== undefined) {
     const [binding] = await db

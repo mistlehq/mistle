@@ -17,10 +17,19 @@ func NewRouter(input RouterInput) http.Handler {
 	if input.EgressHandler != nil {
 		mux.Handle("/egress/routes/", input.EgressHandler)
 	}
-	if input.ProxyHandler != nil {
-		mux.Handle("/", input.ProxyHandler)
+	if input.ProxyHandler == nil {
+		return mux
 	}
-	return mux
+
+	mux.Handle("/", input.ProxyHandler)
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method == http.MethodConnect {
+			input.ProxyHandler.ServeHTTP(writer, request)
+			return
+		}
+
+		mux.ServeHTTP(writer, request)
+	})
 }
 
 func healthHandler(input RouterInput) http.HandlerFunc {

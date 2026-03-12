@@ -3,6 +3,7 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { gzipSync } from "node:zlib";
 
 import { reserveAvailablePort, startHttpEcho } from "@mistle/test-harness";
 import { describe, expect } from "vitest";
@@ -101,6 +102,53 @@ async function startControlPlaneCredentialServer(input: {
   return {
     baseUrl: `http://${input.host}:${String(port)}`,
     requests,
+    stop: async () => {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error !== undefined) {
+            reject(error);
+            return;
+          }
+
+          resolve();
+        });
+      });
+    },
+  };
+}
+
+async function startGzipUpstream(input: {
+  host: string;
+  path: string;
+  body: string;
+}): Promise<{ baseUrl: string; stop: () => Promise<void> }> {
+  const port = await reserveAvailablePort({ host: input.host });
+  const gzippedBody = gzipSync(input.body);
+
+  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+    if (request.url !== input.path) {
+      response.statusCode = 404;
+      response.end("not found");
+      return;
+    }
+
+    response.statusCode = 200;
+    response.setHeader("content-type", "application/json");
+    response.setHeader("content-encoding", "gzip");
+    response.setHeader("content-length", String(gzippedBody.byteLength));
+    response.end(gzippedBody);
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, input.host, () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  return {
+    baseUrl: `http://${input.host}:${String(port)}`,
     stop: async () => {
       await new Promise<void>((resolve, reject) => {
         server.close((error) => {
@@ -247,6 +295,67 @@ describe("tokenizer proxy integration", () => {
       ]);
     } finally {
       await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  });
+
+  it("strips stale compression headers after forwarding a transparently decompressed upstream body", async () => {
+    const upstreamService = await startGzipUpstream({
+      host: "127.0.0.1",
+      path: "/graphql",
+      body: JSON.stringify({ data: { viewer: { login: "mistle-bot" } } }),
+    });
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "ghs_test_token",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+    });
+    await runtime.start();
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/routes/route_graphql/graphql`,
+        {
+          method: "POST",
+          headers: {
+            [EgressRequestHeaders.UPSTREAM_BASE_URL]: upstreamService.baseUrl,
+            [EgressRequestHeaders.BINDING_ID]: "ibd_github",
+            [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "bearer",
+            [EgressRequestHeaders.AUTH_INJECTION_TARGET]: "authorization",
+            [EgressRequestHeaders.CONNECTION_ID]: "icn_github",
+            [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "oauth_access_token",
+            [EgressRequestHeaders.CREDENTIAL_RESOLVER_KEY]: "github_app_installation_token",
+          },
+          body: JSON.stringify({ query: "{ viewer { login } }" }),
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-encoding")).toBeNull();
+      expect(response.headers.get("content-length")).toBeNull();
+      await expect(response.json()).resolves.toEqual({
+        data: {
+          viewer: {
+            login: "mistle-bot",
+          },
+        },
+      });
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamService.stop()]);
     }
   });
 });

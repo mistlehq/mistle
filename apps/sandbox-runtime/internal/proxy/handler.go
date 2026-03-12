@@ -58,7 +58,7 @@ func NewHandler(input NewHandlerInput) (http.Handler, error) {
 	}
 
 	return Handler{
-		httpClient:           input.HTTPClient,
+		httpClient:           newRedirectPreservingClient(input.HTTPClient),
 		certificateAuthority: input.CertificateAuthority,
 		integrationMediator:  input.IntegrationMediator,
 	}, nil
@@ -407,18 +407,18 @@ func classifyInterceptedRequest(connectTarget string, request *http.Request) (in
 
 func filterProxyResponse(response *http.Response) *http.Response {
 	filteredResponse := &http.Response{
-		StatusCode:        response.StatusCode,
-		Status:            response.Status,
-		Proto:             response.Proto,
-		ProtoMajor:        response.ProtoMajor,
-		ProtoMinor:        response.ProtoMinor,
-		Header:            make(http.Header),
-		Body:              response.Body,
-		ContentLength:     response.ContentLength,
-		TransferEncoding:  response.TransferEncoding,
-		Close:             response.Close,
-		Trailer:           make(http.Header),
-		Uncompressed:      response.Uncompressed,
+		StatusCode:       response.StatusCode,
+		Status:           response.Status,
+		Proto:            response.Proto,
+		ProtoMajor:       response.ProtoMajor,
+		ProtoMinor:       response.ProtoMinor,
+		Header:           make(http.Header),
+		Body:             response.Body,
+		ContentLength:    response.ContentLength,
+		TransferEncoding: response.TransferEncoding,
+		Close:            response.Close,
+		Trailer:          make(http.Header),
+		Uncompressed:     response.Uncompressed,
 	}
 
 	copyHeadersWithoutHopByHop(filteredResponse.Header, response.Header, false)
@@ -473,6 +473,14 @@ func closeRequestBody(request *http.Request) {
 		return
 	}
 	_ = request.Body.Close()
+}
+
+func newRedirectPreservingClient(baseClient *http.Client) *http.Client {
+	clonedClient := *baseClient
+	clonedClient.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return &clonedClient
 }
 
 func firstNonEmpty(values ...string) string {

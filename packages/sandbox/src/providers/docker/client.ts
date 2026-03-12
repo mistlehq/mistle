@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import http from "node:http";
 
 import Docker from "dockerode";
 import { z } from "zod";
@@ -139,19 +140,6 @@ function toDockerEnv(env: Record<string, string> | undefined): string[] | undefi
   return entries.map(([key, value]) => `${key}=${value}`);
 }
 
-function createAttachStdinOptions(): Docker.ContainerAttachOptions {
-  return {
-    // Docker attach requires the upgraded TCP stream for stdin writes, and the
-    // callback only resolves reliably when stdout/stderr are also attached.
-    hijack: true,
-    stdin: true,
-    stream: true,
-    logs: false,
-    stdout: true,
-    stderr: true,
-  };
-}
-
 export class DockerApiClient implements DockerClient {
   readonly #config: DockerSandboxConfig;
   readonly #docker: Docker;
@@ -169,12 +157,17 @@ export class DockerApiClient implements DockerClient {
 
     await this.#pullImage(parsedRequest.imageRef);
 
+    const hostConfig: Docker.HostConfig = {};
+    if (this.#config.networkName !== undefined) {
+      hostConfig.NetworkMode = this.#config.networkName;
+    }
     const createContainerOptions: Docker.ContainerCreateOptions = {
       Image: parsedRequest.imageRef,
       OpenStdin: true,
       AttachStdin: true,
       StdinOnce: true,
       ...(parsedRequest.env === undefined ? {} : { Env: toDockerEnv(parsedRequest.env) }),
+      ...(Object.keys(hostConfig).length === 0 ? {} : { HostConfig: hostConfig }),
       Labels: {
         "mistle.sandbox.provider": "docker",
       },
@@ -184,16 +177,15 @@ export class DockerApiClient implements DockerClient {
       DockerClientOperationIds.CREATE_CONTAINER,
       () => this.#docker.createContainer(createContainerOptions),
     );
-
-    const attachedStdinStream = await this.#runDockerClientOperation(
-      DockerClientOperationIds.ATTACH_STDIN,
-      () => container.attach(createAttachStdinOptions()),
-    );
-    this.#trackAttachedStdinStream(container.id, attachedStdinStream);
-
     await this.#runDockerClientOperation(DockerClientOperationIds.START_CONTAINER, () =>
       container.start(),
     );
+
+    const attachedStdinStream = await this.#runDockerClientOperation(
+      DockerClientOperationIds.ATTACH_STDIN,
+      () => this.#attachContainerStdin(container.id),
+    );
+    this.#trackAttachedStdinStream(container.id, attachedStdinStream);
 
     return {
       sandboxId: container.id,
@@ -321,14 +313,67 @@ export class DockerApiClient implements DockerClient {
       return existingAttachedStdinStream;
     }
 
-    const container = this.#docker.getContainer(sandboxId);
     const attachedStdinStream = await this.#runDockerClientOperation(
       DockerClientOperationIds.ATTACH_STDIN,
-      () => container.attach(createAttachStdinOptions()),
+      () => this.#attachContainerStdin(sandboxId),
     );
     this.#trackAttachedStdinStream(sandboxId, attachedStdinStream);
 
     return attachedStdinStream;
+  }
+
+  async #attachContainerStdin(sandboxId: string): Promise<NodeJS.ReadWriteStream> {
+    const query = new URLSearchParams({
+      stdin: "1",
+      stream: "1",
+      logs: "0",
+      stdout: "1",
+      stderr: "1",
+    });
+
+    return await new Promise<NodeJS.ReadWriteStream>((resolve, reject) => {
+      const request = http.request({
+        socketPath: this.#config.socketPath,
+        path: `/containers/${encodeURIComponent(sandboxId)}/attach?${query.toString()}`,
+        method: "POST",
+        headers: {
+          Connection: "Upgrade",
+          Upgrade: "tcp",
+          "Content-Length": "0",
+        },
+      });
+
+      const cleanup = (): void => {
+        request.removeAllListeners("upgrade");
+        request.removeAllListeners("response");
+        request.removeAllListeners("error");
+      };
+
+      request.once("upgrade", (_response, socket, head) => {
+        cleanup();
+        if (head.length > 0) {
+          socket.unshift(head);
+        }
+        resolve(socket);
+      });
+
+      request.once("response", (response) => {
+        cleanup();
+        request.destroy();
+        reject(
+          new Error(
+            `Docker attach did not upgrade the connection. Received HTTP ${response.statusCode ?? 0}.`,
+          ),
+        );
+      });
+
+      request.once("error", (error) => {
+        cleanup();
+        reject(error);
+      });
+
+      request.flushHeaders();
+    });
   }
 
   #trackAttachedStdinStream(sandboxId: string, attachedStdinStream: NodeJS.ReadWriteStream): void {

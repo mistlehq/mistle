@@ -298,6 +298,8 @@ describe("parseConfigRecord", () => {
             docker: {
               socketPath: "/var/run/docker.sock",
               snapshotRepository: "localhost:5001/mistle/snapshots",
+              networkName: "mistle-sandbox-dev",
+              tracesEndpoint: "http://otel-lgtm:4318/v1/traces",
             },
           },
         },

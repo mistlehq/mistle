@@ -507,7 +507,7 @@ describe("compileRuntimePlan", () => {
     const installScript = runtimePlan.artifacts[0]?.lifecycle.install[0]?.args[2];
     expect(typeof installScript).toBe("string");
     expect(installScript).toContain(
-      'curl -fsSL "https://github.com/$repo/releases/latest/download/$asset_name"',
+      'curl --noproxy "*" -fsSL "https://github.com/$repo/releases/latest/download/$asset_name"',
     );
     expect(installScript).toContain("openai/codex");
     expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");

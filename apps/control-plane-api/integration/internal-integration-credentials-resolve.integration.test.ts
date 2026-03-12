@@ -1,3 +1,5 @@
+import { generateKeyPairSync } from "node:crypto";
+
 import {
   IntegrationBindingKinds,
   IntegrationConnectionStatuses,
@@ -21,18 +23,34 @@ type ConnectionResponse = {
   id: string;
 };
 
-async function insertGitHubBindingFixture(input: { fixture: ControlPlaneApiIntegrationFixture }) {
+async function insertGitHubBindingFixture(input: {
+  fixture: ControlPlaneApiIntegrationFixture;
+  targetKey: string;
+  connectionId: string;
+  bindingId: string;
+}) {
   const authSession = await input.fixture.authSession();
+  const { privateKey } = generateKeyPairSync("rsa", {
+    modulusLength: 2048,
+    privateKeyEncoding: {
+      type: "pkcs8",
+      format: "pem",
+    },
+    publicKeyEncoding: {
+      type: "spki",
+      format: "pem",
+    },
+  });
   const encryptedSecrets = encryptIntegrationTargetSecrets({
     secrets: {
-      app_private_key_pem: "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----",
+      app_private_key_pem: privateKey,
     },
     masterKeyVersion: 1,
     masterEncryptionKeyMaterial: "integration-master-key-testing",
   });
 
   await input.fixture.db.insert(integrationTargets).values({
-    targetKey: "github-cloud-binding-aware",
+    targetKey: input.targetKey,
     familyId: "github",
     variantId: "github-cloud",
     enabled: true,
@@ -45,9 +63,9 @@ async function insertGitHubBindingFixture(input: { fixture: ControlPlaneApiInteg
   });
 
   await input.fixture.db.insert(integrationConnections).values({
-    id: "icn_github_binding_aware",
+    id: input.connectionId,
     organizationId: authSession.organizationId,
-    targetKey: "github-cloud-binding-aware",
+    targetKey: input.targetKey,
     displayName: "GitHub binding-aware connection",
     status: IntegrationConnectionStatuses.ACTIVE,
     config: {
@@ -68,10 +86,10 @@ async function insertGitHubBindingFixture(input: { fixture: ControlPlaneApiInteg
   });
 
   await input.fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
-    id: "ibd_github_binding_aware",
+    id: input.bindingId,
     sandboxProfileId: "sbp_github_binding_aware",
     sandboxProfileVersion: 1,
-    connectionId: "icn_github_binding_aware",
+    connectionId: input.connectionId,
     kind: IntegrationBindingKinds.GIT,
     config: {
       repositories: ["mistlehq/mistle", "mistlehq/platform", "mistlehq/mistle"],
@@ -80,8 +98,8 @@ async function insertGitHubBindingFixture(input: { fixture: ControlPlaneApiInteg
 
   return {
     organizationId: authSession.organizationId,
-    connectionId: "icn_github_binding_aware",
-    bindingId: "ibd_github_binding_aware",
+    connectionId: input.connectionId,
+    bindingId: input.bindingId,
   };
 }
 
@@ -257,41 +275,20 @@ describe("internal integration credentials resolve", () => {
     });
   });
 
-  it("rejects custom credential resolution when binding id is missing", async ({ fixture }) => {
-    const githubFixture = await insertGitHubBindingFixture({ fixture });
-
-    const response = await fixture.request(
-      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
-      {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
-        },
-        body: JSON.stringify({
-          connectionId: githubFixture.connectionId,
-          secretType: "oauth_access_token",
-          resolverKey: "github_app_installation_token",
-        }),
-      },
-    );
-
-    expect(response.status).toBe(400);
-    await expect(response.json()).resolves.toEqual({
-      code: "BINDING_REQUIRED",
-      message: "Binding id is required for custom credential resolution.",
-    });
-  });
-
   it("rejects custom credential resolution when binding belongs to a different connection", async ({
     fixture,
   }) => {
-    const githubFixture = await insertGitHubBindingFixture({ fixture });
+    const githubFixture = await insertGitHubBindingFixture({
+      fixture,
+      targetKey: "github-cloud-binding-aware-mismatch",
+      connectionId: "icn_github_binding_aware_mismatch",
+      bindingId: "ibd_github_binding_aware_mismatch",
+    });
 
     await fixture.db.insert(integrationConnections).values({
       id: "icn_github_other_connection",
       organizationId: githubFixture.organizationId,
-      targetKey: "github-cloud-binding-aware",
+      targetKey: "github-cloud-binding-aware-mismatch",
       displayName: "Other GitHub connection",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
@@ -321,7 +318,7 @@ describe("internal integration credentials resolve", () => {
     await expect(response.json()).resolves.toEqual({
       code: "BINDING_CONNECTION_MISMATCH",
       message:
-        "Integration binding 'ibd_github_binding_aware' does not belong to connection 'icn_github_other_connection'.",
+        "Integration binding 'ibd_github_binding_aware_mismatch' does not belong to connection 'icn_github_other_connection'.",
     });
   });
 });
