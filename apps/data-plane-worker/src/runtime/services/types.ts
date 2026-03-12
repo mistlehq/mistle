@@ -1,12 +1,12 @@
 import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import type { SandboxAdapter } from "@mistle/sandbox";
 import type { Clock, Sleeper } from "@mistle/time";
+
+import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
 import type {
   DataPlaneWorkerServices,
   StartSandboxInstanceWorkflowServices,
-} from "@mistle/workflows/data-plane";
-
-import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
+} from "../workflow-types.js";
 
 export type TunnelConnectAckPolicy = {
   timeoutMs: number;

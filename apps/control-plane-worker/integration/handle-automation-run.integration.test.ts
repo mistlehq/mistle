@@ -34,7 +34,11 @@ import {
   OpenAiReasoningEfforts,
   OpenAiRuntimes,
 } from "@mistle/integrations-definitions";
-import type { HandleAutomationRunWorkflowInput } from "@mistle/workflows/control-plane";
+import type { HandleAutomationRunWorkflowInput } from "@mistle/workflow-registry/control-plane";
+import { eq } from "drizzle-orm";
+import { Pool } from "pg";
+import { describe, expect } from "vitest";
+
 import {
   AutomationConversationDeliveryTaskActions,
   claimOrResumeAutomationConversationDeliveryTask,
@@ -47,11 +51,7 @@ import {
   resolveAutomationConversationDeliveryActiveTaskAction,
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
-} from "@mistle/workflows/control-plane/runtime";
-import { eq } from "drizzle-orm";
-import { Pool } from "pg";
-import { describe, expect } from "vitest";
-
+} from "../src/runtime/workflows/index.js";
 import { it } from "./test-context.js";
 
 const TestTimeoutMs = 120_000;

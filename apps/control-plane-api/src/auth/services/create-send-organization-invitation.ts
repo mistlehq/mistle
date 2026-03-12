@@ -1,11 +1,14 @@
 import { SendOrganizationInvitationWorkflowSpec } from "@mistle/workflow-registry/control-plane";
-import { type createControlPlaneOpenWorkflow } from "@mistle/workflows/control-plane";
+
+import { buildDashboardUrl } from "../../dashboard-url.js";
+import { type createControlPlaneOpenWorkflow } from "../../openworkflow/index.js";
 
 type ControlPlaneOpenWorkflow = ReturnType<typeof createControlPlaneOpenWorkflow>;
+const DashboardInvitationAcceptPath = "/invitations/accept";
 
 type CreateSendOrganizationInvitationServiceInput = {
   openWorkflow: ControlPlaneOpenWorkflow;
-  invitationAcceptBaseUrl: string;
+  dashboardBaseUrl: string;
 };
 
 type SendOrganizationInvitationInput = {
@@ -18,13 +21,13 @@ type SendOrganizationInvitationInput = {
 };
 
 function buildInvitationUrl(input: {
-  invitationAcceptBaseUrl: string;
+  dashboardBaseUrl: string;
   invitationId: string;
   email: string;
   organizationName: string;
   inviterEmail: string;
 }): string {
-  const url = new URL(input.invitationAcceptBaseUrl);
+  const url = new URL(buildDashboardUrl(input.dashboardBaseUrl, DashboardInvitationAcceptPath));
   url.searchParams.set("invitationId", input.invitationId);
   url.searchParams.set("email", input.email);
   url.searchParams.set("organizationName", input.organizationName);
@@ -38,7 +41,7 @@ export function createSendOrganizationInvitationService(
 ): (inviteInput: SendOrganizationInvitationInput) => Promise<void> {
   return async (inviteInput) => {
     const invitationUrl = buildInvitationUrl({
-      invitationAcceptBaseUrl: input.invitationAcceptBaseUrl,
+      dashboardBaseUrl: input.dashboardBaseUrl,
       invitationId: inviteInput.invitationId,
       email: inviteInput.email,
       organizationName: inviteInput.organizationName,

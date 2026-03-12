@@ -31,7 +31,7 @@ export type StartControlPlaneSystemEnvironmentInput = {
   postgres: SharedPostgresOptions;
   workflowNamespaceId: string;
   authBaseUrl: string;
-  authInvitationAcceptBaseUrl: string;
+  dashboardBaseUrl: string;
   authTrustedOrigins: string;
   cacheBustKey?: string;
   controlPlaneApiEnvironment?: Record<string, string>;
@@ -113,8 +113,7 @@ export async function startControlPlaneSystemEnvironment(
         MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL: containerDatabaseUrl,
         MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID: input.workflowNamespaceId,
         MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL: input.authBaseUrl,
-        MISTLE_APPS_CONTROL_PLANE_API_AUTH_INVITATION_ACCEPT_BASE_URL:
-          input.authInvitationAcceptBaseUrl,
+        MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL: input.dashboardBaseUrl,
         MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS: input.authTrustedOrigins,
       },
     });

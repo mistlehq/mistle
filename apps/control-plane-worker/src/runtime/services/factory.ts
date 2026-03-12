@@ -4,7 +4,9 @@ import {
   HandleAutomationRunWorkflowSpec,
   HandleAutomationConversationDeliveryWorkflowSpec,
   type HandleAutomationConversationDeliveryWorkflowInput,
-} from "@mistle/workflows/control-plane";
+} from "@mistle/workflow-registry/control-plane";
+
+import { executeConversationProviderDelivery } from "../automation-workflows/provider/execute-conversation-provider-delivery.js";
 import {
   acquireConversationDeliveryConnection,
   claimOrResumeAutomationConversationDeliveryTask,
@@ -23,9 +25,7 @@ import {
   resolveAutomationConversationDeliveryActiveTaskAction,
   resolveAutomationConversationDeliveryRoute,
   transitionAutomationRunToRunning,
-} from "@mistle/workflows/control-plane/runtime";
-
-import { executeConversationProviderDelivery } from "../automation-workflows/provider/execute-conversation-provider-delivery.js";
+} from "../workflows/index.js";
 import { createEmailSender } from "./create-email-sender.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 import { handleIntegrationWebhookEvent } from "./handle-integration-webhook-event.js";
