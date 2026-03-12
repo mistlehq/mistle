@@ -67,7 +67,7 @@ Use this package for:
 Do not use this package for:
 
 - dashboard-specific React state
-- transcript UI state
+- chat thread UI state
 - control-plane conversation routing or orchestration
 
 Those concerns belong in higher layers outside this package.

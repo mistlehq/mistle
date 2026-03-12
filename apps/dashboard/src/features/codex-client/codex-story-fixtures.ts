@@ -173,7 +173,7 @@ export const CodexStoryChatThreadEntriesWithExploringGroup: readonly ChatEntry[]
     turnId: "turn-exploring",
     kind: "user-message",
     status: "completed",
-    text: "Inspect the semantic transcript pipeline and summarize what changed.",
+    text: "Inspect the semantic timeline pipeline and summarize what changed.",
   },
   {
     id: "reasoning-exploring-1",
@@ -181,7 +181,7 @@ export const CodexStoryChatThreadEntriesWithExploringGroup: readonly ChatEntry[]
     kind: "reasoning",
     source: "summary",
     status: "completed",
-    summary: "Reading the shared semantic helpers and the dashboard transcript renderer first.",
+    summary: "Reading the shared semantic helpers and the dashboard chat-thread renderer first.",
   },
   CodexStoryExploringGroupEntry,
   {
@@ -191,7 +191,7 @@ export const CodexStoryChatThreadEntriesWithExploringGroup: readonly ChatEntry[]
     phase: null,
     status: "completed",
     text: [
-      "The transcript now derives semantic output from normalized Codex thread items.",
+      "The chat thread now derives semantic output from normalized Codex thread items.",
       "",
       "- shared helpers classify items before rendering",
       "- the dashboard groups adjacent exploring commands",
@@ -212,7 +212,7 @@ export const CodexStoryThinkingGroupEntry: ChatSemanticGroupEntry = {
     {
       id: "thinking-1",
       label: "Thought",
-      detail: "Comparing current grouped transcript output with the updated spec.",
+      detail: "Comparing current grouped timeline output with the updated spec.",
       detailKind: "plain",
       command: null,
       output: null,
@@ -274,7 +274,7 @@ export const CodexStoryChatThreadEntriesWithStructuredPlan: readonly ChatEntry[]
         status: "completed",
       },
       {
-        step: "Wire structured plan updates into the dashboard transcript",
+        step: "Wire structured plan updates into the dashboard chat thread",
         status: "inProgress",
       },
       {
@@ -290,7 +290,7 @@ export const CodexStoryChatThreadEntriesWithStructuredPlan: readonly ChatEntry[]
     kind: "assistant-message",
     phase: null,
     status: "streaming",
-    text: "The transcript can now switch to a structured plan block when turn/plan/updated arrives.",
+    text: "The chat thread can now switch to a structured plan block when turn/plan/updated arrives.",
   },
 ];
 
@@ -345,7 +345,7 @@ export const CodexStorySearchingWebGroupEntry: ChatSemanticGroupEntry = {
     {
       id: "searching-web-1",
       label: "Web search",
-      detail: "opencode shared transcript renderer grouped tools",
+      detail: "opencode shared chat renderer grouped tools",
       detailKind: "plain",
       command: null,
       output: JSON.stringify(
@@ -521,7 +521,7 @@ export const CodexStoryRunningCommandsLongOutputGroupEntry: ChatSemanticGroupEnt
         "✓ packages/codex-app-server-client/src/thread-items/thread-items.test.ts (14 tests) 35ms",
         "",
         "stdout | tests/system/codex-session-render.system.test.ts",
-        "Rebuilding dashboard transcript fixtures...",
+        "Rebuilding dashboard chat-entry fixtures...",
         "Loading semantic group snapshots...",
         "",
         "stderr | tests/system/codex-session-render.system.test.ts",
@@ -581,7 +581,7 @@ export const CodexStorySessionEntriesWithExploringGroup: readonly ChatEntry[] = 
     turnId: "turn-session-exploring",
     kind: "user-message",
     status: "completed",
-    text: "Trace how the transcript UI renders the new exploring group.",
+    text: "Trace how the chat thread renders the new exploring group.",
   },
   CodexStoryExploringGroupEntry,
   {
@@ -590,7 +590,7 @@ export const CodexStorySessionEntriesWithExploringGroup: readonly ChatEntry[] = 
     kind: "assistant-message",
     phase: null,
     status: "completed",
-    text: "The grouped exploring block is visible in the transcript and keeps the surrounding session layout intact.",
+    text: "The grouped exploring block is visible in the chat thread and keeps the surrounding session layout intact.",
   },
 ];
 

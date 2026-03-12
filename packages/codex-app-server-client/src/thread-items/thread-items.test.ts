@@ -28,7 +28,7 @@ describe("thread item semantics", () => {
           content: [
             {
               type: "text",
-              text: "Inspect the grouped transcript flow",
+              text: "Inspect the grouped timeline flow",
             },
           ],
         },
@@ -38,7 +38,7 @@ describe("thread item semantics", () => {
         kind: "user-message",
         id: "user_1",
         turnId: "turn_1",
-        text: "Inspect the grouped transcript flow",
+        text: "Inspect the grouped timeline flow",
       },
     ]);
 
@@ -872,10 +872,10 @@ describe("thread item semantics", () => {
           {
             type: "webSearch",
             id: "web_2",
-            query: "storybook grouped transcript",
+            query: "storybook grouped timeline",
             action: {
               type: "search",
-              query: "storybook grouped transcript",
+              query: "storybook grouped timeline",
             },
           },
         ],

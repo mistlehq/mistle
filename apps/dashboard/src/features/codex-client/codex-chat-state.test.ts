@@ -257,7 +257,7 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
-  it("groups adjacent exploring command executions into one exploring transcript block", () => {
+  it("groups adjacent exploring command executions into one exploring chat block", () => {
     const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
       type: "hydrate_from_thread_read",
       turns: [
@@ -361,7 +361,7 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
-  it("groups adjacent reasoning items into one thinking transcript block", () => {
+  it("groups adjacent reasoning items into one thinking chat block", () => {
     const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
       type: "hydrate_from_thread_read",
       turns: [
@@ -441,7 +441,7 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
-  it("rebuilds the same exploring transcript shape from hydration and live notifications", () => {
+  it("rebuilds the same exploring chat-entry shape from hydration and live notifications", () => {
     const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
       type: "hydrate_from_thread_read",
       turns: [
@@ -1354,7 +1354,7 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
-  it("surfaces generic completed items for unsupported transcript item types", () => {
+  it("surfaces generic completed items for unsupported chat item types", () => {
     const state = reduceCodexChatState(createInitialCodexChatState(), {
       type: "notification_received",
       notification: {
@@ -1407,7 +1407,7 @@ describe("reduceCodexChatState", () => {
     ]);
   });
 
-  it("does not surface raw userMessage items as generic transcript entries", () => {
+  it("does not surface raw userMessage items as generic chat entries", () => {
     const state = reduceCodexChatState(createInitialCodexChatState(), {
       type: "notification_received",
       notification: {
@@ -1431,7 +1431,7 @@ describe("reduceCodexChatState", () => {
     expect(state.entries).toEqual([]);
   });
 
-  it("omits empty reasoning content arrays from transcript state", () => {
+  it("omits empty reasoning content arrays from chat-entry state", () => {
     const state = reduceCodexChatState(createInitialCodexChatState(), {
       type: "notification_received",
       notification: {

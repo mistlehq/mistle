@@ -19,10 +19,10 @@ Right now the dashboard reducer already performs some item normalization, but it
 The following decisions are part of this spec and are no longer open questions.
 
 - `plan` stays outside the semantic action grouping layer.
-- `plan` remains a first-class dashboard transcript entry and is not downgraded to `generic-item` as part of this work.
+- `plan` remains a first-class dashboard chat entry and is not downgraded to `generic-item` as part of this work.
 - the semantic layer owns semantic identity, grouping, aggregate counts, and canonical display keys
-- the dashboard owns localized strings, final transcript view-model shaping, and rendering
-- dashboard state becomes item-first for Codex turns: normalized items are the source of truth, and grouped transcript output is derived from those items
+- the dashboard owns localized strings, final chat-entry view-model shaping, and rendering
+- dashboard state becomes item-first for Codex turns: normalized items are the source of truth, and grouped chat output is derived from those items
 - hydrated history and live item snapshots use the same normalize -> classify -> group pipeline, with delta accumulation remaining in the dashboard reducer
 - grouped semantic blocks ship in the same implementation as the state-model rewrite; this is a one-shot migration, not a staged rollout
 
@@ -66,7 +66,7 @@ Key files:
   - `ExecCell` holds grouped command calls and decides whether the cell is exploratory at lines `1-166`
   - `is_exploring_cell()` and `is_exploring_call()` are the key classification checks at lines `119-165`
 - `/Users/jonathanlow/Projects/codex/codex-rs/tui/src/exec_cell/render.rs`
-  - `exploring_display_lines()` renders grouped `Exploring` or `Explored` transcript output at lines `252-354`
+  - `exploring_display_lines()` renders grouped `Exploring` or `Explored` chat output at lines `252-354`
 - `/Users/jonathanlow/Projects/codex/codex-rs/tui/src/history_cell.rs`
   - `web_search_header()` renders `Searching the web` or `Searched` at lines `1513-1518`
 
@@ -126,7 +126,7 @@ This layer preserves:
 
 ### 3. Semantic classification and grouping
 
-Classify normalized items and group them for transcript presentation.
+Classify normalized items and group them for chat presentation.
 
 Files:
 
@@ -421,7 +421,7 @@ The table below defines the mapping from raw Codex `ThreadItem` values to the no
 | --------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `userMessage`                           | `id`, `content`                                                                                  | `user-message`      | Normalize textual user input into a displayable text form.                                                                                                    |
 | `agentMessage`                          | `id`, `text`, `phase`                                                                            | `assistant-message` | Preserve `phase`; map active lifecycle to `streaming` and finalized lifecycle to `completed`.                                                                 |
-| `plan`                                  | `id`, `text`                                                                                     | `plan`              | Preserve plan content as a dedicated normalized item. It remains a standalone transcript entry and is never part of semantic action grouping.                 |
+| `plan`                                  | `id`, `text`                                                                                     | `plan`              | Preserve plan content as a dedicated normalized item. It remains a standalone chat entry and is never part of semantic action grouping.                       |
 | `reasoning`                             | `id`, `summary`, `content`                                                                       | `reasoning`         | Emit one normalized reasoning item for summary content and one for full content when both are present. Preserve source as `summary` or `content`.             |
 | `commandExecution`                      | `id`, `command`, `cwd`, `status`, `commandActions`, `aggregatedOutput`, `exitCode`, `durationMs` | `command-execution` | Preserve `commandActions` exactly; do not reparse shell locally.                                                                                              |
 | `fileChange`                            | `id`, `changes`, `status`                                                                        | `file-change`       | Preserve change list and item status.                                                                                                                         |
@@ -492,7 +492,7 @@ Normalized output:
 Notes:
 
 - emit no reasoning item for empty `summary` or empty `content`
-- this intentionally does not preserve empty reasoning content arrays as transcript entries
+- this intentionally does not preserve empty reasoning content arrays as chat entries
 
 #### `commandExecution`
 
@@ -715,7 +715,7 @@ Notes:
 - unsupported raw items normalize to `generic-item`, not `null`
 - thread and turn builders accept raw turn payloads from `packages/codex-app-server-client/src/codex/operations.ts`
 - the shared package should align with the current Codex protocol schema and enum values, but must not take an app-specific dependency on generated types under `apps/control-plane-worker`
-- timeline builders return a mixed transcript sequence of grouped semantic entries and standalone transcript entries
+- timeline builders return a mixed sequence of grouped semantic entries and standalone chat entries
 - adjacent items of the same groupable semantic kind are grouped
 - `plan`, `user-message`, `assistant-message`, and fallback `generic-item` remain standalone by explicit product rule
 
@@ -860,8 +860,8 @@ These rules remove ambiguity during implementation.
 - grouping is per turn
 - a turn boundary is a hard grouping boundary
 - a user message boundary is a hard grouping boundary
-- assistant messages are standalone transcript entries and are not members of semantic action groups
-- `plan` is a standalone transcript entry and is never a member of a semantic action group
+- assistant messages are standalone chat entries and are not members of semantic action groups
+- `plan` is a standalone chat entry and is never a member of a semantic action group
 - fallback `generic-item` entries remain standalone and are never merged into semantic groups
 - adjacent items of the same semantic kind group together when that semantic kind is groupable
 - the currently groupable semantic kinds are:
@@ -873,15 +873,15 @@ These rules remove ambiguity during implementation.
   - `tool-call`
 - a semantic-kind boundary is a hard grouping boundary
 - a standalone-kind item breaks adjacency and starts a new grouping run on either side
-- any non-groupable transcript item between two groupable items flushes the current group
+- any non-groupable chat entry between two groupable items flushes the current group
 - different semantic kinds do not merge
 - `streaming` and `completed` items of the same groupable semantic kind may be in the same group if they are adjacent and in the same turn
 - group status is recalculated from child item status after every item update
 - `tool-call` items do not merge with `exploring`, `making-edits`, `thinking`, or `running-commands`
 - `plan` items do not merge with semantic action groups
-- command execution approvals are not part of the grouped transcript model
+- command execution approvals are not part of the grouped chat-entry model
 
-The recommended default is per-turn grouping, not cross-turn grouping. This is the least surprising transcript behavior and is the safest match for `mistle`'s turn model.
+The recommended default is per-turn grouping, not cross-turn grouping. This is the least surprising chat-thread behavior and is the safest match for `mistle`'s turn model.
 
 ## Grouping Rules
 
@@ -890,7 +890,7 @@ Grouping happens after classification, not during normalization.
 This follows the same architectural split as:
 
 - `opencode`, where adjacent tool parts are first grouped in `message-part.tsx` lines `395-437` and then rendered in `ContextToolGroup()` at lines `765-835`
-- `codex`, where grouped exec-call state lives in `exec_cell/model.rs` and the grouped transcript lines are rendered separately in `exec_cell/render.rs` lines `252-354`
+- `codex`, where grouped exec-call state lives in `exec_cell/model.rs` and the grouped chat lines are rendered separately in `exec_cell/render.rs` lines `252-354`
 
 The grouping layer:
 
@@ -956,14 +956,14 @@ const turnTimeline = buildCodexTurnTimeline({
 The final timeline returned by `buildCodexTurnTimeline()` or `buildCodexThreadTimeline()` is a mixed sequence of `CodexTimelineEntry` values:
 
 - `SemanticActionGroup` for adjacent `exploring` command executions
-- `StandaloneTimelineEntry` for non-mergeable transcript items such as one `making-edits` item, one `plan` item, or one generic transcript item
+- `StandaloneTimelineEntry` for non-mergeable items such as one `making-edits` item, one `plan` item, or one generic chat item
 
 Do not force every item into a grouped semantic block.
 
 This follows the reference implementations:
 
 - `opencode` emits a mixed stream of grouped `context` entries and standalone `part` entries in `/Users/jonathanlow/Projects/opencode/packages/ui/src/components/message-part.tsx` lines `495-555`
-- `codex` renders grouped exec cells alongside other history cell types rather than collapsing the entire transcript into one grouping system
+- `codex` renders grouped exec cells alongside other history cell types rather than collapsing the entire chat thread into one grouping system
 
 ## Display Metadata Ownership
 
@@ -1005,7 +1005,7 @@ The dashboard does not consume:
 
 - hard-coded English labels from the shared package
 - component-specific rendering instructions
-- app-server transport objects as the source of truth for grouped transcript state
+- app-server transport objects as the source of truth for grouped chat-entry state
 
 ## Examples
 
@@ -1263,7 +1263,7 @@ Classification result:
 
 The dashboard stops owning the Codex-specific normalization rules currently embedded in `codex-chat-state.ts`.
 
-The shared normalized model preserves `commandActions`, and the derived dashboard transcript view-model does not erase them even if the first UI revision does not render every grouped semantic kind with equal polish. This is the durable structure that enables semantic grouping without reparsing shell commands later.
+The shared normalized model preserves `commandActions`, and the derived dashboard chat-entry view model does not erase them even if the first UI revision does not render every grouped semantic kind with equal polish. This is the durable structure that enables semantic grouping without reparsing shell commands later.
 
 That preservation choice is directly aligned with the reference systems:
 
@@ -1275,7 +1275,7 @@ Instead:
 1. `readCodexThread()` keeps returning raw turns.
 2. The dashboard reducer stores normalized Codex items per turn as the source of truth.
 3. The dashboard uses shared classifier and timeline helpers from `@mistle/codex-app-server-client`.
-4. The reducer derives grouped timeline entries and final transcript view-model entries from the normalized per-turn item state.
+4. The reducer derives grouped timeline entries and final chat-entry view model entries from the normalized per-turn item state.
 
 This allows the dashboard to render:
 
@@ -1288,11 +1288,11 @@ without re-implementing Codex parsing logic.
 This also aligns the dashboard with the reference implementations:
 
 - like `codex`, grouped execution state is derived from underlying item state and updated by routing item-level deltas into that state first
-- like `opencode`, grouped transcript output remains a mixed stream of grouped semantic blocks and standalone transcript entries
+- like `opencode`, grouped chat output remains a mixed stream of grouped semantic blocks and standalone chat entries
 
 ## Dashboard Change Detail
 
-The dashboard change is a full state-model rewrite for Codex transcript state. This is intentionally a one-shot migration so hydrated history, live notifications, and grouped rendering all share one source of truth and one derivation pipeline.
+The dashboard change is a full state-model rewrite for Codex chat-entry state. This is intentionally a one-shot migration so hydrated history, live notifications, and grouped rendering all share one source of truth and one derivation pipeline.
 
 ### `apps/dashboard/src/features/codex-client/codex-chat-state.ts`
 
@@ -1300,21 +1300,21 @@ This is the main dashboard file that changes.
 
 Today it:
 
-- maps raw `ThreadItem` payloads into dashboard transcript entries in local mapping helpers
+- maps raw `ThreadItem` payloads into dashboard chat entries in local mapping helpers
 - hydrates thread reads into chat turns in `mapThreadReadTurnToChatTurn()`
 - maps live notifications into dashboard chat actions in `mapNotificationToChatActions()`
 - drops semantic inputs such as `commandActions` from `commandExecution`
 
 After the change it:
 
-- stop using flattened transcript entries as the source of truth for Codex item state
+- stop using flattened chat entries as the source of truth for Codex item state
 - store normalized Codex items per turn
 - keep delta accumulation for partial live items in the dashboard reducer
 - once a current raw item snapshot exists, normalize it and update normalized items by `itemId`
 - rerun item classification and rebuild the affected turn timeline after each item update
 - consume shared semantic timeline helpers from `@mistle/codex-app-server-client`
 - derive dashboard-facing grouped blocks and standalone entries from the normalized turn state
-- preserve `plan` as a dedicated normalized and standalone transcript item outside semantic action grouping
+- preserve `plan` as a dedicated normalized and standalone chat entry outside semantic action grouping
 
 Expected change size:
 
@@ -1335,14 +1335,14 @@ Today it has standalone entry types such as:
 
 It does not yet have a grouped semantic block type.
 
-After the change it adds explicit grouped semantic transcript support through a second derived transcript view-model above the current normalized item state.
+After the change it adds explicit grouped semantic chat support through a second derived chat-entry view model above the current normalized item state.
 
 This follows the same architectural shape as the reference implementations:
 
-- `codex` derives grouped exec transcript cells from underlying call state
+- `codex` derives grouped exec chat cells from underlying call state
 - `opencode` derives grouped context entries from underlying ordered parts
 
-`plan` remains a standalone non-grouped entry in that derived transcript view-model.
+`plan` remains a standalone non-grouped entry in that derived chat-entry view model.
 
 Expected change size:
 
@@ -1363,7 +1363,7 @@ After the change it:
 
 - continue to own orchestration and RPC flow
 - continue to dispatch hydration and notification events
-- rely on the reducer and shared helpers to derive grouped timeline entries and the final transcript view-model instead of raw per-item dashboard mapping
+- rely on the reducer and shared helpers to derive grouped timeline entries and the final chat-entry view model instead of raw per-item dashboard mapping
 
 Expected change size:
 
@@ -1378,7 +1378,7 @@ The dashboard rendering layer must:
 - render grouped blocks such as `Exploring` / `Explored`
 - render aggregate counts such as `3 reads, 2 searches`
 - render grouped child details
-- continue rendering standalone entries such as user messages, assistant messages, plans, `making-edits`, `thinking`, `searching-web`, tool calls, and generic items in transcript order
+- continue rendering standalone entries such as user messages, assistant messages, plans, `making-edits`, `thinking`, `searching-web`, tool calls, and generic items in chat-entry order
 
 ### Overall dashboard impact
 
@@ -1391,7 +1391,7 @@ Estimate:
 
 This split matches the reference implementations:
 
-- `codex` keeps semantic execution state separate from transcript rendering
+- `codex` keeps semantic execution state separate from chat rendering
 - `opencode` keeps context grouping logic separate from final grouped UI rendering
 
 The dashboard follows the same pattern by moving semantic interpretation into the shared client package and keeping dashboard code focused on presentation and app state.
@@ -1503,9 +1503,9 @@ If worker-side consumers need semantic history in the future, add a separate pat
 1. reads thread history with `includeTurns: true`
 2. passes turns through the shared classifier
 
-This keeps orchestration separate from transcript semantics.
+This keeps orchestration separate from chat semantics.
 
-Command execution approvals remain outside this semantic transcript model. They are related to command execution, but they answer a different product question: what the system is asking permission to run, not what happened in the conversation history. If they need shared presentation later, they can reuse command-action formatting utilities without being forced into the grouped transcript abstraction.
+Command execution approvals remain outside this semantic chat-entry model. They are related to command execution, but they answer a different product question: what the system is asking permission to run, not what happened in the conversation history. If they need shared presentation later, they can reuse command-action formatting utilities without being forced into the grouped chat-entry abstraction.
 
 ## Non-Goals
 
@@ -1545,7 +1545,7 @@ Build order:
 5. rewrite dashboard Codex state to store normalized items per turn
 6. integrate hydrated thread reads in the dashboard
 7. integrate live notification updates using the same item-update then regroup flow
-8. add grouped semantic transcript rendering
+8. add grouped semantic chat rendering
 9. add or update unit tests for each stage
 
 This matches the dependency order seen in the references:
@@ -1575,9 +1575,9 @@ Required tests:
 - grouping tests that verify semantic kind boundaries break groups
 - grouping tests that verify standalone kinds such as `plan`, `assistant-message`, and `generic-item` break groups
 - grouping tests that verify `streaming` status propagates to the group while any child item is still active
-- dashboard reducer tests that verify hydration and live notifications both rebuild the same grouped transcript state
+- dashboard reducer tests that verify hydration and live notifications both rebuild the same grouped chat-entry state
 - dashboard reducer tests that verify `plan` remains standalone and never merges into semantic action groups
-- dashboard transcript tests that verify standalone entries preserve order around grouped semantic blocks
+- dashboard chat-entry tests that verify standalone entries preserve order around grouped semantic blocks
 - dashboard reducer tests that verify delta accumulation happens before normalization and grouping
 
 Regression tests:
@@ -1620,12 +1620,12 @@ This implementation includes:
 - dashboard state rewrite to store normalized items as the source of truth for Codex turns
 - dashboard hydration integration for grouped semantic history
 - live notification merge support using the same normalized and grouped model
-- grouped dashboard transcript rendering
-- preservation of `plan` as a standalone dashboard transcript entry outside semantic action grouping
+- grouped dashboard chat rendering
+- preservation of `plan` as a standalone dashboard chat entry outside semantic action grouping
 
 This implementation does not include:
 
-- command execution approvals in the grouped transcript model
+- command execution approvals in the grouped chat-entry model
 - worker-orchestration integration
 - provider-agnostic semantic abstraction
 - UI-specific animation implementation
@@ -1644,7 +1644,7 @@ Implement in this order:
 3. Add adjacency-based per-turn grouping for all groupable semantic kinds, with `plan`, `user-message`, `assistant-message`, and fallback `generic-item` remaining standalone.
 4. Rewrite dashboard Codex state so normalized items are the source of truth.
 5. Switch dashboard hydration to the shared normalize -> classify -> group pipeline, and switch live item snapshots to that pipeline after dashboard-side delta accumulation.
-6. Render grouped semantic transcript blocks while preserving standalone entries such as `plan`.
+6. Render grouped semantic chat blocks while preserving standalone entries such as `plan`.
 7. Leave command execution approvals out of the semantic timeline implementation.
 
 The model supports both persisted history and live notifications by carrying `streaming` and `completed` status through the normalized and semantic layers.
@@ -1653,7 +1653,7 @@ For active/completed label behavior, use the reference implementations as the gu
 
 - `opencode` active/completed title transitions in `/Users/jonathanlow/Projects/opencode/packages/ui/src/components/tool-status-title.tsx` lines `23-120`
 - `opencode` status labels in `/Users/jonathanlow/Projects/opencode/packages/ui/src/i18n/en.ts` lines `50-58`
-- `codex` grouped `Exploring` or `Explored` transcript rendering in `/Users/jonathanlow/Projects/codex/codex-rs/tui/src/exec_cell/render.rs` lines `252-354`
+- `codex` grouped `Exploring` or `Explored` chat rendering in `/Users/jonathanlow/Projects/codex/codex-rs/tui/src/exec_cell/render.rs` lines `252-354`
 - `codex` `Searching the web` / `Searched` labeling in `/Users/jonathanlow/Projects/codex/codex-rs/tui/src/history_cell.rs` lines `1513-1518`
 
 That slice is enough to prove the boundary and validate the model before broader refactors.

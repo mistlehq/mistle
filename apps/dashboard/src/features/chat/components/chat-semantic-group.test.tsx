@@ -34,7 +34,7 @@ describe("ChatSemanticGroup", () => {
     expect(screen.getByText("Thoughts")).toBeTruthy();
     expect(screen.getByText("2 items")).toBeTruthy();
     expect(screen.getAllByText("Thought")).toHaveLength(2);
-    expect(screen.getByText(/Comparing current grouped transcript output/)).toBeTruthy();
+    expect(screen.getByText(/Comparing current grouped timeline output/)).toBeTruthy();
     expect(screen.queryByText("Toggle results")).toBeNull();
   });
 

@@ -62,7 +62,7 @@ export const SessionDetail: Story = {
     mainContent: (
       <div className="flex h-full min-h-0 flex-col">
         <div className="min-h-0 flex-1 rounded-xl border bg-card p-6 shadow-xs">
-          <p className="text-sm">Session transcript surface</p>
+          <p className="text-sm">Session chat thread surface</p>
         </div>
       </div>
     ),
