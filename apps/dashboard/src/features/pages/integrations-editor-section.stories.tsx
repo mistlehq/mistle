@@ -24,6 +24,21 @@ function createQueryClient(): QueryClient {
   });
 }
 
+function filterGithubResources(search: string): IntegrationConnectionResources {
+  const normalizedSearch = search.trim().toLowerCase();
+  const items =
+    normalizedSearch.length === 0
+      ? GithubResources.items
+      : GithubResources.items.filter((item) =>
+          item.handle.toLowerCase().includes(normalizedSearch),
+        );
+
+  return {
+    ...GithubResources,
+    items,
+  };
+}
+
 const OpenAiTarget: IntegrationTargetSummary = {
   targetKey: "target-openai",
   displayName: "OpenAI",
@@ -121,6 +136,17 @@ const GithubResources: IntegrationConnectionResources = {
 function IntegrationsEditorSectionStory(): React.JSX.Element {
   const [queryClient] = useState(() => {
     const client = createQueryClient();
+    client.setQueryDefaults(
+      ["integration-connections", GithubResources.connectionId, "resources", GithubResources.kind],
+      {
+        queryFn: async ({ queryKey }) => {
+          const searchKey = queryKey.at(-1);
+          const search = typeof searchKey === "string" ? searchKey : "";
+
+          return filterGithubResources(search);
+        },
+      },
+    );
     client.setQueryData(
       [
         "integration-connections",
