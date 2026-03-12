@@ -27,7 +27,6 @@ import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-
 import {
   createDefaultBindingConfig,
   resolveBindingKindFromTarget,
-  SandboxProfileBindingConfigEditor,
   type IntegrationConnectionSummary,
   type IntegrationTargetSummary,
   type SandboxProfileBindingEditorRow,
