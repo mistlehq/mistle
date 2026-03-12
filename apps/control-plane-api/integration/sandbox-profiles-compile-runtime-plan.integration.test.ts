@@ -134,6 +134,8 @@ describe("sandbox profile compile runtime plan integration", () => {
               mode: 384,
               content: `model = "gpt-5.3-codex"
 model_reasoning_effort = "medium"
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
 developer_instructions = "Prefer concise answers.\\nAlways explain tradeoffs."
 
 [projects."/"]

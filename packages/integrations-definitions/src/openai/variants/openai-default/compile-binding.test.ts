@@ -172,6 +172,8 @@ describe("compileOpenAiApiKeyBinding", () => {
     const configContent = compiled.runtimeClients[0]?.setup.files[0]?.content;
     expect(configContent).toContain('model = "gpt-5.3-codex"');
     expect(configContent).toContain('model_reasoning_effort = "medium"');
+    expect(configContent).toContain('approval_policy = "never"');
+    expect(configContent).toContain('sandbox_mode = "danger-full-access"');
     expect(configContent).toContain('trust_level = "trusted"');
     expect(configContent).not.toContain("developer_instructions");
     expect(configContent).not.toContain("base_url =");
