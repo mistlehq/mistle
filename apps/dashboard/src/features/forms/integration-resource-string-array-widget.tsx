@@ -1,119 +1,60 @@
-import { Alert, AlertDescription, Badge, Button, Input, ScrollArea } from "@mistle/ui";
+import { Input } from "@mistle/ui";
 import type { RJSFSchema, WidgetProps } from "@rjsf/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDeferredValue, useState } from "react";
+import { z } from "zod";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
-  type IntegrationConnectionResourceSummary,
   listIntegrationConnectionResources,
   refreshIntegrationConnectionResources,
 } from "../integrations/integrations-service.js";
+import { formatDateTime } from "../shared/date-formatters.js";
+import type { IntegrationFormContext } from "./integration-form-context.js";
+import { buildIntegrationResourceWidgetViewModel } from "./integration-resource-string-array-widget-view-model.js";
+import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
 
 type JsonObject = Record<string, unknown>;
-type IntegrationFormContext = {
-  layout?: "vertical" | "horizontal";
-};
+const IntegrationResourceSummaryOptionSchema = z
+  .object({
+    kind: z.string().min(1),
+    selectionMode: z.enum(["single", "multi"]),
+    count: z.number().int().min(0),
+    syncState: z.enum(["never-synced", "syncing", "ready", "error"]),
+    lastSyncedAt: z.string().min(1).optional(),
+  })
+  .strict();
 
-type IntegrationResourceStringArrayWidgetOptions = {
-  connectionId: string;
-  kind: string;
-  title?: string | undefined;
-  searchPlaceholder?: string | undefined;
-  emptyMessage?: string | undefined;
-  refreshLabel?: string | undefined;
-  resourceSummary?: IntegrationConnectionResourceSummary | undefined;
-};
+const IntegrationResourceStringArrayWidgetOptionsSchema = z
+  .object({
+    connectionId: z.string().min(1),
+    kind: z.string().min(1),
+    title: z.string().min(1).optional(),
+    searchPlaceholder: z.string().min(1).optional(),
+    emptyMessage: z.string().min(1).optional(),
+    refreshLabel: z.string().min(1).optional(),
+    resourceSummary: IntegrationResourceSummaryOptionSchema.optional(),
+  })
+  .passthrough();
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readStringOption(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function resolveResourceSummary(value: unknown): IntegrationConnectionResourceSummary | undefined {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-
-  if (
-    value.selectionMode !== "single" &&
-    value.selectionMode !== "multi" &&
-    value.selectionMode !== undefined
-  ) {
-    throw new Error("Integration resource widget received an invalid resource summary.");
-  }
-
-  if (
-    value.syncState !== "never-synced" &&
-    value.syncState !== "syncing" &&
-    value.syncState !== "ready" &&
-    value.syncState !== "error" &&
-    value.syncState !== undefined
-  ) {
-    throw new Error("Integration resource widget received an invalid resource summary.");
-  }
-
-  const kind = readStringOption(value.kind);
-  const selectionMode = value.selectionMode;
-  const syncState = value.syncState;
-  const count = typeof value.count === "number" && Number.isInteger(value.count) ? value.count : 0;
-  if (kind === undefined || selectionMode === undefined || syncState === undefined) {
-    throw new Error("Integration resource widget received an incomplete resource summary.");
-  }
-
-  return {
-    kind,
-    selectionMode,
-    count,
-    syncState,
-    ...(readStringOption(value.lastSyncedAt) === undefined
-      ? {}
-      : { lastSyncedAt: readStringOption(value.lastSyncedAt) }),
-  };
-}
+type IntegrationResourceStringArrayWidgetOptions = z.infer<
+  typeof IntegrationResourceStringArrayWidgetOptionsSchema
+>;
 
 function resolveWidgetOptions(
   options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"],
 ): IntegrationResourceStringArrayWidgetOptions {
-  if (!isRecord(options)) {
-    throw new Error("Integration resource widget options must be an object.");
+  const parsedOptions = IntegrationResourceStringArrayWidgetOptionsSchema.safeParse(options);
+  if (!parsedOptions.success) {
+    throw new Error("Integration resource widget received invalid options.");
   }
 
-  const connectionId = readStringOption(options.connectionId);
-  if (connectionId === undefined) {
-    throw new Error("Integration resource widget requires a connectionId option.");
-  }
-
-  const kind = readStringOption(options.kind);
-  if (kind === undefined) {
-    throw new Error("Integration resource widget requires a kind option.");
-  }
-
-  const resourceSummary = resolveResourceSummary(options.resourceSummary);
+  const resourceSummary = parsedOptions.data.resourceSummary;
   if (resourceSummary?.selectionMode === "single") {
     throw new Error("Integration resource widget currently supports only multi selection.");
   }
 
-  return {
-    connectionId,
-    kind,
-    ...(readStringOption(options.title) === undefined
-      ? {}
-      : { title: readStringOption(options.title) }),
-    ...(readStringOption(options.searchPlaceholder) === undefined
-      ? {}
-      : { searchPlaceholder: readStringOption(options.searchPlaceholder) }),
-    ...(readStringOption(options.emptyMessage) === undefined
-      ? {}
-      : { emptyMessage: readStringOption(options.emptyMessage) }),
-    ...(readStringOption(options.refreshLabel) === undefined
-      ? {}
-      : { refreshLabel: readStringOption(options.refreshLabel) }),
-    ...(resourceSummary === undefined ? {} : { resourceSummary }),
-  };
+  return parsedOptions.data;
 }
 
 function resolveSelectedHandles(value: unknown): string[] {
@@ -122,19 +63,6 @@ function resolveSelectedHandles(value: unknown): string[] {
   }
 
   return value.filter((entry): entry is string => typeof entry === "string");
-}
-
-function formatSyncStateLabel(syncState: string): string {
-  switch (syncState) {
-    case "never-synced":
-      return "Never synced";
-    case "syncing":
-      return "Syncing";
-    case "error":
-      return "Sync failed";
-    default:
-      return "Ready";
-  }
 }
 
 function formatSyncMetadata(input: {
@@ -153,34 +81,13 @@ function formatSyncMetadata(input: {
   return `Last synced ${input.lastSyncedAt}`;
 }
 
-function IntegrationResourceListError(input: {
-  error: unknown;
-  onRefresh: () => void;
-  isRefreshing: boolean;
-  refreshLabel: string;
-}): React.JSX.Element {
-  const message = resolveApiErrorMessage({
-    error: input.error,
-    fallbackMessage: "Could not load resources for this connection.",
-  });
-
-  return (
-    <Alert variant="destructive">
-      <AlertDescription className="gap-3 flex flex-col">
-        <span>{message}</span>
-        <div>
-          <Button
-            disabled={input.isRefreshing}
-            onClick={input.onRefresh}
-            size="sm"
-            type="button"
-            variant="outline"
-          >
-            {input.isRefreshing ? "Refreshing..." : input.refreshLabel}
-          </Button>
-        </div>
-      </AlertDescription>
-    </Alert>
+function resolveResourceOverride(input: {
+  formContext: IntegrationFormContext | undefined;
+  connectionId: string;
+  kind: string;
+}) {
+  return input.formContext?.resourceOverrides?.find(
+    (override) => override.connectionId === input.connectionId && override.kind === input.kind,
   );
 }
 
@@ -192,6 +99,11 @@ export function IntegrationResourceStringArrayWidget(
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search);
   const selectedHandles = resolveSelectedHandles(props.value);
+  const resourceOverride = resolveResourceOverride({
+    formContext: props.registry.formContext,
+    connectionId: options.connectionId,
+    kind: options.kind,
+  });
 
   const resourceQuery = useQuery({
     queryKey: [
@@ -208,6 +120,7 @@ export function IntegrationResourceStringArrayWidget(
         ...(deferredSearch.length === 0 ? {} : { search: deferredSearch }),
         signal,
       }),
+    enabled: resourceOverride === undefined,
     retry: false,
   });
 
@@ -233,9 +146,16 @@ export function IntegrationResourceStringArrayWidget(
     return <Input disabled id={props.id} value={selectedHandles.join(", ")} />;
   }
 
-  const availableHandles = new Set(resourceQuery.data?.items.map((item) => item.handle) ?? []);
+  const visibleItems =
+    resourceOverride === undefined
+      ? (resourceQuery.data?.items ?? [])
+      : resourceOverride.items.filter((item) =>
+          item.handle.toLowerCase().includes(deferredSearch.trim().toLowerCase()),
+        );
+  const availableHandles = new Set(visibleItems.map((item) => item.handle));
   const unavailableSelectedHandles =
-    resourceQuery.data === undefined || deferredSearch.length > 0
+    (resourceOverride === undefined && resourceQuery.data === undefined) ||
+    deferredSearch.length > 0
       ? []
       : selectedHandles.filter((handle) => !availableHandles.has(handle));
 
@@ -247,153 +167,149 @@ export function IntegrationResourceStringArrayWidget(
   }
 
   function triggerRefresh(): void {
+    if (resourceOverride !== undefined) {
+      return;
+    }
+
     refreshMutation.mutate();
   }
 
   const refreshLabel = options.refreshLabel ?? `Refresh ${options.title ?? "resources"}`;
-  const syncState = resourceQuery.data?.syncState ?? options.resourceSummary?.syncState;
+  const syncState =
+    resourceOverride?.syncState ??
+    resourceQuery.data?.syncState ??
+    options.resourceSummary?.syncState;
   const syncMetadata =
-    resourceQuery.data === undefined
-      ? options.resourceSummary === undefined
-        ? null
+    resourceOverride !== undefined
+      ? formatSyncMetadata({
+          syncState: resourceOverride.syncState,
+          ...(resourceOverride.lastSyncedAt === undefined
+            ? {}
+            : { lastSyncedAt: resourceOverride.lastSyncedAt }),
+          ...(resourceOverride.lastErrorMessage === undefined
+            ? {}
+            : { lastErrorMessage: resourceOverride.lastErrorMessage }),
+        })
+      : resourceQuery.data === undefined
+        ? options.resourceSummary === undefined
+          ? null
+          : formatSyncMetadata({
+              syncState: options.resourceSummary.syncState,
+              ...(options.resourceSummary.lastSyncedAt === undefined
+                ? {}
+                : { lastSyncedAt: options.resourceSummary.lastSyncedAt }),
+            })
         : formatSyncMetadata({
-            syncState: options.resourceSummary.syncState,
-            ...(options.resourceSummary.lastSyncedAt === undefined
+            syncState: resourceQuery.data.syncState,
+            ...(resourceQuery.data.lastSyncedAt === undefined
               ? {}
-              : { lastSyncedAt: options.resourceSummary.lastSyncedAt }),
-          })
-      : formatSyncMetadata({
-          syncState: resourceQuery.data.syncState,
-          ...(resourceQuery.data.lastSyncedAt === undefined
-            ? {}
-            : { lastSyncedAt: resourceQuery.data.lastSyncedAt }),
-          ...(resourceQuery.data.lastErrorMessage === undefined
-            ? {}
-            : { lastErrorMessage: resourceQuery.data.lastErrorMessage }),
-        });
+              : { lastSyncedAt: resourceQuery.data.lastSyncedAt }),
+            ...(resourceQuery.data.lastErrorMessage === undefined
+              ? {}
+              : { lastErrorMessage: resourceQuery.data.lastErrorMessage }),
+          });
+  const formattedSyncMetadata =
+    syncMetadata === null
+      ? null
+      : syncMetadata.startsWith("Last synced ")
+        ? `Last synced ${formatDateTime(syncMetadata.slice("Last synced ".length))}`
+        : syncMetadata;
   const refreshErrorMessage =
-    refreshMutation.error === null || refreshMutation.error === undefined
+    resourceOverride !== undefined ||
+    refreshMutation.error === null ||
+    refreshMutation.error === undefined
       ? null
       : resolveApiErrorMessage({
           error: refreshMutation.error,
           fallbackMessage: "Could not refresh resources for this connection.",
         });
+  const resourceListErrorMessage = !resourceQuery.isError
+    ? null
+    : resolveApiErrorMessage({
+        error: resourceQuery.error,
+        fallbackMessage: "Could not load resources for this connection.",
+      });
+  const availableCount =
+    resourceOverride?.items.length ??
+    resourceQuery.data?.items.length ??
+    options.resourceSummary?.count;
+  const widgetViewModel = buildIntegrationResourceWidgetViewModel({
+    title: options.title,
+    availableCount,
+    refreshLabel,
+    syncMetadata: formattedSyncMetadata,
+    syncState,
+    emptyMessage: options.emptyMessage,
+    search,
+    selectedCount: selectedHandles.length,
+    refreshErrorMessage,
+    unavailableSelectedHandles,
+    unavailableSelectedHandlesCount: unavailableSelectedHandles.length,
+    listState:
+      resourceOverride !== undefined
+        ? {
+            mode: "ready",
+          }
+        : resourceQuery.isPending
+          ? {
+              mode: "loading",
+            }
+          : resourceQuery.isError
+            ? {
+                mode: "error",
+                message:
+                  resourceListErrorMessage ?? "Could not load resources for this connection.",
+              }
+            : {
+                mode: "ready",
+              },
+    visibleItemsCount: visibleItems.length,
+  });
 
   return (
-    <div className="gap-3 flex flex-col">
-      <div className="gap-2 flex items-center">
-        <Input
-          aria-label={props.label}
-          className="w-full"
-          id={props.id}
-          onBlur={() => {
-            props.onBlur(props.id, selectedHandles);
-          }}
-          onChange={(event) => {
-            setSearch(event.currentTarget.value);
-          }}
-          onFocus={() => {
-            props.onFocus(props.id, selectedHandles);
-          }}
-          placeholder={options.searchPlaceholder ?? `Search ${options.title ?? "resources"}`}
-          value={search}
-        />
-        <Button
-          disabled={refreshMutation.isPending}
-          onClick={triggerRefresh}
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          {refreshMutation.isPending ? "Refreshing..." : refreshLabel}
-        </Button>
-      </div>
-
-      <div className="gap-2 flex flex-wrap items-center">
-        {syncState === undefined ? null : (
-          <Badge variant="secondary">{formatSyncStateLabel(syncState)}</Badge>
-        )}
-        {syncMetadata === null ? null : (
-          <span className="text-muted-foreground text-xs">{syncMetadata}</span>
-        )}
-        {options.resourceSummary === undefined ? null : (
-          <span className="text-muted-foreground text-xs">
-            {options.resourceSummary.count} available
-          </span>
-        )}
-      </div>
-
-      {refreshErrorMessage === null ? null : (
-        <Alert variant="destructive">
-          <AlertDescription>{refreshErrorMessage}</AlertDescription>
-        </Alert>
-      )}
-
-      {unavailableSelectedHandles.length === 0 ? null : (
-        <Alert variant="destructive">
-          <AlertDescription>
-            Selected resources are no longer accessible on this connection:{" "}
-            {unavailableSelectedHandles.join(", ")}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {selectedHandles.length === 0 ? null : (
-        <div className="gap-2 flex flex-wrap">
-          {selectedHandles.map((handle) => (
-            <Badge key={handle} variant="outline">
-              {handle}
-            </Badge>
-          ))}
-        </div>
-      )}
-
-      {resourceQuery.isPending ? (
-        <div className="border rounded-md p-3 text-sm">Loading resources...</div>
-      ) : resourceQuery.isError ? (
-        <IntegrationResourceListError
-          error={resourceQuery.error}
-          isRefreshing={refreshMutation.isPending}
-          onRefresh={triggerRefresh}
-          refreshLabel={refreshLabel}
-        />
-      ) : (
-        <ScrollArea className="h-56 border rounded-md">
-          <div className="divide-y">
-            {resourceQuery.data.items.length === 0 ? (
-              <p className="text-muted-foreground p-3 text-sm">
-                {options.emptyMessage ?? "No accessible resources found for this connection."}
-              </p>
-            ) : (
-              resourceQuery.data.items.map((resource) => {
-                const isSelected = selectedHandles.includes(resource.handle);
-
-                return (
-                  <label
-                    className="hover:bg-muted/40 gap-3 flex cursor-pointer items-start p-3"
-                    key={resource.id}
-                  >
-                    <input
-                      checked={isSelected}
-                      className="mt-0.5"
-                      onChange={() => {
-                        toggleHandle(resource.handle);
-                      }}
-                      type="checkbox"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="font-medium text-sm">{resource.displayName}</div>
-                      <div className="text-muted-foreground truncate text-xs">
-                        {resource.handle}
-                      </div>
-                    </div>
-                  </label>
-                );
-              })
-            )}
-          </div>
-        </ScrollArea>
-      )}
-    </div>
+    <IntegrationResourceStringArrayWidgetView
+      emptyMessage={widgetViewModel.emptyMessage}
+      id={props.id}
+      isRefreshing={refreshMutation.isPending}
+      label={props.label}
+      listState={
+        resourceOverride !== undefined
+          ? {
+              mode: "ready",
+              items: visibleItems,
+            }
+          : resourceQuery.isPending
+            ? {
+                mode: "loading",
+              }
+            : resourceQuery.isError
+              ? {
+                  mode: "error",
+                  message:
+                    resourceListErrorMessage ?? "Could not load resources for this connection.",
+                }
+              : {
+                  mode: "ready",
+                  items: resourceQuery.data.items,
+                }
+      }
+      onBlur={() => {
+        props.onBlur(props.id, selectedHandles);
+      }}
+      onFocus={() => {
+        props.onFocus(props.id, selectedHandles);
+      }}
+      onRefresh={triggerRefresh}
+      onSearchChange={setSearch}
+      onToggleHandle={toggleHandle}
+      refreshErrorMessage={refreshErrorMessage}
+      refreshLabel={refreshLabel}
+      refreshTooltip={widgetViewModel.refreshTooltip}
+      search={search}
+      searchPlaceholder={widgetViewModel.searchPlaceholder}
+      selectedHandles={selectedHandles}
+      unavailableSelectedHandles={unavailableSelectedHandles}
+      visibleItems={visibleItems}
+    />
   );
 }

@@ -21,26 +21,35 @@ import type {
   WidgetProps,
 } from "@rjsf/utils";
 
+import { isRecord } from "../shared/is-record.js";
+import type { IntegrationFormContext } from "./integration-form-context.js";
 import { IntegrationResourceStringArrayWidget } from "./integration-resource-string-array-widget.js";
 
 type JsonObject = Record<string, unknown>;
-type IntegrationFormContext = {
-  layout?: "vertical" | "horizontal";
-};
+type IntegrationFieldLayout = "horizontal" | "vertical";
 
-function resolveSelectWidgetOptions(
-  options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"],
-): {
+function resolveSelectWidgetOptions(input: {
+  options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"];
+  formContext: IntegrationFormContext | undefined;
+}): {
   fitContent: boolean;
 } {
+  if (input.options.fitContent === false) {
+    return {
+      fitContent: false,
+    };
+  }
+
   return {
-    fitContent: options.fitContent === true,
+    fitContent: input.options.fitContent === true || input.formContext?.layout === "horizontal",
   };
 }
 
 export const IntegrationHorizontalFieldGroupClassName = "gap-6 flex flex-col";
 export const IntegrationHorizontalFieldLayoutClassName =
-  "w-full items-start gap-4 [&>[data-slot=field-label]]:w-40 [&>[data-slot=field-label]]:shrink-0 [&>[data-slot=field-label]]:pt-2 [&>[data-slot=field-content]]:min-w-0 [&>[data-slot=field-content]]:flex-1";
+  "w-full gap-2 md:flex-row md:items-start md:gap-4 md:[&>*]:w-auto md:[&>[data-slot=field-label]]:w-40 md:[&>[data-slot=field-label]]:shrink-0 md:[&>[data-slot=field-label]]:pt-2 md:[&>[data-slot=field-content]]:min-w-0 md:[&>[data-slot=field-content]]:w-auto md:[&>[data-slot=field-content]]:flex-1";
+export const IntegrationStackedFieldLayoutClassName =
+  "w-full gap-1 [&>[data-slot=field-content]]:gap-2";
 export const IntegrationSelectContentClassName =
   "w-max min-w-(--anchor-width) max-w-[min(32rem,calc(100vw-2rem))]";
 
@@ -95,7 +104,10 @@ function CommaSeparatedStringArrayWidget(
 function SelectWidget(props: WidgetProps<JsonObject, RJSFSchema>): React.JSX.Element {
   const enumOptions = props.options.enumOptions ?? [];
   const selectedValue = typeof props.value === "string" ? props.value : undefined;
-  const { fitContent } = resolveSelectWidgetOptions(props.options);
+  const { fitContent } = resolveSelectWidgetOptions({
+    options: props.options,
+    formContext: props.registry.formContext,
+  });
   const placeholder =
     typeof props.placeholder === "string"
       ? props.placeholder
@@ -111,10 +123,10 @@ function SelectWidget(props: WidgetProps<JsonObject, RJSFSchema>): React.JSX.Ele
       }}
       value={selectedValue}
     >
-      <div className={fitContent ? "flex justify-end" : undefined}>
+      <div className={fitContent ? "md:flex md:justify-end" : undefined}>
         <SelectTrigger
           aria-label={props.label}
-          className={fitContent ? "w-auto min-w-fit max-w-full" : "w-full"}
+          className={fitContent ? "w-full md:w-auto md:min-w-fit md:max-w-full" : "w-full"}
           id={props.id}
         >
           <SelectValue placeholder={placeholder} />
@@ -187,6 +199,26 @@ function resolveFormLayout(input: IntegrationFormContext | undefined): "vertical
   return input?.layout === "horizontal" ? "horizontal" : "vertical";
 }
 
+function resolveFieldLayout(
+  props: FieldTemplateProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+): IntegrationFieldLayout {
+  const formLayout = resolveFormLayout(props.registry.formContext);
+  if (formLayout === "vertical") {
+    return "vertical";
+  }
+
+  if (!isRecord(props.uiSchema)) {
+    return "horizontal";
+  }
+
+  const options = props.uiSchema["ui:options"];
+  if (!isRecord(options)) {
+    return "horizontal";
+  }
+
+  return options.layout === "stacked" ? "vertical" : "horizontal";
+}
+
 function IntegrationFieldTemplate(
   props: FieldTemplateProps<JsonObject, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
@@ -195,16 +227,18 @@ function IntegrationFieldTemplate(
   }
 
   const errorItems = (props.rawErrors ?? []).map((message) => ({ message }));
-  const layout = resolveFormLayout(props.registry.formContext);
+  const layout = resolveFieldLayout(props);
 
   return (
     <Field
       className={cn(
         props.classNames,
-        layout === "horizontal" ? IntegrationHorizontalFieldLayoutClassName : undefined,
+        layout === "horizontal"
+          ? IntegrationHorizontalFieldLayoutClassName
+          : IntegrationStackedFieldLayoutClassName,
       )}
       data-invalid={errorItems.length > 0 || undefined}
-      orientation={layout}
+      orientation="vertical"
       style={props.style}
     >
       {props.displayLabel && props.label.length > 0 ? (

@@ -1,6 +1,7 @@
 import { resolveIntegrationForm } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
+import { createStackedFieldUiOptions } from "../../../forms/ui-options.js";
 import { OpenAiConnectionConfigSchema } from "./auth.js";
 import {
   OpenAiConnectionConfigForm,
@@ -79,9 +80,9 @@ describe("openai binding config forms", () => {
     expect(resolvedForm.uiSchema).toEqual({
       additionalInstructions: {
         "ui:widget": "TextareaWidget",
-        "ui:options": {
+        "ui:options": createStackedFieldUiOptions({
           rows: 8,
-        },
+        }),
       },
       defaultModel: {
         "ui:widget": "SelectWidget",

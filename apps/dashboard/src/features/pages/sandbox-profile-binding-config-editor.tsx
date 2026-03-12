@@ -5,12 +5,14 @@ import Form, { type IChangeEvent } from "@rjsf/core";
 import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 
+import type { IntegrationFormContext } from "../forms/integration-form-context.js";
 import {
   IntegrationFormTemplates,
   IntegrationFormWidgets,
 } from "../forms/integration-form-theme.js";
 import type { IntegrationConnectionResourceSummary } from "../integrations/integrations-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { isRecord } from "../shared/is-record.js";
 
 const IntegrationRegistry = createIntegrationFormRegistry();
 
@@ -73,10 +75,6 @@ type ResolvedBindingEditorContext = {
   parsedTargetConfig: Record<string, unknown>;
   parsedConnectionConfig: Record<string, unknown>;
 };
-
-function isRecord(value: unknown): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function resolveRecord(value: unknown): Record<string, unknown> {
   if (!isRecord(value)) {
@@ -423,6 +421,7 @@ export function SandboxProfileBindingConfigEditor(input: {
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
   layout?: "vertical" | "horizontal";
+  formContext?: IntegrationFormContext | undefined;
   onIntegrationBindingRowChange: (
     clientId: string,
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
@@ -475,10 +474,13 @@ export function SandboxProfileBindingConfigEditor(input: {
   }
 
   return (
-    <Form<JsonObject, RJSFSchema, { layout?: "vertical" | "horizontal" }>
+    <Form<JsonObject, RJSFSchema, IntegrationFormContext>
       children={<></>}
       formData={configUiModel.value}
-      formContext={{ layout: input.layout ?? "vertical" }}
+      formContext={{
+        ...(input.formContext ?? {}),
+        layout: input.layout ?? "vertical",
+      }}
       noHtml5Validate
       onChange={(event: IChangeEvent<JsonObject, RJSFSchema>) => {
         const nextFormData = resolveRecord(event.formData);
