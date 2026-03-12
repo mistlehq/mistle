@@ -105,7 +105,7 @@ func TestHandlerServeHTTP(t *testing.T) {
 		if captured.Method != http.MethodPost {
 			t.Fatalf("expected forwarded method POST, got %s", captured.Method)
 		}
-		if captured.Path != "/tokenizer-egress/routes/route_openai/v1/responses" {
+		if captured.Path != "/tokenizer-egress/v1/responses" {
 			t.Fatalf("unexpected forwarded path: %s", captured.Path)
 		}
 		if captured.Query != "stream=true" {

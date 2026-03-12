@@ -94,7 +94,7 @@ func TestProxyMediation(t *testing.T) {
 		if string(responseBody) != `{"tokenized":true}` {
 			t.Fatalf("unexpected tokenizer response body %s", string(responseBody))
 		}
-		if capturedRequest.Path != "/tokenizer-proxy/egress/routes/route_openai/v1/responses" {
+		if capturedRequest.Path != "/tokenizer-proxy/egress/v1/responses" {
 			t.Fatalf("unexpected tokenizer path %s", capturedRequest.Path)
 		}
 		if capturedRequest.Query != "stream=true" {
@@ -176,7 +176,7 @@ func TestProxyMediation(t *testing.T) {
 		if string(responseBody) != `{"intercepted":true}` {
 			t.Fatalf("unexpected tokenizer response body %s", string(responseBody))
 		}
-		if capturedRequest.Path != "/tokenizer-proxy/egress/routes/route_openai/v1/responses" {
+		if capturedRequest.Path != "/tokenizer-proxy/egress/v1/responses" {
 			t.Fatalf("unexpected tokenizer path %s", capturedRequest.Path)
 		}
 		if capturedRequest.Headers.Get(egress.HeaderEgressUpstreamBaseURL) != "https://api.openai.com/v1" {
