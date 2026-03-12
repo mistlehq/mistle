@@ -70,12 +70,40 @@ export const CodexStoryChatThreadEntries: readonly ChatEntry[] = [
   },
 ];
 
+const StorySemanticDisplayKeys = {
+  exploring: {
+    active: "exploring.active",
+    completed: "exploring.done",
+  },
+  thinking: {
+    active: "thinking.active",
+    completed: "thinking.done",
+  },
+  "making-edits": {
+    active: "making-edits.active",
+    completed: "making-edits.done",
+  },
+  "searching-web": {
+    active: "searching-web.active",
+    completed: "searching-web.done",
+  },
+  "tool-call": {
+    active: "tool-call.active",
+    completed: "tool-call.done",
+  },
+  "running-commands": {
+    active: "running-commands.active",
+    completed: "running-commands.done",
+  },
+} as const;
+
 export const CodexStoryExploringGroupEntry: ChatSemanticGroupEntry = {
   id: "exploring-group-1",
   turnId: "turn-exploring",
   kind: "semantic-group",
   semanticKind: "exploring",
   status: "completed",
+  displayKeys: StorySemanticDisplayKeys.exploring,
   counts: {
     reads: 2,
     searches: 1,
@@ -176,6 +204,7 @@ export const CodexStoryThinkingGroupEntry: ChatSemanticGroupEntry = {
   kind: "semantic-group",
   semanticKind: "thinking",
   status: "completed",
+  displayKeys: StorySemanticDisplayKeys.thinking,
   counts: null,
   items: [
     {
@@ -225,6 +254,7 @@ export const CodexStoryMakingEditsGroupEntry: ChatSemanticGroupEntry = {
   kind: "semantic-group",
   semanticKind: "making-edits",
   status: "completed",
+  displayKeys: StorySemanticDisplayKeys["making-edits"],
   counts: null,
   items: [
     {
@@ -263,6 +293,7 @@ export const CodexStorySearchingWebGroupEntry: ChatSemanticGroupEntry = {
   kind: "semantic-group",
   semanticKind: "searching-web",
   status: "completed",
+  displayKeys: StorySemanticDisplayKeys["searching-web"],
   counts: null,
   items: [
     {
@@ -318,6 +349,7 @@ export const CodexStoryToolCallGroupEntry: ChatSemanticGroupEntry = {
   kind: "semantic-group",
   semanticKind: "tool-call",
   status: "completed",
+  displayKeys: StorySemanticDisplayKeys["tool-call"],
   counts: null,
   items: [
     {
@@ -369,6 +401,7 @@ export const CodexStoryRunningCommandsGroupEntry: ChatSemanticGroupEntry = {
   kind: "semantic-group",
   semanticKind: "running-commands",
   status: "completed",
+  displayKeys: StorySemanticDisplayKeys["running-commands"],
   counts: null,
   items: [
     {

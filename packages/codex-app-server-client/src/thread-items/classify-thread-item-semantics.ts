@@ -33,7 +33,7 @@ function classifyCommandExecution(
     semanticKind: "running-commands",
     displayKeys: {
       active: "running-commands.active",
-      completed: null,
+      completed: "running-commands.done",
     },
     status: item.status,
     summaryCounts: null,
@@ -53,7 +53,7 @@ export function classifyCodexThreadItemSemantics(
       semanticKind: "making-edits",
       displayKeys: {
         active: "making-edits.active",
-        completed: null,
+        completed: "making-edits.done",
       },
       status: item.status,
       summaryCounts: null,
@@ -66,7 +66,7 @@ export function classifyCodexThreadItemSemantics(
       semanticKind: "thinking",
       displayKeys: {
         active: "thinking.active",
-        completed: null,
+        completed: "thinking.done",
       },
       status: item.status,
       summaryCounts: null,
@@ -92,7 +92,7 @@ export function classifyCodexThreadItemSemantics(
       semanticKind: "tool-call",
       displayKeys: {
         active: "tool-call.active",
-        completed: null,
+        completed: "tool-call.done",
       },
       status: item.status,
       summaryCounts: null,

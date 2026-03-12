@@ -237,6 +237,10 @@ describe("reduceCodexChatState", () => {
         kind: "semantic-group",
         semanticKind: "running-commands",
         status: "completed",
+        displayKeys: {
+          active: "running-commands.active",
+          completed: "running-commands.done",
+        },
         counts: null,
         items: [
           {
@@ -324,6 +328,10 @@ describe("reduceCodexChatState", () => {
         kind: "semantic-group",
         semanticKind: "exploring",
         status: "completed",
+        displayKeys: {
+          active: "exploring.active",
+          completed: "exploring.done",
+        },
         counts: {
           reads: 1,
           searches: 1,
@@ -404,6 +412,10 @@ describe("reduceCodexChatState", () => {
         kind: "semantic-group",
         semanticKind: "thinking",
         status: "completed",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
         counts: null,
         items: [
           {
@@ -688,6 +700,10 @@ describe("reduceCodexChatState", () => {
         kind: "semantic-group",
         semanticKind: "thinking",
         status: "completed",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
         counts: null,
         items: [
           {
@@ -707,6 +723,10 @@ describe("reduceCodexChatState", () => {
         kind: "semantic-group",
         semanticKind: "running-commands",
         status: "completed",
+        displayKeys: {
+          active: "running-commands.active",
+          completed: "running-commands.done",
+        },
         counts: null,
         items: [
           {
@@ -804,6 +824,10 @@ describe("reduceCodexChatState", () => {
         kind: "semantic-group",
         semanticKind: "thinking",
         status: "streaming",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
         counts: null,
         items: [
           {
@@ -896,6 +920,10 @@ describe("reduceCodexChatState", () => {
         kind: "semantic-group",
         semanticKind: "running-commands",
         status: "streaming",
+        displayKeys: {
+          active: "running-commands.active",
+          completed: "running-commands.done",
+        },
         counts: null,
         items: [
           {
@@ -915,6 +943,10 @@ describe("reduceCodexChatState", () => {
         kind: "semantic-group",
         semanticKind: "making-edits",
         status: "completed",
+        displayKeys: {
+          active: "making-edits.active",
+          completed: "making-edits.done",
+        },
         counts: null,
         items: [
           {
@@ -955,6 +987,10 @@ describe("reduceCodexChatState", () => {
         kind: "semantic-group",
         semanticKind: "tool-call",
         status: "completed",
+        displayKeys: {
+          active: "tool-call.active",
+          completed: "tool-call.done",
+        },
         counts: null,
         items: [
           {
@@ -1028,6 +1064,10 @@ describe("reduceCodexChatState", () => {
         kind: "semantic-group",
         semanticKind: "thinking",
         status: "completed",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
         counts: null,
         items: [
           {
@@ -1073,6 +1113,10 @@ describe("reduceCodexChatState", () => {
         kind: "semantic-group",
         semanticKind: "thinking",
         status: "completed",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
         counts: null,
         items: [
           {
@@ -1120,6 +1164,10 @@ describe("reduceCodexChatState", () => {
         kind: "semantic-group",
         semanticKind: "thinking",
         status: "completed",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
         counts: null,
         items: [
           {

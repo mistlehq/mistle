@@ -12,24 +12,45 @@ type ChatSemanticGroupProps = {
   block: ChatSemanticGroupEntry;
 };
 
+const SemanticGroupDisplayKeyLabels = {
+  "exploring.active": "Exploring",
+  "exploring.done": "Explored",
+  "running-commands.active": "Running commands",
+  "running-commands.done": "Ran commands",
+  "making-edits.active": "Making edits",
+  "making-edits.done": "Updated files",
+  "thinking.active": "Thinking",
+  "thinking.done": "Thoughts",
+  "searching-web.active": "Searching the web",
+  "searching-web.done": "Searched the web",
+  "tool-call.active": "Using tools",
+  "tool-call.done": "Used tools",
+  "generic.active": "Activity",
+} as const;
+
+function isSemanticGroupDisplayKey(
+  value: string,
+): value is keyof typeof SemanticGroupDisplayKeyLabels {
+  return value in SemanticGroupDisplayKeyLabels;
+}
+
 function getSemanticGroupTitle(input: {
-  semanticKind: ChatSemanticGroupKind;
+  displayKeys: {
+    active: string | null;
+    completed: string | null;
+  };
   status: "streaming" | "completed";
 }): string {
-  switch (input.semanticKind) {
-    case "exploring":
-      return input.status === "streaming" ? "Exploring" : "Explored";
-    case "running-commands":
-      return input.status === "streaming" ? "Running commands" : "Ran commands";
-    case "making-edits":
-      return input.status === "streaming" ? "Making edits" : "Updated files";
-    case "thinking":
-      return input.status === "streaming" ? "Thinking" : "Thoughts";
-    case "searching-web":
-      return input.status === "streaming" ? "Searching the web" : "Searched the web";
-    case "tool-call":
-      return input.status === "streaming" ? "Using tools" : "Used tools";
+  const key = input.status === "streaming" ? input.displayKeys.active : input.displayKeys.completed;
+  if (key === null) {
+    throw new Error("Missing semantic group display key.");
   }
+
+  if (!isSemanticGroupDisplayKey(key)) {
+    throw new Error(`Unsupported semantic group display key '${key}'.`);
+  }
+
+  return SemanticGroupDisplayKeyLabels[key];
 }
 
 function getSemanticGroupSummary(input: {
@@ -133,6 +154,49 @@ function getReadRenderMarkdown(input: { path: string; output: string }): string 
   return ["```" + codeFenceLanguage, input.output, "```"].join("\n");
 }
 
+type WebSearchResult = {
+  title: string;
+  url: string;
+  snippet: string | null;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function parseWebSearchResults(output: string): readonly WebSearchResult[] | null {
+  const parsed: unknown = JSON.parse(output);
+  if (!isRecord(parsed)) {
+    return null;
+  }
+
+  const results = parsed["results"];
+  if (!Array.isArray(results)) {
+    return null;
+  }
+
+  return results.flatMap((result): readonly WebSearchResult[] => {
+    if (!isRecord(result)) {
+      return [];
+    }
+
+    const title = result["title"];
+    const url = result["url"];
+    const snippet = result["snippet"];
+    if (typeof title !== "string" || typeof url !== "string") {
+      return [];
+    }
+
+    return [
+      {
+        title,
+        url,
+        snippet: typeof snippet === "string" ? snippet : null,
+      },
+    ];
+  });
+}
+
 function renderSemanticGroupItemOutput(input: {
   item: ChatSemanticGroupEntry["items"][number];
   semanticKind: ChatSemanticGroupKind;
@@ -160,6 +224,34 @@ function renderSemanticGroupItemOutput(input: {
         />
       </div>
     );
+  }
+
+  if (input.semanticKind === "searching-web") {
+    const results = parseWebSearchResults(input.item.output);
+    if (results !== null) {
+      return (
+        <div className="mt-1 space-y-1.5">
+          {results.map((result) => (
+            <div className="border-l-border/50 border-l pl-3" key={result.url}>
+              <a
+                className="block truncate text-sm leading-5 hover:underline"
+                href={result.url}
+                rel="noreferrer"
+                target="_blank"
+              >
+                {result.title}
+              </a>
+              <p className="text-muted-foreground truncate text-xs leading-5">{result.url}</p>
+              {result.snippet === null ? null : (
+                <p className="text-muted-foreground/85 mt-0.5 text-xs leading-5">
+                  {result.snippet}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      );
+    }
   }
 
   if (
@@ -191,7 +283,7 @@ export function ChatSemanticGroup({ block }: ChatSemanticGroupProps): React.JSX.
           <div className="flex items-center gap-1.5">
             <p className="font-medium text-sm">
               {getSemanticGroupTitle({
-                semanticKind: block.semanticKind,
+                displayKeys: block.displayKeys,
                 status: block.status,
               })}
             </p>

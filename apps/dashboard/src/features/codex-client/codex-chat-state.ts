@@ -420,6 +420,7 @@ function mapTimelineEntryToChatEntries(entry: CodexTimelineEntry): readonly Chat
         kind: "semantic-group",
         semanticKind: entry.kind,
         status: entry.status,
+        displayKeys: entry.displayKeys,
         counts: entry.counts,
         items: entry.items.map((item) => {
           const summary = summarizeSemanticGroupItem(item);

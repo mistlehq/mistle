@@ -86,6 +86,10 @@ export type ChatSemanticGroupEntry = {
   kind: "semantic-group";
   semanticKind: ChatSemanticGroupKind;
   status: "streaming" | "completed";
+  displayKeys: {
+    active: string | null;
+    completed: string | null;
+  };
   counts: {
     reads: number;
     searches: number;

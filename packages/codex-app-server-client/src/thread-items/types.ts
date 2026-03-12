@@ -98,11 +98,15 @@ export type SemanticDisplayKey =
   | "exploring.active"
   | "exploring.done"
   | "running-commands.active"
+  | "running-commands.done"
   | "making-edits.active"
+  | "making-edits.done"
   | "thinking.active"
+  | "thinking.done"
   | "searching-web.active"
   | "searching-web.done"
   | "tool-call.active"
+  | "tool-call.done"
   | "generic.active";
 
 export type SemanticActionKind =

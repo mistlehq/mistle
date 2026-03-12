@@ -90,7 +90,7 @@ describe("thread item semantics", () => {
       semanticKind: "running-commands",
       displayKeys: {
         active: "running-commands.active",
-        completed: null,
+        completed: "running-commands.done",
       },
     });
   });
@@ -234,7 +234,7 @@ describe("thread item semantics", () => {
         status: "streaming",
         displayKeys: {
           active: "thinking.active",
-          completed: null,
+          completed: "thinking.done",
         },
         counts: null,
         items: [

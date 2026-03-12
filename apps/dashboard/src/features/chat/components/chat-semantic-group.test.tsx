@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   CodexStoryExploringGroupEntry,
   CodexStoryMakingEditsGroupEntry,
+  CodexStorySearchingWebGroupEntry,
   CodexStoryThinkingGroupEntry,
 } from "../../codex-client/codex-story-fixtures.js";
 import type { ChatSemanticGroupEntry } from "../chat-types.js";
@@ -93,6 +94,10 @@ describe("ChatSemanticGroup", () => {
       kind: "semantic-group",
       semanticKind: "exploring",
       status: "completed",
+      displayKeys: {
+        active: "exploring.active",
+        completed: "exploring.done",
+      },
       counts: {
         reads: 1,
         searches: 0,
@@ -122,5 +127,29 @@ describe("ChatSemanticGroup", () => {
       screen.getByText("apps/dashboard/src/features/chat/components/chat-thread.tsx"),
     ).toBeTruthy();
     expect(container.querySelector("code")).toBeTruthy();
+  });
+
+  it("renders searching-web output as a result list instead of raw json", () => {
+    render(<ChatSemanticGroup block={CodexStorySearchingWebGroupEntry} />);
+
+    const toggleResultsButtons = screen.getAllByText("Toggle results");
+    const firstToggleResultsButton = toggleResultsButtons.at(0);
+    if (firstToggleResultsButton === undefined) {
+      throw new Error("Expected a semantic group result toggle");
+    }
+
+    const disclosureSummary = firstToggleResultsButton.closest("summary");
+    if (disclosureSummary === null) {
+      throw new Error("Expected a semantic group disclosure summary");
+    }
+
+    fireEvent.click(disclosureSummary);
+
+    expect(screen.getByText("packages/web/src/components/Share.tsx")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "https://github.com/anomalyco/opencode/blob/dev/packages/web/src/components/Share.tsx",
+      ),
+    ).toBeTruthy();
   });
 });

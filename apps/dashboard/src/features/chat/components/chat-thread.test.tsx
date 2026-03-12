@@ -120,6 +120,10 @@ describe("ChatThread", () => {
             kind: "semantic-group",
             semanticKind: "exploring",
             status: "completed",
+            displayKeys: {
+              active: "exploring.active",
+              completed: "exploring.done",
+            },
             counts: {
               reads: 1,
               searches: 1,
