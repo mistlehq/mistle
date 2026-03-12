@@ -119,9 +119,6 @@ importers:
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
-      '@mistle/sandbox-runtime-plan-compiler':
-        specifier: workspace:*
-        version: link:../../packages/sandbox-runtime-plan-compiler
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry
@@ -762,31 +759,6 @@ importers:
       testcontainers:
         specifier: ^11.7.2
         version: 11.12.0
-
-  packages/sandbox-runtime-plan-compiler:
-    dependencies:
-      '@mistle/db':
-        specifier: workspace:*
-        version: link:../db
-      '@mistle/integrations-core':
-        specifier: workspace:*
-        version: link:../integrations-core
-    devDependencies:
-      '@mistle/integrations-definitions':
-        specifier: workspace:*
-        version: link:../integrations-definitions
-      '@mistle/test-harness':
-        specifier: workspace:*
-        version: link:../test-harness
-      '@types/pg':
-        specifier: ^8.18.0
-        version: 8.18.0
-      pg:
-        specifier: ^8.20.0
-        version: 8.20.0
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
 
   packages/sandbox-session-protocol:
     devDependencies:
