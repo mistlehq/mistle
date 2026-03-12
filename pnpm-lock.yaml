@@ -219,12 +219,18 @@ importers:
       '@mistle/workflows':
         specifier: workspace:*
         version: link:../../packages/workflows
+      '@openworkflow/cli':
+        specifier: ^0.4.3
+        version: 0.4.3(openworkflow@0.8.1(postgres@3.4.8))
       drizzle-orm:
         specifier: ^0.45.1
         version: 0.45.1(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.0)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.18.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.20.0)(postgres@3.4.8)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))
       hono:
         specifier: ^4.12.5
         version: 4.12.5
+      openworkflow:
+        specifier: ^0.8.1
+        version: 0.8.1(postgres@3.4.8)
       pg:
         specifier: ^8.20.0
         version: 8.20.0

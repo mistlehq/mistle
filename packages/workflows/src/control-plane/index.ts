@@ -28,6 +28,14 @@ export {
   type SendVerificationOTPWorkflowInput,
   type SendVerificationOTPWorkflowOutput,
 } from "@mistle/workflow-registry/control-plane";
+export { createHandleAutomationRunWorkflow } from "./workflows/handle-automation-run/workflow.js";
+export { createHandleAutomationConversationDeliveryWorkflow } from "./workflows/handle-automation-conversation-delivery/workflow.js";
+export { createHandleIntegrationWebhookEventWorkflow } from "./workflows/handle-integration-webhook-event/workflow.js";
+export { createRequestDeleteSandboxProfileWorkflow } from "./workflows/request-delete-sandbox-profile/workflow.js";
+export { createStartSandboxProfileInstanceWorkflow } from "./workflows/start-sandbox-profile-instance/workflow.js";
+export { createSyncIntegrationConnectionResourcesWorkflow } from "./workflows/sync-integration-connection-resources/workflow.js";
+export { createSendOrganizationInvitationWorkflow } from "./workflows/send-organization-invitation/workflow.js";
+export { createSendVerificationOTPWorkflow } from "./workflows/send-verification-otp/workflow.js";
 export {
   type HandoffAutomationRunDeliveryInput,
   type PreparedAutomationRun,
