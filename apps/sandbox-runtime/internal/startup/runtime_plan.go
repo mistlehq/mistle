@@ -155,9 +155,9 @@ type RuntimeFileSpec struct {
 }
 
 type AgentRuntime struct {
-	BindingID  string `json:"bindingId"`
-	RuntimeKey string `json:"runtimeKey"`
-	ClientID   string `json:"clientId"`
+	BindingID   string `json:"bindingId"`
+	RuntimeKey  string `json:"runtimeKey"`
+	ClientID    string `json:"clientId"`
 	EndpointKey string `json:"endpointKey"`
 }
 

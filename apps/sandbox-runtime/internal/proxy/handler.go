@@ -407,18 +407,18 @@ func classifyInterceptedRequest(connectTarget string, request *http.Request) (in
 
 func filterProxyResponse(response *http.Response) *http.Response {
 	filteredResponse := &http.Response{
-		StatusCode:        response.StatusCode,
-		Status:            response.Status,
-		Proto:             response.Proto,
-		ProtoMajor:        response.ProtoMajor,
-		ProtoMinor:        response.ProtoMinor,
-		Header:            make(http.Header),
-		Body:              response.Body,
-		ContentLength:     response.ContentLength,
-		TransferEncoding:  response.TransferEncoding,
-		Close:             response.Close,
-		Trailer:           make(http.Header),
-		Uncompressed:      response.Uncompressed,
+		StatusCode:       response.StatusCode,
+		Status:           response.Status,
+		Proto:            response.Proto,
+		ProtoMajor:       response.ProtoMajor,
+		ProtoMinor:       response.ProtoMinor,
+		Header:           make(http.Header),
+		Body:             response.Body,
+		ContentLength:    response.ContentLength,
+		TransferEncoding: response.TransferEncoding,
+		Close:            response.Close,
+		Trailer:          make(http.Header),
+		Uncompressed:     response.Uncompressed,
 	}
 
 	copyHeadersWithoutHopByHop(filteredResponse.Header, response.Header, false)
