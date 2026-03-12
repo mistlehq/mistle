@@ -412,8 +412,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/test-harness
       '@trpc/client':
-        specifier: ^11.11.0
-        version: 11.11.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)
+        specifier: ^11.12.0
+        version: 11.12.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
@@ -611,8 +611,8 @@ importers:
         specifier: workspace:*
         version: link:../workflows
       '@trpc/client':
-        specifier: ^11.11.0
-        version: 11.11.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)
+        specifier: ^11.12.0
+        version: 11.12.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)
       '@trpc/server':
         specifier: ^11.12.0
         version: 11.12.0(typescript@5.9.3)
@@ -4981,10 +4981,10 @@ packages:
   '@tootallnate/quickjs-emscripten@0.23.0':
     resolution: {integrity: sha512-C5Mc6rdnsaJDjO3UpGW/CQTHtCKaYlScZTly4JIu97Jxo/odCiH0ITnDXSJPTOrEKk/ycSZ0AOgTmkDtkOsvIA==}
 
-  '@trpc/client@11.11.0':
-    resolution: {integrity: sha512-tIPeetFO8GT/o0In+Lk5JA3f29m8qCBSaKNatQdAx6BOfZFjpqHOaoAsCmE/MdUu9AVhPRPorcoqUlZUdDc5gA==}
+  '@trpc/client@11.12.0':
+    resolution: {integrity: sha512-zTwFKQdE99pvNm7kXFdHo5xIQpGqpQJHtqVkT9o+i8h/0fbDOUBEEbFVICiMsNA+GiXskoaDRX2l+z6ir+Ug3w==}
     peerDependencies:
-      '@trpc/server': 11.11.0
+      '@trpc/server': 11.12.0
       typescript: '>=5.7.2'
 
   '@trpc/server@11.12.0':
@@ -15571,7 +15571,7 @@ snapshots:
 
   '@tootallnate/quickjs-emscripten@0.23.0': {}
 
-  '@trpc/client@11.11.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)':
+  '@trpc/client@11.12.0(@trpc/server@11.12.0(typescript@5.9.3))(typescript@5.9.3)':
     dependencies:
       '@trpc/server': 11.12.0(typescript@5.9.3)
       typescript: 5.9.3
