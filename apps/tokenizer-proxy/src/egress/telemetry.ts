@@ -1,5 +1,5 @@
 export type EgressTelemetryBaseAttributesInput = {
-  routeId?: string;
+  egressRuleId?: string;
   method: string;
   requestPath: string;
   bindingId: string;
@@ -10,7 +10,7 @@ export function createEgressTelemetryBaseAttributes(
   input: EgressTelemetryBaseAttributesInput,
 ): Record<string, string> {
   return {
-    ...(input.routeId === undefined ? {} : { "mistle.egress.route_id": input.routeId }),
+    ...(input.egressRuleId === undefined ? {} : { "mistle.egress.rule_id": input.egressRuleId }),
     "mistle.integration.binding_id": input.bindingId,
     "mistle.integration.connection_id": input.connectionId,
     "http.request.method": input.method,

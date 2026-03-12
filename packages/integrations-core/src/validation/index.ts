@@ -47,7 +47,7 @@ function flattenCompiledBindingResults(input: ReadonlyArray<CompiledBindingResul
 }
 
 function validateRoutes(input: ReadonlyArray<EgressCredentialRoute>): void {
-  const routeIdToRoute = new Map<string, EgressCredentialRoute>();
+  const egressRuleIdToRoute = new Map<string, EgressCredentialRoute>();
 
   for (const route of input) {
     if (route.match.pathPrefixes !== undefined) {
@@ -55,21 +55,21 @@ function validateRoutes(input: ReadonlyArray<EgressCredentialRoute>): void {
         if (pathPrefix.trim().length === 0) {
           throw new IntegrationCompilerError(
             CompilerErrorCodes.ROUTE_CONFLICT,
-            `Egress route '${route.routeId}' contains an empty path prefix at index ${pathPrefixIndex}.`,
+            `Egress route '${route.egressRuleId}' contains an empty path prefix at index ${pathPrefixIndex}.`,
           );
         }
       }
     }
 
-    const existingRoute = routeIdToRoute.get(route.routeId);
+    const existingRoute = egressRuleIdToRoute.get(route.egressRuleId);
     if (existingRoute !== undefined) {
       throw new IntegrationCompilerError(
         CompilerErrorCodes.ROUTE_CONFLICT,
-        `Duplicate egress route id '${route.routeId}' detected for bindings '${existingRoute.bindingId}' and '${route.bindingId}'.`,
+        `Duplicate egress rule id '${route.egressRuleId}' detected for bindings '${existingRoute.bindingId}' and '${route.bindingId}'.`,
       );
     }
 
-    routeIdToRoute.set(route.routeId, route);
+    egressRuleIdToRoute.set(route.egressRuleId, route);
   }
 
   for (let leftIndex = 0; leftIndex < input.length; leftIndex += 1) {
@@ -92,7 +92,7 @@ function validateRoutes(input: ReadonlyArray<EgressCredentialRoute>): void {
       ) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.ROUTE_CONFLICT,
-          `Overlapping egress routes detected: '${leftRoute.routeId}' and '${rightRoute.routeId}'.`,
+          `Overlapping egress routes detected: '${leftRoute.egressRuleId}' and '${rightRoute.egressRuleId}'.`,
         );
       }
     }

@@ -31,7 +31,7 @@ const RuntimePlanSchema = z.object({
   ]),
   egressRoutes: z.array(
     z.object({
-      routeId: z.string().min(1),
+      egressRuleId: z.string().min(1),
       bindingId: z.string().min(1),
       match: z.object({
         hosts: z.array(z.string().min(1)),
@@ -107,7 +107,6 @@ const RuntimePlanSchema = z.object({
         resourceKind: z.literal("repository"),
         path: z.string().min(1),
         originUrl: z.url(),
-        routeId: z.string().min(1),
       }),
     ]),
   ),
@@ -209,7 +208,7 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
     },
     egressRoutes: [
       {
-        routeId: "route_1",
+        egressRuleId: "egress_rule_1",
         bindingId: "binding_1",
         match: {
           hosts: ["api.github.com"],

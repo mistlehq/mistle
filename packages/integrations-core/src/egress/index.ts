@@ -221,7 +221,7 @@ export function orderRoutesForMatching(
       return rightLongestPathPrefix - leftLongestPathPrefix;
     }
 
-    return left.routeId.localeCompare(right.routeId);
+    return left.egressRuleId.localeCompare(right.egressRuleId);
   });
 }
 

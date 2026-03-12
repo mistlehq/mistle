@@ -512,7 +512,7 @@ export type EgressCredentialResolverRef = {
 };
 
 export type EgressCredentialRoute = {
-  routeId: string;
+  egressRuleId: string;
   bindingId: string;
   match: {
     hosts: ReadonlyArray<string>;
@@ -682,7 +682,7 @@ export type CompiledRuntimeClient = RuntimeClientBase<string>;
 
 export type RuntimeClient = RuntimeClientBase<string>;
 
-export type CompileBindingEgressRoute = Omit<EgressCredentialRoute, "routeId" | "bindingId">;
+export type CompileBindingEgressRoute = Omit<EgressCredentialRoute, "egressRuleId" | "bindingId">;
 
 export type CompileBindingAgentRuntime = {
   runtimeKey: string;

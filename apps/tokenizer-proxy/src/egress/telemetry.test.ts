@@ -9,14 +9,14 @@ describe("tokenizer proxy egress telemetry helpers", () => {
   it("builds non-sensitive base attributes for egress spans", () => {
     expect(
       createEgressTelemetryBaseAttributes({
-        routeId: "ert_github_graphql",
+        egressRuleId: "egress_rule_github_graphql",
         method: "POST",
         requestPath: "/tokenizer-proxy/egress/graphql",
         bindingId: "ibd_github",
         connectionId: "icn_github",
       }),
     ).toEqual({
-      "mistle.egress.route_id": "ert_github_graphql",
+      "mistle.egress.rule_id": "egress_rule_github_graphql",
       "mistle.integration.binding_id": "ibd_github",
       "mistle.integration.connection_id": "icn_github",
       "http.request.method": "POST",

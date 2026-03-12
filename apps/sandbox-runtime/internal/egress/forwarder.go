@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	HeaderEgressRouteID               = "X-Mistle-Egress-Route-Id"
+	HeaderEgressRuleID                = "X-Mistle-Egress-Rule-Id"
 	HeaderEgressBindingID             = "X-Mistle-Egress-Binding-Id"
 	HeaderEgressUpstreamBaseURL       = "X-Mistle-Egress-Upstream-Base-Url"
 	HeaderEgressAuthInjectionType     = "X-Mistle-Egress-Auth-Injection-Type"
@@ -130,7 +130,7 @@ func (forwarder Forwarder) buildForwardRequest(input struct {
 	}
 
 	copyHeadersWithoutHopByHop(forwardRequest.Header, input.incomingRequest.Header)
-	forwardRequest.Header.Set(HeaderEgressRouteID, input.route.RouteID)
+	forwardRequest.Header.Set(HeaderEgressRuleID, input.route.EgressRuleID)
 	forwardRequest.Header.Set(HeaderEgressBindingID, input.route.BindingID)
 	forwardRequest.Header.Set(HeaderEgressUpstreamBaseURL, input.route.Upstream.BaseURL)
 	forwardRequest.Header.Set(HeaderEgressAuthInjectionType, input.route.AuthInjection.Type)

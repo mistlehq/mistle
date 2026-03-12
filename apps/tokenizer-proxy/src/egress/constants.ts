@@ -2,7 +2,7 @@ export const EGRESS_BASE_PATH = "/tokenizer-proxy/egress";
 export const EGRESS_WILDCARD_BASE_PATH = "/tokenizer-proxy/egress/*";
 
 export const EgressRequestHeaders = {
-  ROUTE_ID: "X-Mistle-Egress-Route-Id",
+  EGRESS_RULE_ID: "X-Mistle-Egress-Rule-Id",
   BINDING_ID: "X-Mistle-Egress-Binding-Id",
   UPSTREAM_BASE_URL: "X-Mistle-Egress-Upstream-Base-Url",
   AUTH_INJECTION_TYPE: "X-Mistle-Egress-Auth-Injection-Type",

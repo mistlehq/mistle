@@ -12,7 +12,7 @@ import type {
 import { validateCompiledBindingResults } from "./index.js";
 
 function createRoute(input: {
-  routeId: string;
+  egressRuleId: string;
   bindingId: string;
   hosts: string[];
   pathPrefixes?: string[];
@@ -26,7 +26,7 @@ function createRoute(input: {
   }
 
   return {
-    routeId: input.routeId,
+    egressRuleId: input.egressRuleId,
     bindingId: input.bindingId,
     match,
     upstream: {
@@ -86,17 +86,17 @@ function createCompiledBindingResult(input: {
     artifacts: [
       {
         artifactKey: input.artifactKey,
-        name: input.artifactName ?? `${input.route.routeId} artifact`,
+        name: input.artifactName ?? `${input.route.egressRuleId} artifact`,
         ...(input.artifactEnv === undefined ? {} : { env: input.artifactEnv }),
         lifecycle: {
           install: input.artifactInstallCommands ?? [
-            { args: ["echo", "install", input.route.routeId] },
+            { args: ["echo", "install", input.route.egressRuleId] },
           ],
           ...(input.artifactUpdateCommands === undefined
             ? {}
             : { update: input.artifactUpdateCommands }),
           remove: input.artifactRemoveCommands ?? [
-            { args: ["echo", "remove", input.route.routeId] },
+            { args: ["echo", "remove", input.route.egressRuleId] },
           ],
         },
       },
@@ -127,7 +127,7 @@ describe("validateCompiledBindingResults", () => {
   it("accepts non-conflicting compiled binding outputs", () => {
     const resultA = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_openai",
+        egressRuleId: "egress_rule_openai",
         bindingId: "bind_openai",
         hosts: ["api.openai.com"],
         pathPrefixes: ["/v1/responses"],
@@ -151,7 +151,7 @@ describe("validateCompiledBindingResults", () => {
 
     const resultB = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_github",
+        egressRuleId: "egress_rule_github",
         bindingId: "bind_github",
         hosts: ["api.github.com"],
         pathPrefixes: ["/repos"],
@@ -169,7 +169,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails on overlapping routes", () => {
     const resultA = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
         pathPrefixes: ["/v1"],
@@ -178,7 +178,7 @@ describe("validateCompiledBindingResults", () => {
     });
     const resultB = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_b",
+        egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
         hosts: ["api.openai.com"],
         pathPrefixes: ["/v1/responses"],
@@ -207,7 +207,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails on duplicate workspace source paths", () => {
     const resultA = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["github.com"],
       }),
@@ -223,7 +223,7 @@ describe("validateCompiledBindingResults", () => {
     });
     const resultB = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_b",
+        egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
         hosts: ["github.example.com"],
       }),
@@ -259,7 +259,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails when a route contains an empty path prefix", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
         pathPrefixes: [""],
@@ -288,7 +288,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails on runtime client env conflicts", () => {
     const resultA = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -303,7 +303,7 @@ describe("validateCompiledBindingResults", () => {
     });
     const resultB = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_b",
+        egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
         hosts: ["api.github.com"],
       }),
@@ -338,7 +338,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails on runtime client fileId conflicts", () => {
     const resultA = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -358,7 +358,7 @@ describe("validateCompiledBindingResults", () => {
     });
     const resultB = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_b",
+        egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
         hosts: ["api.github.com"],
       }),
@@ -398,7 +398,7 @@ describe("validateCompiledBindingResults", () => {
   it("accepts runtime client env values that are structurally equivalent", () => {
     const resultA = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -414,7 +414,7 @@ describe("validateCompiledBindingResults", () => {
 
     const resultB = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_b",
+        egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
         hosts: ["api.github.com"],
       }),
@@ -468,7 +468,7 @@ describe("validateCompiledBindingResults", () => {
 
     const resultA = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -477,7 +477,7 @@ describe("validateCompiledBindingResults", () => {
     });
     const resultB = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_b",
+        egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
         hosts: ["api.github.com"],
       }),
@@ -495,7 +495,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails when runtime client process readiness is invalid", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -530,7 +530,7 @@ describe("validateCompiledBindingResults", () => {
   it("accepts runtime client process ws readiness", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -564,7 +564,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails when runtime client process ws readiness uses unsupported url scheme", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -598,7 +598,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails when runtime client endpoint references missing process", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -626,7 +626,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails when runtime client endpoint ws url uses unsupported url scheme", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -653,7 +653,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails on artifact key conflicts with different lifecycle specs", () => {
     const resultA = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -664,7 +664,7 @@ describe("validateCompiledBindingResults", () => {
 
     const resultB = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_b",
+        egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
         hosts: ["api.github.com"],
       }),
@@ -683,7 +683,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails on artifact key conflicts with different env specs", () => {
     const resultA = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -696,7 +696,7 @@ describe("validateCompiledBindingResults", () => {
 
     const resultB = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_b",
+        egressRuleId: "egress_rule_b",
         bindingId: "bind_b",
         hosts: ["api.github.com"],
       }),
@@ -717,7 +717,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails when an artifact has no install commands", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -735,7 +735,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails when an artifact has no remove commands", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -753,7 +753,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails when an artifact command has empty args", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -771,7 +771,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails when an artifact defines a reserved proxy env key", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -791,7 +791,7 @@ describe("validateCompiledBindingResults", () => {
   it("accepts agent runtimes that reference an existing client endpoint", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -830,7 +830,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails when an agent runtime references a missing client", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),
@@ -865,7 +865,7 @@ describe("validateCompiledBindingResults", () => {
   it("fails when an agent runtime references a missing endpoint", () => {
     const result = createCompiledBindingResult({
       route: createRoute({
-        routeId: "route_a",
+        egressRuleId: "egress_rule_a",
         bindingId: "bind_a",
         hosts: ["api.openai.com"],
       }),

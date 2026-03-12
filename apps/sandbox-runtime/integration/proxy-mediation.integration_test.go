@@ -319,7 +319,7 @@ func TestProxyMediation(t *testing.T) {
 	t.Run("fails closed when multiple routes match the same request", func(t *testing.T) {
 		runtimePlan := buildProxyMediationRuntimePlan()
 		runtimePlan.EgressRoutes = append(runtimePlan.EgressRoutes, startup.EgressCredentialRoute{
-			RouteID:   "route_openai_duplicate",
+			EgressRuleID: "egress_rule_openai_duplicate",
 			BindingID: "ibd_openai_duplicate",
 			Match: startup.EgressRouteMatch{
 				Hosts:        []string{"api.openai.com"},
@@ -423,7 +423,7 @@ func buildProxyMediationRuntimePlan() startup.RuntimePlan {
 		},
 		EgressRoutes: []startup.EgressCredentialRoute{
 			{
-				RouteID:   "route_openai",
+				EgressRuleID: "egress_rule_openai",
 				BindingID: "ibd_openai",
 				Match: startup.EgressRouteMatch{
 					Hosts:        []string{"api.openai.com"},
