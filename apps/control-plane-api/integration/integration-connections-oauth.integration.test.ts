@@ -117,7 +117,9 @@ describe("integration connections oauth integration", () => {
     expect(oauthSession.usedAt).toBeNull();
   });
 
-  it("creates an oauth-backed connection and marks oauth state as used", async ({ fixture }) => {
+  it("creates an oauth-backed connection without requiring auth and marks oauth state as used", async ({
+    fixture,
+  }) => {
     await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
@@ -156,7 +158,6 @@ describe("integration connections oauth integration", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify(requestBody),
       },
@@ -255,7 +256,6 @@ describe("integration connections oauth integration", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify({
           query: {
@@ -276,17 +276,12 @@ describe("integration connections oauth integration", () => {
   it("returns 400 when oauth completion state is missing", async ({ fixture }) => {
     await ensureGithubCloudTarget(fixture);
 
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth-complete-missing-state@example.com",
-    });
-
     const response = await fixture.request(
       "/v1/integration/connections/github-cloud/oauth/complete",
       {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify({
           query: {
@@ -306,17 +301,12 @@ describe("integration connections oauth integration", () => {
   it("returns 400 when oauth completion state is invalid", async ({ fixture }) => {
     await ensureGithubCloudTarget(fixture);
 
-    const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth-complete-invalid-state@example.com",
-    });
-
     const response = await fixture.request(
       "/v1/integration/connections/github-cloud/oauth/complete",
       {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify({
           query: {
@@ -354,7 +344,6 @@ describe("integration connections oauth integration", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify({
           query: {
@@ -401,7 +390,6 @@ describe("integration connections oauth integration", () => {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          cookie: authenticatedSession.cookie,
         },
         body: JSON.stringify({
           query: {

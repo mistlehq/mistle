@@ -21,7 +21,6 @@ import {
 import { resolveOauthHandlerTargetOrThrow } from "./resolve-oauth-handler.js";
 
 type CompleteOAuthConnectionInput = {
-  organizationId: string;
   targetKey: string;
   query: Record<string, string>;
 };
@@ -102,11 +101,7 @@ export async function completeOAuthConnection(
 
   const oauthSession = await db.query.integrationOauthSessions.findFirst({
     where: (table, { and, eq }) =>
-      and(
-        eq(table.organizationId, input.organizationId),
-        eq(table.targetKey, input.targetKey),
-        eq(table.state, state),
-      ),
+      and(eq(table.targetKey, input.targetKey), eq(table.state, state)),
   });
 
   if (oauthSession === undefined) {
@@ -139,7 +134,7 @@ export async function completeOAuthConnection(
   }
 
   const completedOAuthConnection = await resolved.oauthHandler.complete({
-    organizationId: input.organizationId,
+    organizationId: oauthSession.organizationId,
     targetKey: input.targetKey,
     target: resolved.target,
     query: queryParams,
@@ -172,7 +167,7 @@ export async function completeOAuthConnection(
     const [createdConnection] = await tx
       .insert(integrationConnections)
       .values({
-        organizationId: input.organizationId,
+        organizationId: oauthSession.organizationId,
         targetKey: input.targetKey,
         displayName:
           requestedDisplayName ?? completedOAuthConnection.externalSubjectId ?? input.targetKey,
@@ -191,12 +186,14 @@ export async function completeOAuthConnection(
 
     if (completedOAuthConnection.credentialMaterials.length > 0) {
       const organizationCredentialKey = await tx.query.organizationCredentialKeys.findFirst({
-        where: (table, { eq }) => eq(table.organizationId, input.organizationId),
+        where: (table, { eq }) => eq(table.organizationId, oauthSession.organizationId),
         orderBy: (table, { desc }) => [desc(table.version)],
       });
 
       if (organizationCredentialKey === undefined) {
-        throw new Error(`Organization credential key is missing for '${input.organizationId}'.`);
+        throw new Error(
+          `Organization credential key is missing for '${oauthSession.organizationId}'.`,
+        );
       }
 
       const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
@@ -218,7 +215,7 @@ export async function completeOAuthConnection(
           const [createdCredential] = await tx
             .insert(integrationCredentials)
             .values({
-              organizationId: input.organizationId,
+              organizationId: oauthSession.organizationId,
               secretKind: resolveCredentialSecretKind(material.secretType),
               ciphertext: encryptedCredential.ciphertext,
               nonce: encryptedCredential.nonce,
