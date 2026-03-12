@@ -41,11 +41,6 @@ export interface DockerClient {
   stopSandbox(request: DockerStopSandboxRequest): Promise<void>;
 }
 
-const DockerHostGatewayExtraHosts: Docker.HostConfig["ExtraHosts"] = [
-  "host.docker.internal:host-gateway",
-  "host.testcontainers.internal:host-gateway",
-];
-
 const DockerProgressAuxSchema = z
   .object({
     Digest: z.string().optional(),
@@ -168,9 +163,13 @@ export class DockerApiClient implements DockerClient {
       AttachStdin: true,
       StdinOnce: true,
       ...(parsedRequest.env === undefined ? {} : { Env: toDockerEnv(parsedRequest.env) }),
-      HostConfig: {
-        ExtraHosts: DockerHostGatewayExtraHosts,
-      },
+      ...(parsedRequest.extraHosts === undefined
+        ? {}
+        : {
+            HostConfig: {
+              ExtraHosts: parsedRequest.extraHosts,
+            },
+          }),
       Labels: {
         "mistle.sandbox.provider": "docker",
       },

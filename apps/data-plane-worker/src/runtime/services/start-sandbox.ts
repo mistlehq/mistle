@@ -14,8 +14,29 @@ type ResolveSandboxRuntimeTracesEndpointInput = {
   telemetryConfig: DataPlaneWorkerRuntimeConfig["telemetry"];
 };
 
+type ResolveSandboxExtraHostsInput = {
+  sandboxProvider: DataPlaneWorkerRuntimeConfig["sandbox"]["provider"];
+  tokenizerProxyEgressBaseUrl: string;
+  sandboxRuntimeTracesEndpoint: string | undefined;
+};
+
+const DockerHostGatewayHostnames = new Set([
+  "host.docker.internal",
+  "host.testcontainers.internal",
+]);
+
 function isLoopbackHostname(hostname: string): boolean {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+}
+
+function toDockerHostGatewayExtraHost(urlString: string): string | undefined {
+  const hostname = new URL(urlString).hostname;
+
+  if (!DockerHostGatewayHostnames.has(hostname)) {
+    return undefined;
+  }
+
+  return `${hostname}:host-gateway`;
 }
 
 export function resolveSandboxRuntimeTracesEndpoint(
@@ -34,6 +55,33 @@ export function resolveSandboxRuntimeTracesEndpoint(
   return parsedURL.toString();
 }
 
+export function resolveSandboxExtraHosts(
+  input: ResolveSandboxExtraHostsInput,
+): string[] | undefined {
+  if (input.sandboxProvider !== "docker") {
+    return undefined;
+  }
+
+  const extraHosts = new Set<string>();
+  const tokenizerProxyExtraHost = toDockerHostGatewayExtraHost(input.tokenizerProxyEgressBaseUrl);
+  if (tokenizerProxyExtraHost !== undefined) {
+    extraHosts.add(tokenizerProxyExtraHost);
+  }
+
+  if (input.sandboxRuntimeTracesEndpoint !== undefined) {
+    const telemetryExtraHost = toDockerHostGatewayExtraHost(input.sandboxRuntimeTracesEndpoint);
+    if (telemetryExtraHost !== undefined) {
+      extraHosts.add(telemetryExtraHost);
+    }
+  }
+
+  if (extraHosts.size === 0) {
+    return undefined;
+  }
+
+  return [...extraHosts];
+}
+
 export async function startSandbox(
   deps: {
     config: DataPlaneWorkerRuntimeConfig;
@@ -45,12 +93,18 @@ export async function startSandbox(
     sandboxProvider: deps.config.sandbox.provider,
     telemetryConfig: deps.config.telemetry,
   });
+  const sandboxExtraHosts = resolveSandboxExtraHosts({
+    sandboxProvider: deps.config.sandbox.provider,
+    tokenizerProxyEgressBaseUrl: deps.config.app.sandbox.tokenizerProxyEgressBaseUrl,
+    sandboxRuntimeTracesEndpoint,
+  });
 
   const startedSandbox = await deps.sandboxAdapter.start({
     image: {
       ...input.image,
       provider: deps.config.sandbox.provider,
     },
+    ...(sandboxExtraHosts === undefined ? {} : { extraHosts: sandboxExtraHosts }),
     env: {
       [SandboxRuntimeTokenizerProxyEgressBaseURLEnv]:
         deps.config.app.sandbox.tokenizerProxyEgressBaseUrl,

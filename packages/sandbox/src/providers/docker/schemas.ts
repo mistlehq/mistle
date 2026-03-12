@@ -18,6 +18,7 @@ export const DockerStartSandboxRequestSchema = z
     imageRef: z.string().trim().min(1, {
       message: "Docker request field `imageRef` is required.",
     }),
+    extraHosts: z.array(z.string().trim().min(1)).optional(),
     env: z
       .record(
         z.string().trim().min(1, {
