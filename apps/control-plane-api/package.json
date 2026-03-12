@@ -36,6 +36,7 @@
     "@mistle/sandbox-runtime-plan-compiler": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
+    "@mistle/workflow-registry": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "@openworkflow/cli": "^0.4.3",
     "better-auth": "1.5.4",

@@ -1,6 +1,6 @@
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 import { SandboxImageKind } from "@mistle/sandbox";
-import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflows/data-plane";
+import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 import { z } from "zod";
 
 const DataPlaneSandboxImageKinds = SandboxImageKind;

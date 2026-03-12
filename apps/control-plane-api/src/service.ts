@@ -1,5 +1,5 @@
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-trpc/client";
-import { HandleIntegrationWebhookEventWorkflowSpec } from "@mistle/workflows/control-plane";
+import { HandleIntegrationWebhookEventWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 
 import { createControlPlaneAuth } from "./auth/index.js";
 import { createAutomationWebhooksService } from "./automation-webhooks/index.js";
