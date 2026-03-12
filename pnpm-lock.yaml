@@ -1002,6 +1002,21 @@ importers:
         specifier: ^4.0.18
         version: 4.0.18(@opentelemetry/api@1.9.0)(@types/node@25.3.5)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.31.1)(tsx@4.21.0)(yaml@2.8.2)
 
+  packages/workflow-registry:
+    dependencies:
+      '@mistle/db':
+        specifier: workspace:*
+        version: link:../db
+      '@mistle/integrations-core':
+        specifier: workspace:*
+        version: link:../integrations-core
+      '@mistle/sandbox':
+        specifier: workspace:*
+        version: link:../sandbox
+      openworkflow:
+        specifier: ^0.8.1
+        version: 0.8.1(postgres@3.4.8)
+
   packages/workflows:
     dependencies:
       '@mistle/automations':
@@ -1022,6 +1037,9 @@ importers:
       '@mistle/time':
         specifier: workspace:*
         version: link:../time
+      '@mistle/workflow-registry':
+        specifier: workspace:*
+        version: link:../workflow-registry
       drizzle-orm:
         specifier: ^0.45.1
         version: 0.45.1(@electric-sql/pglite@0.3.15)(@opentelemetry/api@1.9.0)(@prisma/client@7.4.2(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))(typescript@5.9.3))(@types/pg@8.18.0)(kysely@0.28.11)(mysql2@3.15.3)(pg@8.20.0)(postgres@3.4.8)(prisma@7.4.2(@types/react@19.2.14)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)(typescript@5.9.3))

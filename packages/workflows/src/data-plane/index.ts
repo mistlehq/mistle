@@ -1,7 +1,12 @@
 export { createDataPlaneBackend } from "./backend.js";
 export { createDataPlaneOpenWorkflow } from "./client.js";
 export { DataPlaneWorkerWorkflowIds, createDataPlaneWorker } from "./worker.js";
-export { StartSandboxInstanceWorkflowSpec } from "./workflows/index.js";
+export {
+  StartSandboxInstanceWorkflowSpec,
+  type StartSandboxInstanceWorkflowImageInput,
+  type StartSandboxInstanceWorkflowInput,
+  type StartSandboxInstanceWorkflowOutput,
+} from "@mistle/workflow-registry/data-plane";
 export { DataPlaneOpenWorkflow } from "./constants.js";
 export type { CreateDataPlaneBackendInput } from "./backend.js";
 export type { CreateDataPlaneOpenWorkflowInput } from "./client.js";
@@ -10,9 +15,4 @@ export type {
   DataPlaneWorkerServices,
   DataPlaneWorkerWorkflowId,
 } from "./worker.js";
-export type {
-  StartSandboxInstanceWorkflowServices,
-  StartSandboxInstanceWorkflowImageInput,
-  StartSandboxInstanceWorkflowInput,
-  StartSandboxInstanceWorkflowOutput,
-} from "./workflows/start-sandbox-instance/index.js";
+export type { StartSandboxInstanceWorkflowServices } from "./workflows/start-sandbox-instance/workflow.js";
