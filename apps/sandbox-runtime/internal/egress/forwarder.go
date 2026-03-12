@@ -80,12 +80,10 @@ func joinPath(basePath string, suffixPath string) string {
 
 func createTokenizerProxyURL(input struct {
 	baseURL    *url.URL
-	routeID    string
 	targetPath string
 	rawQuery   string
 }) string {
 	forwardURL := *input.baseURL
-	forwardURL.Path = joinPath(forwardURL.Path, "routes/"+url.PathEscape(input.routeID))
 	forwardURL.Path = joinPath(forwardURL.Path, input.targetPath)
 	forwardURL.RawQuery = input.rawQuery
 	forwardURL.Fragment = ""
@@ -113,12 +111,10 @@ func (forwarder Forwarder) buildForwardRequest(input struct {
 }) (*http.Request, error) {
 	forwardRequestURL := createTokenizerProxyURL(struct {
 		baseURL    *url.URL
-		routeID    string
 		targetPath string
 		rawQuery   string
 	}{
 		baseURL:    forwarder.tokenizerProxyBaseURL,
-		routeID:    input.route.RouteID,
 		targetPath: input.targetPath,
 		rawQuery:   input.incomingRequest.URL.RawQuery,
 	})
