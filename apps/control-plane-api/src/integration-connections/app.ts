@@ -27,6 +27,8 @@ import { listIntegrationConnections } from "./services/list-connections.js";
 import { startOAuthConnection } from "./services/start-oauth-connection.js";
 import { updateIntegrationConnection } from "./services/update-api-key-connection.js";
 
+const DashboardOrganizationIntegrationsPath = "/settings/organization/integrations";
+
 export function createIntegrationConnectionsApp(): AppRoutes<
   typeof INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH
 > {
@@ -182,16 +184,15 @@ export function createIntegrationConnectionsApp(): AppRoutes<
       const params = ctx.req.valid("param");
       const query = ctx.req.valid("query");
 
-      const completedConnection = await completeOAuthConnection(
-        ctx.get("db"),
-        ctx.get("config").integrations,
-        {
-          targetKey: params.targetKey,
-          query,
-        },
-      );
+      await completeOAuthConnection(ctx.get("db"), ctx.get("config").integrations, {
+        targetKey: params.targetKey,
+        query,
+      });
 
-      return ctx.json(completedConnection, 201);
+      return ctx.redirect(
+        buildDashboardIntegrationsUrl(ctx.get("config").auth.invitationAcceptBaseUrl),
+        302,
+      );
     } catch (error) {
       return handleIntegrationConnectionMutationError(ctx, error);
     }
@@ -214,6 +215,14 @@ function handleListIntegrationConnectionsError(ctx: AppContext, error: unknown) 
   }
 
   throw error;
+}
+
+function buildDashboardIntegrationsUrl(invitationAcceptBaseUrl: string): string {
+  const url = new URL(invitationAcceptBaseUrl);
+  url.pathname = DashboardOrganizationIntegrationsPath;
+  url.search = "";
+  url.hash = "";
+  return url.toString();
 }
 
 function handleIntegrationConnectionMutationError(ctx: AppContext, error: unknown) {

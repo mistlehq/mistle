@@ -241,6 +241,12 @@ export const IntegrationConnectionsForbiddenResponseSchema = z
   })
   .strict();
 
+const RedirectLocationHeaderSchema = z
+  .object({
+    Location: z.string().min(1),
+  })
+  .strict();
+
 export const CreateApiKeyConnectionParamsSchema = z
   .object({
     targetKey: z.string().min(1),
@@ -673,13 +679,9 @@ export const completeOAuthConnectionRoute = createRoute({
     query: CompleteOAuthConnectionQuerySchema,
   },
   responses: {
-    201: {
-      description: "Create an OAuth-backed integration connection from callback query params.",
-      content: {
-        "application/json": {
-          schema: IntegrationConnectionSchema,
-        },
-      },
+    302: {
+      description: "Complete OAuth connection creation and redirect to dashboard integrations.",
+      headers: RedirectLocationHeaderSchema,
     },
     400: {
       description: "Invalid request.",

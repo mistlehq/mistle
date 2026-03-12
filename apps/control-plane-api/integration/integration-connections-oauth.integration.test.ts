@@ -8,7 +8,6 @@ import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import {
-  IntegrationConnectionSchema,
   IntegrationConnectionsBadRequestResponseSchema,
   StartOAuthConnectionResponseSchema,
 } from "../src/integration-connections/contracts.js";
@@ -69,6 +68,15 @@ async function ensureOpenAiDefaultTarget(
         },
       },
     });
+}
+
+function createDashboardOrganizationIntegrationsUrl(
+  fixture: ControlPlaneApiIntegrationFixture,
+): string {
+  return new URL(
+    "/settings/organization/integrations",
+    fixture.config.auth.invitationAcceptBaseUrl,
+  ).toString();
 }
 
 describe("integration connections oauth integration", () => {
@@ -162,27 +170,21 @@ describe("integration connections oauth integration", () => {
       }),
       {
         method: "GET",
+        redirect: "manual",
       },
     );
 
-    expect(completeResponse.status).toBe(201);
-    const completeBody = IntegrationConnectionSchema.parse(await completeResponse.json());
-
-    expect(completeBody.targetKey).toBe("github-cloud");
-    expect(completeBody.displayName).toBe("12345");
-    expect(completeBody.status).toBe("active");
-    expect(completeBody.externalSubjectId).toBe("12345");
-    expect(completeBody.config).toEqual({
-      auth_scheme: "oauth",
-      installation_id: "12345",
-      setup_action: "install",
-    });
+    expect(completeResponse.status).toBe(302);
+    expect(completeResponse.headers.get("location")).toBe(
+      createDashboardOrganizationIntegrationsUrl(fixture),
+    );
 
     const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
       where: (table, { and, eq }) =>
         and(
-          eq(table.id, completeBody.id),
           eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.targetKey, "github-cloud"),
+          eq(table.externalSubjectId, "12345"),
         ),
     });
     expect(persistedConnection).toBeDefined();
@@ -190,6 +192,14 @@ describe("integration connections oauth integration", () => {
       throw new Error("Expected persisted oauth-backed connection.");
     }
 
+    expect(persistedConnection.displayName).toBe("12345");
+    expect(persistedConnection.status).toBe("active");
+    expect(persistedConnection.externalSubjectId).toBe("12345");
+    expect(persistedConnection.config).toEqual({
+      auth_scheme: "oauth",
+      installation_id: "12345",
+      setup_action: "install",
+    });
     expect(persistedConnection.targetSnapshotConfig).toEqual({
       apiBaseUrl: "https://api.github.com",
       webBaseUrl: "https://github.com",
@@ -217,7 +227,7 @@ describe("integration connections oauth integration", () => {
         connectionId: integrationConnectionCredentials.connectionId,
       })
       .from(integrationConnectionCredentials)
-      .where(eq(integrationConnectionCredentials.connectionId, completeBody.id));
+      .where(eq(integrationConnectionCredentials.connectionId, persistedConnection.id));
     expect(linkedCredentials).toHaveLength(0);
   });
 
@@ -263,13 +273,30 @@ describe("integration connections oauth integration", () => {
       }),
       {
         method: "GET",
+        redirect: "manual",
       },
     );
 
-    expect(completeResponse.status).toBe(201);
-    const completeBody = IntegrationConnectionSchema.parse(await completeResponse.json());
-    expect(completeBody.displayName).toBe("GitHub Prod");
-    expect(completeBody.externalSubjectId).toBe("12345");
+    expect(completeResponse.status).toBe(302);
+    expect(completeResponse.headers.get("location")).toBe(
+      createDashboardOrganizationIntegrationsUrl(fixture),
+    );
+
+    const persistedConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { and, eq }) =>
+        and(
+          eq(table.organizationId, authenticatedSession.organizationId),
+          eq(table.targetKey, "github-cloud"),
+          eq(table.externalSubjectId, "12345"),
+        ),
+    });
+    expect(persistedConnection).toBeDefined();
+    if (persistedConnection === undefined) {
+      throw new Error("Expected persisted oauth-backed connection.");
+    }
+
+    expect(persistedConnection.displayName).toBe("GitHub Prod");
+    expect(persistedConnection.externalSubjectId).toBe("12345");
   });
 
   it("returns 400 when oauth completion state is missing", async ({ fixture }) => {

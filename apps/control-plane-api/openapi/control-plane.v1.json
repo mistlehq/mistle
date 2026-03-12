@@ -2743,90 +2743,15 @@
           }
         ],
         "responses": {
-          "201": {
-            "description": "Create an OAuth-backed integration connection from callback query params.",
-            "content": {
-              "application/json": {
+          "302": {
+            "description": "Complete OAuth connection creation and redirect to dashboard integrations.",
+            "headers": {
+              "Location": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "targetKey": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "displayName": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "status": {
-                      "type": "string",
-                      "enum": ["active", "error", "revoked"]
-                    },
-                    "externalSubjectId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "config": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    },
-                    "targetSnapshotConfig": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    },
-                    "resources": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "kind": {
-                            "type": "string",
-                            "minLength": 1
-                          },
-                          "selectionMode": {
-                            "type": "string",
-                            "enum": ["single", "multi"]
-                          },
-                          "count": {
-                            "type": "integer",
-                            "minimum": 0
-                          },
-                          "syncState": {
-                            "type": "string",
-                            "enum": ["never-synced", "syncing", "ready", "error"]
-                          },
-                          "lastSyncedAt": {
-                            "type": "string",
-                            "minLength": 1
-                          }
-                        },
-                        "required": ["kind", "selectionMode", "count", "syncState"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "createdAt": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "updatedAt": {
-                      "type": "string",
-                      "minLength": 1
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "targetKey",
-                    "displayName",
-                    "status",
-                    "createdAt",
-                    "updatedAt"
-                  ],
-                  "additionalProperties": false
-                }
+                  "type": "string",
+                  "minLength": 1
+                },
+                "required": true
               }
             }
           },
