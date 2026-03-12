@@ -31,7 +31,7 @@ describe("ChatSemanticGroup", () => {
 
     expect(screen.getByText("Thoughts")).toBeTruthy();
     expect(screen.getByText("2 items")).toBeTruthy();
-    expect(screen.getByText("Thinking")).toBeTruthy();
+    expect(screen.getAllByText("Thought")).toHaveLength(2);
     expect(screen.getByText(/Comparing current grouped transcript output/)).toBeTruthy();
     expect(screen.queryByText("Toggle results")).toBeNull();
   });
@@ -103,6 +103,7 @@ describe("ChatSemanticGroup", () => {
           id: "read-code-item-1",
           label: "Read",
           detail: "apps/dashboard/src/features/chat/components/chat-thread.tsx",
+          detailKind: "code",
           command: "sed -n '1,40p' apps/dashboard/src/features/chat/components/chat-thread.tsx",
           output: [
             "export function ChatThread(): React.JSX.Element {",

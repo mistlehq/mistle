@@ -86,6 +86,7 @@ export const CodexStoryExploringGroupEntry: ChatSemanticGroupEntry = {
       id: "exploring-command-1",
       label: "Search",
       detail: "semantic",
+      detailKind: "plain",
       command: 'rg -n "semantic" docs apps/dashboard/src/features/codex-client',
       output: [
         "docs/codex-semantic-classification-scratchpad.md:42:Only adjacent exploring items group in v1.",
@@ -97,6 +98,7 @@ export const CodexStoryExploringGroupEntry: ChatSemanticGroupEntry = {
       id: "exploring-command-2",
       label: "List files",
       detail: "apps/dashboard/src/features/chat/components",
+      detailKind: "code",
       command: "ls apps/dashboard/src/features/chat/components",
       output: [
         "chat-assistant-message.tsx",
@@ -110,6 +112,7 @@ export const CodexStoryExploringGroupEntry: ChatSemanticGroupEntry = {
       id: "exploring-command-3",
       label: "Read",
       detail: "apps/dashboard/src/features/chat/components/chat-thread.tsx",
+      detailKind: "code",
       command: "sed -n '1,220p' apps/dashboard/src/features/chat/components/chat-thread.tsx",
       output: [
         'if (block.kind === "semantic-group") {',
@@ -122,6 +125,7 @@ export const CodexStoryExploringGroupEntry: ChatSemanticGroupEntry = {
       id: "exploring-command-4",
       label: "List files",
       detail: "packages/codex-app-server-client/src/thread-items",
+      detailKind: "code",
       command: "find packages/codex-app-server-client/src/thread-items -maxdepth 2 -type f | sort",
       output: [
         "packages/codex-app-server-client/src/thread-items/build-thread-timeline.ts",
@@ -176,17 +180,19 @@ export const CodexStoryThinkingGroupEntry: ChatSemanticGroupEntry = {
   items: [
     {
       id: "thinking-1",
-      label: "Thinking",
+      label: "Thought",
       detail: "Comparing current grouped transcript output with the updated spec.",
+      detailKind: "plain",
       command: null,
       output: null,
       status: "completed",
     },
     {
       id: "thinking-2",
-      label: "Reasoning",
+      label: "Thought",
       detail:
         "The spec now groups adjacent thinking, edits, searches, and tool calls, not just exploring.",
+      detailKind: "plain",
       command: null,
       output: null,
       status: "completed",
@@ -225,6 +231,7 @@ export const CodexStoryMakingEditsGroupEntry: ChatSemanticGroupEntry = {
       id: "making-edits-1",
       label: "Updated",
       detail: "apps/dashboard/src/features/chat/components/chat-thread.tsx",
+      detailKind: "code",
       command: null,
       output: [
         "@@ -48,7 +48,7 @@",
@@ -237,6 +244,7 @@ export const CodexStoryMakingEditsGroupEntry: ChatSemanticGroupEntry = {
       id: "making-edits-2",
       label: "Added",
       detail: "apps/dashboard/src/features/chat/components/chat-semantic-group.tsx",
+      detailKind: "code",
       command: null,
       output: [
         "@@ -0,0 +1,38 @@",
@@ -261,6 +269,7 @@ export const CodexStorySearchingWebGroupEntry: ChatSemanticGroupEntry = {
       id: "searching-web-1",
       label: "Web search",
       detail: "opencode shared transcript renderer grouped tools",
+      detailKind: "plain",
       command: null,
       output: JSON.stringify(
         {
@@ -284,6 +293,7 @@ export const CodexStorySearchingWebGroupEntry: ChatSemanticGroupEntry = {
       id: "searching-web-2",
       label: "Web search",
       detail: "storybook grouped activity list ux",
+      detailKind: "plain",
       command: null,
       output: JSON.stringify(
         {
@@ -314,6 +324,7 @@ export const CodexStoryToolCallGroupEntry: ChatSemanticGroupEntry = {
       id: "tool-call-1",
       label: "Review PR",
       detail: "Pull request #421",
+      detailKind: "plain",
       command: null,
       output: JSON.stringify(
         {
@@ -330,6 +341,7 @@ export const CodexStoryToolCallGroupEntry: ChatSemanticGroupEntry = {
       id: "tool-call-2",
       label: "Summarize document",
       detail: "docs/codex-semantic-classification-scratchpad.md",
+      detailKind: "plain",
       command: null,
       output: JSON.stringify(
         {
@@ -363,6 +375,7 @@ export const CodexStoryRunningCommandsGroupEntry: ChatSemanticGroupEntry = {
       id: "running-command-1",
       label: "Command",
       detail: "pnpm --filter @mistle/dashboard lint",
+      detailKind: "code",
       command: "pnpm --filter @mistle/dashboard lint",
       output: ["Found 0 warnings and 0 errors.", "Finished in 1.9s."].join("\n"),
       status: "completed",
@@ -372,6 +385,7 @@ export const CodexStoryRunningCommandsGroupEntry: ChatSemanticGroupEntry = {
       label: "Command",
       detail:
         "pnpm exec vitest run apps/dashboard/src/features/chat/components/chat-thread.test.tsx",
+      detailKind: "code",
       command:
         "pnpm exec vitest run apps/dashboard/src/features/chat/components/chat-thread.test.tsx",
       output: [

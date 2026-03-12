@@ -78,6 +78,8 @@ export type ChatSemanticGroupKind =
   | "searching-web"
   | "tool-call";
 
+export type ChatSemanticGroupDetailKind = "plain" | "code";
+
 export type ChatSemanticGroupEntry = {
   id: string;
   turnId: string;
@@ -93,6 +95,7 @@ export type ChatSemanticGroupEntry = {
     id: string;
     label: string;
     detail: string | null;
+    detailKind: ChatSemanticGroupDetailKind;
     command: string | null;
     output: string | null;
     status: "streaming" | "completed";

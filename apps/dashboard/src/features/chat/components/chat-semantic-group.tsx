@@ -1,6 +1,10 @@
 import { CaretRightIcon } from "@phosphor-icons/react";
 
-import type { ChatSemanticGroupEntry, ChatSemanticGroupKind } from "../chat-types.js";
+import type {
+  ChatSemanticGroupDetailKind,
+  ChatSemanticGroupEntry,
+  ChatSemanticGroupKind,
+} from "../chat-types.js";
 import { ChatDiffView } from "./chat-diff-view.js";
 import { ChatMarkdownMessage } from "./chat-markdown-message.js";
 
@@ -53,21 +57,14 @@ function getSemanticGroupSummary(input: {
   return `${String(input.itemCount)} item${input.itemCount === 1 ? "" : "s"}`;
 }
 
-function getSemanticGroupDetailClassName(input: { semanticKind: ChatSemanticGroupKind }): string {
-  switch (input.semanticKind) {
-    case "running-commands":
-      return "text-muted-foreground font-mono text-xs leading-6";
-    case "making-edits":
-      return "text-muted-foreground font-mono text-xs leading-6";
-    case "thinking":
-      return "text-muted-foreground text-xs leading-5";
-    case "searching-web":
-      return "text-muted-foreground text-xs leading-5";
-    case "tool-call":
-      return "text-muted-foreground text-xs leading-5";
-    case "exploring":
-      return "text-muted-foreground text-sm";
+function getSemanticGroupDetailClassName(input: {
+  detailKind: ChatSemanticGroupDetailKind;
+}): string {
+  if (input.detailKind === "code") {
+    return "text-muted-foreground font-mono text-xs leading-5";
   }
+
+  return "text-muted-foreground text-xs leading-5";
 }
 
 function getPathExtension(path: string): string | null {
@@ -219,8 +216,8 @@ export function ChatSemanticGroup({ block }: ChatSemanticGroupProps): React.JSX.
             open={item.status === "streaming"}
           >
             <summary className="flex cursor-default list-none items-start justify-between gap-3">
-              <p className="text-sm leading-6">
-                <span className="inline-flex items-center gap-1.5">
+              <div className="min-w-0 flex items-baseline gap-2.5 text-sm leading-6">
+                <span className="inline-flex shrink-0 items-center gap-1.5">
                   <span className="font-medium">{item.label}</span>
                   {item.output === null || item.output.length === 0 ? null : (
                     <span className="text-muted-foreground flex size-3.5 items-center justify-center">
@@ -234,15 +231,17 @@ export function ChatSemanticGroup({ block }: ChatSemanticGroupProps): React.JSX.
                 </span>
                 {item.detail === null ? null : (
                   <span
-                    className={getSemanticGroupDetailClassName({
-                      semanticKind: block.semanticKind,
-                    })}
+                    className={[
+                      "min-w-0 truncate",
+                      getSemanticGroupDetailClassName({
+                        detailKind: item.detailKind,
+                      }),
+                    ].join(" ")}
                   >
-                    {" "}
                     {item.detail}
                   </span>
                 )}
-              </p>
+              </div>
               <div className="text-muted-foreground flex items-center gap-1.5 self-start pt-0.5">
                 <p className="text-xs leading-5">
                   {item.status === "streaming" ? "Running" : "Done"}

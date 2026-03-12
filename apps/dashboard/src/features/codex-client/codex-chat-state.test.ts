@@ -243,6 +243,7 @@ describe("reduceCodexChatState", () => {
             id: "cmd_1",
             label: "Command",
             detail: "ls -la",
+            detailKind: "code",
             command: "ls -la",
             output: "file-a\nfile-b",
             status: "completed",
@@ -333,6 +334,7 @@ describe("reduceCodexChatState", () => {
             id: "cmd_1",
             label: "Read",
             detail: "app.ts",
+            detailKind: "code",
             command: "sed -n '1,120p' app.ts",
             output: "export const App = () => null;",
             status: "completed",
@@ -341,6 +343,7 @@ describe("reduceCodexChatState", () => {
             id: "cmd_2",
             label: "Search",
             detail: "App",
+            detailKind: "plain",
             command: "rg App src",
             output: "src/app.ts",
             status: "completed",
@@ -405,16 +408,18 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "reasoning_1",
-            label: "Thinking",
+            label: "Thought",
             detail: "Inspecting reducer behavior",
+            detailKind: "plain",
             command: null,
             output: null,
             status: "completed",
           },
           {
             id: "reasoning_2:content",
-            label: "Reasoning",
+            label: "Thought",
             detail: "Comparing grouped output to raw item order",
+            detailKind: "plain",
             command: null,
             output: null,
             status: "completed",
@@ -687,8 +692,9 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "reasoning_1",
-            label: "Thinking",
+            label: "Thought",
             detail: "**Preparing file list command**",
+            detailKind: "plain",
             command: null,
             output: null,
             status: "completed",
@@ -707,6 +713,7 @@ describe("reduceCodexChatState", () => {
             id: "cmd_1",
             label: "Command",
             detail: "pwd",
+            detailKind: "code",
             command: "pwd",
             output: "/workspace",
             status: "completed",
@@ -801,16 +808,18 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "reasoning_1",
-            label: "Thinking",
-            detail: "Inspect files\n\n",
+            label: "Thought",
+            detail: "Inspect files",
+            detailKind: "plain",
             command: null,
             output: null,
             status: "streaming",
           },
           {
             id: "reasoning_1:content",
-            label: "Reasoning",
+            label: "Thought",
             detail: "Detailed chain",
+            detailKind: "plain",
             command: null,
             output: null,
             status: "streaming",
@@ -893,6 +902,7 @@ describe("reduceCodexChatState", () => {
             id: "cmd_1",
             label: "Command",
             detail: "ls -la",
+            detailKind: "code",
             command: "ls -la",
             output: "file-a\n",
             status: "streaming",
@@ -911,6 +921,7 @@ describe("reduceCodexChatState", () => {
             id: "file_1",
             label: "Updated",
             detail: "src/app.ts",
+            detailKind: "code",
             command: null,
             output: "Applied patch",
             status: "completed",
@@ -950,6 +961,7 @@ describe("reduceCodexChatState", () => {
             id: "tool_1",
             label: "dynamic",
             detail: "dynamic",
+            detailKind: "plain",
             command: null,
             output: JSON.stringify(
               {
@@ -1020,8 +1032,9 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "reasoning_1",
-            label: "Thinking",
+            label: "Thought",
             detail: "**Creating concise fantasy story**",
+            detailKind: "plain",
             command: null,
             output: null,
             status: "completed",
@@ -1064,8 +1077,9 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "reasoning_1",
-            label: "Thinking",
+            label: "Thought",
             detail: "**Creating concise fantasy story**",
+            detailKind: "plain",
             command: null,
             output: null,
             status: "completed",
@@ -1110,8 +1124,9 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "reasoning_1",
-            label: "Thinking",
+            label: "Thought",
             detail: "**Creating concise fantasy story**",
+            detailKind: "plain",
             command: null,
             output: null,
             status: "completed",

@@ -216,12 +216,14 @@ function summarizeExploringItem(
 ): {
   label: string;
   detail: string | null;
+  detailKind: "plain" | "code";
 } {
   const firstAction = item.commandActions[0];
   if (firstAction === undefined) {
     return {
       label: "Command",
       detail: item.command,
+      detailKind: "code",
     };
   }
 
@@ -229,6 +231,7 @@ function summarizeExploringItem(
     return {
       label: "Read",
       detail: firstAction.path ?? firstAction.name,
+      detailKind: "code",
     };
   }
 
@@ -236,6 +239,7 @@ function summarizeExploringItem(
     return {
       label: "Search",
       detail: firstAction.query ?? firstAction.path ?? item.command,
+      detailKind: "plain",
     };
   }
 
@@ -243,13 +247,35 @@ function summarizeExploringItem(
     return {
       label: "List files",
       detail: firstAction.path ?? item.command,
+      detailKind: "code",
     };
   }
 
   return {
     label: "Command",
     detail: item.command,
+    detailKind: "code",
   };
+}
+
+function formatSemanticGroupDetail(input: {
+  detail: string | null;
+  maxLength: number;
+}): string | null {
+  if (input.detail === null) {
+    return null;
+  }
+
+  const normalizedDetail = input.detail.replaceAll(/\s+/g, " ").trim();
+  if (normalizedDetail.length === 0) {
+    return null;
+  }
+
+  if (normalizedDetail.length <= input.maxLength) {
+    return normalizedDetail;
+  }
+
+  return `${normalizedDetail.slice(0, input.maxLength - 1).trimEnd()}…`;
 }
 
 function summarizeFileChangeOutput(
@@ -294,6 +320,7 @@ function getFileChangeLabel(kind: string | null, count: number): string {
 function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
   label: string;
   detail: string | null;
+  detailKind: "plain" | "code";
   output: string | null;
 } {
   if (item.kind === "command-execution") {
@@ -307,22 +334,34 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
     if (hasExploringActions) {
       return {
         label: exploringSummary.label,
-        detail: exploringSummary.detail,
+        detail: formatSemanticGroupDetail({
+          detail: exploringSummary.detail,
+          maxLength: 72,
+        }),
+        detailKind: exploringSummary.detailKind,
         output: item.output,
       };
     }
 
     return {
       label: "Command",
-      detail: item.command ?? item.reason,
+      detail: formatSemanticGroupDetail({
+        detail: item.command ?? item.reason,
+        maxLength: 80,
+      }),
+      detailKind: "code",
       output: item.output,
     };
   }
 
   if (item.kind === "reasoning") {
     return {
-      label: item.source === "summary" ? "Thinking" : "Reasoning",
-      detail: item.text,
+      label: "Thought",
+      detail: formatSemanticGroupDetail({
+        detail: item.text,
+        maxLength: 88,
+      }),
+      detailKind: "plain",
       output: null,
     };
   }
@@ -331,7 +370,11 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
     const paths = item.changes.map((change) => change.path);
     return {
       label: getFileChangeLabel(item.changes[0]?.kind ?? null, item.changes.length),
-      detail: paths.length === 0 ? null : paths.join(", "),
+      detail: formatSemanticGroupDetail({
+        detail: paths.length === 0 ? null : paths.join(", "),
+        maxLength: 88,
+      }),
+      detailKind: "code",
       output: summarizeFileChangeOutput(item),
     };
   }
@@ -339,7 +382,11 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
   if (item.kind === "web-search") {
     return {
       label: "Web search",
-      detail: item.query,
+      detail: formatSemanticGroupDetail({
+        detail: item.query,
+        maxLength: 72,
+      }),
+      detailKind: "plain",
       output: item.detailsJson,
     };
   }
@@ -347,7 +394,11 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
   if (item.kind === "tool-call") {
     return {
       label: item.title,
-      detail: item.body ?? item.toolType,
+      detail: formatSemanticGroupDetail({
+        detail: item.body ?? item.toolType,
+        maxLength: 72,
+      }),
+      detailKind: "plain",
       output: item.detailsJson,
     };
   }
@@ -355,6 +406,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
   return {
     label: item.kind,
     detail: null,
+    detailKind: "plain",
     output: null,
   };
 }
@@ -376,6 +428,7 @@ function mapTimelineEntryToChatEntries(entry: CodexTimelineEntry): readonly Chat
             id: item.id,
             label: summary.label,
             detail: summary.detail,
+            detailKind: summary.detailKind,
             command: item.kind === "command-execution" ? item.command : null,
             output: summary.output,
             status: "status" in item ? item.status : "completed",
