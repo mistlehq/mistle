@@ -22,7 +22,7 @@ export const dataPlaneWorkerDevelopmentPreset = {
         },
         sandbox: {
           tokenizer_proxy_egress_base_url:
-            "http://tokenizer-proxy-relay:5205/tokenizer-proxy/egress",
+            "http://tokenizer-proxy-relay:5025/tokenizer-proxy/egress",
           docker: {
             socket_path: "/var/run/docker.sock",
             snapshot_repository: "localhost:5001/mistle/snapshots",
