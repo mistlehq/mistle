@@ -111,22 +111,7 @@ function joinPath(basePath: string, suffixPath: string): string {
     : `${normalizedBasePath}/${normalizedSuffixPath}`;
 }
 
-function resolveLegacyTargetPath(requestPath: string): string | undefined {
-  const legacyPrefix = `${EGRESS_BASE_PATH}/routes/`;
-  if (!requestPath.startsWith(legacyPrefix)) {
-    return undefined;
-  }
-
-  const routeScopedPath = requestPath.slice(legacyPrefix.length);
-  const routeDelimiterIndex = routeScopedPath.indexOf("/");
-  if (routeDelimiterIndex < 0) {
-    return "/";
-  }
-
-  return requestPath.slice(legacyPrefix.length + routeDelimiterIndex);
-}
-
-function resolveHeaderAddressedTargetPath(requestPath: string): string | undefined {
+function resolveTargetPath(requestPath: string): string | undefined {
   if (requestPath === EGRESS_BASE_PATH) {
     return "/";
   }
@@ -138,15 +123,10 @@ function resolveHeaderAddressedTargetPath(requestPath: string): string | undefin
   return requestPath.slice(EGRESS_BASE_PATH.length);
 }
 
-function resolveTargetPath(ctx: Context<AppContextBindings>): string {
-  const legacyTargetPath = resolveLegacyTargetPath(ctx.req.path);
-  if (legacyTargetPath !== undefined) {
-    return legacyTargetPath;
-  }
-
-  const headerAddressedTargetPath = resolveHeaderAddressedTargetPath(ctx.req.path);
-  if (headerAddressedTargetPath !== undefined) {
-    return headerAddressedTargetPath;
+function resolveRequestTargetPath(ctx: Context<AppContextBindings>): string {
+  const targetPath = resolveTargetPath(ctx.req.path);
+  if (targetPath !== undefined) {
+    return targetPath;
   }
 
   throw new Error(
@@ -155,23 +135,7 @@ function resolveTargetPath(ctx: Context<AppContextBindings>): string {
 }
 
 function resolveRouteId(ctx: Context<AppContextBindings>): string | undefined {
-  const headerRouteId = readOptionalHeader(ctx.req.raw.headers, EgressRequestHeaders.ROUTE_ID);
-  if (headerRouteId !== undefined) {
-    return headerRouteId;
-  }
-
-  const legacyPrefix = `${EGRESS_BASE_PATH}/routes/`;
-  if (!ctx.req.path.startsWith(legacyPrefix)) {
-    return undefined;
-  }
-
-  const routeScopedPath = ctx.req.path.slice(legacyPrefix.length);
-  const routeDelimiterIndex = routeScopedPath.indexOf("/");
-  if (routeDelimiterIndex < 0) {
-    return routeScopedPath;
-  }
-
-  return routeScopedPath.slice(0, routeDelimiterIndex);
+  return readOptionalHeader(ctx.req.raw.headers, EgressRequestHeaders.ROUTE_ID);
 }
 
 function normalizePath(path: string): string {
@@ -208,7 +172,7 @@ function createUpstreamUrl(ctx: Context<AppContextBindings>, upstreamBaseUrl: st
   const upstreamUrl = new URL(upstreamBaseUrl);
   const incomingUrl = new URL(ctx.req.url);
 
-  upstreamUrl.pathname = resolveForwardPath(upstreamUrl.pathname, resolveTargetPath(ctx));
+  upstreamUrl.pathname = resolveForwardPath(upstreamUrl.pathname, resolveRequestTargetPath(ctx));
 
   for (const [queryKey, queryValue] of incomingUrl.searchParams.entries()) {
     upstreamUrl.searchParams.append(queryKey, queryValue);
