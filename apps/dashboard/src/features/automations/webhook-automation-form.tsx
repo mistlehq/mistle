@@ -20,6 +20,7 @@ import {
   SelectValue,
   Textarea,
 } from "@mistle/ui";
+import { TrashIcon } from "@phosphor-icons/react";
 
 export type WebhookAutomationFormOption = {
   value: string;
@@ -113,14 +114,29 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="space-y-1">
-        <h1 className="text-xl font-semibold">
-          {input.mode === "create" ? "Create automation" : "Edit automation"}
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Connect a webhook-capable integration to a sandbox profile and control how the incoming
-          event payload becomes automation input.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h1 className="text-xl font-semibold">
+            {input.mode === "create" ? "Create automation" : "Edit automation"}
+          </h1>
+          <p className="text-muted-foreground text-sm">
+            Connect a webhook-capable integration to a sandbox profile and control how the incoming
+            event payload becomes automation input.
+          </p>
+        </div>
+
+        {input.onDelete === null ? null : (
+          <Button
+            aria-label="Delete automation"
+            disabled={input.isDeleting || input.isSaving}
+            onClick={input.onDelete}
+            size="icon-sm"
+            type="button"
+            variant="outline"
+          >
+            <TrashIcon aria-hidden className="size-4" />
+          </Button>
+        )}
       </div>
 
       {input.formError === null ? null : (
@@ -306,19 +322,7 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         </CardContent>
       </Card>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          {input.onDelete === null ? null : (
-            <Button
-              disabled={input.isDeleting || input.isSaving}
-              onClick={input.onDelete}
-              type="button"
-              variant="outline"
-            >
-              {input.isDeleting ? "Deleting..." : "Delete automation"}
-            </Button>
-          )}
-        </div>
+      <div className="flex justify-end">
         <Button
           disabled={input.isDeleting || input.isSaving}
           onClick={input.onSubmit}

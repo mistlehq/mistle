@@ -31,8 +31,7 @@ export function DeleteWebhookAutomationDialog(
 
         <div className="space-y-4">
           <p className="text-sm leading-6">
-            Delete <span className="font-medium">{input.automationName}</span>? This removes the
-            automation configuration immediately.
+            This removes <span className="font-medium">{input.automationName}</span>.
           </p>
 
           {input.errorMessage === null ? null : (
