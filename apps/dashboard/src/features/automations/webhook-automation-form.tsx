@@ -22,6 +22,8 @@ import {
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
 
+import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
+
 export type WebhookAutomationFormOption = {
   value: string;
   label: string;
@@ -114,14 +116,16 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-xl font-semibold">
-            {input.mode === "create" ? "Create automation" : "Edit automation"}
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Connect a webhook-capable integration to a sandbox profile and control how the incoming
-            event payload becomes automation input.
-          </p>
+        <div className="min-w-0 flex-1">
+          <WebhookAutomationTitleEditor
+            errorMessage={input.fieldErrors.name}
+            mode={input.mode}
+            onCommit={(nextValue) => {
+              input.onValueChange("name", nextValue);
+            }}
+            saveDisabled={input.isDeleting || input.isSaving}
+            title={input.values.name}
+          />
         </div>
 
         {input.onDelete === null ? null : (
@@ -153,20 +157,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
-          <Field>
-            <FieldLabel htmlFor="automation-name">Automation name</FieldLabel>
-            <FieldContent>
-              <Input
-                id="automation-name"
-                onChange={(event) => {
-                  input.onValueChange("name", event.currentTarget.value);
-                }}
-                value={input.values.name}
-              />
-              <FieldError message={input.fieldErrors.name} />
-            </FieldContent>
-          </Field>
-
           <div className="grid gap-5 md:grid-cols-2">
             <SelectField
               error={input.fieldErrors.integrationConnectionId}

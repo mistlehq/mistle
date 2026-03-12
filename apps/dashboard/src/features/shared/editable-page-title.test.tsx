@@ -4,24 +4,29 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { SandboxProfileTitleEditor } from "./sandbox-profile-title-editor.js";
+import { EditablePageTitle } from "./editable-page-title.js";
 
-describe("SandboxProfileTitleEditor", () => {
+describe("EditablePageTitle", () => {
   afterEach(() => {
     cleanup();
   });
 
   function TitleEditorHarness(): React.JSX.Element {
     const [isEditing, setIsEditing] = useState(false);
-    const [draftValue, setDraftValue] = useState("My Profile");
+    const [draftValue, setDraftValue] = useState("My Title");
     const [commitCount, setCommitCount] = useState(0);
     const [cancelCount, setCancelCount] = useState(0);
 
     return (
       <div>
-        <SandboxProfileTitleEditor
+        <EditablePageTitle
+          ariaLabel="Page title"
+          cancelOnEscape={true}
           draftValue={draftValue}
+          editButtonLabel="Edit page title"
+          errorMessage={undefined}
           isEditing={isEditing}
+          maxWidthClassName={undefined}
           onCancel={() => {
             setCancelCount((current) => current + 1);
             setIsEditing(false);
@@ -34,8 +39,9 @@ describe("SandboxProfileTitleEditor", () => {
           onEditStart={() => {
             setIsEditing(true);
           }}
+          placeholder={undefined}
           saveDisabled={false}
-          title="My Profile"
+          title="My Title"
         />
         <p>Commit count: {commitCount}</p>
         <p>Cancel count: {cancelCount}</p>
@@ -46,15 +52,15 @@ describe("SandboxProfileTitleEditor", () => {
   it("switches into edit mode when edit icon is clicked", () => {
     render(<TitleEditorHarness />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit profile name" }));
-    expect(screen.getByRole("textbox", { name: "Profile name" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Edit page title" }));
+    expect(screen.getByRole("textbox", { name: "Page title" })).toBeDefined();
   });
 
   it("commits on blur while editing", () => {
     render(<TitleEditorHarness />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit profile name" }));
-    fireEvent.blur(screen.getByRole("textbox", { name: "Profile name" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit page title" }));
+    fireEvent.blur(screen.getByRole("textbox", { name: "Page title" }));
 
     expect(screen.getByText("Commit count: 1")).toBeDefined();
   });
@@ -62,8 +68,8 @@ describe("SandboxProfileTitleEditor", () => {
   it("cancels on Escape while editing", () => {
     render(<TitleEditorHarness />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit profile name" }));
-    fireEvent.keyDown(screen.getByRole("textbox", { name: "Profile name" }), {
+    fireEvent.click(screen.getByRole("button", { name: "Edit page title" }));
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Page title" }), {
       key: "Escape",
     });
 

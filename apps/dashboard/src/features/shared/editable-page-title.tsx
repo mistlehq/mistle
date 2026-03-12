@@ -1,23 +1,29 @@
 import { Button, Input } from "@mistle/ui";
 import { PencilSimpleIcon } from "@phosphor-icons/react";
 
-export function SandboxProfileTitleEditor(input: {
+export function EditablePageTitle(input: {
   title: string;
-  isEditing: boolean;
   draftValue: string;
+  isEditing: boolean;
+  ariaLabel: string;
+  editButtonLabel: string;
+  placeholder: string | undefined;
+  errorMessage: string | undefined;
   saveDisabled: boolean;
+  cancelOnEscape: boolean | undefined;
+  maxWidthClassName: string | undefined;
   onEditStart: () => void;
   onDraftValueChange: (nextValue: string) => void;
   onCommit: () => void;
   onCancel: () => void;
 }): React.JSX.Element {
-  const titleContainerClassName = "relative w-full max-w-2xl";
+  const containerClassName = `w-full ${input.maxWidthClassName ?? "max-w-2xl"} space-y-2`;
 
   if (input.isEditing) {
     return (
-      <div className={titleContainerClassName}>
+      <div className={containerClassName}>
         <Input
-          aria-label="Profile name"
+          aria-label={input.ariaLabel}
           autoFocus
           className="h-11 w-full text-xl font-semibold leading-none"
           onBlur={input.onCommit}
@@ -29,22 +35,27 @@ export function SandboxProfileTitleEditor(input: {
               event.currentTarget.blur();
               return;
             }
-            if (event.key === "Escape") {
+
+            if (event.key === "Escape" && (input.cancelOnEscape ?? true)) {
               input.onCancel();
             }
           }}
+          placeholder={input.placeholder}
           value={input.draftValue}
         />
+        {input.errorMessage === undefined ? null : (
+          <p className="text-destructive text-sm">{input.errorMessage}</p>
+        )}
       </div>
     );
   }
 
   return (
-    <div className={titleContainerClassName}>
+    <div className={containerClassName}>
       <div className="inline-flex items-center gap-1">
         <h1 className="text-xl font-semibold">{input.title}</h1>
         <Button
-          aria-label="Edit profile name"
+          aria-label={input.editButtonLabel}
           disabled={input.saveDisabled}
           onClick={input.onEditStart}
           size="icon-sm"
@@ -54,6 +65,9 @@ export function SandboxProfileTitleEditor(input: {
           <PencilSimpleIcon aria-hidden className="size-4" />
         </Button>
       </div>
+      {input.errorMessage === undefined ? null : (
+        <p className="text-destructive text-sm">{input.errorMessage}</p>
+      )}
     </div>
   );
 }

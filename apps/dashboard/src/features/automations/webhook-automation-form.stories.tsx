@@ -122,12 +122,14 @@ export const ValidationErrors: Story = {
     mode: "create",
     formError: "The selected integration connection does not support webhook automations.",
     fieldErrors: {
+      name: "Automation name is required.",
       integrationConnectionId: "Choose a webhook-capable integration connection.",
       sandboxProfileId: "Choose a sandbox profile for the automation target.",
       inputTemplate: "Input template must be valid JSON template text.",
     },
     values: {
       ...CreateValues,
+      name: "",
       integrationConnectionId: "",
       sandboxProfileId: "",
     },
