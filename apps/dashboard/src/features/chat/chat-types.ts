@@ -70,20 +70,30 @@ export type ChatGenericItemEntry = {
   status: "streaming" | "completed";
 };
 
-export type ChatExploringGroupEntry = {
+export type ChatSemanticGroupKind =
+  | "exploring"
+  | "running-commands"
+  | "making-edits"
+  | "thinking"
+  | "searching-web"
+  | "tool-call";
+
+export type ChatSemanticGroupEntry = {
   id: string;
   turnId: string;
-  kind: "exploring-group";
+  kind: "semantic-group";
+  semanticKind: ChatSemanticGroupKind;
   status: "streaming" | "completed";
   counts: {
     reads: number;
     searches: number;
     lists: number;
-  };
+  } | null;
   items: readonly {
     id: string;
+    label: string;
+    detail: string | null;
     command: string | null;
-    cwd: string | null;
     output: string | null;
     status: "streaming" | "completed";
   }[];
@@ -97,4 +107,4 @@ export type ChatEntry =
   | ChatPlanEntry
   | ChatFileChangeEntry
   | ChatGenericItemEntry
-  | ChatExploringGroupEntry;
+  | ChatSemanticGroupEntry;

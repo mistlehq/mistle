@@ -1,4 +1,5 @@
 @import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
 @import "@fontsource-variable/quicksand";
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -45,6 +46,9 @@
 @theme inline {
   --font-sans:
     "Inter Variable", Inter, "Aptos", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono:
+    "JetBrains Mono Variable", "JetBrains Mono", "SFMono-Regular", Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
   --font-logo:
     "Quicksand Variable", Quicksand, "Avenir Next", "Century Gothic", "Trebuchet MS", sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);

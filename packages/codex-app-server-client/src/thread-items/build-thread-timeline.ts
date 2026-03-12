@@ -4,10 +4,17 @@ import { normalizeCodexThreadItem } from "./normalize-thread-item.js";
 import type {
   ClassifiedCodexThreadItem,
   CodexTimelineEntry,
+  GroupableSemanticActionKind,
   SemanticActionGroup,
 } from "./types.js";
 
-function flushExploringGroup(
+function isGroupableSemanticKind(
+  semanticKind: ClassifiedCodexThreadItem["semanticKind"],
+): semanticKind is GroupableSemanticActionKind {
+  return semanticKind !== "generic";
+}
+
+function flushSemanticGroup(
   entries: CodexTimelineEntry[],
   groupItems: ClassifiedCodexThreadItem[],
   turnId: string,
@@ -20,24 +27,31 @@ function flushExploringGroup(
   if (firstItem === undefined) {
     throw new Error(`Missing first item for exploring group in turn '${turnId}'.`);
   }
+  if (!isGroupableSemanticKind(firstItem.semanticKind)) {
+    throw new Error(`Cannot build a semantic group for '${firstItem.semanticKind}'.`);
+  }
+  const groupKind = firstItem.semanticKind;
 
   const group: SemanticActionGroup = {
-    id: `${turnId}:exploring:${firstItem.item.id}`,
-    kind: "exploring",
+    id: `${turnId}:${groupKind}:${firstItem.item.id}`,
+    kind: groupKind,
     status: groupItems.some((item) => item.status === "streaming") ? "streaming" : "completed",
     displayKeys: firstItem.displayKeys,
-    counts: groupItems.reduce(
-      (counts, item) => ({
-        reads: counts.reads + (item.summaryCounts?.reads ?? 0),
-        searches: counts.searches + (item.summaryCounts?.searches ?? 0),
-        lists: counts.lists + (item.summaryCounts?.lists ?? 0),
-      }),
-      {
-        reads: 0,
-        searches: 0,
-        lists: 0,
-      },
-    ),
+    counts:
+      groupKind === "exploring"
+        ? groupItems.reduce(
+            (counts, item) => ({
+              reads: counts.reads + (item.summaryCounts?.reads ?? 0),
+              searches: counts.searches + (item.summaryCounts?.searches ?? 0),
+              lists: counts.lists + (item.summaryCounts?.lists ?? 0),
+            }),
+            {
+              reads: 0,
+              searches: 0,
+              lists: 0,
+            },
+          )
+        : null,
     items: groupItems.map((item) => item.item),
   };
   entries.push(group);
@@ -48,17 +62,25 @@ function buildTurnTimelineFromNormalized(input: {
   items: readonly import("./types.js").NormalizedCodexThreadItem[];
 }): readonly CodexTimelineEntry[] {
   const entries: CodexTimelineEntry[] = [];
-  let currentExploringGroup: ClassifiedCodexThreadItem[] = [];
+  let currentGroup: ClassifiedCodexThreadItem[] = [];
 
   for (const item of input.items) {
     const classified = classifyCodexThreadItemSemantics(item);
-    if (classified.semanticKind === "exploring") {
-      currentExploringGroup.push(classified);
+    const currentGroupKind = currentGroup[0]?.semanticKind ?? null;
+    if (
+      isGroupableSemanticKind(classified.semanticKind) &&
+      (currentGroupKind === null || currentGroupKind === classified.semanticKind)
+    ) {
+      currentGroup.push(classified);
       continue;
     }
 
-    flushExploringGroup(entries, currentExploringGroup, input.turnId);
-    currentExploringGroup = [];
+    flushSemanticGroup(entries, currentGroup, input.turnId);
+    currentGroup = [];
+    if (isGroupableSemanticKind(classified.semanticKind)) {
+      currentGroup.push(classified);
+      continue;
+    }
     entries.push({
       id: classified.item.id,
       item: classified.item,
@@ -68,7 +90,7 @@ function buildTurnTimelineFromNormalized(input: {
     });
   }
 
-  flushExploringGroup(entries, currentExploringGroup, input.turnId);
+  flushSemanticGroup(entries, currentGroup, input.turnId);
   return entries;
 }
 

@@ -28,7 +28,7 @@ The following decisions are part of this spec and are no longer open questions.
 
 These choices follow the reference implementations:
 
-- `opencode` groups only specific adjacent context tools and keeps status labels in UI/i18n
+- `opencode` groups only specific adjacent context tools and keeps status labels in UI/i18n, but Mistle’s semantic grouping layer generalizes adjacency grouping across semantic kinds rather than stopping at exploring-only
 - `codex` keeps grouped execution state as a derived model over underlying call state and renders plan updates as separate history cells rather than folding them into exploring/editing groups
 
 ## Implementation Boundary
@@ -151,7 +151,7 @@ Follow this call order:
 1. Read raw Codex thread data from `packages/codex-app-server-client/src/codex/operations.ts`.
 2. Convert raw `ThreadItem` values into `NormalizedCodexThreadItem` values.
 3. Classify each normalized item into a semantic kind.
-4. Group adjacent classified items within each turn into `SemanticActionGroup` values when they are groupable in the v1 model.
+4. Group adjacent classified items within each turn into `SemanticActionGroup` values when they are groupable by semantic kind.
 5. Return the grouped timeline to app-level consumers such as `apps/dashboard`.
 
 Use the same pipeline for live notifications:
@@ -364,7 +364,7 @@ export type SemanticActionKind =
 
 export type SemanticActionGroup = {
   id: string;
-  kind: "exploring";
+  kind: SemanticActionKind;
   status: "streaming" | "completed";
   displayKeys: {
     active: SemanticDisplayKey | null;
@@ -716,7 +716,8 @@ Notes:
 - thread and turn builders accept raw turn payloads from `packages/codex-app-server-client/src/codex/operations.ts`
 - the shared package should align with the current Codex protocol schema and enum values, but must not take an app-specific dependency on generated types under `apps/control-plane-worker`
 - timeline builders return a mixed transcript sequence of grouped semantic entries and standalone transcript entries
-- in v1, only `exploring` is groupable; all other semantic kinds remain standalone timeline entries
+- adjacent items of the same groupable semantic kind are grouped
+- `plan`, `user-message`, `assistant-message`, and fallback `generic-item` remain standalone by explicit product rule
 
 ## Status Mapping Rules
 
@@ -858,10 +859,21 @@ These rules remove ambiguity during implementation.
 - a turn boundary is a hard grouping boundary
 - a user message boundary is a hard grouping boundary
 - assistant messages are standalone transcript entries and are not members of semantic action groups
+- `plan` is a standalone transcript entry and is never a member of a semantic action group
+- fallback `generic-item` entries remain standalone and are never merged into semantic groups
+- adjacent items of the same semantic kind group together when that semantic kind is groupable
+- the currently groupable semantic kinds are:
+  - `exploring`
+  - `running-commands`
+  - `making-edits`
+  - `thinking`
+  - `searching-web`
+  - `tool-call`
+- a semantic-kind boundary is a hard grouping boundary
+- a standalone-kind item breaks adjacency and starts a new grouping run on either side
 - any non-groupable transcript item between two groupable items flushes the current group
-- only `exploring` items are groupable in v1
 - different semantic kinds do not merge
-- `streaming` and `completed` `exploring` items may be in the same group if they are adjacent and in the same turn
+- `streaming` and `completed` items of the same groupable semantic kind may be in the same group if they are adjacent and in the same turn
 - group status is recalculated from child item status after every item update
 - `tool-call` items do not merge with `exploring`, `making-edits`, `thinking`, or `running-commands`
 - `plan` items do not merge with semantic action groups
@@ -880,12 +892,11 @@ This follows the same architectural split as:
 
 The grouping layer:
 
-- merge adjacent `exploring` items into one `SemanticActionGroup`
-- compute counts for `reads`, `searches`, and `lists`
+- merge adjacent items of the same groupable semantic kind into one `SemanticActionGroup`
+- compute counts for `reads`, `searches`, and `lists` only for `exploring`; other semantic kinds use `counts: null`
 - preserve the individual normalized items inside the group
 - expose grouped timeline helpers as derived helpers on top of normalized items and item-level classification, not as the only public abstraction
 - group only within a single turn
-- leave `running-commands`, `making-edits`, `thinking`, `searching-web`, `tool-call`, and `generic` as standalone timeline entries in v1
 
 The grouping layer does not merge:
 
@@ -893,7 +904,8 @@ The grouping layer does not merge:
 - file changes with command executions
 - thinking with tool calls
 - items across turn boundaries
-- same-kind non-`exploring` items with each other
+- any item across a semantic-kind boundary
+- any item across a standalone-kind boundary
 
 The grouping algorithm is simple adjacency-based grouping.
 
@@ -901,7 +913,7 @@ The grouping algorithm is simple adjacency-based grouping.
 
 ## Public API Proposal
 
-Export the new helpers from the package root. The package exposes normalized items, item-level semantic classification, and grouped timeline builders. Grouped blocks are a narrow presentation helper for exploratory runs, not a generic representation for every semantic kind.
+Export the new helpers from the package root. The package exposes normalized items, item-level semantic classification, and grouped timeline builders. Grouped blocks are a generic semantic-timeline representation for all groupable semantic kinds, not a special-case helper only for exploring.
 
 ```ts
 export type {
@@ -1093,7 +1105,83 @@ Grouped result:
 }
 ```
 
-### Example 4: same semantic kind across turns does not merge
+### Example 4: adjacent reasoning items form one thinking group
+
+Input:
+
+```ts
+[
+  {
+    kind: "reasoning",
+    turnId: "turn_1",
+    source: "summary",
+    text: "Inspecting reducer behavior",
+    status: "completed",
+  },
+  {
+    kind: "reasoning",
+    turnId: "turn_1",
+    source: "content",
+    text: "Comparing grouped output to raw item order",
+    status: "streaming",
+  },
+];
+```
+
+Grouped result:
+
+```ts
+{
+  id: "turn_1:thinking:<firstItemId>",
+  kind: "thinking",
+  status: "streaming",
+  displayKeys: {
+    active: "thinking.active",
+    completed: null,
+  },
+  counts: null,
+  items: [/* both reasoning items in order */],
+}
+```
+
+### Example 5: adjacent file changes form one making-edits group
+
+Input:
+
+```ts
+[
+  {
+    kind: "file-change",
+    turnId: "turn_1",
+    changes: [{ path: "a.ts", kind: "modified", diff: "..." }],
+    status: "completed",
+  },
+  {
+    kind: "file-change",
+    turnId: "turn_1",
+    changes: [{ path: "b.ts", kind: "modified", diff: "..." }],
+    status: "completed",
+  },
+];
+```
+
+Grouped result:
+
+```ts
+{
+  id: "turn_1:making-edits:<firstItemId>",
+  kind: "making-edits",
+  status: "completed",
+  displayKeys: {
+    active: "making-edits.active",
+    completed: null,
+  },
+  counts: null,
+  items: [/* both file-change items in order */],
+}
+```
+
+### Example 6: same semantic kind across turns does not merge
 
 Input:
 
@@ -1145,7 +1233,7 @@ Grouped result:
 ];
 ```
 
-### Example 5: file change
+### Example 7: file change classification
 
 Input:
 
@@ -1173,7 +1261,7 @@ Classification result:
 
 The dashboard stops owning the Codex-specific normalization rules currently embedded in `codex-chat-state.ts`.
 
-The shared normalized model preserves `commandActions`, and the derived dashboard transcript view-model does not erase them even if the first UI revision does not render them directly. This is the durable structure that enables Codex-style `Exploring` grouping without reparsing shell commands later.
+The shared normalized model preserves `commandActions`, and the derived dashboard transcript view-model does not erase them even if the first UI revision does not render every grouped semantic kind with equal polish. This is the durable structure that enables semantic grouping without reparsing shell commands later.
 
 That preservation choice is directly aligned with the reference systems:
 
@@ -1189,9 +1277,8 @@ Instead:
 
 This allows the dashboard to render:
 
-- `Exploring`
-- `Explored`
-- counts like `3 reads, 2 searches`
+- grouped `Exploring` / `Explored` blocks with counts like `3 reads, 2 searches`
+- grouped `Thinking`, `Making edits`, `Searching the web`, `Tool call`, and `Running commands` blocks when adjacent items share a semantic kind
 - per-item details under each group
 
 without re-implementing Codex parsing logic.
@@ -1477,8 +1564,14 @@ Required tests:
 - classification tests for mixed exploratory and unknown command executions
 - classification tests for `file-change`, `reasoning`, `web-search`, and `tool-call`
 - grouping tests for adjacent exploring items in the same turn
+- grouping tests for adjacent reasoning items in the same turn
+- grouping tests for adjacent file-change items in the same turn
+- grouping tests for adjacent web-search items in the same turn
+- grouping tests for adjacent tool-call items in the same turn
+- grouping tests for adjacent running-command items in the same turn
 - grouping tests that verify turn boundaries break groups
 - grouping tests that verify semantic kind boundaries break groups
+- grouping tests that verify standalone kinds such as `plan`, `assistant-message`, and `generic-item` break groups
 - grouping tests that verify `streaming` status propagates to the group while any child item is still active
 - dashboard reducer tests that verify hydration and live notifications both rebuild the same grouped transcript state
 - dashboard reducer tests that verify `plan` remains standalone and never merges into semantic action groups
@@ -1489,6 +1582,8 @@ Regression tests:
 
 - commands whose parse result includes one unknown action
 - adjacent exploring items followed by a non-exploring command
+- adjacent thinking items separated by a `plan` item
+- adjacent making-edits items separated by an assistant message
 - two exploring segments separated by a user or assistant message boundary
 
 Property-based tests are optional. If added, they target grouping invariants such as:
@@ -1503,12 +1598,14 @@ Property-based tests are optional. If added, they target grouping invariants suc
 The implementation is complete when all of the following are true:
 
 - hydrated thread history groups adjacent exploratory command executions within one turn
+- hydrated thread history groups adjacent `thinking`, `making-edits`, `searching-web`, `tool-call`, and `running-commands` items within one turn when no standalone boundary intervenes
 - turn boundaries never merge semantic groups
 - unknown command actions produce `running-commands`, not `exploring`
 - grouped status is `streaming` while any child item is active and `completed` only when all children are complete
 - live output deltas update the existing item, preserve the existing group ID when the first grouped item is unchanged, and then regroup the turn
 - unsupported but valid raw item types appear as `generic-item` entries instead of being dropped
 - dashboard integration no longer discards `commandActions`
+- `plan`, `user-message`, `assistant-message`, and fallback `generic-item` remain standalone and never merge into semantic action groups
 
 ## Implementation Scope
 
@@ -1516,7 +1613,7 @@ This implementation includes:
 
 - normalization of persisted `ThreadItem` history
 - semantic classification for command execution, file change, reasoning, web search, and tool calls
-- adjacency-based per-turn `exploring` grouping only
+- adjacency-based per-turn grouping for all groupable semantic kinds
 - shared timeline builders in `packages/codex-app-server-client`
 - dashboard state rewrite to store normalized items as the source of truth for Codex turns
 - dashboard hydration integration for grouped semantic history
@@ -1541,7 +1638,8 @@ Implement in this order:
    - file change
    - reasoning
    - web search
-3. Add adjacency-based per-turn `exploring` grouping.
+   - tool call
+3. Add adjacency-based per-turn grouping for all groupable semantic kinds, with `plan`, `user-message`, `assistant-message`, and fallback `generic-item` remaining standalone.
 4. Rewrite dashboard Codex state so normalized items are the source of truth.
 5. Switch dashboard hydration to the shared normalize -> classify -> group pipeline, and switch live item snapshots to that pipeline after dashboard-side delta accumulation.
 6. Render grouped semantic transcript blocks while preserving standalone entries such as `plan`.

@@ -114,6 +114,8 @@ export type SemanticActionKind =
   | "tool-call"
   | "generic";
 
+export type GroupableSemanticActionKind = Exclude<SemanticActionKind, "generic">;
+
 export type ClassifiedCodexThreadItem = {
   item: NormalizedCodexThreadItem;
   semanticKind: SemanticActionKind;
@@ -131,7 +133,7 @@ export type ClassifiedCodexThreadItem = {
 
 export type SemanticActionGroup = {
   id: string;
-  kind: "exploring";
+  kind: GroupableSemanticActionKind;
   status: CodexItemStatus;
   displayKeys: {
     active: SemanticDisplayKey | null;

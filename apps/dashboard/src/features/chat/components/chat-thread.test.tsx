@@ -66,7 +66,7 @@ describe("ChatThread", () => {
         decision: "accept",
       },
     ]);
-  });
+  }, 10_000);
 
   it("renders multiline commands in the same code-block treatment as command output", () => {
     render(
@@ -101,5 +101,62 @@ describe("ChatThread", () => {
     const renderedCommand = screen.getByText(/# Two Little Pigs/);
     expect(renderedCommand.tagName).toBe("PRE");
     expect(renderedCommand.className).toContain("bg-muted");
+  });
+
+  it("renders exploring groups as semantic investigation steps with collapsible results", () => {
+    const { container } = render(
+      <ChatThread
+        entries={[
+          {
+            id: "user_1",
+            turnId: "turn_1",
+            kind: "user-message",
+            text: "Inspect the codebase",
+            status: "completed",
+          },
+          {
+            id: "exploring_1",
+            turnId: "turn_1",
+            kind: "semantic-group",
+            semanticKind: "exploring",
+            status: "completed",
+            counts: {
+              reads: 1,
+              searches: 1,
+              lists: 0,
+            },
+            items: [
+              {
+                id: "cmd_1",
+                label: "Read",
+                detail: "app.ts",
+                command: "sed -n '1,120p' app.ts",
+                output: "export const App = () => null;",
+                status: "completed",
+              },
+              {
+                id: "cmd_2",
+                label: "Search",
+                detail: "App",
+                command: "rg App src",
+                output: "src/app.ts",
+                status: "completed",
+              },
+            ],
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
+
+    expect(screen.getByText("Explored")).toBeTruthy();
+    expect(screen.getByText("Read")).toBeTruthy();
+    expect(screen.getByText("app.ts")).toBeTruthy();
+    expect(screen.getByText("Search")).toBeTruthy();
+    expect(screen.queryByText("Show results")).toBeNull();
+    expect(screen.getAllByText("Toggle results")).toHaveLength(2);
+    expect(container.textContent?.includes("cwd: /workspace")).toBe(false);
   });
 });

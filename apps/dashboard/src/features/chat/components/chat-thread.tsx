@@ -8,6 +8,7 @@ import { buildChatTurnGroups } from "../chat-view-model.js";
 import { ChatAssistantMessage } from "./chat-assistant-message.js";
 import { ChatCommandBlock } from "./chat-command-block.js";
 import { ChatFileChangeBlock } from "./chat-file-change-block.js";
+import { ChatSemanticGroup } from "./chat-semantic-group.js";
 import { ChatUserMessage } from "./chat-user-message.js";
 
 type ChatThreadProps = {
@@ -56,50 +57,8 @@ export function ChatThread({
           {group.assistantBlocks.length === 0 ? null : (
             <div className="max-w-[72ch] space-y-4">
               {group.assistantBlocks.map((block) => {
-                if (block.kind === "exploring-group") {
-                  return (
-                    <div className="space-y-3 rounded-xl border p-3" key={block.id}>
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="font-medium text-sm">
-                          {block.status === "streaming" ? "Exploring" : "Explored"}
-                        </p>
-                        <p className="text-muted-foreground text-xs">
-                          {[
-                            block.counts.reads > 0
-                              ? `${String(block.counts.reads)} read${block.counts.reads === 1 ? "" : "s"}`
-                              : null,
-                            block.counts.searches > 0
-                              ? `${String(block.counts.searches)} search${block.counts.searches === 1 ? "" : "es"}`
-                              : null,
-                            block.counts.lists > 0
-                              ? `${String(block.counts.lists)} list${block.counts.lists === 1 ? "" : "s"}`
-                              : null,
-                          ]
-                            .filter((value) => value !== null)
-                            .join(", ")}
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        {block.items.map((item) => (
-                          <div className="space-y-1 rounded-md border p-2" key={item.id}>
-                            {item.command === null ? null : (
-                              <pre className="bg-muted overflow-x-auto rounded-md p-2 text-xs leading-5 whitespace-pre-wrap">
-                                {item.command}
-                              </pre>
-                            )}
-                            {item.cwd === null ? null : (
-                              <p className="text-muted-foreground text-xs">cwd: {item.cwd}</p>
-                            )}
-                            {item.output === null || item.output.length === 0 ? null : (
-                              <pre className="bg-muted overflow-x-auto rounded-md p-2 text-xs leading-5 whitespace-pre-wrap">
-                                {item.output}
-                              </pre>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
+                if (block.kind === "semantic-group") {
+                  return <ChatSemanticGroup block={block} key={block.id} />;
                 }
 
                 if (block.kind === "assistant-message") {

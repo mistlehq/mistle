@@ -1,4 +1,9 @@
-import type { ChatCommandEntry, ChatEntry, ChatFileChangeEntry } from "../chat/chat-types.js";
+import type {
+  ChatCommandEntry,
+  ChatEntry,
+  ChatFileChangeEntry,
+  ChatSemanticGroupEntry,
+} from "../chat/chat-types.js";
 import type { CodexSessionPageComposerProps } from "../pages/codex-session-page-view.js";
 import type {
   CodexCommandApprovalRequestEntry,
@@ -65,6 +70,318 @@ export const CodexStoryChatThreadEntries: readonly ChatEntry[] = [
   },
 ];
 
+export const CodexStoryExploringGroupEntry: ChatSemanticGroupEntry = {
+  id: "exploring-group-1",
+  turnId: "turn-exploring",
+  kind: "semantic-group",
+  semanticKind: "exploring",
+  status: "completed",
+  counts: {
+    reads: 2,
+    searches: 1,
+    lists: 1,
+  },
+  items: [
+    {
+      id: "exploring-command-1",
+      label: "Search",
+      detail: "semantic",
+      command: 'rg -n "semantic" docs apps/dashboard/src/features/codex-client',
+      output: [
+        "docs/codex-semantic-classification-scratchpad.md:42:Only adjacent exploring items group in v1.",
+        "apps/dashboard/src/features/codex-client/codex-chat-state.ts:188:buildCodexTurnTimelineFromNormalized(...)",
+      ].join("\n"),
+      status: "completed",
+    },
+    {
+      id: "exploring-command-2",
+      label: "List files",
+      detail: "apps/dashboard/src/features/chat/components",
+      command: "ls apps/dashboard/src/features/chat/components",
+      output: [
+        "chat-assistant-message.tsx",
+        "chat-command-block.tsx",
+        "chat-file-change-block.tsx",
+        "chat-thread.tsx",
+      ].join("\n"),
+      status: "completed",
+    },
+    {
+      id: "exploring-command-3",
+      label: "Read",
+      detail: "apps/dashboard/src/features/chat/components/chat-thread.tsx",
+      command: "sed -n '1,220p' apps/dashboard/src/features/chat/components/chat-thread.tsx",
+      output: [
+        'if (block.kind === "semantic-group") {',
+        "  const groupSummary = getSemanticGroupSummary(...);",
+        '  return <div className="space-y-3">...</div>;',
+      ].join("\n"),
+      status: "completed",
+    },
+    {
+      id: "exploring-command-4",
+      label: "List files",
+      detail: "packages/codex-app-server-client/src/thread-items",
+      command: "find packages/codex-app-server-client/src/thread-items -maxdepth 2 -type f | sort",
+      output: [
+        "packages/codex-app-server-client/src/thread-items/build-thread-timeline.ts",
+        "packages/codex-app-server-client/src/thread-items/classify-thread-item-semantics.ts",
+        "packages/codex-app-server-client/src/thread-items/normalize-thread-item.ts",
+      ].join("\n"),
+      status: "completed",
+    },
+  ],
+};
+
+export const CodexStoryChatThreadEntriesWithExploringGroup: readonly ChatEntry[] = [
+  {
+    id: "user-exploring-1",
+    turnId: "turn-exploring",
+    kind: "user-message",
+    status: "completed",
+    text: "Inspect the semantic transcript pipeline and summarize what changed.",
+  },
+  {
+    id: "reasoning-exploring-1",
+    turnId: "turn-exploring",
+    kind: "reasoning",
+    source: "summary",
+    status: "completed",
+    summary: "Reading the shared semantic helpers and the dashboard transcript renderer first.",
+  },
+  CodexStoryExploringGroupEntry,
+  {
+    id: "assistant-exploring-1",
+    turnId: "turn-exploring",
+    kind: "assistant-message",
+    phase: null,
+    status: "completed",
+    text: [
+      "The transcript now derives semantic output from normalized Codex thread items.",
+      "",
+      "- shared helpers classify items before rendering",
+      "- the dashboard groups adjacent exploring commands",
+      "- the UI renders the grouped inspection block inline",
+    ].join("\n"),
+  },
+];
+
+export const CodexStoryThinkingGroupEntry: ChatSemanticGroupEntry = {
+  id: "thinking-group-1",
+  turnId: "turn-thinking",
+  kind: "semantic-group",
+  semanticKind: "thinking",
+  status: "completed",
+  counts: null,
+  items: [
+    {
+      id: "thinking-1",
+      label: "Thinking",
+      detail: "Comparing current grouped transcript output with the updated spec.",
+      command: null,
+      output: null,
+      status: "completed",
+    },
+    {
+      id: "thinking-2",
+      label: "Reasoning",
+      detail:
+        "The spec now groups adjacent thinking, edits, searches, and tool calls, not just exploring.",
+      command: null,
+      output: null,
+      status: "completed",
+    },
+  ],
+};
+
+export const CodexStoryChatThreadEntriesWithThinkingGroup: readonly ChatEntry[] = [
+  {
+    id: "user-thinking-1",
+    turnId: "turn-thinking",
+    kind: "user-message",
+    status: "completed",
+    text: "Explain how the semantic grouping changed.",
+  },
+  CodexStoryThinkingGroupEntry,
+  {
+    id: "assistant-thinking-1",
+    turnId: "turn-thinking",
+    kind: "assistant-message",
+    phase: null,
+    status: "completed",
+    text: "Grouping is now generic by semantic kind, with `plan`, user, assistant, and fallback generic items still remaining standalone.",
+  },
+];
+
+export const CodexStoryMakingEditsGroupEntry: ChatSemanticGroupEntry = {
+  id: "making-edits-group-1",
+  turnId: "turn-making-edits",
+  kind: "semantic-group",
+  semanticKind: "making-edits",
+  status: "completed",
+  counts: null,
+  items: [
+    {
+      id: "making-edits-1",
+      label: "Updated",
+      detail: "apps/dashboard/src/features/chat/components/chat-thread.tsx",
+      command: null,
+      output: [
+        "@@ -48,7 +48,7 @@",
+        '- return <div className="space-y-3 rounded-xl border p-3">...</div>;',
+        '+ return <div className="space-y-2">...</div>;',
+      ].join("\n"),
+      status: "completed",
+    },
+    {
+      id: "making-edits-2",
+      label: "Added",
+      detail: "apps/dashboard/src/features/chat/components/chat-semantic-group.tsx",
+      command: null,
+      output: [
+        "@@ -0,0 +1,38 @@",
+        "+export function ChatSemanticGroup({ block }: ChatSemanticGroupProps) {",
+        '+  return <div className="space-y-3">...</div>;',
+        "+}",
+      ].join("\n"),
+      status: "completed",
+    },
+  ],
+};
+
+export const CodexStorySearchingWebGroupEntry: ChatSemanticGroupEntry = {
+  id: "searching-web-group-1",
+  turnId: "turn-searching-web",
+  kind: "semantic-group",
+  semanticKind: "searching-web",
+  status: "completed",
+  counts: null,
+  items: [
+    {
+      id: "searching-web-1",
+      label: "Web search",
+      detail: "opencode shared transcript renderer grouped tools",
+      command: null,
+      output: JSON.stringify(
+        {
+          results: [
+            {
+              title: "packages/web/src/components/Share.tsx",
+              url: "https://github.com/anomalyco/opencode/blob/dev/packages/web/src/components/Share.tsx",
+            },
+            {
+              title: "packages/web/src/components/share/part.tsx",
+              url: "https://github.com/anomalyco/opencode/blob/dev/packages/web/src/components/share/part.tsx",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      status: "completed",
+    },
+    {
+      id: "searching-web-2",
+      label: "Web search",
+      detail: "storybook grouped activity list ux",
+      command: null,
+      output: JSON.stringify(
+        {
+          results: [
+            {
+              title: "Accordion disclosure patterns",
+              url: "https://www.w3.org/WAI/ARIA/apg/patterns/disclosure/",
+            },
+          ],
+        },
+        null,
+        2,
+      ),
+      status: "completed",
+    },
+  ],
+};
+
+export const CodexStoryToolCallGroupEntry: ChatSemanticGroupEntry = {
+  id: "tool-call-group-1",
+  turnId: "turn-tool-call",
+  kind: "semantic-group",
+  semanticKind: "tool-call",
+  status: "completed",
+  counts: null,
+  items: [
+    {
+      id: "tool-call-1",
+      label: "Review PR",
+      detail: "Pull request #421",
+      command: null,
+      output: JSON.stringify(
+        {
+          repo: "mistle",
+          prNumber: 421,
+          findings: 3,
+        },
+        null,
+        2,
+      ),
+      status: "completed",
+    },
+    {
+      id: "tool-call-2",
+      label: "Summarize document",
+      detail: "docs/codex-semantic-classification-scratchpad.md",
+      command: null,
+      output: JSON.stringify(
+        {
+          sections: 8,
+          groupedKinds: [
+            "exploring",
+            "thinking",
+            "making-edits",
+            "searching-web",
+            "tool-call",
+            "running-commands",
+          ],
+        },
+        null,
+        2,
+      ),
+      status: "completed",
+    },
+  ],
+};
+
+export const CodexStoryRunningCommandsGroupEntry: ChatSemanticGroupEntry = {
+  id: "running-commands-group-1",
+  turnId: "turn-running-commands",
+  kind: "semantic-group",
+  semanticKind: "running-commands",
+  status: "completed",
+  counts: null,
+  items: [
+    {
+      id: "running-command-1",
+      label: "Command",
+      detail: "pnpm --filter @mistle/dashboard lint",
+      command: "pnpm --filter @mistle/dashboard lint",
+      output: ["Found 0 warnings and 0 errors.", "Finished in 1.9s."].join("\n"),
+      status: "completed",
+    },
+    {
+      id: "running-command-2",
+      label: "Command",
+      detail:
+        "pnpm exec vitest run apps/dashboard/src/features/chat/components/chat-thread.test.tsx",
+      command:
+        "pnpm exec vitest run apps/dashboard/src/features/chat/components/chat-thread.test.tsx",
+      output: [
+        "✓ apps/dashboard/src/features/chat/components/chat-thread.test.tsx (3 tests) 78ms",
+      ].join("\n"),
+      status: "completed",
+    },
+  ],
+};
+
 export const CodexStorySessionEntries: readonly ChatEntry[] = [
   {
     id: "user-1",
@@ -86,6 +403,36 @@ export const CodexStorySessionEntries: readonly ChatEntry[] = [
       "- `CodexSessionPage` should render through a view boundary",
       "- next dashboard stories should stay prop-driven",
     ].join("\n"),
+  },
+];
+
+export const CodexStorySessionEntriesWithExploringGroup: readonly ChatEntry[] = [
+  {
+    id: "user-session-exploring-1",
+    turnId: "turn-session-exploring",
+    kind: "user-message",
+    status: "completed",
+    text: "Trace how the transcript UI renders the new exploring group.",
+  },
+  {
+    id: "plan-session-exploring-1",
+    turnId: "turn-session-exploring",
+    kind: "plan",
+    status: "completed",
+    text: [
+      "1. Read the shared semantic timeline builder",
+      "2. Inspect the chat thread component",
+      "3. Confirm the page layout still scans well",
+    ].join("\n"),
+  },
+  CodexStoryExploringGroupEntry,
+  {
+    id: "assistant-session-exploring-1",
+    turnId: "turn-session-exploring",
+    kind: "assistant-message",
+    phase: null,
+    status: "completed",
+    text: "The grouped exploring block is visible in the transcript and keeps the surrounding session layout intact.",
   },
 ];
 

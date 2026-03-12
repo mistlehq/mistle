@@ -232,16 +232,22 @@ describe("reduceCodexChatState", () => {
         status: "completed",
       },
       {
-        id: "cmd_1",
+        id: "turn_123:running-commands:cmd_1",
         turnId: "turn_123",
-        kind: "command-execution",
-        command: "ls -la",
-        output: "file-a\nfile-b",
-        cwd: "/workspace",
-        exitCode: 0,
-        commandStatus: "completed",
-        reason: "Inspect repository contents",
+        kind: "semantic-group",
+        semanticKind: "running-commands",
         status: "completed",
+        counts: null,
+        items: [
+          {
+            id: "cmd_1",
+            label: "Command",
+            detail: "ls -la",
+            command: "ls -la",
+            output: "file-a\nfile-b",
+            status: "completed",
+          },
+        ],
       },
     ]);
   });
@@ -314,7 +320,8 @@ describe("reduceCodexChatState", () => {
       {
         id: "turn_001:exploring:cmd_1",
         turnId: "turn_001",
-        kind: "exploring-group",
+        kind: "semantic-group",
+        semanticKind: "exploring",
         status: "completed",
         counts: {
           reads: 1,
@@ -324,16 +331,92 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "cmd_1",
+            label: "Read",
+            detail: "app.ts",
             command: "sed -n '1,120p' app.ts",
-            cwd: "/workspace",
             output: "export const App = () => null;",
             status: "completed",
           },
           {
             id: "cmd_2",
+            label: "Search",
+            detail: "App",
             command: "rg App src",
-            cwd: "/workspace",
             output: "src/app.ts",
+            status: "completed",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("groups adjacent reasoning items into one thinking transcript block", () => {
+    const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_002",
+          status: "completed",
+          items: [
+            {
+              type: "userMessage",
+              id: "user_2",
+              content: [
+                {
+                  type: "text",
+                  text: "Explain what changed",
+                },
+              ],
+            },
+            {
+              type: "reasoning",
+              id: "reasoning_1",
+              summary: [{ type: "text", text: "Inspecting reducer behavior" }],
+              content: [],
+              status: "completed",
+            },
+            {
+              type: "reasoning",
+              id: "reasoning_2",
+              summary: [],
+              content: [{ type: "text", text: "Comparing grouped output to raw item order" }],
+              status: "completed",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(hydrated.entries).toEqual([
+      {
+        id: "user_2",
+        turnId: "turn_002",
+        kind: "user-message",
+        text: "Explain what changed",
+        status: "completed",
+      },
+      {
+        id: "turn_002:thinking:reasoning_1",
+        turnId: "turn_002",
+        kind: "semantic-group",
+        semanticKind: "thinking",
+        status: "completed",
+        counts: null,
+        items: [
+          {
+            id: "reasoning_1",
+            label: "Thinking",
+            detail: "Inspecting reducer behavior",
+            command: null,
+            output: null,
+            status: "completed",
+          },
+          {
+            id: "reasoning_2:content",
+            label: "Reasoning",
+            detail: "Comparing grouped output to raw item order",
+            command: null,
+            output: null,
             status: "completed",
           },
         ],
@@ -595,24 +678,40 @@ describe("reduceCodexChatState", () => {
         status: "completed",
       },
       {
-        id: "reasoning_1",
+        id: "turn_001:thinking:reasoning_1",
         turnId: "turn_001",
-        kind: "reasoning",
-        summary: "**Preparing file list command**",
-        source: "summary",
+        kind: "semantic-group",
+        semanticKind: "thinking",
         status: "completed",
+        counts: null,
+        items: [
+          {
+            id: "reasoning_1",
+            label: "Thinking",
+            detail: "**Preparing file list command**",
+            command: null,
+            output: null,
+            status: "completed",
+          },
+        ],
       },
       {
-        id: "cmd_1",
+        id: "turn_001:running-commands:cmd_1",
         turnId: "turn_001",
-        kind: "command-execution",
-        command: "pwd",
-        output: "/workspace",
-        cwd: "/workspace",
-        exitCode: 0,
-        commandStatus: "completed",
-        reason: null,
+        kind: "semantic-group",
+        semanticKind: "running-commands",
         status: "completed",
+        counts: null,
+        items: [
+          {
+            id: "cmd_1",
+            label: "Command",
+            detail: "pwd",
+            command: "pwd",
+            output: "/workspace",
+            status: "completed",
+          },
+        ],
       },
       {
         id: "assistant_1",
@@ -693,20 +792,30 @@ describe("reduceCodexChatState", () => {
 
     expect(updated.entries).toEqual([
       {
-        id: "reasoning_1",
+        id: "turn_123:thinking:reasoning_1",
         turnId: "turn_123",
-        kind: "reasoning",
-        summary: "Inspect files\n\n",
-        source: "summary",
+        kind: "semantic-group",
+        semanticKind: "thinking",
         status: "streaming",
-      },
-      {
-        id: "reasoning_1:content",
-        turnId: "turn_123",
-        kind: "reasoning",
-        summary: "Detailed chain",
-        source: "content",
-        status: "streaming",
+        counts: null,
+        items: [
+          {
+            id: "reasoning_1",
+            label: "Thinking",
+            detail: "Inspect files\n\n",
+            command: null,
+            output: null,
+            status: "streaming",
+          },
+          {
+            id: "reasoning_1:content",
+            label: "Reasoning",
+            detail: "Detailed chain",
+            command: null,
+            output: null,
+            status: "streaming",
+          },
+        ],
       },
       {
         id: "plan_1",
@@ -773,31 +882,40 @@ describe("reduceCodexChatState", () => {
 
     expect(withFileChange.entries).toEqual([
       {
-        id: "cmd_1",
+        id: "turn_123:running-commands:cmd_1",
         turnId: "turn_123",
-        kind: "command-execution",
-        command: "ls -la",
-        output: "file-a\n",
-        cwd: "/workspace",
-        exitCode: null,
-        commandStatus: "inProgress",
-        reason: "Inspect repository",
+        kind: "semantic-group",
+        semanticKind: "running-commands",
         status: "streaming",
-      },
-      {
-        id: "file_1",
-        turnId: "turn_123",
-        kind: "file-change",
-        changes: [
+        counts: null,
+        items: [
           {
-            path: "src/app.ts",
-            kind: "update",
-            diff: "@@ -1 +1 @@",
+            id: "cmd_1",
+            label: "Command",
+            detail: "ls -la",
+            command: "ls -la",
+            output: "file-a\n",
+            status: "streaming",
           },
         ],
-        output: "Applied patch",
-        fileChangeStatus: "completed",
+      },
+      {
+        id: "turn_123:making-edits:file_1",
+        turnId: "turn_123",
+        kind: "semantic-group",
+        semanticKind: "making-edits",
         status: "completed",
+        counts: null,
+        items: [
+          {
+            id: "file_1",
+            label: "Updated",
+            detail: "src/app.ts",
+            command: null,
+            output: "Applied patch",
+            status: "completed",
+          },
+        ],
       },
     ]);
   });
@@ -821,23 +939,31 @@ describe("reduceCodexChatState", () => {
 
     expect(state.entries).toEqual([
       {
-        id: "tool_1",
+        id: "turn_123:tool-call:tool_1",
         turnId: "turn_123",
-        kind: "generic-item",
-        itemType: "dynamicToolCall",
-        title: "Dynamic Tool Call",
-        body: "dynamic",
-        detailsJson: JSON.stringify(
+        kind: "semantic-group",
+        semanticKind: "tool-call",
+        status: "completed",
+        counts: null,
+        items: [
           {
-            type: "dynamicToolCall",
             id: "tool_1",
-            name: "custom_tool",
+            label: "dynamic",
+            detail: "dynamic",
+            command: null,
+            output: JSON.stringify(
+              {
+                type: "dynamicToolCall",
+                id: "tool_1",
+                name: "custom_tool",
+                status: "completed",
+              },
+              null,
+              2,
+            ),
             status: "completed",
           },
-          null,
-          2,
-        ),
-        status: "completed",
+        ],
       },
     ]);
   });
@@ -885,12 +1011,22 @@ describe("reduceCodexChatState", () => {
 
     expect(state.entries).toEqual([
       {
-        id: "reasoning_1",
+        id: "turn_123:thinking:reasoning_1",
         turnId: "turn_123",
-        kind: "reasoning",
-        summary: "**Creating concise fantasy story**",
-        source: "summary",
+        kind: "semantic-group",
+        semanticKind: "thinking",
         status: "completed",
+        counts: null,
+        items: [
+          {
+            id: "reasoning_1",
+            label: "Thinking",
+            detail: "**Creating concise fantasy story**",
+            command: null,
+            output: null,
+            status: "completed",
+          },
+        ],
       },
     ]);
   });
@@ -919,12 +1055,22 @@ describe("reduceCodexChatState", () => {
 
     expect(state.entries).toEqual([
       {
-        id: "reasoning_1",
+        id: "turn_123:thinking:reasoning_1",
         turnId: "turn_123",
-        kind: "reasoning",
-        summary: "**Creating concise fantasy story**",
-        source: "summary",
+        kind: "semantic-group",
+        semanticKind: "thinking",
         status: "completed",
+        counts: null,
+        items: [
+          {
+            id: "reasoning_1",
+            label: "Thinking",
+            detail: "**Creating concise fantasy story**",
+            command: null,
+            output: null,
+            status: "completed",
+          },
+        ],
       },
     ]);
   });
@@ -955,12 +1101,22 @@ describe("reduceCodexChatState", () => {
 
     expect(state.entries).toEqual([
       {
-        id: "reasoning_1",
+        id: "turn_123:thinking:reasoning_1",
         turnId: "turn_123",
-        kind: "reasoning",
-        summary: "**Creating concise fantasy story**",
-        source: "summary",
+        kind: "semantic-group",
+        semanticKind: "thinking",
         status: "completed",
+        counts: null,
+        items: [
+          {
+            id: "reasoning_1",
+            label: "Thinking",
+            detail: "**Creating concise fantasy story**",
+            command: null,
+            output: null,
+            status: "completed",
+          },
+        ],
       },
     ]);
   });

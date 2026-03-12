@@ -202,4 +202,60 @@ describe("thread item semantics", () => {
       },
     ]);
   });
+
+  it("groups adjacent reasoning items into one thinking block", () => {
+    const timeline = buildCodexTurnTimeline({
+      turn: {
+        id: "turn_1",
+        status: "completed",
+        items: [
+          {
+            type: "reasoning",
+            id: "reasoning_1",
+            summary: [{ type: "text", text: "Inspecting reducer behavior" }],
+            content: [],
+            status: "completed",
+          },
+          {
+            type: "reasoning",
+            id: "reasoning_2",
+            summary: [],
+            content: [{ type: "text", text: "Comparing grouped output to raw item order" }],
+            status: "inProgress",
+          },
+        ],
+      },
+    });
+
+    expect(timeline).toEqual([
+      {
+        id: "turn_1:thinking:reasoning_1",
+        kind: "thinking",
+        status: "streaming",
+        displayKeys: {
+          active: "thinking.active",
+          completed: null,
+        },
+        counts: null,
+        items: [
+          {
+            kind: "reasoning",
+            id: "reasoning_1",
+            turnId: "turn_1",
+            source: "summary",
+            text: "Inspecting reducer behavior",
+            status: "completed",
+          },
+          {
+            kind: "reasoning",
+            id: "reasoning_2:content",
+            turnId: "turn_1",
+            source: "content",
+            text: "Comparing grouped output to raw item order",
+            status: "streaming",
+          },
+        ],
+      },
+    ]);
+  });
 });

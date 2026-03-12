@@ -14,11 +14,11 @@ import type {
   ChatAssistantEntry,
   ChatCommandEntry,
   ChatEntry,
-  ChatExploringGroupEntry,
   ChatFileChangeEntry,
   ChatGenericItemEntry,
   ChatPlanEntry,
   ChatReasoningEntry,
+  ChatSemanticGroupEntry,
   ChatUserEntry,
 } from "../chat/chat-types.js";
 
@@ -211,35 +211,177 @@ function createGenericEntry(input: {
   };
 }
 
+function summarizeExploringItem(
+  item: Extract<NormalizedCodexThreadItem, { kind: "command-execution" }>,
+): {
+  label: string;
+  detail: string | null;
+} {
+  const firstAction = item.commandActions[0];
+  if (firstAction === undefined) {
+    return {
+      label: "Command",
+      detail: item.command,
+    };
+  }
+
+  if (firstAction.type === "read") {
+    return {
+      label: "Read",
+      detail: firstAction.path ?? firstAction.name,
+    };
+  }
+
+  if (firstAction.type === "search") {
+    return {
+      label: "Search",
+      detail: firstAction.query ?? firstAction.path ?? item.command,
+    };
+  }
+
+  if (firstAction.type === "list-files") {
+    return {
+      label: "List files",
+      detail: firstAction.path ?? item.command,
+    };
+  }
+
+  return {
+    label: "Command",
+    detail: item.command,
+  };
+}
+
+function summarizeFileChangeOutput(
+  item: Extract<NormalizedCodexThreadItem, { kind: "file-change" }>,
+): string | null {
+  if (item.output !== null && item.output.length > 0) {
+    return item.output;
+  }
+
+  const diffs = item.changes
+    .filter((change) => change.diff !== null && change.diff.length > 0)
+    .map((change) => `# ${change.path}\n${change.diff}`);
+
+  return diffs.length === 0 ? null : diffs.join("\n\n");
+}
+
+function getFileChangeLabel(kind: string | null, count: number): string {
+  if (count > 1) {
+    return "File changes";
+  }
+
+  switch (kind) {
+    case "add":
+    case "added":
+      return "Added";
+    case "delete":
+    case "deleted":
+      return "Deleted";
+    case "rename":
+    case "renamed":
+      return "Renamed";
+    case "update":
+    case "updated":
+    case "modify":
+    case "modified":
+      return "Updated";
+    default:
+      return "File change";
+  }
+}
+
+function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
+  label: string;
+  detail: string | null;
+  output: string | null;
+} {
+  if (item.kind === "command-execution") {
+    const exploringSummary = summarizeExploringItem(item);
+    const hasExploringActions =
+      item.commandActions.length > 0 &&
+      item.commandActions.every(
+        (action) =>
+          action.type === "read" || action.type === "list-files" || action.type === "search",
+      );
+    if (hasExploringActions) {
+      return {
+        label: exploringSummary.label,
+        detail: exploringSummary.detail,
+        output: item.output,
+      };
+    }
+
+    return {
+      label: "Command",
+      detail: item.command ?? item.reason,
+      output: item.output,
+    };
+  }
+
+  if (item.kind === "reasoning") {
+    return {
+      label: item.source === "summary" ? "Thinking" : "Reasoning",
+      detail: item.text,
+      output: null,
+    };
+  }
+
+  if (item.kind === "file-change") {
+    const paths = item.changes.map((change) => change.path);
+    return {
+      label: getFileChangeLabel(item.changes[0]?.kind ?? null, item.changes.length),
+      detail: paths.length === 0 ? null : paths.join(", "),
+      output: summarizeFileChangeOutput(item),
+    };
+  }
+
+  if (item.kind === "web-search") {
+    return {
+      label: "Web search",
+      detail: item.query,
+      output: item.detailsJson,
+    };
+  }
+
+  if (item.kind === "tool-call") {
+    return {
+      label: item.title,
+      detail: item.body ?? item.toolType,
+      output: item.detailsJson,
+    };
+  }
+
+  return {
+    label: item.kind,
+    detail: null,
+    output: null,
+  };
+}
+
 function mapTimelineEntryToChatEntries(entry: CodexTimelineEntry): readonly ChatEntry[] {
   if (!("item" in entry)) {
     return [
       {
         id: entry.id,
         turnId: entry.items[0]?.turnId ?? "",
-        kind: "exploring-group",
+        kind: "semantic-group",
+        semanticKind: entry.kind,
         status: entry.status,
-        counts: entry.counts ?? {
-          reads: 0,
-          searches: 0,
-          lists: 0,
-        },
-        items: entry.items.flatMap((item) => {
-          if (item.kind !== "command-execution") {
-            return [];
-          }
+        counts: entry.counts,
+        items: entry.items.map((item) => {
+          const summary = summarizeSemanticGroupItem(item);
 
-          return [
-            {
-              id: item.id,
-              command: item.command,
-              cwd: item.cwd,
-              output: item.output,
-              status: item.status,
-            },
-          ];
+          return {
+            id: item.id,
+            label: summary.label,
+            detail: summary.detail,
+            command: item.kind === "command-execution" ? item.command : null,
+            output: summary.output,
+            status: "status" in item ? item.status : "completed",
+          };
         }),
-      } satisfies ChatExploringGroupEntry,
+      } satisfies ChatSemanticGroupEntry,
     ];
   }
 

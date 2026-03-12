@@ -54,7 +54,7 @@ export function CodexSessionPage(): React.JSX.Element {
 
   const transcriptItemIds = new Set(
     chatState.entries.flatMap((entry) => {
-      if (entry.kind === "exploring-group") {
+      if (entry.kind === "semantic-group") {
         return entry.items.map((item) => item.id);
       }
 
