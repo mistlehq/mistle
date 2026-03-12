@@ -30,6 +30,7 @@ const CONTROL_PLANE_API_CONTAINER_BASE_URL = "http://control-plane-api:5100";
 const DATA_PLANE_API_CONTAINER_BASE_URL = "http://data-plane-api:5200";
 const DATA_PLANE_GATEWAY_CONTAINER_BASE_URL = "http://data-plane-gateway:5202";
 const TOKENIZER_PROXY_CONTAINER_BASE_URL = "http://tokenizer-proxy:5205";
+const TOKENIZER_PROXY_EGRESS_CONTAINER_BASE_URL = `${TOKENIZER_PROXY_CONTAINER_BASE_URL}/tokenizer-proxy/egress`;
 const DATA_PLANE_GATEWAY_TUNNEL_WS_URL = "ws://data-plane-gateway:5202/tunnel/sandbox";
 const REGISTRY_IMAGE_REFERENCE = "registry:3";
 const REGISTRY_INTERNAL_PORT = 5000;
@@ -273,8 +274,6 @@ export async function startFullSystemEnvironment(
     cleanupTasks.unshift(async () => {
       await dataPlaneGateway.stop();
     });
-    const sandboxInternalGatewayWsUrl = `ws://${sharedInfraLease.infra.containerHostGateway}:${String(dataPlaneGateway.mappedPort)}/tunnel/sandbox`;
-
     const controlPlaneApi = await startControlPlaneApi({
       buildContextHostPath: input.buildContextHostPath,
       configPathInContainer: input.configPathInContainer,
@@ -350,8 +349,6 @@ export async function startFullSystemEnvironment(
     cleanupTasks.unshift(async () => {
       await tokenizerProxy.stop();
     });
-    const tokenizerProxyEgressBaseUrl = `http://${sharedInfraLease.infra.containerHostGateway}:${String(tokenizerProxy.mappedPort)}/tokenizer-proxy/egress`;
-
     const dataPlaneWorker = await startDataPlaneWorker({
       buildContextHostPath: input.buildContextHostPath,
       configPathInContainer: input.configPathInContainer,
@@ -370,11 +367,12 @@ export async function startFullSystemEnvironment(
         MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS: "false",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY: sandboxSnapshotRepository,
+        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: network.getName(),
         MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
         MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
-        MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: sandboxInternalGatewayWsUrl,
+        MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL: DATA_PLANE_GATEWAY_TUNNEL_WS_URL,
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
-          tokenizerProxyEgressBaseUrl,
+          TOKENIZER_PROXY_EGRESS_CONTAINER_BASE_URL,
       },
     });
     cleanupTasks.unshift(async () => {
