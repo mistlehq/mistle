@@ -1,6 +1,7 @@
 export { createDataPlaneBackend } from "./backend.js";
 export { createDataPlaneOpenWorkflow } from "./client.js";
 export { DataPlaneWorkerWorkflowIds, createDataPlaneWorker } from "./worker.js";
+export { createStartSandboxInstanceWorkflow } from "./workflows/start-sandbox-instance/workflow.js";
 export {
   StartSandboxInstanceWorkflowSpec,
   type StartSandboxInstanceWorkflowImageInput,
