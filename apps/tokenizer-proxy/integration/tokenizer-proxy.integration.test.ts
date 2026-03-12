@@ -298,6 +298,77 @@ describe("tokenizer proxy integration", () => {
     }
   });
 
+  it("supports the header-addressed egress endpoint without a route-shaped request path", async () => {
+    const upstreamEchoService = await startHttpEcho();
+    const controlPlaneServer = await startControlPlaneCredentialServer({
+      host: "127.0.0.1",
+      serviceToken: "integration-service-token",
+      credentialValue: "ghs_test_token",
+    });
+
+    const host = "127.0.0.1";
+    const port = await reserveAvailablePort({ host });
+    const runtime = createTokenizerProxyRuntime({
+      app: {
+        server: {
+          host,
+          port,
+        },
+        controlPlaneApi: {
+          baseUrl: controlPlaneServer.baseUrl,
+        },
+      },
+      internalAuthServiceToken: "integration-service-token",
+    });
+    await runtime.start();
+
+    try {
+      const response = await fetch(
+        `http://${host}:${String(port)}/tokenizer-proxy/egress/mistlehq/mistle.git/info/refs?service=git-upload-pack`,
+        {
+          method: "GET",
+          headers: {
+            [EgressRequestHeaders.ROUTE_ID]: "route_git",
+            [EgressRequestHeaders.UPSTREAM_BASE_URL]: upstreamEchoService.baseUrl,
+            [EgressRequestHeaders.BINDING_ID]: "ibd_github",
+            [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "basic",
+            [EgressRequestHeaders.AUTH_INJECTION_TARGET]: "authorization",
+            [EgressRequestHeaders.AUTH_INJECTION_USERNAME]: "x-access-token",
+            [EgressRequestHeaders.CONNECTION_ID]: "icn_github",
+            [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "oauth_access_token",
+            [EgressRequestHeaders.CREDENTIAL_RESOLVER_KEY]: "github_app_installation_token",
+          },
+        },
+      );
+      const body: unknown = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(body).toMatchObject({
+        method: "GET",
+        path: "/mistlehq/mistle.git/info/refs",
+        query: {
+          service: "git-upload-pack",
+        },
+      });
+      if (typeof body !== "object" || body === null || !("headers" in body)) {
+        throw new Error("Expected echoed response headers.");
+      }
+      expect(readHeaderValue(body.headers, "authorization")).toBe(
+        "Basic eC1hY2Nlc3MtdG9rZW46Z2hzX3Rlc3RfdG9rZW4=",
+      );
+      expect(controlPlaneServer.requests).toEqual([
+        {
+          bindingId: "ibd_github",
+          connectionId: "icn_github",
+          resolverKey: "github_app_installation_token",
+          secretType: "oauth_access_token",
+        },
+      ]);
+    } finally {
+      await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
+    }
+  });
+
   it("strips stale compression headers after forwarding a transparently decompressed upstream body", async () => {
     const upstreamService = await startGzipUpstream({
       host: "127.0.0.1",

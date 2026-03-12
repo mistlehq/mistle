@@ -4,7 +4,7 @@ import type { Context } from "hono";
 
 import { logger } from "../logger.js";
 import type { AppContextBindings } from "../types.js";
-import { EGRESS_ROUTE_BASE_PATH, EgressRequestHeaders } from "./constants.js";
+import { EGRESS_BASE_PATH, EgressRequestHeaders } from "./constants.js";
 import { CredentialCache } from "./credential-cache.js";
 import {
   createEgressTelemetryBaseAttributes,
@@ -111,20 +111,67 @@ function joinPath(basePath: string, suffixPath: string): string {
     : `${normalizedBasePath}/${normalizedSuffixPath}`;
 }
 
-function resolveTargetPath(ctx: Context<AppContextBindings>): string {
-  const routeId = ctx.req.param("routeId");
-  const routePrefix = `/tokenizer-proxy/egress/routes/${routeId}`;
-  if (ctx.req.path === routePrefix) {
+function resolveLegacyTargetPath(requestPath: string): string | undefined {
+  const legacyPrefix = `${EGRESS_BASE_PATH}/routes/`;
+  if (!requestPath.startsWith(legacyPrefix)) {
+    return undefined;
+  }
+
+  const routeScopedPath = requestPath.slice(legacyPrefix.length);
+  const routeDelimiterIndex = routeScopedPath.indexOf("/");
+  if (routeDelimiterIndex < 0) {
     return "/";
   }
 
-  if (!ctx.req.path.startsWith(`${routePrefix}/`)) {
-    throw new Error(
-      `Egress request path '${ctx.req.path}' is outside route scope '${routePrefix}'.`,
-    );
+  return requestPath.slice(legacyPrefix.length + routeDelimiterIndex);
+}
+
+function resolveHeaderAddressedTargetPath(requestPath: string): string | undefined {
+  if (requestPath === EGRESS_BASE_PATH) {
+    return "/";
   }
 
-  return ctx.req.path.slice(routePrefix.length);
+  if (!requestPath.startsWith(`${EGRESS_BASE_PATH}/`)) {
+    return undefined;
+  }
+
+  return requestPath.slice(EGRESS_BASE_PATH.length);
+}
+
+function resolveTargetPath(ctx: Context<AppContextBindings>): string {
+  const legacyTargetPath = resolveLegacyTargetPath(ctx.req.path);
+  if (legacyTargetPath !== undefined) {
+    return legacyTargetPath;
+  }
+
+  const headerAddressedTargetPath = resolveHeaderAddressedTargetPath(ctx.req.path);
+  if (headerAddressedTargetPath !== undefined) {
+    return headerAddressedTargetPath;
+  }
+
+  throw new Error(
+    `Egress request path '${ctx.req.path}' is outside egress scope '${EGRESS_BASE_PATH}'.`,
+  );
+}
+
+function resolveRouteId(ctx: Context<AppContextBindings>): string | undefined {
+  const headerRouteId = readOptionalHeader(ctx.req.raw.headers, EgressRequestHeaders.ROUTE_ID);
+  if (headerRouteId !== undefined) {
+    return headerRouteId;
+  }
+
+  const legacyPrefix = `${EGRESS_BASE_PATH}/routes/`;
+  if (!ctx.req.path.startsWith(legacyPrefix)) {
+    return undefined;
+  }
+
+  const routeScopedPath = ctx.req.path.slice(legacyPrefix.length);
+  const routeDelimiterIndex = routeScopedPath.indexOf("/");
+  if (routeDelimiterIndex < 0) {
+    return routeScopedPath;
+  }
+
+  return routeScopedPath.slice(0, routeDelimiterIndex);
 }
 
 function normalizePath(path: string): string {
@@ -280,12 +327,12 @@ function copyResponseHeaders(source: Headers): Headers {
 
 export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
   return async (ctx: Context<AppContextBindings>) => {
-    const routeId = ctx.req.param("routeId");
+    const routeId = resolveRouteId(ctx);
     const span = EgressTracer.startSpan("tokenizer_proxy.egress.proxy_request", {
       attributes: {
-        "mistle.egress.route_id": routeId,
         "http.request.method": ctx.req.method,
         "url.path": ctx.req.path,
+        ...(routeId === undefined ? {} : { "mistle.egress.route_id": routeId }),
       },
     });
 
@@ -483,5 +530,3 @@ export function createEgressProxyHandler(input: CreateEgressProxyHandlerInput) {
     });
   };
 }
-
-export { EGRESS_ROUTE_BASE_PATH };
