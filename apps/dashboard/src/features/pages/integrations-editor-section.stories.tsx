@@ -7,9 +7,7 @@ import type React from "react";
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
 import {
   createGithubRepositoryResources,
-  filterRepositoryItems,
   RepositoryItems,
-  resolveRepositorySearchTerms,
 } from "../forms/integration-resource-string-array-widget-story-support.js";
 import type {
   IntegrationConnectionSummary,
@@ -94,23 +92,6 @@ const GithubResources = createGithubRepositoryResources({
 function IntegrationsEditorSectionStory(): React.JSX.Element {
   const [queryClient] = useState(() => {
     const client = createQueryClient();
-
-    for (const searchTerm of resolveRepositorySearchTerms(RepositoryItems)) {
-      client.setQueryData(
-        [
-          "integration-connections",
-          GithubResources.connectionId,
-          "resources",
-          GithubResources.kind,
-          searchTerm,
-        ],
-        createGithubRepositoryResources({
-          connectionId: GithubConnection.id,
-          items: filterRepositoryItems(RepositoryItems, searchTerm),
-        }),
-      );
-    }
-
     return client;
   });
   const [rows, setRows] = useState<readonly SandboxProfileBindingEditorRow[]>([]);
@@ -135,6 +116,9 @@ function IntegrationsEditorSectionStory(): React.JSX.Element {
         integrationSaveError={null}
         integrationSaveSuccess={false}
         isSavingIntegrationBindings={false}
+        bindingFormContext={{
+          resourceOverrides: [GithubResources],
+        }}
         onAddIntegrationBindingRow={async (input) => {
           setRows((currentRows) => [
             ...currentRows,

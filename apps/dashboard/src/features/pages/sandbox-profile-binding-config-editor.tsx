@@ -5,6 +5,7 @@ import Form, { type IChangeEvent } from "@rjsf/core";
 import type { RJSFSchema, UiSchema } from "@rjsf/utils";
 import validator from "@rjsf/validator-ajv8";
 
+import type { IntegrationFormContext } from "../forms/integration-form-context.js";
 import {
   IntegrationFormTemplates,
   IntegrationFormWidgets,
@@ -423,6 +424,7 @@ export function SandboxProfileBindingConfigEditor(input: {
   availableConnections: readonly IntegrationConnectionSummary[];
   availableTargets: readonly IntegrationTargetSummary[];
   layout?: "vertical" | "horizontal";
+  formContext?: IntegrationFormContext | undefined;
   onIntegrationBindingRowChange: (
     clientId: string,
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
@@ -475,10 +477,13 @@ export function SandboxProfileBindingConfigEditor(input: {
   }
 
   return (
-    <Form<JsonObject, RJSFSchema, { layout?: "vertical" | "horizontal" }>
+    <Form<JsonObject, RJSFSchema, IntegrationFormContext>
       children={<></>}
       formData={configUiModel.value}
-      formContext={{ layout: input.layout ?? "vertical" }}
+      formContext={{
+        ...(input.formContext ?? {}),
+        layout: input.layout ?? "vertical",
+      }}
       noHtml5Validate
       onChange={(event: IChangeEvent<JsonObject, RJSFSchema>) => {
         const nextFormData = resolveRecord(event.formData);

@@ -28,6 +28,7 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import type { IntegrationFormContext } from "../forms/integration-form-context.js";
 import {
   IntegrationHorizontalFieldGroupClassName,
   IntegrationHorizontalFieldLayoutClassName,
@@ -88,6 +89,7 @@ type IntegrationsEditorSectionProps = {
   }) => Promise<boolean>;
   isSavingIntegrationBindings: boolean;
   integrationSaveSuccess: boolean;
+  bindingFormContext?: IntegrationFormContext | undefined;
 };
 
 type IntegrationDialogState = {
@@ -659,6 +661,7 @@ export function IntegrationsEditorSection(
               <SandboxProfileBindingConfigEditor
                 availableConnections={props.availableConnections}
                 availableTargets={props.availableTargets}
+                formContext={props.bindingFormContext}
                 layout="horizontal"
                 onIntegrationBindingRowChange={updateDialogRow}
                 row={integrationDialogState.row}

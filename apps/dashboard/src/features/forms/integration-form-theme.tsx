@@ -21,12 +21,10 @@ import type {
   WidgetProps,
 } from "@rjsf/utils";
 
+import type { IntegrationFormContext } from "./integration-form-context.js";
 import { IntegrationResourceStringArrayWidget } from "./integration-resource-string-array-widget.js";
 
 type JsonObject = Record<string, unknown>;
-type IntegrationFormContext = {
-  layout?: "vertical" | "horizontal";
-};
 type IntegrationFieldLayout = "horizontal" | "vertical";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
