@@ -28,6 +28,7 @@
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
+    "@mistle/workflow-registry": "workspace:*",
     "@mistle/workflows": "workspace:*",
     "@openworkflow/cli": "^0.4.3",
     "drizzle-orm": "^0.45.1",
