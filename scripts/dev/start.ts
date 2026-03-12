@@ -254,7 +254,7 @@ process.once("SIGTERM", () => {
 
 function start(): void {
   console.log(
-    "Starting local infra dependencies (Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM, tokenizer relay)...",
+    "Starting local infra dependencies (Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM, tokenizer relay, gateway relay)...",
   );
   const controlPlaneApiLocalPort = readControlPlaneApiLocalPort(DEV_CONFIG_PATH);
   const dataPlaneApiLocalPort = readDataPlaneApiLocalPort(DEV_CONFIG_PATH);
@@ -295,6 +295,7 @@ function start(): void {
       "registry",
       "otel-lgtm",
       "tokenizer-proxy-relay",
+      "data-plane-gateway-relay",
     ],
     env: sharedDevEnv,
   });

@@ -77,6 +77,15 @@ services:
     networks:
       - sandbox-dev
 
+  data-plane-gateway-relay:
+    image: nginx:1.27-alpine
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - "./data-plane-gateway-relay.nginx.conf:/etc/nginx/conf.d/default.conf:ro"
+    networks:
+      - sandbox-dev
+
   tunnel:
     image: "${CLOUDFLARED_IMAGE:-cloudflare/cloudflared:latest}"
     volumes:
