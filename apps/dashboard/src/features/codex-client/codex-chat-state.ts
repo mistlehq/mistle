@@ -265,6 +265,7 @@ function summarizeExploringItem(
 ): {
   label: string;
   detail: string | null;
+  sourcePath: string | null;
   detailKind: "plain" | "code";
 } {
   const firstAction = item.commandActions[0];
@@ -272,6 +273,7 @@ function summarizeExploringItem(
     return {
       label: "Command",
       detail: item.command,
+      sourcePath: null,
       detailKind: "code",
     };
   }
@@ -280,6 +282,7 @@ function summarizeExploringItem(
     return {
       label: "Read",
       detail: firstAction.path ?? firstAction.name,
+      sourcePath: firstAction.path ?? firstAction.name,
       detailKind: "code",
     };
   }
@@ -288,6 +291,7 @@ function summarizeExploringItem(
     return {
       label: "Search",
       detail: firstAction.query ?? firstAction.path ?? item.command,
+      sourcePath: null,
       detailKind: "plain",
     };
   }
@@ -296,6 +300,7 @@ function summarizeExploringItem(
     return {
       label: "List files",
       detail: firstAction.path ?? item.command,
+      sourcePath: firstAction.path ?? item.command ?? null,
       detailKind: "code",
     };
   }
@@ -303,6 +308,7 @@ function summarizeExploringItem(
   return {
     label: "Command",
     detail: item.command,
+    sourcePath: null,
     detailKind: "code",
   };
 }
@@ -370,6 +376,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
   sourceKind: "command-execution" | "reasoning" | "file-change" | "web-search" | "tool-call";
   label: string;
   detail: string | null;
+  sourcePath: string | null;
   detailKind: "plain" | "code";
   output: string | null;
 } {
@@ -389,6 +396,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
           detail: exploringSummary.detail,
           maxLength: 72,
         }),
+        sourcePath: exploringSummary.sourcePath,
         detailKind: exploringSummary.detailKind,
         output: item.output,
       };
@@ -401,6 +409,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
         detail: item.command ?? item.reason,
         maxLength: 80,
       }),
+      sourcePath: null,
       detailKind: "code",
       output: item.output,
     };
@@ -414,6 +423,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
         detail: item.text,
         maxLength: 88,
       }),
+      sourcePath: null,
       detailKind: "plain",
       output: null,
     };
@@ -428,6 +438,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
         detail: paths.length === 0 ? null : paths.join(", "),
         maxLength: 88,
       }),
+      sourcePath: null,
       detailKind: "code",
       output: summarizeFileChangeOutput(item),
     };
@@ -441,6 +452,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
         detail: item.query,
         maxLength: 72,
       }),
+      sourcePath: null,
       detailKind: "plain",
       output: item.detailsJson,
     };
@@ -454,6 +466,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
         detail: item.body ?? item.toolType,
         maxLength: 72,
       }),
+      sourcePath: null,
       detailKind: "plain",
       output: item.detailsJson,
     };
@@ -463,16 +476,13 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
     sourceKind: "tool-call",
     label: item.kind,
     detail: null,
+    sourcePath: null,
     detailKind: "plain",
     output: null,
   };
 }
 
-function mapTimelineEntryToChatEntries(input: {
-  entry: CodexTimelineEntry;
-  planSnapshot: CodexTurnPlanSnapshot | null;
-}): readonly ChatEntry[] {
-  const { entry } = input;
+function mapTimelineEntryToChatEntries(entry: CodexTimelineEntry): readonly ChatEntry[] {
   if (!("item" in entry)) {
     return [
       {
@@ -491,6 +501,7 @@ function mapTimelineEntryToChatEntries(input: {
             sourceKind: summary.sourceKind,
             label: summary.label,
             detail: summary.detail,
+            ...(summary.sourcePath === null ? {} : { sourcePath: summary.sourcePath }),
             detailKind: summary.detailKind,
             command: item.kind === "command-execution" ? item.command : null,
             output: summary.output,
@@ -647,12 +658,7 @@ function buildEntries(input: {
       items: buildNormalizedItems(turn),
     });
     for (const timelineEntry of timeline) {
-      entries.push(
-        ...mapTimelineEntryToChatEntries({
-          entry: timelineEntry,
-          planSnapshot: turn.planSnapshot,
-        }),
-      );
+      entries.push(...mapTimelineEntryToChatEntries(timelineEntry));
     }
 
     if (turn.planSnapshot !== null) {
