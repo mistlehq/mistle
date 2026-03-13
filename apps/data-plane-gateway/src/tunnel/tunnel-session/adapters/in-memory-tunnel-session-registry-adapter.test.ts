@@ -14,6 +14,7 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
     });
     const firstBinding = adapter.bindClientStream({
       sandboxInstanceId: "sbi_test",
+      channelKind: "pty",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
@@ -61,21 +62,25 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
 
     const firstBinding = adapter.bindClientStream({
       sandboxInstanceId: "sbi_test",
+      channelKind: "pty",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
     const secondBinding = adapter.bindClientStream({
       sandboxInstanceId: "sbi_test",
+      channelKind: "agent",
       clientSessionId: "conn_2",
       clientStreamId: 8,
     });
 
     expect(firstBinding).toEqual({
+      channelKind: "pty",
       clientSessionId: "conn_1",
       clientStreamId: 7,
       tunnelStreamId: 1,
     });
     expect(secondBinding).toEqual({
+      channelKind: "agent",
       clientSessionId: "conn_2",
       clientStreamId: 8,
       tunnelStreamId: 2,
@@ -114,6 +119,7 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
     expect(() =>
       adapter.bindClientStream({
         sandboxInstanceId: "sbi_missing",
+        channelKind: "pty",
         clientSessionId: "conn_1",
         clientStreamId: 7,
       }),
@@ -130,6 +136,7 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
     });
     const binding = adapter.bindClientStream({
       sandboxInstanceId: "sbi_test",
+      channelKind: "pty",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
@@ -163,5 +170,46 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
         sandboxInstanceId: "sbi_test",
       }),
     ).toBeUndefined();
+  });
+
+  it("releases all bindings for one client session without affecting others", () => {
+    const adapter = new InMemoryTunnelSessionRegistryAdapter();
+    adapter.attachBootstrapSession({
+      sandboxInstanceId: "sbi_test",
+      side: "bootstrap",
+      nodeId: "dpg_test",
+      sessionId: "sess_bootstrap_1",
+    });
+    const firstReleasedBinding = adapter.bindClientStream({
+      sandboxInstanceId: "sbi_test",
+      channelKind: "pty",
+      clientSessionId: "conn_1",
+      clientStreamId: 7,
+    });
+    const secondReleasedBinding = adapter.bindClientStream({
+      sandboxInstanceId: "sbi_test",
+      channelKind: "agent",
+      clientSessionId: "conn_1",
+      clientStreamId: 8,
+    });
+    const remainingBinding = adapter.bindClientStream({
+      sandboxInstanceId: "sbi_test",
+      channelKind: "pty",
+      clientSessionId: "conn_2",
+      clientStreamId: 9,
+    });
+
+    expect(
+      adapter.releaseClientSessionBindings({
+        sandboxInstanceId: "sbi_test",
+        clientSessionId: "conn_1",
+      }),
+    ).toEqual([firstReleasedBinding, secondReleasedBinding]);
+    expect(
+      adapter.getBindingByTunnelStreamId({
+        sandboxInstanceId: "sbi_test",
+        tunnelStreamId: remainingBinding.tunnelStreamId,
+      }),
+    ).toEqual(remainingBinding);
   });
 });

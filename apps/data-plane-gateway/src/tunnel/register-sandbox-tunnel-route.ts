@@ -16,6 +16,7 @@ import { typeid } from "typeid-js";
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { insertSandboxTunnelConnectAck } from "./connect-ack.js";
+import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import type { SandboxOwnerLeaseHeartbeat } from "./ownership/sandbox-owner-lease-heartbeat.js";
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
 import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
@@ -40,6 +41,7 @@ type RegisterSandboxTunnelRouteInput = {
   gatewayNodeId: string;
   bootstrapTokenConfig: BootstrapTokenConfig;
   connectionTokenConfig: ConnectionTokenConfig;
+  interactiveStreamRouter: InteractiveStreamRouter;
   relayCoordinator: TunnelRelayCoordinator;
   sandboxOwnerStore: SandboxOwnerStore;
   sandboxOwnerResolver: SandboxOwnerResolver;

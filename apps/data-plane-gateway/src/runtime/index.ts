@@ -7,11 +7,20 @@ import { typeid } from "typeid-js";
 import { createApp, stopApp } from "../app.js";
 import { startServer } from "../server.js";
 import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory-relay-coordinator.js";
+import { LocalGatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
+import { LocalGatewayForwardingServerAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
+import {
+  GatewayForwardingClient,
+  GatewayForwardingServer,
+  InteractiveStreamRouter,
+} from "../tunnel/gateway-forwarding/index.js";
 import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
 import { SandboxOwnerLeaseHeartbeat } from "../tunnel/ownership/sandbox-owner-lease-heartbeat.js";
 import { StoreBackedSandboxOwnerResolver } from "../tunnel/ownership/store-backed-sandbox-owner-resolver.js";
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
 import { registerSandboxTunnelTokenExchangeRoute } from "../tunnel/register-sandbox-tunnel-token-exchange-route.js";
+import { InMemoryTunnelSessionRegistryAdapter } from "../tunnel/tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
+import { TunnelSessionRegistry } from "../tunnel/tunnel-session/index.js";
 import type {
   DataPlaneGatewayRuntime,
   DataPlaneGatewayRuntimeConfig,
@@ -29,6 +38,20 @@ export function createDataPlaneGatewayRuntime(
   const relayCoordinator = createInMemoryTunnelRelayCoordinator(nodeId);
   const sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
   const sandboxOwnerResolver = new StoreBackedSandboxOwnerResolver(nodeId, sandboxOwnerStore);
+  const tunnelSessionRegistry = new TunnelSessionRegistry(
+    new InMemoryTunnelSessionRegistryAdapter(),
+  );
+  const gatewayForwardingServer = new GatewayForwardingServer(
+    new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),
+  );
+  const gatewayForwardingClient = new GatewayForwardingClient(
+    new LocalGatewayForwardingClientAdapter(nodeId, gatewayForwardingServer),
+  );
+  const interactiveStreamRouter = new InteractiveStreamRouter(
+    nodeId,
+    sandboxOwnerResolver,
+    gatewayForwardingClient,
+  );
   const sandboxOwnerLeaseHeartbeat = new SandboxOwnerLeaseHeartbeat(
     sandboxOwnerStore,
     systemScheduler,
@@ -49,6 +72,7 @@ export function createDataPlaneGatewayRuntime(
       tokenIssuer: config.sandbox.connect.tokenIssuer,
       tokenAudience: config.sandbox.connect.tokenAudience,
     } satisfies ConnectionTokenConfig,
+    interactiveStreamRouter,
     relayCoordinator,
     sandboxOwnerStore,
     sandboxOwnerResolver,

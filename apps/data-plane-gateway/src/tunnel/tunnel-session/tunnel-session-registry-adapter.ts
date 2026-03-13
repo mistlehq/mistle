@@ -1,3 +1,5 @@
+import type { StreamChannel } from "@mistle/sandbox-session-protocol";
+
 import type { RelayTarget } from "../types.js";
 import type { ClientStreamBinding } from "./sandbox-tunnel-session.js";
 
@@ -33,6 +35,7 @@ export interface TunnelSessionRegistryAdapter {
   detachBootstrapSession(input: RelayTarget): DetachBootstrapSessionResult | undefined;
   bindClientStream(input: {
     sandboxInstanceId: string;
+    channelKind: StreamChannel["kind"];
     clientSessionId: string;
     clientStreamId: number;
   }): ClientStreamBinding;
@@ -50,4 +53,8 @@ export interface TunnelSessionRegistryAdapter {
     clientSessionId: string;
     clientStreamId: number;
   }): ClientStreamBinding | undefined;
+  releaseClientSessionBindings(input: {
+    sandboxInstanceId: string;
+    clientSessionId: string;
+  }): ClientStreamBinding[];
 }

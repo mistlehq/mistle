@@ -1,6 +1,9 @@
+import type { StreamChannel } from "@mistle/sandbox-session-protocol";
+
 import type { RelayTarget } from "../types.js";
 
 export type ClientStreamBinding = {
+  channelKind: StreamChannel["kind"];
   clientSessionId: string;
   clientStreamId: number;
   tunnelStreamId: number;
@@ -24,6 +27,7 @@ export class SandboxTunnelSession {
   public constructor(public readonly bootstrapTarget: RelayTarget) {}
 
   public bindClientStream(input: {
+    channelKind: StreamChannel["kind"];
     clientSessionId: string;
     clientStreamId: number;
   }): ClientStreamBinding {
@@ -40,6 +44,7 @@ export class SandboxTunnelSession {
 
     const tunnelStreamId = this.allocateTunnelStreamId();
     const binding: ClientStreamBinding = {
+      channelKind: input.channelKind,
       clientSessionId: input.clientSessionId,
       clientStreamId: input.clientStreamId,
       tunnelStreamId,
@@ -82,6 +87,32 @@ export class SandboxTunnelSession {
     this.#bindingsByClientKey.clear();
     this.#bindingsByTunnelStreamId.clear();
     return bindings;
+  }
+
+  /**
+   * Removes every binding associated with a single client websocket session.
+   */
+  public releaseClientSessionBindings(input: { clientSessionId: string }): ClientStreamBinding[] {
+    const releasedBindings: ClientStreamBinding[] = [];
+    for (const binding of this.#bindingsByTunnelStreamId.values()) {
+      if (binding.clientSessionId !== input.clientSessionId) {
+        continue;
+      }
+
+      releasedBindings.push(binding);
+    }
+
+    for (const binding of releasedBindings) {
+      this.#bindingsByClientKey.delete(
+        toClientBindingKey({
+          clientSessionId: binding.clientSessionId,
+          clientStreamId: binding.clientStreamId,
+        }),
+      );
+      this.#bindingsByTunnelStreamId.delete(binding.tunnelStreamId);
+    }
+
+    return releasedBindings;
   }
 
   public get bindingCount(): number {
