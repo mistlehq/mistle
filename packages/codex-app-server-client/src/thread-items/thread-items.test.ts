@@ -341,7 +341,7 @@ describe("thread item semantics", () => {
         type: "commandExecution",
         id: "cmd_1",
         command: "rg token src",
-        cwd: "/workspace",
+        cwd: "/home/sandbox",
         status: "completed",
         commandActions: [
           {
@@ -363,7 +363,7 @@ describe("thread item semantics", () => {
         id: "cmd_1",
         turnId: "turn_1",
         command: "rg token src",
-        cwd: "/workspace",
+        cwd: "/home/sandbox",
         commandStatus: "completed",
         exitCode: 0,
         output: "src/app.ts",
@@ -390,7 +390,7 @@ describe("thread item semantics", () => {
           type: "commandExecution",
           id: "cmd_streaming",
           command: "rg token src",
-          cwd: "/workspace",
+          cwd: "/home/sandbox",
           status: "inProgress",
           commandActions: [],
           aggregatedOutput: null,
@@ -488,7 +488,7 @@ describe("thread item semantics", () => {
         type: "commandExecution",
         id: "cmd_1",
         command: "find src -maxdepth 2 -type f",
-        cwd: "/workspace",
+        cwd: "/home/sandbox",
         status: "completed",
         commandActions: [
           {
@@ -519,7 +519,7 @@ describe("thread item semantics", () => {
         type: "commandExecution",
         id: "cmd_1",
         command: "rg token src && git status",
-        cwd: "/workspace",
+        cwd: "/home/sandbox",
         status: "completed",
         commandActions: [
           {
@@ -675,7 +675,7 @@ describe("thread item semantics", () => {
             type: "commandExecution",
             id: "cmd_1",
             command: "sed -n '1,120p' app.ts",
-            cwd: "/workspace",
+            cwd: "/home/sandbox",
             status: "completed",
             commandActions: [
               {
@@ -693,7 +693,7 @@ describe("thread item semantics", () => {
             type: "commandExecution",
             id: "cmd_2",
             command: "rg App src",
-            cwd: "/workspace",
+            cwd: "/home/sandbox",
             status: "inProgress",
             commandActions: [
               {
@@ -731,7 +731,7 @@ describe("thread item semantics", () => {
             id: "cmd_1",
             turnId: "turn_1",
             command: "sed -n '1,120p' app.ts",
-            cwd: "/workspace",
+            cwd: "/home/sandbox",
             commandStatus: "completed",
             exitCode: 0,
             output: "export const App = () => null;",
@@ -752,7 +752,7 @@ describe("thread item semantics", () => {
             id: "cmd_2",
             turnId: "turn_1",
             command: "rg App src",
-            cwd: "/workspace",
+            cwd: "/home/sandbox",
             commandStatus: "inProgress",
             exitCode: null,
             output: null,
@@ -962,7 +962,7 @@ describe("thread item semantics", () => {
             type: "commandExecution",
             id: "cmd_1",
             command: "git status",
-            cwd: "/workspace",
+            cwd: "/home/sandbox",
             status: "completed",
             commandActions: [
               {
@@ -978,7 +978,7 @@ describe("thread item semantics", () => {
             type: "commandExecution",
             id: "cmd_2",
             command: "pnpm lint",
-            cwd: "/workspace",
+            cwd: "/home/sandbox",
             status: "completed",
             commandActions: [
               {
@@ -1013,7 +1013,7 @@ describe("thread item semantics", () => {
               type: "commandExecution",
               id: "cmd_1",
               command: "rg semantic src",
-              cwd: "/workspace",
+              cwd: "/home/sandbox",
               status: "completed",
               commandActions: [
                 {
@@ -1037,7 +1037,7 @@ describe("thread item semantics", () => {
               type: "commandExecution",
               id: "cmd_2",
               command: "rg grouping docs",
-              cwd: "/workspace",
+              cwd: "/home/sandbox",
               status: "completed",
               commandActions: [
                 {
@@ -1071,7 +1071,7 @@ describe("thread item semantics", () => {
             type: "commandExecution",
             id: "cmd_1",
             command: "sed -n '1,40p' app.ts",
-            cwd: "/workspace",
+            cwd: "/home/sandbox",
             status: "completed",
             commandActions: [
               {
@@ -1158,7 +1158,7 @@ describe("thread item semantics", () => {
           id: "cmd_1",
           turnId: "turn_1",
           command: "sed -n '1,40p' app.ts",
-          cwd: "/workspace",
+          cwd: "/home/sandbox",
           commandStatus: "completed",
           exitCode: 0,
           output: "export const App = () => null;",
@@ -1187,7 +1187,7 @@ describe("thread item semantics", () => {
           id: "cmd_2",
           turnId: "turn_1",
           command: "rg App src",
-          cwd: "/workspace",
+          cwd: "/home/sandbox",
           commandStatus: "completed",
           exitCode: 0,
           output: "src/app.ts",

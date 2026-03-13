@@ -253,7 +253,7 @@ describe("ChatSemanticGroup", () => {
             itemId: "running-command-1",
             reason: "Approve the lint command.",
             command: "pnpm --filter @mistle/dashboard lint",
-            cwd: "/workspace",
+            cwd: "/home/sandbox",
             availableDecisions: ["accept", "cancel"],
             networkHost: null,
             networkProtocol: null,

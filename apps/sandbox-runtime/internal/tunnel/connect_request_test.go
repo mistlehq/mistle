@@ -89,7 +89,7 @@ func TestParsePTYConnectRequest(t *testing.T) {
 				Session: sessionprotocol.PTYSessionModeCreate,
 				Cols:    120,
 				Rows:    40,
-				Cwd:     "/workspace",
+				Cwd:     "/home/sandbox",
 			},
 		})
 		if err != nil {

@@ -6,7 +6,7 @@ import { startDockerHttpApp } from "./http-app.js";
 import type { StartedWorkspaceApp } from "./shared.js";
 
 const IntegrationTargetsProvisionManifestFileName = "integration-targets.provision.json";
-const IntegrationTargetsProvisionManifestContainerPath = `/workspace/${IntegrationTargetsProvisionManifestFileName}`;
+const IntegrationTargetsProvisionManifestContainerPath = `/app/${IntegrationTargetsProvisionManifestFileName}`;
 
 const ControlPlaneApiDefinition: DockerHttpAppDefinition = {
   appName: "control-plane-api",

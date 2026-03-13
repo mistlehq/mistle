@@ -30,7 +30,7 @@ const meta = {
     configRequirementsJson: JSON.stringify(
       {
         required_env: ["OPENAI_API_KEY"],
-        writable_paths: ["/workspace/mistle"],
+        writable_paths: ["/home/sandbox/projects/mistle"],
       },
       null,
       2,
