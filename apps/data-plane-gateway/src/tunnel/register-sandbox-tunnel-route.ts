@@ -9,6 +9,7 @@ import {
   type BootstrapTokenConfig,
   verifyBootstrapToken,
 } from "@mistle/gateway-tunnel-auth";
+import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 import type { WSMessageReceive } from "hono/ws";
 import { typeid } from "typeid-js";
 
@@ -19,6 +20,11 @@ import type { SandboxOwnerLeaseHeartbeat } from "./ownership/sandbox-owner-lease
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
 import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
+import {
+  classifySandboxTunnelClose,
+  getSandboxTunnelSessionAttributes,
+  getSandboxTunnelSessionSpanName,
+} from "./telemetry.js";
 import {
   markSandboxTunnelConnected,
   markSandboxTunnelDisconnected,
@@ -59,6 +65,7 @@ const CloseCodes: {
   INTERNAL_ERROR: 1011,
 };
 const OwnerLeaseTtlMs = 30_000;
+const TunnelLifecycleTracer = trace.getTracer("@mistle/data-plane-gateway");
 
 function toNormalizedTokenValue(token: string | null): string | undefined {
   const normalizedToken = token?.trim();
@@ -134,6 +141,96 @@ function toForwardPayload(data: WSMessageReceive): string | ArrayBuffer | undefi
 
 function toSourcePeerSide(tokenKind: TokenKind): RelayPeerSide {
   return tokenKind;
+}
+
+function normalizeError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new Error(`Unexpected non-Error throwable: ${String(error)}`);
+}
+
+function recordTunnelSessionError(input: {
+  tunnelSessionSpan: Span | undefined;
+  error: unknown;
+  statusMessage: string;
+}): void {
+  if (input.tunnelSessionSpan === undefined) {
+    return;
+  }
+
+  input.tunnelSessionSpan.recordException(normalizeError(input.error));
+  input.tunnelSessionSpan.setStatus({
+    code: SpanStatusCode.ERROR,
+    message: input.statusMessage,
+  });
+}
+
+function finalizeTunnelSession(input: {
+  closeCode: number;
+  closeReason: string;
+  openedAtMs: number | undefined;
+  peerSide: RelayPeerSide;
+  relaySessionId: string;
+  sandboxInstanceId: string;
+  tokenKind: TokenKind;
+  tunnelSessionSpan: Span | undefined;
+}): void {
+  const closeClassification = classifySandboxTunnelClose({
+    closeCode: input.closeCode,
+    closeReason: input.closeReason,
+  });
+  const durationMs = input.openedAtMs === undefined ? undefined : Date.now() - input.openedAtMs;
+  const logData = {
+    closeCode: input.closeCode,
+    closeOutcome: closeClassification.outcome,
+    closeReason: input.closeReason,
+    durationMs,
+    peerSide: input.peerSide,
+    relaySessionId: input.relaySessionId,
+    sandboxInstanceId: input.sandboxInstanceId,
+    tokenKind: input.tokenKind,
+  };
+  const logMessage =
+    input.tokenKind === "bootstrap"
+      ? closeClassification.logLevel === "info"
+        ? "Sandbox bootstrap tunnel disconnected"
+        : "Sandbox bootstrap tunnel disconnected unexpectedly"
+      : closeClassification.logLevel === "info"
+        ? "Sandbox connection peer detached"
+        : "Sandbox connection peer detached unexpectedly";
+
+  if (closeClassification.logLevel === "info") {
+    logger.info(logData, logMessage);
+  } else {
+    logger.warn(logData, logMessage);
+  }
+
+  if (input.tunnelSessionSpan === undefined) {
+    return;
+  }
+
+  input.tunnelSessionSpan.setAttributes({
+    "mistle.sandbox.tunnel.close_code": input.closeCode,
+    "mistle.sandbox.tunnel.close_outcome": closeClassification.outcome,
+    "mistle.sandbox.tunnel.close_reason": input.closeReason,
+    ...(durationMs === undefined
+      ? {}
+      : {
+          "mistle.sandbox.tunnel.duration_ms": durationMs,
+        }),
+  });
+  if (closeClassification.spanStatusCode === SpanStatusCode.ERROR) {
+    const statusMessage =
+      closeClassification.spanStatusMessage ??
+      `Sandbox tunnel websocket closed with code ${String(input.closeCode)}.`;
+    input.tunnelSessionSpan.setStatus({
+      code: closeClassification.spanStatusCode,
+      message: statusMessage,
+    });
+  }
+  input.tunnelSessionSpan.end();
 }
 
 export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInput): void {
@@ -291,9 +388,43 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
         let sandboxOwnerLeaseHeartbeatHandle:
           | ReturnType<SandboxOwnerLeaseHeartbeat["start"]>
           | undefined;
+        let tunnelSessionSpan: Span | undefined;
+        let tunnelOpenedAtMs: number | undefined;
+        const relaySessionId =
+          requestedToken.kind === "bootstrap" ? bootstrapRelaySessionId : connectionRelaySessionId;
 
         return {
           onOpen: (_event, ws) => {
+            tunnelOpenedAtMs = Date.now();
+            tunnelSessionSpan = TunnelLifecycleTracer.startSpan(
+              getSandboxTunnelSessionSpanName({
+                peerSide: sourcePeerSide,
+              }),
+              {
+                attributes: getSandboxTunnelSessionAttributes({
+                  sandboxInstanceId,
+                  peerSide: sourcePeerSide,
+                  tokenKind: requestedToken.kind,
+                }),
+              },
+            );
+            logger.info(
+              {
+                sandboxInstanceId,
+                peerSide: sourcePeerSide,
+                relaySessionId,
+                tokenKind: requestedToken.kind,
+                ...(requestedToken.kind === "bootstrap"
+                  ? {
+                      leaseId: bootstrapOwnerLeaseId,
+                    }
+                  : {}),
+              },
+              requestedToken.kind === "bootstrap"
+                ? "Sandbox bootstrap tunnel connected"
+                : "Sandbox connection peer attached",
+            );
+
             relayTarget = input.relayCoordinator.attachPeer({
               sandboxInstanceId,
               side: sourcePeerSide,
@@ -309,6 +440,11 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 db: ctx.get("db"),
                 sandboxInstanceId,
               }).catch((error: unknown) => {
+                recordTunnelSessionError({
+                  tunnelSessionSpan,
+                  error,
+                  statusMessage: "Failed to persist sandbox tunnel connection.",
+                });
                 logger.error(
                   {
                     err: error,
@@ -345,6 +481,11 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                     },
                     "Lost sandbox ownership while bootstrap websocket was still connected",
                   );
+                  tunnelSessionSpan?.addEvent("sandbox.tunnel.owner_lease.lost");
+                  tunnelSessionSpan?.setStatus({
+                    code: SpanStatusCode.ERROR,
+                    message: "Sandbox ownership lease could not be renewed.",
+                  });
                   ws.close(
                     CloseCodes.INTERNAL_ERROR,
                     "Sandbox ownership lease could not be renewed.",
@@ -379,6 +520,11 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 payload,
               })
               .catch((error: unknown) => {
+                recordTunnelSessionError({
+                  tunnelSessionSpan,
+                  error,
+                  statusMessage: "Failed forwarding websocket message to tunnel peer.",
+                });
                 logger.error(
                   {
                     err: error,
@@ -393,7 +539,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 );
               });
           },
-          onClose: () => {
+          onClose: (event) => {
             sandboxOwnerLeaseHeartbeatHandle?.stop();
             if (requestedToken.kind === "bootstrap" && bootstrapOwnerLeaseId !== undefined) {
               void markSandboxTunnelDisconnected({
@@ -413,10 +559,39 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 leaseId: bootstrapOwnerLeaseId,
               });
             }
-            if (relayTarget === undefined) {
-              return;
+            if (relayTarget !== undefined) {
+              input.relayCoordinator.detachPeer(relayTarget);
             }
-            input.relayCoordinator.detachPeer(relayTarget);
+            finalizeTunnelSession({
+              closeCode: event.code,
+              closeReason: event.reason,
+              openedAtMs: tunnelOpenedAtMs,
+              peerSide: sourcePeerSide,
+              relaySessionId,
+              sandboxInstanceId,
+              tokenKind: requestedToken.kind,
+              tunnelSessionSpan,
+            });
+            tunnelSessionSpan = undefined;
+          },
+          onError: (_event, ws) => {
+            const error = new Error("Sandbox tunnel websocket emitted an error event.");
+            recordTunnelSessionError({
+              tunnelSessionSpan,
+              error,
+              statusMessage: error.message,
+            });
+            logger.error(
+              {
+                err: error,
+                peerSide: sourcePeerSide,
+                relaySessionId,
+                sandboxInstanceId,
+                tokenKind: requestedToken.kind,
+              },
+              "Sandbox tunnel websocket emitted an error event",
+            );
+            ws.close(CloseCodes.INTERNAL_ERROR, error.message);
           },
         };
       },
