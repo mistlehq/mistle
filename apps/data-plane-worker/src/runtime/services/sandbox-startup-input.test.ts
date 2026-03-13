@@ -194,6 +194,7 @@ const RuntimePlanSchema = z.object({
 
 const SandboxStartupInputSchema = z.object({
   bootstrapToken: z.string().min(1),
+  tunnelExchangeToken: z.string().min(1),
   tunnelGatewayWsUrl: z.string().min(1),
   runtimePlan: RuntimePlanSchema,
 });
@@ -257,9 +258,10 @@ describe("encodeSandboxStartupInput", () => {
     expect(url).toBe("ws://127.0.0.1:5003/tunnel/sandbox/sbi_example_001");
   });
 
-  it("encodes bootstrap token, tunnel gateway ws url, and runtime plan as newline-delimited json", () => {
+  it("encodes bootstrap token, tunnel exchange token, tunnel gateway ws url, and runtime plan as newline-delimited json", () => {
     const encoded = encodeSandboxStartupInput({
       bootstrapToken: "bootstrap-token-value",
+      tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       runtimePlan: createRuntimePlan(),
     });
@@ -270,6 +272,7 @@ describe("encodeSandboxStartupInput", () => {
     const decoded = SandboxStartupInputSchema.parse(JSON.parse(encodedText.trimEnd()));
     expect(decoded).toEqual({
       bootstrapToken: "bootstrap-token-value",
+      tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
       runtimePlan: createRuntimePlan(),
     });

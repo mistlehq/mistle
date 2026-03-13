@@ -55,6 +55,7 @@ export function loadDataPlaneWorkerFromToml(
     },
     tunnel: {
       bootstrapTokenTtlSeconds: tunnel.bootstrap_token_ttl_seconds,
+      exchangeTokenTtlSeconds: tunnel.exchange_token_ttl_seconds,
     },
     sandbox: sandboxConfig,
   });
