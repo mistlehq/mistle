@@ -13,23 +13,22 @@ func TestBuildControlMessageSchema(t *testing.T) {
 	if schema.Title != "SandboxSessionControlMessage" {
 		t.Fatalf("expected schema title to be SandboxSessionControlMessage, got %q", schema.Title)
 	}
-	if len(schema.OneOf) != 9 {
-		t.Fatalf("expected oneOf to include 9 message definitions, got %d", len(schema.OneOf))
+	if len(schema.OneOf) != 8 {
+		t.Fatalf("expected oneOf to include 8 message definitions, got %d", len(schema.OneOf))
 	}
-	if len(schema.Definitions) != 9 {
-		t.Fatalf("expected 9 schema definitions, got %d", len(schema.Definitions))
+	if len(schema.Definitions) != 8 {
+		t.Fatalf("expected 8 schema definitions, got %d", len(schema.Definitions))
 	}
 
 	expectedDefinitionNames := []string{
 		"StreamOpen",
 		"StreamOpenOK",
 		"StreamOpenError",
+		"StreamSignal",
+		"StreamEvent",
+		"StreamClose",
+		"StreamReset",
 		"Disconnect",
-		"PTYResize",
-		"PTYClose",
-		"PTYCloseOK",
-		"PTYCloseError",
-		"PTYExit",
 	}
 
 	for _, definitionName := range expectedDefinitionNames {

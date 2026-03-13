@@ -18,9 +18,10 @@ const (
 	connectErrorCodePTYSessionUnavailable      = "pty_session_unavailable"
 	connectErrorCodePTYSessionExists           = "pty_session_exists"
 	connectErrorCodePTYSessionCreateFailed     = "pty_session_create_failed"
-	ptyCloseErrorCodeTerminateFailed           = "pty_terminate_failed"
-	ptyCloseErrorCodeInvalidCloseRequest       = "invalid_pty_close_request"
 	ptyConnectErrorCodeInvalidSessionSelection = "invalid_pty_session_mode"
+	streamResetCodeInvalidStreamSignal         = "invalid_stream_signal"
+	streamResetCodeInvalidStreamClose          = "invalid_stream_close"
+	streamResetCodeStreamCloseFailed           = "stream_close_failed"
 )
 
 func writeStreamOpenOK(
@@ -37,6 +38,22 @@ func writeStreamOpenError(
 	streamOpenError sessionprotocol.StreamOpenError,
 ) error {
 	return writeTextJSONMessage(ctx, tunnelConn, streamOpenError)
+}
+
+func writeStreamEvent(
+	ctx context.Context,
+	tunnelConn *websocket.Conn,
+	streamEvent sessionprotocol.StreamEvent,
+) error {
+	return writeTextJSONMessage(ctx, tunnelConn, streamEvent)
+}
+
+func writeStreamReset(
+	ctx context.Context,
+	tunnelConn *websocket.Conn,
+	streamReset sessionprotocol.StreamReset,
+) error {
+	return writeTextJSONMessage(ctx, tunnelConn, streamReset)
 }
 
 func writeTextJSONMessage(ctx context.Context, tunnelConn *websocket.Conn, payload any) error {

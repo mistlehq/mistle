@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"syscall"
 
 	"github.com/coder/websocket"
@@ -96,7 +95,7 @@ func handlePTYConnectRequest(
 		return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open acknowledgement: %w", err)
 	}
 
-	if err := relayPTYSession(ctx, tunnelConn, activePTYSession); err != nil {
+	if err := relayPTYSession(ctx, tunnelConn, activePTYSession, connectRequest.StreamID); err != nil {
 		return activePTYSession, fmt.Errorf("sandbox tunnel pty relay failed: %w", err)
 	}
 
@@ -107,7 +106,12 @@ func handlePTYConnectRequest(
 	return activePTYSession, nil
 }
 
-func relayPTYSession(ctx context.Context, tunnelConn *websocket.Conn, session *ptySession) error {
+func relayPTYSession(
+	ctx context.Context,
+	tunnelConn *websocket.Conn,
+	session *ptySession,
+	streamID int,
+) error {
 	relayContext, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -138,6 +142,7 @@ func relayPTYSession(ctx context.Context, tunnelConn *websocket.Conn, session *p
 					relayContext,
 					tunnelConn,
 					session,
+					streamID,
 					wsReadResult.Payload,
 				)
 				if err != nil {
@@ -165,9 +170,13 @@ func relayPTYSession(ctx context.Context, tunnelConn *websocket.Conn, session *p
 			}
 			return fmt.Errorf("failed to read pty output: %w", ptyOutputErr)
 		case <-session.exitedCh:
-			if err := writeTextJSONMessage(relayContext, tunnelConn, sessionprotocol.PTYExit{
-				Type:     sessionprotocol.MessageTypePTYExit,
-				ExitCode: session.ExitCode(),
+			if err := writeStreamEvent(relayContext, tunnelConn, sessionprotocol.StreamEvent{
+				Type:     sessionprotocol.MessageTypeStreamEvent,
+				StreamID: streamID,
+				Event: sessionprotocol.PTYExitEvent{
+					Type:     sessionprotocol.MessageTypePTYExit,
+					ExitCode: session.ExitCode(),
+				},
 			}); err != nil {
 				return fmt.Errorf("failed to write pty exit message: %w", err)
 			}
@@ -216,6 +225,7 @@ func handlePTYControlMessage(
 	ctx context.Context,
 	tunnelConn *websocket.Conn,
 	session *ptySession,
+	streamID int,
 	payload []byte,
 ) (ptyControlAction, error) {
 	messageType, err := parseControlMessageType(payload)
@@ -258,61 +268,81 @@ func handlePTYControlMessage(
 		}
 
 		return ptyControlActionContinue, nil
-	case sessionprotocol.MessageTypePTYResize:
-		var resizeRequest sessionprotocol.PTYResize
-		if err := json.Unmarshal(payload, &resizeRequest); err != nil {
-			return ptyControlActionContinue, fmt.Errorf("pty resize request must be valid JSON: %w", err)
+	case sessionprotocol.MessageTypeStreamSignal:
+		signalMessage, err := parsePTYResizeSignal(payload)
+		if err != nil {
+			if writeErr := writeStreamReset(ctx, tunnelConn, sessionprotocol.StreamReset{
+				Type:     sessionprotocol.MessageTypeStreamReset,
+				StreamID: streamID,
+				Code:     streamResetCodeInvalidStreamSignal,
+				Message:  err.Error(),
+			}); writeErr != nil {
+				return ptyControlActionCloseSession, fmt.Errorf("failed to write stream.reset for invalid pty signal: %w", writeErr)
+			}
+			return ptyControlActionCloseSession, nil
 		}
-		if err := session.Resize(resizeRequest.Cols, resizeRequest.Rows); err != nil {
+		if signalMessage.StreamID != streamID {
+			if err := writeStreamReset(ctx, tunnelConn, sessionprotocol.StreamReset{
+				Type:     sessionprotocol.MessageTypeStreamReset,
+				StreamID: streamID,
+				Code:     streamResetCodeInvalidStreamSignal,
+				Message:  fmt.Sprintf("stream signal streamId %d does not match active PTY stream %d", signalMessage.StreamID, streamID),
+			}); err != nil {
+				return ptyControlActionCloseSession, fmt.Errorf("failed to write stream.reset for mismatched pty signal: %w", err)
+			}
+			return ptyControlActionCloseSession, nil
+		}
+		if err := session.Resize(signalMessage.Signal.Cols, signalMessage.Signal.Rows); err != nil {
 			return ptyControlActionContinue, fmt.Errorf("failed to resize pty session: %w", err)
 		}
 		return ptyControlActionContinue, nil
-	case sessionprotocol.MessageTypePTYClose:
-		var closeRequest sessionprotocol.PTYClose
-		if err := json.Unmarshal(payload, &closeRequest); err != nil {
-			if writeErr := writeTextJSONMessage(ctx, tunnelConn, sessionprotocol.PTYCloseError{
-				Type:      sessionprotocol.MessageTypePTYCloseErr,
-				RequestID: "",
-				Code:      ptyCloseErrorCodeInvalidCloseRequest,
-				Message:   fmt.Sprintf("pty close request must be valid JSON: %v", err),
+	case sessionprotocol.MessageTypeStreamClose:
+		closeRequest, err := parseStreamClose(payload)
+		if err != nil {
+			if writeErr := writeStreamReset(ctx, tunnelConn, sessionprotocol.StreamReset{
+				Type:     sessionprotocol.MessageTypeStreamReset,
+				StreamID: streamID,
+				Code:     streamResetCodeInvalidStreamClose,
+				Message:  err.Error(),
 			}); writeErr != nil {
-				return ptyControlActionContinue, fmt.Errorf("failed to write pty.close.error: %w", writeErr)
+				return ptyControlActionCloseSession, fmt.Errorf("failed to write stream.reset for invalid pty close: %w", writeErr)
 			}
-			return ptyControlActionContinue, nil
+			return ptyControlActionCloseSession, nil
 		}
-
-		closeRequest.RequestID = strings.TrimSpace(closeRequest.RequestID)
-		if closeRequest.RequestID == "" {
-			if writeErr := writeTextJSONMessage(ctx, tunnelConn, sessionprotocol.PTYCloseError{
-				Type:      sessionprotocol.MessageTypePTYCloseErr,
-				RequestID: "",
-				Code:      ptyCloseErrorCodeInvalidCloseRequest,
-				Message:   "pty close request requestId is required",
-			}); writeErr != nil {
-				return ptyControlActionContinue, fmt.Errorf("failed to write pty.close.error: %w", writeErr)
+		if closeRequest.StreamID != streamID {
+			if err := writeStreamReset(ctx, tunnelConn, sessionprotocol.StreamReset{
+				Type:     sessionprotocol.MessageTypeStreamReset,
+				StreamID: streamID,
+				Code:     streamResetCodeInvalidStreamClose,
+				Message:  fmt.Sprintf("stream close streamId %d does not match active PTY stream %d", closeRequest.StreamID, streamID),
+			}); err != nil {
+				return ptyControlActionCloseSession, fmt.Errorf("failed to write stream.reset for mismatched pty close: %w", err)
 			}
-			return ptyControlActionContinue, nil
+			return ptyControlActionCloseSession, nil
 		}
 
 		exitCode, terminateErr := session.Terminate()
 		if terminateErr != nil {
-			if writeErr := writeTextJSONMessage(ctx, tunnelConn, sessionprotocol.PTYCloseError{
-				Type:      sessionprotocol.MessageTypePTYCloseErr,
-				RequestID: closeRequest.RequestID,
-				Code:      ptyCloseErrorCodeTerminateFailed,
-				Message:   terminateErr.Error(),
+			if writeErr := writeStreamReset(ctx, tunnelConn, sessionprotocol.StreamReset{
+				Type:     sessionprotocol.MessageTypeStreamReset,
+				StreamID: streamID,
+				Code:     streamResetCodeStreamCloseFailed,
+				Message:  terminateErr.Error(),
 			}); writeErr != nil {
-				return ptyControlActionContinue, fmt.Errorf("failed to write pty.close.error: %w", writeErr)
+				return ptyControlActionCloseSession, fmt.Errorf("failed to write stream.reset for pty close failure: %w", writeErr)
 			}
-			return ptyControlActionContinue, nil
+			return ptyControlActionCloseSession, nil
 		}
 
-		if err := writeTextJSONMessage(ctx, tunnelConn, sessionprotocol.PTYCloseOK{
-			Type:      sessionprotocol.MessageTypePTYCloseOK,
-			RequestID: closeRequest.RequestID,
-			ExitCode:  exitCode,
+		if err := writeStreamEvent(ctx, tunnelConn, sessionprotocol.StreamEvent{
+			Type:     sessionprotocol.MessageTypeStreamEvent,
+			StreamID: streamID,
+			Event: sessionprotocol.PTYExitEvent{
+				Type:     sessionprotocol.MessageTypePTYExit,
+				ExitCode: exitCode,
+			},
 		}); err != nil {
-			return ptyControlActionContinue, fmt.Errorf("failed to write pty.close.ok: %w", err)
+			return ptyControlActionCloseSession, fmt.Errorf("failed to write stream.event for pty close: %w", err)
 		}
 
 		_ = session.CloseTerminal()
@@ -320,4 +350,45 @@ func handlePTYControlMessage(
 	default:
 		return ptyControlActionContinue, fmt.Errorf("unsupported pty control message type '%s'", messageType)
 	}
+}
+
+func parsePTYResizeSignal(payload []byte) (sessionprotocol.StreamSignal, error) {
+	var signalMessage sessionprotocol.StreamSignal
+	if err := json.Unmarshal(payload, &signalMessage); err != nil {
+		return sessionprotocol.StreamSignal{}, fmt.Errorf("stream.signal must be valid JSON: %w", err)
+	}
+
+	if signalMessage.Type != sessionprotocol.MessageTypeStreamSignal {
+		return sessionprotocol.StreamSignal{}, fmt.Errorf("stream.signal request type must be '%s'", sessionprotocol.MessageTypeStreamSignal)
+	}
+	if signalMessage.StreamID <= 0 {
+		return sessionprotocol.StreamSignal{}, fmt.Errorf("stream.signal request streamId must be a positive integer")
+	}
+	if signalMessage.Signal.Type != sessionprotocol.MessageTypePTYResize {
+		return sessionprotocol.StreamSignal{}, fmt.Errorf("stream.signal signal.type must be '%s'", sessionprotocol.MessageTypePTYResize)
+	}
+	if signalMessage.Signal.Cols < 1 || signalMessage.Signal.Rows < 1 {
+		return sessionprotocol.StreamSignal{}, fmt.Errorf("pty resize signal cols and rows must be greater than or equal to 1")
+	}
+	if signalMessage.Signal.Cols > 65535 || signalMessage.Signal.Rows > 65535 {
+		return sessionprotocol.StreamSignal{}, fmt.Errorf("pty resize signal cols and rows must be less than or equal to 65535")
+	}
+
+	return signalMessage, nil
+}
+
+func parseStreamClose(payload []byte) (sessionprotocol.StreamClose, error) {
+	var closeRequest sessionprotocol.StreamClose
+	if err := json.Unmarshal(payload, &closeRequest); err != nil {
+		return sessionprotocol.StreamClose{}, fmt.Errorf("stream.close must be valid JSON: %w", err)
+	}
+
+	if closeRequest.Type != sessionprotocol.MessageTypeStreamClose {
+		return sessionprotocol.StreamClose{}, fmt.Errorf("stream.close request type must be '%s'", sessionprotocol.MessageTypeStreamClose)
+	}
+	if closeRequest.StreamID <= 0 {
+		return sessionprotocol.StreamClose{}, fmt.Errorf("stream.close request streamId must be a positive integer")
+	}
+
+	return closeRequest, nil
 }
