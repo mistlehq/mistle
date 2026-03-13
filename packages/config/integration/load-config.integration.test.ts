@@ -271,6 +271,7 @@ const dataPlaneWorkerEnvConfig = {
   },
   tunnel: {
     bootstrapTokenTtlSeconds: 120,
+    exchangeTokenTtlSeconds: 3600,
   },
   sandbox: {
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
@@ -312,6 +313,7 @@ const dataPlaneWorkerDockerFixtureConfig = {
   },
   tunnel: {
     bootstrapTokenTtlSeconds: 120,
+    exchangeTokenTtlSeconds: 3600,
   },
   sandbox: {
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",

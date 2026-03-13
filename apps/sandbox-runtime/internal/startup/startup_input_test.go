@@ -23,6 +23,7 @@ const validRuntimePlanJSON = `{
 
 const validStartupInputJSON = `{
 	"bootstrapToken": "test-token",
+	"tunnelExchangeToken": "test-exchange-token",
 	"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
 	"runtimePlan": ` + validRuntimePlanJSON + `
 }`
@@ -39,6 +40,9 @@ func TestReadStartupInput(t *testing.T) {
 
 		if startupInput.BootstrapToken != "test-token" {
 			t.Fatalf("expected bootstrap token test-token, got %q", startupInput.BootstrapToken)
+		}
+		if startupInput.TunnelExchangeToken != "test-exchange-token" {
+			t.Fatalf("expected tunnel exchange token test-exchange-token, got %q", startupInput.TunnelExchangeToken)
 		}
 		if startupInput.TunnelGatewayURL != "ws://127.0.0.1:5003/tunnel/sandbox" {
 			t.Fatalf("expected tunnel gateway ws url to match, got %q", startupInput.TunnelGatewayURL)
@@ -64,6 +68,7 @@ func TestReadStartupInput(t *testing.T) {
 		startupInput, err := ReadStartupInput(ReadStartupInputInput{
 			Reader: bytes.NewBufferString(`{
 				"bootstrapToken": "test-token",
+				"tunnelExchangeToken": "test-exchange-token",
 				"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
 				"runtimePlan": {
 					"sandboxProfileId": "sbp_123",
@@ -117,6 +122,7 @@ func TestReadStartupInput(t *testing.T) {
 			Reader: bytes.NewBufferString(`
 				{
 					"bootstrapToken": "  test-token  ",
+					"tunnelExchangeToken": "  test-exchange-token  ",
 					"tunnelGatewayWsUrl": "  ws://127.0.0.1:5003/tunnel/sandbox  ",
 					"runtimePlan": ` + validRuntimePlanJSON + `
 				}
@@ -129,6 +135,9 @@ func TestReadStartupInput(t *testing.T) {
 
 		if startupInput.BootstrapToken != "test-token" {
 			t.Fatalf("expected bootstrap token test-token, got %q", startupInput.BootstrapToken)
+		}
+		if startupInput.TunnelExchangeToken != "test-exchange-token" {
+			t.Fatalf("expected tunnel exchange token test-exchange-token, got %q", startupInput.TunnelExchangeToken)
 		}
 		if startupInput.TunnelGatewayURL != "ws://127.0.0.1:5003/tunnel/sandbox" {
 			t.Fatalf("expected tunnel gateway ws url to match, got %q", startupInput.TunnelGatewayURL)
@@ -185,6 +194,7 @@ func TestReadStartupInput(t *testing.T) {
 	t.Run("fails when bootstrap token is missing", func(t *testing.T) {
 		_, err := ReadStartupInput(ReadStartupInputInput{
 			Reader: bytes.NewBufferString(`{
+				"tunnelExchangeToken": "test-exchange-token",
 				"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
 				"runtimePlan": ` + validRuntimePlanJSON + `
 			}`),
@@ -195,10 +205,25 @@ func TestReadStartupInput(t *testing.T) {
 		}
 	})
 
+	t.Run("fails when tunnel exchange token is missing", func(t *testing.T) {
+		_, err := ReadStartupInput(ReadStartupInputInput{
+			Reader: bytes.NewBufferString(`{
+				"bootstrapToken": "test-token",
+				"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+				"runtimePlan": ` + validRuntimePlanJSON + `
+			}`),
+			MaxBytes: 4096,
+		})
+		if err == nil {
+			t.Fatal("expected error when tunnel exchange token is missing")
+		}
+	})
+
 	t.Run("fails when tunnel gateway ws url is missing", func(t *testing.T) {
 		_, err := ReadStartupInput(ReadStartupInputInput{
 			Reader: bytes.NewBufferString(`{
 				"bootstrapToken": "test-token",
+				"tunnelExchangeToken": "test-exchange-token",
 				"runtimePlan": ` + validRuntimePlanJSON + `
 			}`),
 			MaxBytes: 4096,
@@ -212,6 +237,7 @@ func TestReadStartupInput(t *testing.T) {
 		_, err := ReadStartupInput(ReadStartupInputInput{
 			Reader: bytes.NewBufferString(`{
 				"bootstrapToken": "test-token",
+				"tunnelExchangeToken": "test-exchange-token",
 				"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox"
 			}`),
 			MaxBytes: 4096,
@@ -225,6 +251,7 @@ func TestReadStartupInput(t *testing.T) {
 		_, err := ReadStartupInput(ReadStartupInputInput{
 			Reader: bytes.NewBufferString(`{
 				"bootstrapToken": "test-token",
+				"tunnelExchangeToken": "test-exchange-token",
 				"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
 				"runtimePlan": ` + validRuntimePlanJSON + `,
 				"unexpected": true
@@ -243,6 +270,7 @@ func TestReadStartupInput(t *testing.T) {
 		_, err := ReadStartupInput(ReadStartupInputInput{
 			Reader: bytes.NewBufferString(`{
 				"bootstrapToken": "test-token",
+				"tunnelExchangeToken": "test-exchange-token",
 				"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
 				"runtimePlan": {
 					"sandboxProfileId": "sbp_123",
@@ -274,6 +302,7 @@ func TestReadStartupInput(t *testing.T) {
 		_, err := ReadStartupInput(ReadStartupInputInput{
 			Reader: bytes.NewBufferString(`{
 				"bootstrapToken": "test-token",
+				"tunnelExchangeToken": "test-exchange-token",
 				"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
 				"runtimePlan": {
 					"sandboxProfileId": "sbp_123",
@@ -298,6 +327,7 @@ func TestReadStartupInput(t *testing.T) {
 		_, err := ReadStartupInput(ReadStartupInputInput{
 			Reader: bytes.NewBufferString(`{
 				"bootstrapToken": "test-token",
+				"tunnelExchangeToken": "test-exchange-token",
 				"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
 				"runtimePlan": {
 					"sandboxProfileId": "sbp_123",

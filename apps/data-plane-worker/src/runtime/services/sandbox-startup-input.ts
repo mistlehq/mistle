@@ -8,6 +8,7 @@ function trimTrailingSlash(value: string): string {
 
 export type SandboxStartupInput = {
   bootstrapToken: string;
+  tunnelExchangeToken: string;
   tunnelGatewayWsUrl: string;
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
 };

@@ -58,6 +58,11 @@ const loadTunnelEnv = createEnvLoader<typeof DataPlaneWorkerTunnelConfigSchema>(
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS",
     parse: Number,
   },
+  {
+    key: "exchangeTokenTtlSeconds",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS",
+    parse: Number,
+  },
 ]);
 
 const loadSandboxModalEnv = createEnvLoader<typeof DataPlaneWorkerSandboxModalConfigSchema>([

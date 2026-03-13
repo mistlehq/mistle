@@ -27,6 +27,7 @@ export const DataPlaneWorkerWorkflowConfigSchema = z
 export const DataPlaneWorkerTunnelConfigSchema = z
   .object({
     bootstrapTokenTtlSeconds: z.number().int().min(1),
+    exchangeTokenTtlSeconds: z.number().int().min(1),
   })
   .strict();
 

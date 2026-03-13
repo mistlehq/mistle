@@ -12,15 +12,17 @@ import (
 const DefaultStartupInputMaxBytes = 1024 * 1024
 
 type StartupInput struct {
-	BootstrapToken   string      `json:"bootstrapToken"`
-	TunnelGatewayURL string      `json:"tunnelGatewayWsUrl"`
-	RuntimePlan      RuntimePlan `json:"runtimePlan"`
+	BootstrapToken      string      `json:"bootstrapToken"`
+	TunnelExchangeToken string      `json:"tunnelExchangeToken"`
+	TunnelGatewayURL    string      `json:"tunnelGatewayWsUrl"`
+	RuntimePlan         RuntimePlan `json:"runtimePlan"`
 }
 
 type readStartupInputPayload struct {
-	BootstrapToken   *string      `json:"bootstrapToken"`
-	TunnelGatewayURL *string      `json:"tunnelGatewayWsUrl"`
-	RuntimePlan      *RuntimePlan `json:"runtimePlan"`
+	BootstrapToken      *string      `json:"bootstrapToken"`
+	TunnelExchangeToken *string      `json:"tunnelExchangeToken"`
+	TunnelGatewayURL    *string      `json:"tunnelGatewayWsUrl"`
+	RuntimePlan         *RuntimePlan `json:"runtimePlan"`
 }
 
 type ReadStartupInputInput struct {
@@ -82,6 +84,14 @@ func ReadStartupInput(input ReadStartupInputInput) (StartupInput, error) {
 		return StartupInput{}, fmt.Errorf("startup input bootstrap token is required")
 	}
 
+	if startupInputPayload.TunnelExchangeToken == nil {
+		return StartupInput{}, fmt.Errorf("startup input tunnel exchange token is required")
+	}
+	normalizedTunnelExchangeToken := strings.TrimSpace(*startupInputPayload.TunnelExchangeToken)
+	if normalizedTunnelExchangeToken == "" {
+		return StartupInput{}, fmt.Errorf("startup input tunnel exchange token is required")
+	}
+
 	if startupInputPayload.TunnelGatewayURL == nil {
 		return StartupInput{}, fmt.Errorf("startup input tunnel gateway ws url is required")
 	}
@@ -98,8 +108,9 @@ func ReadStartupInput(input ReadStartupInputInput) (StartupInput, error) {
 	}
 
 	return StartupInput{
-		BootstrapToken:   normalizedBootstrapToken,
-		TunnelGatewayURL: normalizedGatewayURL,
-		RuntimePlan:      *startupInputPayload.RuntimePlan,
+		BootstrapToken:      normalizedBootstrapToken,
+		TunnelExchangeToken: normalizedTunnelExchangeToken,
+		TunnelGatewayURL:    normalizedGatewayURL,
+		RuntimePlan:         *startupInputPayload.RuntimePlan,
 	}, nil
 }

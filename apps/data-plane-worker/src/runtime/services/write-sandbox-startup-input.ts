@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
+import { mintBootstrapToken, mintTunnelExchangeToken } from "@mistle/gateway-tunnel-auth";
 import type { SandboxAdapter, SandboxHandle } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
@@ -18,6 +18,7 @@ export async function writeSandboxStartupInput(input: {
   sandbox: SandboxHandle;
 }): Promise<string> {
   const bootstrapTokenJti = randomUUID();
+  const tunnelExchangeTokenJti = randomUUID();
   const tunnelGatewayWsUrl = createSandboxTunnelGatewayWsUrl({
     gatewayWebsocketUrl: input.config.sandbox.internalGatewayWsUrl,
     sandboxInstanceId: input.sandboxInstanceId,
@@ -32,11 +33,22 @@ export async function writeSandboxStartupInput(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     ttlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
   });
+  const tunnelExchangeToken = await mintTunnelExchangeToken({
+    config: {
+      tokenSecret: input.config.sandbox.bootstrap.tokenSecret,
+      tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
+      tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
+    },
+    jti: tunnelExchangeTokenJti,
+    sandboxInstanceId: input.sandboxInstanceId,
+    ttlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
+  });
 
   try {
     await input.sandbox.writeStdin({
       payload: encodeSandboxStartupInput({
         bootstrapToken,
+        tunnelExchangeToken,
         tunnelGatewayWsUrl,
         runtimePlan: input.runtimePlan,
       }),

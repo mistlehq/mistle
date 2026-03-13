@@ -6,6 +6,8 @@ Current scope:
 
 - mint bootstrap tokens for sandbox tunnel bootstrap
 - verify bootstrap tokens and normalize failure categories
+- mint tunnel exchange tokens for sandbox reconnect bootstrap exchange
+- verify tunnel exchange tokens and normalize failure categories
 
 This package only handles token signing and verification semantics. It does not handle:
 
@@ -19,10 +21,16 @@ Exported from [`src/index.ts`](./src/index.ts):
 
 - `mintBootstrapToken(input)`
 - `verifyBootstrapToken(input)`
+- `mintTunnelExchangeToken(input)`
+- `verifyTunnelExchangeToken(input)`
 - `BootstrapTokenError`
 - `BootstrapTokenErrorCode`
 - `BootstrapTokenConfig`
 - `VerifiedBootstrapToken`
+- `TunnelExchangeTokenError`
+- `TunnelExchangeTokenErrorCode`
+- `TunnelExchangeTokenConfig`
+- `VerifiedTunnelExchangeToken`
 
 ## Example Usage
 
