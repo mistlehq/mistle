@@ -475,4 +475,222 @@ describe("sandbox tunnel websocket ping integration", () => {
     },
     IntegrationTestTimeoutMs,
   );
+
+  it(
+    "forwards PTY exit events back to the client stream after a client stream.close",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const clientStreamId = 41;
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: clientStreamId,
+            channel: {
+              kind: "pty",
+              session: "create",
+              cols: 120,
+              rows: 40,
+            },
+          }),
+        );
+        await waitForWebSocketMessage(bootstrapSocket);
+
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        await waitForWebSocketMessage(clientSocket);
+
+        const forwardedClosePromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.close",
+            streamId: clientStreamId,
+          }),
+        );
+        const forwardedClose = await forwardedClosePromise;
+
+        expect(forwardedClose.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedClose.data)).toEqual({
+          type: "stream.close",
+          streamId: 1,
+        });
+
+        const forwardedExitPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.event",
+            streamId: 1,
+            event: {
+              type: "pty.exit",
+              exitCode: 0,
+            },
+          }),
+        );
+        const forwardedExit = await forwardedExitPromise;
+
+        expect(forwardedExit.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedExit.data)).toEqual({
+          type: "stream.event",
+          streamId: clientStreamId,
+          event: {
+            type: "pty.exit",
+            exitCode: 0,
+          },
+        });
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "resets client PTY streams when a newer bootstrap peer replaces the current one",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const bootstrapTokenOne = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const bootstrapTokenTwo = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let firstBootstrapSocket: WebSocket | undefined;
+      let secondBootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        firstBootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapTokenOne)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const clientStreamId = 41;
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: clientStreamId,
+            channel: {
+              kind: "pty",
+              session: "create",
+              cols: 120,
+              rows: 40,
+            },
+          }),
+        );
+        await waitForWebSocketMessage(firstBootstrapSocket);
+
+        await sendWebSocketMessage(
+          firstBootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        await waitForWebSocketMessage(clientSocket);
+
+        const firstBootstrapClosedPromise = waitForWebSocketClose(firstBootstrapSocket);
+        const clientResetPromise = waitForWebSocketMessage(clientSocket);
+        secondBootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapTokenTwo)}`,
+        );
+        const firstBootstrapClosed = await firstBootstrapClosedPromise;
+        const clientReset = await clientResetPromise;
+
+        expect(firstBootstrapClosed.code).toBe(1012);
+        expect(firstBootstrapClosed.reason).toBe("Replaced by newer sandbox tunnel connection.");
+        expect(clientReset.isBinary).toBe(false);
+        expect(parseStreamMessage(clientReset.data)).toEqual({
+          type: "stream.reset",
+          streamId: clientStreamId,
+          code: "bootstrap_reconnected",
+          message: "Sandbox bootstrap tunnel reconnected and invalidated the active PTY stream.",
+        });
+
+        await Promise.all([
+          sendWebSocketPingAndExpectPong(
+            secondBootstrapSocket,
+            Buffer.from("new-bootstrap", "utf8"),
+          ),
+          sendWebSocketPingAndExpectPong(clientSocket, Buffer.from("client-still-open", "utf8")),
+        ]);
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(firstBootstrapSocket),
+          closeWebSocketIfOpen(secondBootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
 });
