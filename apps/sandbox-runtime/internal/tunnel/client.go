@@ -11,6 +11,7 @@ import (
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/httpclient"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/sessionprotocol"
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
+	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/telemetry"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -21,11 +22,12 @@ const bootstrapTokenQueryParam = "bootstrap_token"
 const tunnelTracerName = "@mistle/sandbox-runtime"
 
 type RunInput struct {
-	Context        context.Context
-	GatewayWSURL   string
-	BootstrapToken []byte
-	AgentRuntimes  []startup.AgentRuntime
-	RuntimeClients []startup.RuntimeClient
+	Context             context.Context
+	GatewayWSURL        string
+	BootstrapToken      []byte
+	TunnelExchangeToken string
+	AgentRuntimes       []startup.AgentRuntime
+	RuntimeClients      []startup.RuntimeClient
 }
 
 func parseGatewayURL(gatewayWSURL string) (*url.URL, error) {
@@ -76,9 +78,15 @@ func Run(input RunInput) error {
 		runSpan.SetStatus(codes.Error, err.Error())
 		return err
 	}
+	tunnelTokens, err := newTunnelTokens(bootstrapToken, input.TunnelExchangeToken)
+	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
+		return err
+	}
 
 	query := parsedGatewayURL.Query()
-	query.Set(bootstrapTokenQueryParam, bootstrapToken)
+	query.Set(bootstrapTokenQueryParam, tunnelTokens.CurrentBootstrapToken())
 	parsedGatewayURL.RawQuery = query.Encode()
 
 	connectContext, connectSpan := tracer.Start(runContext, "sandbox.tunnel.connect")
@@ -97,6 +105,24 @@ func Run(input RunInput) error {
 	connectSpan.End()
 	defer conn.CloseNow()
 
+	tokenExchangeContext, cancelTokenExchange := context.WithCancel(runContext)
+	defer cancelTokenExchange()
+
+	tokenExchangeErrCh := make(chan error, 1)
+	go func() {
+		tokenExchangeErr := runTunnelTokenExchangeLoop(tunnelTokenExchangeLoopInput{
+			Context:      tokenExchangeContext,
+			GatewayWSURL: input.GatewayWSURL,
+			HTTPClient: telemetry.NewHTTPClient(
+				httpclient.NewDirectClient(http.DefaultClient),
+			),
+			Tokens: tunnelTokens,
+		})
+		if tokenExchangeErr != nil {
+			tokenExchangeErrCh <- tokenExchangeErr
+		}
+	}()
+
 	var activePTYSession *ptySession
 	defer func() {
 		if activePTYSession == nil || activePTYSession.IsExited() {
@@ -111,6 +137,13 @@ func Run(input RunInput) error {
 		if err != nil {
 			if runContext.Err() != nil {
 				return nil
+			}
+			select {
+			case tokenExchangeErr := <-tokenExchangeErrCh:
+				runSpan.RecordError(tokenExchangeErr)
+				runSpan.SetStatus(codes.Error, tokenExchangeErr.Error())
+				return fmt.Errorf("sandbox tunnel token exchange failed: %w", tokenExchangeErr)
+			default:
 			}
 			runSpan.RecordError(err)
 			runSpan.SetStatus(codes.Error, err.Error())
