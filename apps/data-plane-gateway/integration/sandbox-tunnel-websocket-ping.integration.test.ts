@@ -6,6 +6,10 @@ import { randomUUID } from "node:crypto";
 
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
+import {
+  parseStreamControlMessage,
+  type StreamControlMessage,
+} from "@mistle/sandbox-session-protocol";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 import WebSocket from "ws";
@@ -21,6 +25,19 @@ import {
 } from "./websocket-test-helpers.js";
 
 const IntegrationTestTimeoutMs = 30_000;
+
+function parseStreamMessage(data: string | Buffer): StreamControlMessage {
+  if (typeof data !== "string") {
+    throw new Error("Expected websocket message data to be a string.");
+  }
+
+  const parsedPayload = parseStreamControlMessage(data);
+  if (parsedPayload === undefined) {
+    throw new Error("Expected websocket message payload to be a valid stream control message.");
+  }
+
+  return parsedPayload;
+}
 
 async function closeWebSocketIfOpen(socket: WebSocket | undefined): Promise<void> {
   if (socket === undefined) {
@@ -346,6 +363,113 @@ describe("sandbox tunnel websocket ping integration", () => {
           closeWebSocketIfOpen(bootstrapSocket),
           closeWebSocketIfOpen(firstClientSocket),
           closeWebSocketIfOpen(secondClientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "routes PTY control messages through gateway stream bindings and closes PTY streams on connection detach",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const clientStreamId = 41;
+        const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: clientStreamId,
+            channel: {
+              kind: "pty",
+              session: "create",
+              cols: 120,
+              rows: 40,
+            },
+          }),
+        );
+        const forwardedOpen = await forwardedOpenPromise;
+
+        expect(forwardedOpen.isBinary).toBe(false);
+        const forwardedOpenPayload = parseStreamMessage(forwardedOpen.data);
+        expect(forwardedOpenPayload).toEqual({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "pty",
+            session: "create",
+            cols: 120,
+            rows: 40,
+          },
+        });
+
+        const forwardedOpenOkPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        const forwardedOpenOk = await forwardedOpenOkPromise;
+
+        expect(forwardedOpenOk.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedOpenOk.data)).toEqual({
+          type: "stream.open.ok",
+          streamId: clientStreamId,
+        });
+
+        const forwardedClosePromise = waitForWebSocketMessage(bootstrapSocket);
+        await closeWebSocket(clientSocket);
+        clientSocket = undefined;
+
+        const forwardedClose = await forwardedClosePromise;
+        expect(forwardedClose.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedClose.data)).toEqual({
+          type: "stream.close",
+          streamId: 1,
+        });
+
+        await sendWebSocketPingAndExpectPong(
+          bootstrapSocket,
+          Buffer.from("bootstrap-still-open-after-pty", "utf8"),
+        );
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
         ]);
       }
     },

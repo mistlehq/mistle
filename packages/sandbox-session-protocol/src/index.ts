@@ -1,3 +1,3 @@
 export * from "./data-frame.js";
 export * from "./stream-protocol.js";
-export * from "./generated/types.js";
+export type { Disconnect, SandboxSessionControlMessage } from "./generated/types.js";

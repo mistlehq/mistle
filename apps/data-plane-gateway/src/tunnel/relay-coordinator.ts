@@ -134,19 +134,30 @@ export class TunnelRelayCoordinator {
   }
 
   public detachPeer(input: RelayTarget): void {
-    this.relayTransport.unregisterLocalPeer({
+    this.detachPeerWithOptions({
       target: input,
+      notifyOppositePeer: true,
+    });
+  }
+
+  public detachPeerWithOptions(input: { target: RelayTarget; notifyOppositePeer: boolean }): void {
+    this.relayTransport.unregisterLocalPeer({
+      target: input.target,
     });
 
-    const removed = this.peerRegistry.removePeer(input);
+    const removed = this.peerRegistry.removePeer(input.target);
     if (!removed) {
       return;
     }
 
-    if (input.side === "connection") {
+    if (input.target.side === "connection") {
+      if (!input.notifyOppositePeer) {
+        return;
+      }
+
       const opposite = this.peerRegistry.getPeer({
-        sandboxInstanceId: input.sandboxInstanceId,
-        side: getOppositeSide(input.side),
+        sandboxInstanceId: input.target.sandboxInstanceId,
+        side: getOppositeSide(input.target.side),
       });
       if (opposite !== undefined) {
         void this.relayTransport
@@ -162,8 +173,8 @@ export class TunnelRelayCoordinator {
     }
 
     const opposite = this.peerRegistry.getPeer({
-      sandboxInstanceId: input.sandboxInstanceId,
-      side: getOppositeSide(input.side),
+      sandboxInstanceId: input.target.sandboxInstanceId,
+      side: getOppositeSide(input.target.side),
     });
     if (opposite === undefined) {
       return;

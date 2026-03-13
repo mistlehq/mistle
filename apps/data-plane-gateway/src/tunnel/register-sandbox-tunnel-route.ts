@@ -9,6 +9,10 @@ import {
   type BootstrapTokenConfig,
   verifyBootstrapToken,
 } from "@mistle/gateway-tunnel-auth";
+import {
+  parseStreamControlMessage,
+  type StreamControlMessage,
+} from "@mistle/sandbox-session-protocol";
 import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 import type { WSMessageReceive } from "hono/ws";
 import { typeid } from "typeid-js";
@@ -31,6 +35,7 @@ import {
   markSandboxTunnelDisconnected,
   markSandboxTunnelSeen,
 } from "./tunnel-liveliness-store.js";
+import type { ClientStreamBinding, TunnelSessionRegistry } from "./tunnel-session/index.js";
 import type { RelayPeerSide, RelayTarget } from "./types.js";
 
 const SandboxTunnelRoutePath = "/tunnel/sandbox/:instanceId";
@@ -43,6 +48,7 @@ type RegisterSandboxTunnelRouteInput = {
   connectionTokenConfig: ConnectionTokenConfig;
   interactiveStreamRouter: InteractiveStreamRouter;
   relayCoordinator: TunnelRelayCoordinator;
+  tunnelSessionRegistry: TunnelSessionRegistry;
   sandboxOwnerStore: SandboxOwnerStore;
   sandboxOwnerResolver: SandboxOwnerResolver;
   sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat;
@@ -143,6 +149,167 @@ function toForwardPayload(data: WSMessageReceive): string | ArrayBuffer | undefi
 
 function toSourcePeerSide(tokenKind: TokenKind): RelayPeerSide {
   return tokenKind;
+}
+
+function parsePTYStreamOpen(payload: string) {
+  const message = parseStreamControlMessage(payload);
+  if (message?.type !== "stream.open" || message.channel.kind !== "pty") {
+    return undefined;
+  }
+
+  return message;
+}
+
+function replaceStreamId(input: { message: StreamControlMessage; streamId: number }): string {
+  return JSON.stringify({
+    ...input.message,
+    streamId: input.streamId,
+  });
+}
+
+function hasPTYExitEvent(message: StreamControlMessage): boolean {
+  return message.type === "stream.event" && message.event.type === "pty.exit";
+}
+
+function hasPTYResizeSignal(message: StreamControlMessage): boolean {
+  return message.type === "stream.signal" && message.signal.type === "pty.resize";
+}
+
+async function translateConnectionPayloadToBootstrap(input: {
+  clientSessionId: string;
+  interactiveStreamRouter: InteractiveStreamRouter;
+  payload: string;
+  sandboxInstanceId: string;
+}): Promise<string> {
+  const ptyStreamOpen = parsePTYStreamOpen(input.payload);
+  if (ptyStreamOpen !== undefined) {
+    const route = await input.interactiveStreamRouter.openInteractiveStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      channelKind: "pty",
+      clientSessionId: input.clientSessionId,
+      clientStreamId: ptyStreamOpen.streamId,
+    });
+
+    return replaceStreamId({
+      message: ptyStreamOpen,
+      streamId: route.binding.tunnelStreamId,
+    });
+  }
+
+  const controlMessage = parseStreamControlMessage(input.payload);
+  if (controlMessage === undefined) {
+    return input.payload;
+  }
+
+  const route = await input.interactiveStreamRouter.findInteractiveStreamByClient({
+    sandboxInstanceId: input.sandboxInstanceId,
+    clientSessionId: input.clientSessionId,
+    clientStreamId: controlMessage.streamId,
+  });
+  if (route === undefined || route.binding.channelKind !== "pty") {
+    return input.payload;
+  }
+
+  if (controlMessage.type === "stream.signal") {
+    if (!hasPTYResizeSignal(controlMessage)) {
+      return input.payload;
+    }
+
+    return replaceStreamId({
+      message: controlMessage,
+      streamId: route.binding.tunnelStreamId,
+    });
+  }
+
+  if (controlMessage.type === "stream.close") {
+    await input.interactiveStreamRouter.closeInteractiveStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      clientSessionId: route.binding.clientSessionId,
+      clientStreamId: route.binding.clientStreamId,
+    });
+
+    return replaceStreamId({
+      message: controlMessage,
+      streamId: route.binding.tunnelStreamId,
+    });
+  }
+
+  return input.payload;
+}
+
+async function translateBootstrapPayloadToConnection(input: {
+  interactiveStreamRouter: InteractiveStreamRouter;
+  payload: string;
+  sandboxInstanceId: string;
+}): Promise<string> {
+  const controlMessage = parseStreamControlMessage(input.payload);
+  if (controlMessage === undefined) {
+    return input.payload;
+  }
+
+  const route = await input.interactiveStreamRouter.findInteractiveStreamByTunnel({
+    sandboxInstanceId: input.sandboxInstanceId,
+    tunnelStreamId: controlMessage.streamId,
+  });
+  if (route === undefined || route.binding.channelKind !== "pty") {
+    return input.payload;
+  }
+
+  if (
+    controlMessage.type === "stream.open.error" ||
+    controlMessage.type === "stream.reset" ||
+    hasPTYExitEvent(controlMessage)
+  ) {
+    await input.interactiveStreamRouter.closeInteractiveStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      clientSessionId: route.binding.clientSessionId,
+      clientStreamId: route.binding.clientStreamId,
+    });
+  }
+
+  return replaceStreamId({
+    message: controlMessage,
+    streamId: route.binding.clientStreamId,
+  });
+}
+
+function createStreamClosePayload(binding: ClientStreamBinding): string {
+  return JSON.stringify({
+    type: "stream.close",
+    streamId: binding.tunnelStreamId,
+  });
+}
+
+async function handleTunnelWebSocketMessage(input: {
+  clientSessionId: string;
+  interactiveStreamRouter: InteractiveStreamRouter;
+  payload: string | ArrayBuffer;
+  relayCoordinator: TunnelRelayCoordinator;
+  sandboxInstanceId: string;
+  sourcePeerSide: RelayPeerSide;
+}): Promise<void> {
+  let routedPayload = input.payload;
+  if (typeof input.payload === "string") {
+    routedPayload =
+      input.sourcePeerSide === "connection"
+        ? await translateConnectionPayloadToBootstrap({
+            clientSessionId: input.clientSessionId,
+            interactiveStreamRouter: input.interactiveStreamRouter,
+            payload: input.payload,
+            sandboxInstanceId: input.sandboxInstanceId,
+          })
+        : await translateBootstrapPayloadToConnection({
+            interactiveStreamRouter: input.interactiveStreamRouter,
+            payload: input.payload,
+            sandboxInstanceId: input.sandboxInstanceId,
+          });
+  }
+
+  await input.relayCoordinator.forwardPeerMessage({
+    sandboxInstanceId: input.sandboxInstanceId,
+    fromSide: input.sourcePeerSide,
+    payload: routedPayload,
+  });
 }
 
 function normalizeError(error: unknown): Error {
@@ -438,6 +605,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             });
 
             if (requestedToken.kind === "bootstrap") {
+              input.tunnelSessionRegistry.attachBootstrapSession(relayTarget);
               void markSandboxTunnelConnected({
                 db: ctx.get("db"),
                 sandboxInstanceId,
@@ -515,31 +683,32 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               return;
             }
 
-            void input.relayCoordinator
-              .forwardPeerMessage({
-                sandboxInstanceId,
-                fromSide: sourcePeerSide,
-                payload,
-              })
-              .catch((error: unknown) => {
-                recordTunnelSessionError({
-                  tunnelSessionSpan,
-                  error,
-                  statusMessage: "Failed forwarding websocket message to tunnel peer.",
-                });
-                logger.error(
-                  {
-                    err: error,
-                    instanceId: sandboxInstanceId,
-                    sourceTokenKind: requestedToken.kind,
-                  },
-                  "Failed forwarding sandbox tunnel websocket message to peer",
-                );
-                ws.close(
-                  CloseCodes.INTERNAL_ERROR,
-                  "Failed forwarding websocket message to tunnel peer.",
-                );
+            void handleTunnelWebSocketMessage({
+              clientSessionId: relaySessionId,
+              interactiveStreamRouter: input.interactiveStreamRouter,
+              payload,
+              relayCoordinator: input.relayCoordinator,
+              sandboxInstanceId,
+              sourcePeerSide,
+            }).catch((error: unknown) => {
+              recordTunnelSessionError({
+                tunnelSessionSpan,
+                error,
+                statusMessage: "Failed handling sandbox tunnel websocket message.",
               });
+              logger.error(
+                {
+                  err: error,
+                  instanceId: sandboxInstanceId,
+                  sourceTokenKind: requestedToken.kind,
+                },
+                "Failed handling sandbox tunnel websocket message",
+              );
+              ws.close(
+                CloseCodes.INTERNAL_ERROR,
+                "Failed handling sandbox tunnel websocket message.",
+              );
+            });
           },
           onClose: (event) => {
             sandboxOwnerLeaseHeartbeatHandle?.stop();
@@ -562,7 +731,44 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               });
             }
             if (relayTarget !== undefined) {
-              input.relayCoordinator.detachPeer(relayTarget);
+              let suppressOppositePeerNotification = false;
+              if (requestedToken.kind === "bootstrap") {
+                input.tunnelSessionRegistry.detachBootstrapSession(relayTarget);
+              } else {
+                const releasedBindings = input.tunnelSessionRegistry.releaseClientSessionBindings({
+                  sandboxInstanceId,
+                  clientSessionId: relaySessionId,
+                });
+                const ptyBindings = releasedBindings.filter(
+                  (binding: ClientStreamBinding) => binding.channelKind === "pty",
+                );
+                suppressOppositePeerNotification = ptyBindings.length > 0;
+
+                if (ptyBindings.length > 0) {
+                  void Promise.all(
+                    ptyBindings.map((binding: ClientStreamBinding) =>
+                      input.relayCoordinator.forwardPeerMessage({
+                        sandboxInstanceId,
+                        fromSide: sourcePeerSide,
+                        payload: createStreamClosePayload(binding),
+                      }),
+                    ),
+                  ).catch((error: unknown) => {
+                    logger.error(
+                      {
+                        err: error,
+                        sandboxInstanceId,
+                      },
+                      "Failed forwarding PTY stream.close during connection detach",
+                    );
+                  });
+                }
+              }
+
+              input.relayCoordinator.detachPeerWithOptions({
+                target: relayTarget,
+                notifyOppositePeer: !suppressOppositePeerNotification,
+              });
             }
             finalizeTunnelSession({
               closeCode: event.code,
