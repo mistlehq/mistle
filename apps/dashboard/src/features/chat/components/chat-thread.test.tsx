@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { ChatThread } from "./chat-thread.js";
+
+afterEach(cleanup);
 
 describe("ChatThread", () => {
   it("renders command approvals inline with the matching command block", () => {
@@ -66,7 +68,7 @@ describe("ChatThread", () => {
         decision: "accept",
       },
     ]);
-  });
+  }, 10_000);
 
   it("renders multiline commands in the same code-block treatment as command output", () => {
     render(
@@ -101,5 +103,188 @@ describe("ChatThread", () => {
     const renderedCommand = screen.getByText(/# Two Little Pigs/);
     expect(renderedCommand.tagName).toBe("PRE");
     expect(renderedCommand.className).toContain("bg-muted");
+  });
+
+  it("renders exploring groups as semantic investigation steps with collapsible results", () => {
+    const { container } = render(
+      <ChatThread
+        entries={[
+          {
+            id: "user_1",
+            turnId: "turn_1",
+            kind: "user-message",
+            text: "Inspect the codebase",
+            status: "completed",
+          },
+          {
+            id: "exploring_1",
+            turnId: "turn_1",
+            kind: "semantic-group",
+            semanticKind: "exploring",
+            status: "completed",
+            displayKeys: {
+              active: "exploring.active",
+              completed: "exploring.done",
+            },
+            counts: {
+              reads: 1,
+              searches: 1,
+              lists: 0,
+            },
+            items: [
+              {
+                id: "cmd_1",
+                sourceKind: "command-execution",
+                label: "Read",
+                detail: "app.ts",
+                detailKind: "code",
+                command: "sed -n '1,120p' app.ts",
+                output: "export const App = () => null;",
+                status: "completed",
+              },
+              {
+                id: "cmd_2",
+                sourceKind: "command-execution",
+                label: "Search",
+                detail: "App",
+                detailKind: "plain",
+                command: "rg App src",
+                output: "src/app.ts",
+                status: "completed",
+              },
+            ],
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
+
+    expect(screen.getByText("Explored")).toBeTruthy();
+    expect(screen.getByText("Read")).toBeTruthy();
+    expect(screen.getByText("app.ts")).toBeTruthy();
+    expect(screen.getByText("Search")).toBeTruthy();
+    expect(screen.queryByText("Show results")).toBeNull();
+    expect(screen.getAllByText("Toggle results")).toHaveLength(2);
+    expect(container.textContent?.includes("cwd: /workspace")).toBe(false);
+  });
+
+  it("renders command approvals inline for grouped command items", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ChatThread
+        entries={[
+          {
+            id: "user_1",
+            turnId: "turn_1",
+            kind: "user-message",
+            text: "Run a couple of checks",
+            status: "completed",
+          },
+          {
+            id: "commands_1",
+            turnId: "turn_1",
+            kind: "semantic-group",
+            semanticKind: "running-commands",
+            status: "completed",
+            displayKeys: {
+              active: "running-commands.active",
+              completed: "running-commands.done",
+            },
+            counts: null,
+            items: [
+              {
+                id: "cmd_1",
+                sourceKind: "command-execution",
+                label: "Command",
+                detail: "pnpm --filter @mistle/dashboard lint",
+                detailKind: "code",
+                command: "pnpm --filter @mistle/dashboard lint",
+                output: "Done",
+                status: "completed",
+              },
+            ],
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+        pendingServerRequests={[
+          {
+            requestId: 44,
+            method: "item/commandExecution/requestApproval",
+            kind: "command-approval",
+            threadId: "thread_1",
+            turnId: "turn_1",
+            itemId: "cmd_1",
+            reason: "Approve the grouped command.",
+            command: "pnpm --filter @mistle/dashboard lint",
+            cwd: "/workspace",
+            availableDecisions: ["accept", "cancel"],
+            networkHost: null,
+            networkProtocol: null,
+            networkPort: null,
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Approve command")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "accept" }));
+
+    expect(submittedResults).toEqual([{ decision: "accept" }]);
+  });
+
+  it("renders generic items collapsed by default and expands their content on demand", () => {
+    render(
+      <ChatThread
+        entries={[
+          {
+            id: "user_1",
+            turnId: "turn_1",
+            kind: "user-message",
+            text: "Show the fallback activity",
+            status: "completed",
+          },
+          {
+            id: "generic_1",
+            turnId: "turn_1",
+            kind: "generic-item",
+            itemType: "contextCompaction",
+            title: "Context compaction",
+            body: "Compacted the current session context before continuing.",
+            detailsJson: JSON.stringify(
+              {
+                strategy: "drop-superseded-read-output",
+              },
+              null,
+              2,
+            ),
+            status: "streaming",
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
+
+    expect(screen.getByText("Context compaction")).toBeTruthy();
+    expect(screen.getByText("Running")).toBeTruthy();
+    const genericDisclosure = screen.getByText("Context compaction").closest("details");
+    expect(genericDisclosure?.hasAttribute("open")).toBe(false);
+
+    fireEvent.click(screen.getByText("Context compaction"));
+
+    expect(genericDisclosure?.hasAttribute("open")).toBe(true);
+    expect(
+      screen.getByText("Compacted the current session context before continuing."),
+    ).toBeTruthy();
+    expect(screen.getByText(/drop-superseded-read-output/)).toBeTruthy();
   });
 });

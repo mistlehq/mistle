@@ -232,18 +232,429 @@ describe("reduceCodexChatState", () => {
         status: "completed",
       },
       {
-        id: "cmd_1",
+        id: "turn_123:running-commands:cmd_1",
         turnId: "turn_123",
-        kind: "command-execution",
-        command: "ls -la",
-        output: "file-a\nfile-b",
-        cwd: "/workspace",
-        exitCode: 0,
-        commandStatus: "completed",
-        reason: "Inspect repository contents",
+        kind: "semantic-group",
+        semanticKind: "running-commands",
         status: "completed",
+        displayKeys: {
+          active: "running-commands.active",
+          completed: "running-commands.done",
+        },
+        counts: null,
+        items: [
+          {
+            id: "cmd_1",
+            sourceKind: "command-execution",
+            label: "Command",
+            detail: "ls -la",
+            detailKind: "code",
+            command: "ls -la",
+            output: "file-a\nfile-b",
+            status: "completed",
+          },
+        ],
       },
     ]);
+  });
+
+  it("groups adjacent exploring command executions into one exploring chat block", () => {
+    const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_001",
+          status: "completed",
+          items: [
+            {
+              type: "userMessage",
+              id: "user_1",
+              content: [
+                {
+                  type: "text",
+                  text: "Inspect the codebase",
+                },
+              ],
+            },
+            {
+              type: "commandExecution",
+              id: "cmd_1",
+              command: "sed -n '1,120p' app.ts",
+              aggregatedOutput: "export const App = () => null;",
+              cwd: "/workspace",
+              exitCode: 0,
+              status: "completed",
+              commandActions: [
+                {
+                  type: "read",
+                  command: "sed -n '1,120p' app.ts",
+                  name: "app.ts",
+                  path: "app.ts",
+                },
+              ],
+            },
+            {
+              type: "commandExecution",
+              id: "cmd_2",
+              command: "rg App src",
+              aggregatedOutput: "src/app.ts",
+              cwd: "/workspace",
+              exitCode: 0,
+              status: "completed",
+              commandActions: [
+                {
+                  type: "search",
+                  command: "rg App src",
+                  query: "App",
+                  path: "src",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(hydrated.entries).toEqual([
+      {
+        id: "user_1",
+        turnId: "turn_001",
+        kind: "user-message",
+        text: "Inspect the codebase",
+        status: "completed",
+      },
+      {
+        id: "turn_001:exploring:cmd_1",
+        turnId: "turn_001",
+        kind: "semantic-group",
+        semanticKind: "exploring",
+        status: "completed",
+        displayKeys: {
+          active: "exploring.active",
+          completed: "exploring.done",
+        },
+        counts: {
+          reads: 1,
+          searches: 1,
+          lists: 0,
+        },
+        items: [
+          {
+            id: "cmd_1",
+            sourceKind: "command-execution",
+            label: "Read",
+            detail: "app.ts",
+            detailKind: "code",
+            command: "sed -n '1,120p' app.ts",
+            output: "export const App = () => null;",
+            status: "completed",
+          },
+          {
+            id: "cmd_2",
+            sourceKind: "command-execution",
+            label: "Search",
+            detail: "App",
+            detailKind: "plain",
+            command: "rg App src",
+            output: "src/app.ts",
+            status: "completed",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("groups adjacent reasoning items into one thinking chat block", () => {
+    const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_002",
+          status: "completed",
+          items: [
+            {
+              type: "userMessage",
+              id: "user_2",
+              content: [
+                {
+                  type: "text",
+                  text: "Explain what changed",
+                },
+              ],
+            },
+            {
+              type: "reasoning",
+              id: "reasoning_1",
+              summary: [{ type: "text", text: "Inspecting reducer behavior" }],
+              content: [],
+              status: "completed",
+            },
+            {
+              type: "reasoning",
+              id: "reasoning_2",
+              summary: [],
+              content: [{ type: "text", text: "Comparing grouped output to raw item order" }],
+              status: "completed",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(hydrated.entries).toEqual([
+      {
+        id: "user_2",
+        turnId: "turn_002",
+        kind: "user-message",
+        text: "Explain what changed",
+        status: "completed",
+      },
+      {
+        id: "turn_002:thinking:reasoning_1",
+        turnId: "turn_002",
+        kind: "semantic-group",
+        semanticKind: "thinking",
+        status: "completed",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
+        counts: null,
+        items: [
+          {
+            id: "reasoning_1",
+            sourceKind: "reasoning",
+            label: "Thought",
+            detail: "Inspecting reducer behavior",
+            detailKind: "plain",
+            command: null,
+            output: null,
+            status: "completed",
+          },
+          {
+            id: "reasoning_2:content",
+            sourceKind: "reasoning",
+            label: "Thought",
+            detail: "Comparing grouped output to raw item order",
+            detailKind: "plain",
+            command: null,
+            output: null,
+            status: "completed",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("rebuilds the same exploring chat-entry shape from hydration and live notifications", () => {
+    const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_003",
+          status: "completed",
+          items: [
+            {
+              type: "commandExecution",
+              id: "cmd_1",
+              command: "sed -n '1,80p' app.ts",
+              aggregatedOutput: "export const App = () => null;",
+              cwd: "/workspace",
+              exitCode: 0,
+              status: "completed",
+              commandActions: [
+                {
+                  type: "read",
+                  command: "sed -n '1,80p' app.ts",
+                  name: "app.ts",
+                  path: "app.ts",
+                },
+              ],
+            },
+            {
+              type: "commandExecution",
+              id: "cmd_2",
+              command: "rg App src",
+              aggregatedOutput: "src/app.ts",
+              cwd: "/workspace",
+              exitCode: 0,
+              status: "completed",
+              commandActions: [
+                {
+                  type: "search",
+                  command: "rg App src",
+                  query: "App",
+                  path: "src",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+
+    const live = reduceCodexChatState(
+      reduceCodexChatState(
+        reduceCodexChatState(createInitialCodexChatState(), {
+          type: "notification_received",
+          notification: {
+            method: "turn/started",
+            params: {
+              turn: {
+                id: "turn_003",
+                status: "inProgress",
+              },
+            },
+          },
+        }),
+        {
+          type: "notification_received",
+          notification: {
+            method: "item/completed",
+            params: {
+              turnId: "turn_003",
+              item: {
+                type: "commandExecution",
+                id: "cmd_1",
+                command: "sed -n '1,80p' app.ts",
+                aggregatedOutput: "export const App = () => null;",
+                cwd: "/workspace",
+                exitCode: 0,
+                status: "completed",
+                commandActions: [
+                  {
+                    type: "read",
+                    command: "sed -n '1,80p' app.ts",
+                    name: "app.ts",
+                    path: "app.ts",
+                  },
+                ],
+              },
+            },
+          },
+        },
+      ),
+      {
+        type: "notification_received",
+        notification: {
+          method: "item/completed",
+          params: {
+            turnId: "turn_003",
+            item: {
+              type: "commandExecution",
+              id: "cmd_2",
+              command: "rg App src",
+              aggregatedOutput: "src/app.ts",
+              cwd: "/workspace",
+              exitCode: 0,
+              status: "completed",
+              commandActions: [
+                {
+                  type: "search",
+                  command: "rg App src",
+                  query: "App",
+                  path: "src",
+                },
+              ],
+            },
+          },
+        },
+      },
+    );
+
+    expect(live.entries).toEqual(hydrated.entries);
+  });
+
+  it("rebuilds the same thinking and standalone plan shape from hydration and live notifications", () => {
+    const hydrated = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_004",
+          status: "completed",
+          items: [
+            {
+              type: "reasoning",
+              id: "reasoning_1",
+              summary: [{ type: "text", text: "Inspect files" }],
+              content: [{ type: "text", text: "Detailed chain" }],
+              status: "completed",
+            },
+            {
+              type: "plan",
+              id: "plan_1",
+              text: "1. Inspect files",
+              status: "completed",
+            },
+          ],
+        },
+      ],
+    });
+
+    const live = reduceCodexChatState(
+      reduceCodexChatState(
+        reduceCodexChatState(
+          reduceCodexChatState(createInitialCodexChatState(), {
+            type: "notification_received",
+            notification: {
+              method: "turn/started",
+              params: {
+                turn: {
+                  id: "turn_004",
+                  status: "inProgress",
+                },
+              },
+            },
+          }),
+          {
+            type: "notification_received",
+            notification: {
+              method: "item/completed",
+              params: {
+                turnId: "turn_004",
+                item: {
+                  type: "reasoning",
+                  id: "reasoning_1",
+                  summary: [{ type: "text", text: "Inspect files" }],
+                  content: [{ type: "text", text: "Detailed chain" }],
+                  status: "completed",
+                },
+              },
+            },
+          },
+        ),
+        {
+          type: "notification_received",
+          notification: {
+            method: "item/completed",
+            params: {
+              turnId: "turn_004",
+              item: {
+                type: "plan",
+                id: "plan_1",
+                text: "1. Inspect files",
+                status: "completed",
+              },
+            },
+          },
+        },
+      ),
+      {
+        type: "notification_received",
+        notification: {
+          method: "turn/completed",
+          params: {
+            turn: {
+              id: "turn_004",
+              status: "completed",
+              error: null,
+            },
+          },
+        },
+      },
+    );
+
+    expect(live.entries).toEqual(hydrated.entries);
   });
 
   it("updates completion status from turn/completed", () => {
@@ -500,24 +911,52 @@ describe("reduceCodexChatState", () => {
         status: "completed",
       },
       {
-        id: "reasoning_1",
+        id: "turn_001:thinking:reasoning_1",
         turnId: "turn_001",
-        kind: "reasoning",
-        summary: "**Preparing file list command**",
-        source: "summary",
+        kind: "semantic-group",
+        semanticKind: "thinking",
         status: "completed",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
+        counts: null,
+        items: [
+          {
+            id: "reasoning_1",
+            sourceKind: "reasoning",
+            label: "Thought",
+            detail: "**Preparing file list command**",
+            detailKind: "plain",
+            command: null,
+            output: null,
+            status: "completed",
+          },
+        ],
       },
       {
-        id: "cmd_1",
+        id: "turn_001:running-commands:cmd_1",
         turnId: "turn_001",
-        kind: "command-execution",
-        command: "pwd",
-        output: "/workspace",
-        cwd: "/workspace",
-        exitCode: 0,
-        commandStatus: "completed",
-        reason: null,
+        kind: "semantic-group",
+        semanticKind: "running-commands",
         status: "completed",
+        displayKeys: {
+          active: "running-commands.active",
+          completed: "running-commands.done",
+        },
+        counts: null,
+        items: [
+          {
+            id: "cmd_1",
+            sourceKind: "command-execution",
+            label: "Command",
+            detail: "pwd",
+            detailKind: "code",
+            command: "pwd",
+            output: "/workspace",
+            status: "completed",
+          },
+        ],
       },
       {
         id: "assistant_1",
@@ -598,26 +1037,112 @@ describe("reduceCodexChatState", () => {
 
     expect(updated.entries).toEqual([
       {
-        id: "reasoning_1",
+        id: "turn_123:thinking:reasoning_1",
         turnId: "turn_123",
-        kind: "reasoning",
-        summary: "Inspect files\n\n",
-        source: "summary",
+        kind: "semantic-group",
+        semanticKind: "thinking",
         status: "streaming",
-      },
-      {
-        id: "reasoning_1:content",
-        turnId: "turn_123",
-        kind: "reasoning",
-        summary: "Detailed chain",
-        source: "content",
-        status: "streaming",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
+        counts: null,
+        items: [
+          {
+            id: "reasoning_1",
+            sourceKind: "reasoning",
+            label: "Thought",
+            detail: "Inspect files",
+            detailKind: "plain",
+            command: null,
+            output: null,
+            status: "streaming",
+          },
+          {
+            id: "reasoning_1:content",
+            sourceKind: "reasoning",
+            label: "Thought",
+            detail: "Detailed chain",
+            detailKind: "plain",
+            command: null,
+            output: null,
+            status: "streaming",
+          },
+        ],
       },
       {
         id: "plan_1",
         turnId: "turn_123",
         kind: "plan",
         text: "1. Inspect files",
+        explanation: null,
+        steps: null,
+        status: "streaming",
+      },
+    ]);
+  });
+
+  it("renders structured plan updates from turn/plan/updated as a standalone checklist entry", () => {
+    const started = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "notification_received",
+      notification: {
+        method: "turn/started",
+        params: {
+          turn: {
+            id: "turn_300",
+            status: "inProgress",
+          },
+        },
+      },
+    });
+
+    const updated = reduceCodexChatState(started, {
+      type: "notification_received",
+      notification: {
+        method: "turn/plan/updated",
+        params: {
+          threadId: "thread_1",
+          turnId: "turn_300",
+          explanation: "Refining rollout sequence",
+          plan: [
+            {
+              step: "Audit coverage",
+              status: "completed",
+            },
+            {
+              step: "Add parity tests",
+              status: "inProgress",
+            },
+            {
+              step: "Polish Storybook",
+              status: "pending",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(updated.entries).toEqual([
+      {
+        id: "turn_300:plan-snapshot",
+        turnId: "turn_300",
+        kind: "plan",
+        text: null,
+        explanation: "Refining rollout sequence",
+        steps: [
+          {
+            step: "Audit coverage",
+            status: "completed",
+          },
+          {
+            step: "Add parity tests",
+            status: "inProgress",
+          },
+          {
+            step: "Polish Storybook",
+            status: "pending",
+          },
+        ],
         status: "streaming",
       },
     ]);
@@ -678,36 +1203,295 @@ describe("reduceCodexChatState", () => {
 
     expect(withFileChange.entries).toEqual([
       {
-        id: "cmd_1",
+        id: "turn_123:running-commands:cmd_1",
         turnId: "turn_123",
-        kind: "command-execution",
-        command: "ls -la",
-        output: "file-a\n",
-        cwd: "/workspace",
-        exitCode: null,
-        commandStatus: "in_progress",
-        reason: "Inspect repository",
+        kind: "semantic-group",
+        semanticKind: "running-commands",
         status: "streaming",
-      },
-      {
-        id: "file_1",
-        turnId: "turn_123",
-        kind: "file-change",
-        changes: [
+        displayKeys: {
+          active: "running-commands.active",
+          completed: "running-commands.done",
+        },
+        counts: null,
+        items: [
           {
-            path: "src/app.ts",
-            kind: "update",
-            diff: "@@ -1 +1 @@",
+            id: "cmd_1",
+            sourceKind: "command-execution",
+            label: "Command",
+            detail: "ls -la",
+            detailKind: "code",
+            command: "ls -la",
+            output: "file-a\n",
+            status: "streaming",
           },
         ],
-        output: "Applied patch",
-        fileChangeStatus: "completed",
+      },
+      {
+        id: "turn_123:making-edits:file_1",
+        turnId: "turn_123",
+        kind: "semantic-group",
+        semanticKind: "making-edits",
+        status: "completed",
+        displayKeys: {
+          active: "making-edits.active",
+          completed: "making-edits.done",
+        },
+        counts: null,
+        items: [
+          {
+            id: "file_1",
+            sourceKind: "file-change",
+            label: "Updated",
+            detail: "src/app.ts",
+            detailKind: "code",
+            command: null,
+            output: "@@ -1 +1 @@",
+            status: "completed",
+          },
+        ],
+      },
+    ]);
+  });
+
+  it("prefers per-file diffs over aggregated status output for grouped file changes", () => {
+    const state = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_123",
+          status: "completed",
+          items: [
+            {
+              type: "fileChange",
+              id: "file_1",
+              changes: [
+                {
+                  path: "src/app.ts",
+                  kind: "update",
+                  diff: "@@ -1 +1 @@",
+                },
+              ],
+              output: "Applied patch",
+              status: "completed",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(state.entries).toContainEqual({
+      id: "turn_123:making-edits:file_1",
+      turnId: "turn_123",
+      kind: "semantic-group",
+      semanticKind: "making-edits",
+      status: "completed",
+      displayKeys: {
+        active: "making-edits.active",
+        completed: "making-edits.done",
+      },
+      counts: null,
+      items: [
+        {
+          id: "file_1",
+          sourceKind: "file-change",
+          label: "Updated",
+          detail: "src/app.ts",
+          detailKind: "code",
+          command: null,
+          output: "@@ -1 +1 @@",
+          status: "completed",
+        },
+      ],
+    });
+  });
+
+  it("keeps raw plan items and turn plan snapshots as separate transcript entries", () => {
+    const state = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_400",
+          status: "completed",
+          items: [
+            {
+              type: "plan",
+              id: "plan_400",
+              text: "1. Inspect reducer",
+              status: "completed",
+            },
+          ],
+        },
+      ],
+    });
+
+    const updated = reduceCodexChatState(state, {
+      type: "notification_received",
+      notification: {
+        method: "turn/plan/updated",
+        params: {
+          threadId: "thread_1",
+          turnId: "turn_400",
+          explanation: "Refining rollout sequence",
+          plan: [
+            {
+              step: "Inspect reducer",
+              status: "completed",
+            },
+            {
+              step: "Patch reducer",
+              status: "inProgress",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(updated.entries).toEqual([
+      {
+        id: "plan_400",
+        turnId: "turn_400",
+        kind: "plan",
+        text: "1. Inspect reducer",
+        explanation: null,
+        steps: null,
+        status: "completed",
+      },
+      {
+        id: "turn_400:plan-snapshot",
+        turnId: "turn_400",
+        kind: "plan",
+        text: null,
+        explanation: "Refining rollout sequence",
+        steps: [
+          {
+            step: "Inspect reducer",
+            status: "completed",
+          },
+          {
+            step: "Patch reducer",
+            status: "inProgress",
+          },
+        ],
         status: "completed",
       },
     ]);
   });
 
-  it("surfaces generic completed items for unsupported transcript item types", () => {
+  it("preserves the semantic group id when live deltas update a later grouped item", () => {
+    const started = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "notification_received",
+      notification: {
+        method: "turn/started",
+        params: {
+          turn: {
+            id: "turn_200",
+            status: "inProgress",
+          },
+        },
+      },
+    });
+
+    const withFirstItem = reduceCodexChatState(started, {
+      type: "notification_received",
+      notification: {
+        method: "item/completed",
+        params: {
+          turnId: "turn_200",
+          item: {
+            type: "commandExecution",
+            id: "cmd_1",
+            command: "sed -n '1,40p' app.ts",
+            aggregatedOutput: "export const App = () => null;",
+            cwd: "/workspace",
+            exitCode: 0,
+            status: "completed",
+            commandActions: [
+              {
+                type: "read",
+                command: "sed -n '1,40p' app.ts",
+                name: "app.ts",
+                path: "app.ts",
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const withSecondItemStarted = reduceCodexChatState(withFirstItem, {
+      type: "notification_received",
+      notification: {
+        method: "item/started",
+        params: {
+          turnId: "turn_200",
+          item: {
+            type: "commandExecution",
+            id: "cmd_2",
+            command: "rg App src",
+            cwd: "/workspace",
+            status: "inProgress",
+            commandActions: [
+              {
+                type: "search",
+                command: "rg App src",
+                query: "App",
+                path: "src",
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const initialGroup = withSecondItemStarted.entries[0];
+    if (initialGroup === undefined || initialGroup.kind !== "semantic-group") {
+      throw new Error("Expected an exploring semantic group.");
+    }
+
+    const withSecondItemDelta = reduceCodexChatState(withSecondItemStarted, {
+      type: "notification_received",
+      notification: {
+        method: "item/commandExecution/outputDelta",
+        params: {
+          turnId: "turn_200",
+          itemId: "cmd_2",
+          delta: "src/app.ts\n",
+        },
+      },
+    });
+
+    const updatedGroup = withSecondItemDelta.entries[0];
+    if (updatedGroup === undefined || updatedGroup.kind !== "semantic-group") {
+      throw new Error("Expected an exploring semantic group after delta.");
+    }
+
+    expect(initialGroup.id).toBe("turn_200:exploring:cmd_1");
+    expect(updatedGroup.id).toBe(initialGroup.id);
+    expect(updatedGroup.items).toEqual([
+      {
+        id: "cmd_1",
+        sourceKind: "command-execution",
+        label: "Read",
+        detail: "app.ts",
+        detailKind: "code",
+        command: "sed -n '1,40p' app.ts",
+        output: "export const App = () => null;",
+        status: "completed",
+      },
+      {
+        id: "cmd_2",
+        sourceKind: "command-execution",
+        label: "Search",
+        detail: "App",
+        detailKind: "plain",
+        command: "rg App src",
+        output: "src/app.ts\n",
+        status: "streaming",
+      },
+    ]);
+  });
+
+  it("surfaces generic completed items for unsupported chat item types", () => {
     const state = reduceCodexChatState(createInitialCodexChatState(), {
       type: "notification_received",
       notification: {
@@ -726,28 +1510,42 @@ describe("reduceCodexChatState", () => {
 
     expect(state.entries).toEqual([
       {
-        id: "tool_1",
+        id: "turn_123:tool-call:tool_1",
         turnId: "turn_123",
-        kind: "generic-item",
-        itemType: "dynamicToolCall",
-        title: "Dynamic Tool Call",
-        body: "custom_tool",
-        detailsJson: JSON.stringify(
+        kind: "semantic-group",
+        semanticKind: "tool-call",
+        status: "completed",
+        displayKeys: {
+          active: "tool-call.active",
+          completed: "tool-call.done",
+        },
+        counts: null,
+        items: [
           {
-            type: "dynamicToolCall",
             id: "tool_1",
-            name: "custom_tool",
+            sourceKind: "tool-call",
+            label: "dynamic",
+            detail: "dynamic",
+            detailKind: "plain",
+            command: null,
+            output: JSON.stringify(
+              {
+                type: "dynamicToolCall",
+                id: "tool_1",
+                name: "custom_tool",
+                status: "completed",
+              },
+              null,
+              2,
+            ),
             status: "completed",
           },
-          null,
-          2,
-        ),
-        status: "completed",
+        ],
       },
     ]);
   });
 
-  it("does not surface raw userMessage items as generic transcript entries", () => {
+  it("does not surface raw userMessage items as generic chat entries", () => {
     const state = reduceCodexChatState(createInitialCodexChatState(), {
       type: "notification_received",
       notification: {
@@ -771,7 +1569,7 @@ describe("reduceCodexChatState", () => {
     expect(state.entries).toEqual([]);
   });
 
-  it("preserves empty reasoning content arrays in state so rendering can suppress them", () => {
+  it("omits empty reasoning content arrays from chat-entry state", () => {
     const state = reduceCodexChatState(createInitialCodexChatState(), {
       type: "notification_received",
       notification: {
@@ -790,20 +1588,28 @@ describe("reduceCodexChatState", () => {
 
     expect(state.entries).toEqual([
       {
-        id: "reasoning_1",
+        id: "turn_123:thinking:reasoning_1",
         turnId: "turn_123",
-        kind: "reasoning",
-        summary: "**Creating concise fantasy story**",
-        source: "summary",
+        kind: "semantic-group",
+        semanticKind: "thinking",
         status: "completed",
-      },
-      {
-        id: "reasoning_1:content",
-        turnId: "turn_123",
-        kind: "reasoning",
-        summary: "[]",
-        source: "content",
-        status: "completed",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
+        counts: null,
+        items: [
+          {
+            id: "reasoning_1",
+            sourceKind: "reasoning",
+            label: "Thought",
+            detail: "**Creating concise fantasy story**",
+            detailKind: "plain",
+            command: null,
+            output: null,
+            status: "completed",
+          },
+        ],
       },
     ]);
   });
@@ -832,20 +1638,28 @@ describe("reduceCodexChatState", () => {
 
     expect(state.entries).toEqual([
       {
-        id: "reasoning_1",
+        id: "turn_123:thinking:reasoning_1",
         turnId: "turn_123",
-        kind: "reasoning",
-        summary: "**Creating concise fantasy story**",
-        source: "summary",
+        kind: "semantic-group",
+        semanticKind: "thinking",
         status: "completed",
-      },
-      {
-        id: "reasoning_1:content",
-        turnId: "turn_123",
-        kind: "reasoning",
-        summary: "[]",
-        source: "content",
-        status: "completed",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
+        counts: null,
+        items: [
+          {
+            id: "reasoning_1",
+            sourceKind: "reasoning",
+            label: "Thought",
+            detail: "**Creating concise fantasy story**",
+            detailKind: "plain",
+            command: null,
+            output: null,
+            status: "completed",
+          },
+        ],
       },
     ]);
   });
@@ -876,20 +1690,28 @@ describe("reduceCodexChatState", () => {
 
     expect(state.entries).toEqual([
       {
-        id: "reasoning_1",
+        id: "turn_123:thinking:reasoning_1",
         turnId: "turn_123",
-        kind: "reasoning",
-        summary: "**Creating concise fantasy story**",
-        source: "summary",
+        kind: "semantic-group",
+        semanticKind: "thinking",
         status: "completed",
-      },
-      {
-        id: "reasoning_1:content",
-        turnId: "turn_123",
-        kind: "reasoning",
-        summary: "[]",
-        source: "content",
-        status: "completed",
+        displayKeys: {
+          active: "thinking.active",
+          completed: "thinking.done",
+        },
+        counts: null,
+        items: [
+          {
+            id: "reasoning_1",
+            sourceKind: "reasoning",
+            label: "Thought",
+            detail: "**Creating concise fantasy story**",
+            detailKind: "plain",
+            command: null,
+            output: null,
+            status: "completed",
+          },
+        ],
       },
     ]);
   });

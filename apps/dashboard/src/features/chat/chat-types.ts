@@ -41,7 +41,14 @@ export type ChatPlanEntry = {
   id: string;
   turnId: string;
   kind: "plan";
-  text: string;
+  text: string | null;
+  explanation: string | null;
+  steps:
+    | readonly {
+        step: string;
+        status: "pending" | "inProgress" | "completed";
+      }[]
+    | null;
   status: "streaming" | "completed";
 };
 
@@ -70,6 +77,43 @@ export type ChatGenericItemEntry = {
   status: "streaming" | "completed";
 };
 
+export type ChatSemanticGroupKind =
+  | "exploring"
+  | "running-commands"
+  | "making-edits"
+  | "thinking"
+  | "searching-web"
+  | "tool-call";
+
+export type ChatSemanticGroupDetailKind = "plain" | "code";
+
+export type ChatSemanticGroupEntry = {
+  id: string;
+  turnId: string;
+  kind: "semantic-group";
+  semanticKind: ChatSemanticGroupKind;
+  status: "streaming" | "completed";
+  displayKeys: {
+    active: string | null;
+    completed: string | null;
+  };
+  counts: {
+    reads: number;
+    searches: number;
+    lists: number;
+  } | null;
+  items: readonly {
+    id: string;
+    sourceKind: "command-execution" | "reasoning" | "file-change" | "web-search" | "tool-call";
+    label: string;
+    detail: string | null;
+    detailKind: ChatSemanticGroupDetailKind;
+    command: string | null;
+    output: string | null;
+    status: "streaming" | "completed";
+  }[];
+};
+
 export type ChatEntry =
   | ChatUserEntry
   | ChatAssistantEntry
@@ -77,4 +121,5 @@ export type ChatEntry =
   | ChatReasoningEntry
   | ChatPlanEntry
   | ChatFileChangeEntry
-  | ChatGenericItemEntry;
+  | ChatGenericItemEntry
+  | ChatSemanticGroupEntry;

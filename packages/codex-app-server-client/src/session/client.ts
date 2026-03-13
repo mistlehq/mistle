@@ -4,6 +4,7 @@ import type {
   ConnectOK,
 } from "@mistle/sandbox-session-protocol";
 
+import { isRecord } from "../shared/is-record.js";
 import { CodexSessionSocketReadyStates, type CodexSessionRuntime } from "./runtime.js";
 import type {
   CodexJsonRpcErrorResponse,
@@ -23,10 +24,6 @@ export type CodexSessionClientInput = {
 };
 
 type EventListener = (event: CodexSessionEvent) => void;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 
 function readString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;

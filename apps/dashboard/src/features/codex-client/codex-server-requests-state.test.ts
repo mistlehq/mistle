@@ -208,7 +208,7 @@ describe("reduceCodexServerRequestsState", () => {
     ]);
   });
 
-  it("stores unsupported server requests as generic entries", () => {
+  it("ignores unsupported server requests", () => {
     const state = reduceCodexServerRequestsState(createInitialCodexServerRequestsState(), {
       type: "server_request_received",
       request: {
@@ -221,23 +221,7 @@ describe("reduceCodexServerRequestsState", () => {
       },
     });
 
-    expect(state.entries).toEqual([
-      {
-        requestId: 17,
-        method: "tool/unsupported",
-        kind: "generic",
-        paramsJson: JSON.stringify(
-          {
-            title: "Choose",
-            questions: [{ id: "q1", question: "Which option?" }],
-          },
-          null,
-          2,
-        ),
-        status: "pending",
-        responseErrorMessage: null,
-      },
-    ]);
+    expect(state.entries).toEqual([]);
   });
 
   it("marks a request as responding and restores error state on response failure", () => {

@@ -562,7 +562,12 @@ export function reduceChatState(state: ChatState, action: ChatAction): ChatState
       id: action.itemId,
       turnId: action.turnId,
       kind: "plan",
-      text: existingEntry?.kind === "plan" ? `${existingEntry.text}${action.delta}` : action.delta,
+      text:
+        existingEntry?.kind === "plan" && existingEntry.text !== null
+          ? `${existingEntry.text}${action.delta}`
+          : action.delta,
+      explanation: null,
+      steps: null,
       status: "streaming",
     };
 
@@ -576,6 +581,8 @@ export function reduceChatState(state: ChatState, action: ChatAction): ChatState
         turnId: action.turnId,
         kind: "plan",
         text: action.text,
+        explanation: null,
+        steps: null,
         status: "completed",
       } satisfies ChatPlanEntry),
     );

@@ -6,6 +6,7 @@ import type {
   ChatGenericItemEntry,
   ChatPlanEntry,
   ChatReasoningEntry,
+  ChatSemanticGroupEntry,
   ChatUserEntry,
 } from "./chat-types.js";
 
@@ -15,7 +16,8 @@ export type ChatAssistantBlock =
   | ChatCommandEntry
   | ChatPlanEntry
   | ChatFileChangeEntry
-  | ChatGenericItemEntry;
+  | ChatGenericItemEntry
+  | ChatSemanticGroupEntry;
 
 export type ChatTurnGroup = {
   turnId: string;

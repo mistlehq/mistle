@@ -4,6 +4,9 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   CodexStorySessionComposerProps,
   CodexStorySessionEntries,
+  CodexStorySessionEntriesWithExploringGroup,
+  CodexStoryChatThreadEntriesWithStructuredPlan,
+  CodexStoryChatThreadEntriesWithThinkingGroup,
   CodexStorySessionServerRequests,
 } from "../codex-client/codex-story-fixtures.js";
 import { CodexSessionPageView } from "./codex-session-page-view.js";
@@ -60,5 +63,23 @@ export const WithAlerts: Story = {
     sandboxStatusErrorMessage: "Could not load sandbox status.",
     startErrorMessage: "The session failed to connect to the agent.",
     sandboxFailureMessage: "The sandbox exited before the transport was ready.",
+  },
+};
+
+export const WithExploringGroup: Story = {
+  args: {
+    chatEntries: CodexStorySessionEntriesWithExploringGroup,
+  },
+};
+
+export const WithThinkingGroup: Story = {
+  args: {
+    chatEntries: CodexStoryChatThreadEntriesWithThinkingGroup,
+  },
+};
+
+export const WithStructuredPlan: Story = {
+  args: {
+    chatEntries: CodexStoryChatThreadEntriesWithStructuredPlan,
   },
 };
