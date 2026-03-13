@@ -71,6 +71,19 @@ export function buildAvailableIntegrationViewCards(input: {
   });
 }
 
+export function resolveEditableConnectionMethodId(
+  connection: Pick<IntegrationConnection, "config" | "id" | "targetKey">,
+): IntegrationConnectionMethodId {
+  const authScheme = resolveConnectionAuthScheme(connection.config ?? null);
+  if (authScheme === null) {
+    throw new Error(
+      `Unsupported auth scheme for integration connection '${connection.id}' on target '${connection.targetKey}'.`,
+    );
+  }
+
+  return authScheme;
+}
+
 export function buildIntegrationConnectionDetailItems(input: {
   connections: readonly IntegrationConnection[];
   refreshingResourceKeys: ReadonlySet<string>;
@@ -96,12 +109,17 @@ export function buildIntegrationConnectionDetailItems(input: {
         count: resource.count,
         syncState: resource.syncState,
         ...(resource.lastSyncedAt === undefined ? {} : { lastSyncedAt: resource.lastSyncedAt }),
-        isRefreshing: input.refreshingResourceKeys.has(
-          createRefreshingResourceKey({
-            connectionId: connection.id,
-            kind: resource.kind,
-          }),
-        ),
+        ...(resource.lastErrorMessage === undefined
+          ? {}
+          : { lastErrorMessage: resource.lastErrorMessage }),
+        isRefreshing:
+          resource.syncState === "syncing" ||
+          input.refreshingResourceKeys.has(
+            createRefreshingResourceKey({
+              connectionId: connection.id,
+              kind: resource.kind,
+            }),
+          ),
       })),
     };
   });

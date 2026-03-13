@@ -98,4 +98,38 @@ describe("IntegrationConnectionDetailView", () => {
 
     expect(screen.getByText("No connections found for this target.")).toBeTruthy();
   });
+
+  it("disables refresh controls for resources already marked as refreshing", () => {
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            displayName: "Engineering GitHub",
+            status: "active",
+            authMethodLabel: "OAuth",
+            createdAt: "2026-03-03T00:00:00.000Z",
+            updatedAt: "2026-03-11T04:30:00.000Z",
+            resources: [
+              {
+                kind: "repositories",
+                selectionMode: "multi",
+                count: 41,
+                syncState: "syncing",
+                isRefreshing: true,
+              },
+            ],
+          },
+        ]}
+        onRefreshResource={() => {}}
+        onSelectConnection={() => {}}
+        selectedConnectionId="icn_github_primary"
+        targetDisplayName="GitHub"
+        targetKey="github"
+      />,
+    );
+
+    const refreshButton = screen.getByRole("button", { name: "Refreshing..." });
+    expect(refreshButton).toHaveProperty("disabled", true);
+  });
 });
