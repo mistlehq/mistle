@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import type { CompiledRuntimePlan } from "../types/index.js";
+import { RuntimeFileWriteMode, type CompiledRuntimePlan } from "../types/index.js";
 
 const ResolvedSandboxImageSchema = z.discriminatedUnion("source", [
   z
@@ -103,6 +103,9 @@ const RuntimeClientSetupSchema = z
             path: z.string().min(1),
             mode: z.number().int().min(0),
             content: z.string(),
+            writeMode: z
+              .enum([RuntimeFileWriteMode.OVERWRITE, RuntimeFileWriteMode.IF_ABSENT])
+              .optional(),
           })
           .strict(),
       )
@@ -309,6 +312,7 @@ function normalizeRuntimeClientFile(
     path: file.path,
     mode: file.mode,
     content: file.content,
+    ...(file.writeMode === undefined ? {} : { writeMode: file.writeMode }),
   };
 }
 

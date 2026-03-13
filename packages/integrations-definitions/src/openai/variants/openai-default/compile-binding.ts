@@ -1,4 +1,4 @@
-import type { CompileBindingInput, CompileBindingResult } from "@mistle/integrations-core";
+import { type CompileBindingInput, type CompileBindingResult } from "@mistle/integrations-core";
 import { stringify as stringifyToml } from "smol-toml";
 
 import { resolveOpenAiCredentialSecretType } from "./auth.js";
@@ -121,7 +121,7 @@ export function compileOpenAiApiKeyBinding(
           files: [
             {
               fileId: "codex_config",
-              path: "/home/sandbox/.codex/config.toml",
+              path: "/etc/codex/config.toml",
               mode: 384,
               content: renderCodexConfig({
                 model: input.binding.config.defaultModel,

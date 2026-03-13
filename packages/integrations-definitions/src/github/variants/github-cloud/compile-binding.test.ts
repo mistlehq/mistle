@@ -4,8 +4,16 @@ import { describe, expect, it } from "vitest";
 import { compileGitHubCloudBinding } from "./compile-binding.js";
 
 function artifactBinPath(name: string): string {
-  return `/workspace/.mistle/bin/${name}`;
+  return `/var/lib/mistle/bin/${name}`;
 }
+
+const SandboxPaths = {
+  userHomeDir: "/home/sandbox",
+  userProjectsDir: "/home/sandbox/projects",
+  runtimeDataDir: "/var/lib/mistle",
+  runtimeArtifactDir: "/var/lib/mistle/artifacts",
+  runtimeArtifactBinDir: "/var/lib/mistle/bin",
+} as const;
 
 function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
   install: ReadonlyArray<RuntimeArtifactCommand>;
@@ -18,6 +26,7 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
         return input;
       },
     },
+    sandboxPaths: SandboxPaths,
     artifactBinPath,
     mise: {
       install(input: { tools: ReadonlyArray<string>; force?: boolean; timeoutMs?: number }) {
@@ -96,6 +105,7 @@ describe("compileGitHubCloudBinding", () => {
         },
       },
       refs: {
+        sandboxPaths: SandboxPaths,
         artifactBinPath,
       },
     });
@@ -191,7 +201,7 @@ describe("compileGitHubCloudBinding", () => {
       ],
       remove: [
         {
-          args: ["rm", "-f", "/workspace/.mistle/bin/gh"],
+          args: ["rm", "-f", "/var/lib/mistle/bin/gh"],
         },
       ],
     });
@@ -200,13 +210,13 @@ describe("compileGitHubCloudBinding", () => {
       {
         sourceKind: "git-clone",
         resourceKind: "repository",
-        path: "/workspace/repos/acme/repo-a",
+        path: "/home/sandbox/projects/acme/repo-a",
         originUrl: "https://github.com/acme/repo-a.git",
       },
       {
         sourceKind: "git-clone",
         resourceKind: "repository",
-        path: "/workspace/repos/acme/repo-b",
+        path: "/home/sandbox/projects/acme/repo-b",
         originUrl: "https://github.com/acme/repo-b.git",
       },
     ]);
@@ -243,6 +253,7 @@ describe("compileGitHubCloudBinding", () => {
         },
       },
       refs: {
+        sandboxPaths: SandboxPaths,
         artifactBinPath,
       },
     });
@@ -258,7 +269,7 @@ describe("compileGitHubCloudBinding", () => {
       {
         sourceKind: "git-clone",
         resourceKind: "repository",
-        path: "/workspace/repos/acme/repo",
+        path: "/home/sandbox/projects/acme/repo",
         originUrl: "https://proxy.example.com/github/acme/repo.git",
       },
     ]);
@@ -295,6 +306,7 @@ describe("compileGitHubCloudBinding", () => {
         },
       },
       refs: {
+        sandboxPaths: SandboxPaths,
         artifactBinPath,
       },
     });
@@ -335,6 +347,7 @@ describe("compileGitHubCloudBinding", () => {
         },
       },
       refs: {
+        sandboxPaths: SandboxPaths,
         artifactBinPath,
       },
     });
@@ -383,6 +396,7 @@ describe("compileGitHubCloudBinding", () => {
           },
         },
         refs: {
+          sandboxPaths: SandboxPaths,
           artifactBinPath,
         },
       }),

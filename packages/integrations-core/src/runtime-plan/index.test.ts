@@ -27,7 +27,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 {
                   processKey: "codex-app-server",
                   command: {
-                    args: ["/workspace/.mistle/bin/codex", "app-server"],
+                    args: ["/var/lib/mistle/bin/codex", "app-server"],
                   },
                   readiness: {
                     type: "none",
@@ -205,7 +205,7 @@ describe("assembleCompiledRuntimePlan", () => {
                 files: [
                   {
                     fileId: "codex_config",
-                    path: "/workspace/.codex/config.toml",
+                    path: "/home/sandbox/.codex/config.toml",
                     mode: 384,
                     content: 'model = "gpt-5.3-codex"',
                   },
@@ -431,7 +431,7 @@ describe("assembleCompiledRuntimePlan", () => {
                   files: [
                     {
                       fileId: "codex_config",
-                      path: "/workspace/.codex/config.toml",
+                      path: "/home/sandbox/.codex/config.toml",
                       mode: 384,
                       content: 'model = "gpt-5.3-codex"',
                     },
@@ -455,7 +455,7 @@ describe("assembleCompiledRuntimePlan", () => {
                   files: [
                     {
                       fileId: "codex_config",
-                      path: "/workspace/.codex/override.toml",
+                      path: "/home/sandbox/.codex/override.toml",
                       mode: 384,
                       content: 'model = "gpt-5.3-codex"',
                     },
@@ -492,7 +492,7 @@ describe("assembleCompiledRuntimePlan", () => {
                   files: [
                     {
                       fileId: "codex_config",
-                      path: "/workspace/.codex/config.toml",
+                      path: "/home/sandbox/.codex/config.toml",
                       mode: 384,
                       content: 'model = "gpt-5.3-codex"',
                     },
@@ -516,7 +516,7 @@ describe("assembleCompiledRuntimePlan", () => {
                   files: [
                     {
                       fileId: "codex_config",
-                      path: "/workspace/.codex/override.toml",
+                      path: "/home/sandbox/.codex/override.toml",
                       mode: 384,
                       content: 'model = "gpt-5.3-codex"',
                     },

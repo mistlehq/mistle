@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { SessionsPage } from "./sessions-page.js";
 
 describe("SessionsPage", () => {
-  it("renders sandbox launcher controls", () => {
+  it("renders sandbox launcher controls", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -17,7 +17,7 @@ describe("SessionsPage", () => {
       },
     });
 
-    render(
+    const rendered = render(
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
           <SessionsPage />
@@ -25,10 +25,16 @@ describe("SessionsPage", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("Start a new session")).toBeDefined();
-    expect(screen.getByRole("combobox", { name: "Sandbox profile" })).toBeDefined();
-    expect(screen.getByRole("button", { name: "Start session" })).toBeDefined();
-    expect(screen.queryByText("Recent Sessions")).toBeNull();
-    expect(screen.queryByText("No launched sessions yet.")).toBeNull();
+    try {
+      expect(screen.getByText("Start a new session")).toBeDefined();
+      expect(screen.getByRole("combobox", { name: "Sandbox profile" })).toBeDefined();
+      expect(screen.getByRole("button", { name: "Start session" })).toBeDefined();
+      expect(screen.queryByText("Recent Sessions")).toBeNull();
+      expect(screen.queryByText("No launched sessions yet.")).toBeNull();
+    } finally {
+      rendered.unmount();
+      await queryClient.cancelQueries();
+      queryClient.clear();
+    }
   });
 });

@@ -108,7 +108,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(updateCommand?.timeoutMs).toBe(120_000);
 
     expect(runtimePlan.artifacts[0]?.lifecycle.remove).toEqual([
-      { args: ["rm", "-f", "/workspace/.mistle/bin/codex"] },
+      { args: ["rm", "-f", "/var/lib/mistle/bin/codex"] },
     ]);
 
     const installScript = installCommand?.args[2];
@@ -117,7 +117,7 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(installScript).toContain("releases/latest/download/$asset_name");
     expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
-    expect(installScript).toContain("/workspace/.mistle/bin/codex");
+    expect(installScript).toContain("/var/lib/mistle/bin/codex");
     expect(runtimePlan.runtimeClients).toEqual([
       {
         clientId: "codex-cli",
@@ -130,7 +130,7 @@ describe("sandbox profile compile runtime plan integration", () => {
           files: [
             {
               fileId: "codex_config",
-              path: "/home/sandbox/.codex/config.toml",
+              path: "/etc/codex/config.toml",
               mode: 384,
               content: `model = "gpt-5.3-codex"
 model_reasoning_effort = "medium"
@@ -148,12 +148,7 @@ trust_level = "trusted"
           {
             processKey: "codex-app-server",
             command: {
-              args: [
-                "/workspace/.mistle/bin/codex",
-                "app-server",
-                "--listen",
-                "ws://127.0.0.1:4500",
-              ],
+              args: ["/var/lib/mistle/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
             },
             readiness: {
               type: "ws",

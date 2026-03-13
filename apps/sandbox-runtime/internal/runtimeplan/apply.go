@@ -22,6 +22,7 @@ const (
 	runtimeImageSourceSnapshot    = "snapshot"
 	runtimeImageSourceProfileBase = "profile-base"
 	runtimeImageSourceBase        = "base"
+	runtimeFileWriteModeIfAbsent  = "if-absent"
 )
 
 type artifactLifecycleCommandSet string
@@ -239,6 +240,10 @@ func applyRuntimeFile(file startup.RuntimeFileSpec) error {
 	parentDirectory := filepath.Dir(file.Path)
 	if err := os.MkdirAll(parentDirectory, 0o755); err != nil {
 		return fmt.Errorf("failed to create parent directory %s: %w", parentDirectory, err)
+	}
+
+	if file.WriteMode == runtimeFileWriteModeIfAbsent && pathExists(file.Path) {
+		return nil
 	}
 
 	if err := os.WriteFile(file.Path, []byte(file.Content), os.FileMode(file.Mode)); err != nil {

@@ -4,8 +4,16 @@ import { describe, expect, it } from "vitest";
 import { compileGitHubEnterpriseServerBinding } from "./compile-binding.js";
 
 function artifactBinPath(name: string): string {
-  return `/workspace/.mistle/bin/${name}`;
+  return `/var/lib/mistle/bin/${name}`;
 }
+
+const SandboxPaths = {
+  userHomeDir: "/home/sandbox",
+  userProjectsDir: "/home/sandbox/projects",
+  runtimeDataDir: "/var/lib/mistle",
+  runtimeArtifactDir: "/var/lib/mistle/artifacts",
+  runtimeArtifactBinDir: "/var/lib/mistle/bin",
+} as const;
 
 function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
   install: ReadonlyArray<RuntimeArtifactCommand>;
@@ -18,6 +26,7 @@ function resolveArtifactLifecycleCommands(artifact: RuntimeArtifactSpec): {
         return input;
       },
     },
+    sandboxPaths: SandboxPaths,
     artifactBinPath,
     mise: {
       install(input: { tools: ReadonlyArray<string>; force?: boolean; timeoutMs?: number }) {
@@ -96,6 +105,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         },
       },
       refs: {
+        sandboxPaths: SandboxPaths,
         artifactBinPath,
       },
     });
@@ -173,7 +183,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
       ],
       remove: [
         {
-          args: ["rm", "-f", "/workspace/.mistle/bin/gh"],
+          args: ["rm", "-f", "/var/lib/mistle/bin/gh"],
         },
       ],
     });
@@ -182,7 +192,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
       {
         sourceKind: "git-clone",
         resourceKind: "repository",
-        path: "/workspace/repos/acme/repo",
+        path: "/home/sandbox/projects/acme/repo",
         originUrl: "https://ghe.example.com/acme/repo.git",
       },
     ]);
@@ -219,6 +229,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         },
       },
       refs: {
+        sandboxPaths: SandboxPaths,
         artifactBinPath,
       },
     });
@@ -262,6 +273,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         },
       },
       refs: {
+        sandboxPaths: SandboxPaths,
         artifactBinPath,
       },
     });
@@ -308,6 +320,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
           },
         },
         refs: {
+          sandboxPaths: SandboxPaths,
           artifactBinPath,
         },
       }),

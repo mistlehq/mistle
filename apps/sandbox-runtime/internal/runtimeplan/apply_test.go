@@ -94,6 +94,56 @@ func TestApply(t *testing.T) {
 		}
 	})
 
+	t.Run("skips create-only runtime files when the target already exists", func(t *testing.T) {
+		tempDirectory := t.TempDir()
+		configPath := filepath.Join(tempDirectory, "codex", "config.toml")
+		if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+			t.Fatalf("expected config directory creation to succeed, got %v", err)
+		}
+		if err := os.WriteFile(configPath, []byte("model = \"user-choice\""), 0o600); err != nil {
+			t.Fatalf("expected existing config write to succeed, got %v", err)
+		}
+
+		err := Apply(ApplyInput{
+			RuntimePlan: startup.RuntimePlan{
+				Image: startup.ResolvedSandboxImage{
+					Source:   "base",
+					ImageRef: "mistle/sandbox-base:dev",
+				},
+				RuntimeClients: []startup.RuntimeClient{
+					{
+						ClientID: "client_codex",
+						Setup: startup.RuntimeClientSetup{
+							Env: map[string]string{},
+							Files: []startup.RuntimeFileSpec{
+								{
+									FileID:    "file_codex_config",
+									Path:      configPath,
+									Mode:      0o600,
+									Content:   "model = \"seeded-default\"",
+									WriteMode: "if-absent",
+								},
+							},
+						},
+						Processes: []startup.RuntimeClientProcessSpec{},
+						Endpoints: []startup.RuntimeClientEndpointSpec{},
+					},
+				},
+			},
+		})
+		if err != nil {
+			t.Fatalf("expected create-only runtime file apply to succeed, got %v", err)
+		}
+
+		fileBytes, err := os.ReadFile(configPath)
+		if err != nil {
+			t.Fatalf("expected config file read to succeed, got %v", err)
+		}
+		if string(fileBytes) != "model = \"user-choice\"" {
+			t.Fatalf("expected existing config to be preserved, got %s", string(fileBytes))
+		}
+	})
+
 	t.Run("returns an error when a parent directory cannot be created", func(t *testing.T) {
 		tempDirectory := t.TempDir()
 		blockingPath := filepath.Join(tempDirectory, "not-a-directory")
