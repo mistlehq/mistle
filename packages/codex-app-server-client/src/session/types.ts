@@ -1,16 +1,16 @@
-import type { ConnectError, ConnectOK } from "@mistle/sandbox-session-protocol";
+import type { StreamOpenError, StreamOpenOK } from "@mistle/sandbox-session-protocol";
 
 export type CodexSessionConnectionState =
   | "idle"
   | "connecting_socket"
-  | "handshaking_agent"
+  | "opening_agent_stream"
   | "connected_socket"
   | "initializing"
   | "ready"
   | "closed"
   | "error";
 
-export type CodexControlMessage = ConnectOK | ConnectError;
+export type CodexControlMessage = StreamOpenOK | StreamOpenError;
 
 export type CodexJsonRpcId = number | string;
 

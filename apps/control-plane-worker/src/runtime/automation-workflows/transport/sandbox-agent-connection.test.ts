@@ -19,7 +19,7 @@ type AgentTestServerMode = "accept" | "reject";
 
 type AgentTestServer = {
   url: string;
-  connectRequest: Promise<{ requestId: string }>;
+  connectRequest: Promise<{ streamId: number }>;
   payload: Promise<string>;
   socketClosed: Promise<void>;
   close: () => Promise<void>;
@@ -61,7 +61,7 @@ function toText(data: RawData): string {
   return Buffer.concat(data).toString("utf8");
 }
 
-function parseRequestIdFromConnectMessage(data: RawData): string {
+function parseStreamIdFromOpenMessage(data: RawData): number {
   const payloadText = toText(data);
 
   let parsedPayload: unknown;
@@ -77,24 +77,24 @@ function parseRequestIdFromConnectMessage(data: RawData): string {
 
   if (
     !("type" in parsedPayload) ||
-    !("requestId" in parsedPayload) ||
+    !("streamId" in parsedPayload) ||
     !("channel" in parsedPayload)
   ) {
-    throw new Error("Expected agent connect request payload to include type/requestId/channel.");
+    throw new Error("Expected agent stream.open payload to include type/streamId/channel.");
   }
 
   const typeValue = parsedPayload.type;
-  const requestIdValue = parsedPayload.requestId;
+  const streamIdValue = parsedPayload.streamId;
   const channelValue = parsedPayload.channel;
 
-  if (typeValue !== "connect") {
+  if (typeValue !== "stream.open") {
     throw new Error(
-      `Expected connect request type to be 'connect', received '${String(typeValue)}'.`,
+      `Expected agent stream open type to be 'stream.open', received '${String(typeValue)}'.`,
     );
   }
 
-  if (typeof requestIdValue !== "string" || requestIdValue.length === 0) {
-    throw new Error("Expected connect request requestId to be a non-empty string.");
+  if (typeof streamIdValue !== "number" || !Number.isInteger(streamIdValue) || streamIdValue <= 0) {
+    throw new Error("Expected agent stream.open streamId to be a positive integer.");
   }
 
   if (
@@ -107,11 +107,11 @@ function parseRequestIdFromConnectMessage(data: RawData): string {
     throw new Error("Expected connect request channel.kind to be 'agent'.");
   }
 
-  return requestIdValue;
+  return streamIdValue;
 }
 
 async function startAgentTestServer(mode: AgentTestServerMode): Promise<AgentTestServer> {
-  const connectDeferred = createDeferred<{ requestId: string }>();
+  const connectDeferred = createDeferred<{ streamId: number }>();
   const payloadDeferred = createDeferred<string>();
   const socketClosedDeferred = createDeferred<void>();
 
@@ -132,14 +132,14 @@ async function startAgentTestServer(mode: AgentTestServerMode): Promise<AgentTes
       if (!didHandleConnect) {
         didHandleConnect = true;
         try {
-          const requestId = parseRequestIdFromConnectMessage(message);
-          connectDeferred.resolve({ requestId });
+          const streamId = parseStreamIdFromOpenMessage(message);
+          connectDeferred.resolve({ streamId });
 
           if (mode === "reject") {
             socket.send(
               JSON.stringify({
-                type: "connect.error",
-                requestId,
+                type: "stream.open.error",
+                streamId,
                 code: "agent_endpoint_unavailable",
                 message: "agent endpoint unavailable",
               }),
@@ -149,8 +149,8 @@ async function startAgentTestServer(mode: AgentTestServerMode): Promise<AgentTes
 
           socket.send(
             JSON.stringify({
-              type: "connect.ok",
-              requestId,
+              type: "stream.open.ok",
+              streamId,
             }),
           );
           return;
@@ -255,7 +255,7 @@ describe("sandbox agent websocket delivery", () => {
       const payloadText = await server.payload;
       await server.socketClosed;
 
-      expect(connectRequest.requestId.length).toBeGreaterThan(0);
+      expect(connectRequest.streamId).toBeGreaterThan(0);
 
       expect(payloadText).toBe("Handle @mistlebot run this");
     } finally {
@@ -263,12 +263,12 @@ describe("sandbox agent websocket delivery", () => {
     }
   });
 
-  it("surfaces connect.error responses from the sandbox agent channel", async () => {
+  it("surfaces stream.open.error responses from the sandbox agent channel", async () => {
     const server = await startAgentTestServer("reject");
 
     try {
       await expect(deliverAutomationPayload(createDeliverInput(server.url))).rejects.toThrow(
-        "Sandbox agent connect request was rejected (agent_endpoint_unavailable): agent endpoint unavailable",
+        "Sandbox agent stream.open request was rejected (agent_endpoint_unavailable): agent endpoint unavailable",
       );
     } finally {
       await server.close();

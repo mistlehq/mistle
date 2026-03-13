@@ -50,7 +50,7 @@ export function resolveSessionHeaderStatusUi(input: {
     };
   }
 
-  if (input.agentConnectionState === "handshaking_agent") {
+  if (input.agentConnectionState === "opening_agent_stream") {
     return {
       label: "Connecting",
       variant: "outline",

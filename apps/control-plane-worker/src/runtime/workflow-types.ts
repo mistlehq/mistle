@@ -85,7 +85,6 @@ export type FinalAutomationConversationDeliveryTaskStatus = "completed" | "faile
 export type AutomationConversationDeliveryTaskAction = "deliver" | "ignore";
 
 export type ExecuteConversationProviderDeliveryInput = {
-  requestId: string;
   conversationId: string;
   integrationFamilyId: string;
   connectionUrl: string;

@@ -29,7 +29,6 @@ export type ProviderSteerExecutionOutput = {
 
 export type ProviderConnectInput = {
   connectionUrl: string;
-  requestId?: string;
   connectTimeoutMs?: number;
 };
 

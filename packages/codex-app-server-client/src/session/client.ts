@@ -1,8 +1,4 @@
-import type {
-  AgentConnectRequest,
-  ConnectError,
-  ConnectOK,
-} from "@mistle/sandbox-session-protocol";
+import type { StreamOpen, StreamOpenError, StreamOpenOK } from "@mistle/sandbox-session-protocol";
 
 import { isRecord } from "../shared/is-record.js";
 import { CodexSessionSocketReadyStates, type CodexSessionRuntime } from "./runtime.js";
@@ -39,7 +35,17 @@ function readJsonRpcId(value: unknown): string | number | null {
   return null;
 }
 
-export function parseConnectControlMessage(payload: string): ConnectOK | ConnectError | null {
+function readPositiveInteger(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    return null;
+  }
+
+  return value;
+}
+
+export function parseStreamOpenControlMessage(
+  payload: string,
+): StreamOpenOK | StreamOpenError | null {
   let parsedPayload: unknown;
   try {
     parsedPayload = JSON.parse(payload);
@@ -52,19 +58,19 @@ export function parseConnectControlMessage(payload: string): ConnectOK | Connect
   }
 
   const type = readString(parsedPayload.type);
-  const requestId = readString(parsedPayload.requestId);
-  if (type === null || requestId === null) {
+  const streamId = readPositiveInteger(parsedPayload.streamId);
+  if (type === null || streamId === null) {
     return null;
   }
 
-  if (type === "connect.ok") {
+  if (type === "stream.open.ok") {
     return {
       type,
-      requestId,
+      streamId,
     };
   }
 
-  if (type === "connect.error") {
+  if (type === "stream.open.error") {
     const code = readString(parsedPayload.code);
     const message = readString(parsedPayload.message);
     if (code === null || message === null) {
@@ -73,7 +79,7 @@ export function parseConnectControlMessage(payload: string): ConnectOK | Connect
 
     return {
       type,
-      requestId,
+      streamId,
       code,
       message,
     };
@@ -213,11 +219,11 @@ export class CodexSessionClient {
     this.#socket = socket;
 
     await new Promise<void>((resolve, reject) => {
-      const connectRequestId = this.#runtime.createRequestId();
+      const streamId = this.#runtime.createStreamId();
       let settled = false;
 
       const timeoutTask = this.#runtime.scheduleTimeout(() => {
-        fail(new Error("Timed out while establishing agent session connection."));
+        fail(new Error("Timed out while opening agent session stream."));
       }, this.#connectTimeoutMs);
 
       const cleanup = (): void => {
@@ -254,16 +260,15 @@ export class CodexSessionClient {
       };
 
       const handleOpen = (): void => {
-        this.#setState("handshaking_agent", null);
-        const connectRequest: AgentConnectRequest = {
-          type: "connect",
-          v: 1,
-          requestId: connectRequestId,
+        this.#setState("opening_agent_stream", null);
+        const openMessage: StreamOpen = {
+          type: "stream.open",
+          streamId,
           channel: {
             kind: "agent",
           },
         };
-        socket.send(JSON.stringify(connectRequest));
+        socket.send(JSON.stringify(openMessage));
       };
 
       const handleMessage = (event: unknown): void => {
@@ -272,12 +277,12 @@ export class CodexSessionClient {
           return;
         }
 
-        const controlMessage = parseConnectControlMessage(controlPayload);
-        if (controlMessage === null || controlMessage.requestId !== connectRequestId) {
+        const controlMessage = parseStreamOpenControlMessage(controlPayload);
+        if (controlMessage === null || controlMessage.streamId !== streamId) {
           return;
         }
 
-        if (controlMessage.type === "connect.ok") {
+        if (controlMessage.type === "stream.open.ok") {
           succeed();
           return;
         }
@@ -290,7 +295,7 @@ export class CodexSessionClient {
       };
 
       const handleClose = (): void => {
-        fail(new Error("Sandbox websocket connection closed before agent channel was ready."));
+        fail(new Error("Sandbox websocket connection closed before agent stream was ready."));
       };
 
       socket.addEventListener("open", handleOpen);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  parseConnectControlMessage,
+  parseStreamOpenControlMessage,
   parseJsonRpcErrorResponse,
   parseJsonRpcNotification,
   parseJsonRpcServerRequest,
@@ -9,33 +9,33 @@ import {
 } from "./codex-session-client.js";
 
 describe("codex app server client protocol parsers", () => {
-  it("parses connect.ok control messages", () => {
+  it("parses stream.open.ok control messages", () => {
     expect(
-      parseConnectControlMessage(
+      parseStreamOpenControlMessage(
         JSON.stringify({
-          type: "connect.ok",
-          requestId: "req_123",
+          type: "stream.open.ok",
+          streamId: 17,
         }),
       ),
     ).toEqual({
-      type: "connect.ok",
-      requestId: "req_123",
+      type: "stream.open.ok",
+      streamId: 17,
     });
   });
 
-  it("parses connect.error control messages", () => {
+  it("parses stream.open.error control messages", () => {
     expect(
-      parseConnectControlMessage(
+      parseStreamOpenControlMessage(
         JSON.stringify({
-          type: "connect.error",
-          requestId: "req_123",
+          type: "stream.open.error",
+          streamId: 17,
           code: "REJECTED",
           message: "agent connection rejected",
         }),
       ),
     ).toEqual({
-      type: "connect.error",
-      requestId: "req_123",
+      type: "stream.open.error",
+      streamId: 17,
       code: "REJECTED",
       message: "agent connection rejected",
     });
@@ -43,7 +43,7 @@ describe("codex app server client protocol parsers", () => {
 
   it("ignores non-control payloads when parsing control messages", () => {
     expect(
-      parseConnectControlMessage(
+      parseStreamOpenControlMessage(
         JSON.stringify({
           method: "thread/start",
           id: 1,

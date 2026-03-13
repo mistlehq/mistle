@@ -39,6 +39,6 @@ export interface CodexScheduledTask {
 
 export interface CodexSessionRuntime {
   createSocket(connectionUrl: string): CodexSessionSocket;
-  createRequestId(): string;
+  createStreamId(): number;
   scheduleTimeout(callback: () => void, timeoutMs: number): CodexScheduledTask;
 }

@@ -1,6 +1,6 @@
 export {
   CodexSessionClient,
-  parseConnectControlMessage,
+  parseStreamOpenControlMessage,
   parseJsonRpcErrorResponse,
   parseJsonRpcNotification,
   parseJsonRpcServerRequest,

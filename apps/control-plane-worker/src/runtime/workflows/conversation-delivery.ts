@@ -50,7 +50,6 @@ export type HandleAutomationConversationDeliveryDependencies = {
 };
 
 export type ExecuteConversationProviderDeliveryInput = {
-  requestId: string;
   conversationId: string;
   integrationFamilyId: string;
   connectionUrl: string;
@@ -354,7 +353,6 @@ export async function deliverConversationAutomationPayload(
   }
 
   const deliveryResult = await ctx.executeConversationProviderDelivery({
-    requestId: input.taskId,
     conversationId: input.preparedAutomationRun.conversationId,
     integrationFamilyId: input.resolvedAutomationConversationRoute.integrationFamilyId,
     connectionUrl: input.acquiredAutomationConnection.url,
