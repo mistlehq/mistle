@@ -332,7 +332,7 @@ function summarizeFileChangeOutput(
 ): string | null {
   const diffs = item.changes
     .filter((change) => change.diff !== null && change.diff.length > 0)
-    .map((change) => `# ${change.path}\n${change.diff}`);
+    .map((change) => change.diff);
 
   if (diffs.length > 0) {
     return diffs.join("\n\n");
@@ -522,7 +522,7 @@ function mapTimelineEntryToChatEntries(input: {
         turnId: item.turnId,
         text: item.text,
         status: item.status,
-        planSnapshot: input.planSnapshot,
+        planSnapshot: null,
       }),
     ];
   }
@@ -646,12 +646,7 @@ function buildEntries(input: {
       turnId,
       items: buildNormalizedItems(turn),
     });
-    let renderedPlanEntry = false;
     for (const timelineEntry of timeline) {
-      if ("item" in timelineEntry && timelineEntry.item.kind === "plan") {
-        renderedPlanEntry = true;
-      }
-
       entries.push(
         ...mapTimelineEntryToChatEntries({
           entry: timelineEntry,
@@ -660,7 +655,7 @@ function buildEntries(input: {
       );
     }
 
-    if (!renderedPlanEntry && turn.planSnapshot !== null) {
+    if (turn.planSnapshot !== null) {
       entries.push(
         buildPlanEntry({
           id: `${turn.id}:plan-snapshot`,

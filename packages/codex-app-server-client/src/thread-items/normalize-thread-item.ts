@@ -375,7 +375,7 @@ export function normalizeCodexThreadItem(input: {
         id: itemId,
         turnId: input.turnId,
         query: readOptionalString(item, "query"),
-        detailsJson: action === null ? null : serializeUnknown(action),
+        detailsJson: action === null ? null : serializeUnknown(item),
         status: action === null ? "streaming" : "completed",
       },
     ];

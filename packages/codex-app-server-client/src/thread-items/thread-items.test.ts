@@ -294,6 +294,13 @@ describe("thread item semantics", () => {
             type: "search",
             query: "semantic grouping ui",
           },
+          results: [
+            {
+              title: "Semantic grouping in Share.tsx",
+              url: "https://example.com/share",
+              snippet: "Compact grouped activity rendering.",
+            },
+          ],
         },
       }),
     ).toEqual([
@@ -304,8 +311,20 @@ describe("thread item semantics", () => {
         query: "semantic grouping ui",
         detailsJson: JSON.stringify(
           {
-            type: "search",
+            type: "webSearch",
+            id: "web_1",
             query: "semantic grouping ui",
+            action: {
+              type: "search",
+              query: "semantic grouping ui",
+            },
+            results: [
+              {
+                title: "Semantic grouping in Share.tsx",
+                url: "https://example.com/share",
+                snippet: "Compact grouped activity rendering.",
+              },
+            ],
           },
           null,
           2,

@@ -1245,7 +1245,7 @@ describe("reduceCodexChatState", () => {
             detail: "src/app.ts",
             detailKind: "code",
             command: null,
-            output: ["# src/app.ts", "@@ -1 +1 @@"].join("\n"),
+            output: "@@ -1 +1 @@",
             status: "completed",
           },
         ],
@@ -1298,11 +1298,83 @@ describe("reduceCodexChatState", () => {
           detail: "src/app.ts",
           detailKind: "code",
           command: null,
-          output: ["# src/app.ts", "@@ -1 +1 @@"].join("\n"),
+          output: "@@ -1 +1 @@",
           status: "completed",
         },
       ],
     });
+  });
+
+  it("keeps raw plan items and turn plan snapshots as separate transcript entries", () => {
+    const state = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_400",
+          status: "completed",
+          items: [
+            {
+              type: "plan",
+              id: "plan_400",
+              text: "1. Inspect reducer",
+              status: "completed",
+            },
+          ],
+        },
+      ],
+    });
+
+    const updated = reduceCodexChatState(state, {
+      type: "notification_received",
+      notification: {
+        method: "turn/plan/updated",
+        params: {
+          threadId: "thread_1",
+          turnId: "turn_400",
+          explanation: "Refining rollout sequence",
+          plan: [
+            {
+              step: "Inspect reducer",
+              status: "completed",
+            },
+            {
+              step: "Patch reducer",
+              status: "inProgress",
+            },
+          ],
+        },
+      },
+    });
+
+    expect(updated.entries).toEqual([
+      {
+        id: "plan_400",
+        turnId: "turn_400",
+        kind: "plan",
+        text: "1. Inspect reducer",
+        explanation: null,
+        steps: null,
+        status: "completed",
+      },
+      {
+        id: "turn_400:plan-snapshot",
+        turnId: "turn_400",
+        kind: "plan",
+        text: null,
+        explanation: "Refining rollout sequence",
+        steps: [
+          {
+            step: "Inspect reducer",
+            status: "completed",
+          },
+          {
+            step: "Patch reducer",
+            status: "inProgress",
+          },
+        ],
+        status: "completed",
+      },
+    ]);
   });
 
   it("preserves the semantic group id when live deltas update a later grouped item", () => {
