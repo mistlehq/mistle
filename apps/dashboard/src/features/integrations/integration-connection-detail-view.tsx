@@ -9,7 +9,14 @@ import {
   CardTitle,
 } from "@mistle/ui";
 
-import { formatDate, formatDateTime } from "../shared/date-formatters.js";
+import { formatDate } from "../shared/date-formatters.js";
+import {
+  formatConnectionStatusLabel,
+  formatResourceMetadata,
+  formatResourceSummaryCount,
+  formatSelectionModeLabel,
+  formatSyncStateLabel,
+} from "./integration-connection-detail-formatters.js";
 import { resolveIntegrationLogoPath } from "./logo.js";
 
 export type IntegrationConnectionDetailResourceSummary = {
@@ -243,14 +250,6 @@ export function IntegrationConnectionDetailView(
   );
 }
 
-function formatResourceSummaryCount(count: number): string {
-  if (count === 1) {
-    return "1 resource summary";
-  }
-
-  return `${count} resource summaries`;
-}
-
 function MetadataField(input: { label: string; value: string }): React.JSX.Element {
   return (
     <div className="rounded-md border p-3">
@@ -258,64 +257,4 @@ function MetadataField(input: { label: string; value: string }): React.JSX.Eleme
       <p className="mt-1 text-sm">{input.value}</p>
     </div>
   );
-}
-
-function formatConnectionStatusLabel(status: "active" | "error" | "revoked"): string {
-  if (status === "active") {
-    return "Active";
-  }
-  if (status === "error") {
-    return "Error";
-  }
-  return "Revoked";
-}
-
-function formatSelectionModeLabel(selectionMode: "single" | "multi"): string {
-  if (selectionMode === "single") {
-    return "single-select";
-  }
-  return "multi-select";
-}
-
-function formatSyncStateLabel(syncState: "never-synced" | "syncing" | "ready" | "error"): string {
-  if (syncState === "never-synced") {
-    return "Never synced";
-  }
-  if (syncState === "syncing") {
-    return "Syncing";
-  }
-  if (syncState === "error") {
-    return "Sync failed";
-  }
-  return "Ready";
-}
-
-function formatResourceMetadata(input: {
-  lastErrorMessage?: string;
-  lastSyncedAt?: string;
-  syncState: "never-synced" | "syncing" | "ready" | "error";
-}): string {
-  if (input.syncState === "error") {
-    if (input.lastErrorMessage !== undefined) {
-      return input.lastErrorMessage;
-    }
-    return "The last sync attempt failed.";
-  }
-
-  if (input.syncState === "syncing") {
-    if (input.lastSyncedAt !== undefined) {
-      return `Refresh in progress. Last completed sync ${formatDateTime(input.lastSyncedAt)}.`;
-    }
-    return "Refresh in progress.";
-  }
-
-  if (input.syncState === "never-synced") {
-    return "Resources have not been synced yet.";
-  }
-
-  if (input.lastSyncedAt === undefined) {
-    return "Resources are ready.";
-  }
-
-  return `Last synced ${formatDateTime(input.lastSyncedAt)}.`;
 }

@@ -12,33 +12,21 @@ import {
   startOAuthIntegrationConnection,
   updateIntegrationConnection,
 } from "../integrations/integrations-service.js";
-
-export type OpenIntegrationConnectionDialogInput =
-  | {
-      methods: readonly IntegrationConnectionMethodId[];
-      mode: "create";
-      targetDisplayName: string;
-      targetKey: string;
-    }
-  | {
-      connectionDisplayName?: string;
-      connectionId: string;
-      currentMethodId: IntegrationConnectionMethodId;
-      mode: "update";
-      targetDisplayName: string;
-      targetKey: string;
-    };
+import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
+import {
+  createClosedIntegrationConnectionDialogDraft,
+  createOpenIntegrationConnectionDialogState,
+  hasIntegrationConnectionDialogChanges,
+  isIntegrationConnectionDisplayNameChanged,
+  resolveIntegrationConnectionDialogValidationError,
+} from "./use-integration-connection-dialog-state-helpers.js";
 
 export function useIntegrationConnectionDialogState(input: { queryKey: readonly unknown[] }) {
   const queryClient = useQueryClient();
   const [dialog, setDialog] = useState<IntegrationConnectionDialogState | null>(null);
-  const [methodId, setMethodId] = useState<IntegrationConnectionMethodId>(
-    IntegrationConnectionMethodIds.API_KEY,
+  const [draft, setDraft] = useState(() =>
+    createClosedIntegrationConnectionDialogDraft(IntegrationConnectionMethodIds.API_KEY),
   );
-  const [connectionDisplayNamePlaceholder, setConnectionDisplayNamePlaceholder] = useState("");
-  const [connectionDisplayNameValue, setConnectionDisplayNameValue] = useState("");
-  const [apiKeyValue, setApiKeyValue] = useState("");
-  const [error, setError] = useState<string | null>(null);
 
   const createApiKeyMutation = useMutation({
     mutationFn: async (mutationInput: { targetKey: string; displayName: string; apiKey: string }) =>
@@ -60,53 +48,16 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
 
   function closeDialog(): void {
     setDialog(null);
-    setMethodId(IntegrationConnectionMethodIds.API_KEY);
-    setConnectionDisplayNamePlaceholder("");
-    setConnectionDisplayNameValue("");
-    setApiKeyValue("");
-    setError(null);
+    setDraft(createClosedIntegrationConnectionDialogDraft(IntegrationConnectionMethodIds.API_KEY));
   }
 
   function openDialog(openInput: OpenIntegrationConnectionDialogInput): void {
-    const supportedMethods =
-      openInput.mode === "create" ? openInput.methods : [openInput.currentMethodId];
-    const existingConnectionDisplayName =
-      openInput.mode === "update" ? openInput.connectionDisplayName : undefined;
-    const defaultMethod = supportedMethods[0];
-    if (defaultMethod === undefined) {
-      throw new Error(
-        `Integration target '${openInput.targetKey}' does not declare any supported auth scheme.`,
-      );
-    }
-    const defaultConnectionDisplayName =
-      openInput.mode === "update"
-        ? (existingConnectionDisplayName ?? openInput.connectionId ?? "")
-        : `${openInput.targetDisplayName} connection`;
-
-    if (openInput.mode === "create") {
-      setDialog({
-        targetKey: openInput.targetKey,
-        displayName: openInput.targetDisplayName,
-        mode: openInput.mode,
-        methods: openInput.methods,
-      });
-    } else {
-      setDialog({
-        connectionId: openInput.connectionId,
-        currentMethodId: openInput.currentMethodId,
-        targetKey: openInput.targetKey,
-        displayName: openInput.targetDisplayName,
-        mode: openInput.mode,
-        ...(existingConnectionDisplayName === undefined
-          ? {}
-          : { initialConnectionDisplayName: existingConnectionDisplayName }),
-      });
-    }
-    setMethodId(defaultMethod);
-    setConnectionDisplayNamePlaceholder(defaultConnectionDisplayName);
-    setConnectionDisplayNameValue(existingConnectionDisplayName ?? "");
-    setApiKeyValue("");
-    setError(null);
+    const nextState = createOpenIntegrationConnectionDialogState({
+      defaultMethodId: IntegrationConnectionMethodIds.API_KEY,
+      openInput,
+    });
+    setDialog(nextState.dialog);
+    setDraft(nextState.draft);
   }
 
   async function runSubmit(): Promise<void> {
@@ -114,24 +65,23 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       throw new Error("Connection dialog is required to run this action.");
     }
 
-    const supportedMethods = dialog.mode === "create" ? dialog.methods : [dialog.currentMethodId];
-    if (!supportedMethods.includes(methodId)) {
-      throw new Error(
-        `Connect method '${methodId}' is not supported for target '${dialog.targetKey}'.`,
-      );
+    const validationError = resolveIntegrationConnectionDialogValidationError({
+      dialog,
+      methodId: draft.methodId,
+      apiKeyValue: draft.apiKeyValue,
+      connectionDisplayNameValue: draft.connectionDisplayNameValue,
+    });
+    if (validationError !== null) {
+      setDraft((currentDraft) => ({
+        ...currentDraft,
+        error: validationError,
+      }));
+      return;
     }
 
-    if (methodId === IntegrationConnectionMethodIds.API_KEY) {
-      const normalizedApiKey = apiKeyValue.trim();
-      if (dialog.mode === "create" && normalizedApiKey.length === 0) {
-        setError("API key is required.");
-        return;
-      }
-      const normalizedConnectionDisplayName = connectionDisplayNameValue.trim();
-      if (normalizedConnectionDisplayName.length === 0) {
-        setError("Connection name is required.");
-        return;
-      }
+    if (draft.methodId === IntegrationConnectionMethodIds.API_KEY) {
+      const normalizedApiKey = draft.apiKeyValue.trim();
+      const normalizedConnectionDisplayName = draft.connectionDisplayNameValue.trim();
 
       if (dialog.mode === "update") {
         await updateConnectionMutation.mutateAsync({
@@ -156,15 +106,9 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     }
 
     if (dialog.mode === "update") {
-      const normalizedConnectionDisplayName = connectionDisplayNameValue.trim();
-      if (normalizedConnectionDisplayName.length === 0) {
-        setError("Connection name is required.");
-        return;
-      }
-
       await updateConnectionMutation.mutateAsync({
         connectionId: dialog.connectionId,
-        displayName: normalizedConnectionDisplayName,
+        displayName: draft.connectionDisplayNameValue.trim(),
       });
 
       await queryClient.invalidateQueries({
@@ -177,64 +121,78 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
 
     const started = await startOAuthMutation.mutateAsync({
       targetKey: dialog.targetKey,
-      ...(connectionDisplayNameValue.trim().length === 0
+      ...(draft.connectionDisplayNameValue.trim().length === 0
         ? {}
-        : { displayName: connectionDisplayNameValue.trim() }),
+        : { displayName: draft.connectionDisplayNameValue.trim() }),
     });
     globalThis.location.assign(started.authorizationUrl);
   }
 
   function submitDialog(): void {
-    setError(null);
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      error: null,
+    }));
     void runSubmit().catch((submitError: unknown) => {
-      setError(
-        resolveApiErrorMessage({
+      setDraft((currentDraft) => ({
+        ...currentDraft,
+        error: resolveApiErrorMessage({
           error: submitError,
           fallbackMessage:
             dialog?.mode === "update"
               ? "Could not update connection."
               : "Could not start integration connection.",
         }),
-      );
+      }));
     });
   }
 
   return {
     dialog,
-    methodId,
-    connectionDisplayNamePlaceholder,
-    connectionDisplayNameValue,
-    apiKeyValue,
-    error,
+    methodId: draft.methodId,
+    connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
+    connectionDisplayNameValue: draft.connectionDisplayNameValue,
+    apiKeyValue: draft.apiKeyValue,
+    error: draft.error,
     pending:
       createApiKeyMutation.isPending ||
       startOAuthMutation.isPending ||
       updateConnectionMutation.isPending,
-    hasChanges:
-      dialog?.mode === "create"
-        ? true
-        : (dialog?.initialConnectionDisplayName ?? connectionDisplayNamePlaceholder).trim() !==
-            connectionDisplayNameValue.trim() || apiKeyValue.trim().length > 0,
-    isApiKeyChanged: apiKeyValue.trim().length > 0,
-    isConnectionDisplayNameChanged:
-      dialog?.mode === "update"
-        ? (dialog.initialConnectionDisplayName ?? connectionDisplayNamePlaceholder).trim() !==
-          connectionDisplayNameValue.trim()
-        : connectionDisplayNameValue.trim().length > 0,
+    hasChanges: hasIntegrationConnectionDialogChanges({
+      dialog,
+      connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
+      connectionDisplayNameValue: draft.connectionDisplayNameValue,
+      apiKeyValue: draft.apiKeyValue,
+    }),
+    isApiKeyChanged: draft.apiKeyValue.trim().length > 0,
+    isConnectionDisplayNameChanged: isIntegrationConnectionDisplayNameChanged({
+      dialog,
+      connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,
+      connectionDisplayNameValue: draft.connectionDisplayNameValue,
+    }),
     openDialog,
     closeDialog,
     submitDialog,
     onApiKeyChange: (value: string): void => {
-      setApiKeyValue(value);
-      setError(null);
+      setDraft((currentDraft) => ({
+        ...currentDraft,
+        apiKeyValue: value,
+        error: null,
+      }));
     },
     onConnectionDisplayNameChange: (value: string): void => {
-      setConnectionDisplayNameValue(value);
-      setError(null);
+      setDraft((currentDraft) => ({
+        ...currentDraft,
+        connectionDisplayNameValue: value,
+        error: null,
+      }));
     },
     onMethodChange: (nextMethodId: IntegrationConnectionMethodId): void => {
-      setMethodId(nextMethodId);
-      setError(null);
+      setDraft((currentDraft) => ({
+        ...currentDraft,
+        methodId: nextMethodId,
+        error: null,
+      }));
     },
   };
 }

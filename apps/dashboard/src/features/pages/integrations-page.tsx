@@ -1,27 +1,27 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import {
-  formatConnectionAuthMethodLabel,
-  resolveConnectionAuthScheme,
-} from "../integrations/connection-auth.js";
+import { resolveConnectionAuthScheme } from "../integrations/connection-auth.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
-import { formatConnectionCount } from "../integrations/format-connection-count.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import {
   IntegrationConnectionDialog,
   IntegrationConnectionMethodIds,
-  type IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-dialog.js";
-import { listIntegrationDirectory } from "../integrations/integrations-service.js";
-import { refreshIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import {
-  OrganizationIntegrationsSettingsPageView,
-  type OrganizationIntegrationsSettingsPageCard,
-} from "./organization-integrations-settings-page-view.js";
+  listIntegrationDirectory,
+  refreshIntegrationConnectionResources,
+} from "../integrations/integrations-service.js";
+import {
+  buildAvailableIntegrationViewCards,
+  buildConnectedIntegrationViewCards,
+  buildIntegrationConnectionDetailItems,
+} from "./integrations-page-view-model.js";
+import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
 import { useIntegrationConnectionDialogState } from "./use-integration-connection-dialog-state.js";
+import { useIntegrationDetailState } from "./use-integration-detail-state.js";
 
 const SETTINGS_INTEGRATIONS_QUERY_KEY: readonly ["settings", "integrations", "directory"] = [
   "settings",
@@ -29,26 +29,11 @@ const SETTINGS_INTEGRATIONS_QUERY_KEY: readonly ["settings", "integrations", "di
   "directory",
 ];
 
-function toConnectionMethods(
-  supportedAuthSchemes: readonly ("oauth" | "api-key")[] | undefined,
-): readonly IntegrationConnectionMethodId[] {
-  if (supportedAuthSchemes === undefined) {
-    return [];
-  }
-
-  return supportedAuthSchemes.map((scheme) =>
-    scheme === "api-key"
-      ? IntegrationConnectionMethodIds.API_KEY
-      : IntegrationConnectionMethodIds.OAUTH,
-  );
-}
-
 export function IntegrationsPage() {
   const navigate = useNavigate();
   const params = useParams();
   const queryClient = useQueryClient();
   const detailTargetKey = params["targetKey"] ?? null;
-  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
 
   const connectionDialogState = useIntegrationConnectionDialogState({
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
@@ -74,36 +59,15 @@ export function IntegrationsPage() {
     [cards],
   );
 
-  const selectedDetailCard = useMemo(() => {
-    if (detailTargetKey === null) {
-      return null;
-    }
-
-    return cards.find((card) => card.target.targetKey === detailTargetKey) ?? null;
-  }, [cards, detailTargetKey]);
-
-  const selectedDetailConnections = useMemo(() => {
-    if (selectedDetailCard === null) {
-      return [];
-    }
-
-    return selectedDetailCard.connections.filter((connection) => connection.status === "active");
-  }, [selectedDetailCard]);
-
-  useEffect(() => {
-    const defaultConnection = selectedDetailConnections[0] ?? null;
-    if (defaultConnection === null) {
-      setSelectedConnectionId(null);
-      return;
-    }
-
-    const selectedStillExists = selectedDetailConnections.some(
-      (connection) => connection.id === selectedConnectionId,
-    );
-    if (!selectedStillExists) {
-      setSelectedConnectionId(defaultConnection.id);
-    }
-  }, [selectedConnectionId, selectedDetailConnections]);
+  const {
+    selectedConnectionId,
+    setSelectedConnectionId,
+    selectedDetailCard,
+    selectedDetailConnections,
+  } = useIntegrationDetailState({
+    cards,
+    detailTargetKey,
+  });
 
   if (
     detailTargetKey !== null &&
@@ -124,44 +88,24 @@ export function IntegrationsPage() {
     },
   });
 
-  const connectedViewCards = useMemo<readonly OrganizationIntegrationsSettingsPageCard[]>(
+  const connectedViewCards = useMemo(
     () =>
-      activeIntegrationCards.map((card) => ({
-        targetKey: card.target.targetKey,
-        displayName: card.displayName,
-        description: formatConnectionCount(card.connections.length),
-        configStatus: card.configStatus,
-        ...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey }),
-        actionLabel: "View",
-        onAction: () => {
-          void navigate(`/settings/organization/integrations/${card.target.targetKey}`);
+      buildConnectedIntegrationViewCards({
+        activeCards: activeIntegrationCards,
+        onOpenTarget: (targetKey) => {
+          void navigate(`/settings/organization/integrations/${targetKey}`);
         },
-      })),
+      }),
     [activeIntegrationCards, navigate],
   );
 
-  const availableViewCards = useMemo<readonly OrganizationIntegrationsSettingsPageCard[]>(
+  const availableViewCards = useMemo(
     () =>
-      cards.map((card) => {
-        const methods = toConnectionMethods(card.target.supportedAuthSchemes);
-
-        return {
-          targetKey: card.target.targetKey,
-          displayName: card.displayName,
-          description: card.description,
-          configStatus: card.configStatus,
-          ...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey }),
-          actionDisabled: methods.length === 0,
-          actionLabel: "Add",
-          onAction: () => {
-            connectionDialogState.openDialog({
-              targetKey: card.target.targetKey,
-              targetDisplayName: card.displayName,
-              methods,
-              mode: "create",
-            });
-          },
-        };
+      buildAvailableIntegrationViewCards({
+        cards,
+        onOpenCreateDialog: (dialogInput) => {
+          connectionDialogState.openDialog(dialogInput);
+        },
       }),
     [cards, connectionDialogState],
   );
@@ -173,35 +117,12 @@ export function IntegrationsPage() {
 
     return (
       <IntegrationConnectionDetailView
-        connections={selectedDetailConnections.map((connection) => {
-          const authScheme = resolveConnectionAuthScheme(connection.config ?? null);
-
-          return {
-            id: connection.id,
-            displayName: connection.displayName,
-            status: connection.status,
-            ...(authScheme === null
-              ? {}
-              : { authMethodLabel: formatConnectionAuthMethodLabel(authScheme) }),
-            ...(connection.externalSubjectId === undefined
-              ? {}
-              : { externalSubjectId: connection.externalSubjectId }),
-            createdAt: connection.createdAt,
-            updatedAt: connection.updatedAt,
-            resources: (connection.resources ?? []).map((resource) => ({
-              kind: resource.kind,
-              selectionMode: resource.selectionMode,
-              count: resource.count,
-              syncState: resource.syncState,
-              ...(resource.lastSyncedAt === undefined
-                ? {}
-                : { lastSyncedAt: resource.lastSyncedAt }),
-              isRefreshing:
-                refreshResourceMutation.isPending &&
-                refreshResourceMutation.variables?.connectionId === connection.id &&
-                refreshResourceMutation.variables.kind === resource.kind,
-            })),
-          };
+        connections={buildIntegrationConnectionDetailItems({
+          connections: selectedDetailConnections,
+          refreshingResource:
+            !refreshResourceMutation.isPending || refreshResourceMutation.variables === undefined
+              ? null
+              : refreshResourceMutation.variables,
         })}
         {...(selectedDetailCard.target.logoKey === undefined
           ? {}
