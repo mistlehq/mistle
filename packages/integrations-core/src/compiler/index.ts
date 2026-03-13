@@ -25,13 +25,20 @@ import {
   type RuntimeArtifactLifecycleBuilder,
   type RuntimeArtifactRefs,
   type RuntimeArtifactSpec,
+  type SandboxPathRefs,
 } from "../types/index.js";
 import { validateCompiledBindingResults } from "../validation/index.js";
 
-const RuntimeArtifactBinDirectory = "/workspace/.mistle/bin";
+const SandboxPaths: SandboxPathRefs = {
+  userHomeDir: "/home/sandbox",
+  userProjectsDir: "/home/sandbox/projects",
+  runtimeDataDir: "/var/lib/mistle",
+  runtimeArtifactDir: "/var/lib/mistle/artifacts",
+  runtimeArtifactBinDir: "/var/lib/mistle/bin",
+};
 
 function artifactBinPath(name: string): string {
-  return `${RuntimeArtifactBinDirectory}/${name}`;
+  return `${SandboxPaths.runtimeArtifactBinDir}/${name}`;
 }
 
 function resolveEgressRuleId(input: { bindingId: string; routeIndex: number }): string {
@@ -114,6 +121,7 @@ function createRuntimeArtifactRefs(input: {
     command: {
       exec,
     },
+    sandboxPaths: SandboxPaths,
     artifactBinPath,
     mise: {
       install: (installInput) =>
@@ -578,6 +586,7 @@ function compileBindings(input: CompileBindingsInput): ReadonlyArray<CompiledBin
         config: parsedBindingConfig,
       },
       refs: {
+        sandboxPaths: SandboxPaths,
         artifactBinPath,
       },
     };

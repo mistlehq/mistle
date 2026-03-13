@@ -921,7 +921,7 @@ describeIf("system github cli sandbox", () => {
         await connectPtyChannel({
           socket: websocket,
           pump,
-          cwd: "/workspace",
+          cwd: "/home/sandbox",
         });
 
         const ghAvailabilityOutput = await expectSuccessfulPtyCommand({
@@ -933,7 +933,7 @@ describeIf("system github cli sandbox", () => {
         });
         expect(ghAvailabilityOutput).toContain("GH_READY");
 
-        const repositoryWorkspacePath = `/workspace/repos/${repository.owner}/${repository.repo}`;
+        const repositoryWorkspacePath = `/home/sandbox/projects/${repository.owner}/${repository.repo}`;
         const canonicalOriginOutput = await expectSuccessfulPtyCommand({
           socket: websocket,
           pump,

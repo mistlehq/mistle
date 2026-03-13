@@ -86,8 +86,11 @@ function toRepositoryCloneOriginUrl(input: { webBaseUrl: string; repository: str
   return parsedBaseUrl.toString();
 }
 
-function toRepositoryWorkspacePath(repository: string): string {
-  return `/workspace/repos/${repository}`;
+function toRepositoryWorkspacePath(input: {
+  projectsDirectory: string;
+  repository: string;
+}): string {
+  return `${input.projectsDirectory}/${input.repository}`;
 }
 
 function resolveGitHubApiPathPrefixes(apiBaseUrl: string): ReadonlyArray<string> {
@@ -246,7 +249,10 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
     workspaceSources: repositories.map((repository) => ({
       sourceKind: "git-clone",
       resourceKind: "repository",
-      path: toRepositoryWorkspacePath(repository),
+      path: toRepositoryWorkspacePath({
+        projectsDirectory: input.refs.sandboxPaths.userProjectsDir,
+        repository,
+      }),
       originUrl: toRepositoryCloneOriginUrl({
         webBaseUrl: input.target.config.webBaseUrl,
         repository,

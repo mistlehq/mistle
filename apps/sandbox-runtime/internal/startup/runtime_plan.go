@@ -10,6 +10,8 @@ const (
 	resolvedSandboxImageSourceSnapshot    = "snapshot"
 	resolvedSandboxImageSourceProfileBase = "profile-base"
 	resolvedSandboxImageSourceBase        = "base"
+	runtimeFileWriteModeOverwrite         = "overwrite"
+	runtimeFileWriteModeIfAbsent          = "if-absent"
 )
 
 var allowedAuthInjectionTypes = map[string]struct{}{
@@ -148,10 +150,11 @@ type RuntimeClientProcessStopPolicy struct {
 }
 
 type RuntimeFileSpec struct {
-	FileID  string `json:"fileId"`
-	Path    string `json:"path"`
-	Mode    int    `json:"mode"`
-	Content string `json:"content"`
+	FileID    string `json:"fileId"`
+	Path      string `json:"path"`
+	Mode      int    `json:"mode"`
+	Content   string `json:"content"`
+	WriteMode string `json:"writeMode"`
 }
 
 type AgentRuntime struct {
@@ -545,6 +548,16 @@ func validateRuntimeClientSetup(setup RuntimeClientSetup, clientIndex int) error
 		}
 		if file.Mode < 0 {
 			return fmt.Errorf("runtime plan runtimeClients[%d].setup.files[%d].mode must be greater than or equal to 0", clientIndex, fileIndex)
+		}
+		if strings.TrimSpace(file.WriteMode) != "" &&
+			file.WriteMode != runtimeFileWriteModeOverwrite &&
+			file.WriteMode != runtimeFileWriteModeIfAbsent {
+			return fmt.Errorf(
+				"runtime plan runtimeClients[%d].setup.files[%d].writeMode '%s' is not supported",
+				clientIndex,
+				fileIndex,
+				file.WriteMode,
+			)
 		}
 	}
 

@@ -9,6 +9,7 @@ import type {
   RuntimeArtifactCommand,
   RuntimeClientEndpointSpec,
   RuntimeClientProcessSpec,
+  RuntimeFileWriteMode,
 } from "../types/index.js";
 
 const ReservedArtifactEnvKeys = new Set([
@@ -569,11 +570,11 @@ function validateRuntimeClients(input: ReadonlyArray<CompiledRuntimeClient>): vo
   const clientEnvByClientId = new Map<string, Map<string, string>>();
   const clientFilesByPathByClientId = new Map<
     string,
-    Map<string, { fileId: string; mode: number; content: string }>
+    Map<string, { fileId: string; mode: number; content: string; writeMode?: RuntimeFileWriteMode }>
   >();
   const clientFilesByIdByClientId = new Map<
     string,
-    Map<string, { path: string; mode: number; content: string }>
+    Map<string, { path: string; mode: number; content: string; writeMode?: RuntimeFileWriteMode }>
   >();
   const clientProcessesByKey = new Map<string, Map<string, RuntimeClientProcessSpec>>();
   const clientEndpointsByKey = new Map<string, Map<string, RuntimeClientEndpointSpec>>();
@@ -622,7 +623,8 @@ function validateRuntimeClients(input: ReadonlyArray<CompiledRuntimeClient>): vo
         existingFileByPath !== undefined &&
         (existingFileByPath.fileId !== file.fileId ||
           existingFileByPath.mode !== file.mode ||
-          existingFileByPath.content !== file.content)
+          existingFileByPath.content !== file.content ||
+          existingFileByPath.writeMode !== file.writeMode)
       ) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
@@ -635,7 +637,8 @@ function validateRuntimeClients(input: ReadonlyArray<CompiledRuntimeClient>): vo
         existingFileById !== undefined &&
         (existingFileById.path !== file.path ||
           existingFileById.mode !== file.mode ||
-          existingFileById.content !== file.content)
+          existingFileById.content !== file.content ||
+          existingFileById.writeMode !== file.writeMode)
       ) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
@@ -647,11 +650,13 @@ function validateRuntimeClients(input: ReadonlyArray<CompiledRuntimeClient>): vo
         fileId: file.fileId,
         mode: file.mode,
         content: file.content,
+        ...(file.writeMode === undefined ? {} : { writeMode: file.writeMode }),
       });
       filesById.set(file.fileId, {
         path: file.path,
         mode: file.mode,
         content: file.content,
+        ...(file.writeMode === undefined ? {} : { writeMode: file.writeMode }),
       });
     }
 

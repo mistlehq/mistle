@@ -29,7 +29,14 @@ describe("compileLinearBinding", () => {
         config: {},
       },
       refs: {
-        artifactBinPath: (name) => `/workspace/.mistle/bin/${name}`,
+        sandboxPaths: {
+          userHomeDir: "/home/sandbox",
+          userProjectsDir: "/home/sandbox/projects",
+          runtimeDataDir: "/var/lib/mistle",
+          runtimeArtifactDir: "/var/lib/mistle/artifacts",
+          runtimeArtifactBinDir: "/var/lib/mistle/bin",
+        },
+        artifactBinPath: (name) => `/var/lib/mistle/bin/${name}`,
       },
     });
 

@@ -44,7 +44,7 @@ func TestValidateRuntimePlan(t *testing.T) {
 				{
 					SourceKind:   "git-clone",
 					ResourceKind: "repository",
-					Path:         "/workspace/repos/mistlehq/mistle",
+					Path:         "/home/sandbox/projects/mistlehq/mistle",
 					OriginURL:    "https://github.com/mistlehq/mistle.git",
 				},
 			},

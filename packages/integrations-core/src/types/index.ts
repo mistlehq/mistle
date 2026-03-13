@@ -296,7 +296,16 @@ export type ResolvedIntegrationMcpServer = {
   };
 };
 
+export type SandboxPathRefs = {
+  userHomeDir: string;
+  userProjectsDir: string;
+  runtimeDataDir: string;
+  runtimeArtifactDir: string;
+  runtimeArtifactBinDir: string;
+};
+
 export type CompileBindingRefs = {
+  sandboxPaths: SandboxPathRefs;
   artifactBinPath(name: string): string;
 };
 
@@ -561,6 +570,7 @@ export type RuntimeArtifactRefs = {
   command: {
     exec(input: RuntimeArtifactCommand): RuntimeArtifactCommand;
   };
+  sandboxPaths: SandboxPathRefs;
   artifactBinPath(name: string): string;
   mise: {
     install(input: {
@@ -614,9 +624,24 @@ export type CompiledRuntimeArtifactRemovalSpec = {
   commands: ReadonlyArray<RuntimeArtifactCommand>;
 };
 
+export const RuntimeFileWriteMode = {
+  OVERWRITE: "overwrite",
+  IF_ABSENT: "if-absent",
+} as const;
+
+export type RuntimeFileWriteMode = (typeof RuntimeFileWriteMode)[keyof typeof RuntimeFileWriteMode];
+
+export type RuntimeClientSetupFile = {
+  fileId: string;
+  path: string;
+  mode: number;
+  content: string;
+  writeMode?: RuntimeFileWriteMode;
+};
+
 type RuntimeClientSetupBase<TEnvValue> = {
   env: Record<string, TEnvValue>;
-  files: ReadonlyArray<{ fileId: string; path: string; mode: number; content: string }>;
+  files: ReadonlyArray<RuntimeClientSetupFile>;
   launchArgs?: ReadonlyArray<string>;
 };
 

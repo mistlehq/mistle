@@ -7,7 +7,7 @@ prepend_path_once() {
   esac
 }
 
-prepend_path_once /workspace/.mistle/bin
+prepend_path_once /var/lib/mistle/bin
 prepend_path_once /home/sandbox/.local/share/mise/shims
 
 export PATH

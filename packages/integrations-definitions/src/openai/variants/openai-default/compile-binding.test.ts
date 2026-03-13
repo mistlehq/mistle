@@ -11,7 +11,14 @@ import { createOpenAiRawBindingCapabilities } from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 
 const OpenAiApiKeyAuthScheme: IntegrationSupportedAuthScheme = "api-key";
-const RuntimeArtifactBinDirectory = "/workspace/.mistle/bin";
+const RuntimeArtifactBinDirectory = "/var/lib/mistle/bin";
+const SandboxPaths = {
+  userHomeDir: "/home/sandbox",
+  userProjectsDir: "/home/sandbox/projects",
+  runtimeDataDir: "/var/lib/mistle",
+  runtimeArtifactDir: "/var/lib/mistle/artifacts",
+  runtimeArtifactBinDir: RuntimeArtifactBinDirectory,
+} as const;
 
 function artifactBinPath(name: string): string {
   return `${RuntimeArtifactBinDirectory}/${name}`;
@@ -36,6 +43,7 @@ function createRuntimeArtifactRefs(): RuntimeArtifactRefs {
     command: {
       exec,
     },
+    sandboxPaths: SandboxPaths,
     artifactBinPath,
     mise: {
       install: (input) =>
@@ -106,6 +114,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         },
       },
       refs: {
+        sandboxPaths: SandboxPaths,
         artifactBinPath,
       },
     });
@@ -145,7 +154,7 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(installCommands?.[0]?.args[1]).toContain(
       '"fileName":"codex-aarch64-unknown-linux-musl.tar.gz"',
     );
-    expect(installCommands?.[0]?.args[1]).toContain('"installPath":"/workspace/.mistle/bin/codex"');
+    expect(installCommands?.[0]?.args[1]).toContain('"installPath":"/var/lib/mistle/bin/codex"');
     expect(installCommands?.[0]?.timeoutMs).toBe(120_000);
 
     const updateCommands = resolveArtifactLifecycleHook(codexArtifact?.lifecycle.update);
@@ -153,7 +162,7 @@ describe("compileOpenAiApiKeyBinding", () => {
 
     expect(resolveArtifactLifecycleHook(codexArtifact?.lifecycle.remove)).toEqual([
       {
-        args: ["rm", "-f", "/workspace/.mistle/bin/codex"],
+        args: ["rm", "-f", "/var/lib/mistle/bin/codex"],
       },
     ]);
 
@@ -168,6 +177,7 @@ describe("compileOpenAiApiKeyBinding", () => {
       fileId: "codex_config",
       path: "/home/sandbox/.codex/config.toml",
       mode: 384,
+      writeMode: "if-absent",
     });
     const configContent = compiled.runtimeClients[0]?.setup.files[0]?.content;
     expect(configContent).toContain('model = "gpt-5.3-codex"');
@@ -182,7 +192,7 @@ describe("compileOpenAiApiKeyBinding", () => {
       {
         processKey: "codex-app-server",
         command: {
-          args: ["/workspace/.mistle/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
+          args: ["/var/lib/mistle/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
         },
         readiness: {
           type: "ws",
@@ -247,6 +257,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         },
       },
       refs: {
+        sandboxPaths: SandboxPaths,
         artifactBinPath,
       },
     });
@@ -287,6 +298,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         },
       },
       refs: {
+        sandboxPaths: SandboxPaths,
         artifactBinPath,
       },
     });
@@ -330,6 +342,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         },
       },
       refs: {
+        sandboxPaths: SandboxPaths,
         artifactBinPath,
       },
     });
@@ -366,6 +379,7 @@ describe("compileOpenAiApiKeyBinding", () => {
           },
         },
         refs: {
+          sandboxPaths: SandboxPaths,
           artifactBinPath,
         },
       }),

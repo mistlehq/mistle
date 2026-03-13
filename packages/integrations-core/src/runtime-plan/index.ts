@@ -12,6 +12,7 @@ import type {
   RuntimeClient,
   RuntimeClientEndpointSpec,
   RuntimeClientProcessSpec,
+  RuntimeFileWriteMode,
 } from "../types/index.js";
 
 export { CompiledRuntimePlanSchema } from "./schema.js";
@@ -241,8 +242,14 @@ function mergeRuntimeClients(input: ReadonlyArray<RuntimeClient>): ReadonlyArray
     string,
     {
       env: Map<string, string>;
-      filesByPath: Map<string, { fileId: string; mode: number; content: string }>;
-      filesById: Map<string, { path: string; mode: number; content: string }>;
+      filesByPath: Map<
+        string,
+        { fileId: string; mode: number; content: string; writeMode?: RuntimeFileWriteMode }
+      >;
+      filesById: Map<
+        string,
+        { path: string; mode: number; content: string; writeMode?: RuntimeFileWriteMode }
+      >;
       launchArgs: string[];
       processesByKey: Map<string, RuntimeClientProcessSpec>;
       endpointsByKey: Map<string, RuntimeClientEndpointSpec>;
@@ -280,7 +287,8 @@ function mergeRuntimeClients(input: ReadonlyArray<RuntimeClient>): ReadonlyArray
         existingFileByPath !== undefined &&
         (existingFileByPath.fileId !== file.fileId ||
           existingFileByPath.mode !== file.mode ||
-          existingFileByPath.content !== file.content)
+          existingFileByPath.content !== file.content ||
+          existingFileByPath.writeMode !== file.writeMode)
       ) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
@@ -293,7 +301,8 @@ function mergeRuntimeClients(input: ReadonlyArray<RuntimeClient>): ReadonlyArray
         existingFileById !== undefined &&
         (existingFileById.path !== file.path ||
           existingFileById.mode !== file.mode ||
-          existingFileById.content !== file.content)
+          existingFileById.content !== file.content ||
+          existingFileById.writeMode !== file.writeMode)
       ) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT,
@@ -305,11 +314,13 @@ function mergeRuntimeClients(input: ReadonlyArray<RuntimeClient>): ReadonlyArray
         fileId: file.fileId,
         mode: file.mode,
         content: file.content,
+        ...(file.writeMode === undefined ? {} : { writeMode: file.writeMode }),
       });
       mergedClient.filesById.set(file.fileId, {
         path: file.path,
         mode: file.mode,
         content: file.content,
+        ...(file.writeMode === undefined ? {} : { writeMode: file.writeMode }),
       });
     }
 
@@ -359,6 +370,7 @@ function mergeRuntimeClients(input: ReadonlyArray<RuntimeClient>): ReadonlyArray
           path,
           mode: file.mode,
           content: file.content,
+          ...(file.writeMode === undefined ? {} : { writeMode: file.writeMode }),
         }));
       const processes = [...mergedClient.processesByKey.values()].sort((left, right) =>
         left.processKey.localeCompare(right.processKey),

@@ -9,6 +9,8 @@ The base image includes a single sandbox runtime entrypoint that every sandbox w
 - Generate a fresh per-sandbox proxy CA, install its certificate into the OS trust store, and pass signer material to `sandboxd`
 - Drop privileges to the `sandbox` user before execing `sandboxd`
 - Install `mise` as the runtime manager at `/usr/local/bin/mise`
+- Pre-create user-owned sandbox state under `/home/sandbox`
+- Pre-create runtime-owned mutable state under `/var/lib/mistle`
 
 ## Runtime Contract
 
@@ -28,4 +30,6 @@ The base image includes a single sandbox runtime entrypoint that every sandbox w
   - `runtimePlan`
 - Health endpoint: `GET /__healthz` returns 200 only after bootstrap token is loaded
 - Egress behavior: `sandboxd` acts as an outbound HTTP(S) proxy and forwards matched integration traffic to tokenizer proxy egress
-- `PATH` includes `mise` shims at `/home/sandbox/.local/share/mise/shims`
+- User-owned persistent state lives under `/home/sandbox`
+- Runtime-owned mutable state lives under `/var/lib/mistle`
+- `PATH` includes `/var/lib/mistle/bin` and `mise` shims at `/home/sandbox/.local/share/mise/shims`

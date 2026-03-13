@@ -32,8 +32,15 @@ RUN apt-get update \
 
 RUN groupadd --gid "${SANDBOX_GID}" "${SANDBOX_USER}" \
   && useradd --uid "${SANDBOX_UID}" --gid "${SANDBOX_GID}" --create-home --shell /bin/sh "${SANDBOX_USER}" \
-  && mkdir -p /workspace/.mistle/bin \
-  && chown -R "${SANDBOX_UID}:${SANDBOX_GID}" /workspace
+  && mkdir -p \
+    /home/${SANDBOX_USER}/projects \
+    /run/mistle \
+    /var/lib/mistle/artifacts \
+    /var/lib/mistle/bin \
+  && chown -R "${SANDBOX_UID}:${SANDBOX_GID}" \
+    /home/${SANDBOX_USER} \
+    /run/mistle \
+    /var/lib/mistle
 
 RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PATH="/usr/local/bin/mise" sh
 
@@ -47,9 +54,9 @@ RUN chmod +x \
   /usr/local/bin/sandbox-bootstrap \
   /usr/local/bin/sandboxd
 
-ENV PATH="/workspace/.mistle/bin:/home/${SANDBOX_USER}/.local/share/mise/shims:/usr/local/bin:${PATH}"
+ENV PATH="/var/lib/mistle/bin:/home/${SANDBOX_USER}/.local/share/mise/shims:/usr/local/bin:${PATH}"
 
-WORKDIR /workspace
+WORKDIR /home/${SANDBOX_USER}
 USER root
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandbox-bootstrap"]
