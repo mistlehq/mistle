@@ -48,6 +48,40 @@ describe("SandboxOwnerLeaseHeartbeat", () => {
     handle.stop();
   });
 
+  it("notifies the caller after a successful owner lease renewal", async () => {
+    const clock = createMutableClock(0);
+    const scheduler = createManualScheduler(clock);
+    const sandboxOwnerStore = new InMemorySandboxOwnerStore(clock);
+    const owner = await sandboxOwnerStore.claimOwner({
+      sandboxInstanceId: "sbi_test",
+      nodeId: "dpg_test",
+      sessionId: "dts_test",
+      ttlMs: 30_000,
+    });
+    const heartbeat = new SandboxOwnerLeaseHeartbeat(sandboxOwnerStore, scheduler, 10_000);
+    let renewalCount = 0;
+
+    const handle = heartbeat.start({
+      sandboxInstanceId: owner.sandboxInstanceId,
+      leaseId: owner.leaseId,
+      ttlMs: 30_000,
+      onLeaseRenewed: () => {
+        renewalCount += 1;
+      },
+      onLeaseLost: () => {
+        throw new Error("Expected owner lease renewal to succeed.");
+      },
+    });
+
+    clock.advanceMs(10_000);
+    expect(scheduler.runDue()).toBe(1);
+    await flushMicrotasks();
+
+    expect(renewalCount).toBe(1);
+
+    handle.stop();
+  });
+
   it("stops scheduling renewals when the heartbeat is stopped", async () => {
     const clock = createMutableClock(0);
     const scheduler = createManualScheduler(clock);

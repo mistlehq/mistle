@@ -19,6 +19,11 @@ import type { SandboxOwnerLeaseHeartbeat } from "./ownership/sandbox-owner-lease
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
 import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
+import {
+  markSandboxTunnelConnected,
+  markSandboxTunnelDisconnected,
+  markSandboxTunnelSeen,
+} from "./tunnel-liveliness-store.js";
 import type { RelayPeerSide, RelayTarget } from "./types.js";
 
 const SandboxTunnelRoutePath = "/tunnel/sandbox/:instanceId";
@@ -300,10 +305,38 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             });
 
             if (requestedToken.kind === "bootstrap") {
+              void markSandboxTunnelConnected({
+                db: ctx.get("db"),
+                sandboxInstanceId,
+              }).catch((error: unknown) => {
+                logger.error(
+                  {
+                    err: error,
+                    sandboxInstanceId,
+                  },
+                  "Failed to persist sandbox tunnel connected timestamp",
+                );
+                ws.close(CloseCodes.INTERNAL_ERROR, "Failed to persist sandbox tunnel connection.");
+              });
+
               sandboxOwnerLeaseHeartbeatHandle = input.sandboxOwnerLeaseHeartbeat.start({
                 sandboxInstanceId,
                 leaseId: bootstrapOwnerLeaseId,
                 ttlMs: OwnerLeaseTtlMs,
+                onLeaseRenewed: () => {
+                  void markSandboxTunnelSeen({
+                    db: ctx.get("db"),
+                    sandboxInstanceId,
+                  }).catch((error: unknown) => {
+                    logger.error(
+                      {
+                        err: error,
+                        sandboxInstanceId,
+                      },
+                      "Failed to persist sandbox tunnel heartbeat timestamp",
+                    );
+                  });
+                },
                 onLeaseLost: () => {
                   logger.error(
                     {
@@ -363,6 +396,18 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
           onClose: () => {
             sandboxOwnerLeaseHeartbeatHandle?.stop();
             if (requestedToken.kind === "bootstrap" && bootstrapOwnerLeaseId !== undefined) {
+              void markSandboxTunnelDisconnected({
+                db: ctx.get("db"),
+                sandboxInstanceId,
+              }).catch((error: unknown) => {
+                logger.error(
+                  {
+                    err: error,
+                    sandboxInstanceId,
+                  },
+                  "Failed to persist sandbox tunnel disconnected timestamp",
+                );
+              });
               void input.sandboxOwnerStore.releaseOwner({
                 sandboxInstanceId,
                 leaseId: bootstrapOwnerLeaseId,
