@@ -64,7 +64,18 @@ Configure these values:
 1. **GitHub App name** such as `Mistle GitHub App`
 2. **Homepage URL** as any valid URL for your organization
 3. **Callback URL** can be left unset for this flow.
-4. **Setup URL** should point at the frontend route in your deployment that receives the GitHub App installation callback and submits the returned query parameters to Mistle.
+4. **Setup URL** should point at the control-plane OAuth completion endpoint for the target key you plan to enable. GitHub redirects here after app installation, and Mistle completes the connection before redirecting the browser to the dashboard integrations page:
+
+<CodeGroup>
+```txt GitHub Cloud target
+https://<control-plane-base-url>/v1/integration/connections/github-cloud/oauth/complete
+```
+
+```txt GHES target
+https://<control-plane-base-url>/v1/integration/connections/github-enterprise-server/oauth/complete
+```
+
+</CodeGroup>
 5. **Webhook URL** should target the control-plane webhook route for the target key you plan to enable:
 
 <CodeGroup>
@@ -93,7 +104,7 @@ https://<control-plane-base-url>/v1/integration/webhooks/github-enterprise-serve
 9. Generate and download a PEM private key.
 10. Copy the App ID, app slug, and optional client ID into your Mistle provision manifest.
 
-Mistle's current GitHub flow is GitHub App installation based, not a traditional OAuth authorization-code exchange. The backend starts the flow by generating an installation URL at `/apps/<app-slug>/installations/new?state=...` and completes it from callback query parameters such as `state`, `installation_id`, and `setup_action`.
+Mistle's current GitHub flow is GitHub App installation based, not a traditional OAuth authorization-code exchange. The backend starts the flow by generating an installation URL at `/apps/<app-slug>/installations/new?state=...`. GitHub then redirects directly to Mistle's control-plane completion endpoint at `/v1/integration/connections/<target-key>/oauth/complete`, which processes callback query parameters such as `state`, `installation_id`, and `setup_action`, creates the integration connection, and redirects the browser to the dashboard integrations page.
 
 ## Configure Mistle
 
