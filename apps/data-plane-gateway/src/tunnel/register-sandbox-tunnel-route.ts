@@ -167,6 +167,15 @@ function replaceStreamId(input: { message: StreamControlMessage; streamId: numbe
   });
 }
 
+function parseAgentStreamOpen(payload: string) {
+  const message = parseStreamControlMessage(payload);
+  if (message?.type !== "stream.open" || message.channel.kind !== "agent") {
+    return undefined;
+  }
+
+  return message;
+}
+
 function hasPTYExitEvent(message: StreamControlMessage): boolean {
   return message.type === "stream.event" && message.event.type === "pty.exit";
 }
@@ -198,6 +207,23 @@ async function translateConnectionPayloadToBootstrap(input: {
     };
   }
 
+  const agentStreamOpen = parseAgentStreamOpen(input.payload);
+  if (agentStreamOpen !== undefined) {
+    const route = await input.interactiveStreamRouter.openInteractiveStream({
+      sandboxInstanceId: input.sandboxInstanceId,
+      channelKind: "agent",
+      clientSessionId: input.clientSessionId,
+      clientStreamId: agentStreamOpen.streamId,
+    });
+
+    return {
+      payload: replaceStreamId({
+        message: agentStreamOpen,
+        streamId: route.binding.tunnelStreamId,
+      }),
+    };
+  }
+
   const controlMessage = parseStreamControlMessage(input.payload);
   if (controlMessage === undefined) {
     return {
@@ -210,38 +236,25 @@ async function translateConnectionPayloadToBootstrap(input: {
     clientSessionId: input.clientSessionId,
     clientStreamId: controlMessage.streamId,
   });
-  if (route === undefined || route.binding.channelKind !== "pty") {
+  if (route === undefined) {
     return {
       payload: input.payload,
     };
   }
 
   if (controlMessage.type === "stream.signal") {
-    if (!hasPTYResizeSignal(controlMessage)) {
+    if (route.binding.channelKind !== "pty" || !hasPTYResizeSignal(controlMessage)) {
       return {
         payload: input.payload,
       };
     }
-
-    return {
-      payload: replaceStreamId({
-        message: controlMessage,
-        streamId: route.binding.tunnelStreamId,
-      }),
-    };
-  }
-
-  if (controlMessage.type === "stream.close") {
-    return {
-      payload: replaceStreamId({
-        message: controlMessage,
-        streamId: route.binding.tunnelStreamId,
-      }),
-    };
   }
 
   return {
-    payload: input.payload,
+    payload: replaceStreamId({
+      message: controlMessage,
+      streamId: route.binding.tunnelStreamId,
+    }),
   };
 }
 
@@ -261,7 +274,7 @@ async function translateBootstrapPayloadToConnection(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     tunnelStreamId: controlMessage.streamId,
   });
-  if (route === undefined || route.binding.channelKind !== "pty") {
+  if (route === undefined) {
     return {
       payload: input.payload,
     };
@@ -275,7 +288,7 @@ async function translateBootstrapPayloadToConnection(input: {
     releaseInteractiveStream:
       controlMessage.type === "stream.open.error" ||
       controlMessage.type === "stream.reset" ||
-      hasPTYExitEvent(controlMessage)
+      (route.binding.channelKind === "pty" && hasPTYExitEvent(controlMessage))
         ? {
             clientSessionId: route.binding.clientSessionId,
             clientStreamId: route.binding.clientStreamId,
