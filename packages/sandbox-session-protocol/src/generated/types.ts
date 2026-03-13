@@ -4,72 +4,64 @@
  * Sandbox session websocket control messages.
  */
 export type SandboxSessionControlMessage =
-  | AgentConnectRequest
-  | PTYConnectRequest
-  | ConnectOK
-  | ConnectError
-  | Disconnect
-  | PTYResize
-  | PTYClose
-  | PTYCloseOK
-  | PTYCloseError
-  | PTYExit;
+  | StreamOpen
+  | StreamOpenOK
+  | StreamOpenError
+  | StreamSignal
+  | StreamEvent
+  | StreamClose
+  | StreamReset
+  | Disconnect;
 
-export interface AgentConnectRequest {
-  type: "connect";
-  v: 1;
-  requestId: string;
+export interface StreamOpen {
+  type: "stream.open";
+  streamId: number;
   channel: {
-    kind: "agent";
-  };
-}
-export interface PTYConnectRequest {
-  type: "connect";
-  v: 1;
-  requestId: string;
-  channel: {
-    kind: "pty";
-    session: "create" | "attach";
+    kind: "agent" | "pty";
+    session?: "create" | "attach";
     cols?: number;
     rows?: number;
     cwd?: string;
   };
 }
-export interface ConnectOK {
-  type: "connect.ok";
-  requestId: string;
+export interface StreamOpenOK {
+  type: "stream.open.ok";
+  streamId: number;
 }
-export interface ConnectError {
-  type: "connect.error";
-  requestId: string;
+export interface StreamOpenError {
+  type: "stream.open.error";
+  streamId: number;
+  code: string;
+  message: string;
+}
+export interface StreamSignal {
+  type: "stream.signal";
+  streamId: number;
+  signal: {
+    type: "pty.resize";
+    cols: number;
+    rows: number;
+  };
+}
+export interface StreamEvent {
+  type: "stream.event";
+  streamId: number;
+  event: {
+    type: "pty.exit";
+    exitCode: number;
+  };
+}
+export interface StreamClose {
+  type: "stream.close";
+  streamId: number;
+}
+export interface StreamReset {
+  type: "stream.reset";
+  streamId: number;
   code: string;
   message: string;
 }
 export interface Disconnect {
   type: "disconnect";
   reason?: string;
-}
-export interface PTYResize {
-  type: "pty.resize";
-  cols: number;
-  rows: number;
-}
-export interface PTYClose {
-  type: "pty.close";
-  requestId: string;
-}
-export interface PTYCloseOK {
-  type: "pty.close.ok";
-  requestId: string;
-  exitCode: number;
-}
-export interface PTYCloseError {
-  type: "pty.close.error";
-  requestId: string;
-  code: string;
-  message: string;
-}
-export interface PTYExit {
-  type: "pty.exit";
-  exitCode: number;
 }

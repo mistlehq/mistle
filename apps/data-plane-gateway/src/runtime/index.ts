@@ -74,6 +74,7 @@ export function createDataPlaneGatewayRuntime(
     } satisfies ConnectionTokenConfig,
     interactiveStreamRouter,
     relayCoordinator,
+    tunnelSessionRegistry,
     sandboxOwnerStore,
     sandboxOwnerResolver,
     sandboxOwnerLeaseHeartbeat,

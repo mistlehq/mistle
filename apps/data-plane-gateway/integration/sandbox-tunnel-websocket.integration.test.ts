@@ -4,13 +4,14 @@
 
 import { randomUUID } from "node:crypto";
 
+import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 import WebSocket from "ws";
 
-import { it } from "./test-context.js";
+import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import {
   closeWebSocket,
   connectWebSocket,
@@ -21,6 +22,27 @@ import {
 } from "./websocket-test-helpers.js";
 
 const IntegrationTestTimeoutMs = 30_000;
+
+async function insertSandboxInstanceRow(input: {
+  fixture: DataPlaneGatewayIntegrationFixture;
+  sandboxInstanceId: string;
+}): Promise<void> {
+  await input.fixture.db.insert(sandboxInstances).values({
+    id: input.sandboxInstanceId,
+    organizationId: "org_data_plane_gateway_integration",
+    sandboxProfileId: "sbp_data_plane_gateway_integration",
+    sandboxProfileVersion: 1,
+    provider: input.fixture.config.sandbox.provider,
+    providerSandboxId: `provider-${input.sandboxInstanceId}`,
+    status: SandboxInstanceStatuses.STARTING,
+    startedByKind: "system",
+    startedById: "workflow_data_plane_gateway_integration",
+    source: "webhook",
+    tunnelConnectedAt: null,
+    lastTunnelSeenAt: null,
+    tunnelDisconnectedAt: "2026-03-13T00:00:00.000Z",
+  });
+}
 
 async function closeWebSocketIfOpen(socket: WebSocket | undefined): Promise<void> {
   if (socket === undefined) {
@@ -33,11 +55,15 @@ async function closeWebSocketIfOpen(socket: WebSocket | undefined): Promise<void
   await closeWebSocket(socket);
 }
 
-describe("sandbox tunnel websocket ping integration", () => {
+describe("sandbox tunnel websocket integration", () => {
   it(
     "accepts websocket connections for bootstrap and connection tokens and responds to ping on both",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
       const bootstrapToken = await mintBootstrapToken({
         config: {
           bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
@@ -59,11 +85,11 @@ describe("sandbox tunnel websocket ping integration", () => {
         ttlSeconds: 120,
       });
 
-      let sandboxSocket: WebSocket | undefined;
+      let bootstrapSocket: WebSocket | undefined;
       let clientSocket: WebSocket | undefined;
 
       try {
-        sandboxSocket = await connectWebSocket(
+        bootstrapSocket = await connectWebSocket(
           `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
         );
         clientSocket = await connectWebSocket(
@@ -71,12 +97,12 @@ describe("sandbox tunnel websocket ping integration", () => {
         );
 
         await Promise.all([
-          sendWebSocketPingAndExpectPong(sandboxSocket, Buffer.from("sandbox-ping", "utf8")),
+          sendWebSocketPingAndExpectPong(bootstrapSocket, Buffer.from("sandbox-ping", "utf8")),
           sendWebSocketPingAndExpectPong(clientSocket, Buffer.from("client-ping", "utf8")),
         ]);
       } finally {
         await Promise.all([
-          closeWebSocketIfOpen(sandboxSocket),
+          closeWebSocketIfOpen(bootstrapSocket),
           closeWebSocketIfOpen(clientSocket),
         ]);
       }
@@ -88,6 +114,10 @@ describe("sandbox tunnel websocket ping integration", () => {
     "forwards text and binary websocket messages between bootstrap and connection peers",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
       const bootstrapToken = await mintBootstrapToken({
         config: {
           bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
@@ -109,11 +139,11 @@ describe("sandbox tunnel websocket ping integration", () => {
         ttlSeconds: 120,
       });
 
-      let sandboxSocket: WebSocket | undefined;
+      let bootstrapSocket: WebSocket | undefined;
       let clientSocket: WebSocket | undefined;
 
       try {
-        sandboxSocket = await connectWebSocket(
+        bootstrapSocket = await connectWebSocket(
           `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
         );
         clientSocket = await connectWebSocket(
@@ -121,16 +151,16 @@ describe("sandbox tunnel websocket ping integration", () => {
         );
 
         const clientTextPayload = "hello from client";
-        const forwardedToSandboxPromise = waitForWebSocketMessage(sandboxSocket);
+        const forwardedToBootstrapPromise = waitForWebSocketMessage(bootstrapSocket);
         await sendWebSocketMessage(clientSocket, clientTextPayload);
-        const forwardedToSandbox = await forwardedToSandboxPromise;
+        const forwardedToBootstrap = await forwardedToBootstrapPromise;
 
-        expect(forwardedToSandbox.isBinary).toBe(false);
-        expect(forwardedToSandbox.data).toBe(clientTextPayload);
+        expect(forwardedToBootstrap.isBinary).toBe(false);
+        expect(forwardedToBootstrap.data).toBe(clientTextPayload);
 
-        const sandboxBinaryPayload = Buffer.from([0x01, 0x7f, 0xa5]);
+        const bootstrapBinaryPayload = Buffer.from([0x01, 0x7f, 0xa5]);
         const forwardedToClientPromise = waitForWebSocketMessage(clientSocket);
-        await sendWebSocketMessage(sandboxSocket, sandboxBinaryPayload);
+        await sendWebSocketMessage(bootstrapSocket, bootstrapBinaryPayload);
         const forwardedToClient = await forwardedToClientPromise;
 
         expect(forwardedToClient.isBinary).toBe(true);
@@ -138,10 +168,10 @@ describe("sandbox tunnel websocket ping integration", () => {
         if (typeof forwardedToClient.data === "string") {
           throw new Error("Expected binary websocket message to forward as Buffer.");
         }
-        expect(forwardedToClient.data.equals(sandboxBinaryPayload)).toBe(true);
+        expect(forwardedToClient.data.equals(bootstrapBinaryPayload)).toBe(true);
       } finally {
         await Promise.all([
-          closeWebSocketIfOpen(sandboxSocket),
+          closeWebSocketIfOpen(bootstrapSocket),
           closeWebSocketIfOpen(clientSocket),
         ]);
       }
@@ -153,6 +183,10 @@ describe("sandbox tunnel websocket ping integration", () => {
     "replaces an existing bootstrap peer with a newer one for the same sandbox instance",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
       const bootstrapTokenOne = await mintBootstrapToken({
         config: {
           bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
@@ -227,6 +261,10 @@ describe("sandbox tunnel websocket ping integration", () => {
     "closes the connection peer when bootstrap peer disconnects",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
       const bootstrapToken = await mintBootstrapToken({
         config: {
           bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
@@ -279,6 +317,10 @@ describe("sandbox tunnel websocket ping integration", () => {
     "keeps the bootstrap peer connected when connection peer disconnects",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
       const bootstrapToken = await mintBootstrapToken({
         config: {
           bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
