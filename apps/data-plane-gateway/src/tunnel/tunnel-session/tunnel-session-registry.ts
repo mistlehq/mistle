@@ -11,7 +11,7 @@ import type {
  *
  * This wrapper exists so callers depend on stable registry operations instead of the
  * underlying live session implementation. That keeps the owner-local session model
- * compatible with future gateway-to-gateway forwarding.
+ * compatible with gateway-to-gateway forwarding.
  */
 export class TunnelSessionRegistry {
   public constructor(private readonly adapter: TunnelSessionRegistryAdapter) {}

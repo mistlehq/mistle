@@ -24,8 +24,8 @@ export type DetachBootstrapSessionResult = {
  * Stores owner-local tunnel session state for the current gateway node.
  *
  * Implementations intentionally operate on stable identifiers and bindings instead of
- * exposing the live session object, so future owner-forwarding can treat the registry
- * as a node-local service behind a consistent boundary.
+ * exposing the live session object, so owner-forwarding can treat the registry as a
+ * node-local service behind a consistent boundary.
  */
 export interface TunnelSessionRegistryAdapter {
   attachBootstrapSession(input: RelayTarget): AttachBootstrapSessionResult;
