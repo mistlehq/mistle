@@ -88,7 +88,6 @@ export async function executeConversationProviderDelivery(
   const adapter = getConversationProviderAdapter(input.integrationFamilyId);
   const connection = await adapter.connect({
     connectionUrl: input.connectionUrl,
-    requestId: input.requestId,
   });
 
   try {

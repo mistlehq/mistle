@@ -519,14 +519,10 @@ export function createCodexConversationProviderAdapter(): ConversationProviderAd
     connect: async (input) => {
       const connectInput: {
         connectionUrl: string;
-        requestId?: string;
         connectTimeoutMs?: number;
       } = {
         connectionUrl: input.connectionUrl,
       };
-      if (input.requestId !== undefined) {
-        connectInput.requestId = input.requestId;
-      }
       if (input.connectTimeoutMs !== undefined) {
         connectInput.connectTimeoutMs = input.connectTimeoutMs;
       }

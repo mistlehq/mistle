@@ -1,10 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { randomInt } from "node:crypto";
 
-import type {
-  AgentConnectRequest,
-  ConnectError,
-  ConnectOK,
-} from "@mistle/sandbox-session-protocol";
+import type { StreamOpen, StreamOpenError, StreamOpenOK } from "@mistle/sandbox-session-protocol";
 import { systemScheduler } from "@mistle/time";
 import WebSocket, { type RawData } from "ws";
 
@@ -12,11 +8,10 @@ const DefaultConnectTimeoutMs = 15_000;
 const DefaultCloseCode = 1000;
 const DefaultCloseReason = "automation payload delivered";
 
-type ConnectControlMessage = ConnectOK | ConnectError;
+type StreamOpenControlMessage = StreamOpenOK | StreamOpenError;
 
 export type ConnectSandboxAgentConnectionInput = {
   connectionUrl: string;
-  requestId?: string;
   connectTimeoutMs?: number;
 };
 
@@ -26,7 +21,7 @@ export type CloseSandboxAgentConnectionInput = {
 };
 
 export type SandboxAgentConnection = {
-  requestId: string;
+  streamId: number;
   socket: WebSocket;
   sendText: (message: string) => Promise<void>;
   close: (input?: CloseSandboxAgentConnectionInput) => Promise<void>;
@@ -49,7 +44,15 @@ function toBuffer(data: RawData): Buffer {
   return Buffer.concat(data);
 }
 
-function parseConnectControlMessage(data: RawData): ConnectControlMessage | null {
+function readPositiveInteger(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    return null;
+  }
+
+  return value;
+}
+
+function parseStreamOpenControlMessage(data: RawData): StreamOpenControlMessage | null {
   const rawPayload = toBuffer(data).toString("utf8");
 
   let parsedPayload: unknown;
@@ -63,24 +66,24 @@ function parseConnectControlMessage(data: RawData): ConnectControlMessage | null
     return null;
   }
 
-  if (!("type" in parsedPayload) || !("requestId" in parsedPayload)) {
+  if (!("type" in parsedPayload) || !("streamId" in parsedPayload)) {
     return null;
   }
 
   const typeValue = parsedPayload.type;
-  const requestIdValue = parsedPayload.requestId;
-  if (typeof typeValue !== "string" || typeof requestIdValue !== "string") {
+  const streamIdValue = readPositiveInteger(parsedPayload.streamId);
+  if (typeof typeValue !== "string" || streamIdValue === null) {
     return null;
   }
 
-  if (typeValue === "connect.ok") {
+  if (typeValue === "stream.open.ok") {
     return {
-      type: "connect.ok",
-      requestId: requestIdValue,
+      type: "stream.open.ok",
+      streamId: streamIdValue,
     };
   }
 
-  if (typeValue === "connect.error") {
+  if (typeValue === "stream.open.error") {
     if (!("code" in parsedPayload) || !("message" in parsedPayload)) {
       return null;
     }
@@ -92,8 +95,8 @@ function parseConnectControlMessage(data: RawData): ConnectControlMessage | null
     }
 
     return {
-      type: "connect.error",
-      requestId: requestIdValue,
+      type: "stream.open.error",
+      streamId: streamIdValue,
       code: codeValue,
       message: messageValue,
     };
@@ -150,16 +153,15 @@ function closeSocket(socket: WebSocket, input?: CloseSandboxAgentConnectionInput
 export async function connectSandboxAgentConnection(
   input: ConnectSandboxAgentConnectionInput,
 ): Promise<SandboxAgentConnection> {
-  const requestId = input.requestId ?? randomUUID();
+  const streamId = randomInt(1, 0x7fff_ffff);
   const connectTimeoutMs = input.connectTimeoutMs ?? DefaultConnectTimeoutMs;
   const socket = new WebSocket(input.connectionUrl, {
     handshakeTimeout: connectTimeoutMs,
   });
 
-  const agentConnectRequest: AgentConnectRequest = {
-    type: "connect",
-    v: 1,
-    requestId,
+  const openMessage: StreamOpen = {
+    type: "stream.open",
+    streamId,
     channel: {
       kind: "agent",
     },
@@ -171,7 +173,7 @@ export async function connectSandboxAgentConnection(
     const connectTimeout = systemScheduler.schedule(() => {
       fail(
         new Error(
-          `Timed out waiting for sandbox agent connect acknowledgement after ${String(connectTimeoutMs)}ms.`,
+          `Timed out waiting for sandbox agent stream.open acknowledgement after ${String(connectTimeoutMs)}ms.`,
         ),
       );
     }, connectTimeoutMs);
@@ -206,34 +208,34 @@ export async function connectSandboxAgentConnection(
     }
 
     function handleOpen(): void {
-      const connectRequestPayload = JSON.stringify(agentConnectRequest);
-      void sendTextFrame(socket, connectRequestPayload).catch((error: unknown) => {
+      const openPayload = JSON.stringify(openMessage);
+      void sendTextFrame(socket, openPayload).catch((error: unknown) => {
         if (error instanceof Error) {
           fail(error);
           return;
         }
 
-        fail(new Error("Failed to send sandbox agent connect request."));
+        fail(new Error("Failed to send sandbox agent stream.open request."));
       });
     }
 
     function handleMessage(data: RawData): void {
-      const controlMessage = parseConnectControlMessage(data);
+      const controlMessage = parseStreamOpenControlMessage(data);
       if (controlMessage === null) {
         return;
       }
-      if (controlMessage.requestId !== requestId) {
+      if (controlMessage.streamId !== streamId) {
         return;
       }
 
-      if (controlMessage.type === "connect.ok") {
+      if (controlMessage.type === "stream.open.ok") {
         succeed();
         return;
       }
 
       fail(
         new Error(
-          `Sandbox agent connect request was rejected (${controlMessage.code}): ${controlMessage.message}`,
+          `Sandbox agent stream.open request was rejected (${controlMessage.code}): ${controlMessage.message}`,
         ),
       );
     }
@@ -243,7 +245,7 @@ export async function connectSandboxAgentConnection(
     }
 
     function handleClose(): void {
-      fail(new Error("Sandbox agent websocket closed before connect acknowledgement."));
+      fail(new Error("Sandbox agent websocket closed before stream.open acknowledgement."));
     }
 
     socket.on("open", handleOpen);
@@ -253,7 +255,7 @@ export async function connectSandboxAgentConnection(
   });
 
   return {
-    requestId,
+    streamId,
     socket,
     sendText: async (message) => sendTextFrame(socket, message),
     close: async (closeInput) => closeSocket(socket, closeInput),

@@ -87,10 +87,22 @@ class BrowserCodexScheduledTask implements CodexScheduledTask {
   }
 }
 
+function createSequentialStreamId(): () => number {
+  let nextStreamId = 1;
+
+  return () => {
+    const streamId = nextStreamId;
+    nextStreamId += 1;
+    return streamId;
+  };
+}
+
 export function createBrowserCodexSessionRuntime(): CodexSessionRuntime {
+  const createStreamId = createSequentialStreamId();
+
   return {
     createSocket: (connectionUrl) => new BrowserCodexSessionSocket(connectionUrl),
-    createRequestId: () => crypto.randomUUID(),
+    createStreamId,
     scheduleTimeout: (callback, timeoutMs) =>
       new BrowserCodexScheduledTask(window.setTimeout(callback, timeoutMs)),
   };

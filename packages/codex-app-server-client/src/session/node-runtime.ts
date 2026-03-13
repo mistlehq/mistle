@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import WebSocket, { type RawData } from "ws";
 
 import {
@@ -123,10 +121,22 @@ class NodeCodexScheduledTask implements CodexScheduledTask {
   }
 }
 
+function createSequentialStreamId(): () => number {
+  let nextStreamId = 1;
+
+  return () => {
+    const streamId = nextStreamId;
+    nextStreamId += 1;
+    return streamId;
+  };
+}
+
 export function createNodeCodexSessionRuntime(): CodexSessionRuntime {
+  const createStreamId = createSequentialStreamId();
+
   return {
     createSocket: (connectionUrl) => new NodeCodexSessionSocket(connectionUrl),
-    createRequestId: () => randomUUID(),
+    createStreamId,
     scheduleTimeout: (callback, timeoutMs) =>
       new NodeCodexScheduledTask(setTimeout(callback, timeoutMs)),
   };

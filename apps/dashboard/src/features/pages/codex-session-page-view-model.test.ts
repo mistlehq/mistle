@@ -40,7 +40,7 @@ describe("resolveSessionHeaderStatusUi", () => {
     expect(
       resolveSessionHeaderStatusUi({
         sandboxStatus: "running",
-        agentConnectionState: "handshaking_agent",
+        agentConnectionState: "opening_agent_stream",
         step: "connecting",
         hasConnectionError: false,
       }),
