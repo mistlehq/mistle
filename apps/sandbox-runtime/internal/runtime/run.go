@@ -171,6 +171,20 @@ func Run(input RunInput) (runErr error) {
 	directHTTPClient := httpclient.NewDirectClient(http.DefaultClient)
 	egressHTTPClient := telemetry.NewHTTPClient(directHTTPClient)
 
+	err = traceStep(
+		runContext,
+		tracingHandle.Tracer(),
+		"sandbox.runtime.mark_process_non_dumpable",
+		func(context.Context) error {
+			return markCurrentProcessNonDumpable()
+		},
+	)
+	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
+		return err
+	}
+
 	proxyCertificateAuthority, err := traceStepWithValue(
 		runContext,
 		tracingHandle.Tracer(),
@@ -183,21 +197,6 @@ func Run(input RunInput) (runErr error) {
 		runSpan.RecordError(err)
 		runSpan.SetStatus(codes.Error, err.Error())
 		return err
-	}
-	if proxyCertificateAuthority != nil {
-		err = traceStep(
-			runContext,
-			tracingHandle.Tracer(),
-			"sandbox.runtime.mark_process_non_dumpable",
-			func(context.Context) error {
-				return markCurrentProcessNonDumpable()
-			},
-		)
-		if err != nil {
-			runSpan.RecordError(err)
-			runSpan.SetStatus(codes.Error, err.Error())
-			return err
-		}
 	}
 
 	proxyHandler, err := traceStepWithValue(
