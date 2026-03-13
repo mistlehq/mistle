@@ -277,6 +277,10 @@ describe("sandbox tunnel connect endpoint integration", () => {
     "rejects reconnect attempts that reuse an acknowledged bootstrap token",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
       const jti = randomUUID();
       const token = await mintBootstrapToken({
         config: {
@@ -311,6 +315,10 @@ describe("sandbox tunnel connect endpoint integration", () => {
     "rejects reconnect attempts that reuse an acknowledged connection token",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
       const bootstrapToken = await mintBootstrapToken({
         config: {
           bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
