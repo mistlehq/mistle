@@ -252,6 +252,42 @@ func (response tunnelTokenExchangeResponse) validate() error {
 	return nil
 }
 
+func exchangeTunnelTokensNow(
+	ctx context.Context,
+	httpClient *http.Client,
+	gatewayWSURL string,
+	tokens *tunnelTokens,
+) error {
+	if ctx == nil {
+		return fmt.Errorf("sandbox tunnel token exchange context is required")
+	}
+	if httpClient == nil {
+		return fmt.Errorf("sandbox tunnel token exchange http client is required")
+	}
+	if tokens == nil {
+		return fmt.Errorf("sandbox tunnel token exchange tokens are required")
+	}
+
+	exchangeURL, err := buildTunnelTokenExchangeURL(gatewayWSURL)
+	if err != nil {
+		return err
+	}
+
+	currentExchangeToken := tokens.CurrentTunnelExchangeToken()
+	exchangeResponse, err := exchangeTunnelTokens(ctx, httpClient, exchangeURL, currentExchangeToken)
+	if err != nil {
+		return err
+	}
+	if _, _, err := parseTunnelTokenJWTWindow(exchangeResponse.TunnelExchangeToken); err != nil {
+		return err
+	}
+
+	return tokens.Replace(
+		exchangeResponse.BootstrapToken,
+		exchangeResponse.TunnelExchangeToken,
+	)
+}
+
 func runTunnelTokenExchangeLoop(input tunnelTokenExchangeLoopInput) error {
 	if input.Context == nil {
 		return fmt.Errorf("sandbox tunnel token exchange context is required")
@@ -263,8 +299,7 @@ func runTunnelTokenExchangeLoop(input tunnelTokenExchangeLoopInput) error {
 		return fmt.Errorf("sandbox tunnel token exchange tokens are required")
 	}
 
-	exchangeURL, err := buildTunnelTokenExchangeURL(input.GatewayWSURL)
-	if err != nil {
+	if _, err := buildTunnelTokenExchangeURL(input.GatewayWSURL); err != nil {
 		return err
 	}
 
@@ -306,22 +341,13 @@ func runTunnelTokenExchangeLoop(input tunnelTokenExchangeLoopInput) error {
 				return fmt.Errorf("sandbox tunnel exchange token expired before renewal succeeded")
 			}
 
-			exchangeResponse, err := exchangeTunnelTokens(
+			err := exchangeTunnelTokensNow(
 				input.Context,
 				input.HTTPClient,
-				exchangeURL,
-				currentExchangeToken,
+				input.GatewayWSURL,
+				input.Tokens,
 			)
 			if err == nil {
-				if _, _, parseErr := parseTunnelTokenJWTWindow(exchangeResponse.TunnelExchangeToken); parseErr != nil {
-					return parseErr
-				}
-				if replaceErr := input.Tokens.Replace(
-					exchangeResponse.BootstrapToken,
-					exchangeResponse.TunnelExchangeToken,
-				); replaceErr != nil {
-					return replaceErr
-				}
 				break
 			}
 
