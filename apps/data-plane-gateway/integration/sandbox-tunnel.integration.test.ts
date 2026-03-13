@@ -4,12 +4,14 @@
 
 import { randomUUID } from "node:crypto";
 
+import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
+import { systemSleeper } from "@mistle/time";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 
-import { it } from "./test-context.js";
+import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import {
   closeWebSocket,
   connectWebSocket,
@@ -18,11 +20,74 @@ import {
 
 const IntegrationTestTimeoutMs = 30_000;
 
+async function insertSandboxInstanceRow(input: {
+  fixture: DataPlaneGatewayIntegrationFixture;
+  sandboxInstanceId: string;
+}): Promise<void> {
+  await input.fixture.db.insert(sandboxInstances).values({
+    id: input.sandboxInstanceId,
+    organizationId: "org_data_plane_gateway_integration",
+    sandboxProfileId: "sbp_data_plane_gateway_integration",
+    sandboxProfileVersion: 1,
+    provider: input.fixture.config.sandbox.provider,
+    providerSandboxId: `provider-${input.sandboxInstanceId}`,
+    status: SandboxInstanceStatuses.STARTING,
+    startedByKind: "system",
+    startedById: "workflow_data_plane_gateway_integration",
+    source: "webhook",
+    tunnelConnectedAt: null,
+    lastTunnelSeenAt: null,
+    tunnelDisconnectedAt: "2026-03-13T00:00:00.000Z",
+  });
+}
+
+async function waitForSandboxInstanceProjection(
+  input: DataPlaneGatewayIntegrationFixture & {
+    sandboxInstanceId: string;
+    predicate: (sandboxInstance: {
+      tunnelConnectedAt: string | null;
+      lastTunnelSeenAt: string | null;
+      tunnelDisconnectedAt: string | null;
+    }) => boolean;
+  },
+): Promise<{
+  tunnelConnectedAt: string | null;
+  lastTunnelSeenAt: string | null;
+  tunnelDisconnectedAt: string | null;
+}> {
+  const deadline = Date.now() + 5_000;
+
+  while (Date.now() < deadline) {
+    const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
+      columns: {
+        tunnelConnectedAt: true,
+        lastTunnelSeenAt: true,
+        tunnelDisconnectedAt: true,
+      },
+      where: (table, { eq }) => eq(table.id, input.sandboxInstanceId),
+    });
+
+    if (sandboxInstance !== undefined && input.predicate(sandboxInstance)) {
+      return sandboxInstance;
+    }
+
+    await systemSleeper.sleep(50);
+  }
+
+  throw new Error(
+    `Timed out waiting for sandbox tunnel projection for instance '${input.sandboxInstanceId}'.`,
+  );
+}
+
 describe("sandbox tunnel connect endpoint integration", () => {
   it(
     "accepts a valid bootstrap token and records exactly one ack",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
       const jti = randomUUID();
       const token = await mintBootstrapToken({
         config: {
@@ -41,8 +106,19 @@ describe("sandbox tunnel connect endpoint integration", () => {
       const recordedAck = await fixture.db.query.sandboxTunnelConnectAcks.findFirst({
         where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
       });
+      const sandboxInstance = await waitForSandboxInstanceProjection({
+        ...fixture,
+        sandboxInstanceId,
+        predicate: (currentSandboxInstance) =>
+          currentSandboxInstance.tunnelConnectedAt !== null &&
+          currentSandboxInstance.lastTunnelSeenAt !== null &&
+          currentSandboxInstance.tunnelDisconnectedAt === null,
+      });
 
       expect(recordedAck?.bootstrapTokenJti).toBe(jti);
+      expect(sandboxInstance?.tunnelConnectedAt).not.toBeNull();
+      expect(sandboxInstance?.lastTunnelSeenAt).not.toBeNull();
+      expect(sandboxInstance?.tunnelDisconnectedAt).toBeNull();
 
       await closeWebSocket(socket);
     },
@@ -53,6 +129,10 @@ describe("sandbox tunnel connect endpoint integration", () => {
     "accepts a valid connection token and records exactly one ack",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
       const bootstrapToken = await mintBootstrapToken({
         config: {
           bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
@@ -89,6 +169,41 @@ describe("sandbox tunnel connect endpoint integration", () => {
 
       await closeWebSocket(socket);
       await closeWebSocket(bootstrapSocket);
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "records tunnel disconnection when the bootstrap socket closes",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const token = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const socket = await connectWebSocket(
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(token)}`,
+      );
+
+      await closeWebSocket(socket);
+
+      const sandboxInstance = await waitForSandboxInstanceProjection({
+        ...fixture,
+        sandboxInstanceId,
+        predicate: (currentSandboxInstance) => currentSandboxInstance.tunnelDisconnectedAt !== null,
+      });
+
+      expect(sandboxInstance?.tunnelDisconnectedAt).not.toBeNull();
     },
     IntegrationTestTimeoutMs,
   );

@@ -21,6 +21,7 @@ export class SandboxOwnerLeaseHeartbeat {
     sandboxInstanceId: string;
     leaseId: string;
     ttlMs: number;
+    onLeaseRenewed?: () => void;
     onLeaseLost: () => void;
   }): SandboxOwnerLeaseHeartbeatHandle {
     let stopped = false;
@@ -63,6 +64,7 @@ export class SandboxOwnerLeaseHeartbeat {
         return;
       }
 
+      input.onLeaseRenewed?.();
       scheduleNextRenewal();
     };
 
