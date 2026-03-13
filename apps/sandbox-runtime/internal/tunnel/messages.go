@@ -22,6 +22,7 @@ const (
 	streamResetCodeInvalidStreamSignal         = "invalid_stream_signal"
 	streamResetCodeInvalidStreamClose          = "invalid_stream_close"
 	streamResetCodeStreamCloseFailed           = "stream_close_failed"
+	streamResetCodeTargetClosed                = "target_closed"
 )
 
 func writeStreamOpenOK(

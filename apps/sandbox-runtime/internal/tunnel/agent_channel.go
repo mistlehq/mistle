@@ -92,7 +92,7 @@ func handleAgentConnectRequest(
 		return fmt.Errorf("failed to write sandbox tunnel stream.open acknowledgement: %w", err)
 	}
 
-	relayResult, err := relayTunnelFrames(ctx, tunnelConn, agentConn)
+	relayResult, err := relayTunnelFrames(ctx, tunnelConn, agentConn, connectRequest.StreamID)
 	if err != nil {
 		return fmt.Errorf("sandbox tunnel websocket relay failed: %w", err)
 	}
@@ -173,6 +173,7 @@ func relayTunnelFrames(
 	ctx context.Context,
 	tunnelConn *websocket.Conn,
 	agentConn *websocket.Conn,
+	streamID int,
 ) (agentRelayResult, error) {
 	relayContext, cancelAgentRelay := context.WithCancel(ctx)
 	defer cancelAgentRelay()
@@ -213,7 +214,18 @@ func relayTunnelFrames(
 
 		if messageType == websocket.MessageText {
 			controlMessageType, parseErr := parseControlMessageType(payload)
-			if parseErr == nil && controlMessageType == sessionprotocol.MessageTypeDisconnect {
+			if parseErr == nil && controlMessageType == sessionprotocol.MessageTypeStreamClose {
+				streamClose, closeErr := parseStreamClose(payload)
+				if closeErr != nil {
+					return "", closeErr
+				}
+				if streamClose.StreamID != streamID {
+					return "", fmt.Errorf(
+						"stream.close streamId %d does not match active agent stream %d",
+						streamClose.StreamID,
+						streamID,
+					)
+				}
 				return agentRelayResultDisconnected, nil
 			}
 		}

@@ -582,19 +582,17 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				if index == 0 {
-					disconnectPayload, err := json.Marshal(sessionprotocol.Disconnect{
-						Type:   sessionprotocol.MessageTypeDisconnect,
-						Reason: "connection peer disconnected",
-					})
-					if err != nil {
-						handlerErrCh <- fmt.Errorf("expected disconnect payload marshal to succeed: %w", err)
-						return
-					}
-					if err := conn.Write(handlerCtx, websocket.MessageText, disconnectPayload); err != nil {
-						handlerErrCh <- fmt.Errorf("expected disconnect control write to succeed: %w", err)
-						return
-					}
+				closePayload, err := json.Marshal(sessionprotocol.StreamClose{
+					Type:     sessionprotocol.MessageTypeStreamClose,
+					StreamID: expectedStreamID,
+				})
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected stream.close payload marshal to succeed: %w", err)
+					return
+				}
+				if err := conn.Write(handlerCtx, websocket.MessageText, closePayload); err != nil {
+					handlerErrCh <- fmt.Errorf("expected stream.close write to succeed: %w", err)
+					return
 				}
 			}
 
