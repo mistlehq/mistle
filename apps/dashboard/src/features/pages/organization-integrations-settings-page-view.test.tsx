@@ -69,4 +69,39 @@ describe("OrganizationIntegrationsSettingsPageView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(retried).toBe(true);
   });
+
+  it("hides integration directory sections when rendering a detail surface", () => {
+    render(
+      <OrganizationIntegrationsSettingsPageView
+        availableCards={[
+          {
+            targetKey: "openai-default",
+            displayName: "OpenAI",
+            description: "Bring organization API access into Mistle.",
+            configStatus: "valid",
+            actionLabel: "Add",
+            onAction: () => {},
+          },
+        ]}
+        connectedCards={[
+          {
+            targetKey: "github",
+            displayName: "GitHub",
+            description: "1 connection",
+            configStatus: "valid",
+            actionLabel: "View",
+            onAction: () => {},
+          },
+        ]}
+        detailSurface={<div>GitHub connection detail</div>}
+        isLoading={false}
+        loadErrorMessage={null}
+        onRetryLoad={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText("Available Integrations")).toBeNull();
+    expect(screen.queryByText("Connected")).toBeNull();
+    expect(screen.getByText("GitHub connection detail")).toBeTruthy();
+  });
 });

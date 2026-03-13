@@ -7,8 +7,13 @@ import {
   buildAvailableIntegrationViewCards,
   buildConnectedIntegrationViewCards,
   buildIntegrationConnectionDetailItems,
+  buildIntegrationConnectionResourceItemsByKey,
+  buildIntegrationConnectionResourceRequests,
+  createIntegrationConnectionResourceKey,
   createRefreshingResourceKey,
+  getIntegrationConnectionResourceSummaries,
   resolveEditableConnectionMethodId,
+  shouldPollIntegrationDetailResources,
   toConnectionMethods,
 } from "./integrations-page-view-model.js";
 
@@ -101,7 +106,7 @@ describe("integrations page view model", () => {
     });
 
     expect(item?.authMethodLabel).toBe("OAuth");
-    expect(item?.externalSubjectId).toBe("mistle-labs");
+    expect(item?.authMethodId).toBe("oauth");
     expect(item?.resources[0]?.isRefreshing).toBe(true);
     expect(item?.resources[0]?.lastErrorMessage).toBe("Resource sync failed.");
   });
@@ -132,6 +137,148 @@ describe("integrations page view model", () => {
     expect(item?.resources[0]?.isRefreshing).toBe(true);
   });
 
+  it("returns an empty resource summary list when a connection has no resources payload", () => {
+    expect(
+      getIntegrationConnectionResourceSummaries({
+        resources: undefined,
+      }),
+    ).toEqual([]);
+
+    expect(getIntegrationConnectionResourceSummaries(null)).toEqual([]);
+  });
+
+  it("builds resource requests and keyed resource-item lookups for detail connections", () => {
+    const requests = buildIntegrationConnectionResourceRequests([
+      createConnection({
+        id: "icn_primary",
+        status: "active",
+        resources: [
+          {
+            kind: "repositories",
+            selectionMode: "multi",
+            count: 42,
+            syncState: "ready",
+          },
+        ],
+      }),
+      createConnection({
+        id: "icn_secondary",
+        status: "active",
+        resources: [
+          {
+            kind: "organizations",
+            selectionMode: "single",
+            count: 1,
+            syncState: "never-synced",
+          },
+        ],
+      }),
+    ]);
+
+    expect(requests).toEqual([
+      {
+        connectionId: "icn_primary",
+        kind: "repositories",
+        syncState: "ready",
+      },
+      {
+        connectionId: "icn_secondary",
+        kind: "organizations",
+        syncState: "never-synced",
+      },
+    ]);
+
+    const itemsByKey = buildIntegrationConnectionResourceItemsByKey([
+      {
+        connectionId: "icn_primary",
+        state: {
+          errorMessage: null,
+          isLoading: false,
+          items: [],
+          kind: "repositories",
+        },
+      },
+    ]);
+
+    expect(
+      itemsByKey.get(
+        createIntegrationConnectionResourceKey({
+          connectionId: "icn_primary",
+          kind: "repositories",
+        }),
+      ),
+    ).toEqual({
+      errorMessage: null,
+      isLoading: false,
+      items: [],
+      kind: "repositories",
+    });
+  });
+
+  it("polls while the selected detail connection has syncing resources", () => {
+    expect(
+      shouldPollIntegrationDetailResources({
+        cards: [
+          createCard({
+            description: "GitHub",
+            connections: [
+              createConnection({
+                id: "icn_syncing",
+                status: "active",
+                resources: [
+                  {
+                    kind: "repositories",
+                    selectionMode: "multi",
+                    count: 42,
+                    syncState: "syncing",
+                  },
+                ],
+              }),
+            ],
+          }),
+        ],
+        activeDetailConnectionId: "icn_syncing",
+        detailTargetKey: "github",
+      }),
+    ).toBe(true);
+  });
+
+  it("stops polling when not on a detail route or no selected resource is syncing", () => {
+    expect(
+      shouldPollIntegrationDetailResources({
+        cards: [createCard({ description: "GitHub" })],
+        activeDetailConnectionId: null,
+        detailTargetKey: null,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldPollIntegrationDetailResources({
+        cards: [
+          createCard({
+            description: "GitHub",
+            connections: [
+              createConnection({
+                id: "icn_ready",
+                status: "active",
+                resources: [
+                  {
+                    kind: "repositories",
+                    selectionMode: "multi",
+                    count: 42,
+                    syncState: "ready",
+                  },
+                ],
+              }),
+            ],
+          }),
+        ],
+        activeDetailConnectionId: "icn_ready",
+        detailTargetKey: "github",
+      }),
+    ).toBe(false);
+  });
+
   it("fails fast when editing a connection with an unsupported auth scheme", () => {
     expect(() =>
       resolveEditableConnectionMethodId({
@@ -148,9 +295,35 @@ describe("integrations page view model", () => {
 function createCard(input: {
   description: string;
   connectionCount?: number;
+  connections?: readonly IntegrationConnection[];
   connectionStatuses?: readonly IntegrationConnection["status"][];
   supportedAuthSchemes?: ("oauth" | "api-key")[];
 }): IntegrationCardViewModel {
+  if (input.connections !== undefined) {
+    return {
+      target: {
+        targetKey: "github",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {},
+        displayName: "GitHub",
+        description: input.description,
+        ...(input.supportedAuthSchemes === undefined
+          ? {}
+          : { supportedAuthSchemes: [...input.supportedAuthSchemes] }),
+        targetHealth: {
+          configStatus: "valid",
+        },
+      },
+      displayName: "GitHub",
+      description: input.description,
+      status: "Connected",
+      configStatus: "valid",
+      connections: [...input.connections],
+    };
+  }
+
   const connectionStatuses =
     input.connectionStatuses ??
     Array.from<IntegrationConnection["status"]>({ length: input.connectionCount ?? 1 }).fill(
@@ -186,5 +359,23 @@ function createCard(input: {
     status: "Connected",
     configStatus: "valid",
     connections,
+  };
+}
+
+function createConnection(
+  input: Partial<IntegrationConnection> & Pick<IntegrationConnection, "id" | "status">,
+): IntegrationConnection {
+  return {
+    id: input.id,
+    targetKey: "github",
+    displayName: input.displayName ?? `GitHub ${input.id}`,
+    status: input.status,
+    createdAt: "2026-03-03T00:00:00.000Z",
+    updatedAt: "2026-03-11T04:30:00.000Z",
+    ...(input.resources === undefined ? {} : { resources: input.resources }),
+    ...(input.config === undefined ? {} : { config: input.config }),
+    ...(input.externalSubjectId === undefined
+      ? {}
+      : { externalSubjectId: input.externalSubjectId }),
   };
 }

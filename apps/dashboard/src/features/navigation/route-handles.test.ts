@@ -47,12 +47,9 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.settingsOrganizationIntegrations.title).toBe("Integrations");
     expect(ROUTE_HANDLES.settingsOrganizationIntegrations.description).toBe("");
 
-    expect(ROUTE_HANDLES.settingsOrganizationIntegrationDetail.title).toBe(
-      "Integration connection",
-    );
-    expect(ROUTE_HANDLES.settingsOrganizationIntegrationDetail.description).toBe(
-      "Inspect an existing integration connection and resource readiness.",
-    );
+    expect(typeof ROUTE_HANDLES.settingsOrganizationIntegrationDetail.title).toBe("function");
+    expect(typeof ROUTE_HANDLES.settingsOrganizationIntegrationDetail.description).toBe("function");
+    expect(ROUTE_HANDLES.settingsOrganizationIntegrationDetail.headerIcon).toBeDefined();
 
     expect(ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult.title).toBe(
       "Integration callback result",
@@ -106,6 +103,32 @@ describe("route handles", () => {
     expect(detailBreadcrumb({ params: { targetKey: "custom-integration_v2" } })).toBe(
       "Custom Integration V2",
     );
+  });
+
+  it("resolves integration detail titles from known definitions and unknown target keys", () => {
+    const detailTitle = ROUTE_HANDLES.settingsOrganizationIntegrationDetail.title;
+    expect(typeof detailTitle).toBe("function");
+
+    if (typeof detailTitle !== "function") {
+      throw new Error("settingsOrganizationIntegrationDetail title must be a function");
+    }
+
+    expect(detailTitle({ params: { targetKey: "github-cloud" } })).toBe("GitHub");
+    expect(detailTitle({ params: { targetKey: "custom-integration_v2" } })).toBe(
+      "Custom Integration V2",
+    );
+  });
+
+  it("resolves integration detail supporting text from the target key", () => {
+    const detailDescription = ROUTE_HANDLES.settingsOrganizationIntegrationDetail.description;
+    expect(typeof detailDescription).toBe("function");
+
+    if (typeof detailDescription !== "function") {
+      throw new Error("settingsOrganizationIntegrationDetail description must be a function");
+    }
+
+    expect(detailDescription({ params: { targetKey: "github-cloud" } })).toBe("github-cloud");
+    expect(detailDescription({ params: {} })).toBe("");
   });
 
   it("resolves sandbox profile detail breadcrumb with profile id fallback", () => {

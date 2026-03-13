@@ -6,7 +6,7 @@ export function useIntegrationDetailState(input: {
   cards: readonly IntegrationCardViewModel[];
   detailTargetKey: string | null;
 }) {
-  const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null);
+  const [activeDetailConnectionId, setActiveDetailConnectionId] = useState<string | null>(null);
 
   const selectedDetailCard = useMemo(() => {
     if (input.detailTargetKey === null) {
@@ -30,21 +30,21 @@ export function useIntegrationDetailState(input: {
       selectedDetailConnections[0] ??
       null;
     if (defaultConnection === null) {
-      setSelectedConnectionId(null);
+      setActiveDetailConnectionId(null);
       return;
     }
 
     const selectedStillExists = selectedDetailConnections.some(
-      (connection) => connection.id === selectedConnectionId,
+      (connection) => connection.id === activeDetailConnectionId,
     );
     if (!selectedStillExists) {
-      setSelectedConnectionId(defaultConnection.id);
+      setActiveDetailConnectionId(defaultConnection.id);
     }
-  }, [selectedConnectionId, selectedDetailConnections]);
+  }, [activeDetailConnectionId, selectedDetailConnections]);
 
   return {
-    selectedConnectionId,
-    setSelectedConnectionId,
+    activeDetailConnectionId,
+    setActiveDetailConnectionId,
     selectedDetailCard,
     selectedDetailConnections,
   };

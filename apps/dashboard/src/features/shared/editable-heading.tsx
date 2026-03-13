@@ -3,8 +3,8 @@ import { PencilSimpleIcon } from "@phosphor-icons/react";
 
 import { PageTitleField } from "./page-title-field.js";
 
-export function EditablePageTitle(input: {
-  title: string;
+export function EditableHeading(input: {
+  value: string;
   draftValue: string;
   isEditing: boolean;
   ariaLabel: string;
@@ -14,19 +14,24 @@ export function EditablePageTitle(input: {
   saveDisabled: boolean;
   cancelOnEscape: boolean | undefined;
   maxWidthClassName: string | undefined;
+  headingTag?: "div" | "h1" | "h2";
+  headingClassName?: string;
+  inputClassName?: string;
   onEditStart: () => void;
   onDraftValueChange: (nextValue: string) => void;
   onCommit: () => void;
   onCancel: () => void;
 }): React.JSX.Element {
   const containerClassName = `w-full ${input.maxWidthClassName ?? "max-w-2xl"} space-y-2`;
+  const HeadingTag = input.headingTag ?? "h1";
+  const headingClassName = input.headingClassName ?? "text-xl font-semibold leading-none";
 
   if (input.isEditing) {
     return (
       <PageTitleField
         ariaLabel={input.ariaLabel}
         autoFocus={true}
-        fieldId="editable-page-title-input"
+        fieldId="editable-heading-input"
         label={input.ariaLabel}
         onBlur={input.onCommit}
         onChange={input.onDraftValueChange}
@@ -42,6 +47,7 @@ export function EditablePageTitle(input: {
         }}
         showLabel={false}
         value={input.draftValue}
+        {...(input.inputClassName === undefined ? {} : { className: input.inputClassName })}
         {...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage })}
         {...(input.maxWidthClassName === undefined
           ? {}
@@ -53,8 +59,8 @@ export function EditablePageTitle(input: {
 
   return (
     <div className={containerClassName}>
-      <div className="inline-flex h-10 items-center gap-1">
-        <h1 className="text-xl font-semibold leading-none">{input.title}</h1>
+      <div className="flex max-w-full items-center gap-1">
+        <HeadingTag className={`min-w-0 ${headingClassName}`}>{input.value}</HeadingTag>
         <Button
           aria-label={input.editButtonLabel}
           disabled={input.saveDisabled}

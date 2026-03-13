@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import { EditablePageTitle } from "../shared/editable-page-title.js";
+import { EditableHeading } from "../shared/editable-heading.js";
 import { PageTitleField } from "../shared/page-title-field.js";
 
 export function WebhookAutomationTitleEditor(input: {
@@ -46,12 +46,13 @@ export function WebhookAutomationTitleEditor(input: {
   }
 
   return (
-    <EditablePageTitle
+    <EditableHeading
       ariaLabel="Automation name"
       cancelOnEscape={true}
       draftValue={draftValue}
       editButtonLabel="Edit automation name"
       errorMessage={input.errorMessage}
+      inputClassName="text-base font-medium"
       isEditing={isEditing}
       maxWidthClassName="max-w-4xl"
       onCancel={cancelEdit}
@@ -62,7 +63,7 @@ export function WebhookAutomationTitleEditor(input: {
       }}
       placeholder="Automation name"
       saveDisabled={input.saveDisabled}
-      title={input.title}
+      value={input.title}
     />
   );
 }

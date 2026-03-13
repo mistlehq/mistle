@@ -1,23 +1,14 @@
-import {
-  Alert,
-  AlertDescription,
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@mistle/ui";
+import { Alert, AlertDescription, Badge, Button } from "@mistle/ui";
+import { ArrowClockwiseIcon, PencilSimpleIcon } from "@phosphor-icons/react";
 
-import { formatDate } from "../shared/date-formatters.js";
+import { EditableHeading } from "../shared/editable-heading.js";
 import {
   formatConnectionStatusLabel,
-  formatResourceMetadata,
-  formatResourceSummaryCount,
-  formatSelectionModeLabel,
+  formatResourceHeading,
+  formatResourceInlineMetadata,
   formatSyncStateLabel,
 } from "./integration-connection-detail-formatters.js";
-import { resolveIntegrationLogoPath } from "./logo.js";
+import type { IntegrationConnectionResource } from "./integrations-service.js";
 
 export type IntegrationConnectionDetailResourceSummary = {
   count: number;
@@ -25,228 +16,223 @@ export type IntegrationConnectionDetailResourceSummary = {
   kind: string;
   lastErrorMessage?: string;
   lastSyncedAt?: string;
-  selectionMode: "single" | "multi";
   syncState: "never-synced" | "syncing" | "ready" | "error";
 };
 
 export type IntegrationConnectionDetailItem = {
+  authMethodId?: "api-key" | "oauth" | null;
   authMethodLabel?: string | null;
   contextItems?: readonly {
     label: string;
     value: string;
   }[];
-  createdAt: string;
   displayName: string;
-  externalSubjectId?: string;
   id: string;
   resources: readonly IntegrationConnectionDetailResourceSummary[];
   status: "active" | "error" | "revoked";
-  updatedAt: string;
 };
 
 export type IntegrationConnectionDetailViewProps = {
   connections: readonly IntegrationConnectionDetailItem[];
   logoKey?: string;
-  onEditConnection?: (connectionId: string) => void;
+  onEditApiKey?: (connectionId: string) => void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
-  onSelectConnection: (connectionId: string) => void;
-  selectedConnectionId: string | null;
-  targetDisplayName: string;
-  targetKey: string;
+  resourceItemsByKey?: ReadonlyMap<
+    string,
+    {
+      errorMessage: string | null;
+      isLoading: boolean;
+      items: readonly IntegrationConnectionResource[];
+      kind: string;
+    }
+  >;
+  titleEditor?:
+    | {
+        connectionId: string | null;
+        draftValue: string;
+        errorMessage?: string;
+        isEditing: boolean;
+        onCancel: () => void;
+        onCommit: () => void;
+        onDraftValueChange: (nextValue: string) => void;
+        onEditStart: (connectionId: string) => void;
+        saveDisabled: boolean;
+      }
+    | undefined;
 };
 
 export function IntegrationConnectionDetailView(
   props: IntegrationConnectionDetailViewProps,
 ): React.JSX.Element {
-  const selectedConnection =
-    props.connections.find((connection) => connection.id === props.selectedConnectionId) ??
-    props.connections[0] ??
-    null;
+  if (props.connections.length === 0) {
+    return (
+      <div className="overflow-hidden rounded-md border bg-card">
+        <div className="p-4">
+          <p className="text-muted-foreground text-sm">No connections found for this target.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="gap-4 grid grid-cols-1 xl:grid-cols-[280px_minmax(0,1fr)]">
-      <Card>
-        <CardHeader>
-          <CardTitle className="gap-3 flex items-center text-base">
-            {props.logoKey === undefined ? (
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-md border bg-muted text-xs font-semibold uppercase">
-                {props.targetDisplayName.slice(0, 1)}
-              </span>
-            ) : (
-              <img
-                alt={`${props.targetDisplayName} logo`}
-                className="h-8 w-8 rounded-md border p-1"
-                src={resolveIntegrationLogoPath({ logoKey: props.logoKey })}
-              />
-            )}
-            <span>{props.targetDisplayName}</span>
-          </CardTitle>
-          <p className="text-muted-foreground text-sm">{props.targetKey}</p>
-        </CardHeader>
-        <CardContent className="gap-2 flex flex-col">
-          {props.connections.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No connections found for this target.</p>
-          ) : (
-            props.connections.map((connection) => {
-              const isSelected = selectedConnection?.id === connection.id;
-
-              return (
-                <button
-                  aria-pressed={isSelected}
-                  className={`rounded-md border px-3 py-2 text-left ${isSelected ? "border-foreground bg-muted/60" : "hover:bg-muted/40"}`}
-                  key={connection.id}
-                  onClick={() => {
-                    props.onSelectConnection(connection.id);
-                  }}
-                  type="button"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="font-medium text-sm">{connection.displayName}</span>
-                    <Badge variant={connection.status === "active" ? "secondary" : "outline"}>
-                      {formatConnectionStatusLabel(connection.status)}
-                    </Badge>
-                  </div>
-                  <p className="text-muted-foreground mt-1 text-xs">
-                    {connection.resources.length === 0
-                      ? "No resource summaries"
-                      : formatResourceSummaryCount(connection.resources.length)}
-                  </p>
-                </button>
-              );
-            })
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        {selectedConnection === null ? (
-          <CardContent className="py-10">
-            <p className="text-muted-foreground text-sm">
-              Select a connection to inspect its readiness.
-            </p>
-          </CardContent>
-        ) : (
-          <>
-            <CardHeader className="gap-4 flex flex-col md:flex-row md:items-start md:justify-between">
-              <div className="gap-3 flex flex-col">
-                <div className="gap-2 flex flex-wrap items-center">
-                  <CardTitle>{selectedConnection.displayName}</CardTitle>
-                  <Badge variant={selectedConnection.status === "active" ? "secondary" : "outline"}>
-                    {formatConnectionStatusLabel(selectedConnection.status)}
-                  </Badge>
-                </div>
-                <div className="gap-2 flex flex-wrap text-sm">
-                  {selectedConnection.authMethodLabel ? (
-                    <span className="text-muted-foreground">
-                      Auth method: {selectedConnection.authMethodLabel}
-                    </span>
-                  ) : null}
-                  {selectedConnection.externalSubjectId ? (
-                    <span className="text-muted-foreground">
-                      Subject: {selectedConnection.externalSubjectId}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-              {props.onEditConnection ? (
-                <Button
-                  onClick={() => {
-                    props.onEditConnection?.(selectedConnection.id);
-                  }}
-                  type="button"
-                  variant="outline"
-                >
-                  Edit connection
-                </Button>
-              ) : null}
-            </CardHeader>
-            <CardContent className="gap-6 flex flex-col">
-              <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
-                <MetadataField label="Created" value={formatDate(selectedConnection.createdAt)} />
-                <MetadataField label="Updated" value={formatDate(selectedConnection.updatedAt)} />
-              </div>
-
-              {selectedConnection.contextItems === undefined ||
-              selectedConnection.contextItems.length === 0 ? null : (
-                <div className="gap-3 flex flex-col">
-                  <h3 className="font-medium text-sm">Connection context</h3>
-                  <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
-                    {selectedConnection.contextItems.map((item) => (
-                      <MetadataField key={item.label} label={item.label} value={item.value} />
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="gap-3 flex flex-col">
-                <div className="flex items-center justify-between gap-3">
-                  <h3 className="font-medium text-sm">Resource readiness</h3>
-                  <span className="text-muted-foreground text-xs">
-                    {selectedConnection.resources.length} resource kind
-                    {selectedConnection.resources.length === 1 ? "" : "s"}
-                  </span>
-                </div>
-
-                {selectedConnection.resources.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    No resource-backed capabilities are visible for this connection yet.
-                  </p>
-                ) : (
-                  <div className="gap-3 grid grid-cols-1 lg:grid-cols-2">
-                    {selectedConnection.resources.map((resource) => (
-                      <Card key={resource.kind}>
-                        <CardHeader className="gap-2 flex flex-row items-start justify-between space-y-0">
-                          <div className="gap-2 flex flex-col">
-                            <CardTitle className="text-base capitalize">{resource.kind}</CardTitle>
-                            <p className="text-muted-foreground text-sm">
-                              {resource.count} accessible,{" "}
-                              {formatSelectionModeLabel(resource.selectionMode)}
-                            </p>
-                          </div>
-                          <Badge variant="secondary">
-                            {formatSyncStateLabel(resource.syncState)}
-                          </Badge>
-                        </CardHeader>
-                        <CardContent className="gap-3 flex flex-col">
-                          <p className="text-muted-foreground text-sm">
-                            {formatResourceMetadata(resource)}
-                          </p>
-                          {resource.lastErrorMessage ? (
-                            <Alert variant="destructive">
-                              <AlertDescription>{resource.lastErrorMessage}</AlertDescription>
-                            </Alert>
-                          ) : null}
-                          {props.onRefreshResource ? (
-                            <div>
-                              <Button
-                                disabled={resource.isRefreshing === true}
-                                onClick={() => {
-                                  props.onRefreshResource?.({
-                                    connectionId: selectedConnection.id,
-                                    kind: resource.kind,
-                                  });
-                                }}
-                                size="sm"
-                                type="button"
-                                variant="outline"
-                              >
-                                {resource.isRefreshing === true
-                                  ? "Refreshing..."
-                                  : "Refresh resources"}
-                              </Button>
-                            </div>
-                          ) : null}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </>
-        )}
-      </Card>
+    <div className="flex flex-col gap-4">
+      {props.connections.map((connection) => (
+        <ConnectionCard
+          connection={connection}
+          key={connection.id}
+          {...(props.onEditApiKey === undefined ? {} : { onEditApiKey: props.onEditApiKey })}
+          {...(props.onRefreshResource === undefined
+            ? {}
+            : { onRefreshResource: props.onRefreshResource })}
+          {...(props.resourceItemsByKey === undefined
+            ? {}
+            : { resourceItemsByKey: props.resourceItemsByKey })}
+          {...(props.titleEditor === undefined ? {} : { titleEditor: props.titleEditor })}
+        />
+      ))}
     </div>
+  );
+}
+
+function ConnectionCard(input: {
+  connection: IntegrationConnectionDetailItem;
+  onEditApiKey?: (connectionId: string) => void;
+  onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
+  resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
+  titleEditor?: IntegrationConnectionDetailViewProps["titleEditor"];
+}): React.JSX.Element {
+  const connectionTitleEditor =
+    input.titleEditor === undefined
+      ? null
+      : {
+          ...input.titleEditor,
+          isEditing:
+            input.titleEditor.isEditing && input.titleEditor.connectionId === input.connection.id,
+          onEditStart: () => {
+            input.titleEditor?.onEditStart(input.connection.id);
+          },
+        };
+
+  return (
+    <section className="gap-4 flex flex-col overflow-hidden rounded-md border bg-card p-4">
+      <div className="gap-4 flex flex-col">
+        <div className="gap-2 flex flex-wrap items-start">
+          {connectionTitleEditor ? (
+            <EditableHeading
+              ariaLabel="Connection name"
+              cancelOnEscape={true}
+              draftValue={connectionTitleEditor.draftValue}
+              editButtonLabel="Edit connection name"
+              errorMessage={connectionTitleEditor.errorMessage}
+              headingClassName="text-base font-semibold leading-tight"
+              isEditing={connectionTitleEditor.isEditing}
+              maxWidthClassName="max-w-3xl"
+              onCancel={connectionTitleEditor.onCancel}
+              onCommit={connectionTitleEditor.onCommit}
+              onDraftValueChange={connectionTitleEditor.onDraftValueChange}
+              onEditStart={connectionTitleEditor.onEditStart}
+              placeholder="Connection name"
+              saveDisabled={connectionTitleEditor.saveDisabled}
+              value={input.connection.displayName}
+            />
+          ) : (
+            <h2 className="text-base font-semibold leading-tight">
+              {input.connection.displayName}
+            </h2>
+          )}
+          {input.connection.status === "active" ? null : (
+            <Badge variant="outline">{formatConnectionStatusLabel(input.connection.status)}</Badge>
+          )}
+        </div>
+        <ConnectionAuthSection
+          authMethodId={input.connection.authMethodId}
+          authMethodLabel={input.connection.authMethodLabel}
+          connectionId={input.connection.id}
+          onEditApiKey={input.onEditApiKey}
+        />
+      </div>
+
+      {input.connection.contextItems === undefined ||
+      input.connection.contextItems.length === 0 ? null : (
+        <div className="gap-3 flex flex-col">
+          <h3 className="font-medium text-sm">Connection context</h3>
+          <div className="gap-3 grid grid-cols-1 md:grid-cols-2">
+            {input.connection.contextItems.map((item) => (
+              <MetadataField key={item.label} label={item.label} value={item.value} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {input.connection.resources.length === 0 ? null : (
+        <div className="gap-2 flex flex-col">
+          <div>
+            {input.connection.resources.map((resource) => (
+              <ResourceSection
+                connectionId={input.connection.id}
+                key={resource.kind}
+                onRefreshResource={input.onRefreshResource}
+                resource={resource}
+                resourceItems={
+                  input.resourceItemsByKey?.get(`${input.connection.id}:${resource.kind}`) ?? null
+                }
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function shouldShowResourceSyncStateBadge(
+  syncState: IntegrationConnectionDetailResourceSummary["syncState"],
+): boolean {
+  return syncState !== "ready" && syncState !== "syncing";
+}
+
+function ConnectionAuthSection(input: {
+  authMethodId: IntegrationConnectionDetailItem["authMethodId"] | undefined;
+  authMethodLabel: string | null | undefined;
+  connectionId: string;
+  onEditApiKey: ((connectionId: string) => void) | undefined;
+}): React.JSX.Element | null {
+  if (input.authMethodLabel === undefined || input.authMethodLabel === null) {
+    return null;
+  }
+
+  if (input.authMethodId === "api-key") {
+    return (
+      <div className="gap-1 flex flex-col">
+        <InlineField label="Auth method" value="API key" />
+        <div className="inline-flex items-center gap-1.5 text-sm">
+          <InlineField label="API key" value="**********" />
+          {input.onEditApiKey ? (
+            <Button
+              aria-label="Edit API key"
+              onClick={() => {
+                input.onEditApiKey?.(input.connectionId);
+              }}
+              size="icon-sm"
+              type="button"
+              variant="ghost"
+            >
+              <PencilSimpleIcon aria-hidden className="size-4" />
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  return <InlineField label="Auth method" value={input.authMethodLabel} />;
+}
+
+function InlineField(input: { label: string; value: string }): React.JSX.Element {
+  return (
+    <p className="text-sm leading-tight">
+      <span>{input.label}:</span> <span>{input.value}</span>
+    </p>
   );
 }
 
@@ -255,6 +241,105 @@ function MetadataField(input: { label: string; value: string }): React.JSX.Eleme
     <div className="rounded-md border p-3">
       <p className="text-muted-foreground text-xs uppercase tracking-wide">{input.label}</p>
       <p className="mt-1 text-sm">{input.value}</p>
+    </div>
+  );
+}
+
+function ResourceSection(input: {
+  connectionId: string;
+  onRefreshResource: ((input: { connectionId: string; kind: string }) => void) | undefined;
+  resource: IntegrationConnectionDetailResourceSummary;
+  resourceItems: {
+    errorMessage: string | null;
+    isLoading: boolean;
+    items: readonly IntegrationConnectionResource[];
+    kind: string;
+  } | null;
+}): React.JSX.Element {
+  return (
+    <div className="gap-4 flex flex-col py-3 first:pt-0 last:pb-0">
+      <div className="flex items-start justify-between gap-3">
+        <div className="gap-1 flex flex-col">
+          <div className="flex items-start gap-2">
+            <span className="text-sm leading-tight">
+              {formatResourceHeading({
+                count: input.resource.count,
+                kind: input.resource.kind,
+              })}
+            </span>
+            {shouldShowResourceSyncStateBadge(input.resource.syncState) ? (
+              <Badge variant="secondary">{formatSyncStateLabel(input.resource.syncState)}</Badge>
+            ) : null}
+          </div>
+          <p className="text-muted-foreground text-xs">
+            {formatResourceInlineMetadata(input.resource)}
+          </p>
+        </div>
+        {input.onRefreshResource ? (
+          <div className="shrink-0">
+            <Button
+              aria-label={`Refresh ${input.resource.kind}`}
+              disabled={input.resource.isRefreshing === true}
+              onClick={() => {
+                input.onRefreshResource?.({
+                  connectionId: input.connectionId,
+                  kind: input.resource.kind,
+                });
+              }}
+              size="sm"
+              title="Sync resource"
+              type="button"
+              variant="outline"
+            >
+              <ArrowClockwiseIcon
+                aria-hidden
+                className={input.resource.isRefreshing === true ? "size-4 animate-spin" : "size-4"}
+              />
+              <span>Sync</span>
+            </Button>
+          </div>
+        ) : null}
+      </div>
+      {input.resource.lastErrorMessage ? (
+        <Alert variant="destructive">
+          <AlertDescription>{input.resource.lastErrorMessage}</AlertDescription>
+        </Alert>
+      ) : null}
+      <ResourceItemsPreview
+        errorMessage={input.resourceItems?.errorMessage ?? null}
+        isLoading={input.resourceItems?.isLoading ?? false}
+        items={input.resourceItems?.items ?? []}
+        kind={input.resource.kind}
+      />
+    </div>
+  );
+}
+
+function ResourceItemsPreview(input: {
+  errorMessage: string | null;
+  isLoading: boolean;
+  items: readonly IntegrationConnectionResource[];
+  kind: string;
+}): React.JSX.Element | null {
+  if (input.isLoading) {
+    return <p className="text-muted-foreground text-sm">Loading {input.kind}...</p>;
+  }
+
+  if (input.errorMessage !== null) {
+    return <p className="text-destructive text-sm">{input.errorMessage}</p>;
+  }
+
+  if (input.items.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="gap-2 flex flex-wrap">
+      {input.items.map((item) => (
+        <span className="rounded-full border px-2.5 py-1 text-xs" key={item.id}>
+          {item.displayName}
+        </span>
+      ))}
     </div>
   );
 }

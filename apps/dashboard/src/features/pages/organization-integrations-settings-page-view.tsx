@@ -38,6 +38,8 @@ export type OrganizationIntegrationsSettingsPageViewProps = {
 export function OrganizationIntegrationsSettingsPageView(
   props: OrganizationIntegrationsSettingsPageViewProps,
 ): React.JSX.Element {
+  const isDetailFocused = props.detailSurface !== undefined && props.detailSurface !== null;
+
   if (props.isLoading) {
     return (
       <div className="gap-3 flex flex-col">
@@ -73,6 +75,15 @@ export function OrganizationIntegrationsSettingsPageView(
           targets in the control-plane database to populate this page.
         </CardContent>
       </Card>
+    );
+  }
+
+  if (isDetailFocused) {
+    return (
+      <div className="w-full gap-4 flex flex-col">
+        {props.connectionDialog ?? null}
+        {props.detailSurface}
+      </div>
     );
   }
 

@@ -4,14 +4,14 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { EditablePageTitle } from "./editable-page-title.js";
+import { EditableHeading } from "./editable-heading.js";
 
-describe("EditablePageTitle", () => {
+describe("EditableHeading", () => {
   afterEach(() => {
     cleanup();
   });
 
-  function TitleEditorHarness(): React.JSX.Element {
+  function HeadingEditorHarness(): React.JSX.Element {
     const [isEditing, setIsEditing] = useState(false);
     const [draftValue, setDraftValue] = useState("My Title");
     const [commitCount, setCommitCount] = useState(0);
@@ -19,12 +19,13 @@ describe("EditablePageTitle", () => {
 
     return (
       <div>
-        <EditablePageTitle
-          ariaLabel="Page title"
+        <EditableHeading
+          ariaLabel="Heading"
           cancelOnEscape={true}
           draftValue={draftValue}
-          editButtonLabel="Edit page title"
+          editButtonLabel="Edit heading"
           errorMessage={undefined}
+          headingTag="h2"
           isEditing={isEditing}
           maxWidthClassName={undefined}
           onCancel={() => {
@@ -41,7 +42,7 @@ describe("EditablePageTitle", () => {
           }}
           placeholder={undefined}
           saveDisabled={false}
-          title="My Title"
+          value="My Title"
         />
         <p>Commit count: {commitCount}</p>
         <p>Cancel count: {cancelCount}</p>
@@ -50,26 +51,26 @@ describe("EditablePageTitle", () => {
   }
 
   it("switches into edit mode when edit icon is clicked", () => {
-    render(<TitleEditorHarness />);
+    render(<HeadingEditorHarness />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit page title" }));
-    expect(screen.getByRole("textbox", { name: "Page title" })).toBeDefined();
+    fireEvent.click(screen.getByRole("button", { name: "Edit heading" }));
+    expect(screen.getByRole("textbox", { name: "Heading" })).toBeDefined();
   });
 
   it("commits on blur while editing", () => {
-    render(<TitleEditorHarness />);
+    render(<HeadingEditorHarness />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit page title" }));
-    fireEvent.blur(screen.getByRole("textbox", { name: "Page title" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit heading" }));
+    fireEvent.blur(screen.getByRole("textbox", { name: "Heading" }));
 
     expect(screen.getByText("Commit count: 1")).toBeDefined();
   });
 
   it("cancels on Escape while editing", () => {
-    render(<TitleEditorHarness />);
+    render(<HeadingEditorHarness />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Edit page title" }));
-    fireEvent.keyDown(screen.getByRole("textbox", { name: "Page title" }), {
+    fireEvent.click(screen.getByRole("button", { name: "Edit heading" }));
+    fireEvent.keyDown(screen.getByRole("textbox", { name: "Heading" }), {
       key: "Escape",
     });
 

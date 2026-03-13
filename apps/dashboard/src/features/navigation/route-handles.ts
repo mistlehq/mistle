@@ -1,5 +1,8 @@
+import { listIntegrationDefinitions } from "@mistle/integrations-definitions";
+import { createElement } from "react";
 import { z } from "zod";
 
+import { resolveIntegrationLogoPath } from "../integrations/logo.js";
 import type { AppRouteHandle, RouteTextResolverInput, RouteTextValue } from "./route-meta.js";
 
 type SettingsPageRouteHandle = AppRouteHandle & {
@@ -49,6 +52,73 @@ function resolveIntegrationDetailBreadcrumb(input: RouteTextResolverInput): stri
   }
 
   return normalizeIntegrationBreadcrumbLabel(targetKey);
+}
+
+function resolveIntegrationDefinitionMetadata(targetKey: string): {
+  displayName: string;
+  logoKey: string;
+} | null {
+  const definition =
+    listIntegrationDefinitions().find((candidate) => candidate.variantId === targetKey) ??
+    listIntegrationDefinitions().find((candidate) => candidate.familyId === targetKey) ??
+    null;
+
+  if (definition === null) {
+    return null;
+  }
+
+  return {
+    displayName: definition.displayName,
+    logoKey: definition.logoKey,
+  };
+}
+
+function resolveIntegrationDetailTitle(input: RouteTextResolverInput): string {
+  const targetKey = input.params["targetKey"];
+  if (targetKey === undefined || targetKey.trim().length === 0) {
+    return "Connection";
+  }
+
+  const metadata = resolveIntegrationDefinitionMetadata(targetKey);
+  if (metadata !== null) {
+    return metadata.displayName;
+  }
+
+  return normalizeIntegrationBreadcrumbLabel(targetKey);
+}
+
+function resolveIntegrationDetailSubtitle(input: RouteTextResolverInput): string {
+  const targetKey = input.params["targetKey"];
+  if (targetKey === undefined || targetKey.trim().length === 0) {
+    return "";
+  }
+
+  return targetKey;
+}
+
+function resolveIntegrationDetailHeaderIcon(input: RouteTextResolverInput): React.ReactNode | null {
+  const targetKey = input.params["targetKey"];
+  if (targetKey === undefined || targetKey.trim().length === 0) {
+    return null;
+  }
+
+  const metadata = resolveIntegrationDefinitionMetadata(targetKey);
+  if (metadata === null) {
+    return createElement(
+      "span",
+      {
+        className:
+          "inline-flex h-11 w-11 items-center justify-center rounded-md border bg-muted text-sm font-semibold uppercase",
+      },
+      normalizeIntegrationBreadcrumbLabel(targetKey).slice(0, 1),
+    );
+  }
+
+  return createElement("img", {
+    alt: `${metadata.displayName} logo`,
+    className: "h-11 w-11 rounded-md border bg-background p-1.5",
+    src: resolveIntegrationLogoPath({ logoKey: metadata.logoKey }),
+  });
 }
 
 function resolveSessionDetailBreadcrumb(input: RouteTextResolverInput): string {
@@ -175,8 +245,9 @@ export const ROUTE_HANDLES = {
   },
   settingsOrganizationIntegrationDetail: {
     breadcrumb: resolveIntegrationDetailBreadcrumb,
-    title: "Integration connection",
-    description: "Inspect an existing integration connection and resource readiness.",
+    title: resolveIntegrationDetailTitle,
+    description: resolveIntegrationDetailSubtitle,
+    headerIcon: resolveIntegrationDetailHeaderIcon,
   },
   settingsOrganizationIntegrationCallbackResult: {
     breadcrumb: resolveIntegrationCallbackBreadcrumb,

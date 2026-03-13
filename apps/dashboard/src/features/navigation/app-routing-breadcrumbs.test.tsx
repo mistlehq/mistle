@@ -18,7 +18,7 @@ function PageHarness(): React.JSX.Element {
     <div>
       <AppBreadcrumbs />
       <p data-slot="meta-title">{pageMeta.title ?? "MISSING_TITLE"}</p>
-      <p data-slot="meta-description">{pageMeta.description ?? "MISSING_DESCRIPTION"}</p>
+      <p data-slot="meta-description">{pageMeta.supportingText ?? "MISSING_DESCRIPTION"}</p>
     </div>
   );
 }
@@ -126,8 +126,8 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain('href="/settings/organization/general"');
     expect(markup).toContain('href="/settings/organization/integrations"');
     expect(markup).toContain("Github");
-    expect(markup).toContain("Integration connection");
-    expect(markup).toContain("Inspect an existing integration connection and resource readiness.");
+    expect(markup).toContain('data-slot="meta-title">GitHub');
+    expect(markup).toContain('data-slot="meta-description">github');
   });
 
   it("enforces breadcrumb and page metadata coverage for settings destinations", () => {
