@@ -72,6 +72,7 @@ export const APP_ROUTES = createRoutesFromElements(
           organizationGeneral: <OrganizationGeneralSettingsPage />,
           organizationMembers: <OrganizationMembersSettingsPage />,
           organizationIntegrations: <OrganizationIntegrationsSettingsPage />,
+          organizationIntegrationDetail: <OrganizationIntegrationsSettingsPage />,
           organizationIntegrationCallbackResult: <IntegrationsCallbackResultPage />,
         })}
       </Route>

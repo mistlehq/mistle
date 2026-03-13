@@ -1,34 +1,28 @@
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Skeleton,
-} from "@mistle/ui";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
+import { resolveConnectionAuthScheme } from "../integrations/connection-auth.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
-import { formatConnectionCount } from "../integrations/format-connection-count.js";
+import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
 import {
   IntegrationConnectionDialog,
   IntegrationConnectionMethodIds,
-  type IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-dialog.js";
-import { IntegrationSection } from "../integrations/integration-section.js";
-import { IntegrationTile } from "../integrations/integration-tile.js";
-import { listIntegrationDirectory } from "../integrations/integrations-service.js";
 import {
-  type ViewDialogState,
-  ViewConnectionsDialog,
-} from "../integrations/view-connections-dialog.js";
+  listIntegrationDirectory,
+  refreshIntegrationConnectionResources,
+} from "../integrations/integrations-service.js";
+import {
+  buildAvailableIntegrationViewCards,
+  buildConnectedIntegrationViewCards,
+  buildIntegrationConnectionDetailItems,
+  createRefreshingResourceKey,
+} from "./integrations-page-view-model.js";
+import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
 import { useIntegrationConnectionDialogState } from "./use-integration-connection-dialog-state.js";
+import { useIntegrationDetailState } from "./use-integration-detail-state.js";
 
 const SETTINGS_INTEGRATIONS_QUERY_KEY: readonly ["settings", "integrations", "directory"] = [
   "settings",
@@ -36,22 +30,11 @@ const SETTINGS_INTEGRATIONS_QUERY_KEY: readonly ["settings", "integrations", "di
   "directory",
 ];
 
-function toConnectionMethods(
-  supportedAuthSchemes: readonly ("oauth" | "api-key")[] | undefined,
-): readonly IntegrationConnectionMethodId[] {
-  if (supportedAuthSchemes === undefined) {
-    return [];
-  }
-
-  return supportedAuthSchemes.map((scheme) =>
-    scheme === "api-key"
-      ? IntegrationConnectionMethodIds.API_KEY
-      : IntegrationConnectionMethodIds.OAUTH,
-  );
-}
-
 export function IntegrationsPage() {
-  const [viewDialog, setViewDialog] = useState<ViewDialogState | null>(null);
+  const navigate = useNavigate();
+  const params = useParams();
+  const queryClient = useQueryClient();
+  const detailTargetKey = params["targetKey"] ?? null;
 
   const connectionDialogState = useIntegrationConnectionDialogState({
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
@@ -71,175 +54,167 @@ export function IntegrationsPage() {
     return buildIntegrationCards(integrationsQuery.data);
   }, [integrationsQuery.data]);
 
-  const selectedViewConnections = useMemo(() => {
-    if (viewDialog === null) {
-      return [];
-    }
+  const [refreshingResourceKeys, setRefreshingResourceKeys] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
 
-    const selectedCard = cards.find((card) => card.target.targetKey === viewDialog.targetKey);
-    if (selectedCard === undefined) {
-      throw new Error(`Integration card was not found for target '${viewDialog.targetKey}'.`);
-    }
-
-    return selectedCard.connections.filter((connection) => connection.status === "active");
-  }, [cards, viewDialog]);
-
-  const activeIntegrationCards = useMemo(
-    () =>
-      cards.filter((card) => card.connections.some((connection) => connection.status === "active")),
+  const connectedIntegrationCards = useMemo(
+    () => cards.filter((card) => card.connections.length > 0),
     [cards],
   );
 
-  if (integrationsQuery.isPending) {
-    return (
-      <div className="gap-3 flex flex-col">
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-        <Skeleton className="h-20 w-full" />
-      </div>
-    );
+  const {
+    selectedConnectionId,
+    setSelectedConnectionId,
+    selectedDetailCard,
+    selectedDetailConnections,
+  } = useIntegrationDetailState({
+    cards,
+    detailTargetKey,
+  });
+
+  if (
+    detailTargetKey !== null &&
+    !integrationsQuery.isPending &&
+    !integrationsQuery.isError &&
+    selectedDetailCard === null
+  ) {
+    throw new Error(`Integration target '${detailTargetKey}' was not found.`);
   }
 
-  if (integrationsQuery.isError) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>Could not load integrations</AlertTitle>
-        <AlertDescription className="gap-3 flex flex-col items-start">
-          <span>
-            {resolveApiErrorMessage({
-              error: integrationsQuery.error,
-              fallbackMessage: "Could not load integrations.",
-            })}
-          </span>
-          <Button
-            onClick={() => {
-              void integrationsQuery.refetch();
-            }}
-            type="button"
-            variant="outline"
-          >
-            Retry
-          </Button>
-        </AlertDescription>
-      </Alert>
-    );
-  }
+  const refreshResourceMutation = useMutation({
+    mutationFn: async (input: { connectionId: string; kind: string }) =>
+      refreshIntegrationConnectionResources(input),
+    onMutate: (variables) => {
+      setRefreshingResourceKeys((current) => {
+        const next = new Set(current);
+        next.add(createRefreshingResourceKey(variables));
+        return next;
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
+      });
+    },
+    onSettled: (_data, _error, variables) => {
+      setRefreshingResourceKeys((current) => {
+        const next = new Set(current);
+        next.delete(createRefreshingResourceKey(variables));
+        return next;
+      });
+    },
+  });
 
-  if (cards.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>No integrations available</CardTitle>
-          <CardDescription>
-            No integration targets are currently configured for this environment. Seed integration
-            targets in the control-plane database to populate this page.
-          </CardDescription>
-        </CardHeader>
-        <CardContent />
-      </Card>
-    );
-  }
+  const connectedViewCards = useMemo(
+    () =>
+      buildConnectedIntegrationViewCards({
+        connectedCards: connectedIntegrationCards,
+        onOpenTarget: (targetKey) => {
+          void navigate(`/settings/organization/integrations/${targetKey}`);
+        },
+      }),
+    [connectedIntegrationCards, navigate],
+  );
 
-  return (
-    <div className="w-full gap-4 flex flex-col">
-      <IntegrationSection
-        cards={activeIntegrationCards}
-        emptyStateMessage="No active integration connections yet. Add one from the integrations list below."
-        renderTile={(card) => {
-          return (
-            <IntegrationTile
-              actionLabel="View"
-              actionVariant="outline"
-              description={formatConnectionCount(card.connections.length)}
-              displayName={card.displayName}
-              {...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey })}
-              {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
-              onAction={() => {
-                setViewDialog({
-                  targetKey: card.target.targetKey,
-                  displayName: card.displayName,
-                });
-              }}
-            />
+  const availableViewCards = useMemo(
+    () =>
+      buildAvailableIntegrationViewCards({
+        cards,
+        onOpenCreateDialog: (dialogInput) => {
+          connectionDialogState.openDialog(dialogInput);
+        },
+      }),
+    [cards, connectionDialogState],
+  );
+
+  const detailSurface = useMemo(() => {
+    if (detailTargetKey === null || selectedDetailCard === null) {
+      return null;
+    }
+
+    return (
+      <IntegrationConnectionDetailView
+        connections={buildIntegrationConnectionDetailItems({
+          connections: selectedDetailConnections,
+          refreshingResourceKeys,
+        })}
+        {...(selectedDetailCard.target.logoKey === undefined
+          ? {}
+          : { logoKey: selectedDetailCard.target.logoKey })}
+        onEditConnection={(connectionId) => {
+          const selectedConnection = selectedDetailConnections.find(
+            (connection) => connection.id === connectionId,
           );
-        }}
-        title="Connected"
-      />
-
-      <IntegrationSection
-        cards={cards}
-        renderTile={(card) => {
-          const methods = toConnectionMethods(card.target.supportedAuthSchemes);
-
-          return (
-            <IntegrationTile
-              actionDisabled={methods.length === 0}
-              actionLabel={methods.length === 0 ? "N/A" : "Add"}
-              description={card.description}
-              displayName={card.displayName}
-              {...(card.target.logoKey === undefined ? {} : { logoKey: card.target.logoKey })}
-              {...(card.configStatus === "invalid" ? { statusBadge: "Invalid config" } : {})}
-              onAction={() => {
-                connectionDialogState.openDialog({
-                  targetKey: card.target.targetKey,
-                  targetDisplayName: card.displayName,
-                  methods,
-                  mode: "create",
-                });
-              }}
-            />
-          );
-        }}
-        title="Available Integrations"
-      />
-
-      <IntegrationConnectionDialog
-        apiKeyValue={connectionDialogState.apiKeyValue}
-        connectionDisplayNamePlaceholder={connectionDialogState.connectionDisplayNamePlaceholder}
-        connectionDisplayNameValue={connectionDialogState.connectionDisplayNameValue}
-        connectError={connectionDialogState.error}
-        connectMethodId={connectionDialogState.methodId}
-        dialog={connectionDialogState.dialog}
-        hasChanges={connectionDialogState.hasChanges}
-        isApiKeyChanged={connectionDialogState.isApiKeyChanged}
-        isConnectionDisplayNameChanged={connectionDialogState.isConnectionDisplayNameChanged}
-        onApiKeyChange={connectionDialogState.onApiKeyChange}
-        onConnectionDisplayNameChange={connectionDialogState.onConnectionDisplayNameChange}
-        onClose={connectionDialogState.closeDialog}
-        onMethodChange={connectionDialogState.onMethodChange}
-        onSubmit={connectionDialogState.submitDialog}
-        pending={connectionDialogState.pending}
-      />
-
-      <ViewConnectionsDialog
-        connections={selectedViewConnections}
-        dialog={viewDialog}
-        onClose={() => {
-          setViewDialog(null);
-        }}
-        onOpenEditConnectionDialog={({
-          connectionId,
-          connectionDisplayName,
-          connectionMethodId,
-        }) => {
-          if (viewDialog === null) {
-            throw new Error("View dialog state is required to open edit connection dialog.");
+          if (selectedConnection === undefined) {
+            throw new Error(`Integration connection '${connectionId}' was not found.`);
           }
 
-          setViewDialog(null);
+          const authScheme = resolveConnectionAuthScheme(selectedConnection.config ?? null);
           connectionDialogState.openDialog({
-            targetKey: viewDialog.targetKey,
-            targetDisplayName: viewDialog.displayName,
+            targetKey: selectedDetailCard.target.targetKey,
+            targetDisplayName: selectedDetailCard.displayName,
             mode: "update",
-            connectionId,
-            connectionDisplayName,
+            connectionId: selectedConnection.id,
+            connectionDisplayName: selectedConnection.displayName,
             currentMethodId:
-              connectionMethodId === null
-                ? IntegrationConnectionMethodIds.API_KEY
-                : connectionMethodId,
+              authScheme === null ? IntegrationConnectionMethodIds.API_KEY : authScheme,
           });
         }}
+        onRefreshResource={(input) => {
+          refreshResourceMutation.mutate(input);
+        }}
+        onSelectConnection={setSelectedConnectionId}
+        selectedConnectionId={selectedConnectionId}
+        targetDisplayName={selectedDetailCard.displayName}
+        targetKey={selectedDetailCard.target.targetKey}
       />
-    </div>
+    );
+  }, [
+    connectionDialogState,
+    detailTargetKey,
+    refreshingResourceKeys,
+    selectedConnectionId,
+    selectedDetailCard,
+    selectedDetailConnections,
+  ]);
+
+  return (
+    <OrganizationIntegrationsSettingsPageView
+      availableCards={availableViewCards}
+      connectedCards={connectedViewCards}
+      connectionDialog={
+        <IntegrationConnectionDialog
+          apiKeyValue={connectionDialogState.apiKeyValue}
+          connectionDisplayNamePlaceholder={connectionDialogState.connectionDisplayNamePlaceholder}
+          connectionDisplayNameValue={connectionDialogState.connectionDisplayNameValue}
+          connectError={connectionDialogState.error}
+          connectMethodId={connectionDialogState.methodId}
+          dialog={connectionDialogState.dialog}
+          hasChanges={connectionDialogState.hasChanges}
+          isApiKeyChanged={connectionDialogState.isApiKeyChanged}
+          isConnectionDisplayNameChanged={connectionDialogState.isConnectionDisplayNameChanged}
+          onApiKeyChange={connectionDialogState.onApiKeyChange}
+          onConnectionDisplayNameChange={connectionDialogState.onConnectionDisplayNameChange}
+          onClose={connectionDialogState.closeDialog}
+          onMethodChange={connectionDialogState.onMethodChange}
+          onSubmit={connectionDialogState.submitDialog}
+          pending={connectionDialogState.pending}
+        />
+      }
+      detailSurface={detailSurface}
+      isLoading={integrationsQuery.isPending}
+      loadErrorMessage={
+        integrationsQuery.isError
+          ? resolveApiErrorMessage({
+              error: integrationsQuery.error,
+              fallbackMessage: "Could not load integrations.",
+            })
+          : null
+      }
+      onRetryLoad={() => {
+        void integrationsQuery.refetch();
+      }}
+    />
   );
 }

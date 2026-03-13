@@ -38,6 +38,13 @@ describe("route handles", () => {
     expect(ROUTE_HANDLES.settingsOrganizationIntegrations.title).toBe("Integrations");
     expect(ROUTE_HANDLES.settingsOrganizationIntegrations.description).toBe("");
 
+    expect(ROUTE_HANDLES.settingsOrganizationIntegrationDetail.title).toBe(
+      "Integration connection",
+    );
+    expect(ROUTE_HANDLES.settingsOrganizationIntegrationDetail.description).toBe(
+      "Inspect an existing integration connection and resource readiness.",
+    );
+
     expect(ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult.title).toBe(
       "Integration callback result",
     );
@@ -75,6 +82,20 @@ describe("route handles", () => {
     expect(callbackBreadcrumb({ params: { targetKey: "openai" } })).toBe("Openai callback");
     expect(callbackBreadcrumb({ params: { targetKey: "custom-integration_v2" } })).toBe(
       "Custom Integration V2 callback",
+    );
+  });
+
+  it("normalizes integration detail breadcrumb labels for known and unknown target keys", () => {
+    const detailBreadcrumb = ROUTE_HANDLES.settingsOrganizationIntegrationDetail.breadcrumb;
+    expect(typeof detailBreadcrumb).toBe("function");
+
+    if (typeof detailBreadcrumb !== "function") {
+      throw new Error("settingsOrganizationIntegrationDetail breadcrumb must be a function");
+    }
+
+    expect(detailBreadcrumb({ params: { targetKey: "github" } })).toBe("Github");
+    expect(detailBreadcrumb({ params: { targetKey: "custom-integration_v2" } })).toBe(
+      "Custom Integration V2",
     );
   });
 

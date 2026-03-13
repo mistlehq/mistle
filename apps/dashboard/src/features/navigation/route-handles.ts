@@ -42,6 +42,15 @@ function resolveIntegrationCallbackBreadcrumb(input: RouteTextResolverInput): st
   return `${normalizeIntegrationBreadcrumbLabel(targetKey)} callback`;
 }
 
+function resolveIntegrationDetailBreadcrumb(input: RouteTextResolverInput): string {
+  const targetKey = input.params["targetKey"];
+  if (targetKey === undefined || targetKey.trim().length === 0) {
+    return "Connection";
+  }
+
+  return normalizeIntegrationBreadcrumbLabel(targetKey);
+}
+
 function resolveSessionDetailBreadcrumb(input: RouteTextResolverInput): string {
   const sandboxInstanceId = input.params["sandboxInstanceId"];
   if (sandboxInstanceId === undefined || sandboxInstanceId.trim().length === 0) {
@@ -140,6 +149,11 @@ export const ROUTE_HANDLES = {
     title: "Integrations",
     description: "",
   },
+  settingsOrganizationIntegrationDetail: {
+    breadcrumb: resolveIntegrationDetailBreadcrumb,
+    title: "Integration connection",
+    description: "Inspect an existing integration connection and resource readiness.",
+  },
   settingsOrganizationIntegrationCallbackResult: {
     breadcrumb: resolveIntegrationCallbackBreadcrumb,
     title: "Integration callback result",
@@ -152,6 +166,7 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_KEYS = [
   "settingsOrganizationGeneral",
   "settingsOrganizationMembers",
   "settingsOrganizationIntegrations",
+  "settingsOrganizationIntegrationDetail",
   "settingsOrganizationIntegrationCallbackResult",
 ] as const;
 
@@ -162,6 +177,7 @@ export const SETTINGS_PAGE_ROUTE_HANDLE_CONTRACT: {
   settingsOrganizationGeneral: ROUTE_HANDLES.settingsOrganizationGeneral,
   settingsOrganizationMembers: ROUTE_HANDLES.settingsOrganizationMembers,
   settingsOrganizationIntegrations: ROUTE_HANDLES.settingsOrganizationIntegrations,
+  settingsOrganizationIntegrationDetail: ROUTE_HANDLES.settingsOrganizationIntegrationDetail,
   settingsOrganizationIntegrationCallbackResult:
     ROUTE_HANDLES.settingsOrganizationIntegrationCallbackResult,
 };
