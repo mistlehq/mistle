@@ -42,7 +42,7 @@ func TestStartPTYSessionInheritsProcessEnvironment(t *testing.T) {
 		}
 	}()
 
-	_, err = session.terminal.Write([]byte("printf '__MISTLE_GH_TOKEN__%s__\\n' \"$GH_TOKEN\"\nexit\n"))
+	_, err = session.terminal.Write([]byte("printf '__MISTLE_GH_TOKEN__%s__\\n' \"$GH_TOKEN\"\n"))
 	if err != nil {
 		t.Fatalf("expected PTY command write to succeed, got %v", err)
 	}
