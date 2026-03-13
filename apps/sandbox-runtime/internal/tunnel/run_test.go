@@ -19,8 +19,9 @@ import (
 func TestRun(t *testing.T) {
 	t.Run("fails when context is missing", func(t *testing.T) {
 		err := Run(RunInput{
-			GatewayWSURL:   "ws://127.0.0.1:8090/tunnel/sandbox",
-			BootstrapToken: []byte("token"),
+			GatewayWSURL:        "ws://127.0.0.1:8090/tunnel/sandbox",
+			BootstrapToken:      []byte("token"),
+			TunnelExchangeToken: testLongLivedTunnelExchangeToken(t),
 		})
 		if err == nil {
 			t.Fatal("expected error when context is missing")
@@ -29,9 +30,10 @@ func TestRun(t *testing.T) {
 
 	t.Run("fails when bootstrap token is empty", func(t *testing.T) {
 		err := Run(RunInput{
-			Context:        context.Background(),
-			GatewayWSURL:   "ws://127.0.0.1:8090/tunnel/sandbox",
-			BootstrapToken: []byte(" \n\t "),
+			Context:             context.Background(),
+			GatewayWSURL:        "ws://127.0.0.1:8090/tunnel/sandbox",
+			BootstrapToken:      []byte(" \n\t "),
+			TunnelExchangeToken: testLongLivedTunnelExchangeToken(t),
 		})
 		if err == nil {
 			t.Fatal("expected error when bootstrap token is empty")
@@ -40,9 +42,10 @@ func TestRun(t *testing.T) {
 
 	t.Run("fails when gateway ws url uses unsupported scheme", func(t *testing.T) {
 		err := Run(RunInput{
-			Context:        context.Background(),
-			GatewayWSURL:   "http://127.0.0.1:8090/tunnel/sandbox",
-			BootstrapToken: []byte("token"),
+			Context:             context.Background(),
+			GatewayWSURL:        "http://127.0.0.1:8090/tunnel/sandbox",
+			BootstrapToken:      []byte("token"),
+			TunnelExchangeToken: testLongLivedTunnelExchangeToken(t),
 		})
 		if err == nil {
 			t.Fatal("expected error when gateway ws url scheme is unsupported")
@@ -74,9 +77,10 @@ func TestRun(t *testing.T) {
 		defer cancel()
 
 		err := Run(RunInput{
-			Context:        runCtx,
-			GatewayWSURL:   gatewayWSURL,
-			BootstrapToken: []byte("sandbox-bootstrap-token"),
+			Context:             runCtx,
+			GatewayWSURL:        gatewayWSURL,
+			BootstrapToken:      []byte("sandbox-bootstrap-token"),
+			TunnelExchangeToken: testLongLivedTunnelExchangeToken(t),
 		})
 		if err == nil {
 			t.Fatal("expected run to fail when websocket closes from server side")
@@ -224,9 +228,10 @@ func TestRun(t *testing.T) {
 		defer cancel()
 
 		err := Run(RunInput{
-			Context:        runCtx,
-			GatewayWSURL:   gatewayWSURL,
-			BootstrapToken: []byte("sandbox-bootstrap-token"),
+			Context:             runCtx,
+			GatewayWSURL:        gatewayWSURL,
+			BootstrapToken:      []byte("sandbox-bootstrap-token"),
+			TunnelExchangeToken: testLongLivedTunnelExchangeToken(t),
 			AgentRuntimes: []startup.AgentRuntime{
 				{
 					BindingID:   "bind_openai",
@@ -351,11 +356,12 @@ func TestRun(t *testing.T) {
 		runErrCh := make(chan error, 1)
 		go func() {
 			runErrCh <- Run(RunInput{
-				Context:        runCtx,
-				GatewayWSURL:   gatewayWSURL,
-				BootstrapToken: []byte("sandbox-bootstrap-token"),
-				AgentRuntimes:  []startup.AgentRuntime{},
-				RuntimeClients: []startup.RuntimeClient{},
+				Context:             runCtx,
+				GatewayWSURL:        gatewayWSURL,
+				BootstrapToken:      []byte("sandbox-bootstrap-token"),
+				TunnelExchangeToken: testLongLivedTunnelExchangeToken(t),
+				AgentRuntimes:       []startup.AgentRuntime{},
+				RuntimeClients:      []startup.RuntimeClient{},
 			})
 		}()
 
@@ -535,9 +541,10 @@ func TestRun(t *testing.T) {
 		runErrCh := make(chan error, 1)
 		go func() {
 			runErrCh <- Run(RunInput{
-				Context:        runCtx,
-				GatewayWSURL:   gatewayWSURL,
-				BootstrapToken: []byte("sandbox-bootstrap-token"),
+				Context:             runCtx,
+				GatewayWSURL:        gatewayWSURL,
+				BootstrapToken:      []byte("sandbox-bootstrap-token"),
+				TunnelExchangeToken: testLongLivedTunnelExchangeToken(t),
 				AgentRuntimes: []startup.AgentRuntime{
 					{
 						BindingID:   "bind_openai",
@@ -793,10 +800,11 @@ func TestRun(t *testing.T) {
 		defer cancel()
 
 		err := Run(RunInput{
-			Context:        runCtx,
-			GatewayWSURL:   gatewayWSURL,
-			BootstrapToken: []byte("sandbox-bootstrap-token"),
-			RuntimeClients: []startup.RuntimeClient{},
+			Context:             runCtx,
+			GatewayWSURL:        gatewayWSURL,
+			BootstrapToken:      []byte("sandbox-bootstrap-token"),
+			TunnelExchangeToken: testLongLivedTunnelExchangeToken(t),
+			RuntimeClients:      []startup.RuntimeClient{},
 		})
 		if err == nil {
 			t.Fatal("expected run to fail when websocket closes from gateway side")
@@ -892,10 +900,11 @@ func TestRun(t *testing.T) {
 		defer cancel()
 
 		err := Run(RunInput{
-			Context:        runCtx,
-			GatewayWSURL:   gatewayWSURL,
-			BootstrapToken: []byte("sandbox-bootstrap-token"),
-			RuntimeClients: []startup.RuntimeClient{},
+			Context:             runCtx,
+			GatewayWSURL:        gatewayWSURL,
+			BootstrapToken:      []byte("sandbox-bootstrap-token"),
+			TunnelExchangeToken: testLongLivedTunnelExchangeToken(t),
+			RuntimeClients:      []startup.RuntimeClient{},
 		})
 		if err == nil {
 			t.Fatal("expected run to fail when websocket closes from gateway side")
@@ -972,10 +981,11 @@ func TestRun(t *testing.T) {
 		runErrCh := make(chan error, 1)
 		go func() {
 			runErrCh <- Run(RunInput{
-				Context:        runCtx,
-				GatewayWSURL:   gatewayWSURL,
-				BootstrapToken: []byte("sandbox-bootstrap-token"),
-				RuntimeClients: []startup.RuntimeClient{},
+				Context:             runCtx,
+				GatewayWSURL:        gatewayWSURL,
+				BootstrapToken:      []byte("sandbox-bootstrap-token"),
+				TunnelExchangeToken: testLongLivedTunnelExchangeToken(t),
+				RuntimeClients:      []startup.RuntimeClient{},
 			})
 		}()
 

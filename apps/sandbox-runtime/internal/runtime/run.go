@@ -314,11 +314,12 @@ func Run(input RunInput) (runErr error) {
 		defer tunnelSpan.End()
 
 		tunnelErr := tunnel.Run(tunnel.RunInput{
-			Context:        tunnelContext,
-			GatewayWSURL:   startupInput.TunnelGatewayURL,
-			BootstrapToken: []byte(startupInput.BootstrapToken),
-			AgentRuntimes:  startupInput.RuntimePlan.AgentRuntimes,
-			RuntimeClients: startupInput.RuntimePlan.RuntimeClients,
+			Context:             tunnelContext,
+			GatewayWSURL:        startupInput.TunnelGatewayURL,
+			BootstrapToken:      []byte(startupInput.BootstrapToken),
+			TunnelExchangeToken: startupInput.TunnelExchangeToken,
+			AgentRuntimes:       startupInput.RuntimePlan.AgentRuntimes,
+			RuntimeClients:      startupInput.RuntimePlan.RuntimeClients,
 		})
 		if tunnelErr != nil {
 			tunnelSpan.RecordError(tunnelErr)
