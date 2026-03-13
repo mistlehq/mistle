@@ -3,13 +3,9 @@ import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { resolveConnectionAuthScheme } from "../integrations/connection-auth.js";
 import { buildIntegrationCards } from "../integrations/directory-model.js";
 import { IntegrationConnectionDetailView } from "../integrations/integration-connection-detail-view.js";
-import {
-  IntegrationConnectionDialog,
-  IntegrationConnectionMethodIds,
-} from "../integrations/integration-connection-dialog.js";
+import { IntegrationConnectionDialog } from "../integrations/integration-connection-dialog.js";
 import {
   listIntegrationDirectory,
   refreshIntegrationConnectionResources,
@@ -19,6 +15,7 @@ import {
   buildConnectedIntegrationViewCards,
   buildIntegrationConnectionDetailItems,
   createRefreshingResourceKey,
+  resolveEditableConnectionMethodId,
 } from "./integrations-page-view-model.js";
 import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
 import { useIntegrationConnectionDialogState } from "./use-integration-connection-dialog-state.js";
@@ -150,15 +147,13 @@ export function IntegrationsPage() {
             throw new Error(`Integration connection '${connectionId}' was not found.`);
           }
 
-          const authScheme = resolveConnectionAuthScheme(selectedConnection.config ?? null);
           connectionDialogState.openDialog({
             targetKey: selectedDetailCard.target.targetKey,
             targetDisplayName: selectedDetailCard.displayName,
             mode: "update",
             connectionId: selectedConnection.id,
             connectionDisplayName: selectedConnection.displayName,
-            currentMethodId:
-              authScheme === null ? IntegrationConnectionMethodIds.API_KEY : authScheme,
+            currentMethodId: resolveEditableConnectionMethodId(selectedConnection),
           });
         }}
         onRefreshResource={(input) => {

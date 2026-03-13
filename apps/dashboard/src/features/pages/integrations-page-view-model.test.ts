@@ -8,6 +8,7 @@ import {
   buildConnectedIntegrationViewCards,
   buildIntegrationConnectionDetailItems,
   createRefreshingResourceKey,
+  resolveEditableConnectionMethodId,
   toConnectionMethods,
 } from "./integrations-page-view-model.js";
 
@@ -84,6 +85,7 @@ describe("integrations page view model", () => {
               count: 42,
               syncState: "ready",
               lastSyncedAt: "2026-03-11T04:25:00.000Z",
+              lastErrorMessage: "Resource sync failed.",
             },
           ],
           createdAt: "2026-03-03T00:00:00.000Z",
@@ -101,6 +103,45 @@ describe("integrations page view model", () => {
     expect(item?.authMethodLabel).toBe("OAuth");
     expect(item?.externalSubjectId).toBe("mistle-labs");
     expect(item?.resources[0]?.isRefreshing).toBe(true);
+    expect(item?.resources[0]?.lastErrorMessage).toBe("Resource sync failed.");
+  });
+
+  it("marks syncing resources as refreshing even without a local pending refresh", () => {
+    const [item] = buildIntegrationConnectionDetailItems({
+      connections: [
+        {
+          id: "icn_123",
+          targetKey: "github",
+          displayName: "Engineering GitHub",
+          status: "active",
+          resources: [
+            {
+              kind: "repositories",
+              selectionMode: "multi",
+              count: 42,
+              syncState: "syncing",
+            },
+          ],
+          createdAt: "2026-03-03T00:00:00.000Z",
+          updatedAt: "2026-03-11T04:30:00.000Z",
+        } satisfies IntegrationConnection,
+      ],
+      refreshingResourceKeys: new Set<string>(),
+    });
+
+    expect(item?.resources[0]?.isRefreshing).toBe(true);
+  });
+
+  it("fails fast when editing a connection with an unsupported auth scheme", () => {
+    expect(() =>
+      resolveEditableConnectionMethodId({
+        id: "icn_123",
+        targetKey: "github",
+        config: {
+          auth_scheme: "bearer-token",
+        },
+      }),
+    ).toThrow("Unsupported auth scheme for integration connection 'icn_123' on target 'github'.");
   });
 });
 
