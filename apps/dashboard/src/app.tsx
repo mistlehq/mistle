@@ -9,6 +9,7 @@ import {
 
 import { AuthScreen } from "./features/auth/auth-screen.js";
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
+import { AutomationsPage } from "./features/pages/automations-page.js";
 import { CodexSessionPage } from "./features/pages/codex-session-page.js";
 import { HomePage } from "./features/pages/home-page.js";
 import { IntegrationsCallbackResultPage } from "./features/pages/integrations-callback-result-page.js";
@@ -20,6 +21,7 @@ import { ProfileSettingsPage } from "./features/pages/profile-settings-page.js";
 import { SandboxProfileEditorPage } from "./features/pages/sandbox-profile-editor-page.js";
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
 import { SessionsPage } from "./features/pages/sessions-page.js";
+import { WebhookAutomationEditorPage } from "./features/pages/webhook-automation-editor-page.js";
 import { SettingsLayout } from "./features/settings/settings-layout.js";
 import { createSettingsRoutes } from "./features/settings/settings-routes.js";
 import { AppShell } from "./features/shell/app-shell.js";
@@ -56,6 +58,19 @@ export const APP_ROUTES = createRoutesFromElements(
             element={<SandboxProfileEditorPage mode="edit" />}
             handle={ROUTE_HANDLES.sandboxProfilesDetail}
             path=":profileId"
+          />
+        </Route>
+        <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.automations} path="automations">
+          <Route element={<AutomationsPage />} index />
+          <Route
+            element={<WebhookAutomationEditorPage mode="create" />}
+            handle={ROUTE_HANDLES.automationsNew}
+            path="new"
+          />
+          <Route
+            element={<WebhookAutomationEditorPage mode="edit" />}
+            handle={ROUTE_HANDLES.automationsDetail}
+            path=":automationId"
           />
         </Route>
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.sessions} path="sessions">

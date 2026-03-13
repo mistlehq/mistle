@@ -75,6 +75,20 @@ describe("app routing breadcrumb integration", () => {
     </Route>,
   );
 
+  const automationRoutes = createRoutesFromElements(
+    <Route element={<Outlet />} path="/">
+      <Route element={<Outlet />} handle={ROUTE_HANDLES.automations} path="automations">
+        <Route element={<PageHarness />} index />
+        <Route element={<PageHarness />} handle={ROUTE_HANDLES.automationsNew} path="new" />
+        <Route
+          element={<PageHarness />}
+          handle={ROUTE_HANDLES.automationsDetail}
+          path=":automationId"
+        />
+      </Route>
+    </Route>,
+  );
+
   const dashboardRoutes = createRoutesFromElements(
     <Route element={<Outlet />} path="/">
       <Route element={<PageHarness />} handle={ROUTE_HANDLES.dashboard} index />
@@ -176,5 +190,33 @@ describe("app routing breadcrumb integration", () => {
     expect(markup).toContain('aria-current="page"');
     expect(markup).toContain('data-slot="meta-title">Sessions');
     expect(markup).toContain('data-slot="meta-description"></p>');
+  });
+
+  it("renders automations breadcrumbs for list, create, and detail routes", async () => {
+    const router = createMemoryRouter(automationRoutes, {
+      initialEntries: ["/automations"],
+    });
+    let markup = renderToStaticMarkup(<RouterProvider router={router} />);
+
+    expect(markup).toContain("Automations");
+    expect(markup).toContain('aria-current="page"');
+    expect(markup).toContain('data-slot="meta-title">Automations');
+    expect(markup).toContain("Manage webhook automations.");
+
+    await router.navigate("/automations/new");
+    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+
+    expect(markup).toContain('href="/automations"');
+    expect(markup).toContain("Create");
+    expect(markup).toContain('data-slot="meta-title">Create automation');
+    expect(markup).toContain("Create a webhook automation.");
+
+    await router.navigate("/automations/aut_123");
+    markup = renderToStaticMarkup(<RouterProvider router={router} />);
+
+    expect(markup).toContain('href="/automations"');
+    expect(markup).toContain("aut_123");
+    expect(markup).toContain('data-slot="meta-title">Edit automation');
+    expect(markup).toContain("Edit webhook automation configuration.");
   });
 });

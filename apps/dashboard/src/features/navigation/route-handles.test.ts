@@ -26,6 +26,15 @@ describe("route handles", () => {
       "Edit sandbox profile configuration.",
     );
 
+    expect(ROUTE_HANDLES.automations.title).toBe("Automations");
+    expect(ROUTE_HANDLES.automations.description).toBe("Manage webhook automations.");
+    expect(ROUTE_HANDLES.automationsNew.title).toBe("Create automation");
+    expect(ROUTE_HANDLES.automationsNew.description).toBe("Create a webhook automation.");
+    expect(ROUTE_HANDLES.automationsDetail.title).toBe("Edit automation");
+    expect(ROUTE_HANDLES.automationsDetail.description).toBe(
+      "Edit webhook automation configuration.",
+    );
+
     expect(ROUTE_HANDLES.settingsPersonal.title).toBe("Personal");
     expect(ROUTE_HANDLES.settingsPersonal.description).toBe("");
 
@@ -121,5 +130,17 @@ describe("route handles", () => {
 
     expect(detailBreadcrumb({ params: { sandboxInstanceId: "sbox_123" } })).toBe("sbox_123");
     expect(detailBreadcrumb({ params: {} })).toBe("Session");
+  });
+
+  it("resolves automation detail breadcrumb with automation id fallback", () => {
+    const detailBreadcrumb = ROUTE_HANDLES.automationsDetail.breadcrumb;
+    expect(typeof detailBreadcrumb).toBe("function");
+
+    if (typeof detailBreadcrumb !== "function") {
+      throw new Error("automationsDetail breadcrumb must be a function");
+    }
+
+    expect(detailBreadcrumb({ params: { automationId: "aut_123" } })).toBe("aut_123");
+    expect(detailBreadcrumb({ params: {} })).toBe("Automation");
   });
 });

@@ -1,4 +1,4 @@
-import { CpuIcon, HouseIcon, TerminalIcon } from "@phosphor-icons/react";
+import { CpuIcon, HouseIcon, LightningIcon, TerminalIcon } from "@phosphor-icons/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
@@ -27,6 +27,7 @@ const MAIN_NAV_GROUPS: readonly SidebarNavGroup[] = [
   {
     items: [
       { to: "/", label: "Home", icon: HomeNavIcon, matchMode: "exact" },
+      { to: "/automations", label: "Automations", icon: AutomationsNavIcon },
       { to: "/sandbox-profiles", label: "Sandbox Profiles", icon: SandboxProfilesNavIcon },
       { to: "/sessions", label: "Sessions", icon: SessionsNavIcon },
     ],
@@ -42,6 +43,13 @@ function SandboxProfilesNavIcon(props: {
   "aria-hidden"?: boolean;
 }): React.JSX.Element {
   return <CpuIcon {...props} />;
+}
+
+function AutomationsNavIcon(props: {
+  className?: string;
+  "aria-hidden"?: boolean;
+}): React.JSX.Element {
+  return <LightningIcon {...props} />;
 }
 
 function SessionsNavIcon(props: {
@@ -63,11 +71,14 @@ export function AppShell(): React.JSX.Element {
   const inSettings = isSettingsPath(location.pathname);
   const inSandboxProfiles =
     location.pathname === "/sandbox-profiles" || location.pathname.startsWith("/sandbox-profiles/");
+  const inAutomations =
+    location.pathname === "/automations" || location.pathname.startsWith("/automations/");
   const inDashboardRoot = location.pathname === "/";
   const inSessions =
     location.pathname === "/sessions" || location.pathname.startsWith("/sessions/");
   const inSessionDetail = location.pathname.startsWith("/sessions/");
-  const showBreadcrumbs = inSettings || inSandboxProfiles || inDashboardRoot || inSessions;
+  const showBreadcrumbs =
+    inSettings || inSandboxProfiles || inAutomations || inDashboardRoot || inSessions;
 
   useEffect(() => {
     if (!isSettingsPath(location.pathname)) {

@@ -74,6 +74,15 @@ function resolveSandboxProfileDetailBreadcrumb(input: RouteTextResolverInput): s
   return profileId;
 }
 
+function resolveAutomationDetailBreadcrumb(input: RouteTextResolverInput): string {
+  const automationId = input.params["automationId"];
+  if (automationId === undefined || automationId.trim().length === 0) {
+    return "Automation";
+  }
+
+  return automationId;
+}
+
 export const ROUTE_HANDLES = {
   dashboard: {
     breadcrumb: "Home",
@@ -109,6 +118,21 @@ export const ROUTE_HANDLES = {
     breadcrumb: resolveSandboxProfileDetailBreadcrumb,
     title: "Edit profile",
     description: "Edit sandbox profile configuration.",
+  },
+  automations: {
+    breadcrumb: "Automations",
+    title: "Automations",
+    description: "Manage webhook automations.",
+  },
+  automationsNew: {
+    breadcrumb: "Create",
+    title: "Create automation",
+    description: "Create a webhook automation.",
+  },
+  automationsDetail: {
+    breadcrumb: resolveAutomationDetailBreadcrumb,
+    title: "Edit automation",
+    description: "Edit webhook automation configuration.",
   },
   settings: {
     breadcrumb: "Settings",

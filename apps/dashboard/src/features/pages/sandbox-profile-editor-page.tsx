@@ -24,6 +24,7 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
+import { EditablePageTitle } from "../shared/editable-page-title.js";
 import {
   createDefaultBindingConfig,
   resolveBindingKindFromTarget,
@@ -38,7 +39,6 @@ import {
 import { SandboxProfileBindingSection } from "./sandbox-profile-binding-section.js";
 import { useSandboxProfileIntegrationsState } from "./sandbox-profile-integrations-state.js";
 import { useSandboxProfileMetaState } from "./sandbox-profile-meta-state.js";
-import { SandboxProfileTitleEditor } from "./sandbox-profile-title-editor.js";
 
 type SandboxProfileEditorPageProps = {
   mode: "create" | "edit";
@@ -460,13 +460,19 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
         {props.mode === "create" ? (
           <h1 className="text-xl font-semibold">{metaState.pageTitle}</h1>
         ) : (
-          <SandboxProfileTitleEditor
+          <EditablePageTitle
+            ariaLabel="Profile name"
+            cancelOnEscape={true}
             draftValue={metaState.profileNameDraft}
+            editButtonLabel="Edit profile name"
+            errorMessage={undefined}
             isEditing={metaState.isEditingProfileName}
+            maxWidthClassName={undefined}
             onCancel={metaState.onProfileNameEditCancel}
             onCommit={metaState.onProfileNameEditCommit}
             onDraftValueChange={metaState.onProfileNameDraftChange}
             onEditStart={metaState.onProfileNameEditStart}
+            placeholder={undefined}
             saveDisabled={metaState.isUpdating}
             title={metaState.pageTitle}
           />
