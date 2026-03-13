@@ -1,69 +1,47 @@
 import { describe, expect, it } from "vitest";
 
+import { InMemoryTunnelSessionRegistryAdapter } from "./adapters/in-memory-tunnel-session-registry-adapter.js";
 import { TunnelSessionRegistry } from "./tunnel-session-registry.js";
 
 describe("TunnelSessionRegistry", () => {
-  it("replaces the bootstrap session for a sandbox instance", () => {
-    const registry = new TunnelSessionRegistry();
+  it("delegates bootstrap target and binding operations through the configured adapter", () => {
+    const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter());
 
-    const firstAttach = registry.attachBootstrapSession({
+    registry.attachBootstrapSession({
       sandboxInstanceId: "sbi_test",
       side: "bootstrap",
       nodeId: "dpg_test",
-      sessionId: "sess_bootstrap_1",
+      sessionId: "sess_bootstrap",
     });
-    const secondAttach = registry.attachBootstrapSession({
+    const binding = registry.bindClientStream({
+      sandboxInstanceId: "sbi_test",
+      clientSessionId: "conn_1",
+      clientStreamId: 7,
+    });
+
+    expect(
+      registry.getBootstrapTarget({
+        sandboxInstanceId: "sbi_test",
+      }),
+    ).toEqual({
       sandboxInstanceId: "sbi_test",
       side: "bootstrap",
       nodeId: "dpg_test",
-      sessionId: "sess_bootstrap_2",
+      sessionId: "sess_bootstrap",
     });
-
-    expect(firstAttach.replacedSession).toBeUndefined();
-    expect(secondAttach.replacedSession).toBe(firstAttach.session);
     expect(
-      registry.getBootstrapSession({
+      registry.getBindingByClientStream({
         sandboxInstanceId: "sbi_test",
+        clientSessionId: "conn_1",
+        clientStreamId: 7,
       }),
-    ).toBe(secondAttach.session);
-  });
-
-  it("only detaches the currently registered bootstrap session", () => {
-    const registry = new TunnelSessionRegistry();
-
-    const { session } = registry.attachBootstrapSession({
-      sandboxInstanceId: "sbi_test",
-      side: "bootstrap",
-      nodeId: "dpg_test",
-      sessionId: "sess_bootstrap_1",
-    });
-
+    ).toEqual(binding);
     expect(
-      registry.detachBootstrapSession({
+      registry.unbindClientStream({
         sandboxInstanceId: "sbi_test",
-        side: "bootstrap",
-        nodeId: "dpg_test",
-        sessionId: "stale_session",
+        clientSessionId: "conn_1",
+        clientStreamId: 7,
       }),
-    ).toBeUndefined();
-    expect(
-      registry.getBootstrapSession({
-        sandboxInstanceId: "sbi_test",
-      }),
-    ).toBe(session);
-
-    expect(
-      registry.detachBootstrapSession({
-        sandboxInstanceId: "sbi_test",
-        side: "bootstrap",
-        nodeId: "dpg_test",
-        sessionId: "sess_bootstrap_1",
-      }),
-    ).toBe(session);
-    expect(
-      registry.getBootstrapSession({
-        sandboxInstanceId: "sbi_test",
-      }),
-    ).toBeUndefined();
+    ).toEqual(binding);
   });
 });

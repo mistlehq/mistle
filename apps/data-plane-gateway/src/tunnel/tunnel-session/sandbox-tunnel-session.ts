@@ -15,6 +15,12 @@ export class SandboxTunnelSession {
   readonly #bindingsByTunnelStreamId = new Map<number, ClientStreamBinding>();
   #nextTunnelStreamId = 1;
 
+  /**
+   * Represents the live bootstrap tunnel state for one sandbox on the owner node.
+   *
+   * This class is intentionally a local implementation detail behind
+   * `TunnelSessionRegistryAdapter`.
+   */
   public constructor(public readonly bootstrapTarget: RelayTarget) {}
 
   public bindClientStream(input: {
