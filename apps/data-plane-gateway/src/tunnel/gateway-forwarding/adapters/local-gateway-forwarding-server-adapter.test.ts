@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { InMemoryTunnelSessionRegistryAdapter } from "../../tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
-import { TunnelSessionRegistry } from "../../tunnel-session/index.js";
+import {
+  ClientSessionActiveStreamError,
+  TunnelSessionRegistry,
+} from "../../tunnel-session/index.js";
 import { LocalGatewayForwardingServerAdapter } from "./local-gateway-forwarding-server-adapter.js";
 
 describe("LocalGatewayForwardingServerAdapter", () => {
@@ -35,7 +38,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
       {
         sandboxInstanceId: "sbi_test",
         channelKind: "agent",
-        clientSessionId: "conn_1",
+        clientSessionId: "conn_2",
         clientStreamId: 8,
       },
     );
@@ -100,7 +103,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
         },
         {
           sandboxInstanceId: "sbi_test",
-          clientSessionId: "conn_1",
+          clientSessionId: "conn_2",
         },
       ),
     ).toEqual({
@@ -112,5 +115,44 @@ describe("LocalGatewayForwardingServerAdapter", () => {
       },
       releasedBindings: [secondOpenedStream.binding],
     });
+  });
+
+  it("rejects opening a second active stream for the same client session", async () => {
+    const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter());
+    registry.attachBootstrapSession({
+      sandboxInstanceId: "sbi_test",
+      side: "bootstrap",
+      nodeId: "dpg_test",
+      sessionId: "sess_bootstrap",
+    });
+    const adapter = new LocalGatewayForwardingServerAdapter(registry);
+
+    await adapter.openInteractiveStream(
+      {
+        sourceNodeId: "dpg_test",
+        targetNodeId: "dpg_test",
+      },
+      {
+        sandboxInstanceId: "sbi_test",
+        channelKind: "pty",
+        clientSessionId: "conn_1",
+        clientStreamId: 7,
+      },
+    );
+
+    await expect(
+      adapter.openInteractiveStream(
+        {
+          sourceNodeId: "dpg_test",
+          targetNodeId: "dpg_test",
+        },
+        {
+          sandboxInstanceId: "sbi_test",
+          channelKind: "agent",
+          clientSessionId: "conn_1",
+          clientStreamId: 8,
+        },
+      ),
+    ).rejects.toThrow(ClientSessionActiveStreamError);
   });
 });

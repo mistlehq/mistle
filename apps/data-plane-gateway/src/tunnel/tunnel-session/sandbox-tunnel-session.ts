@@ -2,6 +2,8 @@ import type { StreamChannel } from "@mistle/sandbox-session-protocol";
 
 import type { RelayTarget } from "../types.js";
 
+const DefaultMaxBindingCount = 64;
+
 export type ClientStreamBinding = {
   channelKind: StreamChannel["kind"];
   clientSessionId: string;
@@ -13,9 +15,26 @@ function toClientBindingKey(input: { clientSessionId: string; clientStreamId: nu
   return `${input.clientSessionId}:${String(input.clientStreamId)}`;
 }
 
+export class ClientSessionActiveStreamError extends Error {
+  public constructor(clientSessionId: string) {
+    super(
+      `Client session '${clientSessionId}' already has an active interactive stream bound to the bootstrap tunnel.`,
+    );
+  }
+}
+
+export class TunnelSessionBindingLimitExceededError extends Error {
+  public constructor(maxBindingCount: number) {
+    super(
+      `Bootstrap tunnel session already has the maximum ${String(maxBindingCount)} active interactive stream bindings.`,
+    );
+  }
+}
+
 export class SandboxTunnelSession {
   readonly #bindingsByClientKey = new Map<string, ClientStreamBinding>();
   readonly #bindingsByTunnelStreamId = new Map<number, ClientStreamBinding>();
+  readonly #bindingCountsByClientSessionId = new Map<string, number>();
   #nextTunnelStreamId = 1;
 
   /**
@@ -24,7 +43,10 @@ export class SandboxTunnelSession {
    * This class is intentionally a local implementation detail behind
    * `TunnelSessionRegistryAdapter`.
    */
-  public constructor(public readonly bootstrapTarget: RelayTarget) {}
+  public constructor(
+    public readonly bootstrapTarget: RelayTarget,
+    private readonly maxBindingCount = DefaultMaxBindingCount,
+  ) {}
 
   public bindClientStream(input: {
     channelKind: StreamChannel["kind"];
@@ -33,6 +55,12 @@ export class SandboxTunnelSession {
   }): ClientStreamBinding {
     if (!Number.isInteger(input.clientStreamId) || input.clientStreamId <= 0) {
       throw new Error("Client stream id must be a positive integer.");
+    }
+    if (this.#bindingsByTunnelStreamId.size >= this.maxBindingCount) {
+      throw new TunnelSessionBindingLimitExceededError(this.maxBindingCount);
+    }
+    if ((this.#bindingCountsByClientSessionId.get(input.clientSessionId) ?? 0) > 0) {
+      throw new ClientSessionActiveStreamError(input.clientSessionId);
     }
 
     const clientBindingKey = toClientBindingKey(input);
@@ -52,6 +80,7 @@ export class SandboxTunnelSession {
 
     this.#bindingsByClientKey.set(clientBindingKey, binding);
     this.#bindingsByTunnelStreamId.set(binding.tunnelStreamId, binding);
+    this.#bindingCountsByClientSessionId.set(input.clientSessionId, 1);
 
     return binding;
   }
@@ -79,6 +108,7 @@ export class SandboxTunnelSession {
 
     this.#bindingsByClientKey.delete(clientBindingKey);
     this.#bindingsByTunnelStreamId.delete(binding.tunnelStreamId);
+    this.#bindingCountsByClientSessionId.delete(binding.clientSessionId);
     return binding;
   }
 
@@ -86,6 +116,7 @@ export class SandboxTunnelSession {
     const bindings = Array.from(this.#bindingsByTunnelStreamId.values());
     this.#bindingsByClientKey.clear();
     this.#bindingsByTunnelStreamId.clear();
+    this.#bindingCountsByClientSessionId.clear();
     return bindings;
   }
 
@@ -110,6 +141,7 @@ export class SandboxTunnelSession {
         }),
       );
       this.#bindingsByTunnelStreamId.delete(binding.tunnelStreamId);
+      this.#bindingCountsByClientSessionId.delete(binding.clientSessionId);
     }
 
     return releasedBindings;

@@ -180,23 +180,17 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
       nodeId: "dpg_test",
       sessionId: "sess_bootstrap_1",
     });
-    const firstReleasedBinding = adapter.bindClientStream({
+    const releasedBinding = adapter.bindClientStream({
       sandboxInstanceId: "sbi_test",
       channelKind: "pty",
       clientSessionId: "conn_1",
       clientStreamId: 7,
     });
-    const secondReleasedBinding = adapter.bindClientStream({
-      sandboxInstanceId: "sbi_test",
-      channelKind: "agent",
-      clientSessionId: "conn_1",
-      clientStreamId: 8,
-    });
     const remainingBinding = adapter.bindClientStream({
       sandboxInstanceId: "sbi_test",
-      channelKind: "pty",
+      channelKind: "agent",
       clientSessionId: "conn_2",
-      clientStreamId: 9,
+      clientStreamId: 8,
     });
 
     expect(
@@ -204,7 +198,7 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
         sandboxInstanceId: "sbi_test",
         clientSessionId: "conn_1",
       }),
-    ).toEqual([firstReleasedBinding, secondReleasedBinding]);
+    ).toEqual([releasedBinding]);
     expect(
       adapter.getBindingByTunnelStreamId({
         sandboxInstanceId: "sbi_test",
