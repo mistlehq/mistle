@@ -23,26 +23,30 @@ export async function writeSandboxStartupInput(input: {
     gatewayWebsocketUrl: input.config.sandbox.internalGatewayWsUrl,
     sandboxInstanceId: input.sandboxInstanceId,
   });
-  const bootstrapToken = await mintBootstrapToken({
-    config: {
-      bootstrapTokenSecret: input.config.sandbox.bootstrap.tokenSecret,
-      tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
-      tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
-    },
-    jti: bootstrapTokenJti,
-    sandboxInstanceId: input.sandboxInstanceId,
-    ttlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
-  });
-  const tunnelExchangeToken = await mintTunnelExchangeToken({
-    config: {
-      tokenSecret: input.config.sandbox.bootstrap.tokenSecret,
-      tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
-      tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
-    },
-    jti: tunnelExchangeTokenJti,
-    sandboxInstanceId: input.sandboxInstanceId,
-    ttlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
-  });
+  const [bootstrapToken, tunnelExchangeToken] = await Promise.all([
+    mintBootstrapToken({
+      config: {
+        bootstrapTokenSecret: input.config.sandbox.bootstrap.tokenSecret,
+        tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
+        tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
+      },
+      jti: bootstrapTokenJti,
+      sandboxInstanceId: input.sandboxInstanceId,
+      ttlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
+    }),
+    mintTunnelExchangeToken({
+      config: {
+        tokenSecret: input.config.sandbox.bootstrap.tokenSecret,
+        tokenIssuer: input.config.sandbox.bootstrap.tokenIssuer,
+        tokenAudience: input.config.sandbox.bootstrap.tokenAudience,
+      },
+      jti: tunnelExchangeTokenJti,
+      sandboxInstanceId: input.sandboxInstanceId,
+      bootstrapTokenTtlSeconds: input.config.app.tunnel.bootstrapTokenTtlSeconds,
+      exchangeTokenTtlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
+      ttlSeconds: input.config.app.tunnel.exchangeTokenTtlSeconds,
+    }),
+  ]);
 
   try {
     await input.sandbox.writeStdin({

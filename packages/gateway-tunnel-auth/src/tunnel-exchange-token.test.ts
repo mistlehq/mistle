@@ -39,6 +39,8 @@ describe("@mistle/gateway-tunnel-auth tunnel exchange token", () => {
       config: defaultConfig,
       jti: "jti_roundtrip_001",
       sandboxInstanceId: "sbi_roundtrip_001",
+      bootstrapTokenTtlSeconds: 120,
+      exchangeTokenTtlSeconds: 3600,
       ttlSeconds: 3600,
     });
 
@@ -48,6 +50,8 @@ describe("@mistle/gateway-tunnel-auth tunnel exchange token", () => {
     });
 
     expect(verifiedToken).toEqual({
+      bootstrapTokenTtlSeconds: 120,
+      exchangeTokenTtlSeconds: 3600,
       jti: "jti_roundtrip_001",
       sandboxInstanceId: "sbi_roundtrip_001",
     });
@@ -59,6 +63,8 @@ describe("@mistle/gateway-tunnel-auth tunnel exchange token", () => {
         config: defaultConfig,
         jti: "   ",
         sandboxInstanceId: "sbi_missing_jti_001",
+        bootstrapTokenTtlSeconds: 120,
+        exchangeTokenTtlSeconds: 3600,
         ttlSeconds: 3600,
       }),
     );
@@ -72,6 +78,8 @@ describe("@mistle/gateway-tunnel-auth tunnel exchange token", () => {
         config: defaultConfig,
         jti: "jti_missing_sandbox_instance_001",
         sandboxInstanceId: "   ",
+        bootstrapTokenTtlSeconds: 120,
+        exchangeTokenTtlSeconds: 3600,
         ttlSeconds: 3600,
       }),
     );
@@ -84,6 +92,8 @@ describe("@mistle/gateway-tunnel-auth tunnel exchange token", () => {
       config: defaultConfig,
       jti: "jti_bad_aud_001",
       sandboxInstanceId: "sbi_bad_aud_001",
+      bootstrapTokenTtlSeconds: 120,
+      exchangeTokenTtlSeconds: 3600,
       ttlSeconds: 3600,
     });
 
@@ -138,5 +148,51 @@ describe("@mistle/gateway-tunnel-auth tunnel exchange token", () => {
     );
 
     expect(error.code).toBe(TunnelExchangeTokenErrorCode.SANDBOX_INSTANCE_ID_REQUIRED);
+  });
+
+  it("rejects verify when bootstrapTokenTtlSeconds claim is missing", async () => {
+    const token = await new SignJWT({
+      exchangeTokenTtlSeconds: 3600,
+      sandboxInstanceId: "sbi_missing_bootstrap_ttl_001",
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setJti("jti_missing_bootstrap_ttl_001")
+      .setIssuer(defaultConfig.tokenIssuer)
+      .setAudience(defaultConfig.tokenAudience)
+      .setIssuedAt()
+      .setExpirationTime("2m")
+      .sign(createSecretKey(new TextEncoder().encode(defaultConfig.tokenSecret)));
+
+    const error = await expectTunnelExchangeTokenError(
+      verifyTunnelExchangeToken({
+        config: defaultConfig,
+        token,
+      }),
+    );
+
+    expect(error.code).toBe(TunnelExchangeTokenErrorCode.BOOTSTRAP_TOKEN_TTL_SECONDS_REQUIRED);
+  });
+
+  it("rejects verify when exchangeTokenTtlSeconds claim is missing", async () => {
+    const token = await new SignJWT({
+      bootstrapTokenTtlSeconds: 120,
+      sandboxInstanceId: "sbi_missing_exchange_ttl_001",
+    })
+      .setProtectedHeader({ alg: "HS256" })
+      .setJti("jti_missing_exchange_ttl_001")
+      .setIssuer(defaultConfig.tokenIssuer)
+      .setAudience(defaultConfig.tokenAudience)
+      .setIssuedAt()
+      .setExpirationTime("2m")
+      .sign(createSecretKey(new TextEncoder().encode(defaultConfig.tokenSecret)));
+
+    const error = await expectTunnelExchangeTokenError(
+      verifyTunnelExchangeToken({
+        config: defaultConfig,
+        token,
+      }),
+    );
+
+    expect(error.code).toBe(TunnelExchangeTokenErrorCode.EXCHANGE_TOKEN_TTL_SECONDS_REQUIRED);
   });
 });

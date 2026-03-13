@@ -11,6 +11,7 @@ import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memor
 import { SandboxOwnerLeaseHeartbeat } from "../tunnel/ownership/sandbox-owner-lease-heartbeat.js";
 import { StoreBackedSandboxOwnerResolver } from "../tunnel/ownership/store-backed-sandbox-owner-resolver.js";
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
+import { registerSandboxTunnelTokenExchangeRoute } from "../tunnel/register-sandbox-tunnel-token-exchange-route.js";
 import type {
   DataPlaneGatewayRuntime,
   DataPlaneGatewayRuntimeConfig,
@@ -52,6 +53,19 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerStore,
     sandboxOwnerResolver,
     sandboxOwnerLeaseHeartbeat,
+  });
+  registerSandboxTunnelTokenExchangeRoute({
+    app,
+    bootstrapTokenConfig: {
+      bootstrapTokenSecret: config.sandbox.bootstrap.tokenSecret,
+      tokenIssuer: config.sandbox.bootstrap.tokenIssuer,
+      tokenAudience: config.sandbox.bootstrap.tokenAudience,
+    },
+    tunnelExchangeTokenConfig: {
+      tokenSecret: config.sandbox.bootstrap.tokenSecret,
+      tokenIssuer: config.sandbox.bootstrap.tokenIssuer,
+      tokenAudience: config.sandbox.bootstrap.tokenAudience,
+    },
   });
 
   let startedServer: StartedServer | undefined;
