@@ -149,7 +149,7 @@ func handleSandboxTunnelConnection(
 
 		requestContext, requestSpan := tracer.Start(
 			runContext,
-			"sandbox.tunnel.connect_request",
+			"sandbox.tunnel.stream_open",
 			trace.WithAttributes(attribute.String("mistle.channel.kind", connectRequest.ChannelKind)),
 		)
 
@@ -191,16 +191,16 @@ func handleSandboxTunnelConnection(
 			}
 			*activePTYSession = updatedPTYSession
 		default:
-			if err := writeConnectError(requestContext, conn, sessionprotocol.ConnectError{
-				Type:      sessionprotocol.MessageTypeConnectError,
-				RequestID: connectRequest.RequestID,
-				Code:      connectErrorCodeUnsupportedChannel,
-				Message:   fmt.Sprintf("channel kind '%s' is not supported", connectRequest.ChannelKind),
+			if err := writeStreamOpenError(requestContext, conn, sessionprotocol.StreamOpenError{
+				Type:     sessionprotocol.MessageTypeStreamOpenError,
+				StreamID: connectRequest.StreamID,
+				Code:     connectErrorCodeUnsupportedChannel,
+				Message:  fmt.Sprintf("channel kind '%s' is not supported", connectRequest.ChannelKind),
 			}); err != nil {
 				requestSpan.RecordError(err)
 				requestSpan.SetStatus(codes.Error, err.Error())
 				requestSpan.End()
-				return fmt.Errorf("failed to write sandbox tunnel connect error: %w", err)
+				return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", err)
 			}
 		}
 

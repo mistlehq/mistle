@@ -26,7 +26,7 @@ type ptySession struct {
 	closeOnce sync.Once
 }
 
-func startPTYSession(connectRequest sessionprotocol.PTYConnectRequest) (*ptySession, error) {
+func startPTYSession(connectRequest sessionprotocol.StreamOpen) (*ptySession, error) {
 	command := exec.Command(defaultPTYShell, "-i")
 	if connectRequest.Channel.Cwd != "" {
 		command.Dir = connectRequest.Channel.Cwd

@@ -1,18 +1,15 @@
 package sessionprotocol
 
-// ProtocolVersion is the currently supported control message protocol version.
-const ProtocolVersion = 1
-
 const (
-	MessageTypeConnect      = "connect"
-	MessageTypeConnectOK    = "connect.ok"
-	MessageTypeConnectError = "connect.error"
-	MessageTypeDisconnect   = "disconnect"
-	MessageTypePTYResize    = "pty.resize"
-	MessageTypePTYClose     = "pty.close"
-	MessageTypePTYCloseOK   = "pty.close.ok"
-	MessageTypePTYCloseErr  = "pty.close.error"
-	MessageTypePTYExit      = "pty.exit"
+	MessageTypeStreamOpen      = "stream.open"
+	MessageTypeStreamOpenOK    = "stream.open.ok"
+	MessageTypeStreamOpenError = "stream.open.error"
+	MessageTypeDisconnect      = "disconnect"
+	MessageTypePTYResize       = "pty.resize"
+	MessageTypePTYClose        = "pty.close"
+	MessageTypePTYCloseOK      = "pty.close.ok"
+	MessageTypePTYCloseErr     = "pty.close.error"
+	MessageTypePTYExit         = "pty.exit"
 )
 
 const (
@@ -25,46 +22,33 @@ const (
 	PTYSessionModeAttach = "attach"
 )
 
-// AgentConnectRequest requests a passthrough connection to the single agent endpoint.
-type AgentConnectRequest struct {
-	Type      string              `json:"type" jsonschema:"enum=connect"`
-	V         int                 `json:"v" jsonschema:"enum=1"`
-	RequestID string              `json:"requestId"`
-	Channel   AgentConnectChannel `json:"channel"`
+// StreamOpen requests opening a logical stream on the interactive websocket.
+type StreamOpen struct {
+	Type     string            `json:"type" jsonschema:"enum=stream.open"`
+	StreamID int               `json:"streamId"`
+	Channel  StreamOpenChannel `json:"channel"`
 }
 
-type AgentConnectChannel struct {
-	Kind string `json:"kind" jsonschema:"enum=agent"`
-}
-
-// PTYConnectRequest requests creation or attachment to a PTY session.
-type PTYConnectRequest struct {
-	Type      string            `json:"type" jsonschema:"enum=connect"`
-	V         int               `json:"v" jsonschema:"enum=1"`
-	RequestID string            `json:"requestId"`
-	Channel   PTYConnectChannel `json:"channel"`
-}
-
-type PTYConnectChannel struct {
-	Kind    string `json:"kind" jsonschema:"enum=pty"`
-	Session string `json:"session" jsonschema:"enum=create,enum=attach"`
+type StreamOpenChannel struct {
+	Kind    string `json:"kind" jsonschema:"enum=agent,enum=pty"`
+	Session string `json:"session,omitempty" jsonschema:"enum=create,enum=attach"`
 	Cols    int    `json:"cols,omitempty" jsonschema:"minimum=1"`
 	Rows    int    `json:"rows,omitempty" jsonschema:"minimum=1"`
 	Cwd     string `json:"cwd,omitempty"`
 }
 
-// ConnectOK acknowledges a successful connect request.
-type ConnectOK struct {
-	Type      string `json:"type" jsonschema:"enum=connect.ok"`
-	RequestID string `json:"requestId"`
+// StreamOpenOK acknowledges a successful stream.open request.
+type StreamOpenOK struct {
+	Type     string `json:"type" jsonschema:"enum=stream.open.ok"`
+	StreamID int    `json:"streamId"`
 }
 
-// ConnectError reports a connect request failure.
-type ConnectError struct {
-	Type      string `json:"type" jsonschema:"enum=connect.error"`
-	RequestID string `json:"requestId"`
-	Code      string `json:"code"`
-	Message   string `json:"message"`
+// StreamOpenError reports a stream.open request failure.
+type StreamOpenError struct {
+	Type     string `json:"type" jsonschema:"enum=stream.open.error"`
+	StreamID int    `json:"streamId"`
+	Code     string `json:"code"`
+	Message  string `json:"message"`
 }
 
 // Disconnect reports that the opposite tunnel peer disconnected and the current

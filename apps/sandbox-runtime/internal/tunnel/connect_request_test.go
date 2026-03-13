@@ -15,11 +15,10 @@ import (
 
 func TestReadConnectRequest(t *testing.T) {
 	t.Run("reads valid connect request", func(t *testing.T) {
-		payload, err := json.Marshal(sessionprotocol.AgentConnectRequest{
-			Type:      sessionprotocol.MessageTypeConnect,
-			V:         sessionprotocol.ProtocolVersion,
-			RequestID: "req_agent_001",
-			Channel: sessionprotocol.AgentConnectChannel{
+		payload, err := json.Marshal(sessionprotocol.StreamOpen{
+			Type:     sessionprotocol.MessageTypeStreamOpen,
+			StreamID: 11,
+			Channel: sessionprotocol.StreamOpenChannel{
 				Kind: sessionprotocol.ChannelKindAgent,
 			},
 		})
@@ -32,14 +31,11 @@ func TestReadConnectRequest(t *testing.T) {
 			t.Fatalf("expected readConnectRequest to succeed, got %v", err)
 		}
 
-		if request.Type != sessionprotocol.MessageTypeConnect {
-			t.Fatalf("expected type '%s', got '%s'", sessionprotocol.MessageTypeConnect, request.Type)
+		if request.Type != sessionprotocol.MessageTypeStreamOpen {
+			t.Fatalf("expected type '%s', got '%s'", sessionprotocol.MessageTypeStreamOpen, request.Type)
 		}
-		if request.Version != sessionprotocol.ProtocolVersion {
-			t.Fatalf("expected protocol version %d, got %d", sessionprotocol.ProtocolVersion, request.Version)
-		}
-		if request.RequestID != "req_agent_001" {
-			t.Fatalf("expected requestId 'req_agent_001', got '%s'", request.RequestID)
+		if request.StreamID != 11 {
+			t.Fatalf("expected streamId 11, got %d", request.StreamID)
 		}
 		if request.ChannelKind != sessionprotocol.ChannelKindAgent {
 			t.Fatalf("expected channel kind '%s', got '%s'", sessionprotocol.ChannelKindAgent, request.ChannelKind)
@@ -56,10 +52,9 @@ func TestReadConnectRequest(t *testing.T) {
 		}
 	})
 
-	t.Run("rejects missing request id", func(t *testing.T) {
+	t.Run("rejects missing stream id", func(t *testing.T) {
 		payload, err := json.Marshal(map[string]any{
-			"type": sessionprotocol.MessageTypeConnect,
-			"v":    sessionprotocol.ProtocolVersion,
+			"type": sessionprotocol.MessageTypeStreamOpen,
 			"channel": map[string]any{
 				"kind": sessionprotocol.ChannelKindAgent,
 			},
@@ -70,21 +65,20 @@ func TestReadConnectRequest(t *testing.T) {
 
 		_, readErr := readConnectRequestFromServerPayload(t, websocket.MessageText, payload)
 		if readErr == nil {
-			t.Fatal("expected readConnectRequest to fail when requestId is missing")
+			t.Fatal("expected readConnectRequest to fail when streamId is missing")
 		}
-		if !strings.Contains(readErr.Error(), "requestId is required") {
-			t.Fatalf("expected requestId validation error, got %v", readErr)
+		if !strings.Contains(readErr.Error(), "streamId must be a positive integer") {
+			t.Fatalf("expected streamId validation error, got %v", readErr)
 		}
 	})
 }
 
 func TestParsePTYConnectRequest(t *testing.T) {
 	t.Run("parses valid create request", func(t *testing.T) {
-		payload, err := json.Marshal(sessionprotocol.PTYConnectRequest{
-			Type:      sessionprotocol.MessageTypeConnect,
-			V:         sessionprotocol.ProtocolVersion,
-			RequestID: "req_pty_create",
-			Channel: sessionprotocol.PTYConnectChannel{
+		payload, err := json.Marshal(sessionprotocol.StreamOpen{
+			Type:     sessionprotocol.MessageTypeStreamOpen,
+			StreamID: 12,
+			Channel: sessionprotocol.StreamOpenChannel{
 				Kind:    sessionprotocol.ChannelKindPTY,
 				Session: sessionprotocol.PTYSessionModeCreate,
 				Cols:    120,
@@ -107,9 +101,8 @@ func TestParsePTYConnectRequest(t *testing.T) {
 
 	t.Run("rejects invalid session mode", func(t *testing.T) {
 		payload, err := json.Marshal(map[string]any{
-			"type":      sessionprotocol.MessageTypeConnect,
-			"v":         sessionprotocol.ProtocolVersion,
-			"requestId": "req_invalid_session",
+			"type":      sessionprotocol.MessageTypeStreamOpen,
+			"streamId":  22,
 			"channel": map[string]any{
 				"kind":    sessionprotocol.ChannelKindPTY,
 				"session": "resume",
@@ -130,9 +123,8 @@ func TestParsePTYConnectRequest(t *testing.T) {
 
 	t.Run("rejects cols and rows mismatch", func(t *testing.T) {
 		payload, err := json.Marshal(map[string]any{
-			"type":      sessionprotocol.MessageTypeConnect,
-			"v":         sessionprotocol.ProtocolVersion,
-			"requestId": "req_invalid_size",
+			"type":      sessionprotocol.MessageTypeStreamOpen,
+			"streamId":  33,
 			"channel": map[string]any{
 				"kind":    sessionprotocol.ChannelKindPTY,
 				"session": sessionprotocol.PTYSessionModeCreate,

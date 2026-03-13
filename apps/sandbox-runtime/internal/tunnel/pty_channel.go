@@ -37,39 +37,39 @@ func handlePTYConnectRequest(
 ) (*ptySession, error) {
 	ptyConnectRequest, err := parsePTYConnectRequest(connectRequest.RawPayload)
 	if err != nil {
-		if writeErr := writeConnectError(ctx, tunnelConn, sessionprotocol.ConnectError{
-			Type:      sessionprotocol.MessageTypeConnectError,
-			RequestID: connectRequest.RequestID,
-			Code:      connectErrorCodeInvalidConnectRequest,
-			Message:   err.Error(),
+		if writeErr := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
+			Type:     sessionprotocol.MessageTypeStreamOpenError,
+			StreamID: connectRequest.StreamID,
+			Code:     connectErrorCodeInvalidConnectRequest,
+			Message:  err.Error(),
 		}); writeErr != nil {
-			return activePTYSession, fmt.Errorf("failed to write sandbox tunnel connect error: %w", writeErr)
+			return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 		}
 		return activePTYSession, nil
 	}
 
 	if ptyConnectRequest.Channel.Session == sessionprotocol.PTYSessionModeCreate {
 		if activePTYSession != nil && !activePTYSession.IsExited() {
-			if writeErr := writeConnectError(ctx, tunnelConn, sessionprotocol.ConnectError{
-				Type:      sessionprotocol.MessageTypeConnectError,
-				RequestID: connectRequest.RequestID,
-				Code:      connectErrorCodePTYSessionExists,
-				Message:   "pty session already exists",
+			if writeErr := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
+				Type:     sessionprotocol.MessageTypeStreamOpenError,
+				StreamID: connectRequest.StreamID,
+				Code:     connectErrorCodePTYSessionExists,
+				Message:  "pty session already exists",
 			}); writeErr != nil {
-				return activePTYSession, fmt.Errorf("failed to write sandbox tunnel connect error: %w", writeErr)
+				return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 			}
 			return activePTYSession, nil
 		}
 
 		activePTYSession, err = startPTYSession(ptyConnectRequest)
 		if err != nil {
-			if writeErr := writeConnectError(ctx, tunnelConn, sessionprotocol.ConnectError{
-				Type:      sessionprotocol.MessageTypeConnectError,
-				RequestID: connectRequest.RequestID,
-				Code:      connectErrorCodePTYSessionCreateFailed,
-				Message:   err.Error(),
+			if writeErr := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
+				Type:     sessionprotocol.MessageTypeStreamOpenError,
+				StreamID: connectRequest.StreamID,
+				Code:     connectErrorCodePTYSessionCreateFailed,
+				Message:  err.Error(),
 			}); writeErr != nil {
-				return activePTYSession, fmt.Errorf("failed to write sandbox tunnel connect error: %w", writeErr)
+				return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 			}
 			return activePTYSession, nil
 		}
@@ -77,23 +77,23 @@ func handlePTYConnectRequest(
 
 	if ptyConnectRequest.Channel.Session == sessionprotocol.PTYSessionModeAttach {
 		if activePTYSession == nil || activePTYSession.IsExited() {
-			if writeErr := writeConnectError(ctx, tunnelConn, sessionprotocol.ConnectError{
-				Type:      sessionprotocol.MessageTypeConnectError,
-				RequestID: connectRequest.RequestID,
-				Code:      connectErrorCodePTYSessionUnavailable,
-				Message:   "pty session is not available",
+			if writeErr := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
+				Type:     sessionprotocol.MessageTypeStreamOpenError,
+				StreamID: connectRequest.StreamID,
+				Code:     connectErrorCodePTYSessionUnavailable,
+				Message:  "pty session is not available",
 			}); writeErr != nil {
-				return activePTYSession, fmt.Errorf("failed to write sandbox tunnel connect error: %w", writeErr)
+				return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 			}
 			return activePTYSession, nil
 		}
 	}
 
-	if err := writeConnectOK(ctx, tunnelConn, sessionprotocol.ConnectOK{
-		Type:      sessionprotocol.MessageTypeConnectOK,
-		RequestID: connectRequest.RequestID,
+	if err := writeStreamOpenOK(ctx, tunnelConn, sessionprotocol.StreamOpenOK{
+		Type:     sessionprotocol.MessageTypeStreamOpenOK,
+		StreamID: connectRequest.StreamID,
 	}); err != nil {
-		return activePTYSession, fmt.Errorf("failed to write sandbox tunnel connect acknowledgement: %w", err)
+		return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open acknowledgement: %w", err)
 	}
 
 	if err := relayPTYSession(ctx, tunnelConn, activePTYSession); err != nil {
@@ -224,37 +224,37 @@ func handlePTYControlMessage(
 	}
 
 	switch messageType {
-	case sessionprotocol.MessageTypeConnect:
+	case sessionprotocol.MessageTypeStreamOpen:
 		connectRequest, err := parsePTYConnectRequest(payload)
 		if err != nil {
-			if writeErr := writeConnectError(ctx, tunnelConn, sessionprotocol.ConnectError{
-				Type:      sessionprotocol.MessageTypeConnectError,
-				RequestID: "",
-				Code:      connectErrorCodeInvalidConnectRequest,
-				Message:   err.Error(),
+			if writeErr := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
+				Type:     sessionprotocol.MessageTypeStreamOpenError,
+				StreamID: 0,
+				Code:     connectErrorCodeInvalidConnectRequest,
+				Message:  err.Error(),
 			}); writeErr != nil {
-				return ptyControlActionContinue, fmt.Errorf("failed to write connect.error during pty relay: %w", writeErr)
+				return ptyControlActionContinue, fmt.Errorf("failed to write stream.open.error during pty relay: %w", writeErr)
 			}
 			return ptyControlActionContinue, nil
 		}
 
 		if connectRequest.Channel.Session == sessionprotocol.PTYSessionModeCreate {
-			if err := writeConnectError(ctx, tunnelConn, sessionprotocol.ConnectError{
-				Type:      sessionprotocol.MessageTypeConnectError,
-				RequestID: connectRequest.RequestID,
-				Code:      connectErrorCodePTYSessionExists,
-				Message:   "pty session already exists",
+			if err := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
+				Type:     sessionprotocol.MessageTypeStreamOpenError,
+				StreamID: connectRequest.StreamID,
+				Code:     connectErrorCodePTYSessionExists,
+				Message:  "pty session already exists",
 			}); err != nil {
-				return ptyControlActionContinue, fmt.Errorf("failed to write connect.error during pty relay: %w", err)
+				return ptyControlActionContinue, fmt.Errorf("failed to write stream.open.error during pty relay: %w", err)
 			}
 			return ptyControlActionContinue, nil
 		}
 
-		if err := writeConnectOK(ctx, tunnelConn, sessionprotocol.ConnectOK{
-			Type:      sessionprotocol.MessageTypeConnectOK,
-			RequestID: connectRequest.RequestID,
+		if err := writeStreamOpenOK(ctx, tunnelConn, sessionprotocol.StreamOpenOK{
+			Type:     sessionprotocol.MessageTypeStreamOpenOK,
+			StreamID: connectRequest.StreamID,
 		}); err != nil {
-			return ptyControlActionContinue, fmt.Errorf("failed to write connect.ok during pty relay: %w", err)
+			return ptyControlActionContinue, fmt.Errorf("failed to write stream.open.ok during pty relay: %w", err)
 		}
 
 		return ptyControlActionContinue, nil

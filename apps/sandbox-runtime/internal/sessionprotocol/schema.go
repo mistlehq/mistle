@@ -12,10 +12,9 @@ const (
 )
 
 var controlMessageTypes = []reflect.Type{
-	reflect.TypeOf(AgentConnectRequest{}),
-	reflect.TypeOf(PTYConnectRequest{}),
-	reflect.TypeOf(ConnectOK{}),
-	reflect.TypeOf(ConnectError{}),
+	reflect.TypeOf(StreamOpen{}),
+	reflect.TypeOf(StreamOpenOK{}),
+	reflect.TypeOf(StreamOpenError{}),
 	reflect.TypeOf(Disconnect{}),
 	reflect.TypeOf(PTYResize{}),
 	reflect.TypeOf(PTYClose{}),
