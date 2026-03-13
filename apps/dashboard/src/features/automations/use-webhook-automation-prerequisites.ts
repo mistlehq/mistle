@@ -8,7 +8,7 @@ import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.
 import {
   buildWebhookAutomationConnectionOptions,
   buildWebhookAutomationSandboxProfileOptions,
-} from "./webhook-automations-page-helpers.js";
+} from "./webhook-automation-list-helpers.js";
 
 export const WEBHOOK_AUTOMATION_SANDBOX_PROFILES_QUERY_KEY: readonly [
   "automations",

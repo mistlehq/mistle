@@ -3,13 +3,13 @@ import { useEffect, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useWebhookAutomationPrerequisites } from "./use-webhook-automation-prerequisites.js";
-import type { WebhookAutomationFormValues } from "./webhook-automation-form.js";
 import {
   toCreateWebhookAutomationPayload,
   toUpdateWebhookAutomationPayload,
   toWebhookAutomationFormValues,
   validateWebhookAutomationFormValues,
-} from "./webhook-automations-page-helpers.js";
+} from "./webhook-automation-form-helpers.js";
+import type { WebhookAutomationFormValues } from "./webhook-automation-form.js";
 import {
   AUTOMATIONS_QUERY_KEY_PREFIX,
   webhookAutomationDetailQueryKey,

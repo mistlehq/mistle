@@ -4,8 +4,8 @@ import { useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useWebhookAutomationPrerequisites } from "../automations/use-webhook-automation-prerequisites.js";
+import { buildWebhookAutomationListItems } from "../automations/webhook-automation-list-helpers.js";
 import { WebhookAutomationListView } from "../automations/webhook-automation-list-view.js";
-import { buildWebhookAutomationListItems } from "../automations/webhook-automations-page-helpers.js";
 import { webhookAutomationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { listWebhookAutomations } from "../automations/webhook-automations-service.js";
 
