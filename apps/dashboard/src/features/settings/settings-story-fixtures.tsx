@@ -172,11 +172,11 @@ export function createSettingsShellStoryArgs(pathname: string): SettingsShellVie
       backLabel: "Back",
       breadcrumbs: createStoryBreadcrumb("Settings / Profile"),
       content: createProfileSettingsContent(),
-      description: "Update your name and account information.",
       headerActions: null,
       onBack: () => {},
       pathname,
       showBreadcrumbs: true,
+      supportingText: "Update your name and account information.",
       title: "Profile",
     };
   }
@@ -186,11 +186,11 @@ export function createSettingsShellStoryArgs(pathname: string): SettingsShellVie
       backLabel: "Back",
       breadcrumbs: createStoryBreadcrumb("Settings / Organization / General"),
       content: createOrganizationGeneralContent(),
-      description: "Manage the organization name and defaults.",
       headerActions: null,
       onBack: () => {},
       pathname,
       showBreadcrumbs: true,
+      supportingText: "Manage the organization name and defaults.",
       title: "General",
     };
   }
@@ -200,11 +200,11 @@ export function createSettingsShellStoryArgs(pathname: string): SettingsShellVie
       backLabel: "Back",
       breadcrumbs: createStoryBreadcrumb("Settings / Organization / Members"),
       content: createOrganizationMembersContent(),
-      description: "Invite members, update roles, and review pending invitations.",
       headerActions: createInviteMembersButton(),
       onBack: () => {},
       pathname,
       showBreadcrumbs: true,
+      supportingText: "Invite members, update roles, and review pending invitations.",
       title: "Members",
     };
   }
