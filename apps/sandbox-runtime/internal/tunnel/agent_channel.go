@@ -37,59 +37,59 @@ func handleAgentConnectRequest(
 ) error {
 	agentEndpoint, err := resolveAgentEndpoint(agentRuntimes, runtimeClients)
 	if err != nil {
-		if writeErr := writeConnectError(ctx, tunnelConn, sessionprotocol.ConnectError{
-			Type:      sessionprotocol.MessageTypeConnectError,
-			RequestID: connectRequest.RequestID,
-			Code:      connectErrorCodeAgentEndpointUnavailable,
-			Message:   err.Error(),
+		if writeErr := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
+			Type:     sessionprotocol.MessageTypeStreamOpenError,
+			StreamID: connectRequest.StreamID,
+			Code:     connectErrorCodeAgentEndpointUnavailable,
+			Message:  err.Error(),
 		}); writeErr != nil {
-			return fmt.Errorf("failed to write sandbox tunnel connect error: %w", writeErr)
+			return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 		}
 		return nil
 	}
 	if agentEndpoint == nil {
-		if writeErr := writeConnectError(ctx, tunnelConn, sessionprotocol.ConnectError{
-			Type:      sessionprotocol.MessageTypeConnectError,
-			RequestID: connectRequest.RequestID,
-			Code:      connectErrorCodeAgentEndpointUnavailable,
-			Message:   "agent endpoint is not declared in runtime plan",
+		if writeErr := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
+			Type:     sessionprotocol.MessageTypeStreamOpenError,
+			StreamID: connectRequest.StreamID,
+			Code:     connectErrorCodeAgentEndpointUnavailable,
+			Message:  "agent endpoint is not declared in runtime plan",
 		}); writeErr != nil {
-			return fmt.Errorf("failed to write sandbox tunnel connect error: %w", writeErr)
+			return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 		}
 		return nil
 	}
 
 	if agentEndpoint.ConnectionMode != "dedicated" {
-		if err := writeConnectError(ctx, tunnelConn, sessionprotocol.ConnectError{
-			Type:      sessionprotocol.MessageTypeConnectError,
-			RequestID: connectRequest.RequestID,
-			Code:      connectErrorCodeUnsupportedConnectionMode,
-			Message:   fmt.Sprintf("connection mode '%s' is not supported", agentEndpoint.ConnectionMode),
+		if err := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
+			Type:     sessionprotocol.MessageTypeStreamOpenError,
+			StreamID: connectRequest.StreamID,
+			Code:     connectErrorCodeUnsupportedConnectionMode,
+			Message:  fmt.Sprintf("connection mode '%s' is not supported", agentEndpoint.ConnectionMode),
 		}); err != nil {
-			return fmt.Errorf("failed to write sandbox tunnel connect error: %w", err)
+			return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", err)
 		}
 		return nil
 	}
 
 	agentConn, err := dialAgentEndpoint(ctx, agentEndpoint.TransportURL)
 	if err != nil {
-		if writeErr := writeConnectError(ctx, tunnelConn, sessionprotocol.ConnectError{
-			Type:      sessionprotocol.MessageTypeConnectError,
-			RequestID: connectRequest.RequestID,
-			Code:      connectErrorCodeAgentEndpointDialFailed,
-			Message:   err.Error(),
+		if writeErr := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
+			Type:     sessionprotocol.MessageTypeStreamOpenError,
+			StreamID: connectRequest.StreamID,
+			Code:     connectErrorCodeAgentEndpointDialFailed,
+			Message:  err.Error(),
 		}); writeErr != nil {
-			return fmt.Errorf("failed to write sandbox tunnel connect error: %w", writeErr)
+			return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 		}
 		return nil
 	}
 	defer agentConn.CloseNow()
 
-	if err := writeConnectOK(ctx, tunnelConn, sessionprotocol.ConnectOK{
-		Type:      sessionprotocol.MessageTypeConnectOK,
-		RequestID: connectRequest.RequestID,
+	if err := writeStreamOpenOK(ctx, tunnelConn, sessionprotocol.StreamOpenOK{
+		Type:     sessionprotocol.MessageTypeStreamOpenOK,
+		StreamID: connectRequest.StreamID,
 	}); err != nil {
-		return fmt.Errorf("failed to write sandbox tunnel connect acknowledgement: %w", err)
+		return fmt.Errorf("failed to write sandbox tunnel stream.open acknowledgement: %w", err)
 	}
 
 	relayResult, err := relayTunnelFrames(ctx, tunnelConn, agentConn)

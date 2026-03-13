@@ -224,11 +224,10 @@ func TestRun(t *testing.T) {
 				handlerCtx, handlerCancel := context.WithTimeout(context.Background(), 2*time.Second)
 				defer handlerCancel()
 
-				connectRequestPayload, err := json.Marshal(sessionprotocol.AgentConnectRequest{
-					Type:      sessionprotocol.MessageTypeConnect,
-					V:         sessionprotocol.ProtocolVersion,
-					RequestID: "req_connect_agent",
-					Channel: sessionprotocol.AgentConnectChannel{
+				connectRequestPayload, err := json.Marshal(sessionprotocol.StreamOpen{
+					Type:     sessionprotocol.MessageTypeStreamOpen,
+					StreamID: 11,
+					Channel: sessionprotocol.StreamOpenChannel{
 						Kind: sessionprotocol.ChannelKindAgent,
 					},
 				})
@@ -252,17 +251,17 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				var connectOK sessionprotocol.ConnectOK
+				var connectOK sessionprotocol.StreamOpenOK
 				if err := json.Unmarshal(ackPayload, &connectOK); err != nil {
 					handlerErrCh <- fmt.Errorf("expected connect ack to decode: %w", err)
 					return
 				}
-				if connectOK.Type != sessionprotocol.MessageTypeConnectOK {
-					handlerErrCh <- fmt.Errorf("expected connect ack type '%s', got '%s'", sessionprotocol.MessageTypeConnectOK, connectOK.Type)
+				if connectOK.Type != sessionprotocol.MessageTypeStreamOpenOK {
+					handlerErrCh <- fmt.Errorf("expected connect ack type '%s', got '%s'", sessionprotocol.MessageTypeStreamOpenOK, connectOK.Type)
 					return
 				}
-				if connectOK.RequestID != "req_connect_agent" {
-					handlerErrCh <- fmt.Errorf("expected connect ack requestId 'req_connect_agent', got '%s'", connectOK.RequestID)
+				if connectOK.StreamID != 11 {
+					handlerErrCh <- fmt.Errorf("expected connect ack streamId 11, got %d", connectOK.StreamID)
 					return
 				}
 
@@ -367,7 +366,7 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("writes connect.error when agent endpoint is unavailable", func(t *testing.T) {
-		responseCh := make(chan sessionprotocol.ConnectError, 1)
+		responseCh := make(chan sessionprotocol.StreamOpenError, 1)
 		handlerErrCh := make(chan error, 1)
 
 		gatewayServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -381,11 +380,10 @@ func TestRun(t *testing.T) {
 			handlerCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
-			connectRequestPayload, err := json.Marshal(sessionprotocol.AgentConnectRequest{
-				Type:      sessionprotocol.MessageTypeConnect,
-				V:         sessionprotocol.ProtocolVersion,
-				RequestID: "req_connect_missing_endpoint",
-				Channel: sessionprotocol.AgentConnectChannel{
+			connectRequestPayload, err := json.Marshal(sessionprotocol.StreamOpen{
+				Type:     sessionprotocol.MessageTypeStreamOpen,
+				StreamID: 21,
+				Channel: sessionprotocol.StreamOpenChannel{
 					Kind: sessionprotocol.ChannelKindAgent,
 				},
 			})
@@ -409,7 +407,7 @@ func TestRun(t *testing.T) {
 				return
 			}
 
-			var connectError sessionprotocol.ConnectError
+			var connectError sessionprotocol.StreamOpenError
 			if err := json.Unmarshal(payload, &connectError); err != nil {
 				handlerErrCh <- fmt.Errorf("expected connect error decode to succeed: %w", err)
 				return
@@ -435,18 +433,18 @@ func TestRun(t *testing.T) {
 			})
 		}()
 
-		var connectError sessionprotocol.ConnectError
+		var connectError sessionprotocol.StreamOpenError
 		select {
 		case connectError = <-responseCh:
 		case <-time.After(3 * time.Second):
 			t.Fatal("expected connect.error response from sandbox runtime")
 		}
 
-		if connectError.Type != sessionprotocol.MessageTypeConnectError {
-			t.Fatalf("expected connect.error type '%s', got '%s'", sessionprotocol.MessageTypeConnectError, connectError.Type)
+		if connectError.Type != sessionprotocol.MessageTypeStreamOpenError {
+			t.Fatalf("expected connect.error type '%s', got '%s'", sessionprotocol.MessageTypeStreamOpenError, connectError.Type)
 		}
-		if connectError.RequestID != "req_connect_missing_endpoint" {
-			t.Fatalf("expected connect.error requestId 'req_connect_missing_endpoint', got '%s'", connectError.RequestID)
+		if connectError.StreamID != 21 {
+			t.Fatalf("expected connect.error streamId 21, got %d", connectError.StreamID)
 		}
 		if connectError.Code != connectErrorCodeAgentEndpointUnavailable {
 			t.Fatalf("expected connect.error code '%s', got '%s'", connectErrorCodeAgentEndpointUnavailable, connectError.Code)
@@ -520,11 +518,11 @@ func TestRun(t *testing.T) {
 			defer cancel()
 
 			for index := range 2 {
-				connectRequestPayload, err := json.Marshal(sessionprotocol.AgentConnectRequest{
-					Type:      sessionprotocol.MessageTypeConnect,
-					V:         sessionprotocol.ProtocolVersion,
-					RequestID: fmt.Sprintf("req_connect_agent_%d", index+1),
-					Channel: sessionprotocol.AgentConnectChannel{
+				streamID := index + 1
+				connectRequestPayload, err := json.Marshal(sessionprotocol.StreamOpen{
+					Type:     sessionprotocol.MessageTypeStreamOpen,
+					StreamID: streamID,
+					Channel: sessionprotocol.StreamOpenChannel{
 						Kind: sessionprotocol.ChannelKindAgent,
 					},
 				})
@@ -548,18 +546,18 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				var connectOK sessionprotocol.ConnectOK
+				var connectOK sessionprotocol.StreamOpenOK
 				if err := json.Unmarshal(ackPayload, &connectOK); err != nil {
 					handlerErrCh <- fmt.Errorf("expected connect ack to decode: %w", err)
 					return
 				}
-				expectedRequestID := fmt.Sprintf("req_connect_agent_%d", index+1)
-				if connectOK.Type != sessionprotocol.MessageTypeConnectOK {
-					handlerErrCh <- fmt.Errorf("expected connect ack type '%s', got '%s'", sessionprotocol.MessageTypeConnectOK, connectOK.Type)
+				expectedStreamID := streamID
+				if connectOK.Type != sessionprotocol.MessageTypeStreamOpenOK {
+					handlerErrCh <- fmt.Errorf("expected connect ack type '%s', got '%s'", sessionprotocol.MessageTypeStreamOpenOK, connectOK.Type)
 					return
 				}
-				if connectOK.RequestID != expectedRequestID {
-					handlerErrCh <- fmt.Errorf("expected connect ack requestId '%s', got '%s'", expectedRequestID, connectOK.RequestID)
+				if connectOK.StreamID != expectedStreamID {
+					handlerErrCh <- fmt.Errorf("expected connect ack streamId %d, got %d", expectedStreamID, connectOK.StreamID)
 					return
 				}
 
@@ -707,11 +705,10 @@ func TestRun(t *testing.T) {
 				handlerCtx, handlerCancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer handlerCancel()
 
-				connectCreatePayload, err := json.Marshal(sessionprotocol.PTYConnectRequest{
-					Type:      sessionprotocol.MessageTypeConnect,
-					V:         sessionprotocol.ProtocolVersion,
-					RequestID: "req_pty_create_001",
-					Channel: sessionprotocol.PTYConnectChannel{
+				connectCreatePayload, err := json.Marshal(sessionprotocol.StreamOpen{
+					Type:     sessionprotocol.MessageTypeStreamOpen,
+					StreamID: 31,
+					Channel: sessionprotocol.StreamOpenChannel{
 						Kind:    sessionprotocol.ChannelKindPTY,
 						Session: sessionprotocol.PTYSessionModeCreate,
 						Cols:    120,
@@ -738,11 +735,11 @@ func TestRun(t *testing.T) {
 						continue
 					}
 
-					var createAck sessionprotocol.ConnectOK
+					var createAck sessionprotocol.StreamOpenOK
 					if err := json.Unmarshal(createAckPayload, &createAck); err != nil {
 						continue
 					}
-					if createAck.Type == sessionprotocol.MessageTypeConnectOK && createAck.RequestID == "req_pty_create_001" {
+					if createAck.Type == sessionprotocol.MessageTypeStreamOpenOK && createAck.StreamID == 31 {
 						foundCreateAck = true
 						break
 					}
@@ -752,11 +749,10 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				connectAttachPayload, err := json.Marshal(sessionprotocol.PTYConnectRequest{
-					Type:      sessionprotocol.MessageTypeConnect,
-					V:         sessionprotocol.ProtocolVersion,
-					RequestID: "req_pty_attach_001",
-					Channel: sessionprotocol.PTYConnectChannel{
+				connectAttachPayload, err := json.Marshal(sessionprotocol.StreamOpen{
+					Type:     sessionprotocol.MessageTypeStreamOpen,
+					StreamID: 32,
+					Channel: sessionprotocol.StreamOpenChannel{
 						Kind:    sessionprotocol.ChannelKindPTY,
 						Session: sessionprotocol.PTYSessionModeAttach,
 					},
@@ -781,11 +777,11 @@ func TestRun(t *testing.T) {
 						continue
 					}
 
-					var attachAck sessionprotocol.ConnectOK
+					var attachAck sessionprotocol.StreamOpenOK
 					if err := json.Unmarshal(attachAckPayload, &attachAck); err != nil {
 						continue
 					}
-					if attachAck.Type == sessionprotocol.MessageTypeConnectOK && attachAck.RequestID == "req_pty_attach_001" {
+					if attachAck.Type == sessionprotocol.MessageTypeStreamOpenOK && attachAck.StreamID == 32 {
 						foundAttachAck = true
 						break
 					}
@@ -932,11 +928,10 @@ func TestRun(t *testing.T) {
 				handlerCtx, handlerCancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer handlerCancel()
 
-				connectPayload, err := json.Marshal(sessionprotocol.PTYConnectRequest{
-					Type:      sessionprotocol.MessageTypeConnect,
-					V:         sessionprotocol.ProtocolVersion,
-					RequestID: "req_pty_create_exit",
-					Channel: sessionprotocol.PTYConnectChannel{
+				connectPayload, err := json.Marshal(sessionprotocol.StreamOpen{
+					Type:     sessionprotocol.MessageTypeStreamOpen,
+					StreamID: 41,
+					Channel: sessionprotocol.StreamOpenChannel{
 						Kind:    sessionprotocol.ChannelKindPTY,
 						Session: sessionprotocol.PTYSessionModeCreate,
 					},
@@ -1025,7 +1020,7 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("writes connect.error when attaching to a missing pty session", func(t *testing.T) {
-		responseCh := make(chan sessionprotocol.ConnectError, 1)
+		responseCh := make(chan sessionprotocol.StreamOpenError, 1)
 		handlerErrCh := make(chan error, 1)
 
 		gatewayServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -1039,11 +1034,10 @@ func TestRun(t *testing.T) {
 			handlerCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 			defer cancel()
 
-			connectAttachPayload, err := json.Marshal(sessionprotocol.PTYConnectRequest{
-				Type:      sessionprotocol.MessageTypeConnect,
-				V:         sessionprotocol.ProtocolVersion,
-				RequestID: "req_pty_attach_missing",
-				Channel: sessionprotocol.PTYConnectChannel{
+			connectAttachPayload, err := json.Marshal(sessionprotocol.StreamOpen{
+				Type:     sessionprotocol.MessageTypeStreamOpen,
+				StreamID: 51,
+				Channel: sessionprotocol.StreamOpenChannel{
 					Kind:    sessionprotocol.ChannelKindPTY,
 					Session: sessionprotocol.PTYSessionModeAttach,
 				},
@@ -1068,7 +1062,7 @@ func TestRun(t *testing.T) {
 				return
 			}
 
-			var connectError sessionprotocol.ConnectError
+			var connectError sessionprotocol.StreamOpenError
 			if err := json.Unmarshal(payload, &connectError); err != nil {
 				handlerErrCh <- fmt.Errorf("expected connect.error decode to succeed: %w", err)
 				return
@@ -1093,18 +1087,18 @@ func TestRun(t *testing.T) {
 			})
 		}()
 
-		var connectError sessionprotocol.ConnectError
+		var connectError sessionprotocol.StreamOpenError
 		select {
 		case connectError = <-responseCh:
 		case <-time.After(3 * time.Second):
 			t.Fatal("expected connect.error response for missing pty session")
 		}
 
-		if connectError.Type != sessionprotocol.MessageTypeConnectError {
-			t.Fatalf("expected connect.error type '%s', got '%s'", sessionprotocol.MessageTypeConnectError, connectError.Type)
+		if connectError.Type != sessionprotocol.MessageTypeStreamOpenError {
+			t.Fatalf("expected connect.error type '%s', got '%s'", sessionprotocol.MessageTypeStreamOpenError, connectError.Type)
 		}
-		if connectError.RequestID != "req_pty_attach_missing" {
-			t.Fatalf("expected connect.error requestId 'req_pty_attach_missing', got '%s'", connectError.RequestID)
+		if connectError.StreamID != 51 {
+			t.Fatalf("expected connect.error streamId 51, got %d", connectError.StreamID)
 		}
 		if connectError.Code != connectErrorCodePTYSessionUnavailable {
 			t.Fatalf("expected connect.error code '%s', got '%s'", connectErrorCodePTYSessionUnavailable, connectError.Code)

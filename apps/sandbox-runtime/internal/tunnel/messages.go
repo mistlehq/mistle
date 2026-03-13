@@ -23,12 +23,20 @@ const (
 	ptyConnectErrorCodeInvalidSessionSelection = "invalid_pty_session_mode"
 )
 
-func writeConnectOK(ctx context.Context, tunnelConn *websocket.Conn, connectOK sessionprotocol.ConnectOK) error {
-	return writeTextJSONMessage(ctx, tunnelConn, connectOK)
+func writeStreamOpenOK(
+	ctx context.Context,
+	tunnelConn *websocket.Conn,
+	streamOpenOK sessionprotocol.StreamOpenOK,
+) error {
+	return writeTextJSONMessage(ctx, tunnelConn, streamOpenOK)
 }
 
-func writeConnectError(ctx context.Context, tunnelConn *websocket.Conn, connectError sessionprotocol.ConnectError) error {
-	return writeTextJSONMessage(ctx, tunnelConn, connectError)
+func writeStreamOpenError(
+	ctx context.Context,
+	tunnelConn *websocket.Conn,
+	streamOpenError sessionprotocol.StreamOpenError,
+) error {
+	return writeTextJSONMessage(ctx, tunnelConn, streamOpenError)
 }
 
 func writeTextJSONMessage(ctx context.Context, tunnelConn *websocket.Conn, payload any) error {

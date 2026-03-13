@@ -11,8 +11,8 @@ import (
 func TestStartPTYSessionInheritsProcessEnvironment(t *testing.T) {
 	t.Setenv("GH_TOKEN", "dummy-token")
 
-	session, err := startPTYSession(sessionprotocol.PTYConnectRequest{
-		Channel: sessionprotocol.PTYConnectChannel{
+	session, err := startPTYSession(sessionprotocol.StreamOpen{
+		Channel: sessionprotocol.StreamOpenChannel{
 			Kind:    sessionprotocol.ChannelKindPTY,
 			Session: sessionprotocol.PTYSessionModeCreate,
 			Cols:    80,
