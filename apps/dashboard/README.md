@@ -33,11 +33,7 @@ Minimal dashboard scaffold using Vite + React.
 - Check for drift:
   - `pnpm --filter @mistle/dashboard openapi:check`
 
-## Sandbox Session Protocol Types
+## Sandbox Session Protocol
 
 - Shared package:
   - `../packages/sandbox-session-protocol`
-- Generate types:
-  - `pnpm --filter @mistle/sandbox-session-protocol protocol:generate`
-- Check for drift:
-  - `pnpm --filter @mistle/sandbox-session-protocol protocol:check`

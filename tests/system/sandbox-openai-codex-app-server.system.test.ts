@@ -38,17 +38,17 @@ const DIAGNOSTIC_OUTPUT_MAX_CHARS = 24_000;
 
 const execFileAsync = promisify(execFile);
 
-const ConnectOKSchema = z
+const StreamOpenOKSchema = z
   .object({
-    type: z.literal("connect.ok"),
-    requestId: z.string().min(1),
+    type: z.literal("stream.open.ok"),
+    streamId: z.number().int().positive(),
   })
   .strict();
 
-const ConnectErrorSchema = z
+const StreamOpenErrorSchema = z
   .object({
-    type: z.literal("connect.error"),
-    requestId: z.string().min(1),
+    type: z.literal("stream.open.error"),
+    streamId: z.number().int().positive(),
     code: z.string().min(1),
     message: z.string().min(1),
   })
@@ -876,7 +876,7 @@ async function requestWithTimeout(input: {
 
 async function waitForTunnelHandshakeAck(input: {
   socket: WebSocket;
-  requestId: string;
+  streamId: number;
   timeoutMs: number;
 }): Promise<void> {
   const deadline = Date.now() + input.timeoutMs;
@@ -887,20 +887,20 @@ async function waitForTunnelHandshakeAck(input: {
       remainingTimeMs(deadline),
     );
 
-    const connectOK = ConnectOKSchema.safeParse(nextMessage);
-    if (connectOK.success && connectOK.data.requestId === input.requestId) {
+    const streamOpenOK = StreamOpenOKSchema.safeParse(nextMessage);
+    if (streamOpenOK.success && streamOpenOK.data.streamId === input.streamId) {
       return;
     }
 
-    const connectError = ConnectErrorSchema.safeParse(nextMessage);
-    if (connectError.success && connectError.data.requestId === input.requestId) {
+    const streamOpenError = StreamOpenErrorSchema.safeParse(nextMessage);
+    if (streamOpenError.success && streamOpenError.data.streamId === input.streamId) {
       throw new Error(
-        `Tunnel connect handshake failed with code '${connectError.data.code}': ${connectError.data.message}`,
+        `Tunnel stream.open failed with code '${streamOpenError.data.code}': ${streamOpenError.data.message}`,
       );
     }
 
     if (remainingTimeMs(deadline) === 0) {
-      throw new Error("Timed out waiting for tunnel connect handshake acknowledgement.");
+      throw new Error("Timed out waiting for tunnel stream.open acknowledgement.");
     }
   }
 }
@@ -1429,22 +1429,21 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
           sink: websocketTraceEntries,
         });
 
-        const handshakeRequestId = `connect-${randomUUID()}`;
+        const handshakeStreamId = 1;
         await runStep({
           stepTrace,
-          stepName: "tunnel connect handshake",
+          stepName: "tunnel stream.open handshake",
           action: async () => {
             sendJson(websocket, {
-              type: "connect",
-              v: 1,
-              requestId: handshakeRequestId,
+              type: "stream.open",
+              streamId: handshakeStreamId,
               channel: {
                 kind: "agent",
               },
             });
             await waitForTunnelHandshakeAck({
               socket: websocket,
-              requestId: handshakeRequestId,
+              streamId: handshakeStreamId,
               timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
             });
           },
@@ -1990,18 +1989,17 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
           stepTrace,
           stepName: "connect and initialize Codex app-server",
           action: async () => {
-            const handshakeRequestId = `connect-${randomUUID()}`;
+            const handshakeStreamId = 1;
             sendJson(websocket, {
-              type: "connect",
-              v: 1,
-              requestId: handshakeRequestId,
+              type: "stream.open",
+              streamId: handshakeStreamId,
               channel: {
                 kind: "agent",
               },
             });
             await waitForTunnelHandshakeAck({
               socket: websocket,
-              requestId: handshakeRequestId,
+              streamId: handshakeStreamId,
               timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
             });
 

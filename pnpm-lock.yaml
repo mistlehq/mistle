@@ -250,9 +250,6 @@ importers:
       '@mistle/integrations-definitions':
         specifier: workspace:*
         version: link:../../packages/integrations-definitions
-      '@mistle/sandbox-session-protocol':
-        specifier: workspace:*
-        version: link:../../packages/sandbox-session-protocol
       '@mistle/time':
         specifier: workspace:*
         version: link:../../packages/time

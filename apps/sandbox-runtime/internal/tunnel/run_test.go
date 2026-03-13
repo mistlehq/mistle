@@ -365,7 +365,7 @@ func TestRun(t *testing.T) {
 		}
 	})
 
-	t.Run("writes connect.error when agent endpoint is unavailable", func(t *testing.T) {
+	t.Run("writes stream.open.error when agent endpoint is unavailable", func(t *testing.T) {
 		responseCh := make(chan sessionprotocol.StreamOpenError, 1)
 		handlerErrCh := make(chan error, 1)
 
@@ -437,17 +437,17 @@ func TestRun(t *testing.T) {
 		select {
 		case connectError = <-responseCh:
 		case <-time.After(3 * time.Second):
-			t.Fatal("expected connect.error response from sandbox runtime")
+			t.Fatal("expected stream.open.error response from sandbox runtime")
 		}
 
 		if connectError.Type != sessionprotocol.MessageTypeStreamOpenError {
-			t.Fatalf("expected connect.error type '%s', got '%s'", sessionprotocol.MessageTypeStreamOpenError, connectError.Type)
+			t.Fatalf("expected stream.open.error type '%s', got '%s'", sessionprotocol.MessageTypeStreamOpenError, connectError.Type)
 		}
 		if connectError.StreamID != 21 {
-			t.Fatalf("expected connect.error streamId 21, got %d", connectError.StreamID)
+			t.Fatalf("expected stream.open.error streamId 21, got %d", connectError.StreamID)
 		}
 		if connectError.Code != connectErrorCodeAgentEndpointUnavailable {
-			t.Fatalf("expected connect.error code '%s', got '%s'", connectErrorCodeAgentEndpointUnavailable, connectError.Code)
+			t.Fatalf("expected stream.open.error code '%s', got '%s'", connectErrorCodeAgentEndpointUnavailable, connectError.Code)
 		}
 
 		cancel()
@@ -1025,7 +1025,7 @@ func TestRun(t *testing.T) {
 		}
 	})
 
-	t.Run("writes connect.error when attaching to a missing pty session", func(t *testing.T) {
+	t.Run("writes stream.open.error when attaching to a missing pty session", func(t *testing.T) {
 		responseCh := make(chan sessionprotocol.StreamOpenError, 1)
 		handlerErrCh := make(chan error, 1)
 
@@ -1060,17 +1060,17 @@ func TestRun(t *testing.T) {
 
 			messageType, payload, err := conn.Read(handlerCtx)
 			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected connect.error read to succeed: %w", err)
+				handlerErrCh <- fmt.Errorf("expected stream.open.error read to succeed: %w", err)
 				return
 			}
 			if messageType != websocket.MessageText {
-				handlerErrCh <- fmt.Errorf("expected connect.error message type text, got %s", messageType.String())
+				handlerErrCh <- fmt.Errorf("expected stream.open.error message type text, got %s", messageType.String())
 				return
 			}
 
 			var connectError sessionprotocol.StreamOpenError
 			if err := json.Unmarshal(payload, &connectError); err != nil {
-				handlerErrCh <- fmt.Errorf("expected connect.error decode to succeed: %w", err)
+				handlerErrCh <- fmt.Errorf("expected stream.open.error decode to succeed: %w", err)
 				return
 			}
 			responseCh <- connectError
@@ -1097,17 +1097,17 @@ func TestRun(t *testing.T) {
 		select {
 		case connectError = <-responseCh:
 		case <-time.After(3 * time.Second):
-			t.Fatal("expected connect.error response for missing pty session")
+			t.Fatal("expected stream.open.error response for missing pty session")
 		}
 
 		if connectError.Type != sessionprotocol.MessageTypeStreamOpenError {
-			t.Fatalf("expected connect.error type '%s', got '%s'", sessionprotocol.MessageTypeStreamOpenError, connectError.Type)
+			t.Fatalf("expected stream.open.error type '%s', got '%s'", sessionprotocol.MessageTypeStreamOpenError, connectError.Type)
 		}
 		if connectError.StreamID != 51 {
-			t.Fatalf("expected connect.error streamId 51, got %d", connectError.StreamID)
+			t.Fatalf("expected stream.open.error streamId 51, got %d", connectError.StreamID)
 		}
 		if connectError.Code != connectErrorCodePTYSessionUnavailable {
-			t.Fatalf("expected connect.error code '%s', got '%s'", connectErrorCodePTYSessionUnavailable, connectError.Code)
+			t.Fatalf("expected stream.open.error code '%s', got '%s'", connectErrorCodePTYSessionUnavailable, connectError.Code)
 		}
 
 		cancel()
