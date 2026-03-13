@@ -14,12 +14,16 @@ export type TunnelExchangeTokenConfig = {
 export type VerifiedTunnelExchangeToken = {
   jti: string;
   sandboxInstanceId: string;
+  bootstrapTokenTtlSeconds: number;
+  exchangeTokenTtlSeconds: number;
 };
 
 export const TunnelExchangeTokenErrorCode = {
   TOKEN_REQUIRED: "TOKEN_REQUIRED",
   JTI_REQUIRED: "JTI_REQUIRED",
   SANDBOX_INSTANCE_ID_REQUIRED: "SANDBOX_INSTANCE_ID_REQUIRED",
+  BOOTSTRAP_TOKEN_TTL_SECONDS_REQUIRED: "BOOTSTRAP_TOKEN_TTL_SECONDS_REQUIRED",
+  EXCHANGE_TOKEN_TTL_SECONDS_REQUIRED: "EXCHANGE_TOKEN_TTL_SECONDS_REQUIRED",
   INVALID_TTL_SECONDS: "INVALID_TTL_SECONDS",
   TOKEN_EXPIRED: "TOKEN_EXPIRED",
   TOKEN_INVALID_ISSUER: "TOKEN_INVALID_ISSUER",
@@ -79,6 +83,8 @@ export async function mintTunnelExchangeToken(input: {
   config: TunnelExchangeTokenConfig;
   jti: string;
   sandboxInstanceId: string;
+  bootstrapTokenTtlSeconds: number;
+  exchangeTokenTtlSeconds: number;
   ttlSeconds: number;
 }): Promise<string> {
   const normalizedJti = toNonEmptyString(input.jti);
@@ -102,11 +108,27 @@ export async function mintTunnelExchangeToken(input: {
       message: "Tunnel exchange token ttlSeconds must be an integer greater than or equal to 1.",
     });
   }
+  if (!Number.isInteger(input.bootstrapTokenTtlSeconds) || input.bootstrapTokenTtlSeconds < 1) {
+    throw new TunnelExchangeTokenError({
+      code: TunnelExchangeTokenErrorCode.BOOTSTRAP_TOKEN_TTL_SECONDS_REQUIRED,
+      message:
+        "Tunnel exchange token bootstrapTokenTtlSeconds claim must be an integer greater than or equal to 1.",
+    });
+  }
+  if (!Number.isInteger(input.exchangeTokenTtlSeconds) || input.exchangeTokenTtlSeconds < 1) {
+    throw new TunnelExchangeTokenError({
+      code: TunnelExchangeTokenErrorCode.EXCHANGE_TOKEN_TTL_SECONDS_REQUIRED,
+      message:
+        "Tunnel exchange token exchangeTokenTtlSeconds claim must be an integer greater than or equal to 1.",
+    });
+  }
 
   const nowEpochSeconds = Math.floor(Date.now() / 1000);
 
   try {
     return await new SignJWT({
+      bootstrapTokenTtlSeconds: input.bootstrapTokenTtlSeconds,
+      exchangeTokenTtlSeconds: input.exchangeTokenTtlSeconds,
       sandboxInstanceId: normalizedSandboxInstanceId,
     })
       .setProtectedHeader({ alg: "HS256" })
@@ -139,6 +161,8 @@ export async function verifyTunnelExchangeToken(input: {
 
   let payloadJti: string | undefined;
   let payloadSandboxInstanceId: string | undefined;
+  let payloadBootstrapTokenTtlSeconds: number | undefined;
+  let payloadExchangeTokenTtlSeconds: number | undefined;
   try {
     const verificationResult = await jwtVerify(
       normalizedToken,
@@ -152,6 +176,12 @@ export async function verifyTunnelExchangeToken(input: {
     payloadJti = verificationResult.payload.jti;
     if (typeof verificationResult.payload.sandboxInstanceId === "string") {
       payloadSandboxInstanceId = verificationResult.payload.sandboxInstanceId;
+    }
+    if (typeof verificationResult.payload.bootstrapTokenTtlSeconds === "number") {
+      payloadBootstrapTokenTtlSeconds = verificationResult.payload.bootstrapTokenTtlSeconds;
+    }
+    if (typeof verificationResult.payload.exchangeTokenTtlSeconds === "number") {
+      payloadExchangeTokenTtlSeconds = verificationResult.payload.exchangeTokenTtlSeconds;
     }
   } catch (error) {
     if (error instanceof JoseErrors.JWTExpired) {
@@ -199,8 +229,32 @@ export async function verifyTunnelExchangeToken(input: {
       message: "Tunnel exchange token sandboxInstanceId claim is required.",
     });
   }
+  if (
+    payloadBootstrapTokenTtlSeconds === undefined ||
+    !Number.isInteger(payloadBootstrapTokenTtlSeconds) ||
+    payloadBootstrapTokenTtlSeconds < 1
+  ) {
+    throw new TunnelExchangeTokenError({
+      code: TunnelExchangeTokenErrorCode.BOOTSTRAP_TOKEN_TTL_SECONDS_REQUIRED,
+      message:
+        "Tunnel exchange token bootstrapTokenTtlSeconds claim is required and must be a positive integer.",
+    });
+  }
+  if (
+    payloadExchangeTokenTtlSeconds === undefined ||
+    !Number.isInteger(payloadExchangeTokenTtlSeconds) ||
+    payloadExchangeTokenTtlSeconds < 1
+  ) {
+    throw new TunnelExchangeTokenError({
+      code: TunnelExchangeTokenErrorCode.EXCHANGE_TOKEN_TTL_SECONDS_REQUIRED,
+      message:
+        "Tunnel exchange token exchangeTokenTtlSeconds claim is required and must be a positive integer.",
+    });
+  }
 
   return {
+    bootstrapTokenTtlSeconds: payloadBootstrapTokenTtlSeconds,
+    exchangeTokenTtlSeconds: payloadExchangeTokenTtlSeconds,
     jti: normalizedJti,
     sandboxInstanceId: normalizedSandboxInstanceId,
   };
