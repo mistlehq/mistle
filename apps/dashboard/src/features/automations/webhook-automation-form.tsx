@@ -69,6 +69,8 @@ function SelectField(input: {
   error: string | undefined;
   onValueChange: (value: string) => void;
 }): React.JSX.Element {
+  const selectedOption = input.options.find((option) => option.value === input.value);
+
   return (
     <Field>
       <FieldLabel>{input.label}</FieldLabel>
@@ -84,7 +86,7 @@ function SelectField(input: {
           value={input.value}
         >
           <SelectTrigger className="w-full">
-            <SelectValue placeholder={input.placeholder} />
+            <SelectValue placeholder={input.placeholder}>{selectedOption?.label}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             {input.options.map((option) => (
