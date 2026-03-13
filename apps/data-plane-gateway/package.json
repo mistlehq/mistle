@@ -22,6 +22,7 @@
     "@mistle/gateway-connection-auth": "workspace:*",
     "@mistle/gateway-tunnel-auth": "workspace:*",
     "@mistle/logging": "workspace:*",
+    "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
     "@opentelemetry/api": "^1.9.0",

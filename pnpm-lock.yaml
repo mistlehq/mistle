@@ -432,6 +432,9 @@ importers:
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@mistle/sandbox-session-protocol':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-session-protocol
       '@mistle/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry

@@ -1,3 +1,5 @@
+import type { StreamChannel } from "@mistle/sandbox-session-protocol";
+
 import type { RelayTarget } from "../types.js";
 import type { ClientStreamBinding } from "./sandbox-tunnel-session.js";
 import type {
@@ -42,6 +44,7 @@ export class TunnelSessionRegistry {
    */
   public bindClientStream(input: {
     sandboxInstanceId: string;
+    channelKind: StreamChannel["kind"];
     clientSessionId: string;
     clientStreamId: number;
   }): ClientStreamBinding {
@@ -78,5 +81,15 @@ export class TunnelSessionRegistry {
     clientStreamId: number;
   }): ClientStreamBinding | undefined {
     return this.adapter.unbindClientStream(input);
+  }
+
+  /**
+   * Removes every stream binding associated with a single client websocket session.
+   */
+  public releaseClientSessionBindings(input: {
+    sandboxInstanceId: string;
+    clientSessionId: string;
+  }): ClientStreamBinding[] {
+    return this.adapter.releaseClientSessionBindings(input);
   }
 }

@@ -59,6 +59,7 @@ export class InMemoryTunnelSessionRegistryAdapter implements TunnelSessionRegist
 
   public bindClientStream(input: {
     sandboxInstanceId: string;
+    channelKind: "agent" | "pty";
     clientSessionId: string;
     clientStreamId: number;
   }): ClientStreamBinding {
@@ -70,6 +71,7 @@ export class InMemoryTunnelSessionRegistryAdapter implements TunnelSessionRegist
     }
 
     return session.bindClientStream({
+      channelKind: input.channelKind,
       clientSessionId: input.clientSessionId,
       clientStreamId: input.clientStreamId,
     });
@@ -105,6 +107,20 @@ export class InMemoryTunnelSessionRegistryAdapter implements TunnelSessionRegist
     return this.#sessionsBySandboxInstanceId.get(input.sandboxInstanceId)?.unbindClientStream({
       clientSessionId: input.clientSessionId,
       clientStreamId: input.clientStreamId,
+    });
+  }
+
+  public releaseClientSessionBindings(input: {
+    sandboxInstanceId: string;
+    clientSessionId: string;
+  }): ClientStreamBinding[] {
+    const session = this.#sessionsBySandboxInstanceId.get(input.sandboxInstanceId);
+    if (session === undefined) {
+      return [];
+    }
+
+    return session.releaseClientSessionBindings({
+      clientSessionId: input.clientSessionId,
     });
   }
 }
