@@ -8,7 +8,7 @@ export type SettingsShellViewProps = {
   backLabel?: string;
   breadcrumbs: React.ReactNode | null;
   content: React.ReactNode;
-  description: string;
+  supportingText: string;
   headerActions: React.ReactNode | null;
   onBack: () => void;
   pathname: string;
@@ -24,7 +24,7 @@ export function SettingsShellView(input: SettingsShellViewProps): React.JSX.Elem
       isSessionDetail={false}
       mainContent={
         <SettingsLayoutView
-          description={input.description}
+          supportingText={input.supportingText}
           headerActions={input.headerActions}
           title={input.title}
         >

@@ -24,7 +24,7 @@ import {
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import { getSandboxProfile } from "../sandbox-profiles/sandbox-profiles-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { EditablePageTitle } from "../shared/editable-page-title.js";
+import { EditableHeading } from "../shared/editable-heading.js";
 import {
   createDefaultBindingConfig,
   resolveBindingKindFromTarget,
@@ -460,7 +460,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
         {props.mode === "create" ? (
           <h1 className="text-xl font-semibold">{metaState.pageTitle}</h1>
         ) : (
-          <EditablePageTitle
+          <EditableHeading
             ariaLabel="Profile name"
             cancelOnEscape={true}
             draftValue={metaState.profileNameDraft}
@@ -474,7 +474,7 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
             onEditStart={metaState.onProfileNameEditStart}
             placeholder={undefined}
             saveDisabled={metaState.isUpdating}
-            title={metaState.pageTitle}
+            value={metaState.pageTitle}
           />
         )}
       </div>

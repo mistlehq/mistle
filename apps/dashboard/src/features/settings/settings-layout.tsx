@@ -9,14 +9,15 @@ export function SettingsLayout(): React.JSX.Element {
   const pageMeta = useAppPageMeta();
   const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
   const title = pageMeta.title ?? "Settings";
-  const description = pageMeta.description ?? "Manage account and organization settings.";
-  const shouldShowDescription = description.trim().length > 0;
+  const supportingText = pageMeta.supportingText ?? "Manage account and organization settings.";
+  const shouldShowSupportingText = supportingText.trim().length > 0;
 
   return (
     <SettingsHeaderActionsContext.Provider value={setHeaderActions}>
       <SettingsLayoutView
-        description={shouldShowDescription ? description : ""}
+        supportingText={shouldShowSupportingText ? supportingText : ""}
         headerActions={headerActions}
+        headerIcon={pageMeta.headerIcon}
         title={title}
       >
         <Outlet />

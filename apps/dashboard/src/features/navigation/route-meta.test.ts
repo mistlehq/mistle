@@ -130,4 +130,43 @@ describe("route breadcrumb metadata", () => {
       ]),
     ).toThrow("title resolver failure");
   });
+
+  it("defaults custom page headers to absent when no override is present", () => {
+    expect(
+      resolveAppPageMetaFromMatches([
+        {
+          handle: {
+            title: "Integrations",
+            description: "",
+          },
+          params: {},
+          pathname: "/settings/organization/integrations",
+        },
+      ]),
+    ).toEqual({
+      title: "Integrations",
+      headerIcon: null,
+      supportingText: "",
+    });
+  });
+
+  it("returns route-level supporting text with page metadata", () => {
+    expect(
+      resolveAppPageMetaFromMatches([
+        {
+          handle: {
+            title: "Integration connection",
+            description: "github-cloud",
+            headerIcon: () => "Custom icon",
+          },
+          params: {},
+          pathname: "/settings/organization/integrations/github-cloud",
+        },
+      ]),
+    ).toEqual({
+      title: "Integration connection",
+      headerIcon: "Custom icon",
+      supportingText: "github-cloud",
+    });
+  });
 });

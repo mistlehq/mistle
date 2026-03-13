@@ -24,7 +24,7 @@ describe("useIntegrationDetailState", () => {
     expect(result.current.selectedDetailCard?.target.targetKey).toBe("github");
     expect(result.current.selectedDetailConnections).toHaveLength(1);
     expect(result.current.selectedDetailConnections[0]?.status).toBe("error");
-    expect(result.current.selectedConnectionId).toBe("icn_error");
+    expect(result.current.activeDetailConnectionId).toBe("icn_error");
   });
 
   it("prefers an active connection as the default selection when available", () => {
@@ -43,7 +43,7 @@ describe("useIntegrationDetailState", () => {
       }),
     );
 
-    expect(result.current.selectedConnectionId).toBe("icn_active");
+    expect(result.current.activeDetailConnectionId).toBe("icn_active");
   });
 });
 

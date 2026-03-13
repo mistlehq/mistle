@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { IntegrationConnectionDetailView } from "./integration-connection-detail-view.js";
@@ -11,90 +10,85 @@ describe("IntegrationConnectionDetailView", () => {
     cleanup();
   });
 
-  it("switches the selected connection and exposes refresh actions", () => {
+  it("renders stacked connections and exposes refresh actions", () => {
     let refreshedKind: string | null = null;
-
-    function Harness(): React.JSX.Element {
-      const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(
-        "icn_github_archive",
-      );
-
-      return (
-        <IntegrationConnectionDetailView
-          connections={[
-            {
-              id: "icn_github_primary",
-              displayName: "Engineering GitHub",
-              status: "active",
-              authMethodLabel: "OAuth",
-              createdAt: "2026-03-03T00:00:00.000Z",
-              updatedAt: "2026-03-11T04:30:00.000Z",
-              resources: [
-                {
-                  kind: "repositories",
-                  selectionMode: "multi",
-                  count: 41,
-                  syncState: "ready",
-                  lastSyncedAt: "2026-03-11T04:25:00.000Z",
-                },
-              ],
-            },
-            {
-              id: "icn_github_archive",
-              displayName: "Archive Mirror",
-              status: "error",
-              authMethodLabel: "API key",
-              createdAt: "2026-02-14T00:00:00.000Z",
-              updatedAt: "2026-03-10T10:15:00.000Z",
-              resources: [
-                {
-                  kind: "repositories",
-                  selectionMode: "multi",
-                  count: 0,
-                  syncState: "error",
-                  lastErrorMessage: "GitHub returned a 403 while reading repository visibility.",
-                },
-              ],
-            },
-          ]}
-          onRefreshResource={({ kind }) => {
-            refreshedKind = kind;
-          }}
-          onSelectConnection={setSelectedConnectionId}
-          selectedConnectionId={selectedConnectionId}
-          targetDisplayName="GitHub"
-          targetKey="github"
-        />
-      );
-    }
-
-    render(<Harness />);
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            displayName: "Engineering GitHub",
+            status: "active",
+            authMethodLabel: "OAuth",
+            resources: [
+              {
+                kind: "repositories",
+                count: 41,
+                syncState: "ready",
+                lastSyncedAt: "2026-03-11T04:25:00.000Z",
+              },
+            ],
+          },
+          {
+            id: "icn_github_archive",
+            displayName: "Archive Mirror",
+            status: "error",
+            authMethodLabel: "API key",
+            resources: [
+              {
+                kind: "repositories",
+                count: 0,
+                syncState: "error",
+                lastErrorMessage: "GitHub returned a 403 while reading repository visibility.",
+              },
+            ],
+          },
+        ]}
+        onRefreshResource={({ kind }) => {
+          refreshedKind = kind;
+        }}
+        resourceItemsByKey={
+          new Map([
+            [
+              "icn_github_primary:repositories",
+              {
+                errorMessage: null,
+                isLoading: false,
+                items: [
+                  {
+                    id: "repo_1",
+                    familyId: "github",
+                    kind: "repositories",
+                    handle: "mistle/dashboard",
+                    displayName: "mistle/dashboard",
+                    status: "accessible",
+                    metadata: {},
+                  },
+                ],
+                kind: "repositories",
+              },
+            ],
+          ])
+        }
+      />,
+    );
 
     expect(
       screen.getAllByText("GitHub returned a 403 while reading repository visibility."),
-    ).toHaveLength(2);
-    const [selectEngineeringButton] = screen.getAllByRole("button", { name: /Engineering GitHub/ });
-    if (selectEngineeringButton === undefined) {
-      throw new Error("Expected an Engineering GitHub selection button.");
+    ).toHaveLength(1);
+    expect(screen.getByText("Engineering GitHub")).toBeTruthy();
+    expect(screen.getByText("Archive Mirror")).toBeTruthy();
+    expect(screen.getByText("mistle/dashboard")).toBeTruthy();
+    const [refreshButton] = screen.getAllByRole("button", { name: "Refresh repositories" });
+    if (refreshButton === undefined) {
+      throw new Error("Expected a refresh repositories button.");
     }
-    fireEvent.click(selectEngineeringButton);
-    expect(
-      screen.queryAllByText("GitHub returned a 403 while reading repository visibility."),
-    ).toHaveLength(0);
-    fireEvent.click(screen.getByRole("button", { name: "Refresh resources" }));
+    fireEvent.click(refreshButton);
     expect(refreshedKind).toBe("repositories");
   });
 
   it("renders an empty state when no connections are available", () => {
-    render(
-      <IntegrationConnectionDetailView
-        connections={[]}
-        onSelectConnection={() => {}}
-        selectedConnectionId={null}
-        targetDisplayName="GitHub"
-        targetKey="github"
-      />,
-    );
+    render(<IntegrationConnectionDetailView connections={[]} />);
 
     expect(screen.getByText("No connections found for this target.")).toBeTruthy();
   });
@@ -108,12 +102,9 @@ describe("IntegrationConnectionDetailView", () => {
             displayName: "Engineering GitHub",
             status: "active",
             authMethodLabel: "OAuth",
-            createdAt: "2026-03-03T00:00:00.000Z",
-            updatedAt: "2026-03-11T04:30:00.000Z",
             resources: [
               {
                 kind: "repositories",
-                selectionMode: "multi",
                 count: 41,
                 syncState: "syncing",
                 isRefreshing: true,
@@ -122,14 +113,86 @@ describe("IntegrationConnectionDetailView", () => {
           },
         ]}
         onRefreshResource={() => {}}
-        onSelectConnection={() => {}}
-        selectedConnectionId="icn_github_primary"
-        targetDisplayName="GitHub"
-        targetKey="github"
       />,
     );
 
-    const refreshButton = screen.getByRole("button", { name: "Refreshing..." });
+    const refreshButton = screen.getByRole("button", { name: "Refresh repositories" });
     expect(refreshButton).toHaveProperty("disabled", true);
+  });
+
+  it("starts title editing for the clicked connection", () => {
+    let editingConnectionId: string | null = null;
+
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_github_primary",
+            displayName: "Engineering GitHub",
+            authMethodId: "oauth",
+            authMethodLabel: "OAuth",
+            status: "active",
+            resources: [],
+          },
+          {
+            id: "icn_github_archive",
+            displayName: "Archive Mirror",
+            authMethodId: "oauth",
+            authMethodLabel: "OAuth",
+            status: "active",
+            resources: [],
+          },
+        ]}
+        titleEditor={{
+          connectionId: null,
+          draftValue: "",
+          isEditing: false,
+          onCancel: () => {},
+          onCommit: () => {},
+          onDraftValueChange: () => {},
+          onEditStart: (connectionId) => {
+            editingConnectionId = connectionId;
+          },
+          saveDisabled: false,
+        }}
+      />,
+    );
+
+    const editButtons = screen.getAllByRole("button", { name: "Edit connection name" });
+    const secondEditButton = editButtons[1];
+    if (secondEditButton === undefined) {
+      throw new Error("Expected a second edit connection name button.");
+    }
+    fireEvent.click(secondEditButton);
+    expect(editingConnectionId).toBe("icn_github_archive");
+  });
+
+  it("renders a masked api key row for api key connections", () => {
+    let editedConnectionId: string | null = null;
+
+    render(
+      <IntegrationConnectionDetailView
+        connections={[
+          {
+            id: "icn_openai_primary",
+            displayName: "OpenAI Production",
+            authMethodId: "api-key",
+            authMethodLabel: "API key",
+            status: "active",
+            resources: [],
+          },
+        ]}
+        onEditApiKey={(connectionId) => {
+          editedConnectionId = connectionId;
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Auth method:")).toBeTruthy();
+    expect(screen.getAllByText("API key")[0]).toBeTruthy();
+    expect(screen.getByText("API key:")).toBeTruthy();
+    expect(screen.getByText("**********")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Edit API key" }));
+    expect(editedConnectionId).toBe("icn_openai_primary");
   });
 });

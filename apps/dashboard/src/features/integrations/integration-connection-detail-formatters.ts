@@ -1,13 +1,5 @@
 import { formatDateTime } from "../shared/date-formatters.js";
 
-export function formatResourceSummaryCount(count: number): string {
-  if (count === 1) {
-    return "1 resource summary";
-  }
-
-  return `${count} resource summaries`;
-}
-
 export function formatConnectionStatusLabel(status: "active" | "error" | "revoked"): string {
   if (status === "active") {
     return "Active";
@@ -16,13 +8,6 @@ export function formatConnectionStatusLabel(status: "active" | "error" | "revoke
     return "Error";
   }
   return "Revoked";
-}
-
-export function formatSelectionModeLabel(selectionMode: "single" | "multi"): string {
-  if (selectionMode === "single") {
-    return "single-select";
-  }
-  return "multi-select";
 }
 
 export function formatSyncStateLabel(
@@ -54,9 +39,9 @@ export function formatResourceMetadata(input: {
 
   if (input.syncState === "syncing") {
     if (input.lastSyncedAt !== undefined) {
-      return `Refresh in progress. Last completed sync ${formatDateTime(input.lastSyncedAt)}.`;
+      return `Last synced ${formatDateTime(input.lastSyncedAt)}.`;
     }
-    return "Refresh in progress.";
+    return "Resources have not been synced yet.";
   }
 
   if (input.syncState === "never-synced") {
@@ -68,4 +53,36 @@ export function formatResourceMetadata(input: {
   }
 
   return `Last synced ${formatDateTime(input.lastSyncedAt)}.`;
+}
+
+export function formatResourceHeading(input: { count: number; kind: string }): string {
+  const words = input.kind
+    .split(/[_-]+/g)
+    .filter((part) => part.length > 0)
+    .map((part) => `${part.slice(0, 1).toUpperCase()}${part.slice(1)}`);
+  const [firstWord, ...remainingWords] = words;
+
+  if (firstWord === undefined) {
+    return `Resources (${input.count})`;
+  }
+
+  const singularFirstWord = firstWord.endsWith("ies")
+    ? `${firstWord.slice(0, -3)}y`
+    : firstWord.endsWith("s")
+      ? firstWord.slice(0, -1)
+      : firstWord;
+
+  return [`${singularFirstWord}`, ...remainingWords, `Resources (${input.count})`].join(" ");
+}
+
+export function formatResourceInlineMetadata(input: {
+  lastErrorMessage?: string;
+  lastSyncedAt?: string;
+  syncState: "never-synced" | "syncing" | "ready" | "error";
+}): string {
+  if (input.syncState === "error" && input.lastErrorMessage !== undefined) {
+    return "The last sync attempt failed.";
+  }
+
+  return formatResourceMetadata(input);
 }

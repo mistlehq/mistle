@@ -1,13 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
-import type React from "react";
-import { expect, userEvent, within } from "storybook/test";
 
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
-import {
-  IntegrationConnectionDetailView,
-  type IntegrationConnectionDetailItem,
-} from "../integrations/integration-connection-detail-view.js";
 import {
   OrganizationIntegrationsSettingsPageView,
   type OrganizationIntegrationsSettingsPageCard,
@@ -64,38 +57,6 @@ const AvailableCards: readonly OrganizationIntegrationsSettingsPageCard[] = [
   },
 ] as const;
 
-const DetailConnections: readonly IntegrationConnectionDetailItem[] = [
-  {
-    id: "icn_github_primary",
-    displayName: "Engineering GitHub",
-    status: "active",
-    authMethodLabel: "OAuth",
-    externalSubjectId: "mistle-labs",
-    createdAt: "2026-03-03T00:00:00.000Z",
-    updatedAt: "2026-03-11T04:30:00.000Z",
-    contextItems: [
-      { label: "Installation", value: "Mistle Labs" },
-      { label: "Default owner", value: "mistle-labs" },
-    ],
-    resources: [
-      {
-        kind: "repositories",
-        selectionMode: "multi",
-        count: 41,
-        syncState: "ready",
-        lastSyncedAt: "2026-03-11T04:25:00.000Z",
-      },
-      {
-        kind: "organizations",
-        selectionMode: "single",
-        count: 1,
-        syncState: "ready",
-        lastSyncedAt: "2026-03-11T04:25:00.000Z",
-      },
-    ],
-  },
-] as const;
-
 const meta = {
   title: "Dashboard/Pages/OrganizationIntegrationsSettingsPageView",
   component: OrganizationIntegrationsSettingsPageView,
@@ -131,68 +92,5 @@ export const Empty: Story = {
   args: {
     availableCards: [],
     connectedCards: [],
-  },
-};
-
-export const WithDetailSurfacePreview: Story = {
-  args: {
-    detailSurface: (
-      <div className="pt-2">
-        <IntegrationConnectionDetailView
-          connections={DetailConnections}
-          onSelectConnection={() => {}}
-          selectedConnectionId="icn_github_primary"
-          targetDisplayName="GitHub"
-          targetKey="github"
-        />
-      </div>
-    ),
-  },
-};
-
-export const InteractiveSelectionFlow: Story = {
-  render: function RenderStory(): React.JSX.Element {
-    const [selectedTargetKey, setSelectedTargetKey] = useState<string | null>(null);
-
-    const connectedCards = ConnectedCards.map((card) => ({
-      ...card,
-      onAction: () => {
-        setSelectedTargetKey(card.targetKey);
-      },
-    }));
-
-    return (
-      <OrganizationIntegrationsSettingsPageView
-        availableCards={AvailableCards}
-        connectedCards={connectedCards}
-        detailSurface={
-          selectedTargetKey === "github" ? (
-            <div className="pt-2">
-              <IntegrationConnectionDetailView
-                connections={DetailConnections}
-                onSelectConnection={() => {}}
-                selectedConnectionId="icn_github_primary"
-                targetDisplayName="GitHub"
-                targetKey="github"
-              />
-            </div>
-          ) : null
-        }
-        isLoading={false}
-        loadErrorMessage={null}
-        onRetryLoad={() => {}}
-      />
-    );
-  },
-  play: async ({ canvasElement }): Promise<void> => {
-    const canvas = within(canvasElement);
-    const [firstViewButton] = canvas.getAllByRole("button", { name: "View" });
-    if (firstViewButton === undefined) {
-      throw new Error("Expected a View button.");
-    }
-
-    await userEvent.click(firstViewButton);
-    await expect(canvas.getByText("Engineering GitHub")).toBeVisible();
-    await expect(canvas.getByText("Resource readiness")).toBeVisible();
   },
 };

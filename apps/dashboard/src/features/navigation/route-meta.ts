@@ -14,6 +14,7 @@ export type AppRouteHandle = {
   breadcrumbClickable?: boolean;
   title?: RouteTextValue;
   description?: RouteTextValue;
+  headerIcon?: (input: RouteTextResolverInput) => React.ReactNode;
   hideBreadcrumb?: boolean;
 };
 
@@ -25,7 +26,8 @@ export type AppBreadcrumb = {
 
 export type AppPageMeta = {
   title: string | null;
-  description: string | null;
+  headerIcon: React.ReactNode | null;
+  supportingText: string | null;
 };
 
 type MatchLike = {
@@ -53,6 +55,12 @@ function isRouteTextValue(value: unknown): value is RouteTextValue {
 
 function isRouteHrefValue(value: unknown): value is RouteHrefValue {
   return typeof value === "string" || typeof value === "function";
+}
+
+function isRouteHeaderIconValue(
+  value: unknown,
+): value is (input: RouteTextResolverInput) => React.ReactNode {
+  return typeof value === "function";
 }
 
 function normalizeParams(params: unknown): Readonly<Record<string, string | undefined>> {
@@ -86,6 +94,7 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
   const breadcrumbClickable = handle["breadcrumbClickable"];
   const title = handle["title"];
   const description = handle["description"];
+  const headerIcon = handle["headerIcon"];
   const hideBreadcrumb = handle["hideBreadcrumb"];
 
   if (isRouteTextValue(breadcrumb)) {
@@ -108,6 +117,10 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
     parsedHandle.description = description;
   }
 
+  if (isRouteHeaderIconValue(headerIcon)) {
+    parsedHandle.headerIcon = headerIcon;
+  }
+
   if (typeof hideBreadcrumb === "boolean") {
     parsedHandle.hideBreadcrumb = hideBreadcrumb;
   }
@@ -118,6 +131,7 @@ function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
     parsedHandle.breadcrumbClickable === undefined &&
     parsedHandle.title === undefined &&
     parsedHandle.description === undefined &&
+    parsedHandle.headerIcon === undefined &&
     parsedHandle.hideBreadcrumb === undefined
   ) {
     return null;
@@ -223,7 +237,8 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
   if (!Array.isArray(matches)) {
     return {
       title: null,
-      description: null,
+      headerIcon: null,
+      supportingText: null,
     };
   }
 
@@ -240,18 +255,21 @@ export function resolveAppPageMetaFromMatches(matches: unknown[]): AppPageMeta {
 
     const params = normalizeParams(match.params);
     const title = resolveRouteText(handle.title, { params, data: match.data });
-    const description = resolveRouteText(handle.description, { params, data: match.data });
+    const supportingText = resolveRouteText(handle.description, { params, data: match.data });
+    const headerIcon = handle.headerIcon?.({ params, data: match.data }) ?? null;
 
-    if (title !== null || description !== null) {
+    if (title !== null || supportingText !== null || headerIcon !== null) {
       return {
         title,
-        description,
+        headerIcon,
+        supportingText,
       };
     }
   }
 
   return {
     title: null,
-    description: null,
+    headerIcon: null,
+    supportingText: null,
   };
 }

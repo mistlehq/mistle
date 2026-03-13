@@ -4,10 +4,18 @@ import { createServer } from "node:http";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { createMemoryRouter, createRoutesFromElements, Route, RouterProvider } from "react-router";
+import {
+  createMemoryRouter,
+  createRoutesFromElements,
+  Outlet,
+  Route,
+  RouterProvider,
+} from "react-router";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { ROUTE_HANDLES } from "../src/features/navigation/route-handles.js";
 import { IntegrationsPage } from "../src/features/pages/integrations-page.js";
+import { SettingsLayout } from "../src/features/settings/settings-layout.js";
 
 function createDeferredPromise<T>() {
   let resolve: (value: T) => void = () => {};
@@ -174,10 +182,27 @@ describe("IntegrationsPage resource refresh concurrency", () => {
       });
       const router = createMemoryRouter(
         createRoutesFromElements(
-          <Route
-            element={<IntegrationsPage />}
-            path="/settings/organization/integrations/:targetKey"
-          />,
+          <Route element={<Outlet />} path="/">
+            <Route element={<SettingsLayout />} handle={ROUTE_HANDLES.settings} path="settings">
+              <Route
+                element={<Outlet />}
+                handle={ROUTE_HANDLES.settingsOrganization}
+                path="organization"
+              >
+                <Route
+                  element={<Outlet />}
+                  handle={ROUTE_HANDLES.settingsOrganizationIntegrations}
+                  path="integrations"
+                >
+                  <Route
+                    element={<IntegrationsPage />}
+                    handle={ROUTE_HANDLES.settingsOrganizationIntegrationDetail}
+                    path=":targetKey"
+                  />
+                </Route>
+              </Route>
+            </Route>
+          </Route>,
         ),
         {
           initialEntries: ["/settings/organization/integrations/github"],
@@ -192,35 +217,52 @@ describe("IntegrationsPage resource refresh concurrency", () => {
 
       const connectionNameMatches = await screen.findAllByText("Engineering GitHub");
       expect(connectionNameMatches.length).toBeGreaterThanOrEqual(1);
+      expect(screen.queryByText("Connected")).toBeNull();
+      expect(screen.queryByText("Available Integrations")).toBeNull();
+      expect(screen.queryByText("Integration connection")).toBeNull();
+      expect(screen.getByText("GitHub")).toBeTruthy();
 
-      const initialRefreshButtons = await screen.findAllByRole("button", {
-        name: "Refresh resources",
-      });
-      const repositoriesRefreshButton = initialRefreshButtons[0];
-      const organizationsRefreshButton = initialRefreshButtons[1];
+      const [repositoriesOption] = screen.getAllByRole("button", { name: /Repositories/ });
+      const [organizationsOption] = screen.getAllByRole("button", { name: /Organizations/ });
 
-      if (repositoriesRefreshButton === undefined || organizationsRefreshButton === undefined) {
-        throw new Error("Expected two refresh buttons to be present.");
+      if (repositoriesOption === undefined || organizationsOption === undefined) {
+        throw new Error("Expected repository and organization option buttons to be present.");
       }
 
+      fireEvent.click(repositoriesOption);
+      const repositoriesRefreshButton = await screen.findByRole("button", {
+        name: "Refresh resources",
+      });
       fireEvent.click(repositoriesRefreshButton);
 
       await waitFor(() => {
-        expect(screen.getAllByRole("button", { name: "Refreshing..." })).toHaveLength(1);
+        expect(screen.getByRole("button", { name: "Refreshing..." })).toBeTruthy();
       });
 
+      fireEvent.click(organizationsOption);
+      const organizationsRefreshButton = await screen.findByRole("button", {
+        name: "Refresh resources",
+      });
       fireEvent.click(organizationsRefreshButton);
 
       await waitFor(() => {
         expect(refreshRequestKinds).toEqual(["repositories", "organizations"]);
-        expect(screen.getAllByRole("button", { name: "Refreshing..." })).toHaveLength(2);
+        expect(screen.getByRole("button", { name: "Refreshing..." })).toBeTruthy();
+      });
+
+      fireEvent.click(repositoriesOption);
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Refreshing..." })).toBeTruthy();
       });
 
       repositoriesRefresh.resolve();
       organizationsRefresh.resolve();
 
+      fireEvent.click(organizationsOption);
+
       await waitFor(() => {
-        expect(screen.getAllByRole("button", { name: "Refresh resources" })).toHaveLength(2);
+        expect(screen.getByRole("button", { name: "Refresh resources" })).toBeTruthy();
       });
     } finally {
       await new Promise<void>((resolve, reject) => {
