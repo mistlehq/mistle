@@ -14,6 +14,7 @@ describe("ChatSemanticGroupItemOutput", () => {
           sourceKind: "command-execution",
           label: "Read",
           detail: "apps/dashboard/src/features/chat/components/chat-thread.tsx",
+          sourcePath: "apps/dashboard/src/features/chat/components/chat-thread.tsx",
           detailKind: "code",
           command: "sed -n '1,40p' apps/dashboard/src/features/chat/components/chat-thread.tsx",
           output: [
@@ -57,6 +58,48 @@ describe("ChatSemanticGroupItemOutput", () => {
 
     expect(screen.getByText("Semantic grouping in Share.tsx")).toBeTruthy();
     expect(screen.getByText("https://example.com/share")).toBeTruthy();
+  });
+
+  it("falls back to raw output when a web-search payload is not valid json", () => {
+    const { container } = render(
+      <ChatSemanticGroupItemOutput
+        item={{
+          id: "search-item-invalid",
+          sourceKind: "web-search",
+          label: "Web search",
+          detail: "semantic grouping",
+          detailKind: "plain",
+          command: null,
+          output: "{invalid json",
+          status: "completed",
+        }}
+        semanticKind="searching-web"
+      />,
+    );
+
+    expect(container.querySelector("pre")).toBeTruthy();
+    expect(screen.getByText("{invalid json")).toBeTruthy();
+  });
+
+  it("uses the full source path instead of truncated detail for read rendering", () => {
+    const { container } = render(
+      <ChatSemanticGroupItemOutput
+        item={{
+          id: "read-item-truncated",
+          sourceKind: "command-execution",
+          label: "Read",
+          detail: "very/long/path/to/a/component/chat-thread…",
+          sourcePath: "very/long/path/to/a/component/chat-thread.md",
+          detailKind: "code",
+          command: "sed -n '1,40p' very/long/path/to/a/component/chat-thread.md",
+          output: "# Heading\n\nContent",
+          status: "completed",
+        }}
+        semanticKind="exploring"
+      />,
+    );
+
+    expect(container.querySelector("[data-streamdown]")).toBeTruthy();
   });
 
   it("renders running command output with the command log treatment", () => {

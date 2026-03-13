@@ -107,6 +107,7 @@ export type ChatSemanticGroupEntry = {
     sourceKind: "command-execution" | "reasoning" | "file-change" | "web-search" | "tool-call";
     label: string;
     detail: string | null;
+    sourcePath?: string;
     detailKind: ChatSemanticGroupDetailKind;
     command: string | null;
     output: string | null;

@@ -137,6 +137,7 @@ describe("ChatThread", () => {
                 sourceKind: "command-execution",
                 label: "Read",
                 detail: "app.ts",
+                sourcePath: "app.ts",
                 detailKind: "code",
                 command: "sed -n '1,120p' app.ts",
                 output: "export const App = () => null;",

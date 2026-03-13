@@ -32,7 +32,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function parseWebSearchResults(output: string): readonly WebSearchResult[] | null {
-  const parsed: unknown = JSON.parse(output);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(output);
+  } catch {
+    return null;
+  }
+
   if (!isRecord(parsed)) {
     return null;
   }
@@ -73,9 +79,9 @@ export function ChatSemanticGroupItemOutput({
   }
 
   const readRenderMarkdown =
-    semanticKind === "exploring" && item.label === "Read" && item.detail !== null
+    semanticKind === "exploring" && item.label === "Read" && item.sourcePath !== undefined
       ? getReadRenderMarkdown({
-          path: item.detail,
+          path: item.sourcePath,
           output: item.output,
         })
       : null;

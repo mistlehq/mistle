@@ -145,6 +145,7 @@ describe("ChatSemanticGroup", () => {
           sourceKind: "command-execution",
           label: "Read",
           detail: "apps/dashboard/src/features/chat/components/chat-thread.tsx",
+          sourcePath: "apps/dashboard/src/features/chat/components/chat-thread.tsx",
           detailKind: "code",
           command: "sed -n '1,40p' apps/dashboard/src/features/chat/components/chat-thread.tsx",
           output: [
