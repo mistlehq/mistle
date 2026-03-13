@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub PR Authoring"
+  short_description: "Draft repo-compliant GitHub PRs"
+  default_prompt: "Use $github-pr-authoring to draft or update a GitHub PR for this repository."

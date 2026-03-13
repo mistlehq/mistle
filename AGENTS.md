@@ -117,41 +117,13 @@
 ### Pull Requests
 
 - GH CLI is available; you can open a PR with it when needed.
+- If creating or updating a GitHub PR, use the `github-pr-authoring` skill.
 - Before opening a PR, ensure your branch is rebased onto the latest `main` (for example: `git fetch origin main && git rebase origin/main`).
 - If you open a PR, you must monitor its CI and address issues until the PR is green, unless the failure requires human intervention (e.g. missing GitHub secrets). Do not hack or workaround CI failures.
 - Title: use conventional commit format summarizing the PR.
-- Description: each section uses a H2 markdown header.
+- Use the repository PR template in `.github/pull_request_template.md`.
 - When creating/editing PR descriptions with `gh pr create` or `gh pr edit`, use `--body-file` (or a true multiline heredoc). Do not pass escaped newline sequences like `\n` in a single-line string.
 - In PR descriptions and review instructions, use repo-relative file paths (for example `package.json`, `apps/control-plane-api/src/index.ts`), never absolute local filesystem paths.
-- The PR description must include a `## How to review` section with explicit reviewer guidance, including review entrypoint(s), suggested review order, and local validation commands.
-- The PR description must include a clear, per-test-case breakdown for any new/updated tests, describing what is being tested and how the test is implemented to validate it.
-
-```
-## What was changed
-
-You should write a summary no longer than one paragraph describing what was changed. After this summary, provide details including file references (this should be a bullet list with brief explanation about what was touched and why).
-
-## How to review
-
-Describe the recommended review path for this PR. Include:
-
-- Entrypoint files or modules to read first
-- Suggested review order across files/commits
-- Local setup or commands needed to validate behavior
-
-## What the implication was
-
-Based on the changes, describe what the exact implications are. Where relevant, use Mermaid diagrams to help illustrate flows or other visual concepts.
-
-## Checks and tests performed
-
-List of checks and tests performed to validate the changes. When listing tests, each test must cover:
-
-- What is being tested
-- What is the expected outcome
-- How the test is implemented
-- For property-based tests, what invariants are asserted, what generator bounds are used, and how failures can be replayed from seed/path
-```
 
 ## Language Guidance
 
