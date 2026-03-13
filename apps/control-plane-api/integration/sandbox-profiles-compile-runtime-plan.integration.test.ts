@@ -130,9 +130,8 @@ describe("sandbox profile compile runtime plan integration", () => {
           files: [
             {
               fileId: "codex_config",
-              path: "/home/sandbox/.codex/config.toml",
+              path: "/etc/codex/config.toml",
               mode: 384,
-              writeMode: "if-absent",
               content: `model = "gpt-5.3-codex"
 model_reasoning_effort = "medium"
 approval_policy = "never"

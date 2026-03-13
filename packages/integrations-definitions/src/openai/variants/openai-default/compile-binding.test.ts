@@ -175,9 +175,8 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(compiled.runtimeClients[0]?.setup.files).toHaveLength(1);
     expect(compiled.runtimeClients[0]?.setup.files[0]).toMatchObject({
       fileId: "codex_config",
-      path: "/home/sandbox/.codex/config.toml",
+      path: "/etc/codex/config.toml",
       mode: 384,
-      writeMode: "if-absent",
     });
     const configContent = compiled.runtimeClients[0]?.setup.files[0]?.content;
     expect(configContent).toContain('model = "gpt-5.3-codex"');

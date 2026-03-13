@@ -56,7 +56,7 @@ describe("applyMcpConfigToRuntimeClients", () => {
         createRuntimeClient({
           clientId: "codex-cli",
           fileId: "codex_config",
-          path: "/home/sandbox/.codex/config.toml",
+          path: "/etc/codex/config.toml",
           content: `model = "gpt-5-codex"
 
 [projects."/"]
@@ -116,7 +116,7 @@ trust_level = "trusted"
           createRuntimeClient({
             clientId: "codex-cli",
             fileId: "different_file",
-            path: "/home/sandbox/.codex/config.toml",
+            path: "/etc/codex/config.toml",
             content: 'model = "gpt-5-codex"\n',
           }),
         ],

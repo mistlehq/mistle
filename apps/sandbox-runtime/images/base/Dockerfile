@@ -33,11 +33,13 @@ RUN apt-get update \
 RUN groupadd --gid "${SANDBOX_GID}" "${SANDBOX_USER}" \
   && useradd --uid "${SANDBOX_UID}" --gid "${SANDBOX_GID}" --create-home --shell /bin/sh "${SANDBOX_USER}" \
   && mkdir -p \
+    /etc/codex \
     /home/${SANDBOX_USER}/projects \
     /run/mistle \
     /var/lib/mistle/artifacts \
     /var/lib/mistle/bin \
   && chown -R "${SANDBOX_UID}:${SANDBOX_GID}" \
+    /etc/codex \
     /home/${SANDBOX_USER} \
     /run/mistle \
     /var/lib/mistle

@@ -1,8 +1,4 @@
-import {
-  RuntimeFileWriteMode,
-  type CompileBindingInput,
-  type CompileBindingResult,
-} from "@mistle/integrations-core";
+import { type CompileBindingInput, type CompileBindingResult } from "@mistle/integrations-core";
 import { stringify as stringifyToml } from "smol-toml";
 
 import { resolveOpenAiCredentialSecretType } from "./auth.js";
@@ -125,7 +121,7 @@ export function compileOpenAiApiKeyBinding(
           files: [
             {
               fileId: "codex_config",
-              path: `${input.refs.sandboxPaths.userHomeDir}/.codex/config.toml`,
+              path: "/etc/codex/config.toml",
               mode: 384,
               content: renderCodexConfig({
                 model: input.binding.config.defaultModel,
@@ -136,7 +132,6 @@ export function compileOpenAiApiKeyBinding(
                       additionalInstructions: input.binding.config.additionalInstructions,
                     }),
               }),
-              writeMode: RuntimeFileWriteMode.IF_ABSENT,
             },
           ],
         },
