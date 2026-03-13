@@ -112,6 +112,27 @@ describe("buildWebhookAutomationConnectionOptions", () => {
       },
     ]);
   });
+
+  it("keeps the preserved current connection even when it is not active", () => {
+    expect(
+      buildWebhookAutomationConnectionOptions({
+        connections: SampleConnections,
+        preservedConnectionId: "conn_linear",
+        targets: SampleTargets,
+      }),
+    ).toEqual([
+      {
+        value: "conn_github",
+        label: "GitHub Engineering",
+        description: "GitHub",
+      },
+      {
+        value: "conn_linear",
+        label: "Linear Product",
+        description: "Linear",
+      },
+    ]);
+  });
 });
 
 describe("buildWebhookAutomationSandboxProfileOptions", () => {

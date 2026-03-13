@@ -73,11 +73,15 @@ function summarizeEventTypes(eventTypes: readonly string[] | null): string {
 
 export function buildWebhookAutomationConnectionOptions(input: {
   connections: readonly IntegrationConnection[];
+  preservedConnectionId?: string;
   targets: readonly IntegrationTarget[];
 }): readonly WebhookAutomationFormOption[] {
   return sortOptionsByLabel(
     input.connections
-      .filter((connection) => connection.status === "active")
+      .filter(
+        (connection) =>
+          connection.status === "active" || connection.id === input.preservedConnectionId,
+      )
       .map((connection) => {
         const target = input.targets.find((item) => item.targetKey === connection.targetKey);
         return {

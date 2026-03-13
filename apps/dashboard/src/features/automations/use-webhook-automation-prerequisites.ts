@@ -44,7 +44,7 @@ async function listAllSandboxProfiles(input: {
   }
 }
 
-export function useWebhookAutomationPrerequisites() {
+export function useWebhookAutomationPrerequisites(input?: { preservedConnectionId?: string }) {
   const integrationDirectoryQuery = useQuery({
     queryKey: WEBHOOK_AUTOMATION_INTEGRATION_DIRECTORY_QUERY_KEY,
     queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
@@ -64,8 +64,13 @@ export function useWebhookAutomationPrerequisites() {
         : buildWebhookAutomationConnectionOptions({
             connections: integrationDirectoryQuery.data.connections,
             targets: integrationDirectoryQuery.data.targets,
+            ...(input?.preservedConnectionId === undefined
+              ? {}
+              : {
+                  preservedConnectionId: input.preservedConnectionId,
+                }),
           }),
-    [integrationDirectoryQuery.data],
+    [input?.preservedConnectionId, integrationDirectoryQuery.data],
   );
 
   const sandboxProfileOptions = useMemo(

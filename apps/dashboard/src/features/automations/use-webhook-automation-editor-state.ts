@@ -65,17 +65,6 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
   onValueChange: (key: keyof WebhookAutomationFormValues, value: string | boolean) => void;
 } {
   const queryClient = useQueryClient();
-  const prerequisites = useWebhookAutomationPrerequisites();
-  const [formValues, setFormValues] = useState<WebhookAutomationFormValues>(() =>
-    toWebhookAutomationFormValues(null),
-  );
-  const [fieldErrors, setFieldErrors] = useState<
-    Partial<Record<keyof WebhookAutomationFormValues, string>>
-  >({});
-  const [formError, setFormError] = useState<string | null>(null);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
   const automationQuery = useQuery({
     queryKey:
       input.automationId === undefined
@@ -94,6 +83,23 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
     enabled: input.mode === "edit" && input.automationId !== undefined,
     retry: false,
   });
+
+  const prerequisites = useWebhookAutomationPrerequisites(
+    automationQuery.data === undefined
+      ? undefined
+      : {
+          preservedConnectionId: automationQuery.data.integrationConnectionId,
+        },
+  );
+  const [formValues, setFormValues] = useState<WebhookAutomationFormValues>(() =>
+    toWebhookAutomationFormValues(null),
+  );
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<keyof WebhookAutomationFormValues, string>>
+  >({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const createMutation = useMutation({
     mutationFn: async (values: WebhookAutomationFormValues) =>
