@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -18,6 +18,7 @@ import {
   buildAvailableIntegrationViewCards,
   buildConnectedIntegrationViewCards,
   buildIntegrationConnectionDetailItems,
+  createRefreshingResourceKey,
 } from "./integrations-page-view-model.js";
 import { OrganizationIntegrationsSettingsPageView } from "./organization-integrations-settings-page-view.js";
 import { useIntegrationConnectionDialogState } from "./use-integration-connection-dialog-state.js";
@@ -53,9 +54,12 @@ export function IntegrationsPage() {
     return buildIntegrationCards(integrationsQuery.data);
   }, [integrationsQuery.data]);
 
-  const activeIntegrationCards = useMemo(
-    () =>
-      cards.filter((card) => card.connections.some((connection) => connection.status === "active")),
+  const [refreshingResourceKeys, setRefreshingResourceKeys] = useState<Set<string>>(
+    () => new Set<string>(),
+  );
+
+  const connectedIntegrationCards = useMemo(
+    () => cards.filter((card) => card.connections.length > 0),
     [cards],
   );
 
@@ -81,9 +85,23 @@ export function IntegrationsPage() {
   const refreshResourceMutation = useMutation({
     mutationFn: async (input: { connectionId: string; kind: string }) =>
       refreshIntegrationConnectionResources(input),
+    onMutate: (variables) => {
+      setRefreshingResourceKeys((current) => {
+        const next = new Set(current);
+        next.add(createRefreshingResourceKey(variables));
+        return next;
+      });
+    },
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
+      });
+    },
+    onSettled: (_data, _error, variables) => {
+      setRefreshingResourceKeys((current) => {
+        const next = new Set(current);
+        next.delete(createRefreshingResourceKey(variables));
+        return next;
       });
     },
   });
@@ -91,12 +109,12 @@ export function IntegrationsPage() {
   const connectedViewCards = useMemo(
     () =>
       buildConnectedIntegrationViewCards({
-        activeCards: activeIntegrationCards,
+        connectedCards: connectedIntegrationCards,
         onOpenTarget: (targetKey) => {
           void navigate(`/settings/organization/integrations/${targetKey}`);
         },
       }),
-    [activeIntegrationCards, navigate],
+    [connectedIntegrationCards, navigate],
   );
 
   const availableViewCards = useMemo(
@@ -119,10 +137,7 @@ export function IntegrationsPage() {
       <IntegrationConnectionDetailView
         connections={buildIntegrationConnectionDetailItems({
           connections: selectedDetailConnections,
-          refreshingResource:
-            !refreshResourceMutation.isPending || refreshResourceMutation.variables === undefined
-              ? null
-              : refreshResourceMutation.variables,
+          refreshingResourceKeys,
         })}
         {...(selectedDetailCard.target.logoKey === undefined
           ? {}
@@ -158,7 +173,7 @@ export function IntegrationsPage() {
   }, [
     connectionDialogState,
     detailTargetKey,
-    refreshResourceMutation,
+    refreshingResourceKeys,
     selectedConnectionId,
     selectedDetailCard,
     selectedDetailConnections,

@@ -21,11 +21,14 @@ export function useIntegrationDetailState(input: {
       return [];
     }
 
-    return selectedDetailCard.connections.filter((connection) => connection.status === "active");
+    return selectedDetailCard.connections;
   }, [selectedDetailCard]);
 
   useEffect(() => {
-    const defaultConnection = selectedDetailConnections[0] ?? null;
+    const defaultConnection =
+      selectedDetailConnections.find((connection) => connection.status === "active") ??
+      selectedDetailConnections[0] ??
+      null;
     if (defaultConnection === null) {
       setSelectedConnectionId(null);
       return;

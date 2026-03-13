@@ -28,10 +28,10 @@ export function toConnectionMethods(
 }
 
 export function buildConnectedIntegrationViewCards(input: {
-  activeCards: readonly IntegrationCardViewModel[];
+  connectedCards: readonly IntegrationCardViewModel[];
   onOpenTarget: (targetKey: string) => void;
 }): readonly OrganizationIntegrationsSettingsPageCard[] {
-  return input.activeCards.map((card) => ({
+  return input.connectedCards.map((card) => ({
     targetKey: card.target.targetKey,
     displayName: card.displayName,
     description: formatConnectionCount(card.connections.length),
@@ -73,7 +73,7 @@ export function buildAvailableIntegrationViewCards(input: {
 
 export function buildIntegrationConnectionDetailItems(input: {
   connections: readonly IntegrationConnection[];
-  refreshingResource: { connectionId: string; kind: string } | null;
+  refreshingResourceKeys: ReadonlySet<string>;
 }): readonly IntegrationConnectionDetailItem[] {
   return input.connections.map((connection) => {
     const authScheme = resolveConnectionAuthScheme(connection.config ?? null);
@@ -96,10 +96,17 @@ export function buildIntegrationConnectionDetailItems(input: {
         count: resource.count,
         syncState: resource.syncState,
         ...(resource.lastSyncedAt === undefined ? {} : { lastSyncedAt: resource.lastSyncedAt }),
-        isRefreshing:
-          input.refreshingResource?.connectionId === connection.id &&
-          input.refreshingResource.kind === resource.kind,
+        isRefreshing: input.refreshingResourceKeys.has(
+          createRefreshingResourceKey({
+            connectionId: connection.id,
+            kind: resource.kind,
+          }),
+        ),
       })),
     };
   });
+}
+
+export function createRefreshingResourceKey(input: { connectionId: string; kind: string }): string {
+  return `${input.connectionId}:${input.kind}`;
 }

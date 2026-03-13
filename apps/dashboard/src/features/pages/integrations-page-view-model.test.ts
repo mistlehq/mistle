@@ -7,6 +7,7 @@ import {
   buildAvailableIntegrationViewCards,
   buildConnectedIntegrationViewCards,
   buildIntegrationConnectionDetailItems,
+  createRefreshingResourceKey,
   toConnectionMethods,
 } from "./integrations-page-view-model.js";
 
@@ -23,7 +24,7 @@ describe("integrations page view model", () => {
     let openedTargetKey: string | null = null;
 
     const [card] = buildConnectedIntegrationViewCards({
-      activeCards: [createCard({ description: "GitHub", connectionCount: 2 })],
+      connectedCards: [createCard({ description: "GitHub", connectionCount: 2 })],
       onOpenTarget: (targetKey) => {
         openedTargetKey = targetKey;
       },
@@ -33,6 +34,21 @@ describe("integrations page view model", () => {
     expect(card?.description).toBe("2 connections");
     card?.onAction();
     expect(openedTargetKey).toBe("github");
+  });
+
+  it("builds connected integration cards for targets with non-active connections", () => {
+    const [card] = buildConnectedIntegrationViewCards({
+      connectedCards: [
+        createCard({
+          description: "GitHub",
+          connectionStatuses: ["error"],
+        }),
+      ],
+      onOpenTarget: () => {},
+    });
+
+    expect(card?.description).toBe("1 connection");
+    expect(card?.actionLabel).toBe("View");
   });
 
   it("builds available integration cards with add actions and disabled invalid entries", () => {
@@ -74,10 +90,12 @@ describe("integrations page view model", () => {
           updatedAt: "2026-03-11T04:30:00.000Z",
         } satisfies IntegrationConnection,
       ],
-      refreshingResource: {
-        connectionId: "icn_123",
-        kind: "repositories",
-      },
+      refreshingResourceKeys: new Set([
+        createRefreshingResourceKey({
+          connectionId: "icn_123",
+          kind: "repositories",
+        }),
+      ]),
     });
 
     expect(item?.authMethodLabel).toBe("OAuth");
@@ -89,19 +107,22 @@ describe("integrations page view model", () => {
 function createCard(input: {
   description: string;
   connectionCount?: number;
+  connectionStatuses?: readonly IntegrationConnection["status"][];
   supportedAuthSchemes?: ("oauth" | "api-key")[];
 }): IntegrationCardViewModel {
-  const connections: IntegrationConnection[] = Array.from(
-    { length: input.connectionCount ?? 1 },
-    (_, index) => ({
-      id: `icn_${index}`,
-      targetKey: "github",
-      displayName: `GitHub ${index}`,
-      status: "active",
-      createdAt: "2026-03-03T00:00:00.000Z",
-      updatedAt: "2026-03-11T04:30:00.000Z",
-    }),
-  );
+  const connectionStatuses =
+    input.connectionStatuses ??
+    Array.from<IntegrationConnection["status"]>({ length: input.connectionCount ?? 1 }).fill(
+      "active",
+    );
+  const connections: IntegrationConnection[] = connectionStatuses.map((status, index) => ({
+    id: `icn_${index}`,
+    targetKey: "github",
+    displayName: `GitHub ${index}`,
+    status,
+    createdAt: "2026-03-03T00:00:00.000Z",
+    updatedAt: "2026-03-11T04:30:00.000Z",
+  }));
 
   return {
     target: {
