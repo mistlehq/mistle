@@ -18,12 +18,12 @@ describe("workspace app launcher integration", () => {
       const service = await startWorkspaceApp({
         baseImage: "node:22-alpine",
         projectRootHostPath: PROJECT_ROOT_HOST_PATH,
-        workspaceDirInContainer: "/workspace",
+        workspaceDirInContainer: "/app",
         command: [
           "sh",
           "-euc",
           [
-            "test -f /workspace/pnpm-workspace.yaml",
+            "test -f /app/pnpm-workspace.yaml",
             "node -e \"const http = require('node:http'); const port = Number(process.env.TEST_APP_PORT); http.createServer((_, res) => { res.writeHead(200); res.end('ok'); }).listen(port, '0.0.0.0', () => console.log('workspace-http-ready')); setInterval(() => {}, 1_000);\"",
           ].join("\n"),
         ],
@@ -58,13 +58,11 @@ describe("workspace app launcher integration", () => {
       const service = await startWorkspaceApp({
         baseImage: "alpine:3.22",
         projectRootHostPath: PROJECT_ROOT_HOST_PATH,
-        workspaceDirInContainer: "/workspace",
+        workspaceDirInContainer: "/app",
         command: [
           "sh",
           "-euc",
-          ["test -f /workspace/pnpm-workspace.yaml", "echo workspace-log-ready", "sleep 120"].join(
-            "\n",
-          ),
+          ["test -f /app/pnpm-workspace.yaml", "echo workspace-log-ready", "sleep 120"].join("\n"),
         ],
         environment: {},
         containerPort: 38081,
@@ -91,7 +89,7 @@ describe("workspace app launcher integration", () => {
       const service = await startWorkspaceApp({
         baseImage: "alpine:3.22",
         projectRootHostPath: PROJECT_ROOT_HOST_PATH,
-        workspaceDirInContainer: "/workspace",
+        workspaceDirInContainer: "/app",
         command: ["sh", "-euc", "sleep 120"],
         environment: {},
         containerPort: 38084,
@@ -99,7 +97,7 @@ describe("workspace app launcher integration", () => {
         startupTimeoutMs: 20_000,
         readiness: {
           kind: "command",
-          command: "test -f /workspace/pnpm-workspace.yaml",
+          command: "test -f /app/pnpm-workspace.yaml",
         },
       });
 
@@ -226,7 +224,7 @@ describe("workspace app launcher integration", () => {
       startWorkspaceApp({
         baseImage: "alpine:3.22",
         projectRootHostPath: "relative/path",
-        workspaceDirInContainer: "/workspace",
+        workspaceDirInContainer: "/app",
         command: ["sh", "-euc", "echo noop"],
         environment: {},
         containerPort: 38083,

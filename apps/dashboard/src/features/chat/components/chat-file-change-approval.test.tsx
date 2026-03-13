@@ -19,7 +19,7 @@ describe("ChatFileChangeApproval", () => {
           turnId: "turn-1",
           itemId: "file-change-1",
           reason: "Approve the file update.",
-          grantRoot: "/workspace",
+          grantRoot: "/home/sandbox",
           availableDecisions: ["accept", "decline"],
           status: "pending",
           responseErrorMessage: null,
@@ -33,7 +33,7 @@ describe("ChatFileChangeApproval", () => {
 
     expect(screen.getByText("Approve file changes")).toBeTruthy();
     expect(screen.getByText("Approve the file update.")).toBeTruthy();
-    expect(screen.getByText("grant root: /workspace")).toBeTruthy();
+    expect(screen.getByText("grant root: /home/sandbox")).toBeTruthy();
 
     fireEvent.click(screen.getByRole("button", { name: "accept" }));
 

@@ -20,7 +20,7 @@ describe("ChatCommandApproval", () => {
           itemId: "cmd-1",
           reason: "Approve the command before continuing.",
           command: "pnpm lint",
-          cwd: "/workspace",
+          cwd: "/home/sandbox",
           availableDecisions: ["accept", "cancel"],
           networkHost: "api.example.com",
           networkProtocol: "https",

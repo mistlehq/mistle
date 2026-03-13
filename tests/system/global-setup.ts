@@ -9,7 +9,7 @@ import {
 } from "@mistle/test-harness";
 
 const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../..", import.meta.url));
-const CONFIG_PATH_IN_CONTAINER = "/workspace/config/config.development.toml";
+const CONFIG_PATH_IN_CONTAINER = "/app/config/config.development.toml";
 const APP_STARTUP_TIMEOUT_MS = 120_000;
 const AUTH_ORIGIN = "http://localhost:5100";
 const TestContextId = "system";
