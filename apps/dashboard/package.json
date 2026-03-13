@@ -20,7 +20,6 @@
     "@mistle/codex-app-server-client": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
-    "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/ui": "workspace:*",
     "@phosphor-icons/react": "^2.1.7",

@@ -9,12 +9,6 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./generated/types.js": {
-      "types": "./src/generated/types.ts",
-      "node": "./dist/generated/types.js",
-      "import": "./src/generated/types.ts",
-      "default": "./src/generated/types.ts"
-    },
     "./*.js": {
       "types": "./src/*.ts",
       "node": "./dist/*.js",
@@ -24,11 +18,9 @@
   },
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
-    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc . && pnpm run protocol:check",
+    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run --passWithNoTests",
-    "protocol:generate": "tsx scripts/generate-types.ts",
-    "protocol:check": "tsx scripts/check-types-drift.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },

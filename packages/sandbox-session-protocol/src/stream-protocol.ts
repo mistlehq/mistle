@@ -128,3 +128,5 @@ export function parseStreamControlMessage(payload: string): StreamControlMessage
   const result = StreamControlMessageSchema.safeParse(parsedPayload);
   return result.success ? result.data : undefined;
 }
+
+export type SandboxSessionControlMessage = StreamControlMessage;

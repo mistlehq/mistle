@@ -73,52 +73,49 @@ const SandboxInstanceConnectionTokenResponseSchema = z
   })
   .strict();
 
-const ConnectOKSchema = z
+const StreamOpenOKSchema = z
   .object({
-    type: z.literal("connect.ok"),
-    requestId: z.string().min(1),
+    type: z.literal("stream.open.ok"),
+    streamId: z.number().int().positive(),
   })
   .strict();
 
-const ConnectErrorSchema = z
+const StreamOpenErrorSchema = z
   .object({
-    type: z.literal("connect.error"),
-    requestId: z.string().min(1),
+    type: z.literal("stream.open.error"),
+    streamId: z.number().int().positive(),
     code: z.string().min(1),
     message: z.string().min(1),
   })
   .strict();
 
-const PTYCloseOKSchema = z
+const StreamResetSchema = z
   .object({
-    type: z.literal("pty.close.ok"),
-    requestId: z.string().min(1),
-    exitCode: z.number().int(),
-  })
-  .strict();
-
-const PTYCloseErrorSchema = z
-  .object({
-    type: z.literal("pty.close.error"),
-    requestId: z.string().min(1),
+    type: z.literal("stream.reset"),
+    streamId: z.number().int().positive(),
     code: z.string().min(1),
     message: z.string().min(1),
   })
   .strict();
 
-const PTYExitSchema = z
+const PTYExitEventSchema = z
   .object({
-    type: z.literal("pty.exit"),
-    exitCode: z.number().int(),
+    type: z.literal("stream.event"),
+    streamId: z.number().int().positive(),
+    event: z
+      .object({
+        type: z.literal("pty.exit"),
+        exitCode: z.number().int(),
+      })
+      .strict(),
   })
   .strict();
 
 type JsonControlMessage =
-  | z.infer<typeof ConnectOKSchema>
-  | z.infer<typeof ConnectErrorSchema>
-  | z.infer<typeof PTYCloseOKSchema>
-  | z.infer<typeof PTYCloseErrorSchema>
-  | z.infer<typeof PTYExitSchema>;
+  | z.infer<typeof StreamOpenOKSchema>
+  | z.infer<typeof StreamOpenErrorSchema>
+  | z.infer<typeof StreamResetSchema>
+  | z.infer<typeof PTYExitEventSchema>;
 
 type PtyFrame =
   | {
@@ -359,29 +356,24 @@ async function websocketDataToUtf8(data: unknown): Promise<string> {
 }
 
 function parseControlMessage(value: unknown): JsonControlMessage {
-  const parsedConnectOk = ConnectOKSchema.safeParse(value);
-  if (parsedConnectOk.success) {
-    return parsedConnectOk.data;
+  const parsedStreamOpenOk = StreamOpenOKSchema.safeParse(value);
+  if (parsedStreamOpenOk.success) {
+    return parsedStreamOpenOk.data;
   }
 
-  const parsedConnectError = ConnectErrorSchema.safeParse(value);
-  if (parsedConnectError.success) {
-    return parsedConnectError.data;
+  const parsedStreamOpenError = StreamOpenErrorSchema.safeParse(value);
+  if (parsedStreamOpenError.success) {
+    return parsedStreamOpenError.data;
   }
 
-  const parsedPtyCloseOk = PTYCloseOKSchema.safeParse(value);
-  if (parsedPtyCloseOk.success) {
-    return parsedPtyCloseOk.data;
+  const parsedStreamReset = StreamResetSchema.safeParse(value);
+  if (parsedStreamReset.success) {
+    return parsedStreamReset.data;
   }
 
-  const parsedPtyCloseError = PTYCloseErrorSchema.safeParse(value);
-  if (parsedPtyCloseError.success) {
-    return parsedPtyCloseError.data;
-  }
-
-  const parsedPtyExit = PTYExitSchema.safeParse(value);
-  if (parsedPtyExit.success) {
-    return parsedPtyExit.data;
+  const parsedPtyExitEvent = PTYExitEventSchema.safeParse(value);
+  if (parsedPtyExitEvent.success) {
+    return parsedPtyExitEvent.data;
   }
 
   throw new Error(`Unexpected websocket control message: ${JSON.stringify(value)}`);
@@ -524,12 +516,11 @@ async function connectPtyChannel(input: {
   socket: WebSocket;
   pump: PtyFramePump;
   cwd: string;
-}): Promise<void> {
-  const requestId = `pty-connect-${randomUUID()}`;
+}): Promise<number> {
+  const streamId = 1;
   sendJson(input.socket, {
-    type: "connect",
-    v: 1,
-    requestId,
+    type: "stream.open",
+    streamId,
     channel: {
       kind: "pty",
       session: "create",
@@ -544,24 +535,29 @@ async function connectPtyChannel(input: {
     if (frame.kind !== "control") {
       continue;
     }
-    if (frame.payload.type === "connect.ok" && frame.payload.requestId === requestId) {
-      return;
+    if (frame.payload.type === "stream.open.ok" && frame.payload.streamId === streamId) {
+      return streamId;
     }
-    if (frame.payload.type === "connect.error" && frame.payload.requestId === requestId) {
-      throw new Error(`PTY connect failed with ${frame.payload.code}: ${frame.payload.message}`);
+    if (frame.payload.type === "stream.open.error" && frame.payload.streamId === streamId) {
+      throw new Error(
+        `PTY stream.open failed with ${frame.payload.code}: ${frame.payload.message}`,
+      );
     }
   }
 }
 
-async function closePtyChannel(input: { socket: WebSocket; pump: PtyFramePump }): Promise<void> {
+async function closePtyChannel(input: {
+  socket: WebSocket;
+  pump: PtyFramePump;
+  streamId: number;
+}): Promise<void> {
   if (input.socket.readyState !== WebSocket.OPEN) {
     return;
   }
 
-  const requestId = `pty-close-${randomUUID()}`;
   sendJson(input.socket, {
-    type: "pty.close",
-    requestId,
+    type: "stream.close",
+    streamId: input.streamId,
   });
 
   while (true) {
@@ -569,14 +565,13 @@ async function closePtyChannel(input: { socket: WebSocket; pump: PtyFramePump })
     if (frame.kind !== "control") {
       continue;
     }
-    if (frame.payload.type === "pty.close.ok" && frame.payload.requestId === requestId) {
+    if (frame.payload.type === "stream.event" && frame.payload.streamId === input.streamId) {
       return;
     }
-    if (frame.payload.type === "pty.close.error" && frame.payload.requestId === requestId) {
-      throw new Error(`PTY close failed with ${frame.payload.code}: ${frame.payload.message}`);
-    }
-    if (frame.payload.type === "pty.exit") {
-      return;
+    if (frame.payload.type === "stream.reset" && frame.payload.streamId === input.streamId) {
+      throw new Error(
+        `PTY stream.close failed with ${frame.payload.code}: ${frame.payload.message}`,
+      );
     }
   }
 }
@@ -584,6 +579,7 @@ async function closePtyChannel(input: { socket: WebSocket; pump: PtyFramePump })
 async function runPtyCommand(input: {
   socket: WebSocket;
   pump: PtyFramePump;
+  streamId: number;
   command: string;
   timeoutMs: number;
 }): Promise<{ exitCode: number; output: string }> {
@@ -608,8 +604,15 @@ async function runPtyCommand(input: {
   while (Date.now() < deadlineEpochMs) {
     const frame = await waitForNextPtyFrame(input.pump, Math.max(0, deadlineEpochMs - Date.now()));
     if (frame.kind === "control") {
-      if (frame.payload.type === "pty.exit") {
-        throw new Error(`PTY exited unexpectedly with code ${String(frame.payload.exitCode)}.`);
+      if (frame.payload.type === "stream.event" && frame.payload.streamId === input.streamId) {
+        throw new Error(
+          `PTY exited unexpectedly with code ${String(frame.payload.event.exitCode)}.`,
+        );
+      }
+      if (frame.payload.type === "stream.reset" && frame.payload.streamId === input.streamId) {
+        throw new Error(
+          `PTY stream reset unexpectedly with ${frame.payload.code}: ${frame.payload.message}`,
+        );
       }
       continue;
     }
@@ -643,6 +646,7 @@ async function runPtyCommand(input: {
 async function expectSuccessfulPtyCommand(input: {
   socket: WebSocket;
   pump: PtyFramePump;
+  streamId: number;
   command: string;
   timeoutMs?: number;
   description: string;
@@ -650,6 +654,7 @@ async function expectSuccessfulPtyCommand(input: {
   const result = await runPtyCommand({
     socket: input.socket,
     pump: input.pump,
+    streamId: input.streamId,
     command: input.command,
     timeoutMs: input.timeoutMs ?? PtyCommandTimeoutMs,
   });
@@ -916,9 +921,10 @@ describeIf("system github cli sandbox", () => {
         WebSocketConnectTimeoutMs,
       );
       const pump = createPtyFramePump(websocket);
+      let streamId: number | undefined;
 
       try {
-        await connectPtyChannel({
+        streamId = await connectPtyChannel({
           socket: websocket,
           pump,
           cwd: "/home/sandbox",
@@ -927,6 +933,7 @@ describeIf("system github cli sandbox", () => {
         const ghAvailabilityOutput = await expectSuccessfulPtyCommand({
           socket: websocket,
           pump,
+          streamId,
           description: "gh and rg binaries plus GH_TOKEN availability",
           command:
             'command -v gh >/dev/null && command -v rg >/dev/null && test -n "$GH_TOKEN" && printf "GH_READY\\n"',
@@ -937,6 +944,7 @@ describeIf("system github cli sandbox", () => {
         const canonicalOriginOutput = await expectSuccessfulPtyCommand({
           socket: websocket,
           pump,
+          streamId,
           description: "canonical repository origin",
           command: `test -d ${shellQuote(`${repositoryWorkspacePath}/.git`)} && git -C ${shellQuote(repositoryWorkspacePath)} remote get-url origin`,
         });
@@ -947,6 +955,7 @@ describeIf("system github cli sandbox", () => {
         const graphQlOutput = await expectSuccessfulPtyCommand({
           socket: websocket,
           pump,
+          streamId,
           description: "gh api graphql repository query",
           command: [
             `owner=${shellQuote(repository.owner)}`,
@@ -959,6 +968,7 @@ describeIf("system github cli sandbox", () => {
         const repoViewOutput = await expectSuccessfulPtyCommand({
           socket: websocket,
           pump,
+          streamId,
           description: "gh repo view repository lookup",
           command: `gh repo view ${shellQuote(`${repository.owner}/${repository.repo}`)} --json nameWithOwner --jq '.nameWithOwner'`,
         });
@@ -967,6 +977,7 @@ describeIf("system github cli sandbox", () => {
         const lsRemoteOutput = await expectSuccessfulPtyCommand({
           socket: websocket,
           pump,
+          streamId,
           description: "git ls-remote through authenticated proxy mediation",
           command: `git ls-remote ${shellQuote(`https://github.com/${repository.owner}/${repository.repo}.git`)} HEAD`,
         });
@@ -975,6 +986,7 @@ describeIf("system github cli sandbox", () => {
         await closePtyChannel({
           socket: websocket,
           pump,
+          streamId: streamId ?? 1,
         }).catch(() => undefined);
         await closeWebSocket(websocket);
       }
