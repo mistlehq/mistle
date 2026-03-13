@@ -523,4 +523,89 @@ describe("sandbox tunnel websocket integration", () => {
     },
     IntegrationTestTimeoutMs,
   );
+
+  it(
+    "rejects opening a second interactive stream on the same connection peer",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: 77,
+            channel: {
+              kind: "agent",
+            },
+          }),
+        );
+        await forwardedOpenPromise;
+
+        const rejectedOpenPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: 78,
+            channel: {
+              kind: "pty",
+              session: "create",
+              cols: 80,
+              rows: 24,
+            },
+          }),
+        );
+        const rejectedOpen = await rejectedOpenPromise;
+
+        expect(rejectedOpen.isBinary).toBe(false);
+        const rejectedOpenPayload = parseStreamMessage(rejectedOpen.data);
+        if (rejectedOpenPayload.type !== "stream.open.error") {
+          throw new Error("Expected rejected stream open to produce stream.open.error.");
+        }
+        expect(rejectedOpenPayload.streamId).toBe(78);
+        expect(rejectedOpenPayload.code).toBe("client_session_already_open");
+        expect(rejectedOpenPayload.message).toContain(
+          "already has an active interactive stream bound to the bootstrap tunnel.",
+        );
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
 });

@@ -14,7 +14,7 @@ import {
   type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
 import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
-import type { WSMessageReceive } from "hono/ws";
+import type { WSContext, WSMessageReceive } from "hono/ws";
 import { typeid } from "typeid-js";
 
 import { logger } from "../logger.js";
@@ -35,7 +35,12 @@ import {
   markSandboxTunnelDisconnected,
   markSandboxTunnelSeen,
 } from "./tunnel-liveliness-store.js";
-import type { ClientStreamBinding, TunnelSessionRegistry } from "./tunnel-session/index.js";
+import {
+  ClientSessionActiveStreamError,
+  TunnelSessionBindingLimitExceededError,
+  type ClientStreamBinding,
+  type TunnelSessionRegistry,
+} from "./tunnel-session/index.js";
 import type { RelayPeerSide, RelayTarget } from "./types.js";
 
 const SandboxTunnelRoutePath = "/tunnel/sandbox/:instanceId";
@@ -184,6 +189,38 @@ function hasPTYResizeSignal(message: StreamControlMessage): boolean {
   return message.type === "stream.signal" && message.signal.type === "pty.resize";
 }
 
+function createStreamOpenErrorPayload(input: {
+  code: string;
+  message: string;
+  streamId: number;
+}): string {
+  return JSON.stringify({
+    type: "stream.open.error",
+    streamId: input.streamId,
+    code: input.code,
+    message: input.message,
+  });
+}
+
+function toStreamOpenErrorPayload(input: { error: Error; streamId: number }): string {
+  if (input.error instanceof ClientSessionActiveStreamError) {
+    return createStreamOpenErrorPayload({
+      code: "client_session_already_open",
+      message: input.error.message,
+      streamId: input.streamId,
+    });
+  }
+  if (input.error instanceof TunnelSessionBindingLimitExceededError) {
+    return createStreamOpenErrorPayload({
+      code: "max_active_streams_exceeded",
+      message: input.error.message,
+      streamId: input.streamId,
+    });
+  }
+
+  throw input.error;
+}
+
 async function translateConnectionPayloadToBootstrap(input: {
   clientSessionId: string;
   interactiveStreamRouter: InteractiveStreamRouter;
@@ -192,36 +229,64 @@ async function translateConnectionPayloadToBootstrap(input: {
 }): Promise<RoutedTunnelMessage> {
   const ptyStreamOpen = parsePTYStreamOpen(input.payload);
   if (ptyStreamOpen !== undefined) {
-    const route = await input.interactiveStreamRouter.openInteractiveStream({
-      sandboxInstanceId: input.sandboxInstanceId,
-      channelKind: "pty",
-      clientSessionId: input.clientSessionId,
-      clientStreamId: ptyStreamOpen.streamId,
-    });
+    try {
+      const route = await input.interactiveStreamRouter.openInteractiveStream({
+        sandboxInstanceId: input.sandboxInstanceId,
+        channelKind: "pty",
+        clientSessionId: input.clientSessionId,
+        clientStreamId: ptyStreamOpen.streamId,
+      });
 
-    return {
-      payload: replaceStreamId({
-        message: ptyStreamOpen,
-        streamId: route.binding.tunnelStreamId,
-      }),
-    };
+      return {
+        payload: replaceStreamId({
+          message: ptyStreamOpen,
+          streamId: route.binding.tunnelStreamId,
+        }),
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        return {
+          payload: toStreamOpenErrorPayload({
+            error,
+            streamId: ptyStreamOpen.streamId,
+          }),
+          respondToCurrentPeer: true,
+        };
+      }
+
+      throw error;
+    }
   }
 
   const agentStreamOpen = parseAgentStreamOpen(input.payload);
   if (agentStreamOpen !== undefined) {
-    const route = await input.interactiveStreamRouter.openInteractiveStream({
-      sandboxInstanceId: input.sandboxInstanceId,
-      channelKind: "agent",
-      clientSessionId: input.clientSessionId,
-      clientStreamId: agentStreamOpen.streamId,
-    });
+    try {
+      const route = await input.interactiveStreamRouter.openInteractiveStream({
+        sandboxInstanceId: input.sandboxInstanceId,
+        channelKind: "agent",
+        clientSessionId: input.clientSessionId,
+        clientStreamId: agentStreamOpen.streamId,
+      });
 
-    return {
-      payload: replaceStreamId({
-        message: agentStreamOpen,
-        streamId: route.binding.tunnelStreamId,
-      }),
-    };
+      return {
+        payload: replaceStreamId({
+          message: agentStreamOpen,
+          streamId: route.binding.tunnelStreamId,
+        }),
+      };
+    } catch (error) {
+      if (error instanceof Error) {
+        return {
+          payload: toStreamOpenErrorPayload({
+            error,
+            streamId: agentStreamOpen.streamId,
+          }),
+          respondToCurrentPeer: true,
+        };
+      }
+
+      throw error;
+    }
   }
 
   const controlMessage = parseStreamControlMessage(input.payload);
@@ -319,6 +384,7 @@ function createStreamResetPayload(input: {
 
 type RoutedTunnelMessage = {
   payload: string | ArrayBuffer;
+  respondToCurrentPeer?: boolean | undefined;
   releaseInteractiveStream?:
     | {
         clientSessionId: string;
@@ -388,6 +454,7 @@ async function notifyBootstrapPeerOfReleasedPTYStreams(input: {
 
 async function handleTunnelWebSocketMessage(input: {
   clientSessionId: string;
+  currentSocket: Pick<WSContext, "send">;
   interactiveStreamRouter: InteractiveStreamRouter;
   payload: string | ArrayBuffer;
   relayCoordinator: TunnelRelayCoordinator;
@@ -411,6 +478,11 @@ async function handleTunnelWebSocketMessage(input: {
             payload: input.payload,
             sandboxInstanceId: input.sandboxInstanceId,
           });
+  }
+
+  if (routedMessage.respondToCurrentPeer === true) {
+    input.currentSocket.send(routedMessage.payload);
+    return;
   }
 
   await input.relayCoordinator.forwardPeerMessage({
@@ -823,6 +895,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
 
             void handleTunnelWebSocketMessage({
               clientSessionId: relaySessionId,
+              currentSocket: ws,
               interactiveStreamRouter: input.interactiveStreamRouter,
               payload,
               relayCoordinator: input.relayCoordinator,
