@@ -245,6 +245,7 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "cmd_1",
+            sourceKind: "command-execution",
             label: "Command",
             detail: "ls -la",
             detailKind: "code",
@@ -340,6 +341,7 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "cmd_1",
+            sourceKind: "command-execution",
             label: "Read",
             detail: "app.ts",
             detailKind: "code",
@@ -349,6 +351,7 @@ describe("reduceCodexChatState", () => {
           },
           {
             id: "cmd_2",
+            sourceKind: "command-execution",
             label: "Search",
             detail: "App",
             detailKind: "plain",
@@ -420,6 +423,7 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "reasoning_1",
+            sourceKind: "reasoning",
             label: "Thought",
             detail: "Inspecting reducer behavior",
             detailKind: "plain",
@@ -429,6 +433,7 @@ describe("reduceCodexChatState", () => {
           },
           {
             id: "reasoning_2:content",
+            sourceKind: "reasoning",
             label: "Thought",
             detail: "Comparing grouped output to raw item order",
             detailKind: "plain",
@@ -919,6 +924,7 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "reasoning_1",
+            sourceKind: "reasoning",
             label: "Thought",
             detail: "**Preparing file list command**",
             detailKind: "plain",
@@ -942,6 +948,7 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "cmd_1",
+            sourceKind: "command-execution",
             label: "Command",
             detail: "pwd",
             detailKind: "code",
@@ -1043,6 +1050,7 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "reasoning_1",
+            sourceKind: "reasoning",
             label: "Thought",
             detail: "Inspect files",
             detailKind: "plain",
@@ -1052,6 +1060,7 @@ describe("reduceCodexChatState", () => {
           },
           {
             id: "reasoning_1:content",
+            sourceKind: "reasoning",
             label: "Thought",
             detail: "Detailed chain",
             detailKind: "plain",
@@ -1207,6 +1216,7 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "cmd_1",
+            sourceKind: "command-execution",
             label: "Command",
             detail: "ls -la",
             detailKind: "code",
@@ -1230,16 +1240,69 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "file_1",
+            sourceKind: "file-change",
             label: "Updated",
             detail: "src/app.ts",
             detailKind: "code",
             command: null,
-            output: "Applied patch",
+            output: ["# src/app.ts", "@@ -1 +1 @@"].join("\n"),
             status: "completed",
           },
         ],
       },
     ]);
+  });
+
+  it("prefers per-file diffs over aggregated status output for grouped file changes", () => {
+    const state = reduceCodexChatState(createInitialCodexChatState(), {
+      type: "hydrate_from_thread_read",
+      turns: [
+        {
+          id: "turn_123",
+          status: "completed",
+          items: [
+            {
+              type: "fileChange",
+              id: "file_1",
+              changes: [
+                {
+                  path: "src/app.ts",
+                  kind: "update",
+                  diff: "@@ -1 +1 @@",
+                },
+              ],
+              output: "Applied patch",
+              status: "completed",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(state.entries).toContainEqual({
+      id: "turn_123:making-edits:file_1",
+      turnId: "turn_123",
+      kind: "semantic-group",
+      semanticKind: "making-edits",
+      status: "completed",
+      displayKeys: {
+        active: "making-edits.active",
+        completed: "making-edits.done",
+      },
+      counts: null,
+      items: [
+        {
+          id: "file_1",
+          sourceKind: "file-change",
+          label: "Updated",
+          detail: "src/app.ts",
+          detailKind: "code",
+          command: null,
+          output: ["# src/app.ts", "@@ -1 +1 @@"].join("\n"),
+          status: "completed",
+        },
+      ],
+    });
   });
 
   it("preserves the semantic group id when live deltas update a later grouped item", () => {
@@ -1335,6 +1398,7 @@ describe("reduceCodexChatState", () => {
     expect(updatedGroup.items).toEqual([
       {
         id: "cmd_1",
+        sourceKind: "command-execution",
         label: "Read",
         detail: "app.ts",
         detailKind: "code",
@@ -1344,6 +1408,7 @@ describe("reduceCodexChatState", () => {
       },
       {
         id: "cmd_2",
+        sourceKind: "command-execution",
         label: "Search",
         detail: "App",
         detailKind: "plain",
@@ -1386,6 +1451,7 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "tool_1",
+            sourceKind: "tool-call",
             label: "dynamic",
             detail: "dynamic",
             detailKind: "plain",
@@ -1463,6 +1529,7 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "reasoning_1",
+            sourceKind: "reasoning",
             label: "Thought",
             detail: "**Creating concise fantasy story**",
             detailKind: "plain",
@@ -1512,6 +1579,7 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "reasoning_1",
+            sourceKind: "reasoning",
             label: "Thought",
             detail: "**Creating concise fantasy story**",
             detailKind: "plain",
@@ -1563,6 +1631,7 @@ describe("reduceCodexChatState", () => {
         items: [
           {
             id: "reasoning_1",
+            sourceKind: "reasoning",
             label: "Thought",
             detail: "**Creating concise fantasy story**",
             detailKind: "plain",

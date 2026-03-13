@@ -104,6 +104,7 @@ export type ChatSemanticGroupEntry = {
   } | null;
   items: readonly {
     id: string;
+    sourceKind: "command-execution" | "reasoning" | "file-change" | "web-search" | "tool-call";
     label: string;
     detail: string | null;
     detailKind: ChatSemanticGroupDetailKind;

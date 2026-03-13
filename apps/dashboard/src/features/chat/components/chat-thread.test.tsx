@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { ChatThread } from "./chat-thread.js";
+
+afterEach(cleanup);
 
 describe("ChatThread", () => {
   it("renders command approvals inline with the matching command block", () => {
@@ -132,6 +134,7 @@ describe("ChatThread", () => {
             items: [
               {
                 id: "cmd_1",
+                sourceKind: "command-execution",
                 label: "Read",
                 detail: "app.ts",
                 detailKind: "code",
@@ -141,6 +144,7 @@ describe("ChatThread", () => {
               },
               {
                 id: "cmd_2",
+                sourceKind: "command-execution",
                 label: "Search",
                 detail: "App",
                 detailKind: "plain",
@@ -164,6 +168,76 @@ describe("ChatThread", () => {
     expect(screen.queryByText("Show results")).toBeNull();
     expect(screen.getAllByText("Toggle results")).toHaveLength(2);
     expect(container.textContent?.includes("cwd: /workspace")).toBe(false);
+  });
+
+  it("renders command approvals inline for grouped command items", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ChatThread
+        entries={[
+          {
+            id: "user_1",
+            turnId: "turn_1",
+            kind: "user-message",
+            text: "Run a couple of checks",
+            status: "completed",
+          },
+          {
+            id: "commands_1",
+            turnId: "turn_1",
+            kind: "semantic-group",
+            semanticKind: "running-commands",
+            status: "completed",
+            displayKeys: {
+              active: "running-commands.active",
+              completed: "running-commands.done",
+            },
+            counts: null,
+            items: [
+              {
+                id: "cmd_1",
+                sourceKind: "command-execution",
+                label: "Command",
+                detail: "pnpm --filter @mistle/dashboard lint",
+                detailKind: "code",
+                command: "pnpm --filter @mistle/dashboard lint",
+                output: "Done",
+                status: "completed",
+              },
+            ],
+          },
+        ]}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+        pendingServerRequests={[
+          {
+            requestId: 44,
+            method: "item/commandExecution/requestApproval",
+            kind: "command-approval",
+            threadId: "thread_1",
+            turnId: "turn_1",
+            itemId: "cmd_1",
+            reason: "Approve the grouped command.",
+            command: "pnpm --filter @mistle/dashboard lint",
+            cwd: "/workspace",
+            availableDecisions: ["accept", "cancel"],
+            networkHost: null,
+            networkProtocol: null,
+            networkPort: null,
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Approve command")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "accept" }));
+
+    expect(submittedResults).toEqual([{ decision: "accept" }]);
   });
 
   it("renders generic items collapsed by default and expands their content on demand", () => {

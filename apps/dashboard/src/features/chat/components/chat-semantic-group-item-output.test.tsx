@@ -11,6 +11,7 @@ describe("ChatSemanticGroupItemOutput", () => {
       <ChatSemanticGroupItemOutput
         item={{
           id: "read-item-1",
+          sourceKind: "command-execution",
           label: "Read",
           detail: "apps/dashboard/src/features/chat/components/chat-thread.tsx",
           detailKind: "code",
@@ -34,6 +35,7 @@ describe("ChatSemanticGroupItemOutput", () => {
       <ChatSemanticGroupItemOutput
         item={{
           id: "search-item-1",
+          sourceKind: "web-search",
           label: "Web search",
           detail: "semantic grouping",
           detailKind: "plain",
@@ -62,6 +64,7 @@ describe("ChatSemanticGroupItemOutput", () => {
       <ChatSemanticGroupItemOutput
         item={{
           id: "command-item-1",
+          sourceKind: "command-execution",
           label: "Command",
           detail: "pnpm lint",
           detailKind: "code",

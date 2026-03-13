@@ -114,6 +114,7 @@ export const CodexStoryExploringGroupEntry: ChatSemanticGroupEntry = {
   items: [
     {
       id: "exploring-command-1",
+      sourceKind: "command-execution",
       label: "Search",
       detail: "semantic",
       detailKind: "plain",
@@ -126,6 +127,7 @@ export const CodexStoryExploringGroupEntry: ChatSemanticGroupEntry = {
     },
     {
       id: "exploring-command-2",
+      sourceKind: "command-execution",
       label: "List files",
       detail: "apps/dashboard/src/features/chat/components",
       detailKind: "code",
@@ -140,6 +142,7 @@ export const CodexStoryExploringGroupEntry: ChatSemanticGroupEntry = {
     },
     {
       id: "exploring-command-3",
+      sourceKind: "command-execution",
       label: "Read",
       detail: "apps/dashboard/src/features/chat/components/chat-thread.tsx",
       detailKind: "code",
@@ -153,6 +156,7 @@ export const CodexStoryExploringGroupEntry: ChatSemanticGroupEntry = {
     },
     {
       id: "exploring-command-4",
+      sourceKind: "command-execution",
       label: "List files",
       detail: "packages/codex-app-server-client/src/thread-items",
       detailKind: "code",
@@ -211,6 +215,7 @@ export const CodexStoryThinkingGroupEntry: ChatSemanticGroupEntry = {
   items: [
     {
       id: "thinking-1",
+      sourceKind: "reasoning",
       label: "Thought",
       detail: "Comparing current grouped timeline output with the updated spec.",
       detailKind: "plain",
@@ -220,6 +225,7 @@ export const CodexStoryThinkingGroupEntry: ChatSemanticGroupEntry = {
     },
     {
       id: "thinking-2",
+      sourceKind: "reasoning",
       label: "Thought",
       detail:
         "The spec now groups adjacent thinking, edits, searches, and tool calls, not just exploring.",
@@ -341,6 +347,7 @@ export const CodexStoryMakingEditsGroupEntry: ChatSemanticGroupEntry = {
   items: [
     {
       id: "making-edits-1",
+      sourceKind: "file-change",
       label: "Updated",
       detail: "apps/dashboard/src/features/chat/components/chat-thread.tsx",
       detailKind: "code",
@@ -354,6 +361,7 @@ export const CodexStoryMakingEditsGroupEntry: ChatSemanticGroupEntry = {
     },
     {
       id: "making-edits-2",
+      sourceKind: "file-change",
       label: "Added",
       detail: "apps/dashboard/src/features/chat/components/chat-semantic-group.tsx",
       detailKind: "code",
@@ -380,6 +388,7 @@ export const CodexStorySearchingWebGroupEntry: ChatSemanticGroupEntry = {
   items: [
     {
       id: "searching-web-1",
+      sourceKind: "web-search",
       label: "Web search",
       detail: "opencode shared chat renderer grouped tools",
       detailKind: "plain",
@@ -404,6 +413,7 @@ export const CodexStorySearchingWebGroupEntry: ChatSemanticGroupEntry = {
     },
     {
       id: "searching-web-2",
+      sourceKind: "web-search",
       label: "Web search",
       detail: "storybook grouped activity list ux",
       detailKind: "plain",
@@ -436,6 +446,7 @@ export const CodexStoryToolCallGroupEntry: ChatSemanticGroupEntry = {
   items: [
     {
       id: "tool-call-1",
+      sourceKind: "tool-call",
       label: "Review PR",
       detail: "Pull request #421",
       detailKind: "plain",
@@ -453,6 +464,7 @@ export const CodexStoryToolCallGroupEntry: ChatSemanticGroupEntry = {
     },
     {
       id: "tool-call-2",
+      sourceKind: "tool-call",
       label: "Summarize document",
       detail: "docs/codex-semantic-classification-scratchpad.md",
       detailKind: "plain",
@@ -488,6 +500,7 @@ export const CodexStoryRunningCommandsGroupEntry: ChatSemanticGroupEntry = {
   items: [
     {
       id: "running-command-1",
+      sourceKind: "command-execution",
       label: "Command",
       detail: "pnpm --filter @mistle/dashboard lint",
       detailKind: "code",
@@ -497,6 +510,7 @@ export const CodexStoryRunningCommandsGroupEntry: ChatSemanticGroupEntry = {
     },
     {
       id: "running-command-2",
+      sourceKind: "command-execution",
       label: "Command",
       detail:
         "pnpm exec vitest run apps/dashboard/src/features/chat/components/chat-thread.test.tsx",
@@ -522,6 +536,7 @@ export const CodexStoryRunningCommandsLongOutputGroupEntry: ChatSemanticGroupEnt
   items: [
     {
       id: "running-command-short-1",
+      sourceKind: "command-execution",
       label: "Command",
       detail: "pnpm --filter @mistle/dashboard lint",
       detailKind: "code",
@@ -531,6 +546,7 @@ export const CodexStoryRunningCommandsLongOutputGroupEntry: ChatSemanticGroupEnt
     },
     {
       id: "running-command-short-2",
+      sourceKind: "command-execution",
       label: "Command",
       detail:
         "pnpm exec vitest run apps/dashboard/src/features/chat/components/chat-thread.test.tsx",
@@ -544,6 +560,7 @@ export const CodexStoryRunningCommandsLongOutputGroupEntry: ChatSemanticGroupEnt
     },
     {
       id: "running-command-long-1",
+      sourceKind: "command-execution",
       label: "Command",
       detail: "pnpm test",
       detailKind: "code",

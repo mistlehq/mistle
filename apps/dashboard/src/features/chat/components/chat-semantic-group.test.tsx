@@ -17,7 +17,14 @@ afterEach(cleanup);
 
 describe("ChatSemanticGroup", () => {
   it("renders exploring groups as compact semantic steps with collapsible results", () => {
-    const { container } = render(<ChatSemanticGroup block={CodexStoryExploringGroupEntry} />);
+    const { container } = render(
+      <ChatSemanticGroup
+        block={CodexStoryExploringGroupEntry}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
 
     expect(screen.getByText("Explored")).toBeTruthy();
     expect(screen.getByText("2 reads, 1 search, 1 list")).toBeTruthy();
@@ -29,7 +36,14 @@ describe("ChatSemanticGroup", () => {
   });
 
   it("renders non-exploring groups with semantic titles and no disclosure for empty output", () => {
-    render(<ChatSemanticGroup block={CodexStoryThinkingGroupEntry} />);
+    render(
+      <ChatSemanticGroup
+        block={CodexStoryThinkingGroupEntry}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
 
     expect(screen.getByText("Thoughts")).toBeTruthy();
     expect(screen.getByText("2 items")).toBeTruthy();
@@ -39,7 +53,14 @@ describe("ChatSemanticGroup", () => {
   });
 
   it("toggles output below the row when a disclosure is opened", () => {
-    const { container } = render(<ChatSemanticGroup block={CodexStoryExploringGroupEntry} />);
+    const { container } = render(
+      <ChatSemanticGroup
+        block={CodexStoryExploringGroupEntry}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
     const disclosureDetails = container.querySelectorAll("details").item(1);
     if (disclosureDetails === null) {
       throw new Error("Expected a semantic group item disclosure");
@@ -61,7 +82,14 @@ describe("ChatSemanticGroup", () => {
   });
 
   it("toggles the whole semantic group from the header", () => {
-    const { container } = render(<ChatSemanticGroup block={CodexStoryThinkingGroupEntry} />);
+    const { container } = render(
+      <ChatSemanticGroup
+        block={CodexStoryThinkingGroupEntry}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
     const groupDisclosure = container.querySelector("details");
     if (groupDisclosure === null) {
       throw new Error("Expected a semantic group disclosure");
@@ -78,7 +106,14 @@ describe("ChatSemanticGroup", () => {
   });
 
   it("renders making-edits output with the diff viewer", () => {
-    const { container } = render(<ChatSemanticGroup block={CodexStoryMakingEditsGroupEntry} />);
+    const { container } = render(
+      <ChatSemanticGroup
+        block={CodexStoryMakingEditsGroupEntry}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
 
     expect(screen.getByText("Updated files")).toBeTruthy();
     expect(screen.getByText("Updated")).toBeTruthy();
@@ -107,6 +142,7 @@ describe("ChatSemanticGroup", () => {
       items: [
         {
           id: "read-code-item-1",
+          sourceKind: "command-execution",
           label: "Read",
           detail: "apps/dashboard/src/features/chat/components/chat-thread.tsx",
           detailKind: "code",
@@ -121,7 +157,14 @@ describe("ChatSemanticGroup", () => {
       ],
     };
 
-    const { container } = render(<ChatSemanticGroup block={readCodeBlock} />);
+    const { container } = render(
+      <ChatSemanticGroup
+        block={readCodeBlock}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
 
     expect(screen.getByText("Read")).toBeTruthy();
     expect(
@@ -131,7 +174,14 @@ describe("ChatSemanticGroup", () => {
   });
 
   it("renders searching-web output as a result list instead of raw json", () => {
-    render(<ChatSemanticGroup block={CodexStorySearchingWebGroupEntry} />);
+    render(
+      <ChatSemanticGroup
+        block={CodexStorySearchingWebGroupEntry}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
 
     const toggleResultsButtons = screen.getAllByText("Toggle results");
     const firstToggleResultsButton = toggleResultsButtons.at(0);
@@ -155,7 +205,14 @@ describe("ChatSemanticGroup", () => {
   });
 
   it("renders running-commands output with the subdued command log treatment", () => {
-    const { container } = render(<ChatSemanticGroup block={CodexStoryRunningCommandsGroupEntry} />);
+    const { container } = render(
+      <ChatSemanticGroup
+        block={CodexStoryRunningCommandsGroupEntry}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={() => {}}
+        pendingServerRequests={[]}
+      />,
+    );
 
     const toggleResultsButtons = screen.getAllByText("Toggle results");
     const firstToggleResultsButton = toggleResultsButtons.at(0);
@@ -173,5 +230,43 @@ describe("ChatSemanticGroup", () => {
     const commandLog = container.querySelector('[data-semantic-output="command-log"]');
     expect(commandLog).toBeTruthy();
     expect(commandLog?.textContent?.length).toBeGreaterThan(0);
+  });
+
+  it("renders grouped command approvals inline with the matching semantic item", () => {
+    const submittedResults: unknown[] = [];
+
+    render(
+      <ChatSemanticGroup
+        block={CodexStoryRunningCommandsGroupEntry}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={(_requestId, result) => {
+          submittedResults.push(result);
+        }}
+        pendingServerRequests={[
+          {
+            requestId: 22,
+            method: "item/commandExecution/requestApproval",
+            kind: "command-approval",
+            threadId: "turn-running-commands",
+            turnId: "turn-running-commands",
+            itemId: "running-command-1",
+            reason: "Approve the lint command.",
+            command: "pnpm --filter @mistle/dashboard lint",
+            cwd: "/workspace",
+            availableDecisions: ["accept", "cancel"],
+            networkHost: null,
+            networkProtocol: null,
+            networkPort: null,
+            status: "pending",
+            responseErrorMessage: null,
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.getByText("Approve command")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "accept" }));
+
+    expect(submittedResults).toEqual([{ decision: "accept" }]);
   });
 });

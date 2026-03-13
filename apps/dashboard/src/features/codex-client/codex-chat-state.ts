@@ -330,15 +330,15 @@ function formatSemanticGroupDetail(input: {
 function summarizeFileChangeOutput(
   item: Extract<NormalizedCodexThreadItem, { kind: "file-change" }>,
 ): string | null {
-  if (item.output !== null && item.output.length > 0) {
-    return item.output;
-  }
-
   const diffs = item.changes
     .filter((change) => change.diff !== null && change.diff.length > 0)
     .map((change) => `# ${change.path}\n${change.diff}`);
 
-  return diffs.length === 0 ? null : diffs.join("\n\n");
+  if (diffs.length > 0) {
+    return diffs.join("\n\n");
+  }
+
+  return item.output !== null && item.output.length > 0 ? item.output : null;
 }
 
 function getFileChangeLabel(kind: string | null, count: number): string {
@@ -367,6 +367,7 @@ function getFileChangeLabel(kind: string | null, count: number): string {
 }
 
 function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
+  sourceKind: "command-execution" | "reasoning" | "file-change" | "web-search" | "tool-call";
   label: string;
   detail: string | null;
   detailKind: "plain" | "code";
@@ -382,6 +383,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
       );
     if (hasExploringActions) {
       return {
+        sourceKind: "command-execution",
         label: exploringSummary.label,
         detail: formatSemanticGroupDetail({
           detail: exploringSummary.detail,
@@ -393,6 +395,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
     }
 
     return {
+      sourceKind: "command-execution",
       label: "Command",
       detail: formatSemanticGroupDetail({
         detail: item.command ?? item.reason,
@@ -405,6 +408,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
 
   if (item.kind === "reasoning") {
     return {
+      sourceKind: "reasoning",
       label: "Thought",
       detail: formatSemanticGroupDetail({
         detail: item.text,
@@ -418,6 +422,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
   if (item.kind === "file-change") {
     const paths = item.changes.map((change) => change.path);
     return {
+      sourceKind: "file-change",
       label: getFileChangeLabel(item.changes[0]?.kind ?? null, item.changes.length),
       detail: formatSemanticGroupDetail({
         detail: paths.length === 0 ? null : paths.join(", "),
@@ -430,6 +435,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
 
   if (item.kind === "web-search") {
     return {
+      sourceKind: "web-search",
       label: "Web search",
       detail: formatSemanticGroupDetail({
         detail: item.query,
@@ -442,6 +448,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
 
   if (item.kind === "tool-call") {
     return {
+      sourceKind: "tool-call",
       label: item.title,
       detail: formatSemanticGroupDetail({
         detail: item.body ?? item.toolType,
@@ -453,6 +460,7 @@ function summarizeSemanticGroupItem(item: NormalizedCodexThreadItem): {
   }
 
   return {
+    sourceKind: "tool-call",
     label: item.kind,
     detail: null,
     detailKind: "plain",
@@ -480,6 +488,7 @@ function mapTimelineEntryToChatEntries(input: {
 
           return {
             id: item.id,
+            sourceKind: summary.sourceKind,
             label: summary.label,
             detail: summary.detail,
             detailKind: summary.detailKind,

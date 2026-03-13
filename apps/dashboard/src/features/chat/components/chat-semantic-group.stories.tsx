@@ -14,6 +14,11 @@ const meta = {
   title: "Dashboard/Chat/ChatSemanticGroup",
   component: ChatSemanticGroup,
   tags: ["autodocs"],
+  args: {
+    isRespondingToServerRequest: false,
+    onRespondToServerRequest: () => {},
+    pendingServerRequests: [],
+  },
   parameters: {
     layout: "padded",
   },

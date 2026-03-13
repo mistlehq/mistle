@@ -1,10 +1,10 @@
-import type {
-  CodexCommandApprovalRequestEntry,
-  CodexFileChangeApprovalRequestEntry,
-  CodexServerRequestEntry,
-} from "../../codex-client/codex-server-requests-state.js";
+import type { CodexServerRequestEntry } from "../../codex-client/codex-server-requests-state.js";
 import type { ChatEntry } from "../chat-types.js";
 import { buildChatTurnGroups } from "../chat-view-model.js";
+import {
+  findCommandApprovalRequest,
+  findFileChangeApprovalRequest,
+} from "./chat-approval-requests.js";
 import { ChatAssistantMessage } from "./chat-assistant-message.js";
 import { ChatCommandBlock } from "./chat-command-block.js";
 import { ChatFileChangeBlock } from "./chat-file-change-block.js";
@@ -19,30 +19,6 @@ type ChatThreadProps = {
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
   pendingServerRequests: readonly CodexServerRequestEntry[];
 };
-
-function findCommandApprovalRequest(
-  requests: readonly CodexServerRequestEntry[],
-  itemId: string,
-): CodexCommandApprovalRequestEntry | null {
-  const request = requests.find(
-    (entry): entry is CodexCommandApprovalRequestEntry =>
-      entry.kind === "command-approval" && entry.itemId === itemId,
-  );
-
-  return request ?? null;
-}
-
-function findFileChangeApprovalRequest(
-  requests: readonly CodexServerRequestEntry[],
-  itemId: string,
-): CodexFileChangeApprovalRequestEntry | null {
-  const request = requests.find(
-    (entry): entry is CodexFileChangeApprovalRequestEntry =>
-      entry.kind === "file-change-approval" && entry.itemId === itemId,
-  );
-
-  return request ?? null;
-}
 export function ChatThread({
   entries,
   isRespondingToServerRequest,
@@ -60,7 +36,15 @@ export function ChatThread({
             <div className="max-w-[72ch] space-y-4">
               {group.assistantBlocks.map((block) => {
                 if (block.kind === "semantic-group") {
-                  return <ChatSemanticGroup block={block} key={block.id} />;
+                  return (
+                    <ChatSemanticGroup
+                      block={block}
+                      isRespondingToServerRequest={isRespondingToServerRequest}
+                      key={block.id}
+                      onRespondToServerRequest={onRespondToServerRequest}
+                      pendingServerRequests={pendingServerRequests}
+                    />
+                  );
                 }
 
                 if (block.kind === "assistant-message") {
