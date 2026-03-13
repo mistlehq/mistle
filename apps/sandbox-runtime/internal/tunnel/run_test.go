@@ -791,10 +791,14 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				resizePayload, err := json.Marshal(sessionprotocol.PTYResize{
-					Type: sessionprotocol.MessageTypePTYResize,
-					Cols: 100,
-					Rows: 30,
+				resizePayload, err := json.Marshal(sessionprotocol.StreamSignal{
+					Type:     sessionprotocol.MessageTypeStreamSignal,
+					StreamID: 31,
+					Signal: sessionprotocol.PTYResizeSignal{
+						Type: sessionprotocol.MessageTypePTYResize,
+						Cols: 100,
+						Rows: 30,
+					},
 				})
 				if err != nil {
 					handlerErrCh <- fmt.Errorf("expected pty resize payload marshal to succeed: %w", err)
@@ -831,9 +835,9 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				closePayload, err := json.Marshal(sessionprotocol.PTYClose{
-					Type:      sessionprotocol.MessageTypePTYClose,
-					RequestID: "req_pty_close_001",
+				closePayload, err := json.Marshal(sessionprotocol.StreamClose{
+					Type:     sessionprotocol.MessageTypeStreamClose,
+					StreamID: 31,
 				})
 				if err != nil {
 					handlerErrCh <- fmt.Errorf("expected pty close payload marshal to succeed: %w", err)
@@ -844,28 +848,30 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				foundCloseAck := false
+				foundCloseEvent := false
 				for range 12 {
-					closeAckType, closeAckPayload, readErr := conn.Read(handlerCtx)
+					closeEventType, closeEventPayload, readErr := conn.Read(handlerCtx)
 					if readErr != nil {
 						handlerErrCh <- fmt.Errorf("expected pty close ack read to succeed: %w", readErr)
 						return
 					}
-					if closeAckType != websocket.MessageText {
+					if closeEventType != websocket.MessageText {
 						continue
 					}
 
-					var closeAck sessionprotocol.PTYCloseOK
-					if err := json.Unmarshal(closeAckPayload, &closeAck); err != nil {
+					var closeEvent sessionprotocol.StreamEvent
+					if err := json.Unmarshal(closeEventPayload, &closeEvent); err != nil {
 						continue
 					}
-					if closeAck.Type == sessionprotocol.MessageTypePTYCloseOK && closeAck.RequestID == "req_pty_close_001" {
-						foundCloseAck = true
+					if closeEvent.Type == sessionprotocol.MessageTypeStreamEvent &&
+						closeEvent.StreamID == 31 &&
+						closeEvent.Event.Type == sessionprotocol.MessageTypePTYExit {
+						foundCloseEvent = true
 						break
 					}
 				}
-				if !foundCloseAck {
-					handlerErrCh <- fmt.Errorf("expected to receive pty.close.ok for request req_pty_close_001")
+				if !foundCloseEvent {
+					handlerErrCh <- fmt.Errorf("expected to receive stream.event pty.exit for stream 31 after close")
 					return
 				}
 
@@ -971,11 +977,13 @@ func TestRun(t *testing.T) {
 						continue
 					}
 
-					var exitMessage sessionprotocol.PTYExit
+					var exitMessage sessionprotocol.StreamEvent
 					if err := json.Unmarshal(payload, &exitMessage); err != nil {
 						continue
 					}
-					if exitMessage.Type == sessionprotocol.MessageTypePTYExit {
+					if exitMessage.Type == sessionprotocol.MessageTypeStreamEvent &&
+						exitMessage.StreamID == 41 &&
+						exitMessage.Event.Type == sessionprotocol.MessageTypePTYExit {
 						foundExit = true
 						break
 					}

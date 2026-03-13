@@ -15,12 +15,11 @@ var controlMessageTypes = []reflect.Type{
 	reflect.TypeOf(StreamOpen{}),
 	reflect.TypeOf(StreamOpenOK{}),
 	reflect.TypeOf(StreamOpenError{}),
+	reflect.TypeOf(StreamSignal{}),
+	reflect.TypeOf(StreamEvent{}),
+	reflect.TypeOf(StreamClose{}),
+	reflect.TypeOf(StreamReset{}),
 	reflect.TypeOf(Disconnect{}),
-	reflect.TypeOf(PTYResize{}),
-	reflect.TypeOf(PTYClose{}),
-	reflect.TypeOf(PTYCloseOK{}),
-	reflect.TypeOf(PTYCloseError{}),
-	reflect.TypeOf(PTYExit{}),
 }
 
 // BuildControlMessageSchema builds a discriminated-union schema for sandbox
