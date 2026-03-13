@@ -16,6 +16,23 @@ import (
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/startup"
 )
 
+func writeTestTunnelTokenExchangeResponse(
+	t *testing.T,
+	writer http.ResponseWriter,
+	bootstrapToken string,
+	tunnelExchangeToken string,
+) {
+	t.Helper()
+
+	writer.Header().Set("content-type", "application/json")
+	if err := json.NewEncoder(writer).Encode(tunnelTokenExchangeResponse{
+		BootstrapToken:      bootstrapToken,
+		TunnelExchangeToken: tunnelExchangeToken,
+	}); err != nil {
+		t.Fatalf("expected tunnel token exchange response encode to succeed, got %v", err)
+	}
+}
+
 func TestRun(t *testing.T) {
 	t.Run("fails when context is missing", func(t *testing.T) {
 		err := Run(RunInput{
@@ -52,29 +69,53 @@ func TestRun(t *testing.T) {
 		}
 	})
 
-	t.Run("dials websocket with bootstrap token query", func(t *testing.T) {
-		tokenQueryValues := make(chan string, 1)
-		requestPathValues := make(chan string, 1)
+	t.Run("reconnects with an exchanged bootstrap token after the websocket closes", func(t *testing.T) {
+		tokenQueryValues := make(chan string, 2)
+		requestPathValues := make(chan string, 2)
+		handlerErrCh := make(chan error, 1)
+		runCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		connectionCount := 0
 		server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			tokenQueryValues <- request.URL.Query().Get(bootstrapTokenQueryParam)
-			requestPathValues <- request.URL.Path
+			switch request.URL.Path {
+			case "/tunnel/sandbox/sbi_tunnel_test_001":
+				tokenQueryValues <- request.URL.Query().Get(bootstrapTokenQueryParam)
+				requestPathValues <- request.URL.Path
+				connectionCount++
 
-			conn, err := websocket.Accept(writer, request, nil)
-			if err != nil {
-				t.Errorf("expected websocket accept to succeed, got %v", err)
-				return
-			}
-			defer conn.CloseNow()
+				conn, err := websocket.Accept(writer, request, nil)
+				if err != nil {
+					select {
+					case handlerErrCh <- fmt.Errorf("expected websocket accept to succeed, got %w", err):
+					default:
+					}
+					return
+				}
+				defer conn.CloseNow()
 
-			if err := conn.Close(websocket.StatusNormalClosure, "test completed"); err != nil {
-				t.Errorf("expected websocket close to succeed, got %v", err)
+				if connectionCount == 2 {
+					cancel()
+				}
+
+				_ = conn.Close(websocket.StatusNormalClosure, "test completed")
+			case "/tunnel/sandbox/sbi_tunnel_test_001/token-exchange":
+				writeTestTunnelTokenExchangeResponse(
+					t,
+					writer,
+					"rotated-bootstrap-token-001",
+					testLongLivedTunnelExchangeToken(t),
+				)
+			default:
+				select {
+				case handlerErrCh <- fmt.Errorf("unexpected request path %q", request.URL.Path):
+				default:
+				}
 			}
 		}))
 		defer server.Close()
 
 		gatewayWSURL := "ws" + strings.TrimPrefix(server.URL, "http") + "/tunnel/sandbox/sbi_tunnel_test_001"
-		runCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
 
 		err := Run(RunInput{
 			Context:             runCtx,
@@ -82,30 +123,43 @@ func TestRun(t *testing.T) {
 			BootstrapToken:      []byte("sandbox-bootstrap-token"),
 			TunnelExchangeToken: testLongLivedTunnelExchangeToken(t),
 		})
-		if err == nil {
-			t.Fatal("expected run to fail when websocket closes from server side")
-		}
-
-		if !strings.Contains(err.Error(), "sandbox tunnel websocket read failed") {
-			t.Fatalf("expected websocket read failure error, got %v", err)
+		if err != nil {
+			t.Fatalf("expected run to stop cleanly after reconnect and context cancel, got %v", err)
 		}
 
 		select {
-		case queryToken := <-tokenQueryValues:
-			if queryToken != "sandbox-bootstrap-token" {
-				t.Fatalf("expected bootstrap token query to match, got %s", queryToken)
+		case firstQueryToken := <-tokenQueryValues:
+			if firstQueryToken != "sandbox-bootstrap-token" {
+				t.Fatalf("expected first bootstrap token query to match, got %s", firstQueryToken)
 			}
 		case <-time.After(2 * time.Second):
-			t.Fatal("expected token query to be recorded")
+			t.Fatal("expected first token query to be recorded")
 		}
 
 		select {
-		case requestPath := <-requestPathValues:
-			if requestPath != "/tunnel/sandbox/sbi_tunnel_test_001" {
-				t.Fatalf("expected request path to match, got %s", requestPath)
+		case secondQueryToken := <-tokenQueryValues:
+			if secondQueryToken != "rotated-bootstrap-token-001" {
+				t.Fatalf("expected second bootstrap token query to match rotated token, got %s", secondQueryToken)
 			}
 		case <-time.After(2 * time.Second):
-			t.Fatal("expected request path to be recorded")
+			t.Fatal("expected second token query to be recorded")
+		}
+
+		for range 2 {
+			select {
+			case requestPath := <-requestPathValues:
+				if requestPath != "/tunnel/sandbox/sbi_tunnel_test_001" {
+					t.Fatalf("expected request path to match, got %s", requestPath)
+				}
+			case <-time.After(2 * time.Second):
+				t.Fatal("expected request path to be recorded")
+			}
+		}
+
+		select {
+		case handlerErr := <-handlerErrCh:
+			t.Fatal(handlerErr)
+		default:
 		}
 	})
 
@@ -113,6 +167,8 @@ func TestRun(t *testing.T) {
 		agentRequestCh := make(chan string, 1)
 		gatewayResponseCh := make(chan string, 1)
 		handlerErrCh := make(chan error, 1)
+		runCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
 
 		agentServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			conn, err := websocket.Accept(writer, request, nil)
@@ -147,85 +203,102 @@ func TestRun(t *testing.T) {
 		}))
 		defer agentServer.Close()
 
+		gatewayConnectionCount := 0
 		gatewayServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			conn, err := websocket.Accept(writer, request, nil)
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected gateway websocket accept to succeed: %w", err)
-				return
-			}
-			defer conn.CloseNow()
+			switch request.URL.Path {
+			case "/tunnel/sandbox/sbi_tunnel_test_002":
+				gatewayConnectionCount++
+				conn, err := websocket.Accept(writer, request, nil)
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected gateway websocket accept to succeed: %w", err)
+					return
+				}
+				defer conn.CloseNow()
 
-			handlerCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			defer cancel()
+				if gatewayConnectionCount == 2 {
+					cancel()
+					_ = conn.Close(websocket.StatusNormalClosure, "reconnect observed")
+					return
+				}
 
-			connectRequestPayload, err := json.Marshal(sessionprotocol.AgentConnectRequest{
-				Type:      sessionprotocol.MessageTypeConnect,
-				V:         sessionprotocol.ProtocolVersion,
-				RequestID: "req_connect_agent",
-				Channel: sessionprotocol.AgentConnectChannel{
-					Kind: sessionprotocol.ChannelKindAgent,
-				},
-			})
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected connect request payload marshal to succeed: %w", err)
-				return
-			}
+				handlerCtx, handlerCancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer handlerCancel()
 
-			if err := conn.Write(handlerCtx, websocket.MessageText, connectRequestPayload); err != nil {
-				handlerErrCh <- fmt.Errorf("expected connect request write to succeed: %w", err)
-				return
-			}
+				connectRequestPayload, err := json.Marshal(sessionprotocol.AgentConnectRequest{
+					Type:      sessionprotocol.MessageTypeConnect,
+					V:         sessionprotocol.ProtocolVersion,
+					RequestID: "req_connect_agent",
+					Channel: sessionprotocol.AgentConnectChannel{
+						Kind: sessionprotocol.ChannelKindAgent,
+					},
+				})
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected connect request payload marshal to succeed: %w", err)
+					return
+				}
 
-			ackType, ackPayload, err := conn.Read(handlerCtx)
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected connect ack read to succeed: %w", err)
-				return
-			}
-			if ackType != websocket.MessageText {
-				handlerErrCh <- fmt.Errorf("expected connect ack to be text, got %s", ackType.String())
-				return
-			}
+				if err := conn.Write(handlerCtx, websocket.MessageText, connectRequestPayload); err != nil {
+					handlerErrCh <- fmt.Errorf("expected connect request write to succeed: %w", err)
+					return
+				}
 
-			var connectOK sessionprotocol.ConnectOK
-			if err := json.Unmarshal(ackPayload, &connectOK); err != nil {
-				handlerErrCh <- fmt.Errorf("expected connect ack to decode: %w", err)
-				return
-			}
-			if connectOK.Type != sessionprotocol.MessageTypeConnectOK {
-				handlerErrCh <- fmt.Errorf("expected connect ack type '%s', got '%s'", sessionprotocol.MessageTypeConnectOK, connectOK.Type)
-				return
-			}
-			if connectOK.RequestID != "req_connect_agent" {
-				handlerErrCh <- fmt.Errorf("expected connect ack requestId 'req_connect_agent', got '%s'", connectOK.RequestID)
-				return
-			}
+				ackType, ackPayload, err := conn.Read(handlerCtx)
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected connect ack read to succeed: %w", err)
+					return
+				}
+				if ackType != websocket.MessageText {
+					handlerErrCh <- fmt.Errorf("expected connect ack to be text, got %s", ackType.String())
+					return
+				}
 
-			agentPayload := `{"jsonrpc":"2.0","id":"req-1","method":"ping"}`
-			if err := conn.Write(handlerCtx, websocket.MessageText, []byte(agentPayload)); err != nil {
-				handlerErrCh <- fmt.Errorf("expected gateway->runtime write to succeed: %w", err)
-				return
-			}
+				var connectOK sessionprotocol.ConnectOK
+				if err := json.Unmarshal(ackPayload, &connectOK); err != nil {
+					handlerErrCh <- fmt.Errorf("expected connect ack to decode: %w", err)
+					return
+				}
+				if connectOK.Type != sessionprotocol.MessageTypeConnectOK {
+					handlerErrCh <- fmt.Errorf("expected connect ack type '%s', got '%s'", sessionprotocol.MessageTypeConnectOK, connectOK.Type)
+					return
+				}
+				if connectOK.RequestID != "req_connect_agent" {
+					handlerErrCh <- fmt.Errorf("expected connect ack requestId 'req_connect_agent', got '%s'", connectOK.RequestID)
+					return
+				}
 
-			responseType, responsePayload, err := conn.Read(handlerCtx)
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected runtime->gateway read to succeed: %w", err)
-				return
-			}
-			if responseType != websocket.MessageText {
-				handlerErrCh <- fmt.Errorf("expected runtime->gateway response to be text, got %s", responseType.String())
-				return
-			}
-			gatewayResponseCh <- string(responsePayload)
+				agentPayload := `{"jsonrpc":"2.0","id":"req-1","method":"ping"}`
+				if err := conn.Write(handlerCtx, websocket.MessageText, []byte(agentPayload)); err != nil {
+					handlerErrCh <- fmt.Errorf("expected gateway->runtime write to succeed: %w", err)
+					return
+				}
 
-			_ = conn.Close(websocket.StatusNormalClosure, "test completed")
+				responseType, responsePayload, err := conn.Read(handlerCtx)
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected runtime->gateway read to succeed: %w", err)
+					return
+				}
+				if responseType != websocket.MessageText {
+					handlerErrCh <- fmt.Errorf("expected runtime->gateway response to be text, got %s", responseType.String())
+					return
+				}
+				gatewayResponseCh <- string(responsePayload)
+
+				_ = conn.Close(websocket.StatusNormalClosure, "test completed")
+			case "/tunnel/sandbox/sbi_tunnel_test_002/token-exchange":
+				writeTestTunnelTokenExchangeResponse(
+					t,
+					writer,
+					"rotated-bootstrap-token-002",
+					testLongLivedTunnelExchangeToken(t),
+				)
+			default:
+				handlerErrCh <- fmt.Errorf("unexpected request path %q", request.URL.Path)
+			}
 		}))
 		defer gatewayServer.Close()
 
 		gatewayWSURL := "ws" + strings.TrimPrefix(gatewayServer.URL, "http") + "/tunnel/sandbox/sbi_tunnel_test_002"
 		agentWSURL := "ws" + strings.TrimPrefix(agentServer.URL, "http")
-
-		runCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
 
 		err := Run(RunInput{
 			Context:             runCtx,
@@ -262,11 +335,8 @@ func TestRun(t *testing.T) {
 				},
 			},
 		})
-		if err == nil {
-			t.Fatal("expected run to fail when gateway closes websocket")
-		}
-		if !strings.Contains(err.Error(), "sandbox tunnel websocket relay failed") {
-			t.Fatalf("expected relay failure after gateway close, got %v", err)
+		if err != nil {
+			t.Fatalf("expected run to stop cleanly after reconnect and context cancel, got %v", err)
 		}
 
 		select {
@@ -614,190 +684,210 @@ func TestRun(t *testing.T) {
 
 	t.Run("connects to pty session, supports attach and resize, and closes cleanly", func(t *testing.T) {
 		handlerErrCh := make(chan error, 1)
+		runCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		defer cancel()
+		gatewayConnectionCount := 0
 		gatewayServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			conn, err := websocket.Accept(writer, request, nil)
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected gateway websocket accept to succeed: %w", err)
-				return
-			}
-			defer conn.CloseNow()
-
-			handlerCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-
-			connectCreatePayload, err := json.Marshal(sessionprotocol.PTYConnectRequest{
-				Type:      sessionprotocol.MessageTypeConnect,
-				V:         sessionprotocol.ProtocolVersion,
-				RequestID: "req_pty_create_001",
-				Channel: sessionprotocol.PTYConnectChannel{
-					Kind:    sessionprotocol.ChannelKindPTY,
-					Session: sessionprotocol.PTYSessionModeCreate,
-					Cols:    120,
-					Rows:    40,
-				},
-			})
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty connect payload marshal to succeed: %w", err)
-				return
-			}
-			if err := conn.Write(handlerCtx, websocket.MessageText, connectCreatePayload); err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty connect write to succeed: %w", err)
-				return
-			}
-
-			foundCreateAck := false
-			for range 12 {
-				createAckType, createAckPayload, readErr := conn.Read(handlerCtx)
-				if readErr != nil {
-					handlerErrCh <- fmt.Errorf("expected pty connect ack read to succeed: %w", readErr)
+			switch request.URL.Path {
+			case "/tunnel/sandbox/sbi_tunnel_test_pty_001":
+				gatewayConnectionCount++
+				conn, err := websocket.Accept(writer, request, nil)
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected gateway websocket accept to succeed: %w", err)
 					return
 				}
-				if createAckType != websocket.MessageText {
-					continue
-				}
+				defer conn.CloseNow()
 
-				var createAck sessionprotocol.ConnectOK
-				if err := json.Unmarshal(createAckPayload, &createAck); err != nil {
-					continue
-				}
-				if createAck.Type == sessionprotocol.MessageTypeConnectOK && createAck.RequestID == "req_pty_create_001" {
-					foundCreateAck = true
-					break
-				}
-			}
-			if !foundCreateAck {
-				handlerErrCh <- fmt.Errorf("expected to receive pty connect ack for req_pty_create_001")
-				return
-			}
-
-			connectAttachPayload, err := json.Marshal(sessionprotocol.PTYConnectRequest{
-				Type:      sessionprotocol.MessageTypeConnect,
-				V:         sessionprotocol.ProtocolVersion,
-				RequestID: "req_pty_attach_001",
-				Channel: sessionprotocol.PTYConnectChannel{
-					Kind:    sessionprotocol.ChannelKindPTY,
-					Session: sessionprotocol.PTYSessionModeAttach,
-				},
-			})
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty attach payload marshal to succeed: %w", err)
-				return
-			}
-			if err := conn.Write(handlerCtx, websocket.MessageText, connectAttachPayload); err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty attach write to succeed: %w", err)
-				return
-			}
-
-			foundAttachAck := false
-			for range 12 {
-				attachAckType, attachAckPayload, readErr := conn.Read(handlerCtx)
-				if readErr != nil {
-					handlerErrCh <- fmt.Errorf("expected pty attach ack read to succeed: %w", readErr)
+				if gatewayConnectionCount == 2 {
+					cancel()
+					_ = conn.Close(websocket.StatusNormalClosure, "reconnect observed")
 					return
 				}
-				if attachAckType != websocket.MessageText {
-					continue
-				}
 
-				var attachAck sessionprotocol.ConnectOK
-				if err := json.Unmarshal(attachAckPayload, &attachAck); err != nil {
-					continue
-				}
-				if attachAck.Type == sessionprotocol.MessageTypeConnectOK && attachAck.RequestID == "req_pty_attach_001" {
-					foundAttachAck = true
-					break
-				}
-			}
-			if !foundAttachAck {
-				handlerErrCh <- fmt.Errorf("expected to receive pty attach ack for req_pty_attach_001")
-				return
-			}
+				handlerCtx, handlerCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer handlerCancel()
 
-			resizePayload, err := json.Marshal(sessionprotocol.PTYResize{
-				Type: sessionprotocol.MessageTypePTYResize,
-				Cols: 100,
-				Rows: 30,
-			})
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty resize payload marshal to succeed: %w", err)
-				return
-			}
-			if err := conn.Write(handlerCtx, websocket.MessageText, resizePayload); err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty resize write to succeed: %w", err)
-				return
-			}
-
-			expectedToken := []byte("__MISTLE_PTY_TOKEN__")
-			if err := conn.Write(handlerCtx, websocket.MessageBinary, []byte("printf '__MISTLE_PTY_TOKEN__\\n'\n")); err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty stdin write to succeed: %w", err)
-				return
-			}
-
-			foundToken := false
-			for range 12 {
-				messageType, payload, readErr := conn.Read(handlerCtx)
-				if readErr != nil {
-					handlerErrCh <- fmt.Errorf("expected pty output read to succeed: %w", readErr)
+				connectCreatePayload, err := json.Marshal(sessionprotocol.PTYConnectRequest{
+					Type:      sessionprotocol.MessageTypeConnect,
+					V:         sessionprotocol.ProtocolVersion,
+					RequestID: "req_pty_create_001",
+					Channel: sessionprotocol.PTYConnectChannel{
+						Kind:    sessionprotocol.ChannelKindPTY,
+						Session: sessionprotocol.PTYSessionModeCreate,
+						Cols:    120,
+						Rows:    40,
+					},
+				})
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected pty connect payload marshal to succeed: %w", err)
 					return
 				}
-				if messageType != websocket.MessageBinary {
-					continue
-				}
-				if bytes.Contains(payload, expectedToken) {
-					foundToken = true
-					break
-				}
-			}
-			if !foundToken {
-				handlerErrCh <- fmt.Errorf("expected pty output to contain token %q", string(expectedToken))
-				return
-			}
-
-			closePayload, err := json.Marshal(sessionprotocol.PTYClose{
-				Type:      sessionprotocol.MessageTypePTYClose,
-				RequestID: "req_pty_close_001",
-			})
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty close payload marshal to succeed: %w", err)
-				return
-			}
-			if err := conn.Write(handlerCtx, websocket.MessageText, closePayload); err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty close write to succeed: %w", err)
-				return
-			}
-
-			foundCloseAck := false
-			for range 12 {
-				closeAckType, closeAckPayload, readErr := conn.Read(handlerCtx)
-				if readErr != nil {
-					handlerErrCh <- fmt.Errorf("expected pty close ack read to succeed: %w", readErr)
+				if err := conn.Write(handlerCtx, websocket.MessageText, connectCreatePayload); err != nil {
+					handlerErrCh <- fmt.Errorf("expected pty connect write to succeed: %w", err)
 					return
 				}
-				if closeAckType != websocket.MessageText {
-					continue
+
+				foundCreateAck := false
+				for range 12 {
+					createAckType, createAckPayload, readErr := conn.Read(handlerCtx)
+					if readErr != nil {
+						handlerErrCh <- fmt.Errorf("expected pty connect ack read to succeed: %w", readErr)
+						return
+					}
+					if createAckType != websocket.MessageText {
+						continue
+					}
+
+					var createAck sessionprotocol.ConnectOK
+					if err := json.Unmarshal(createAckPayload, &createAck); err != nil {
+						continue
+					}
+					if createAck.Type == sessionprotocol.MessageTypeConnectOK && createAck.RequestID == "req_pty_create_001" {
+						foundCreateAck = true
+						break
+					}
+				}
+				if !foundCreateAck {
+					handlerErrCh <- fmt.Errorf("expected to receive pty connect ack for req_pty_create_001")
+					return
 				}
 
-				var closeAck sessionprotocol.PTYCloseOK
-				if err := json.Unmarshal(closeAckPayload, &closeAck); err != nil {
-					continue
+				connectAttachPayload, err := json.Marshal(sessionprotocol.PTYConnectRequest{
+					Type:      sessionprotocol.MessageTypeConnect,
+					V:         sessionprotocol.ProtocolVersion,
+					RequestID: "req_pty_attach_001",
+					Channel: sessionprotocol.PTYConnectChannel{
+						Kind:    sessionprotocol.ChannelKindPTY,
+						Session: sessionprotocol.PTYSessionModeAttach,
+					},
+				})
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected pty attach payload marshal to succeed: %w", err)
+					return
 				}
-				if closeAck.Type == sessionprotocol.MessageTypePTYCloseOK && closeAck.RequestID == "req_pty_close_001" {
-					foundCloseAck = true
-					break
+				if err := conn.Write(handlerCtx, websocket.MessageText, connectAttachPayload); err != nil {
+					handlerErrCh <- fmt.Errorf("expected pty attach write to succeed: %w", err)
+					return
 				}
-			}
-			if !foundCloseAck {
-				handlerErrCh <- fmt.Errorf("expected to receive pty.close.ok for request req_pty_close_001")
-				return
-			}
 
-			_ = conn.Close(websocket.StatusNormalClosure, "test completed")
+				foundAttachAck := false
+				for range 12 {
+					attachAckType, attachAckPayload, readErr := conn.Read(handlerCtx)
+					if readErr != nil {
+						handlerErrCh <- fmt.Errorf("expected pty attach ack read to succeed: %w", readErr)
+						return
+					}
+					if attachAckType != websocket.MessageText {
+						continue
+					}
+
+					var attachAck sessionprotocol.ConnectOK
+					if err := json.Unmarshal(attachAckPayload, &attachAck); err != nil {
+						continue
+					}
+					if attachAck.Type == sessionprotocol.MessageTypeConnectOK && attachAck.RequestID == "req_pty_attach_001" {
+						foundAttachAck = true
+						break
+					}
+				}
+				if !foundAttachAck {
+					handlerErrCh <- fmt.Errorf("expected to receive pty attach ack for req_pty_attach_001")
+					return
+				}
+
+				resizePayload, err := json.Marshal(sessionprotocol.PTYResize{
+					Type: sessionprotocol.MessageTypePTYResize,
+					Cols: 100,
+					Rows: 30,
+				})
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected pty resize payload marshal to succeed: %w", err)
+					return
+				}
+				if err := conn.Write(handlerCtx, websocket.MessageText, resizePayload); err != nil {
+					handlerErrCh <- fmt.Errorf("expected pty resize write to succeed: %w", err)
+					return
+				}
+
+				expectedToken := []byte("__MISTLE_PTY_TOKEN__")
+				if err := conn.Write(handlerCtx, websocket.MessageBinary, []byte("printf '__MISTLE_PTY_TOKEN__\\n'\n")); err != nil {
+					handlerErrCh <- fmt.Errorf("expected pty stdin write to succeed: %w", err)
+					return
+				}
+
+				foundToken := false
+				for range 12 {
+					messageType, payload, readErr := conn.Read(handlerCtx)
+					if readErr != nil {
+						handlerErrCh <- fmt.Errorf("expected pty output read to succeed: %w", readErr)
+						return
+					}
+					if messageType != websocket.MessageBinary {
+						continue
+					}
+					if bytes.Contains(payload, expectedToken) {
+						foundToken = true
+						break
+					}
+				}
+				if !foundToken {
+					handlerErrCh <- fmt.Errorf("expected pty output to contain token %q", string(expectedToken))
+					return
+				}
+
+				closePayload, err := json.Marshal(sessionprotocol.PTYClose{
+					Type:      sessionprotocol.MessageTypePTYClose,
+					RequestID: "req_pty_close_001",
+				})
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected pty close payload marshal to succeed: %w", err)
+					return
+				}
+				if err := conn.Write(handlerCtx, websocket.MessageText, closePayload); err != nil {
+					handlerErrCh <- fmt.Errorf("expected pty close write to succeed: %w", err)
+					return
+				}
+
+				foundCloseAck := false
+				for range 12 {
+					closeAckType, closeAckPayload, readErr := conn.Read(handlerCtx)
+					if readErr != nil {
+						handlerErrCh <- fmt.Errorf("expected pty close ack read to succeed: %w", readErr)
+						return
+					}
+					if closeAckType != websocket.MessageText {
+						continue
+					}
+
+					var closeAck sessionprotocol.PTYCloseOK
+					if err := json.Unmarshal(closeAckPayload, &closeAck); err != nil {
+						continue
+					}
+					if closeAck.Type == sessionprotocol.MessageTypePTYCloseOK && closeAck.RequestID == "req_pty_close_001" {
+						foundCloseAck = true
+						break
+					}
+				}
+				if !foundCloseAck {
+					handlerErrCh <- fmt.Errorf("expected to receive pty.close.ok for request req_pty_close_001")
+					return
+				}
+
+				_ = conn.Close(websocket.StatusNormalClosure, "test completed")
+			case "/tunnel/sandbox/sbi_tunnel_test_pty_001/token-exchange":
+				writeTestTunnelTokenExchangeResponse(
+					t,
+					writer,
+					"rotated-bootstrap-token-pty-001",
+					testLongLivedTunnelExchangeToken(t),
+				)
+			default:
+				handlerErrCh <- fmt.Errorf("unexpected request path %q", request.URL.Path)
+			}
 		}))
 		defer gatewayServer.Close()
 
 		gatewayWSURL := "ws" + strings.TrimPrefix(gatewayServer.URL, "http") + "/tunnel/sandbox/sbi_tunnel_test_pty_001"
-		runCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-		defer cancel()
 
 		err := Run(RunInput{
 			Context:             runCtx,
@@ -806,11 +896,8 @@ func TestRun(t *testing.T) {
 			TunnelExchangeToken: testLongLivedTunnelExchangeToken(t),
 			RuntimeClients:      []startup.RuntimeClient{},
 		})
-		if err == nil {
-			t.Fatal("expected run to fail when websocket closes from gateway side")
-		}
-		if !strings.Contains(err.Error(), "sandbox tunnel websocket read failed") {
-			t.Fatalf("expected websocket read failure after close, got %v", err)
+		if err != nil {
+			t.Fatalf("expected run to stop cleanly after reconnect and context cancel, got %v", err)
 		}
 
 		select {
@@ -822,82 +909,102 @@ func TestRun(t *testing.T) {
 
 	t.Run("sends pty.exit when process exits without pty.close", func(t *testing.T) {
 		handlerErrCh := make(chan error, 1)
+		runCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		defer cancel()
+		gatewayConnectionCount := 0
 		gatewayServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			conn, err := websocket.Accept(writer, request, nil)
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected gateway websocket accept to succeed: %w", err)
-				return
-			}
-			defer conn.CloseNow()
-
-			handlerCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-
-			connectPayload, err := json.Marshal(sessionprotocol.PTYConnectRequest{
-				Type:      sessionprotocol.MessageTypeConnect,
-				V:         sessionprotocol.ProtocolVersion,
-				RequestID: "req_pty_create_exit",
-				Channel: sessionprotocol.PTYConnectChannel{
-					Kind:    sessionprotocol.ChannelKindPTY,
-					Session: sessionprotocol.PTYSessionModeCreate,
-				},
-			})
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty connect payload marshal to succeed: %w", err)
-				return
-			}
-			if err := conn.Write(handlerCtx, websocket.MessageText, connectPayload); err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty connect write to succeed: %w", err)
-				return
-			}
-
-			ackType, _, err := conn.Read(handlerCtx)
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty connect ack read to succeed: %w", err)
-				return
-			}
-			if ackType != websocket.MessageText {
-				handlerErrCh <- fmt.Errorf("expected pty connect ack type text, got %s", ackType.String())
-				return
-			}
-
-			if err := conn.Write(handlerCtx, websocket.MessageBinary, []byte("exit\n")); err != nil {
-				handlerErrCh <- fmt.Errorf("expected pty stdin exit write to succeed: %w", err)
-				return
-			}
-
-			foundExit := false
-			for range 12 {
-				messageType, payload, readErr := conn.Read(handlerCtx)
-				if readErr != nil {
-					handlerErrCh <- fmt.Errorf("expected pty message read to succeed: %w", readErr)
+			switch request.URL.Path {
+			case "/tunnel/sandbox/sbi_tunnel_test_pty_002":
+				gatewayConnectionCount++
+				conn, err := websocket.Accept(writer, request, nil)
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected gateway websocket accept to succeed: %w", err)
 					return
 				}
-				if messageType != websocket.MessageText {
-					continue
+				defer conn.CloseNow()
+
+				if gatewayConnectionCount == 2 {
+					cancel()
+					_ = conn.Close(websocket.StatusNormalClosure, "reconnect observed")
+					return
 				}
 
-				var exitMessage sessionprotocol.PTYExit
-				if err := json.Unmarshal(payload, &exitMessage); err != nil {
-					continue
-				}
-				if exitMessage.Type == sessionprotocol.MessageTypePTYExit {
-					foundExit = true
-					break
-				}
-			}
-			if !foundExit {
-				handlerErrCh <- fmt.Errorf("expected to receive pty.exit message")
-				return
-			}
+				handlerCtx, handlerCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer handlerCancel()
 
-			_ = conn.Close(websocket.StatusNormalClosure, "test completed")
+				connectPayload, err := json.Marshal(sessionprotocol.PTYConnectRequest{
+					Type:      sessionprotocol.MessageTypeConnect,
+					V:         sessionprotocol.ProtocolVersion,
+					RequestID: "req_pty_create_exit",
+					Channel: sessionprotocol.PTYConnectChannel{
+						Kind:    sessionprotocol.ChannelKindPTY,
+						Session: sessionprotocol.PTYSessionModeCreate,
+					},
+				})
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected pty connect payload marshal to succeed: %w", err)
+					return
+				}
+				if err := conn.Write(handlerCtx, websocket.MessageText, connectPayload); err != nil {
+					handlerErrCh <- fmt.Errorf("expected pty connect write to succeed: %w", err)
+					return
+				}
+
+				ackType, _, err := conn.Read(handlerCtx)
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected pty connect ack read to succeed: %w", err)
+					return
+				}
+				if ackType != websocket.MessageText {
+					handlerErrCh <- fmt.Errorf("expected pty connect ack type text, got %s", ackType.String())
+					return
+				}
+
+				if err := conn.Write(handlerCtx, websocket.MessageBinary, []byte("exit\n")); err != nil {
+					handlerErrCh <- fmt.Errorf("expected pty stdin exit write to succeed: %w", err)
+					return
+				}
+
+				foundExit := false
+				for range 12 {
+					messageType, payload, readErr := conn.Read(handlerCtx)
+					if readErr != nil {
+						handlerErrCh <- fmt.Errorf("expected pty message read to succeed: %w", readErr)
+						return
+					}
+					if messageType != websocket.MessageText {
+						continue
+					}
+
+					var exitMessage sessionprotocol.PTYExit
+					if err := json.Unmarshal(payload, &exitMessage); err != nil {
+						continue
+					}
+					if exitMessage.Type == sessionprotocol.MessageTypePTYExit {
+						foundExit = true
+						break
+					}
+				}
+				if !foundExit {
+					handlerErrCh <- fmt.Errorf("expected to receive pty.exit message")
+					return
+				}
+
+				_ = conn.Close(websocket.StatusNormalClosure, "test completed")
+			case "/tunnel/sandbox/sbi_tunnel_test_pty_002/token-exchange":
+				writeTestTunnelTokenExchangeResponse(
+					t,
+					writer,
+					"rotated-bootstrap-token-pty-002",
+					testLongLivedTunnelExchangeToken(t),
+				)
+			default:
+				handlerErrCh <- fmt.Errorf("unexpected request path %q", request.URL.Path)
+			}
 		}))
 		defer gatewayServer.Close()
 
 		gatewayWSURL := "ws" + strings.TrimPrefix(gatewayServer.URL, "http") + "/tunnel/sandbox/sbi_tunnel_test_pty_002"
-		runCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
-		defer cancel()
 
 		err := Run(RunInput{
 			Context:             runCtx,
@@ -906,11 +1013,8 @@ func TestRun(t *testing.T) {
 			TunnelExchangeToken: testLongLivedTunnelExchangeToken(t),
 			RuntimeClients:      []startup.RuntimeClient{},
 		})
-		if err == nil {
-			t.Fatal("expected run to fail when websocket closes from gateway side")
-		}
-		if !strings.Contains(err.Error(), "sandbox tunnel websocket read failed") {
-			t.Fatalf("expected websocket read failure after close, got %v", err)
+		if err != nil {
+			t.Fatalf("expected run to stop cleanly after reconnect and context cancel, got %v", err)
 		}
 
 		select {
