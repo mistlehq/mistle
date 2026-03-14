@@ -993,6 +993,9 @@ importers:
       '@mistle/db':
         specifier: workspace:*
         version: link:../packages/db
+      '@mistle/sandbox-session-protocol':
+        specifier: workspace:*
+        version: link:../packages/sandbox-session-protocol
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../packages/test-harness
