@@ -181,6 +181,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
         async () => {
           return startSandboxInstance.tunnelConnectAcks.waitForSandboxTunnelConnectAck({
             bootstrapTokenJti: startedSandbox.bootstrapTokenJti,
+            sandboxInstanceId: startedSandbox.sandboxInstanceId,
           });
         },
       );
