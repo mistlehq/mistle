@@ -84,13 +84,14 @@ describe("sandbox tunnel token exchange endpoint integration", () => {
         fixture,
         sandboxInstanceId,
       });
+      const exchangeTokenJti = randomUUID();
       const exchangeToken = await mintTunnelExchangeToken({
         config: {
           tokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
           tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
           tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
         },
-        jti: randomUUID(),
+        jti: exchangeTokenJti,
         sandboxInstanceId,
         bootstrapTokenTtlSeconds: 120,
         exchangeTokenTtlSeconds: 3600,
@@ -133,6 +134,58 @@ describe("sandbox tunnel token exchange endpoint integration", () => {
         jti: verifiedExchangeToken.jti,
         sandboxInstanceId,
       });
+      await expect(
+        fixture.db.query.sandboxTunnelTokenRedemptions.findMany({
+          where: (table, { eq }) => eq(table.tokenJti, exchangeTokenJti),
+        }),
+      ).resolves.toHaveLength(1);
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "rejects exchange token replay after the first successful redemption",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const exchangeTokenJti = randomUUID();
+      const exchangeToken = await mintTunnelExchangeToken({
+        config: {
+          tokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: exchangeTokenJti,
+        sandboxInstanceId,
+        bootstrapTokenTtlSeconds: 120,
+        exchangeTokenTtlSeconds: 3600,
+        ttlSeconds: 3600,
+      });
+
+      const firstResponse = await postTunnelTokenExchange({
+        fixture,
+        sandboxInstanceId,
+        exchangeToken,
+      });
+      const secondResponse = await postTunnelTokenExchange({
+        fixture,
+        sandboxInstanceId,
+        exchangeToken,
+      });
+
+      expect(firstResponse.status).toBe(200);
+      expect(secondResponse.status).toBe(409);
+      await expect(secondResponse.json()).resolves.toEqual({
+        error: "Tunnel exchange token has already been redeemed.",
+      });
+      await expect(
+        fixture.db.query.sandboxTunnelTokenRedemptions.findMany({
+          where: (table, { eq }) => eq(table.tokenJti, exchangeTokenJti),
+        }),
+      ).resolves.toHaveLength(1);
     },
     IntegrationTestTimeoutMs,
   );

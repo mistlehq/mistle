@@ -14,7 +14,6 @@ export type StartSandboxInstanceWorkflowServices = {
       sandboxInstanceId: string;
       provider: SandboxProvider;
       providerSandboxId: string;
-      bootstrapTokenJti: string;
     }>;
     stopSandbox: (input: { provider: SandboxProvider; providerSandboxId: string }) => Promise<void>;
   };
@@ -44,10 +43,7 @@ export type StartSandboxInstanceWorkflowServices = {
     }) => Promise<void>;
   };
   tunnelReadiness: {
-    waitForSandboxTunnelReadiness: (input: {
-      bootstrapTokenJti: string;
-      sandboxInstanceId: string;
-    }) => Promise<boolean>;
+    waitForSandboxTunnelReadiness: (input: { sandboxInstanceId: string }) => Promise<boolean>;
   };
 };
 

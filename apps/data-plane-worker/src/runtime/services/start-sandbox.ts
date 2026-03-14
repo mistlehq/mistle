@@ -42,7 +42,7 @@ export async function startSandbox(
     throw new Error("Sandbox adapter returned sandbox handle with unexpected provider.");
   }
 
-  const bootstrapTokenJti = await writeSandboxStartupInput({
+  await writeSandboxStartupInput({
     config: deps.config,
     sandboxAdapter: deps.sandboxAdapter,
     sandboxInstanceId: input.sandboxInstanceId,
@@ -54,6 +54,5 @@ export async function startSandbox(
     sandboxInstanceId: input.sandboxInstanceId,
     provider: startedSandbox.provider,
     providerSandboxId: startedSandbox.sandboxId,
-    bootstrapTokenJti,
   };
 }
