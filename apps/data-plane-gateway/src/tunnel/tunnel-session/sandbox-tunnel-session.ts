@@ -2,7 +2,7 @@ import type { StreamChannel } from "@mistle/sandbox-session-protocol";
 
 import type { RelayTarget } from "../types.js";
 
-const DefaultMaxBindingCount = 64;
+const DefaultMaxBindingCount = 1;
 
 export type ClientStreamBinding = {
   channelKind: StreamChannel["kind"];
@@ -41,7 +41,10 @@ export class SandboxTunnelSession {
    * Represents the live bootstrap tunnel state for one sandbox on the owner node.
    *
    * This class is intentionally a local implementation detail behind
-   * `TunnelSessionRegistryAdapter`.
+   * `TunnelSessionRegistryAdapter`. The current sandbox runtime processes one
+   * active interactive stream at a time on the bootstrap websocket, so the
+   * default binding limit stays at one even though multiple connection peers
+   * may be attached concurrently.
    */
   public constructor(
     public readonly bootstrapTarget: RelayTarget,
@@ -56,11 +59,11 @@ export class SandboxTunnelSession {
     if (!Number.isInteger(input.clientStreamId) || input.clientStreamId <= 0) {
       throw new Error("Client stream id must be a positive integer.");
     }
-    if (this.#bindingsByTunnelStreamId.size >= this.maxBindingCount) {
-      throw new TunnelSessionBindingLimitExceededError(this.maxBindingCount);
-    }
     if ((this.#bindingCountsByClientSessionId.get(input.clientSessionId) ?? 0) > 0) {
       throw new ClientSessionActiveStreamError(input.clientSessionId);
+    }
+    if (this.#bindingsByTunnelStreamId.size >= this.maxBindingCount) {
+      throw new TunnelSessionBindingLimitExceededError(this.maxBindingCount);
     }
 
     const clientBindingKey = toClientBindingKey(input);

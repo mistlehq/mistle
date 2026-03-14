@@ -18,7 +18,7 @@ function createPeerLocation(input: {
 }
 
 describe("InMemoryLocalPeerRegistryAdapter", () => {
-  it("stores and retrieves peers by instance id and side", () => {
+  it("stores the bootstrap peer by sandbox instance", () => {
     const adapter = new InMemoryLocalPeerRegistryAdapter();
     const bootstrapLocation = createPeerLocation({
       sandboxInstanceId: "sbi_abc",
@@ -26,92 +26,128 @@ describe("InMemoryLocalPeerRegistryAdapter", () => {
       nodeId: "dpg_1",
       sessionId: "session_bootstrap",
     });
-    const connectionLocation = createPeerLocation({
-      sandboxInstanceId: "sbi_abc",
-      side: "connection",
-      nodeId: "dpg_1",
-      sessionId: "session_connection",
-    });
 
-    adapter.setPeer(bootstrapLocation);
-    adapter.setPeer(connectionLocation);
+    adapter.setBootstrapPeer(bootstrapLocation);
 
     expect(
-      adapter.getPeer({
+      adapter.getBootstrapPeer({
         sandboxInstanceId: "sbi_abc",
-        side: "bootstrap",
       }),
     ).toEqual(bootstrapLocation);
-    expect(
-      adapter.getPeer({
-        sandboxInstanceId: "sbi_abc",
-        side: "connection",
-      }),
-    ).toEqual(connectionLocation);
   });
 
-  it("returns the previous peer when replacing an existing key", () => {
+  it("stores multiple connection peers for the same sandbox instance", () => {
     const adapter = new InMemoryLocalPeerRegistryAdapter();
-    const previousLocation = createPeerLocation({
+    const firstConnectionLocation = createPeerLocation({
       sandboxInstanceId: "sbi_abc",
       side: "connection",
       nodeId: "dpg_1",
       sessionId: "session_one",
     });
-    const nextLocation = createPeerLocation({
+    const secondConnectionLocation = createPeerLocation({
       sandboxInstanceId: "sbi_abc",
       side: "connection",
+      nodeId: "dpg_1",
+      sessionId: "session_two",
+    });
+
+    adapter.setConnectionPeer(firstConnectionLocation);
+    adapter.setConnectionPeer(secondConnectionLocation);
+
+    expect(
+      adapter.getConnectionPeer({
+        sandboxInstanceId: "sbi_abc",
+        side: "connection",
+        sessionId: "session_one",
+      }),
+    ).toEqual(firstConnectionLocation);
+    expect(
+      adapter.getConnectionPeer({
+        sandboxInstanceId: "sbi_abc",
+        side: "connection",
+        sessionId: "session_two",
+      }),
+    ).toEqual(secondConnectionLocation);
+    expect(
+      adapter.listConnectionPeers({
+        sandboxInstanceId: "sbi_abc",
+      }),
+    ).toEqual([firstConnectionLocation, secondConnectionLocation]);
+  });
+
+  it("returns the previous bootstrap peer when replacing it", () => {
+    const adapter = new InMemoryLocalPeerRegistryAdapter();
+    const previousLocation = createPeerLocation({
+      sandboxInstanceId: "sbi_abc",
+      side: "bootstrap",
+      nodeId: "dpg_1",
+      sessionId: "session_one",
+    });
+    const nextLocation = createPeerLocation({
+      sandboxInstanceId: "sbi_abc",
+      side: "bootstrap",
       nodeId: "dpg_2",
       sessionId: "session_two",
     });
 
-    expect(adapter.setPeer(previousLocation)).toBeUndefined();
-    expect(adapter.setPeer(nextLocation)).toEqual(previousLocation);
+    expect(adapter.setBootstrapPeer(previousLocation)).toBeUndefined();
+    expect(adapter.setBootstrapPeer(nextLocation)).toEqual(previousLocation);
     expect(
-      adapter.getPeer({
+      adapter.getBootstrapPeer({
         sandboxInstanceId: "sbi_abc",
-        side: "connection",
       }),
     ).toEqual(nextLocation);
   });
 
   it("only removes the peer when node id and session id match", () => {
     const adapter = new InMemoryLocalPeerRegistryAdapter();
-    const storedLocation = createPeerLocation({
+    const storedBootstrapLocation = createPeerLocation({
       sandboxInstanceId: "sbi_abc",
       side: "bootstrap",
       nodeId: "dpg_1",
-      sessionId: "session_one",
+      sessionId: "session_bootstrap",
+    });
+    const storedConnectionLocation = createPeerLocation({
+      sandboxInstanceId: "sbi_abc",
+      side: "connection",
+      nodeId: "dpg_1",
+      sessionId: "session_connection",
     });
 
-    adapter.setPeer(storedLocation);
+    adapter.setBootstrapPeer(storedBootstrapLocation);
+    adapter.setConnectionPeer(storedConnectionLocation);
 
-    const removeWithWrongNodeId = adapter.removePeer(
-      createPeerLocation({
-        sandboxInstanceId: "sbi_abc",
-        side: "bootstrap",
-        nodeId: "dpg_2",
-        sessionId: "session_one",
-      }),
-    );
-    const removeWithWrongSessionId = adapter.removePeer(
-      createPeerLocation({
-        sandboxInstanceId: "sbi_abc",
-        side: "bootstrap",
-        nodeId: "dpg_1",
-        sessionId: "session_two",
-      }),
-    );
-    const removeWithMatchingIdentity = adapter.removePeer(storedLocation);
-
-    expect(removeWithWrongNodeId).toBe(false);
-    expect(removeWithWrongSessionId).toBe(false);
-    expect(removeWithMatchingIdentity).toBe(true);
     expect(
-      adapter.getPeer({
+      adapter.removePeer(
+        createPeerLocation({
+          sandboxInstanceId: "sbi_abc",
+          side: "bootstrap",
+          nodeId: "dpg_2",
+          sessionId: "session_bootstrap",
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      adapter.removePeer(
+        createPeerLocation({
+          sandboxInstanceId: "sbi_abc",
+          side: "connection",
+          nodeId: "dpg_1",
+          sessionId: "session_other",
+        }),
+      ),
+    ).toBe(false);
+    expect(adapter.removePeer(storedBootstrapLocation)).toBe(true);
+    expect(adapter.removePeer(storedConnectionLocation)).toBe(true);
+    expect(
+      adapter.getBootstrapPeer({
         sandboxInstanceId: "sbi_abc",
-        side: "bootstrap",
       }),
     ).toBeUndefined();
+    expect(
+      adapter.listConnectionPeers({
+        sandboxInstanceId: "sbi_abc",
+      }),
+    ).toEqual([]);
   });
 });

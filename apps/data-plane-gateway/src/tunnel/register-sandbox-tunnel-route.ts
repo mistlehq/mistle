@@ -359,6 +359,7 @@ async function translateBootstrapPayloadToConnection(input: {
       message: controlMessage,
       streamId: route.binding.clientStreamId,
     }),
+    targetConnectionSessionId: route.binding.clientSessionId,
     releaseInteractiveStream:
       controlMessage.type === "stream.open.error" ||
       controlMessage.type === "stream.reset" ||
@@ -475,6 +476,7 @@ function readDataFrameStreamId(payload: ArrayBuffer): number | undefined {
 type RoutedTunnelMessage = {
   payload: string | ArrayBuffer;
   respondToCurrentPeer?: boolean | undefined;
+  targetConnectionSessionId?: string | undefined;
   releaseInteractiveStream?:
     | {
         clientSessionId: string;
@@ -560,6 +562,7 @@ async function translateBootstrapBinaryPayloadToConnection(input: {
 
   return {
     payload: translatedPayload,
+    targetConnectionSessionId: route.binding.clientSessionId,
   };
 }
 
@@ -595,27 +598,17 @@ async function notifyConnectionPeerOfReleasedInteractiveStreams(input: {
   sandboxInstanceId: string;
   toPayload?: (binding: ClientStreamBinding) => string;
 }): Promise<void> {
-  const connectionPeer = input.relayCoordinator.getPeer({
-    sandboxInstanceId: input.sandboxInstanceId,
-    side: "connection",
-  });
-  if (connectionPeer === undefined) {
-    return;
-  }
-
-  const bindingsForCurrentConnection = input.releasedBindings.filter(
-    (binding: ClientStreamBinding) => binding.clientSessionId === connectionPeer.sessionId,
-  );
-  if (bindingsForCurrentConnection.length === 0) {
+  if (input.releasedBindings.length === 0) {
     return;
   }
 
   await Promise.all(
-    bindingsForCurrentConnection.map((binding: ClientStreamBinding) =>
+    input.releasedBindings.map((binding: ClientStreamBinding) =>
       input.relayCoordinator.forwardPeerMessage({
         sandboxInstanceId: input.sandboxInstanceId,
         fromSide: "bootstrap",
         payload: (input.toPayload ?? createReleasedInteractiveStreamResetPayload)(binding),
+        targetSessionId: binding.clientSessionId,
       }),
     ),
   );
@@ -692,6 +685,7 @@ async function handleTunnelWebSocketMessage(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     fromSide: input.sourcePeerSide,
     payload: routedMessage.payload,
+    targetSessionId: routedMessage.targetConnectionSessionId,
   });
 
   if (routedMessage.releaseInteractiveStream !== undefined) {

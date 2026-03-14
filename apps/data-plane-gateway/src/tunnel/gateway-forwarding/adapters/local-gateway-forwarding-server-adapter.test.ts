@@ -9,7 +9,7 @@ import { LocalGatewayForwardingServerAdapter } from "./local-gateway-forwarding-
 
 describe("LocalGatewayForwardingServerAdapter", () => {
   it("opens, looks up, closes, and releases interactive streams against the local registry", async () => {
-    const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter());
+    const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter(2));
     registry.attachBootstrapSession({
       sandboxInstanceId: "sbi_test",
       side: "bootstrap",
@@ -118,7 +118,7 @@ describe("LocalGatewayForwardingServerAdapter", () => {
   });
 
   it("rejects opening a second active stream for the same client session", async () => {
-    const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter());
+    const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter(2));
     registry.attachBootstrapSession({
       sandboxInstanceId: "sbi_test",
       side: "bootstrap",

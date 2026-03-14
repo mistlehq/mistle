@@ -8,12 +8,15 @@ import {
 
 describe("SandboxTunnelSession", () => {
   it("binds client streams to monotonically increasing tunnel stream ids", () => {
-    const session = new SandboxTunnelSession({
-      sandboxInstanceId: "sbi_test",
-      side: "bootstrap",
-      nodeId: "dpg_test",
-      sessionId: "sess_bootstrap",
-    });
+    const session = new SandboxTunnelSession(
+      {
+        sandboxInstanceId: "sbi_test",
+        side: "bootstrap",
+        nodeId: "dpg_test",
+        sessionId: "sess_bootstrap",
+      },
+      2,
+    );
 
     const firstBinding = session.bindClientStream({
       channelKind: "pty",
@@ -48,12 +51,15 @@ describe("SandboxTunnelSession", () => {
   });
 
   it("unbinds and releases stream bindings", () => {
-    const session = new SandboxTunnelSession({
-      sandboxInstanceId: "sbi_test",
-      side: "bootstrap",
-      nodeId: "dpg_test",
-      sessionId: "sess_bootstrap",
-    });
+    const session = new SandboxTunnelSession(
+      {
+        sandboxInstanceId: "sbi_test",
+        side: "bootstrap",
+        nodeId: "dpg_test",
+        sessionId: "sess_bootstrap",
+      },
+      2,
+    );
 
     const binding = session.bindClientStream({
       channelKind: "pty",
@@ -87,12 +93,15 @@ describe("SandboxTunnelSession", () => {
   });
 
   it("releases all bindings for a client session", () => {
-    const session = new SandboxTunnelSession({
-      sandboxInstanceId: "sbi_test",
-      side: "bootstrap",
-      nodeId: "dpg_test",
-      sessionId: "sess_bootstrap",
-    });
+    const session = new SandboxTunnelSession(
+      {
+        sandboxInstanceId: "sbi_test",
+        side: "bootstrap",
+        nodeId: "dpg_test",
+        sessionId: "sess_bootstrap",
+      },
+      2,
+    );
 
     const releasedBinding = session.bindClientStream({
       channelKind: "pty",
@@ -135,6 +144,29 @@ describe("SandboxTunnelSession", () => {
         clientStreamId: 8,
       }),
     ).toThrow(ClientSessionActiveStreamError);
+  });
+
+  it("limits the default session to one active interactive stream", () => {
+    const session = new SandboxTunnelSession({
+      sandboxInstanceId: "sbi_test",
+      side: "bootstrap",
+      nodeId: "dpg_test",
+      sessionId: "sess_bootstrap",
+    });
+
+    session.bindClientStream({
+      channelKind: "pty",
+      clientSessionId: "conn_1",
+      clientStreamId: 7,
+    });
+
+    expect(() =>
+      session.bindClientStream({
+        channelKind: "agent",
+        clientSessionId: "conn_2",
+        clientStreamId: 8,
+      }),
+    ).toThrow(TunnelSessionBindingLimitExceededError);
   });
 
   it("rejects bindings beyond the configured session limit", () => {
