@@ -1,39 +1,38 @@
 import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import type { Clock, Sleeper } from "@mistle/time";
 
-import type { TunnelConnectAckPolicy, WaitForSandboxTunnelConnectAckInput } from "./types.js";
+import type { TunnelReadinessPolicy, WaitForSandboxTunnelReadinessInput } from "./types.js";
 
-export async function waitForSandboxTunnelConnectAck(
+export async function waitForSandboxTunnelReadiness(
   deps: {
     db: DataPlaneDatabase;
-    policy: TunnelConnectAckPolicy;
+    policy: TunnelReadinessPolicy;
     clock: Clock;
     sleeper: Sleeper;
   },
-  input: WaitForSandboxTunnelConnectAckInput,
+  input: WaitForSandboxTunnelReadinessInput,
 ): Promise<boolean> {
   if (deps.policy.timeoutMs <= 0) {
-    throw new Error("Expected sandbox tunnel connect ack timeout to be positive.");
+    throw new Error("Expected sandbox tunnel readiness timeout to be positive.");
   }
   if (deps.policy.pollIntervalMs <= 0) {
-    throw new Error("Expected sandbox tunnel connect ack poll interval to be positive.");
+    throw new Error("Expected sandbox tunnel readiness poll interval to be positive.");
   }
   if (input.bootstrapTokenJti.trim().length === 0) {
-    throw new Error("Expected bootstrap token JTI to be non-empty when waiting for connect ack.");
+    throw new Error("Expected bootstrap token JTI to be non-empty when waiting for readiness.");
   }
   if (input.sandboxInstanceId.trim().length === 0) {
-    throw new Error("Expected sandbox instance id to be non-empty when waiting for connect ack.");
+    throw new Error("Expected sandbox instance id to be non-empty when waiting for readiness.");
   }
 
   const deadlineMs = deps.clock.nowMs() + deps.policy.timeoutMs;
   while (true) {
-    const [ack, sandboxInstance] = await Promise.all([
-      deps.db.query.sandboxTunnelConnectAcks.findFirst({
+    const [tokenRedemption, sandboxInstance] = await Promise.all([
+      deps.db.query.sandboxTunnelTokenRedemptions.findFirst({
         columns: {
-          bootstrapTokenJti: true,
+          tokenJti: true,
         },
-        where: (table, { eq: whereEq }) =>
-          whereEq(table.bootstrapTokenJti, input.bootstrapTokenJti),
+        where: (table, { eq: whereEq }) => whereEq(table.tokenJti, input.bootstrapTokenJti),
       }),
       deps.db.query.sandboxInstances.findFirst({
         columns: {
@@ -47,7 +46,7 @@ export async function waitForSandboxTunnelConnectAck(
     ]);
 
     if (
-      ack !== undefined &&
+      tokenRedemption !== undefined &&
       sandboxInstance?.activeTunnelLeaseId !== null &&
       sandboxInstance?.activeTunnelLeaseId !== undefined &&
       sandboxInstance.tunnelConnectedAt !== null &&

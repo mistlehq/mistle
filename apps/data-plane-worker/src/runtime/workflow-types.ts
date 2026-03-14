@@ -43,8 +43,8 @@ export type StartSandboxInstanceWorkflowServices = {
       failureMessage: string;
     }) => Promise<void>;
   };
-  tunnelConnectAcks: {
-    waitForSandboxTunnelConnectAck: (input: {
+  tunnelReadiness: {
+    waitForSandboxTunnelReadiness: (input: {
       bootstrapTokenJti: string;
       sandboxInstanceId: string;
     }) => Promise<boolean>;

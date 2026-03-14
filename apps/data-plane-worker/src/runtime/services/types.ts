@@ -8,14 +8,14 @@ import type {
   StartSandboxInstanceWorkflowServices,
 } from "../workflow-types.js";
 
-export type TunnelConnectAckPolicy = {
+export type TunnelReadinessPolicy = {
   timeoutMs: number;
   pollIntervalMs: number;
 };
 
 export type SandboxLifecycleService = StartSandboxInstanceWorkflowServices["sandboxLifecycle"];
 export type SandboxInstanceStoreService = StartSandboxInstanceWorkflowServices["sandboxInstances"];
-export type TunnelConnectAckService = StartSandboxInstanceWorkflowServices["tunnelConnectAcks"];
+export type TunnelReadinessService = StartSandboxInstanceWorkflowServices["tunnelReadiness"];
 
 export type StartSandboxInput = Parameters<SandboxLifecycleService["startSandbox"]>[0];
 export type StartSandboxOutput = Awaited<ReturnType<SandboxLifecycleService["startSandbox"]>>;
@@ -35,15 +35,15 @@ export type MarkSandboxInstanceRunningInput = Parameters<
 export type MarkSandboxInstanceFailedInput = Parameters<
   SandboxInstanceStoreService["markSandboxInstanceFailed"]
 >[0];
-export type WaitForSandboxTunnelConnectAckInput = Parameters<
-  TunnelConnectAckService["waitForSandboxTunnelConnectAck"]
+export type WaitForSandboxTunnelReadinessInput = Parameters<
+  TunnelReadinessService["waitForSandboxTunnelReadiness"]
 >[0];
 
 export type CreateDataPlaneWorkerServicesInput = {
   config: DataPlaneWorkerRuntimeConfig;
   db: DataPlaneDatabase;
   sandboxAdapter: SandboxAdapter;
-  tunnelConnectAckPolicy: TunnelConnectAckPolicy;
+  tunnelReadinessPolicy: TunnelReadinessPolicy;
   clock: Clock;
   sleeper: Sleeper;
 };

@@ -5,7 +5,7 @@ import { Pool } from "pg";
 import { createSandboxRuntimeAdapter } from "../runtime/resources.js";
 import {
   createDataPlaneWorkerServices,
-  createDefaultTunnelConnectAckPolicy,
+  createDefaultTunnelReadinessPolicy,
 } from "../runtime/services/index.js";
 import type { DataPlaneWorkerServices } from "../runtime/workflow-types.js";
 import { getOpenWorkflowRuntime } from "./runtime.js";
@@ -51,7 +51,7 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
       config: runtimeConfig,
       db,
       sandboxAdapter: createSandboxRuntimeAdapter(runtimeConfig),
-      tunnelConnectAckPolicy: createDefaultTunnelConnectAckPolicy(runtimeConfig),
+      tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(runtimeConfig),
       clock: systemClock,
       sleeper: systemSleeper,
     });

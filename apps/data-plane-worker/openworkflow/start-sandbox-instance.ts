@@ -177,9 +177,9 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
     let didSandboxConnectToTunnel: boolean;
     try {
       didSandboxConnectToTunnel = await step.run(
-        { name: "wait-for-sandbox-tunnel-connect-ack" },
+        { name: "wait-for-sandbox-tunnel-readiness" },
         async () => {
-          return startSandboxInstance.tunnelConnectAcks.waitForSandboxTunnelConnectAck({
+          return startSandboxInstance.tunnelReadiness.waitForSandboxTunnelReadiness({
             bootstrapTokenJti: startedSandbox.bootstrapTokenJti,
             sandboxInstanceId: startedSandbox.sandboxInstanceId,
           });
@@ -192,11 +192,11 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           provider: startedSandbox.provider,
           providerSandboxId: startedSandbox.providerSandboxId,
           failureCode: StartSandboxFailureCodes.TUNNEL_CONNECT_ACK_WAIT_FAILED,
-          failureMessage: "Failed to wait for sandbox tunnel connect acknowledgement.",
+          failureMessage: "Failed to wait for sandbox tunnel readiness.",
         });
       } catch (cleanupError) {
         throw new Error(
-          "Failed to wait for sandbox tunnel connect acknowledgement and failed cleanup after startup failure.",
+          "Failed to wait for sandbox tunnel readiness and failed cleanup after startup failure.",
           {
             cause: {
               waitForAckError: error,
@@ -207,7 +207,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
       }
 
       throw new Error(
-        "Failed to wait for sandbox tunnel connect acknowledgement. Sandbox was stopped and sandbox instance was marked as failed.",
+        "Failed to wait for sandbox tunnel readiness. Sandbox was stopped and sandbox instance was marked as failed.",
         {
           cause: error,
         },
@@ -221,11 +221,11 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           provider: startedSandbox.provider,
           providerSandboxId: startedSandbox.providerSandboxId,
           failureCode: StartSandboxFailureCodes.TUNNEL_CONNECT_ACK_TIMEOUT,
-          failureMessage: "Sandbox tunnel connect acknowledgement timed out.",
+          failureMessage: "Sandbox tunnel readiness timed out.",
         });
       } catch (cleanupError) {
         throw new Error(
-          "Sandbox tunnel connect acknowledgement timed out and failed cleanup after startup failure.",
+          "Sandbox tunnel readiness timed out and failed cleanup after startup failure.",
           {
             cause: cleanupError,
           },
@@ -233,7 +233,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
       }
 
       throw new Error(
-        "Sandbox tunnel connect acknowledgement timed out. Sandbox was stopped and sandbox instance was marked as failed.",
+        "Sandbox tunnel readiness timed out. Sandbox was stopped and sandbox instance was marked as failed.",
       );
     }
 

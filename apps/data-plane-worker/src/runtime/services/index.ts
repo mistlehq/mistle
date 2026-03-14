@@ -1,8 +1,8 @@
-export { createDataPlaneWorkerServices, createDefaultTunnelConnectAckPolicy } from "./factory.js";
+export { createDataPlaneWorkerServices, createDefaultTunnelReadinessPolicy } from "./factory.js";
 export type {
   CreateDataPlaneWorkerServicesInput,
   SandboxInstanceStoreService,
   SandboxLifecycleService,
-  TunnelConnectAckPolicy,
-  TunnelConnectAckService,
+  TunnelReadinessPolicy,
+  TunnelReadinessService,
 } from "./types.js";

@@ -28,8 +28,8 @@ export type {
   SandboxSnapshotArtifactKind,
   SandboxInstanceSnapshot,
 } from "./sandbox-instance-snapshots.js";
-export { sandboxTunnelConnectAcks } from "./sandbox-tunnel-connect-acks.js";
+export { sandboxTunnelTokenRedemptions } from "./sandbox-tunnel-token-redemptions.js";
 export type {
-  InsertSandboxTunnelConnectAck,
-  SandboxTunnelConnectAck,
-} from "./sandbox-tunnel-connect-acks.js";
+  InsertSandboxTunnelTokenRedemption,
+  SandboxTunnelTokenRedemption,
+} from "./sandbox-tunnel-token-redemptions.js";
