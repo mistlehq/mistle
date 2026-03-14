@@ -1,20 +1,12 @@
 import type { NodeWebSocket } from "@hono/node-ws";
-import {
-  ConnectionTokenError,
-  type ConnectionTokenConfig,
-  verifyConnectionToken,
-} from "@mistle/gateway-connection-auth";
-import {
-  BootstrapTokenError,
-  type BootstrapTokenConfig,
-  verifyBootstrapToken,
-} from "@mistle/gateway-tunnel-auth";
+import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
+import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
 import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 import type { WSContext, WSMessageReceive } from "hono/ws";
-import { typeid } from "typeid-js";
 
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
+import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import type { SandboxOwnerLeaseHeartbeat } from "./ownership/sandbox-owner-lease-heartbeat.js";
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
@@ -31,7 +23,6 @@ import {
   getSandboxTunnelSessionAttributes,
   getSandboxTunnelSessionSpanName,
 } from "./telemetry.js";
-import { recordSandboxTunnelTokenRedemption } from "./token-redemption-store.js";
 import { notifyBootstrapPeerOfReleasedInteractiveStreams } from "./tunnel-peer-notifier.js";
 import type { TunnelSessionRegistry } from "./tunnel-session/index.js";
 import type { RelayPeerSide } from "./types.js";
@@ -53,17 +44,6 @@ type RegisterSandboxTunnelRouteInput = {
 };
 
 type TokenKind = "bootstrap" | "connection";
-type RequestedToken =
-  | {
-      kind: "missing";
-    }
-  | {
-      kind: "ambiguous";
-    }
-  | {
-      kind: TokenKind;
-      token: string;
-    };
 
 const CloseCodes: {
   INTERNAL_ERROR: number;
@@ -74,67 +54,6 @@ const CloseCodes: {
 };
 const OwnerLeaseTtlMs = 30_000;
 const TunnelLifecycleTracer = trace.getTracer("@mistle/data-plane-gateway");
-
-function toNormalizedTokenValue(token: string | null): string | undefined {
-  const normalizedToken = token?.trim();
-  if (normalizedToken === undefined || normalizedToken.length === 0) {
-    return undefined;
-  }
-
-  return normalizedToken;
-}
-
-function readRequestedTokenFromRequestUrl(url: URL): RequestedToken {
-  const bootstrapToken = url.searchParams.get("bootstrap_token");
-  const connectionToken = url.searchParams.get("connect_token");
-  const normalizedBootstrapToken = toNormalizedTokenValue(bootstrapToken);
-  const normalizedConnectionToken = toNormalizedTokenValue(connectionToken);
-
-  if (normalizedBootstrapToken !== undefined && normalizedConnectionToken !== undefined) {
-    return { kind: "ambiguous" };
-  }
-
-  if (normalizedBootstrapToken !== undefined) {
-    return { kind: "bootstrap", token: normalizedBootstrapToken };
-  }
-  if (normalizedConnectionToken !== undefined) {
-    return { kind: "connection", token: normalizedConnectionToken };
-  }
-
-  return { kind: "missing" };
-}
-
-async function verifyRequestedToken(input: {
-  requestedToken: RequestedToken;
-  bootstrapTokenConfig: BootstrapTokenConfig;
-  connectionTokenConfig: ConnectionTokenConfig;
-}): Promise<{ tokenKind: TokenKind; tokenJti: string; tokenSandboxInstanceId: string }> {
-  if (input.requestedToken.kind === "missing" || input.requestedToken.kind === "ambiguous") {
-    throw new Error("Expected a token-bearing request.");
-  }
-
-  if (input.requestedToken.kind === "bootstrap") {
-    const verificationResult = await verifyBootstrapToken({
-      config: input.bootstrapTokenConfig,
-      token: input.requestedToken.token,
-    });
-    return {
-      tokenKind: "bootstrap",
-      tokenJti: verificationResult.jti,
-      tokenSandboxInstanceId: verificationResult.sandboxInstanceId,
-    };
-  }
-
-  const verificationResult = await verifyConnectionToken({
-    config: input.connectionTokenConfig,
-    token: input.requestedToken.token,
-  });
-  return {
-    tokenKind: "connection",
-    tokenJti: verificationResult.jti,
-    tokenSandboxInstanceId: verificationResult.sandboxInstanceId,
-  };
-}
 
 function toForwardPayload(data: WSMessageReceive): string | ArrayBuffer | undefined {
   if (typeof data === "string") {
@@ -290,6 +209,13 @@ function finalizeTunnelSession(input: {
 }
 
 export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInput): void {
+  const tunnelWebSocketAdmission = new SandboxTunnelWebSocketAdmission({
+    bootstrapTokenConfig: input.bootstrapTokenConfig,
+    connectionTokenConfig: input.connectionTokenConfig,
+    gatewayNodeId: input.gatewayNodeId,
+    sandboxOwnerResolver: input.sandboxOwnerResolver,
+    sandboxOwnerStore: input.sandboxOwnerStore,
+  });
   const tunnelProtocolTranslator = new TunnelProtocolTranslator(input.interactiveStreamRouter);
   const tunnelSessionService = new TunnelSessionService(
     input.interactiveStreamRouter,
@@ -311,114 +237,18 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
         return ctx.json({ error: "Sandbox instance id path param is required." }, 400);
       }
 
-      const requestedToken = readRequestedTokenFromRequestUrl(new URL(ctx.req.url));
-      if (requestedToken.kind === "missing") {
-        return ctx.json({ error: "Sandbox auth token is required." }, 401);
-      }
-      if (requestedToken.kind === "ambiguous") {
+      const admission = await tunnelWebSocketAdmission.admitRequest({
+        db: ctx.get("db"),
+        requestUrl: ctx.req.url,
+        requestedInstanceId,
+      });
+      if (admission.kind === "rejected") {
         return ctx.json(
-          {
-            error:
-              "Provide exactly one auth token query param: either 'bootstrap_token' or 'connect_token'.",
-          },
-          400,
+          { error: admission.rejection.error },
+          { status: admission.rejection.status },
         );
       }
-
-      let verifiedTokenJti: string;
-      let verifiedTokenKind: TokenKind;
-      let verifiedTokenSandboxInstanceId: string;
-      try {
-        const verificationResult = await verifyRequestedToken({
-          requestedToken,
-          bootstrapTokenConfig: input.bootstrapTokenConfig,
-          connectionTokenConfig: input.connectionTokenConfig,
-        });
-        verifiedTokenJti = verificationResult.tokenJti;
-        verifiedTokenKind = verificationResult.tokenKind;
-        verifiedTokenSandboxInstanceId = verificationResult.tokenSandboxInstanceId;
-      } catch (error) {
-        if (error instanceof BootstrapTokenError) {
-          return ctx.json({ error: error.message }, 401);
-        }
-        if (error instanceof ConnectionTokenError) {
-          return ctx.json({ error: error.message }, 401);
-        }
-
-        logger.error(
-          {
-            err: error,
-            requestedTokenKind: requestedToken.kind,
-            requestedInstanceId,
-          },
-          "Unexpected sandbox tunnel token verification failure",
-        );
-        return ctx.json({ error: "Sandbox tunnel token verification failed." }, 500);
-      }
-
-      if (verifiedTokenSandboxInstanceId !== requestedInstanceId) {
-        return ctx.json(
-          { error: "Sandbox tunnel token sandboxInstanceId claim does not match request path." },
-          401,
-        );
-      }
-
-      if (verifiedTokenKind === "connection") {
-        const ownerResolution = await input.sandboxOwnerResolver.resolveOwner({
-          sandboxInstanceId: requestedInstanceId,
-        });
-        if (ownerResolution.kind === "missing") {
-          return ctx.json({ error: "Sandbox is not connected." }, 409);
-        }
-        if (ownerResolution.kind === "remote") {
-          return ctx.json({ error: "Sandbox is connected to a different gateway node." }, 503);
-        }
-      }
-
-      try {
-        // Redeem the token before websocket upgrade so each issued tunnel token is single-use.
-        const inserted = await recordSandboxTunnelTokenRedemption({
-          db: ctx.get("db"),
-          tokenJti: verifiedTokenJti,
-        });
-
-        if (!inserted) {
-          return ctx.json({ error: "Sandbox tunnel token has already been redeemed." }, 409);
-        }
-      } catch (error) {
-        logger.error(
-          {
-            err: error,
-            tokenJti: verifiedTokenJti,
-            tokenKind: verifiedTokenKind,
-          },
-          "Failed to persist sandbox tunnel token redemption",
-        );
-        return ctx.json({ error: "Failed to redeem sandbox tunnel token." }, 500);
-      }
-
-      if (verifiedTokenKind === "bootstrap") {
-        const sandboxRelaySessionId = typeid("dts").toString();
-        try {
-          const owner = await input.sandboxOwnerStore.claimOwner({
-            sandboxInstanceId: requestedInstanceId,
-            nodeId: input.gatewayNodeId,
-            sessionId: sandboxRelaySessionId,
-            ttlMs: OwnerLeaseTtlMs,
-          });
-          ctx.set("sandboxRelaySessionId", sandboxRelaySessionId);
-          ctx.set("sandboxOwnerLeaseId", owner.leaseId);
-        } catch (error) {
-          logger.error(
-            {
-              err: error,
-              sandboxInstanceId: requestedInstanceId,
-            },
-            "Failed to claim sandbox ownership for bootstrap websocket",
-          );
-          return ctx.json({ error: "Failed to claim sandbox ownership." }, 500);
-        }
-      }
+      ctx.set("sandboxTunnelAdmission", admission.request);
 
       await next();
     },
@@ -429,33 +259,18 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
           throw new Error("Sandbox tunnel websocket request is missing instanceId path parameter.");
         }
 
-        const sandboxInstanceId = requestedInstanceId.trim();
-        const requestedToken = readRequestedTokenFromRequestUrl(new URL(ctx.req.url));
-        if (requestedToken.kind !== "bootstrap" && requestedToken.kind !== "connection") {
-          throw new Error("Expected validated sandbox tunnel websocket request token.");
+        const admittedRequest = ctx.get("sandboxTunnelAdmission");
+        if (admittedRequest === undefined) {
+          throw new Error("Expected validated sandbox tunnel websocket request admission.");
         }
 
-        const sourcePeerSide = toSourcePeerSide(requestedToken.kind);
-        const bootstrapRelaySessionId =
-          requestedToken.kind === "bootstrap" ? ctx.get("sandboxRelaySessionId") : undefined;
-        const bootstrapOwnerLeaseId =
-          requestedToken.kind === "bootstrap" ? ctx.get("sandboxOwnerLeaseId") : undefined;
-        const connectionRelaySessionId =
-          requestedToken.kind === "connection" ? typeid("dts").toString() : undefined;
-        if (requestedToken.kind === "bootstrap" && bootstrapRelaySessionId === undefined) {
-          throw new Error("Expected sandbox relay session id for bootstrap websocket request.");
-        }
-        if (requestedToken.kind === "bootstrap" && bootstrapOwnerLeaseId === undefined) {
-          throw new Error("Expected sandbox owner lease id for bootstrap websocket request.");
-        }
-        if (requestedToken.kind === "connection" && connectionRelaySessionId === undefined) {
-          throw new Error("Expected sandbox relay session id for connection websocket request.");
-        }
+        const sandboxInstanceId = admittedRequest.sandboxInstanceId;
+        const sourceTokenKind: TokenKind = admittedRequest.kind;
+        const sourcePeerSide = toSourcePeerSide(sourceTokenKind);
         let attachedPeer: AttachedTunnelPeer | undefined;
         let tunnelSessionSpan: Span | undefined;
         let tunnelOpenedAtMs: number | undefined;
-        const relaySessionId: string =
-          requestedToken.kind === "bootstrap" ? bootstrapRelaySessionId : connectionRelaySessionId;
+        const relaySessionId = admittedRequest.relaySessionId;
 
         return {
           onOpen: (_event, ws) => {
@@ -468,7 +283,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 attributes: getSandboxTunnelSessionAttributes({
                   sandboxInstanceId,
                   peerSide: sourcePeerSide,
-                  tokenKind: requestedToken.kind,
+                  tokenKind: sourceTokenKind,
                 }),
               },
             );
@@ -477,22 +292,22 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 sandboxInstanceId,
                 peerSide: sourcePeerSide,
                 relaySessionId,
-                tokenKind: requestedToken.kind,
-                ...(requestedToken.kind === "bootstrap"
+                tokenKind: sourceTokenKind,
+                ...(admittedRequest.kind === "bootstrap"
                   ? {
-                      leaseId: bootstrapOwnerLeaseId,
+                      leaseId: admittedRequest.ownerLeaseId,
                     }
                   : {}),
               },
-              requestedToken.kind === "bootstrap"
+              admittedRequest.kind === "bootstrap"
                 ? "Sandbox bootstrap tunnel connected"
                 : "Sandbox connection peer attached",
             );
 
-            if (requestedToken.kind === "bootstrap") {
+            if (admittedRequest.kind === "bootstrap") {
               attachedPeer = tunnelSessionService.attachBootstrapPeer({
                 db: ctx.get("db"),
-                leaseId: bootstrapOwnerLeaseId,
+                leaseId: admittedRequest.ownerLeaseId,
                 onFatalError: (failure) => {
                   recordTunnelSessionError({
                     tunnelSessionSpan,
@@ -557,7 +372,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 logger.info(
                   {
                     instanceId: sandboxInstanceId,
-                    sourceTokenKind: requestedToken.kind,
+                    sourceTokenKind,
                   },
                   error.message,
                 );
@@ -574,7 +389,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 {
                   err: error,
                   instanceId: sandboxInstanceId,
-                  sourceTokenKind: requestedToken.kind,
+                  sourceTokenKind,
                 },
                 "Failed handling sandbox tunnel websocket message",
               );
@@ -586,11 +401,11 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
           },
           onClose: (event) => {
             if (attachedPeer !== undefined) {
-              if (requestedToken.kind === "bootstrap") {
+              if (admittedRequest.kind === "bootstrap") {
                 void tunnelSessionService.detachBootstrapPeer({
                   attachedPeer,
                   db: ctx.get("db"),
-                  leaseId: bootstrapOwnerLeaseId,
+                  leaseId: admittedRequest.ownerLeaseId,
                   sandboxInstanceId,
                 });
               } else {
@@ -607,7 +422,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               peerSide: sourcePeerSide,
               relaySessionId,
               sandboxInstanceId,
-              tokenKind: requestedToken.kind,
+              tokenKind: sourceTokenKind,
               tunnelSessionSpan,
             });
             tunnelSessionSpan = undefined;
@@ -625,7 +440,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 peerSide: sourcePeerSide,
                 relaySessionId,
                 sandboxInstanceId,
-                tokenKind: requestedToken.kind,
+                tokenKind: sourceTokenKind,
               },
               "Sandbox tunnel websocket emitted an error event",
             );
