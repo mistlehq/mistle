@@ -21,16 +21,39 @@ export async function waitForSandboxTunnelConnectAck(
   if (input.bootstrapTokenJti.trim().length === 0) {
     throw new Error("Expected bootstrap token JTI to be non-empty when waiting for connect ack.");
   }
+  if (input.sandboxInstanceId.trim().length === 0) {
+    throw new Error("Expected sandbox instance id to be non-empty when waiting for connect ack.");
+  }
 
   const deadlineMs = deps.clock.nowMs() + deps.policy.timeoutMs;
   while (true) {
-    const ack = await deps.db.query.sandboxTunnelConnectAcks.findFirst({
-      columns: {
-        bootstrapTokenJti: true,
-      },
-      where: (table, { eq: whereEq }) => whereEq(table.bootstrapTokenJti, input.bootstrapTokenJti),
-    });
-    if (ack !== undefined) {
+    const [ack, sandboxInstance] = await Promise.all([
+      deps.db.query.sandboxTunnelConnectAcks.findFirst({
+        columns: {
+          bootstrapTokenJti: true,
+        },
+        where: (table, { eq: whereEq }) =>
+          whereEq(table.bootstrapTokenJti, input.bootstrapTokenJti),
+      }),
+      deps.db.query.sandboxInstances.findFirst({
+        columns: {
+          activeTunnelLeaseId: true,
+          tunnelConnectedAt: true,
+          lastTunnelSeenAt: true,
+          tunnelDisconnectedAt: true,
+        },
+        where: (table, { eq: whereEq }) => whereEq(table.id, input.sandboxInstanceId),
+      }),
+    ]);
+
+    if (
+      ack !== undefined &&
+      sandboxInstance?.activeTunnelLeaseId !== null &&
+      sandboxInstance?.activeTunnelLeaseId !== undefined &&
+      sandboxInstance.tunnelConnectedAt !== null &&
+      sandboxInstance.lastTunnelSeenAt !== null &&
+      sandboxInstance.tunnelDisconnectedAt === null
+    ) {
       return true;
     }
 
