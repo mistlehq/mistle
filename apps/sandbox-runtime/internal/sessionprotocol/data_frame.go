@@ -12,6 +12,7 @@ const (
 	PayloadKindWebSocketText   = 0x02
 	PayloadKindWebSocketBinary = 0x03
 	MaxStreamID                = 0xffff_ffff
+	DefaultStreamWindowBytes   = 64 * 1024
 )
 
 type StreamDataFrame struct {

@@ -328,9 +328,6 @@ func handleSandboxTunnelConnection(
 			if err != nil {
 				return fmt.Errorf("sandbox tunnel websocket read failed: %w", err)
 			}
-			if routing.ControlMessageType == sessionprotocol.MessageTypeStreamWindow {
-				continue
-			}
 
 			relay := activeRelaysByStreamID[routing.StreamID]
 			if relay == nil {

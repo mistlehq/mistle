@@ -260,7 +260,8 @@ function isConnectionControlMessageAllowed(message: StreamControlMessage): boole
   return (
     message.type === "stream.open" ||
     message.type === "stream.signal" ||
-    message.type === "stream.close"
+    message.type === "stream.close" ||
+    message.type === "stream.window"
   );
 }
 
@@ -269,7 +270,8 @@ function isBootstrapControlMessageAllowed(message: StreamControlMessage): boolea
     message.type === "stream.open.ok" ||
     message.type === "stream.open.error" ||
     message.type === "stream.event" ||
-    message.type === "stream.reset"
+    message.type === "stream.reset" ||
+    message.type === "stream.window"
   );
 }
 
