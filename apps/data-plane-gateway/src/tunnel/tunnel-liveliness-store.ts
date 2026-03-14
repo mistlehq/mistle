@@ -1,5 +1,5 @@
 import { sandboxInstances, type DataPlaneDatabase } from "@mistle/db/data-plane";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 async function assertSandboxInstanceUpdated(input: {
   sandboxInstanceId: string;
@@ -15,12 +15,14 @@ async function assertSandboxInstanceUpdated(input: {
 }
 
 export async function markSandboxTunnelConnected(input: {
+  activeTunnelLeaseId: string;
   db: DataPlaneDatabase;
   sandboxInstanceId: string;
 }): Promise<void> {
   const updatedRows = await input.db
     .update(sandboxInstances)
     .set({
+      activeTunnelLeaseId: input.activeTunnelLeaseId,
       tunnelConnectedAt: sql`now()`,
       lastTunnelSeenAt: sql`now()`,
       tunnelDisconnectedAt: null,
@@ -38,43 +40,49 @@ export async function markSandboxTunnelConnected(input: {
 }
 
 export async function markSandboxTunnelSeen(input: {
+  activeTunnelLeaseId: string;
   db: DataPlaneDatabase;
   sandboxInstanceId: string;
-}): Promise<void> {
+}): Promise<boolean> {
   const updatedRows = await input.db
     .update(sandboxInstances)
     .set({
       lastTunnelSeenAt: sql`now()`,
       updatedAt: sql`now()`,
     })
-    .where(eq(sandboxInstances.id, input.sandboxInstanceId))
+    .where(
+      and(
+        eq(sandboxInstances.id, input.sandboxInstanceId),
+        eq(sandboxInstances.activeTunnelLeaseId, input.activeTunnelLeaseId),
+      ),
+    )
     .returning({
       id: sandboxInstances.id,
     });
 
-  await assertSandboxInstanceUpdated({
-    sandboxInstanceId: input.sandboxInstanceId,
-    updatedRows,
-  });
+  return updatedRows[0] !== undefined;
 }
 
 export async function markSandboxTunnelDisconnected(input: {
+  activeTunnelLeaseId: string;
   db: DataPlaneDatabase;
   sandboxInstanceId: string;
-}): Promise<void> {
+}): Promise<boolean> {
   const updatedRows = await input.db
     .update(sandboxInstances)
     .set({
       tunnelDisconnectedAt: sql`now()`,
       updatedAt: sql`now()`,
     })
-    .where(eq(sandboxInstances.id, input.sandboxInstanceId))
+    .where(
+      and(
+        eq(sandboxInstances.id, input.sandboxInstanceId),
+        eq(sandboxInstances.activeTunnelLeaseId, input.activeTunnelLeaseId),
+      ),
+    )
     .returning({
       id: sandboxInstances.id,
     });
 
-  await assertSandboxInstanceUpdated({
-    sandboxInstanceId: input.sandboxInstanceId,
-    updatedRows,
-  });
+  return updatedRows[0] !== undefined;
 }

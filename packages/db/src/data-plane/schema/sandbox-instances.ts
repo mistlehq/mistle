@@ -56,6 +56,7 @@ export const sandboxInstances = dataPlaneSchema.table(
     startedById: text("started_by_id").notNull(),
     source: text("source").notNull().$type<SandboxInstanceSource>(),
     startedAt: timestamp("started_at", { withTimezone: true, mode: "string" }),
+    activeTunnelLeaseId: text("active_tunnel_lease_id"),
     tunnelConnectedAt: timestamp("tunnel_connected_at", { withTimezone: true, mode: "string" }),
     lastTunnelSeenAt: timestamp("last_tunnel_seen_at", { withTimezone: true, mode: "string" }),
     tunnelDisconnectedAt: timestamp("tunnel_disconnected_at", {
