@@ -40,9 +40,7 @@ export function createDataPlaneGatewayRuntime(
   const sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
   const sandboxOwnerResolver = new StoreBackedSandboxOwnerResolver(nodeId, sandboxOwnerStore);
   const tunnelSessionRegistry = new TunnelSessionRegistry(
-    new InMemoryTunnelSessionRegistryAdapter(
-      config.interactiveStreams?.maxActiveBindingsPerSandbox ?? DefaultMaxActiveBindingsPerSandbox,
-    ),
+    new InMemoryTunnelSessionRegistryAdapter(DefaultMaxActiveBindingsPerSandbox),
   );
   const gatewayForwardingServer = new GatewayForwardingServer(
     new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),

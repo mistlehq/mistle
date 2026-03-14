@@ -2014,7 +2014,7 @@ describe("sandbox tunnel websocket integration", () => {
         ttlSeconds: 120,
       });
       const connectionTokens = await Promise.all(
-        Array.from({ length: 5 }, () =>
+        Array.from({ length: 33 }, () =>
           mintConnectionToken({
             config: {
               connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
@@ -2043,7 +2043,7 @@ describe("sandbox tunnel websocket integration", () => {
           );
         }
 
-        for (const [index, clientSocket] of clientSockets.slice(0, 4).entries()) {
+        for (const [index, clientSocket] of clientSockets.slice(0, 32).entries()) {
           const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
           await sendWebSocketMessage(
             clientSocket,
@@ -2067,9 +2067,9 @@ describe("sandbox tunnel websocket integration", () => {
           });
         }
 
-        const rejectedClientSocket = clientSockets[4];
+        const rejectedClientSocket = clientSockets[32];
         if (rejectedClientSocket === undefined) {
-          throw new Error("Expected the fifth client websocket to exist.");
+          throw new Error("Expected the rejected client websocket to exist.");
         }
 
         const rejectedOpenPromise = waitForWebSocketMessage(rejectedClientSocket);
@@ -2095,7 +2095,7 @@ describe("sandbox tunnel websocket integration", () => {
         expect(rejectedOpenPayload.streamId).toBe(99);
         expect(rejectedOpenPayload.code).toBe("max_active_streams_exceeded");
         expect(rejectedOpenPayload.message).toContain(
-          "maximum 4 active interactive stream bindings",
+          "maximum 32 active interactive stream bindings",
         );
       } finally {
         await Promise.all([

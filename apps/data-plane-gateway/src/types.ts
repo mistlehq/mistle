@@ -12,9 +12,6 @@ export type DataPlaneGatewayGlobalConfig = NonNullable<LoadDataPlaneGatewayConfi
 export type DataPlaneGatewayRuntimeConfig = {
   app: DataPlaneGatewayConfig;
   sandbox: DataPlaneGatewayGlobalConfig["sandbox"];
-  interactiveStreams?: {
-    maxActiveBindingsPerSandbox?: number;
-  };
 };
 
 export type AppContextBindings = {
