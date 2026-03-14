@@ -21,6 +21,7 @@ const (
 	ptyConnectErrorCodeInvalidSessionSelection = "invalid_pty_session_mode"
 	streamResetCodeInvalidStreamSignal         = "invalid_stream_signal"
 	streamResetCodeInvalidStreamClose          = "invalid_stream_close"
+	streamResetCodeInvalidStreamData           = "invalid_stream_data"
 	streamResetCodeStreamCloseFailed           = "stream_close_failed"
 	streamResetCodeTargetClosed                = "target_closed"
 )
@@ -64,6 +65,33 @@ func writeTextJSONMessage(ctx context.Context, tunnelConn *websocket.Conn, paylo
 	}
 
 	if err := tunnelConn.Write(ctx, websocket.MessageText, encodedPayload); err != nil {
+		return fmt.Errorf("failed to write websocket message: %w", err)
+	}
+
+	return nil
+}
+
+func writeBinaryDataFrame(
+	ctx context.Context,
+	tunnelConn *websocket.Conn,
+	streamID uint32,
+	payloadKind byte,
+	payload []byte,
+) error {
+	encodedPayload, err := sessionprotocol.EncodeDataFrame(struct {
+		StreamID    uint32
+		PayloadKind byte
+		Payload     []byte
+	}{
+		StreamID:    streamID,
+		PayloadKind: payloadKind,
+		Payload:     payload,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to encode data frame: %w", err)
+	}
+
+	if err := tunnelConn.Write(ctx, websocket.MessageBinary, encodedPayload); err != nil {
 		return fmt.Errorf("failed to write websocket message: %w", err)
 	}
 

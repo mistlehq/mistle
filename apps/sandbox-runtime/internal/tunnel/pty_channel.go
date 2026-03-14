@@ -139,10 +139,44 @@ func relayPTYSession(
 		case message := <-incomingMessages:
 			switch message.MessageType {
 			case websocket.MessageBinary:
+				dataFrame, err := sessionprotocol.DecodeDataFrame(message.Payload)
+				if err != nil {
+					if writeErr := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+						Type:     sessionprotocol.MessageTypeStreamReset,
+						StreamID: streamID,
+						Code:     streamResetCodeInvalidStreamData,
+						Message:  err.Error(),
+					}); writeErr != nil {
+						return fmt.Errorf("failed to write stream.reset for invalid pty data frame: %w", writeErr)
+					}
+					return nil
+				}
+				if dataFrame.StreamID != uint32(streamID) {
+					if err := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+						Type:     sessionprotocol.MessageTypeStreamReset,
+						StreamID: streamID,
+						Code:     streamResetCodeInvalidStreamData,
+						Message:  fmt.Sprintf("stream data frame streamId %d does not match active PTY stream %d", dataFrame.StreamID, streamID),
+					}); err != nil {
+						return fmt.Errorf("failed to write stream.reset for mismatched pty data frame: %w", err)
+					}
+					return nil
+				}
+				if dataFrame.PayloadKind != sessionprotocol.PayloadKindRawBytes {
+					if err := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+						Type:     sessionprotocol.MessageTypeStreamReset,
+						StreamID: streamID,
+						Code:     streamResetCodeInvalidStreamData,
+						Message:  fmt.Sprintf("pty stream payloadKind %d is not supported", dataFrame.PayloadKind),
+					}); err != nil {
+						return fmt.Errorf("failed to write stream.reset for unsupported pty payload kind: %w", err)
+					}
+					return nil
+				}
 				if session.IsExited() {
 					continue
 				}
-				if _, err := session.terminal.Write(message.Payload); err != nil {
+				if _, err := session.terminal.Write(dataFrame.Payload); err != nil {
 					return fmt.Errorf("failed to write pty stdin payload: %w", err)
 				}
 			case websocket.MessageText:
@@ -166,8 +200,14 @@ func relayPTYSession(
 				)
 			}
 		case outputPayload := <-ptyOutputCh:
-			if err := tunnelConn.Write(relayContext, websocket.MessageBinary, outputPayload); err != nil {
-				return fmt.Errorf("failed to write pty output to websocket: %w", err)
+			if err := writeBinaryDataFrame(
+				relayContext,
+				tunnelConn,
+				uint32(streamID),
+				sessionprotocol.PayloadKindRawBytes,
+				outputPayload,
+			); err != nil {
+				return fmt.Errorf("failed to write pty output data frame: %w", err)
 			}
 		case ptyOutputErr := <-ptyOutputErrCh:
 			if ptyOutputErr == nil ||

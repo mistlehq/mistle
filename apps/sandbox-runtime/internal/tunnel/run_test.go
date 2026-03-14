@@ -33,6 +33,41 @@ func writeTestTunnelTokenExchangeResponse(
 	}
 }
 
+func encodeTestDataFrame(
+	t *testing.T,
+	streamID uint32,
+	payloadKind byte,
+	payload []byte,
+) []byte {
+	t.Helper()
+
+	encodedPayload, err := sessionprotocol.EncodeDataFrame(struct {
+		StreamID    uint32
+		PayloadKind byte
+		Payload     []byte
+	}{
+		StreamID:    streamID,
+		PayloadKind: payloadKind,
+		Payload:     payload,
+	})
+	if err != nil {
+		t.Fatalf("expected data frame encode to succeed: %v", err)
+	}
+
+	return encodedPayload
+}
+
+func decodeTestDataFrame(t *testing.T, payload []byte) sessionprotocol.StreamDataFrame {
+	t.Helper()
+
+	dataFrame, err := sessionprotocol.DecodeDataFrame(payload)
+	if err != nil {
+		t.Fatalf("expected data frame decode to succeed: %v", err)
+	}
+
+	return dataFrame
+}
+
 func TestRun(t *testing.T) {
 	t.Run("fails when context is missing", func(t *testing.T) {
 		err := Run(RunInput{
@@ -808,7 +843,16 @@ func TestRun(t *testing.T) {
 				}
 
 				expectedToken := []byte("__MISTLE_PTY_TOKEN__")
-				if err := conn.Write(handlerCtx, websocket.MessageBinary, []byte("printf '__MISTLE_PTY_TOKEN__\\n'\n")); err != nil {
+				if err := conn.Write(
+					handlerCtx,
+					websocket.MessageBinary,
+					encodeTestDataFrame(
+						t,
+						31,
+						sessionprotocol.PayloadKindRawBytes,
+						[]byte("printf '__MISTLE_PTY_TOKEN__\\n'\n"),
+					),
+				); err != nil {
 					handlerErrCh <- fmt.Errorf("expected pty stdin write to succeed: %w", err)
 					return
 				}
@@ -823,7 +867,20 @@ func TestRun(t *testing.T) {
 					if messageType != websocket.MessageBinary {
 						continue
 					}
-					if bytes.Contains(payload, expectedToken) {
+					dataFrame := decodeTestDataFrame(t, payload)
+					if dataFrame.StreamID != 31 {
+						handlerErrCh <- fmt.Errorf("expected pty output streamId 31, got %d", dataFrame.StreamID)
+						return
+					}
+					if dataFrame.PayloadKind != sessionprotocol.PayloadKindRawBytes {
+						handlerErrCh <- fmt.Errorf(
+							"expected pty output payloadKind %d, got %d",
+							sessionprotocol.PayloadKindRawBytes,
+							dataFrame.PayloadKind,
+						)
+						return
+					}
+					if bytes.Contains(dataFrame.Payload, expectedToken) {
 						foundToken = true
 						break
 					}
@@ -959,7 +1016,11 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				if err := conn.Write(handlerCtx, websocket.MessageBinary, []byte("exit\n")); err != nil {
+				if err := conn.Write(
+					handlerCtx,
+					websocket.MessageBinary,
+					encodeTestDataFrame(t, 41, sessionprotocol.PayloadKindRawBytes, []byte("exit\n")),
+				); err != nil {
 					handlerErrCh <- fmt.Errorf("expected pty stdin exit write to succeed: %w", err)
 					return
 				}
