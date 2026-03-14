@@ -80,8 +80,10 @@ type RequestedToken =
 
 const CloseCodes: {
   INTERNAL_ERROR: number;
+  PROTOCOL_ERROR: number;
 } = {
   INTERNAL_ERROR: 1011,
+  PROTOCOL_ERROR: 1008,
 };
 const OwnerLeaseTtlMs = 30_000;
 const TunnelLifecycleTracer = trace.getTracer("@mistle/data-plane-gateway");
@@ -227,6 +229,62 @@ function toStreamOpenErrorPayload(input: { error: Error; streamId: number }): st
   throw input.error;
 }
 
+class TunnelProtocolViolationError extends Error {
+  public constructor(message: string) {
+    super(message);
+    this.name = "TunnelProtocolViolationError";
+  }
+}
+
+function createUnsupportedTextPayloadErrorMessage(side: RelayPeerSide): string {
+  return side === "connection"
+    ? "Connection websocket text payloads must be valid stream control messages."
+    : "Bootstrap websocket text payloads must be valid stream control messages.";
+}
+
+function createUnsupportedBinaryPayloadErrorMessage(side: RelayPeerSide): string {
+  return side === "connection"
+    ? "Connection websocket binary payloads must be valid tunnel data frames."
+    : "Bootstrap websocket binary payloads must be valid tunnel data frames.";
+}
+
+function isConnectionControlMessageAllowed(message: StreamControlMessage): boolean {
+  return (
+    message.type === "stream.open" ||
+    message.type === "stream.signal" ||
+    message.type === "stream.close"
+  );
+}
+
+function isBootstrapControlMessageAllowed(message: StreamControlMessage): boolean {
+  return (
+    message.type === "stream.open.ok" ||
+    message.type === "stream.open.error" ||
+    message.type === "stream.event" ||
+    message.type === "stream.reset"
+  );
+}
+
+function assertConnectionControlMessageAllowed(message: StreamControlMessage): void {
+  if (isConnectionControlMessageAllowed(message)) {
+    return;
+  }
+
+  throw new TunnelProtocolViolationError(
+    `Connection websocket cannot send control message type '${message.type}'.`,
+  );
+}
+
+function assertBootstrapControlMessageAllowed(message: StreamControlMessage): void {
+  if (isBootstrapControlMessageAllowed(message)) {
+    return;
+  }
+
+  throw new TunnelProtocolViolationError(
+    `Bootstrap websocket cannot send control message type '${message.type}'.`,
+  );
+}
+
 async function translateConnectionPayloadToBootstrap(input: {
   clientSessionId: string;
   interactiveStreamRouter: InteractiveStreamRouter;
@@ -297,10 +355,9 @@ async function translateConnectionPayloadToBootstrap(input: {
 
   const controlMessage = parseStreamControlMessage(input.payload);
   if (controlMessage === undefined) {
-    return {
-      payload: input.payload,
-    };
+    throw new TunnelProtocolViolationError(createUnsupportedTextPayloadErrorMessage("connection"));
   }
+  assertConnectionControlMessageAllowed(controlMessage);
 
   const route = await input.interactiveStreamRouter.findInteractiveStreamByClient({
     sandboxInstanceId: input.sandboxInstanceId,
@@ -345,10 +402,9 @@ async function translateBootstrapPayloadToConnection(input: {
 }): Promise<RoutedTunnelMessage> {
   const controlMessage = parseStreamControlMessage(input.payload);
   if (controlMessage === undefined) {
-    return {
-      payload: input.payload,
-    };
+    throw new TunnelProtocolViolationError(createUnsupportedTextPayloadErrorMessage("bootstrap"));
   }
+  assertBootstrapControlMessageAllowed(controlMessage);
 
   const route = await input.interactiveStreamRouter.findInteractiveStreamByTunnel({
     sandboxInstanceId: input.sandboxInstanceId,
@@ -500,9 +556,9 @@ async function translateConnectionBinaryPayloadToBootstrap(input: {
 }): Promise<RoutedTunnelMessage> {
   const streamId = readDataFrameStreamId(input.payload);
   if (streamId === undefined) {
-    return {
-      payload: input.payload,
-    };
+    throw new TunnelProtocolViolationError(
+      createUnsupportedBinaryPayloadErrorMessage("connection"),
+    );
   }
 
   const route = await input.interactiveStreamRouter.findInteractiveStreamByClient({
@@ -540,9 +596,7 @@ async function translateBootstrapBinaryPayloadToConnection(input: {
 }): Promise<RoutedTunnelMessage> {
   const streamId = readDataFrameStreamId(input.payload);
   if (streamId === undefined) {
-    return {
-      payload: input.payload,
-    };
+    throw new TunnelProtocolViolationError(createUnsupportedBinaryPayloadErrorMessage("bootstrap"));
   }
 
   const route = await input.interactiveStreamRouter.findInteractiveStreamByTunnel({
@@ -643,7 +697,7 @@ async function notifyBootstrapPeerOfReleasedInteractiveStreams(input: {
 
 async function handleTunnelWebSocketMessage(input: {
   clientSessionId: string;
-  currentSocket: Pick<WSContext, "send">;
+  currentSocket: Pick<WSContext, "close" | "send">;
   interactiveStreamRouter: InteractiveStreamRouter;
   payload: string | ArrayBuffer;
   relayCoordinator: TunnelRelayCoordinator;
@@ -1123,6 +1177,18 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               sandboxInstanceId,
               sourcePeerSide,
             }).catch((error: unknown) => {
+              if (error instanceof TunnelProtocolViolationError) {
+                logger.info(
+                  {
+                    instanceId: sandboxInstanceId,
+                    sourceTokenKind: requestedToken.kind,
+                  },
+                  error.message,
+                );
+                ws.close(CloseCodes.PROTOCOL_ERROR, error.message);
+                return;
+              }
+
               recordTunnelSessionError({
                 tunnelSessionSpan,
                 error,
