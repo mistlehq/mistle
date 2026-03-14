@@ -3,6 +3,93 @@ import { z } from "zod";
 const PositiveIntegerSchema = z.int().positive();
 const NonEmptyStringSchema = z.string().min(1);
 
+export type AgentStreamChannel = {
+  kind: "agent";
+};
+
+export type PTYStreamChannel = {
+  kind: "pty";
+  session: "create" | "attach";
+  cols?: number | undefined;
+  rows?: number | undefined;
+  cwd?: string | undefined;
+};
+
+export type StreamChannel = AgentStreamChannel | PTYStreamChannel;
+
+export type PTYResizeSignal = {
+  type: "pty.resize";
+  cols: number;
+  rows: number;
+};
+
+export type StreamSignal = PTYResizeSignal;
+
+export type PTYExitEvent = {
+  type: "pty.exit";
+  exitCode: number;
+};
+
+export type StreamEvent = PTYExitEvent;
+
+export type StreamOpen = {
+  type: "stream.open";
+  streamId: number;
+  channel: StreamChannel;
+};
+
+export type StreamOpenOK = {
+  type: "stream.open.ok";
+  streamId: number;
+};
+
+export type StreamOpenError = {
+  type: "stream.open.error";
+  streamId: number;
+  code: string;
+  message: string;
+};
+
+export type StreamSignalMessage = {
+  type: "stream.signal";
+  streamId: number;
+  signal: StreamSignal;
+};
+
+export type StreamEventMessage = {
+  type: "stream.event";
+  streamId: number;
+  event: StreamEvent;
+};
+
+export type StreamClose = {
+  type: "stream.close";
+  streamId: number;
+};
+
+export type StreamReset = {
+  type: "stream.reset";
+  streamId: number;
+  code: string;
+  message: string;
+};
+
+export type StreamWindow = {
+  type: "stream.window";
+  streamId: number;
+  bytes: number;
+};
+
+export type StreamControlMessage =
+  | StreamOpen
+  | StreamOpenOK
+  | StreamOpenError
+  | StreamSignalMessage
+  | StreamEventMessage
+  | StreamClose
+  | StreamReset
+  | StreamWindow;
+
 const AgentStreamChannelSchema = z.object({
   kind: z.literal("agent"),
 });
@@ -93,26 +180,6 @@ const StreamControlMessageSchema = z.discriminatedUnion("type", [
   StreamResetSchema,
   StreamWindowSchema,
 ]);
-
-export type AgentStreamChannel = z.infer<typeof AgentStreamChannelSchema>;
-export type PTYStreamChannel = z.infer<typeof PTYStreamChannelSchema>;
-export type StreamChannel = z.infer<typeof StreamChannelSchema>;
-
-export type PTYResizeSignal = z.infer<typeof PTYResizeSignalSchema>;
-export type StreamSignal = z.infer<typeof StreamSignalSchema>;
-
-export type PTYExitEvent = z.infer<typeof PTYExitEventSchema>;
-export type StreamEvent = z.infer<typeof StreamEventSchema>;
-
-export type StreamOpen = z.infer<typeof StreamOpenSchema>;
-export type StreamOpenOK = z.infer<typeof StreamOpenOKSchema>;
-export type StreamOpenError = z.infer<typeof StreamOpenErrorSchema>;
-export type StreamSignalMessage = z.infer<typeof StreamSignalMessageSchema>;
-export type StreamEventMessage = z.infer<typeof StreamEventMessageSchema>;
-export type StreamClose = z.infer<typeof StreamCloseSchema>;
-export type StreamReset = z.infer<typeof StreamResetSchema>;
-export type StreamWindow = z.infer<typeof StreamWindowSchema>;
-export type StreamControlMessage = z.infer<typeof StreamControlMessageSchema>;
 
 /**
  * Parses one JSON control frame carried over the tunnel websocket.
