@@ -1,3 +1,4 @@
+import { decodeDataFrame, PayloadKindWebSocketText } from "@mistle/sandbox-session-protocol";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 import WebSocket, { type RawData, WebSocketServer } from "ws";
@@ -20,7 +21,7 @@ type AgentTestServerMode = "accept" | "reject";
 type AgentTestServer = {
   url: string;
   connectRequest: Promise<{ streamId: number }>;
-  payload: Promise<string>;
+  payload: Promise<{ streamId: number; payload: string }>;
   socketClosed: Promise<void>;
   close: () => Promise<void>;
 };
@@ -59,6 +60,20 @@ function toText(data: RawData): string {
   }
 
   return Buffer.concat(data).toString("utf8");
+}
+
+function toUint8Array(data: RawData): Uint8Array {
+  if (typeof data === "string") {
+    return new TextEncoder().encode(data);
+  }
+  if (data instanceof ArrayBuffer) {
+    return new Uint8Array(data);
+  }
+  if (Buffer.isBuffer(data)) {
+    return new Uint8Array(data);
+  }
+
+  return new Uint8Array(Buffer.concat(data));
 }
 
 function parseStreamIdFromOpenMessage(data: RawData): number {
@@ -112,7 +127,7 @@ function parseStreamIdFromOpenMessage(data: RawData): number {
 
 async function startAgentTestServer(mode: AgentTestServerMode): Promise<AgentTestServer> {
   const connectDeferred = createDeferred<{ streamId: number }>();
-  const payloadDeferred = createDeferred<string>();
+  const payloadDeferred = createDeferred<{ streamId: number; payload: string }>();
   const socketClosedDeferred = createDeferred<void>();
 
   const wsServer = new WebSocketServer({
@@ -161,7 +176,21 @@ async function startAgentTestServer(mode: AgentTestServerMode): Promise<AgentTes
         }
       }
 
-      payloadDeferred.resolve(toText(message));
+      try {
+        const dataFrame = decodeDataFrame(toUint8Array(message));
+        if (dataFrame.payloadKind !== PayloadKindWebSocketText) {
+          throw new Error(
+            `Expected websocket text payload kind ${String(PayloadKindWebSocketText)}, received ${String(dataFrame.payloadKind)}.`,
+          );
+        }
+
+        payloadDeferred.resolve({
+          streamId: dataFrame.streamId,
+          payload: new TextDecoder().decode(dataFrame.payload),
+        });
+      } catch (error) {
+        payloadDeferred.reject(error);
+      }
     });
 
     socket.on("close", () => {
@@ -252,12 +281,14 @@ describe("sandbox agent websocket delivery", () => {
       await deliverAutomationPayload(deliverInput);
 
       const connectRequest = await server.connectRequest;
-      const payloadText = await server.payload;
+      const payloadMessage = await server.payload;
       await server.socketClosed;
 
       expect(connectRequest.streamId).toBeGreaterThan(0);
-
-      expect(payloadText).toBe("Handle @mistlebot run this");
+      expect(payloadMessage).toEqual({
+        streamId: connectRequest.streamId,
+        payload: "Handle @mistlebot run this",
+      });
     } finally {
       await server.close();
     }
@@ -289,8 +320,11 @@ describe("sandbox agent websocket delivery", () => {
         autoClose: false,
       });
 
-      const payloadText = await server.payload;
-      expect(payloadText).toBe("hello-agent");
+      const payloadMessage = await server.payload;
+      expect(payloadMessage).toEqual({
+        streamId: connection.streamId,
+        payload: "hello-agent",
+      });
       expect(connection.socket.readyState).toBe(WebSocket.OPEN);
 
       await systemSleeper.sleep(50);

@@ -10,18 +10,32 @@ import {
   type SandboxSessionSocketEventName,
 } from "./runtime.js";
 
-function toMessageData(data: RawData): unknown {
-  if (typeof data === "string") {
-    return data;
-  }
-  if (data instanceof ArrayBuffer) {
-    return Buffer.from(data).toString("utf8");
-  }
-  if (Buffer.isBuffer(data)) {
-    return data.toString("utf8");
+function toMessageData(data: RawData, isBinary: boolean): string | Uint8Array {
+  if (!isBinary) {
+    if (typeof data === "string") {
+      return data;
+    }
+    if (data instanceof ArrayBuffer) {
+      return new TextDecoder().decode(new Uint8Array(data));
+    }
+    if (Buffer.isBuffer(data)) {
+      return data.toString("utf8");
+    }
+
+    return Buffer.concat(data).toString("utf8");
   }
 
-  return Buffer.concat(data).toString("utf8");
+  if (typeof data === "string") {
+    return new TextEncoder().encode(data);
+  }
+  if (data instanceof ArrayBuffer) {
+    return new Uint8Array(data);
+  }
+  if (Buffer.isBuffer(data)) {
+    return new Uint8Array(data);
+  }
+
+  return new Uint8Array(Buffer.concat(data));
 }
 
 function toReadyState(value: number): SandboxSessionSocket["readyState"] {
@@ -44,7 +58,7 @@ class NodeSandboxSessionSocket implements SandboxSessionSocket {
   >();
   readonly #messageListenerMap = new Map<
     SandboxSessionSocketEventMap["message"],
-    (data: RawData) => void
+    (data: RawData, isBinary: boolean) => void
   >();
 
   constructor(connectionUrl: string) {
@@ -60,8 +74,8 @@ class NodeSandboxSessionSocket implements SandboxSessionSocket {
     listener: SandboxSessionSocketEventMap[EventName],
   ): void {
     if (eventName === "message") {
-      const wrappedMessageListener = (data: RawData): void => {
-        listener(toMessageData(data));
+      const wrappedMessageListener = (data: RawData, isBinary: boolean): void => {
+        listener(toMessageData(data, isBinary));
       };
 
       this.#messageListenerMap.set(listener, wrappedMessageListener);
@@ -101,7 +115,7 @@ class NodeSandboxSessionSocket implements SandboxSessionSocket {
     this.#socket.off(eventName, wrappedListener);
   }
 
-  send(payload: string): void {
+  send(payload: ArrayBuffer | Uint8Array | string): void {
     this.#socket.send(payload);
   }
 

@@ -29,7 +29,7 @@ export interface SandboxSessionSocket {
     eventName: EventName,
     listener: SandboxSessionSocketEventMap[EventName],
   ): void;
-  send(payload: string): void;
+  send(payload: ArrayBuffer | Uint8Array | string): void;
   close(code?: number, reason?: string): void;
 }
 

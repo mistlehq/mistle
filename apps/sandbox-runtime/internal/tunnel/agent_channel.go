@@ -172,13 +172,12 @@ func relayTunnelFrames(
 	defer cancelAgentRelay()
 
 	agentRelayErrCh := make(chan error, 1)
-	go relayFramesDirection(
+	go relayAgentFramesDirection(
 		relayContext,
 		agentRelayErrCh,
 		agentConn,
 		tunnelConn,
-		"agent websocket",
-		"sandbox tunnel websocket",
+		uint32(streamID),
 	)
 
 	for {
@@ -191,13 +190,6 @@ func relayTunnelFrames(
 			}
 			return "", agentRelayErr
 		case message := <-incomingMessages:
-			if message.MessageType != websocket.MessageText && message.MessageType != websocket.MessageBinary {
-				return "", fmt.Errorf(
-					"sandbox tunnel websocket produced unsupported message type %s",
-					message.MessageType.String(),
-				)
-			}
-
 			if message.MessageType == websocket.MessageText {
 				controlMessageType, parseErr := parseControlMessageType(message.Payload)
 				if parseErr == nil && controlMessageType == sessionprotocol.MessageTypeStreamClose {
@@ -214,9 +206,68 @@ func relayTunnelFrames(
 					}
 					return agentRelayResultDisconnected, nil
 				}
+
+				if err := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+					Type:     sessionprotocol.MessageTypeStreamReset,
+					StreamID: streamID,
+					Code:     streamResetCodeInvalidStreamData,
+					Message:  "agent stream only accepts binary data frames after stream.open",
+				}); err != nil {
+					return "", fmt.Errorf("failed to write stream.reset for invalid agent text payload: %w", err)
+				}
+				return agentRelayResultDisconnected, nil
 			}
 
-			if err := agentConn.Write(ctx, message.MessageType, message.Payload); err != nil {
+			if message.MessageType != websocket.MessageBinary {
+				return "", fmt.Errorf(
+					"sandbox tunnel websocket produced unsupported message type %s",
+					message.MessageType.String(),
+				)
+			}
+
+			dataFrame, err := sessionprotocol.DecodeDataFrame(message.Payload)
+			if err != nil {
+				if writeErr := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+					Type:     sessionprotocol.MessageTypeStreamReset,
+					StreamID: streamID,
+					Code:     streamResetCodeInvalidStreamData,
+					Message:  err.Error(),
+				}); writeErr != nil {
+					return "", fmt.Errorf("failed to write stream.reset for invalid agent data frame: %w", writeErr)
+				}
+				return agentRelayResultDisconnected, nil
+			}
+			if dataFrame.StreamID != uint32(streamID) {
+				if err := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+					Type:     sessionprotocol.MessageTypeStreamReset,
+					StreamID: streamID,
+					Code:     streamResetCodeInvalidStreamData,
+					Message:  fmt.Sprintf("stream data frame streamId %d does not match active agent stream %d", dataFrame.StreamID, streamID),
+				}); err != nil {
+					return "", fmt.Errorf("failed to write stream.reset for mismatched agent data frame: %w", err)
+				}
+				return agentRelayResultDisconnected, nil
+			}
+
+			var agentMessageType websocket.MessageType
+			switch dataFrame.PayloadKind {
+			case sessionprotocol.PayloadKindWebSocketText:
+				agentMessageType = websocket.MessageText
+			case sessionprotocol.PayloadKindWebSocketBinary:
+				agentMessageType = websocket.MessageBinary
+			default:
+				if err := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+					Type:     sessionprotocol.MessageTypeStreamReset,
+					StreamID: streamID,
+					Code:     streamResetCodeInvalidStreamData,
+					Message:  fmt.Sprintf("agent stream payloadKind %d is not supported", dataFrame.PayloadKind),
+				}); err != nil {
+					return "", fmt.Errorf("failed to write stream.reset for unsupported agent payload kind: %w", err)
+				}
+				return agentRelayResultDisconnected, nil
+			}
+
+			if err := agentConn.Write(ctx, agentMessageType, dataFrame.Payload); err != nil {
 				if isExpectedAgentDisconnect(err) {
 					return agentRelayResultDisconnected, nil
 				}
@@ -251,28 +302,38 @@ func startAgentRelay(
 	return relay
 }
 
-func relayFramesDirection(
+func relayAgentFramesDirection(
 	ctx context.Context,
 	relayErrCh chan<- error,
 	source *websocket.Conn,
 	target *websocket.Conn,
-	sourceLabel string,
-	targetLabel string,
+	streamID uint32,
 ) {
 	for {
 		messageType, payload, err := source.Read(ctx)
 		if err != nil {
-			relayErrCh <- fmt.Errorf("%s read failed: %w", sourceLabel, err)
+			relayErrCh <- fmt.Errorf("agent websocket read failed: %w", err)
 			return
 		}
 
 		if messageType != websocket.MessageText && messageType != websocket.MessageBinary {
-			relayErrCh <- fmt.Errorf("%s produced unsupported message type %s", sourceLabel, messageType.String())
+			relayErrCh <- fmt.Errorf("agent websocket produced unsupported message type %s", messageType.String())
 			return
 		}
 
-		if err := target.Write(ctx, messageType, payload); err != nil {
-			relayErrCh <- fmt.Errorf("%s write failed: %w", targetLabel, err)
+		var payloadKind byte
+		switch messageType {
+		case websocket.MessageText:
+			payloadKind = sessionprotocol.PayloadKindWebSocketText
+		case websocket.MessageBinary:
+			payloadKind = sessionprotocol.PayloadKindWebSocketBinary
+		default:
+			relayErrCh <- fmt.Errorf("agent websocket produced unsupported message type %s", messageType.String())
+			return
+		}
+
+		if err := writeBinaryDataFrame(ctx, target, streamID, payloadKind, payload); err != nil {
+			relayErrCh <- fmt.Errorf("sandbox tunnel websocket write failed: %w", err)
 			return
 		}
 	}
