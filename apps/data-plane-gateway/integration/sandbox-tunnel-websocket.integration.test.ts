@@ -13,6 +13,7 @@ import {
   encodeDataFrame,
   parseStreamControlMessage,
   PayloadKindWebSocketBinary,
+  PayloadKindWebSocketText,
   type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
 import { typeid } from "typeid-js";
@@ -51,6 +52,14 @@ function parseDataFrame(data: string | Buffer) {
   }
 
   return decodeDataFrame(new Uint8Array(data));
+}
+
+function encodeWebSocketTextDataFrame(input: { payload: string; streamId: number }): Uint8Array {
+  return encodeDataFrame({
+    streamId: input.streamId,
+    payloadKind: PayloadKindWebSocketText,
+    payload: Buffer.from(input.payload, "utf8"),
+  });
 }
 
 async function insertSandboxInstanceRow(input: {
@@ -282,7 +291,7 @@ describe("sandbox tunnel websocket integration", () => {
   );
 
   it(
-    "forwards text and binary websocket messages between bootstrap and connection peers",
+    "closes the connection peer when it sends opaque text or binary websocket payloads",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -321,25 +330,91 @@ describe("sandbox tunnel websocket integration", () => {
           `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
         );
 
-        const clientTextPayload = "hello from client";
-        const forwardedToBootstrapPromise = waitForWebSocketMessage(bootstrapSocket);
-        await sendWebSocketMessage(clientSocket, clientTextPayload);
-        const forwardedToBootstrap = await forwardedToBootstrapPromise;
+        const bootstrapNoMessagePromise = waitForNoWebSocketMessage(bootstrapSocket);
+        const clientClosedOnTextPromise = waitForWebSocketClose(clientSocket);
+        await sendWebSocketMessage(clientSocket, "hello from client");
+        await expect(clientClosedOnTextPromise).resolves.toEqual({
+          code: 1008,
+          reason: "Connection websocket text payloads must be valid stream control messages.",
+        });
+        await bootstrapNoMessagePromise;
 
-        expect(forwardedToBootstrap.isBinary).toBe(false);
-        expect(forwardedToBootstrap.data).toBe(clientTextPayload);
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
 
-        const bootstrapBinaryPayload = Buffer.from([0x01, 0x7f, 0xa5]);
-        const forwardedToClientPromise = waitForWebSocketMessage(clientSocket);
-        await sendWebSocketMessage(bootstrapSocket, bootstrapBinaryPayload);
-        const forwardedToClient = await forwardedToClientPromise;
+        const bootstrapStillNoMessagePromise = waitForNoWebSocketMessage(bootstrapSocket);
+        const clientClosedOnBinaryPromise = waitForWebSocketClose(clientSocket);
+        await sendWebSocketMessage(clientSocket, Buffer.from([0x01, 0x7f, 0xa5]));
+        await expect(clientClosedOnBinaryPromise).resolves.toEqual({
+          code: 1008,
+          reason: "Connection websocket binary payloads must be valid tunnel data frames.",
+        });
+        await bootstrapStillNoMessagePromise;
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
 
-        expect(forwardedToClient.isBinary).toBe(true);
-        expect(typeof forwardedToClient.data).toBe("object");
-        if (typeof forwardedToClient.data === "string") {
-          throw new Error("Expected binary websocket message to forward as Buffer.");
-        }
-        expect(forwardedToClient.data.equals(bootstrapBinaryPayload)).toBe(true);
+  it(
+    "closes the connection peer when it sends a control message reserved for bootstrap responses",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const bootstrapNoMessagePromise = waitForNoWebSocketMessage(bootstrapSocket);
+        const clientClosedPromise = waitForWebSocketClose(clientSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        await expect(clientClosedPromise).resolves.toEqual({
+          code: 1008,
+          reason: "Connection websocket cannot send control message type 'stream.open.ok'.",
+        });
+        await bootstrapNoMessagePromise;
       } finally {
         await Promise.all([
           closeWebSocketIfOpen(bootstrapSocket),
@@ -1153,12 +1228,21 @@ describe("sandbox tunnel websocket integration", () => {
         const forwardedAgentTextPromise = waitForWebSocketMessage(bootstrapSocket);
         await sendWebSocketMessage(
           clientSocket,
-          JSON.stringify({ jsonrpc: "2.0", method: "ping" }),
+          Buffer.from(
+            encodeWebSocketTextDataFrame({
+              streamId: clientStreamId,
+              payload: JSON.stringify({ jsonrpc: "2.0", method: "ping" }),
+            }),
+          ),
         );
         const forwardedAgentText = await forwardedAgentTextPromise;
 
-        expect(forwardedAgentText.isBinary).toBe(false);
-        expect(forwardedAgentText.data).toBe(JSON.stringify({ jsonrpc: "2.0", method: "ping" }));
+        expect(forwardedAgentText.isBinary).toBe(true);
+        expect(parseDataFrame(forwardedAgentText.data)).toEqual({
+          streamId: 1,
+          payloadKind: PayloadKindWebSocketText,
+          payload: Buffer.from(JSON.stringify({ jsonrpc: "2.0", method: "ping" }), "utf8"),
+        });
 
         const forwardedClosePromise = waitForWebSocketMessage(bootstrapSocket);
         await closeWebSocket(clientSocket);
