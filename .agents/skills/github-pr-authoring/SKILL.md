@@ -11,15 +11,15 @@ Produce a GitHub PR that is ready for reviewers and matches the repository PR co
 
 ## Workflow
 
-1. Inspect the actual diff, changed files, and validation results before drafting. Do not invent tests, commands, or implications.
-2. Draft the PR body using the template headings exactly:
+1. Base the PR on the actual diff, changed files, and checks. Do not invent tests, commands, or implications.
+2. Use this exact body structure:
    - `## What was changed`
    - `## How to review`
    - `## What the implication was`
    - `## Checks and tests performed`
 3. Keep file references in the PR body repo-relative, not absolute local filesystem paths.
 4. Use a conventional-commit PR title that summarizes the change.
-5. If opening or editing the PR through GitHub CLI, write the body to a file and use `gh pr create --body-file ...` or `gh pr edit --body-file ...`. Do not pass escaped newline sequences in a one-line argument.
+5. If using `gh`, write the body to a file and use `gh pr create --body-file ...` or `gh pr edit --body-file ...`. Do not pass escaped newline sequences in a one-line argument.
 
 ## Section Expectations
 
