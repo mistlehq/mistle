@@ -835,15 +835,14 @@ async function handleTunnelWebSocketMessage(input: {
 
   if (routedMessage.respondToCurrentPeer === true) {
     input.currentSocket.send(routedMessage.payload);
-    return;
+  } else {
+    await input.relayCoordinator.forwardPeerMessage({
+      sandboxInstanceId: input.sandboxInstanceId,
+      fromSide: input.sourcePeerSide,
+      payload: routedMessage.payload,
+      targetSessionId: routedMessage.targetConnectionSessionId,
+    });
   }
-
-  await input.relayCoordinator.forwardPeerMessage({
-    sandboxInstanceId: input.sandboxInstanceId,
-    fromSide: input.sourcePeerSide,
-    payload: routedMessage.payload,
-    targetSessionId: routedMessage.targetConnectionSessionId,
-  });
 
   if (routedMessage.releaseInteractiveStream !== undefined) {
     await input.interactiveStreamRouter.closeInteractiveStream({
