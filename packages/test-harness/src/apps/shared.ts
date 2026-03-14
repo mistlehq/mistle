@@ -186,9 +186,7 @@ function createWaitStrategy(input: {
 
     const httpWaitStrategy = Wait.forHttp(input.readiness.path, input.containerPort, {
       abortOnContainerExit: true,
-    })
-      .forStatusCode(input.readiness.expectedStatus)
-      .withReadTimeout(input.startupTimeoutMs);
+    }).forStatusCode(input.readiness.expectedStatus);
 
     return Wait.forAll([Wait.forListeningPorts(), httpWaitStrategy]);
   }
