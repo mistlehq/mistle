@@ -29,6 +29,13 @@ func (window *streamSendWindow) add(bytes int) error {
 	window.mu.Lock()
 	defer window.mu.Unlock()
 
+	if window.availableBytes > sessionprotocol.MaxStreamWindowBytes-bytes {
+		return fmt.Errorf(
+			"stream.window credit exceeds configured maximum of %d bytes",
+			sessionprotocol.MaxStreamWindowBytes,
+		)
+	}
+
 	window.availableBytes += bytes
 	return nil
 }

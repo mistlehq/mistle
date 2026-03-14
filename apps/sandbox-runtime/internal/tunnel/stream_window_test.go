@@ -31,6 +31,18 @@ func TestStreamSendWindow(t *testing.T) {
 			t.Fatal("expected added stream.window credit to be consumable")
 		}
 	})
+
+	t.Run("rejects stream.window credit that exceeds the configured maximum", func(t *testing.T) {
+		window := newStreamSendWindow()
+
+		err := window.add(1)
+		if err == nil {
+			t.Fatal("expected stream.window credit add to fail when it exceeds the configured maximum")
+		}
+		if err.Error() != "stream.window credit exceeds configured maximum of 65536 bytes" {
+			t.Fatalf("unexpected stream.window cap error: %v", err)
+		}
+	})
 }
 
 func TestParseStreamWindow(t *testing.T) {

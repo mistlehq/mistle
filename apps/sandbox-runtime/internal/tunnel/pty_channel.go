@@ -223,7 +223,20 @@ func relayPTYSession(
 						return nil
 					}
 					if err := sendWindow.add(streamWindow.Bytes); err != nil {
-						return err
+						if writeErr := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+							Type:     sessionprotocol.MessageTypeStreamReset,
+							StreamID: streamWindow.StreamID,
+							Code:     streamResetCodeInvalidStreamWindow,
+							Message:  err.Error(),
+						}); writeErr != nil {
+							return fmt.Errorf("failed to write stream.reset for excessive pty stream.window: %w", writeErr)
+						}
+						if streamWindow.StreamID != streamID {
+							delete(attachedStreamIDs, streamWindow.StreamID)
+							delete(sendWindowsByStreamID, streamWindow.StreamID)
+							continue
+						}
+						return nil
 					}
 					continue
 				}
