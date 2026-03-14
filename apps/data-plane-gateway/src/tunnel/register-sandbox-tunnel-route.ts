@@ -504,11 +504,7 @@ function replaceDataFrameStreamId(input: {
   }
 
   const payloadKind = view.getUint8(5);
-  if (
-    payloadKind !== PayloadKindRawBytes &&
-    payloadKind !== PayloadKindWebSocketText &&
-    payloadKind !== PayloadKindWebSocketBinary
-  ) {
+  if (!isSupportedDataFramePayloadKind(payloadKind)) {
     return undefined;
   }
 
@@ -517,7 +513,30 @@ function replaceDataFrameStreamId(input: {
   return remappedPayload;
 }
 
-function readDataFrameStreamId(payload: ArrayBuffer): number | undefined {
+type RoutedTunnelMessage = {
+  payload: string | ArrayBuffer;
+  respondToCurrentPeer?: boolean | undefined;
+  targetConnectionSessionId?: string | undefined;
+  notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding | undefined;
+  releaseInteractiveStream?:
+    | {
+        clientSessionId: string;
+        clientStreamId: number;
+      }
+    | undefined;
+};
+
+function isSupportedDataFramePayloadKind(payloadKind: number): boolean {
+  return (
+    payloadKind === PayloadKindRawBytes ||
+    payloadKind === PayloadKindWebSocketText ||
+    payloadKind === PayloadKindWebSocketBinary
+  );
+}
+
+function readDataFrameHeader(
+  payload: ArrayBuffer,
+): { payloadKind: number; streamId: number } | undefined {
   const view = new DataView(payload);
   if (view.byteLength < DataFrameHeaderByteLength) {
     return undefined;
@@ -533,28 +552,45 @@ function readDataFrameStreamId(payload: ArrayBuffer): number | undefined {
   }
 
   const payloadKind = view.getUint8(5);
-  if (
-    payloadKind !== PayloadKindRawBytes &&
-    payloadKind !== PayloadKindWebSocketText &&
-    payloadKind !== PayloadKindWebSocketBinary
-  ) {
+  if (!isSupportedDataFramePayloadKind(payloadKind)) {
     return undefined;
   }
 
-  return streamId;
+  return {
+    payloadKind,
+    streamId,
+  };
 }
 
-type RoutedTunnelMessage = {
-  payload: string | ArrayBuffer;
-  respondToCurrentPeer?: boolean | undefined;
-  targetConnectionSessionId?: string | undefined;
-  releaseInteractiveStream?:
-    | {
-        clientSessionId: string;
-        clientStreamId: number;
-      }
-    | undefined;
-};
+function isPayloadKindAllowedForChannel(input: {
+  channelKind: ClientStreamBinding["channelKind"];
+  payloadKind: number;
+}): boolean {
+  if (input.channelKind === "pty") {
+    return input.payloadKind === PayloadKindRawBytes;
+  }
+
+  return (
+    input.payloadKind === PayloadKindWebSocketText ||
+    input.payloadKind === PayloadKindWebSocketBinary
+  );
+}
+
+function createInvalidStreamDataResetPayload(input: {
+  channelKind: ClientStreamBinding["channelKind"];
+  streamId: number;
+}): string {
+  const message =
+    input.channelKind === "pty"
+      ? "PTY streams only accept raw-bytes data frames."
+      : "Agent streams only accept websocket text or websocket binary data frames.";
+
+  return createStreamResetPayload({
+    code: "invalid_stream_data",
+    message,
+    streamId: input.streamId,
+  });
+}
 
 async function translateConnectionBinaryPayloadToBootstrap(input: {
   clientSessionId: string;
@@ -562,8 +598,8 @@ async function translateConnectionBinaryPayloadToBootstrap(input: {
   payload: ArrayBuffer;
   sandboxInstanceId: string;
 }): Promise<RoutedTunnelMessage> {
-  const streamId = readDataFrameStreamId(input.payload);
-  if (streamId === undefined) {
+  const dataFrameHeader = readDataFrameHeader(input.payload);
+  if (dataFrameHeader === undefined) {
     throw new TunnelProtocolViolationError(
       createUnsupportedBinaryPayloadErrorMessage("connection"),
     );
@@ -572,11 +608,30 @@ async function translateConnectionBinaryPayloadToBootstrap(input: {
   const route = await input.interactiveStreamRouter.findInteractiveStreamByClient({
     sandboxInstanceId: input.sandboxInstanceId,
     clientSessionId: input.clientSessionId,
-    clientStreamId: streamId,
+    clientStreamId: dataFrameHeader.streamId,
   });
   if (route === undefined) {
     return {
-      payload: createUnboundInteractiveStreamResetPayload(streamId),
+      payload: createUnboundInteractiveStreamResetPayload(dataFrameHeader.streamId),
+      respondToCurrentPeer: true,
+    };
+  }
+  if (
+    !isPayloadKindAllowedForChannel({
+      channelKind: route.binding.channelKind,
+      payloadKind: dataFrameHeader.payloadKind,
+    })
+  ) {
+    return {
+      payload: createInvalidStreamDataResetPayload({
+        channelKind: route.binding.channelKind,
+        streamId: route.binding.clientStreamId,
+      }),
+      notifyBootstrapPeerOfReleasedStream: route.binding,
+      releaseInteractiveStream: {
+        clientSessionId: route.binding.clientSessionId,
+        clientStreamId: route.binding.clientStreamId,
+      },
       respondToCurrentPeer: true,
     };
   }
@@ -587,7 +642,7 @@ async function translateConnectionBinaryPayloadToBootstrap(input: {
   });
   if (translatedPayload === undefined) {
     return {
-      payload: createUnboundInteractiveStreamResetPayload(streamId),
+      payload: createUnboundInteractiveStreamResetPayload(dataFrameHeader.streamId),
       respondToCurrentPeer: true,
     };
   }
@@ -602,19 +657,38 @@ async function translateBootstrapBinaryPayloadToConnection(input: {
   payload: ArrayBuffer;
   sandboxInstanceId: string;
 }): Promise<RoutedTunnelMessage> {
-  const streamId = readDataFrameStreamId(input.payload);
-  if (streamId === undefined) {
+  const dataFrameHeader = readDataFrameHeader(input.payload);
+  if (dataFrameHeader === undefined) {
     throw new TunnelProtocolViolationError(createUnsupportedBinaryPayloadErrorMessage("bootstrap"));
   }
 
   const route = await input.interactiveStreamRouter.findInteractiveStreamByTunnel({
     sandboxInstanceId: input.sandboxInstanceId,
-    tunnelStreamId: streamId,
+    tunnelStreamId: dataFrameHeader.streamId,
   });
   if (route === undefined) {
     return {
-      payload: createUnboundInteractiveStreamResetPayload(streamId),
+      payload: createUnboundInteractiveStreamResetPayload(dataFrameHeader.streamId),
       respondToCurrentPeer: true,
+    };
+  }
+  if (
+    !isPayloadKindAllowedForChannel({
+      channelKind: route.binding.channelKind,
+      payloadKind: dataFrameHeader.payloadKind,
+    })
+  ) {
+    return {
+      payload: createInvalidStreamDataResetPayload({
+        channelKind: route.binding.channelKind,
+        streamId: route.binding.clientStreamId,
+      }),
+      notifyBootstrapPeerOfReleasedStream: route.binding,
+      releaseInteractiveStream: {
+        clientSessionId: route.binding.clientSessionId,
+        clientStreamId: route.binding.clientStreamId,
+      },
+      targetConnectionSessionId: route.binding.clientSessionId,
     };
   }
 
@@ -624,7 +698,7 @@ async function translateBootstrapBinaryPayloadToConnection(input: {
   });
   if (translatedPayload === undefined) {
     return {
-      payload: createUnboundInteractiveStreamResetPayload(streamId),
+      payload: createUnboundInteractiveStreamResetPayload(dataFrameHeader.streamId),
       respondToCurrentPeer: true,
     };
   }
@@ -762,6 +836,13 @@ async function handleTunnelWebSocketMessage(input: {
       sandboxInstanceId: input.sandboxInstanceId,
       clientSessionId: routedMessage.releaseInteractiveStream.clientSessionId,
       clientStreamId: routedMessage.releaseInteractiveStream.clientStreamId,
+    });
+  }
+  if (routedMessage.notifyBootstrapPeerOfReleasedStream !== undefined) {
+    await notifyBootstrapPeerOfReleasedInteractiveStreams({
+      relayCoordinator: input.relayCoordinator,
+      releasedBindings: [routedMessage.notifyBootstrapPeerOfReleasedStream],
+      sandboxInstanceId: input.sandboxInstanceId,
     });
   }
 }
