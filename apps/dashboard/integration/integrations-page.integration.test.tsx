@@ -222,47 +222,68 @@ describe("IntegrationsPage resource refresh concurrency", () => {
       expect(screen.queryByText("Integration connection")).toBeNull();
       expect(screen.getByText("GitHub")).toBeTruthy();
 
-      const [repositoriesOption] = screen.getAllByRole("button", { name: /Repositories/ });
-      const [organizationsOption] = screen.getAllByRole("button", { name: /Organizations/ });
-
-      if (repositoriesOption === undefined || organizationsOption === undefined) {
-        throw new Error("Expected repository and organization option buttons to be present.");
-      }
-
-      fireEvent.click(repositoriesOption);
       const repositoriesRefreshButton = await screen.findByRole("button", {
-        name: "Refresh resources",
+        name: "Refresh repositories",
       });
+      await screen.findByRole("button", {
+        name: "Refresh organizations",
+      });
+
       fireEvent.click(repositoriesRefreshButton);
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: "Refreshing..." })).toBeTruthy();
+        expect(refreshRequestKinds).toEqual(["repositories"]);
       });
 
-      fireEvent.click(organizationsOption);
-      const organizationsRefreshButton = await screen.findByRole("button", {
-        name: "Refresh resources",
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Refresh repositories" })).toHaveProperty(
+          "disabled",
+          true,
+        );
+        expect(screen.getByRole("button", { name: "Refresh organizations" })).toHaveProperty(
+          "disabled",
+          false,
+        );
       });
-      fireEvent.click(organizationsRefreshButton);
+
+      fireEvent.click(screen.getByRole("button", { name: "Refresh organizations" }));
 
       await waitFor(() => {
         expect(refreshRequestKinds).toEqual(["repositories", "organizations"]);
-        expect(screen.getByRole("button", { name: "Refreshing..." })).toBeTruthy();
-      });
-
-      fireEvent.click(repositoriesOption);
-
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: "Refreshing..." })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Refresh repositories" })).toHaveProperty(
+          "disabled",
+          true,
+        );
+        expect(screen.getByRole("button", { name: "Refresh organizations" })).toHaveProperty(
+          "disabled",
+          true,
+        );
       });
 
       repositoriesRefresh.resolve();
-      organizationsRefresh.resolve();
-
-      fireEvent.click(organizationsOption);
 
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: "Refresh resources" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Refresh repositories" })).toHaveProperty(
+          "disabled",
+          false,
+        );
+        expect(screen.getByRole("button", { name: "Refresh organizations" })).toHaveProperty(
+          "disabled",
+          true,
+        );
+      });
+
+      organizationsRefresh.resolve();
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Refresh repositories" })).toHaveProperty(
+          "disabled",
+          false,
+        );
+        expect(screen.getByRole("button", { name: "Refresh organizations" })).toHaveProperty(
+          "disabled",
+          false,
+        );
       });
     } finally {
       await new Promise<void>((resolve, reject) => {
