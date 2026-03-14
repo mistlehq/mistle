@@ -12,6 +12,7 @@
   "devDependencies": {
     "@mistle/codex-app-server-client": "workspace:*",
     "@mistle/db": "workspace:*",
+    "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/test-harness": "workspace:*",
     "@mistle/time": "workspace:*",
     "@types/pg": "^8.18.0",
