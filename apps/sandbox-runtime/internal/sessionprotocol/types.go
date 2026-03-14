@@ -8,6 +8,7 @@ const (
 	MessageTypeStreamEvent     = "stream.event"
 	MessageTypeStreamClose     = "stream.close"
 	MessageTypeStreamReset     = "stream.reset"
+	MessageTypeStreamWindow    = "stream.window"
 	MessageTypeDisconnect      = "disconnect"
 	MessageTypePTYResize       = "pty.resize"
 	MessageTypePTYExit         = "pty.exit"
@@ -91,6 +92,13 @@ type StreamReset struct {
 	StreamID int    `json:"streamId"`
 	Code     string `json:"code"`
 	Message  string `json:"message"`
+}
+
+// StreamWindow grants per-stream receive capacity to the opposite peer.
+type StreamWindow struct {
+	Type     string `json:"type" jsonschema:"enum=stream.window"`
+	StreamID int    `json:"streamId"`
+	Bytes    int    `json:"bytes"`
 }
 
 // Disconnect reports that the opposite tunnel peer disconnected and the current
