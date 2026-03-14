@@ -1,4 +1,4 @@
-import { useMutation, useQueries, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useMutationState, useQueries, useQueryClient } from "@tanstack/react-query";
 import { useMemo } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -18,11 +18,31 @@ import {
 
 type IntegrationDirectoryData = Awaited<ReturnType<typeof listIntegrationDirectory>>;
 
+const RefreshIntegrationConnectionResourcesMutationKey = [
+  "settings",
+  "integrations",
+  "refresh-resource",
+] as const;
+
 export const SETTINGS_INTEGRATION_CONNECTION_RESOURCES_QUERY_KEY_PREFIX: readonly [
   "settings",
   "integrations",
   "connection-resources",
 ] = ["settings", "integrations", "connection-resources"];
+
+function isRefreshResourceMutationVariables(
+  value: unknown,
+): value is { connectionId: string; kind: string } {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  if (!("connectionId" in value) || typeof value.connectionId !== "string") {
+    return false;
+  }
+
+  return "kind" in value && typeof value.kind === "string";
+}
 
 export function shouldPollIntegrationDirectory(input: {
   activeDetailConnectionId: string | null;
@@ -47,6 +67,7 @@ export function useIntegrationResourceState(input: {
   const queryClient = useQueryClient();
 
   const refreshResourceMutation = useMutation({
+    mutationKey: RefreshIntegrationConnectionResourcesMutationKey,
     mutationFn: async (payload: { connectionId: string; kind: string }) =>
       refreshIntegrationConnectionResources(payload),
     onSuccess: async () => {
@@ -59,14 +80,21 @@ export function useIntegrationResourceState(input: {
     },
   });
 
-  const refreshingResourceKeys = useMemo(() => {
-    const refreshingMutation = refreshResourceMutation.variables;
-    if (refreshResourceMutation.isPending === false || refreshingMutation === undefined) {
-      return new Set<string>();
-    }
+  const pendingRefreshMutationVariables = useMutationState<unknown>({
+    filters: {
+      mutationKey: RefreshIntegrationConnectionResourcesMutationKey,
+      status: "pending",
+    },
+    select: (mutation) => mutation.state.variables,
+  });
 
-    return new Set<string>([createRefreshingResourceKey(refreshingMutation)]);
-  }, [refreshResourceMutation.isPending, refreshResourceMutation.variables]);
+  const refreshingResourceKeys = useMemo(() => {
+    return new Set<string>(
+      pendingRefreshMutationVariables
+        .filter(isRefreshResourceMutationVariables)
+        .map(createRefreshingResourceKey),
+    );
+  }, [pendingRefreshMutationVariables]);
 
   const resourceRequests = useMemo(
     () => buildIntegrationConnectionResourceRequests(input.detailConnections),
