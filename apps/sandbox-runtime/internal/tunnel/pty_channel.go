@@ -15,12 +15,6 @@ import (
 
 const ptyOutputReadBufferBytes = 4096
 
-type websocketReadResult struct {
-	MessageType websocket.MessageType
-	Payload     []byte
-	Err         error
-}
-
 type ptyControlAction string
 
 const (
@@ -33,7 +27,7 @@ func handlePTYConnectRequest(
 	tunnelConn *websocket.Conn,
 	connectRequest connectRequest,
 	activePTYSession *ptySession,
-) (*ptySession, error) {
+) (*ptySession, *activeTunnelStreamRelay, error) {
 	ptyConnectRequest, err := parsePTYConnectRequest(connectRequest.RawPayload)
 	if err != nil {
 		if writeErr := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
@@ -42,9 +36,9 @@ func handlePTYConnectRequest(
 			Code:     connectErrorCodeInvalidConnectRequest,
 			Message:  err.Error(),
 		}); writeErr != nil {
-			return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
+			return activePTYSession, nil, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 		}
-		return activePTYSession, nil
+		return activePTYSession, nil, nil
 	}
 
 	if ptyConnectRequest.Channel.Session == sessionprotocol.PTYSessionModeCreate {
@@ -55,9 +49,9 @@ func handlePTYConnectRequest(
 				Code:     connectErrorCodePTYSessionExists,
 				Message:  "pty session already exists",
 			}); writeErr != nil {
-				return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
+				return activePTYSession, nil, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 			}
-			return activePTYSession, nil
+			return activePTYSession, nil, nil
 		}
 
 		activePTYSession, err = startPTYSession(ptyConnectRequest)
@@ -68,9 +62,9 @@ func handlePTYConnectRequest(
 				Code:     connectErrorCodePTYSessionCreateFailed,
 				Message:  err.Error(),
 			}); writeErr != nil {
-				return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
+				return activePTYSession, nil, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 			}
-			return activePTYSession, nil
+			return activePTYSession, nil, nil
 		}
 	}
 
@@ -82,9 +76,9 @@ func handlePTYConnectRequest(
 				Code:     connectErrorCodePTYSessionUnavailable,
 				Message:  "pty session is not available",
 			}); writeErr != nil {
-				return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
+				return activePTYSession, nil, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 			}
-			return activePTYSession, nil
+			return activePTYSession, nil, nil
 		}
 	}
 
@@ -92,18 +86,38 @@ func handlePTYConnectRequest(
 		Type:     sessionprotocol.MessageTypeStreamOpenOK,
 		StreamID: connectRequest.StreamID,
 	}); err != nil {
-		return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open acknowledgement: %w", err)
+		return activePTYSession, nil, fmt.Errorf("failed to write sandbox tunnel stream.open acknowledgement: %w", err)
 	}
 
-	if err := relayPTYSession(ctx, tunnelConn, activePTYSession, connectRequest.StreamID); err != nil {
-		return activePTYSession, fmt.Errorf("sandbox tunnel pty relay failed: %w", err)
+	return activePTYSession, startPTYRelay(ctx, tunnelConn, activePTYSession, connectRequest.StreamID), nil
+}
+
+func startPTYRelay(
+	ctx context.Context,
+	tunnelConn *websocket.Conn,
+	session *ptySession,
+	streamID int,
+) *activeTunnelStreamRelay {
+	relay := &activeTunnelStreamRelay{
+		MessageCh: make(chan tunnelMessage),
+		ResultCh:  make(chan activeTunnelStreamRelayResult, 1),
 	}
 
-	if activePTYSession.IsExited() {
-		activePTYSession = nil
-	}
+	go func() {
+		result := activeTunnelStreamRelayResult{
+			PTYSession:        session,
+			UpdatesPTYSession: true,
+		}
+		if err := relayPTYSession(ctx, tunnelConn, session, streamID, relay.MessageCh); err != nil {
+			result.Err = fmt.Errorf("sandbox tunnel pty relay failed: %w", err)
+		}
+		if session.IsExited() {
+			result.PTYSession = nil
+		}
+		relay.ResultCh <- result
+	}()
 
-	return activePTYSession, nil
+	return relay
 }
 
 func relayPTYSession(
@@ -111,12 +125,10 @@ func relayPTYSession(
 	tunnelConn *websocket.Conn,
 	session *ptySession,
 	streamID int,
+	incomingMessages <-chan tunnelMessage,
 ) error {
 	relayContext, cancel := context.WithCancel(ctx)
 	defer cancel()
-
-	wsReadCh := make(chan websocketReadResult, 1)
-	go readWebsocketMessages(relayContext, tunnelConn, wsReadCh)
 
 	ptyOutputCh := make(chan []byte, 8)
 	ptyOutputErrCh := make(chan error, 1)
@@ -124,17 +136,13 @@ func relayPTYSession(
 
 	for {
 		select {
-		case wsReadResult := <-wsReadCh:
-			if wsReadResult.Err != nil {
-				return fmt.Errorf("sandbox tunnel websocket read failed: %w", wsReadResult.Err)
-			}
-
-			switch wsReadResult.MessageType {
+		case message := <-incomingMessages:
+			switch message.MessageType {
 			case websocket.MessageBinary:
 				if session.IsExited() {
 					continue
 				}
-				if _, err := session.terminal.Write(wsReadResult.Payload); err != nil {
+				if _, err := session.terminal.Write(message.Payload); err != nil {
 					return fmt.Errorf("failed to write pty stdin payload: %w", err)
 				}
 			case websocket.MessageText:
@@ -143,7 +151,7 @@ func relayPTYSession(
 					tunnelConn,
 					session,
 					streamID,
-					wsReadResult.Payload,
+					message.Payload,
 				)
 				if err != nil {
 					return err
@@ -154,7 +162,7 @@ func relayPTYSession(
 			default:
 				return fmt.Errorf(
 					"unsupported websocket message type for pty session: %s",
-					wsReadResult.MessageType.String(),
+					message.MessageType.String(),
 				)
 			}
 		case outputPayload := <-ptyOutputCh:
@@ -182,25 +190,6 @@ func relayPTYSession(
 			}
 			_ = session.CloseTerminal()
 			return nil
-		}
-	}
-}
-
-func readWebsocketMessages(ctx context.Context, connection *websocket.Conn, resultCh chan<- websocketReadResult) {
-	for {
-		messageType, payload, err := connection.Read(ctx)
-		select {
-		case resultCh <- websocketReadResult{
-			MessageType: messageType,
-			Payload:     payload,
-			Err:         err,
-		}:
-		case <-ctx.Done():
-			return
-		}
-
-		if err != nil {
-			return
 		}
 	}
 }
