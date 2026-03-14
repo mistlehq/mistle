@@ -1110,23 +1110,30 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				agentAckType, agentAckPayload, err := conn.Read(handlerCtx)
-				if err != nil {
-					handlerErrCh <- fmt.Errorf("expected mixed agent ack read to succeed: %w", err)
-					return
-				}
-				if agentAckType != websocket.MessageText {
-					handlerErrCh <- fmt.Errorf("expected mixed agent ack to be text, got %s", agentAckType.String())
-					return
-				}
-				var agentAck sessionprotocol.StreamOpenOK
-				if err := json.Unmarshal(agentAckPayload, &agentAck); err != nil {
-					handlerErrCh <- fmt.Errorf("expected mixed agent ack decode to succeed: %w", err)
-					return
-				}
-				if agentAck.Type != sessionprotocol.MessageTypeStreamOpenOK || agentAck.StreamID != 61 {
-					handlerErrCh <- fmt.Errorf("expected mixed agent ack for stream 61, got type=%s streamId=%d", agentAck.Type, agentAck.StreamID)
-					return
+				for {
+					agentAckType, agentAckPayload, err := conn.Read(handlerCtx)
+					if err != nil {
+						handlerErrCh <- fmt.Errorf("expected mixed agent ack read to succeed: %w", err)
+						return
+					}
+					if agentAckType != websocket.MessageText {
+						continue
+					}
+
+					var agentAck sessionprotocol.StreamOpenOK
+					if err := json.Unmarshal(agentAckPayload, &agentAck); err != nil {
+						handlerErrCh <- fmt.Errorf("expected mixed agent ack decode to succeed: %w", err)
+						return
+					}
+					if agentAck.Type != sessionprotocol.MessageTypeStreamOpenOK {
+						continue
+					}
+					if agentAck.StreamID != 61 {
+						handlerErrCh <- fmt.Errorf("expected mixed agent ack for stream 61, got streamId=%d", agentAck.StreamID)
+						return
+					}
+
+					break
 				}
 
 				if err := conn.Write(

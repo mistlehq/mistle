@@ -236,6 +236,106 @@ describe("sandbox tunnel websocket integration", () => {
   );
 
   it(
+    "accepts bootstrap detached-work lease control messages without forwarding or closing the tunnel",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const clientNoMessagePromise = waitForNoWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "detached_work.lease.open",
+            leaseId: "lease_codex_turn_123",
+            kind: "agent_turn",
+            protocolFamily: "codex-json-rpc",
+            externalExecutionId: "turn_123",
+          }),
+        );
+        await clientNoMessagePromise;
+
+        const bootstrapOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: 17,
+            channel: {
+              kind: "agent",
+            },
+          }),
+        );
+
+        const forwardedOpen = await bootstrapOpenPromise;
+        expect(forwardedOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedOpen.data)).toEqual({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "agent",
+          },
+        });
+
+        const clientOpenOkPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+
+        const clientOpenOk = await clientOpenOkPromise;
+        expect(clientOpenOk.isBinary).toBe(false);
+        expect(parseStreamMessage(clientOpenOk.data)).toEqual({
+          type: "stream.open.ok",
+          streamId: 17,
+        });
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
     "accepts websocket connections for bootstrap and connection tokens and responds to ping on both",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();

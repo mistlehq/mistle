@@ -154,6 +154,48 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
+  it("drops bootstrap detached-work lease control messages without treating them as protocol violations", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: JSON.stringify({
+          type: "detached_work.lease.open",
+          leaseId: "lease_codex_turn_123",
+          kind: "agent_turn",
+          protocolFamily: "codex-json-rpc",
+          externalExecutionId: "turn_123",
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "drop",
+      },
+    });
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: JSON.stringify({
+          type: "detached_work.lease.renew",
+          leaseId: "lease_codex_turn_123",
+          kind: "agent_turn",
+          protocolFamily: "codex-json-rpc",
+          externalExecutionId: "turn_123",
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "drop",
+      },
+    });
+  });
+
   it("responds with a reset and releases the binding when connection binary data is invalid for the channel", async () => {
     const { router, translator } = await createTranslatorHarness();
 

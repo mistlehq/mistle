@@ -171,6 +171,7 @@ func handleSandboxTunnelConnection(
 	activePTYSession **ptySession,
 	agentRuntimes []startup.AgentRuntime,
 	runtimeClients []startup.RuntimeClient,
+	detachedWorkObserver agentDetachedWorkObserver,
 ) error {
 	tunnelReadResultCh := make(chan tunnelReadResult, 1)
 	relayResultCh := make(chan activeTunnelStreamRelayResult, 8)
@@ -268,6 +269,7 @@ func handleSandboxTunnelConnection(
 						connectRequest,
 						agentRuntimes,
 						runtimeClients,
+						detachedWorkObserver,
 						relayResultCh,
 					)
 					if err != nil {
@@ -400,6 +402,16 @@ func Run(input RunInput) error {
 
 	dialHTTPClient := httpclient.NewDirectClient(http.DefaultClient)
 	tokenExchangeHTTPClient := telemetry.NewHTTPClient(httpclient.NewDirectClient(http.DefaultClient))
+	detachedWorkObserver, err := newAgentDetachedWorkObserver(
+		runContext,
+		input.AgentRuntimes,
+		input.RuntimeClients,
+	)
+	if err != nil {
+		runSpan.RecordError(err)
+		runSpan.SetStatus(codes.Error, err.Error())
+		return err
+	}
 	tokenExchangeContext, cancelTokenExchange := context.WithCancel(runContext)
 	defer cancelTokenExchange()
 
@@ -460,6 +472,7 @@ func Run(input RunInput) error {
 			continue
 		}
 
+		detachedWorkObserver.SetTunnelConn(conn)
 		connectionErr := handleSandboxTunnelConnection(
 			runContext,
 			tracer,
@@ -467,7 +480,9 @@ func Run(input RunInput) error {
 			&activePTYSession,
 			input.AgentRuntimes,
 			input.RuntimeClients,
+			detachedWorkObserver,
 		)
+		detachedWorkObserver.SetTunnelConn(nil)
 		conn.CloseNow()
 		if connectionErr == nil {
 			return nil

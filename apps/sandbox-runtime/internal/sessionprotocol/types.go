@@ -1,17 +1,19 @@
 package sessionprotocol
 
 const (
-	MessageTypeStreamOpen      = "stream.open"
-	MessageTypeStreamOpenOK    = "stream.open.ok"
-	MessageTypeStreamOpenError = "stream.open.error"
-	MessageTypeStreamSignal    = "stream.signal"
-	MessageTypeStreamEvent     = "stream.event"
-	MessageTypeStreamClose     = "stream.close"
-	MessageTypeStreamReset     = "stream.reset"
-	MessageTypeStreamWindow    = "stream.window"
-	MessageTypeDisconnect      = "disconnect"
-	MessageTypePTYResize       = "pty.resize"
-	MessageTypePTYExit         = "pty.exit"
+	MessageTypeStreamOpen             = "stream.open"
+	MessageTypeStreamOpenOK           = "stream.open.ok"
+	MessageTypeStreamOpenError        = "stream.open.error"
+	MessageTypeStreamSignal           = "stream.signal"
+	MessageTypeStreamEvent            = "stream.event"
+	MessageTypeStreamClose            = "stream.close"
+	MessageTypeStreamReset            = "stream.reset"
+	MessageTypeStreamWindow           = "stream.window"
+	MessageTypeDisconnect             = "disconnect"
+	MessageTypeDetachedWorkLeaseOpen  = "detached_work.lease.open"
+	MessageTypeDetachedWorkLeaseRenew = "detached_work.lease.renew"
+	MessageTypePTYResize              = "pty.resize"
+	MessageTypePTYExit                = "pty.exit"
 )
 
 const (
@@ -22,6 +24,10 @@ const (
 const (
 	PTYSessionModeCreate = "create"
 	PTYSessionModeAttach = "attach"
+)
+
+const (
+	DetachedWorkLeaseKindAgentTurn = "agent_turn"
 )
 
 // StreamOpen requests opening a logical stream on the interactive websocket.
@@ -106,4 +112,20 @@ type StreamWindow struct {
 type Disconnect struct {
 	Type   string `json:"type" jsonschema:"enum=disconnect"`
 	Reason string `json:"reason,omitempty"`
+}
+
+type DetachedWorkLeaseOpen struct {
+	Type                string `json:"type" jsonschema:"enum=detached_work.lease.open"`
+	LeaseID             string `json:"leaseId"`
+	Kind                string `json:"kind" jsonschema:"enum=agent_turn"`
+	ProtocolFamily      string `json:"protocolFamily"`
+	ExternalExecutionID string `json:"externalExecutionId,omitempty"`
+}
+
+type DetachedWorkLeaseRenew struct {
+	Type                string `json:"type" jsonschema:"enum=detached_work.lease.renew"`
+	LeaseID             string `json:"leaseId"`
+	Kind                string `json:"kind" jsonschema:"enum=agent_turn"`
+	ProtocolFamily      string `json:"protocolFamily"`
+	ExternalExecutionID string `json:"externalExecutionId,omitempty"`
 }

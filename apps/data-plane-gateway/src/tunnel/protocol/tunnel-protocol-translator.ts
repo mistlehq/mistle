@@ -2,6 +2,7 @@ import {
   PayloadKindRawBytes,
   PayloadKindWebSocketBinary,
   PayloadKindWebSocketText,
+  parseDetachedWorkLeaseControlMessage,
   parseStreamControlMessage,
   type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
@@ -444,6 +445,15 @@ export class TunnelProtocolTranslator {
   private async translateBootstrapTextPayload(
     input: TranslateTunnelInboundMessageInput & { payload: string; sourcePeerSide: "bootstrap" },
   ): Promise<TunnelProtocolTranslation> {
+    const detachedWorkLeaseControlMessage = parseDetachedWorkLeaseControlMessage(input.payload);
+    if (detachedWorkLeaseControlMessage !== undefined) {
+      return createTranslation({
+        delivery: {
+          kind: "drop",
+        },
+      });
+    }
+
     const controlMessage = parseStreamControlMessage(input.payload);
     if (controlMessage === undefined) {
       throw new TunnelProtocolViolationError(createUnsupportedTextPayloadErrorMessage("bootstrap"));
