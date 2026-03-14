@@ -144,6 +144,9 @@ func relayPTYSession(
 	attachedStreamIDs := map[int]struct{}{
 		streamID: {},
 	}
+	sendWindowsByStreamID := map[int]*streamSendWindow{
+		streamID: newStreamSendWindow(),
+	}
 	ptyOutputCh := make(chan []byte, 8)
 	ptyOutputErrCh := make(chan error, 1)
 	go readPTYOutput(session, ptyOutputCh, ptyOutputErrCh)
@@ -193,13 +196,44 @@ func relayPTYSession(
 				if _, err := session.terminal.Write(dataFrame.Payload); err != nil {
 					return fmt.Errorf("failed to write pty stdin payload: %w", err)
 				}
+				if err := writeStreamWindow(relayContext, tunnelConn, sessionprotocol.StreamWindow{
+					Type:     sessionprotocol.MessageTypeStreamWindow,
+					StreamID: int(dataFrame.StreamID),
+					Bytes:    len(dataFrame.Payload),
+				}); err != nil {
+					return fmt.Errorf("failed to write stream.window for consumed pty data: %w", err)
+				}
 			case websocket.MessageText:
+				controlMessageType, err := parseControlMessageType(message.Payload)
+				if err == nil && controlMessageType == sessionprotocol.MessageTypeStreamWindow {
+					streamWindow, windowErr := parseStreamWindow(message.Payload)
+					if windowErr != nil {
+						return windowErr
+					}
+					sendWindow := sendWindowsByStreamID[streamWindow.StreamID]
+					if sendWindow == nil {
+						if err := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+							Type:     sessionprotocol.MessageTypeStreamReset,
+							StreamID: streamWindow.StreamID,
+							Code:     streamResetCodeInvalidStreamData,
+							Message:  fmt.Sprintf("stream.window streamId %d is not attached to the active PTY session", streamWindow.StreamID),
+						}); err != nil {
+							return fmt.Errorf("failed to write stream.reset for mismatched pty stream.window: %w", err)
+						}
+						return nil
+					}
+					if err := sendWindow.add(streamWindow.Bytes); err != nil {
+						return err
+					}
+					continue
+				}
 				controlAction, err := handlePTYControlMessage(
 					relayContext,
 					tunnelConn,
 					session,
 					streamID,
 					attachedStreamIDs,
+					sendWindowsByStreamID,
 					message.Payload,
 				)
 				if err != nil {
@@ -219,6 +253,27 @@ func relayPTYSession(
 			}
 		case outputPayload := <-ptyOutputCh:
 			for attachedStreamID := range attachedStreamIDs {
+				sendWindow := sendWindowsByStreamID[attachedStreamID]
+				if sendWindow == nil {
+					continue
+				}
+				if !sendWindow.tryConsume(len(outputPayload)) {
+					if err := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+						Type:     sessionprotocol.MessageTypeStreamReset,
+						StreamID: attachedStreamID,
+						Code:     streamResetCodeStreamWindowExhausted,
+						Message:  "pty stream send window is exhausted",
+					}); err != nil {
+						return fmt.Errorf("failed to write stream.reset for exhausted pty send window: %w", err)
+					}
+					delete(attachedStreamIDs, attachedStreamID)
+					delete(sendWindowsByStreamID, attachedStreamID)
+					if attachedStreamID == streamID {
+						_ = session.CloseTerminal()
+						return nil
+					}
+					continue
+				}
 				if err := writeBinaryDataFrame(
 					relayContext,
 					tunnelConn,
@@ -278,6 +333,7 @@ func handlePTYControlMessage(
 	session *ptySession,
 	streamID int,
 	attachedStreamIDs map[int]struct{},
+	sendWindowsByStreamID map[int]*streamSendWindow,
 	payload []byte,
 ) (ptyControlAction, error) {
 	messageType, err := parseControlMessageType(payload)
@@ -313,6 +369,7 @@ func handlePTYControlMessage(
 		}
 
 		attachedStreamIDs[connectRequest.StreamID] = struct{}{}
+		sendWindowsByStreamID[connectRequest.StreamID] = newStreamSendWindow()
 		if err := writeStreamOpenOK(ctx, tunnelConn, sessionprotocol.StreamOpenOK{
 			Type:     sessionprotocol.MessageTypeStreamOpenOK,
 			StreamID: connectRequest.StreamID,
@@ -375,6 +432,7 @@ func handlePTYControlMessage(
 		}
 		if closeRequest.StreamID != streamID {
 			delete(attachedStreamIDs, closeRequest.StreamID)
+			delete(sendWindowsByStreamID, closeRequest.StreamID)
 			return ptyControlActionDetachStream, nil
 		}
 

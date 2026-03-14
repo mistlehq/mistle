@@ -1,6 +1,8 @@
 import {
   decodeDataFrame,
+  DefaultStreamWindowBytes,
   encodeDataFrame,
+  parseStreamControlMessage,
   PayloadKindWebSocketText,
 } from "@mistle/sandbox-session-protocol";
 import { systemSleeper } from "@mistle/time";
@@ -23,7 +25,9 @@ type TestServer = {
   openRequest: Promise<string>;
   payload: Promise<{ streamId: number; payload: string }>;
   socketClosed: Promise<void>;
+  windowUpdate: Promise<{ bytes: number; streamId: number }>;
   sendNotification: (payload: unknown) => void;
+  sendWindowUpdate: (bytes: number) => void;
   closeClientSocket: () => void;
   close: () => Promise<void>;
 };
@@ -97,6 +101,7 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
   const openRequestDeferred = createDeferred<string>();
   const payloadDeferred = createDeferred<{ streamId: number; payload: string }>();
   const socketClosedDeferred = createDeferred<void>();
+  const windowUpdateDeferred = createDeferred<{ bytes: number; streamId: number }>();
 
   const wsServer = new WebSocketServer({
     host: "127.0.0.1",
@@ -117,6 +122,15 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
 
     socket.on("message", (message) => {
       if (didHandleConnect) {
+        const controlMessage = parseStreamControlMessage(toText(message));
+        if (controlMessage?.type === "stream.window") {
+          windowUpdateDeferred.resolve({
+            bytes: controlMessage.bytes,
+            streamId: controlMessage.streamId,
+          });
+          return;
+        }
+
         try {
           payloadDeferred.resolve(decodeAgentTextDataFrame(message));
         } catch (error) {
@@ -184,6 +198,7 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
     openRequest: openRequestDeferred.promise,
     payload: payloadDeferred.promise,
     socketClosed: socketClosedDeferred.promise,
+    windowUpdate: windowUpdateDeferred.promise,
     sendNotification: (payload) => {
       if (connectedSocket === null) {
         throw new Error("Expected websocket client to be connected before sending payload.");
@@ -193,6 +208,22 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
       }
 
       connectedSocket.send(encodeAgentTextDataFrame(activeStreamId, JSON.stringify(payload)));
+    },
+    sendWindowUpdate: (bytes) => {
+      if (connectedSocket === null) {
+        throw new Error("Expected websocket client to be connected before sending window update.");
+      }
+      if (activeStreamId === null) {
+        throw new Error("Expected stream.open to complete before sending window update.");
+      }
+
+      connectedSocket.send(
+        JSON.stringify({
+          type: "stream.window",
+          streamId: activeStreamId,
+          bytes,
+        }),
+      );
     },
     closeClientSocket: () => {
       if (connectedSocket === null) {
@@ -411,6 +442,71 @@ describe("sandbox session client", () => {
         method: "ping",
       }),
     });
+  });
+
+  it("returns stream.window credit after consuming an inbound framed payload", async () => {
+    const server = await createManagedTestServer("accept");
+    const client = createClient(server.url);
+
+    await expectClientToOpenAgentStream({
+      client,
+      server,
+    });
+
+    const notificationPayload = {
+      method: "turn/completed",
+      params: {
+        turn: {
+          id: "turn_123",
+        },
+      },
+    };
+    server.sendNotification(notificationPayload);
+
+    expect(await server.windowUpdate).toEqual({
+      bytes: Buffer.byteLength(JSON.stringify(notificationPayload)),
+      streamId: 1,
+    });
+  });
+
+  it("restores send credit when the server grants stream.window bytes", async () => {
+    const server = await createManagedTestServer("accept");
+    const client = createClient(server.url);
+
+    await expectClientToOpenAgentStream({
+      client,
+      server,
+    });
+
+    let exhausted = false;
+    for (let iteration = 0; iteration < DefaultStreamWindowBytes; iteration += 1) {
+      try {
+        client.sendJson({
+          payload: "x".repeat(1024),
+        });
+      } catch (error) {
+        if (
+          error instanceof Error &&
+          error.message === "Sandbox session stream send window is exhausted."
+        ) {
+          exhausted = true;
+          break;
+        }
+
+        throw error;
+      }
+    }
+
+    expect(exhausted).toBe(true);
+
+    server.sendWindowUpdate(4096);
+    await systemSleeper.sleep(PollIntervalMs);
+
+    expect(() =>
+      client.sendJson({
+        payload: "second-message-after-window-update",
+      }),
+    ).not.toThrow();
   });
 
   it("surfaces stream.open errors from the websocket handshake", async () => {

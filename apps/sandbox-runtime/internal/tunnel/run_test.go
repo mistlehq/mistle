@@ -68,6 +68,42 @@ func decodeTestDataFrame(t *testing.T, payload []byte) sessionprotocol.StreamDat
 	return dataFrame
 }
 
+func readNextRuntimeDataFrame(
+	t *testing.T,
+	ctx context.Context,
+	conn *websocket.Conn,
+	expectedStreamID int,
+) sessionprotocol.StreamDataFrame {
+	t.Helper()
+
+	for {
+		messageType, payload, err := conn.Read(ctx)
+		if err != nil {
+			t.Fatalf("expected runtime->gateway read to succeed: %v", err)
+		}
+
+		if messageType == websocket.MessageText {
+			streamWindow, parseErr := parseStreamWindow(payload)
+			if parseErr != nil {
+				t.Fatalf("expected runtime text control message to be stream.window: %v", parseErr)
+			}
+			if streamWindow.StreamID != expectedStreamID {
+				t.Fatalf(
+					"expected runtime stream.window streamId %d, got %d",
+					expectedStreamID,
+					streamWindow.StreamID,
+				)
+			}
+			continue
+		}
+		if messageType != websocket.MessageBinary {
+			t.Fatalf("expected runtime->gateway message to be binary, got %s", messageType.String())
+		}
+
+		return decodeTestDataFrame(t, payload)
+	}
+}
+
 func TestRun(t *testing.T) {
 	t.Run("fails when context is missing", func(t *testing.T) {
 		err := Run(RunInput{
@@ -315,16 +351,7 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				responseType, responsePayload, err := conn.Read(handlerCtx)
-				if err != nil {
-					handlerErrCh <- fmt.Errorf("expected runtime->gateway read to succeed: %w", err)
-					return
-				}
-				if responseType != websocket.MessageBinary {
-					handlerErrCh <- fmt.Errorf("expected runtime->gateway response to be binary, got %s", responseType.String())
-					return
-				}
-				dataFrame := decodeTestDataFrame(t, responsePayload)
+				dataFrame := readNextRuntimeDataFrame(t, handlerCtx, conn, 11)
 				if dataFrame.StreamID != 11 {
 					handlerErrCh <- fmt.Errorf("expected runtime->gateway response streamId 11, got %d", dataFrame.StreamID)
 					return
@@ -633,16 +660,7 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				responseType, responsePayload, err := conn.Read(handlerCtx)
-				if err != nil {
-					handlerErrCh <- fmt.Errorf("expected runtime->gateway read to succeed: %w", err)
-					return
-				}
-				if responseType != websocket.MessageBinary {
-					handlerErrCh <- fmt.Errorf("expected runtime->gateway response to be binary, got %s", responseType.String())
-					return
-				}
-				dataFrame := decodeTestDataFrame(t, responsePayload)
+				dataFrame := readNextRuntimeDataFrame(t, handlerCtx, conn, expectedStreamID)
 				if dataFrame.StreamID != uint32(expectedStreamID) {
 					handlerErrCh <- fmt.Errorf(
 						"expected runtime->gateway response streamId %d, got %d",

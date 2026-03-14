@@ -171,12 +171,14 @@ func relayTunnelFrames(
 ) (agentRelayResult, error) {
 	relayContext, cancelAgentRelay := context.WithCancel(ctx)
 	defer cancelAgentRelay()
+	sendWindow := newStreamSendWindow()
 
 	agentRelayErrCh := make(chan error, 1)
 	go relayAgentFramesDirection(
 		relayContext,
 		agentRelayErrCh,
 		agentConn,
+		sendWindow,
 		tunnelConn,
 		uint32(streamID),
 	)
@@ -193,6 +195,23 @@ func relayTunnelFrames(
 		case message := <-incomingMessages:
 			if message.MessageType == websocket.MessageText {
 				controlMessageType, parseErr := parseControlMessageType(message.Payload)
+				if parseErr == nil && controlMessageType == sessionprotocol.MessageTypeStreamWindow {
+					streamWindow, windowErr := parseStreamWindow(message.Payload)
+					if windowErr != nil {
+						return "", windowErr
+					}
+					if streamWindow.StreamID != streamID {
+						return "", fmt.Errorf(
+							"stream.window streamId %d does not match active agent stream %d",
+							streamWindow.StreamID,
+							streamID,
+						)
+					}
+					if err := sendWindow.add(streamWindow.Bytes); err != nil {
+						return "", err
+					}
+					continue
+				}
 				if parseErr == nil && controlMessageType == sessionprotocol.MessageTypeStreamClose {
 					streamClose, closeErr := parseStreamClose(message.Payload)
 					if closeErr != nil {
@@ -274,6 +293,13 @@ func relayTunnelFrames(
 				}
 				return "", fmt.Errorf("agent websocket write failed: %w", err)
 			}
+			if err := writeStreamWindow(relayContext, tunnelConn, sessionprotocol.StreamWindow{
+				Type:     sessionprotocol.MessageTypeStreamWindow,
+				StreamID: streamID,
+				Bytes:    len(dataFrame.Payload),
+			}); err != nil {
+				return "", fmt.Errorf("failed to write stream.window for consumed agent data: %w", err)
+			}
 		}
 	}
 }
@@ -311,6 +337,7 @@ func relayAgentFramesDirection(
 	ctx context.Context,
 	relayErrCh chan<- error,
 	source *websocket.Conn,
+	sendWindow *streamSendWindow,
 	target *websocket.Conn,
 	streamID uint32,
 ) {
@@ -323,6 +350,20 @@ func relayAgentFramesDirection(
 
 		if messageType != websocket.MessageText && messageType != websocket.MessageBinary {
 			relayErrCh <- fmt.Errorf("agent websocket produced unsupported message type %s", messageType.String())
+			return
+		}
+
+		if !sendWindow.tryConsume(len(payload)) {
+			if writeErr := writeStreamReset(ctx, target, sessionprotocol.StreamReset{
+				Type:     sessionprotocol.MessageTypeStreamReset,
+				StreamID: int(streamID),
+				Code:     streamResetCodeStreamWindowExhausted,
+				Message:  "agent stream send window is exhausted",
+			}); writeErr != nil {
+				relayErrCh <- fmt.Errorf("failed to write stream.reset for exhausted agent send window: %w", writeErr)
+				return
+			}
+			relayErrCh <- nil
 			return
 		}
 

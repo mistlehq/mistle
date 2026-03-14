@@ -1502,6 +1502,130 @@ describe("sandbox tunnel websocket integration", () => {
   );
 
   it(
+    "remaps stream.window credits between the client and bootstrap peers",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const clientStreamId = 77;
+        const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: clientStreamId,
+            channel: {
+              kind: "agent",
+            },
+          }),
+        );
+        const forwardedOpen = await forwardedOpenPromise;
+
+        expect(forwardedOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedOpen.data)).toEqual({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "agent",
+          },
+        });
+
+        const openOkPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        const openOk = await openOkPromise;
+
+        expect(openOk.isBinary).toBe(false);
+        expect(parseStreamMessage(openOk.data)).toEqual({
+          type: "stream.open.ok",
+          streamId: clientStreamId,
+        });
+
+        const forwardedBootstrapWindowPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.window",
+            streamId: 1,
+            bytes: 2048,
+          }),
+        );
+        const forwardedBootstrapWindow = await forwardedBootstrapWindowPromise;
+
+        expect(forwardedBootstrapWindow.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedBootstrapWindow.data)).toEqual({
+          type: "stream.window",
+          streamId: clientStreamId,
+          bytes: 2048,
+        });
+
+        const forwardedClientWindowPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.window",
+            streamId: clientStreamId,
+            bytes: 1024,
+          }),
+        );
+        const forwardedClientWindow = await forwardedClientWindowPromise;
+
+        expect(forwardedClientWindow.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedClientWindow.data)).toEqual({
+          type: "stream.window",
+          streamId: 1,
+          bytes: 1024,
+        });
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
     "releases agent stream bindings after a client stream.close so the same client websocket can open a new stream",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();

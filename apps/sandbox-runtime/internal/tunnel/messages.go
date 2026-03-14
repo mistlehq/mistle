@@ -58,6 +58,14 @@ func writeStreamReset(
 	return writeTextJSONMessage(ctx, tunnelConn, streamReset)
 }
 
+func writeStreamWindow(
+	ctx context.Context,
+	tunnelConn *websocket.Conn,
+	streamWindow sessionprotocol.StreamWindow,
+) error {
+	return writeTextJSONMessage(ctx, tunnelConn, streamWindow)
+}
+
 func writeTextJSONMessage(ctx context.Context, tunnelConn *websocket.Conn, payload any) error {
 	encodedPayload, err := json.Marshal(payload)
 	if err != nil {
