@@ -1,4 +1,8 @@
-import { SandboxSessionClient } from "@mistle/sandbox-session-client";
+import {
+  SandboxSessionClient,
+  SandboxSessionSendGuarantees,
+  type SandboxSessionSendGuarantee,
+} from "@mistle/sandbox-session-client";
 import type {
   JsonRpcErrorResponse as CodexJsonRpcErrorResponse,
   JsonRpcId as CodexJsonRpcId,
@@ -51,7 +55,12 @@ export class CodexJsonRpcClient {
         version: "0.1.0",
       },
     });
-    this.notify("initialized", {});
+    const sendGuarantee = this.#sessionClient.sendGuarantee;
+    await this.notify("initialized", {});
+    await this.#confirmReadyState(sendGuarantee);
+    if (this.#sessionClient.state !== "initializing") {
+      throw new Error("Codex session connection ended before initialization completed.");
+    }
     this.#sessionClient.markReady();
   }
 
@@ -65,28 +74,28 @@ export class CodexJsonRpcClient {
         reject,
       });
 
-      try {
-        this.#sessionClient.sendJson({
+      void this.#sessionClient
+        .sendJson({
           id,
           method,
           ...(params === undefined ? {} : { params }),
+        })
+        .catch((error: unknown) => {
+          this.#pendingRequests.delete(id);
+          reject(error instanceof Error ? error : new Error(String(error)));
         });
-      } catch (error) {
-        this.#pendingRequests.delete(id);
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
     });
   }
 
-  notify(method: string, params?: unknown): void {
-    this.#sessionClient.sendJson({
+  async notify(method: string, params?: unknown): Promise<void> {
+    await this.#sessionClient.sendJson({
       method,
       ...(params === undefined ? {} : { params }),
     });
   }
 
-  respond(id: CodexJsonRpcId, result: unknown): void {
-    this.#sessionClient.sendJson({
+  async respond(id: CodexJsonRpcId, result: unknown): Promise<void> {
+    await this.#sessionClient.sendJson({
       id,
       result,
     });
@@ -156,5 +165,15 @@ export class CodexJsonRpcClient {
       pendingRequest.reject(error);
     }
     this.#pendingRequests.clear();
+  }
+
+  async #confirmReadyState(sendGuarantee: SandboxSessionSendGuarantee | null): Promise<void> {
+    if (sendGuarantee !== SandboxSessionSendGuarantees.QUEUED) {
+      return;
+    }
+
+    await this.call("thread/list", {
+      limit: 1,
+    });
   }
 }

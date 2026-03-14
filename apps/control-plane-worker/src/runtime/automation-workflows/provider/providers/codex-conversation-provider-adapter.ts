@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
+import type { SandboxSessionSocket } from "@mistle/sandbox-session-client";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
-import WebSocket, { type RawData } from "ws";
 
 import { connectSandboxAgentConnection } from "../../transport/sandbox-agent-connection.js";
 import type {
@@ -42,7 +42,7 @@ type JsonRpcResponsePayload = {
 };
 
 type JsonRpcClientConnection = {
-  socket: WebSocket;
+  socket: SandboxSessionSocket;
   sendText: (payload: string) => Promise<void>;
 };
 
@@ -59,27 +59,19 @@ const CodexInitializeClientInfo = {
   version: "0.1.0",
 } as const;
 
-function toText(data: RawData): string {
-  if (typeof data === "string") {
-    return data;
-  }
-  if (Buffer.isBuffer(data)) {
-    return data.toString("utf8");
-  }
-  if (data instanceof ArrayBuffer) {
-    return Buffer.from(data).toString("utf8");
-  }
-
-  return Buffer.concat(data).toString("utf8");
+function toText(data: unknown): string | null {
+  return typeof data === "string" ? data : null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function parseJsonRpcResponsePayload(data: RawData): JsonRpcResponsePayload | null {
+function parseJsonRpcResponsePayload(data: unknown): JsonRpcResponsePayload | null {
   const payloadText = toText(data);
-
+  if (payloadText === null) {
+    return null;
+  }
   let parsedPayload: unknown;
   try {
     parsedPayload = JSON.parse(payloadText);
@@ -338,9 +330,9 @@ async function sendJsonRpcRequest(
 
     function cleanup(): void {
       systemScheduler.cancel(timeout);
-      socket.off("message", handleMessage);
-      socket.off("error", handleError);
-      socket.off("close", handleClose);
+      socket.removeEventListener("message", handleMessage);
+      socket.removeEventListener("error", handleError);
+      socket.removeEventListener("close", handleClose);
     }
 
     function fail(error: Error): void {
@@ -361,7 +353,7 @@ async function sendJsonRpcRequest(
       resolve(value);
     }
 
-    function handleMessage(data: RawData): void {
+    function handleMessage(data: unknown): void {
       const responsePayload = parseJsonRpcResponsePayload(data);
       if (responsePayload === null) {
         return;
@@ -409,17 +401,17 @@ async function sendJsonRpcRequest(
       succeed(responsePayload.result);
     }
 
-    function handleError(error: Error): void {
-      fail(error);
+    function handleError(error: unknown): void {
+      fail(error instanceof Error ? error : new Error("Codex app-server websocket error."));
     }
 
     function handleClose(): void {
       fail(new Error("Codex app-server websocket closed before JSON-RPC response."));
     }
 
-    socket.on("message", handleMessage);
-    socket.on("error", handleError);
-    socket.on("close", handleClose);
+    socket.addEventListener("message", handleMessage);
+    socket.addEventListener("error", handleError);
+    socket.addEventListener("close", handleClose);
 
     const requestPayload =
       input.params === undefined

@@ -24,6 +24,7 @@
     "@mistle/integrations-core": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
     "@mistle/logging": "workspace:*",
+    "@mistle/sandbox-session-client": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",

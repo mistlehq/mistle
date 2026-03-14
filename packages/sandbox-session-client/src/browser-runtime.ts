@@ -1,5 +1,6 @@
 import {
   type SandboxScheduledTask,
+  SandboxSessionSendGuarantees,
   type SandboxSessionRuntime,
   type SandboxSessionSocket,
   type SandboxSessionSocketEventMap,
@@ -34,6 +35,10 @@ class BrowserSandboxSessionSocket implements SandboxSessionSocket {
     return toReadyState(this.#socket.readyState);
   }
 
+  get sendGuarantee(): SandboxSessionSocket["sendGuarantee"] {
+    return SandboxSessionSendGuarantees.QUEUED;
+  }
+
   addEventListener<EventName extends SandboxSessionSocketEventName>(
     eventName: EventName,
     listener: SandboxSessionSocketEventMap[EventName],
@@ -59,8 +64,18 @@ class BrowserSandboxSessionSocket implements SandboxSessionSocket {
     this.#socket.removeEventListener(eventName, wrappedListener);
   }
 
-  send(payload: string): void {
-    this.#socket.send(payload);
+  send(payload: string): Promise<void> {
+    if (this.#socket.readyState !== SandboxSessionSocketReadyStates.OPEN) {
+      return Promise.reject(new Error("Sandbox session socket is not open."));
+    }
+
+    try {
+      this.#socket.send(payload);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+
+    return Promise.resolve();
   }
 
   close(code?: number, reason?: string): void {
@@ -69,14 +84,14 @@ class BrowserSandboxSessionSocket implements SandboxSessionSocket {
 }
 
 class BrowserSandboxScheduledTask implements SandboxScheduledTask {
-  readonly #timeoutId: number;
+  readonly #timeoutId: ReturnType<typeof globalThis.setTimeout>;
 
-  constructor(timeoutId: number) {
+  constructor(timeoutId: ReturnType<typeof globalThis.setTimeout>) {
     this.#timeoutId = timeoutId;
   }
 
   cancel(): void {
-    window.clearTimeout(this.#timeoutId);
+    globalThis.clearTimeout(this.#timeoutId);
   }
 }
 
@@ -97,6 +112,6 @@ export function createBrowserSandboxSessionRuntime(): SandboxSessionRuntime {
     createSocket: (connectionUrl) => new BrowserSandboxSessionSocket(connectionUrl),
     createStreamId,
     scheduleTimeout: (callback, timeoutMs) =>
-      new BrowserSandboxScheduledTask(window.setTimeout(callback, timeoutMs)),
+      new BrowserSandboxScheduledTask(globalThis.setTimeout(callback, timeoutMs)),
   };
 }

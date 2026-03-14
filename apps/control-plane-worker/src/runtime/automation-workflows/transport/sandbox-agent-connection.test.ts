@@ -15,7 +15,7 @@ type Deferred<T> = {
   reject: (reason: unknown) => void;
 };
 
-type AgentTestServerMode = "accept" | "reject";
+type AgentTestServerMode = "accept" | "reject" | "disconnect_before_payload";
 
 type AgentTestServer = {
   url: string;
@@ -153,6 +153,10 @@ async function startAgentTestServer(mode: AgentTestServerMode): Promise<AgentTes
               streamId,
             }),
           );
+
+          if (mode === "disconnect_before_payload") {
+            socket.close(1011, "disconnect before payload");
+          }
           return;
         } catch (error) {
           connectDeferred.reject(error);
@@ -300,6 +304,29 @@ describe("sandbox agent websocket delivery", () => {
         code: 1000,
         reason: "test complete",
       });
+      expect(connection.socket.readyState).toBe(WebSocket.CLOSED);
+      await server.socketClosed;
+    } finally {
+      await server.close();
+    }
+  });
+
+  it("fails fast when the websocket closes before a payload send completes", async () => {
+    const server = await startAgentTestServer("disconnect_before_payload");
+
+    try {
+      const connection = await connectSandboxAgentConnection({
+        connectionUrl: server.url,
+      });
+
+      await expect(
+        sendSandboxAgentMessage({
+          connection,
+          message: "hello-agent",
+          autoClose: false,
+        }),
+      ).rejects.toThrow("Sandbox session socket is not open.");
+
       await server.socketClosed;
     } finally {
       await server.close();

@@ -3,6 +3,7 @@ import WebSocket, { type RawData } from "ws";
 
 import {
   type SandboxScheduledTask,
+  SandboxSessionSendGuarantees,
   type SandboxSessionRuntime,
   type SandboxSessionSocket,
   type SandboxSessionSocketEventMap,
@@ -55,6 +56,10 @@ class NodeSandboxSessionSocket implements SandboxSessionSocket {
     return toReadyState(this.#socket.readyState);
   }
 
+  get sendGuarantee(): SandboxSessionSocket["sendGuarantee"] {
+    return SandboxSessionSendGuarantees.WRITTEN;
+  }
+
   addEventListener<EventName extends SandboxSessionSocketEventName>(
     eventName: EventName,
     listener: SandboxSessionSocketEventMap[EventName],
@@ -101,8 +106,17 @@ class NodeSandboxSessionSocket implements SandboxSessionSocket {
     this.#socket.off(eventName, wrappedListener);
   }
 
-  send(payload: string): void {
-    this.#socket.send(payload);
+  send(payload: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      this.#socket.send(payload, (error) => {
+        if (error == null) {
+          resolve();
+          return;
+        }
+
+        reject(error);
+      });
+    });
   }
 
   close(code?: number, reason?: string): void {

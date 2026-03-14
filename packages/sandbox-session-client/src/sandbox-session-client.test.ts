@@ -2,8 +2,10 @@ import { systemSleeper } from "@mistle/time";
 import { afterEach, describe, expect, it } from "vitest";
 import { type RawData, WebSocketServer } from "ws";
 
+import { createBrowserSandboxSessionRuntime } from "./browser.js";
 import { SandboxSessionClient, parseStreamOpenControlMessage } from "./client.js";
 import { createNodeSandboxSessionRuntime } from "./node.js";
+import { SandboxSessionSendGuarantees } from "./runtime.js";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -11,11 +13,12 @@ type Deferred<T> = {
   reject: (reason: unknown) => void;
 };
 
-type TestServerMode = "accept" | "reject";
+type TestServerMode = "accept" | "close_after_payload" | "reject";
 
 type TestServer = {
   url: string;
   openRequest: Promise<string>;
+  payload: Promise<string>;
   socketClosed: Promise<void>;
   sendNotification: (payload: unknown) => void;
   closeClientSocket: () => void;
@@ -63,6 +66,7 @@ function toText(data: RawData): string {
 
 async function startTestServer(mode: TestServerMode): Promise<TestServer> {
   const openRequestDeferred = createDeferred<string>();
+  const payloadDeferred = createDeferred<string>();
   const socketClosedDeferred = createDeferred<void>();
 
   const wsServer = new WebSocketServer({
@@ -79,29 +83,39 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
 
   wsServer.on("connection", (socket) => {
     connectedSocket = socket;
+    let didHandleOpenRequest = false;
 
     socket.on("message", (message) => {
-      const openRequestText = toText(message);
-      openRequestDeferred.resolve(openRequestText);
+      const payloadText = toText(message);
+      if (!didHandleOpenRequest) {
+        didHandleOpenRequest = true;
+        openRequestDeferred.resolve(payloadText);
 
-      const controlMessage = parseStreamOpenControlMessage(
-        JSON.stringify({
-          type: mode === "accept" ? "stream.open.ok" : "stream.open.error",
-          streamId: 1,
-          ...(mode === "reject"
-            ? {
-                code: "agent_endpoint_unavailable",
-                message: "agent endpoint unavailable",
-              }
-            : {}),
-        }),
-      );
-      if (controlMessage === null) {
-        openRequestDeferred.reject(new Error("Expected valid stream.open control message."));
+        const controlMessage = parseStreamOpenControlMessage(
+          JSON.stringify({
+            type: mode === "reject" ? "stream.open.error" : "stream.open.ok",
+            streamId: 1,
+            ...(mode === "reject"
+              ? {
+                  code: "agent_endpoint_unavailable",
+                  message: "agent endpoint unavailable",
+                }
+              : {}),
+          }),
+        );
+        if (controlMessage === null) {
+          openRequestDeferred.reject(new Error("Expected valid stream.open control message."));
+          return;
+        }
+
+        socket.send(JSON.stringify(controlMessage));
         return;
       }
 
-      socket.send(JSON.stringify(controlMessage));
+      payloadDeferred.resolve(payloadText);
+      if (mode === "close_after_payload") {
+        socket.close(1011, "close after payload");
+      }
     });
 
     socket.on("close", () => {
@@ -110,6 +124,7 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
 
     socket.on("error", (error) => {
       openRequestDeferred.reject(error);
+      payloadDeferred.reject(error);
       socketClosedDeferred.reject(error);
     });
   });
@@ -122,6 +137,7 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
   return {
     url: `ws://127.0.0.1:${String(address.port)}`,
     openRequest: openRequestDeferred.promise,
+    payload: payloadDeferred.promise,
     socketClosed: socketClosedDeferred.promise,
     sendNotification: (payload) => {
       if (connectedSocket === null) {
@@ -187,6 +203,13 @@ function createClient(connectionUrl: string): SandboxSessionClient {
   return new SandboxSessionClient({
     connectionUrl,
     runtime: createNodeSandboxSessionRuntime(),
+  });
+}
+
+function createBrowserClient(connectionUrl: string): SandboxSessionClient {
+  return new SandboxSessionClient({
+    connectionUrl,
+    runtime: createBrowserSandboxSessionRuntime(),
   });
 }
 
@@ -351,5 +374,32 @@ describe("sandbox session client", () => {
     });
 
     expect(client.errorMessage).toBe("Sandbox websocket connection closed.");
+  });
+
+  it("reports queued send guarantees in the browser runtime", async () => {
+    const server = await createManagedTestServer("close_after_payload");
+    const client = createBrowserClient(server.url);
+
+    await expectClientToOpenAgentStream({
+      client,
+      server,
+    });
+
+    expect(client.sendGuarantee).toBe(SandboxSessionSendGuarantees.QUEUED);
+    await client.sendText(JSON.stringify({ method: "initialized" }));
+    expect(await server.payload).toBe(JSON.stringify({ method: "initialized" }));
+    await server.socketClosed;
+  });
+
+  it("exposes written send guarantees in the node runtime", async () => {
+    const server = await createManagedTestServer("accept");
+    const client = createClient(server.url);
+
+    await expectClientToOpenAgentStream({
+      client,
+      server,
+    });
+
+    expect(client.sendGuarantee).toBe(SandboxSessionSendGuarantees.WRITTEN);
   });
 });

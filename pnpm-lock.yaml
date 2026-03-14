@@ -192,6 +192,9 @@ importers:
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging
+      '@mistle/sandbox-session-client':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-session-client
       '@mistle/sandbox-session-protocol':
         specifier: workspace:*
         version: link:../../packages/sandbox-session-protocol
@@ -557,6 +560,13 @@ importers:
       zod:
         specifier: ^4.1.12
         version: 4.3.6
+    devDependencies:
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      ws:
+        specifier: ^8.19.0
+        version: 8.19.0
 
   packages/config:
     dependencies:

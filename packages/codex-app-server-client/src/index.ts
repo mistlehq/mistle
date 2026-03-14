@@ -2,6 +2,7 @@ export * from "./codex/operations.js";
 export * from "./json-rpc/client.js";
 export {
   SandboxSessionClient as CodexSessionClient,
+  SandboxSessionSendGuarantees as CodexSessionSendGuarantees,
   parseJsonRpcErrorResponse,
   parseJsonRpcNotification,
   parseJsonRpcServerRequest,
@@ -18,6 +19,7 @@ export type {
   SandboxSessionConnectionState as CodexSessionConnectionState,
   SandboxSessionEvent as CodexSessionEvent,
   SandboxSessionClientInput as CodexSessionClientInput,
+  SandboxSessionSendGuarantee as CodexSessionSendGuarantee,
 } from "@mistle/sandbox-session-client";
 export * from "./thread-items.js";
 export type {
