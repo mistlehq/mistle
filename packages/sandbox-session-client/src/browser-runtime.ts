@@ -1,28 +1,28 @@
 import {
-  type CodexScheduledTask,
-  type CodexSessionRuntime,
-  type CodexSessionSocket,
-  type CodexSessionSocketEventMap,
-  CodexSessionSocketReadyStates,
-  type CodexSessionSocketEventName,
+  type SandboxScheduledTask,
+  type SandboxSessionRuntime,
+  type SandboxSessionSocket,
+  type SandboxSessionSocketEventMap,
+  SandboxSessionSocketReadyStates,
+  type SandboxSessionSocketEventName,
 } from "./runtime.js";
 
-function toReadyState(value: number): CodexSessionSocket["readyState"] {
+function toReadyState(value: number): SandboxSessionSocket["readyState"] {
   switch (value) {
-    case CodexSessionSocketReadyStates.CONNECTING:
-    case CodexSessionSocketReadyStates.OPEN:
-    case CodexSessionSocketReadyStates.CLOSING:
-    case CodexSessionSocketReadyStates.CLOSED:
+    case SandboxSessionSocketReadyStates.CONNECTING:
+    case SandboxSessionSocketReadyStates.OPEN:
+    case SandboxSessionSocketReadyStates.CLOSING:
+    case SandboxSessionSocketReadyStates.CLOSED:
       return value;
     default:
       throw new Error(`Unsupported browser websocket ready state '${String(value)}'.`);
   }
 }
 
-class BrowserCodexSessionSocket implements CodexSessionSocket {
+class BrowserSandboxSessionSocket implements SandboxSessionSocket {
   readonly #socket: WebSocket;
   readonly #listenerMap = new Map<
-    CodexSessionSocketEventMap[CodexSessionSocketEventName],
+    SandboxSessionSocketEventMap[SandboxSessionSocketEventName],
     EventListener
   >();
 
@@ -30,32 +30,25 @@ class BrowserCodexSessionSocket implements CodexSessionSocket {
     this.#socket = new WebSocket(connectionUrl);
   }
 
-  get readyState(): CodexSessionSocket["readyState"] {
+  get readyState(): SandboxSessionSocket["readyState"] {
     return toReadyState(this.#socket.readyState);
   }
 
-  addEventListener<EventName extends CodexSessionSocketEventName>(
+  addEventListener<EventName extends SandboxSessionSocketEventName>(
     eventName: EventName,
-    listener: CodexSessionSocketEventMap[EventName],
+    listener: SandboxSessionSocketEventMap[EventName],
   ): void {
-    let wrappedListener: EventListener;
-    if (eventName === "message") {
-      wrappedListener = (event) => {
-        listener(event);
-      };
-    } else {
-      wrappedListener = (event) => {
-        listener(event);
-      };
-    }
+    const wrappedListener: EventListener = (event) => {
+      listener(event);
+    };
 
     this.#listenerMap.set(listener, wrappedListener);
     this.#socket.addEventListener(eventName, wrappedListener);
   }
 
-  removeEventListener<EventName extends CodexSessionSocketEventName>(
+  removeEventListener<EventName extends SandboxSessionSocketEventName>(
     eventName: EventName,
-    listener: CodexSessionSocketEventMap[EventName],
+    listener: SandboxSessionSocketEventMap[EventName],
   ): void {
     const wrappedListener = this.#listenerMap.get(listener);
     if (wrappedListener === undefined) {
@@ -75,7 +68,7 @@ class BrowserCodexSessionSocket implements CodexSessionSocket {
   }
 }
 
-class BrowserCodexScheduledTask implements CodexScheduledTask {
+class BrowserSandboxScheduledTask implements SandboxScheduledTask {
   readonly #timeoutId: number;
 
   constructor(timeoutId: number) {
@@ -97,13 +90,13 @@ function createSequentialStreamId(): () => number {
   };
 }
 
-export function createBrowserCodexSessionRuntime(): CodexSessionRuntime {
+export function createBrowserSandboxSessionRuntime(): SandboxSessionRuntime {
   const createStreamId = createSequentialStreamId();
 
   return {
-    createSocket: (connectionUrl) => new BrowserCodexSessionSocket(connectionUrl),
+    createSocket: (connectionUrl) => new BrowserSandboxSessionSocket(connectionUrl),
     createStreamId,
     scheduleTimeout: (callback, timeoutMs) =>
-      new BrowserCodexScheduledTask(window.setTimeout(callback, timeoutMs)),
+      new BrowserSandboxScheduledTask(window.setTimeout(callback, timeoutMs)),
   };
 }

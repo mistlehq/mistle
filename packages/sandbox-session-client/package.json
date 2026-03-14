@@ -1,0 +1,44 @@
+{
+  "name": "@mistle/sandbox-session-client",
+  "private": true,
+  "type": "module",
+  "main": "./index.js",
+  "module": "./index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "node": "./index.js",
+      "import": "./index.js",
+      "default": "./index.js"
+    },
+    "./browser": {
+      "types": "./src/browser.ts",
+      "node": "./browser.js",
+      "import": "./browser.js",
+      "default": "./browser.js"
+    },
+    "./node": {
+      "types": "./src/node.ts",
+      "node": "./node.js",
+      "import": "./node.js",
+      "default": "./node.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@mistle/time": "workspace:*",
+    "@mistle/sandbox-session-protocol": "workspace:*",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
+  }
+}

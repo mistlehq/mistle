@@ -1,12 +1,13 @@
+import { systemScheduler } from "@mistle/time";
 import WebSocket, { type RawData } from "ws";
 
 import {
-  type CodexScheduledTask,
-  type CodexSessionRuntime,
-  type CodexSessionSocket,
-  type CodexSessionSocketEventMap,
-  CodexSessionSocketReadyStates,
-  type CodexSessionSocketEventName,
+  type SandboxScheduledTask,
+  type SandboxSessionRuntime,
+  type SandboxSessionSocket,
+  type SandboxSessionSocketEventMap,
+  SandboxSessionSocketReadyStates,
+  type SandboxSessionSocketEventName,
 } from "./runtime.js";
 
 function toMessageData(data: RawData): unknown {
@@ -23,26 +24,26 @@ function toMessageData(data: RawData): unknown {
   return Buffer.concat(data).toString("utf8");
 }
 
-function toReadyState(value: number): CodexSessionSocket["readyState"] {
+function toReadyState(value: number): SandboxSessionSocket["readyState"] {
   switch (value) {
-    case CodexSessionSocketReadyStates.CONNECTING:
-    case CodexSessionSocketReadyStates.OPEN:
-    case CodexSessionSocketReadyStates.CLOSING:
-    case CodexSessionSocketReadyStates.CLOSED:
+    case SandboxSessionSocketReadyStates.CONNECTING:
+    case SandboxSessionSocketReadyStates.OPEN:
+    case SandboxSessionSocketReadyStates.CLOSING:
+    case SandboxSessionSocketReadyStates.CLOSED:
       return value;
     default:
       throw new Error(`Unsupported node websocket ready state '${String(value)}'.`);
   }
 }
 
-class NodeCodexSessionSocket implements CodexSessionSocket {
+class NodeSandboxSessionSocket implements SandboxSessionSocket {
   readonly #socket: WebSocket;
   readonly #listenerMap = new Map<
-    CodexSessionSocketEventMap[CodexSessionSocketEventName],
+    SandboxSessionSocketEventMap[SandboxSessionSocketEventName],
     (event: unknown) => void
   >();
   readonly #messageListenerMap = new Map<
-    CodexSessionSocketEventMap["message"],
+    SandboxSessionSocketEventMap["message"],
     (data: RawData) => void
   >();
 
@@ -50,13 +51,13 @@ class NodeCodexSessionSocket implements CodexSessionSocket {
     this.#socket = new WebSocket(connectionUrl);
   }
 
-  get readyState(): CodexSessionSocket["readyState"] {
+  get readyState(): SandboxSessionSocket["readyState"] {
     return toReadyState(this.#socket.readyState);
   }
 
-  addEventListener<EventName extends CodexSessionSocketEventName>(
+  addEventListener<EventName extends SandboxSessionSocketEventName>(
     eventName: EventName,
-    listener: CodexSessionSocketEventMap[EventName],
+    listener: SandboxSessionSocketEventMap[EventName],
   ): void {
     if (eventName === "message") {
       const wrappedMessageListener = (data: RawData): void => {
@@ -76,9 +77,9 @@ class NodeCodexSessionSocket implements CodexSessionSocket {
     this.#socket.on(eventName, wrappedListener);
   }
 
-  removeEventListener<EventName extends CodexSessionSocketEventName>(
+  removeEventListener<EventName extends SandboxSessionSocketEventName>(
     eventName: EventName,
-    listener: CodexSessionSocketEventMap[EventName],
+    listener: SandboxSessionSocketEventMap[EventName],
   ): void {
     if (eventName === "message") {
       const wrappedMessageListener = this.#messageListenerMap.get(listener);
@@ -109,15 +110,15 @@ class NodeCodexSessionSocket implements CodexSessionSocket {
   }
 }
 
-class NodeCodexScheduledTask implements CodexScheduledTask {
-  readonly #timeoutId: NodeJS.Timeout;
+class NodeSandboxScheduledTask implements SandboxScheduledTask {
+  readonly #timeoutTask: ReturnType<typeof systemScheduler.schedule>;
 
-  constructor(timeoutId: NodeJS.Timeout) {
-    this.#timeoutId = timeoutId;
+  constructor(timeoutTask: ReturnType<typeof systemScheduler.schedule>) {
+    this.#timeoutTask = timeoutTask;
   }
 
   cancel(): void {
-    clearTimeout(this.#timeoutId);
+    systemScheduler.cancel(this.#timeoutTask);
   }
 }
 
@@ -131,13 +132,13 @@ function createSequentialStreamId(): () => number {
   };
 }
 
-export function createNodeCodexSessionRuntime(): CodexSessionRuntime {
+export function createNodeSandboxSessionRuntime(): SandboxSessionRuntime {
   const createStreamId = createSequentialStreamId();
 
   return {
-    createSocket: (connectionUrl) => new NodeCodexSessionSocket(connectionUrl),
+    createSocket: (connectionUrl) => new NodeSandboxSessionSocket(connectionUrl),
     createStreamId,
     scheduleTimeout: (callback, timeoutMs) =>
-      new NodeCodexScheduledTask(setTimeout(callback, timeoutMs)),
+      new NodeSandboxScheduledTask(systemScheduler.schedule(callback, timeoutMs)),
   };
 }

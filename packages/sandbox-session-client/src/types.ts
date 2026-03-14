@@ -1,6 +1,6 @@
 import type { StreamOpenError, StreamOpenOK } from "@mistle/sandbox-session-protocol";
 
-export type CodexSessionConnectionState =
+export type SandboxSessionConnectionState =
   | "idle"
   | "connecting_socket"
   | "opening_agent_stream"
@@ -10,17 +10,17 @@ export type CodexSessionConnectionState =
   | "closed"
   | "error";
 
-export type CodexControlMessage = StreamOpenOK | StreamOpenError;
+export type SandboxControlMessage = StreamOpenOK | StreamOpenError;
 
-export type CodexJsonRpcId = number | string;
+export type JsonRpcId = number | string;
 
-export type CodexJsonRpcSuccessResponse = {
-  id: CodexJsonRpcId;
+export type JsonRpcSuccessResponse = {
+  id: JsonRpcId;
   result: unknown;
 };
 
-export type CodexJsonRpcErrorResponse = {
-  id: CodexJsonRpcId;
+export type JsonRpcErrorResponse = {
+  id: JsonRpcId;
   error: {
     code: number;
     message: string;
@@ -28,34 +28,34 @@ export type CodexJsonRpcErrorResponse = {
   };
 };
 
-export type CodexJsonRpcNotification = {
+export type JsonRpcNotification = {
   method: string;
   params?: unknown;
 };
 
-export type CodexJsonRpcServerRequest = {
-  id: CodexJsonRpcId;
+export type JsonRpcServerRequest = {
+  id: JsonRpcId;
   method: string;
   params?: unknown;
 };
 
-export type CodexSessionEvent =
+export type SandboxSessionEvent =
   | {
       type: "connection_state_changed";
-      state: CodexSessionConnectionState;
+      state: SandboxSessionConnectionState;
       errorMessage: string | null;
     }
   | {
       type: "notification";
-      notification: CodexJsonRpcNotification;
+      notification: JsonRpcNotification;
     }
   | {
       type: "server_request";
-      request: CodexJsonRpcServerRequest;
+      request: JsonRpcServerRequest;
     }
   | {
       type: "response";
-      response: CodexJsonRpcSuccessResponse | CodexJsonRpcErrorResponse;
+      response: JsonRpcSuccessResponse | JsonRpcErrorResponse;
     }
   | {
       type: "unhandled_message";

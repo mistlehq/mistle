@@ -1,12 +1,12 @@
-import { CodexSessionClient } from "../session/client.js";
+import { SandboxSessionClient } from "@mistle/sandbox-session-client";
 import type {
-  CodexJsonRpcErrorResponse,
-  CodexJsonRpcId,
-  CodexJsonRpcNotification,
-  CodexJsonRpcServerRequest,
-  CodexJsonRpcSuccessResponse,
-  CodexSessionEvent,
-} from "../session/types.js";
+  JsonRpcErrorResponse as CodexJsonRpcErrorResponse,
+  JsonRpcId as CodexJsonRpcId,
+  JsonRpcNotification as CodexJsonRpcNotification,
+  JsonRpcServerRequest as CodexJsonRpcServerRequest,
+  JsonRpcSuccessResponse as CodexJsonRpcSuccessResponse,
+  SandboxSessionEvent as CodexSessionEvent,
+} from "@mistle/sandbox-session-client";
 
 type PendingRequest = {
   resolve: (value: unknown) => void;
@@ -23,7 +23,7 @@ function isErrorResponse(
 }
 
 export class CodexJsonRpcClient {
-  readonly #sessionClient: CodexSessionClient;
+  readonly #sessionClient: SandboxSessionClient;
   readonly #pendingRequests = new Map<CodexJsonRpcId, PendingRequest>();
   readonly #notificationListeners = new Set<NotificationListener>();
   readonly #serverRequestListeners = new Set<ServerRequestListener>();
@@ -31,7 +31,7 @@ export class CodexJsonRpcClient {
 
   #nextId = 0;
 
-  constructor(sessionClient: CodexSessionClient) {
+  constructor(sessionClient: SandboxSessionClient) {
     this.#sessionClient = sessionClient;
     this.#unsubscribeSessionEvent = sessionClient.onEvent((event) => {
       this.#handleSessionEvent(event);
