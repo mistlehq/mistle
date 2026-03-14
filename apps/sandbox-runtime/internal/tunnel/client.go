@@ -130,6 +130,40 @@ func terminateActivePTYSession(activePTYSession **ptySession) {
 	*activePTYSession = nil
 }
 
+func writeStreamAlreadyOpenError(
+	ctx context.Context,
+	conn *websocket.Conn,
+	streamID int,
+) error {
+	return writeStreamOpenError(ctx, conn, sessionprotocol.StreamOpenError{
+		Type:     sessionprotocol.MessageTypeStreamOpenError,
+		StreamID: streamID,
+		Code:     connectErrorCodeInvalidConnectRequest,
+		Message:  fmt.Sprintf("stream %d is already open on the bootstrap tunnel", streamID),
+	})
+}
+
+func writeUnboundStreamReset(
+	ctx context.Context,
+	conn *websocket.Conn,
+	routing tunnelMessageRouting,
+) error {
+	resetCode := streamResetCodeInvalidStreamData
+	switch routing.ControlMessageType {
+	case sessionprotocol.MessageTypeStreamSignal:
+		resetCode = streamResetCodeInvalidStreamSignal
+	case sessionprotocol.MessageTypeStreamClose:
+		resetCode = streamResetCodeInvalidStreamClose
+	}
+
+	return writeStreamReset(ctx, conn, sessionprotocol.StreamReset{
+		Type:     sessionprotocol.MessageTypeStreamReset,
+		StreamID: routing.StreamID,
+		Code:     resetCode,
+		Message:  fmt.Sprintf("stream %d is not open on the bootstrap tunnel", routing.StreamID),
+	})
+}
+
 func handleSandboxTunnelConnection(
 	runContext context.Context,
 	tracer trace.Tracer,
@@ -139,35 +173,23 @@ func handleSandboxTunnelConnection(
 	runtimeClients []startup.RuntimeClient,
 ) error {
 	tunnelReadResultCh := make(chan tunnelReadResult, 1)
+	relayResultCh := make(chan activeTunnelStreamRelayResult, 8)
 	go readTunnelMessages(runContext, conn, tunnelReadResultCh)
 
-	var activeRelay *activeTunnelStreamRelay
+	activeRelaysByStreamID := make(map[int]*activeTunnelStreamRelay)
+	var activePTYRelay *activeTunnelStreamRelay
 
 	for {
-		if activeRelay != nil {
-			select {
-			case activeRelayResult := <-activeRelay.ResultCh:
-				if err := finishActiveTunnelStreamRelay(&activeRelay, activePTYSession, activeRelayResult); err != nil {
-					if runContext.Err() != nil {
-						return nil
-					}
-					return err
-				}
-				continue
-			default:
-			}
-		}
-
-		var activeRelayResultCh <-chan activeTunnelStreamRelayResult
-		if activeRelay != nil {
-			activeRelayResultCh = activeRelay.ResultCh
-		}
-
 		select {
 		case <-runContext.Done():
 			return nil
-		case activeRelayResult := <-activeRelayResultCh:
-			if err := finishActiveTunnelStreamRelay(&activeRelay, activePTYSession, activeRelayResult); err != nil {
+		case activeRelayResult := <-relayResultCh:
+			if err := finishActiveTunnelStreamRelay(
+				activeRelaysByStreamID,
+				&activePTYRelay,
+				activePTYSession,
+				activeRelayResult,
+			); err != nil {
 				if runContext.Err() != nil {
 					return nil
 				}
@@ -181,113 +203,166 @@ func handleSandboxTunnelConnection(
 				return fmt.Errorf("sandbox tunnel websocket read failed: %w", tunnelReadResult.Err)
 			}
 
-			for {
-				if activeRelay == nil {
-					connectRequest, err := parseConnectRequestMessage(
-						tunnelReadResult.Message.MessageType,
-						tunnelReadResult.Message.Payload,
-					)
-					if err != nil {
-						if tunnelReadResult.Message.MessageType == websocket.MessageText {
-							controlMessageType, parseControlErr := parseControlMessageType(tunnelReadResult.Message.Payload)
-							if parseControlErr == nil && controlMessageType == sessionprotocol.MessageTypeStreamClose {
-								break
-							}
-						}
-						return fmt.Errorf("sandbox tunnel websocket read failed: %w", err)
+			connectRequest, connectErr := parseConnectRequestMessage(
+				tunnelReadResult.Message.MessageType,
+				tunnelReadResult.Message.Payload,
+			)
+			if connectErr == nil {
+				if _, exists := activeRelaysByStreamID[connectRequest.StreamID]; exists {
+					if err := writeStreamAlreadyOpenError(runContext, conn, connectRequest.StreamID); err != nil {
+						return fmt.Errorf("failed to write duplicate stream.open error: %w", err)
 					}
-
-					requestContext, requestSpan := tracer.Start(
-						runContext,
-						"sandbox.tunnel.stream_open",
-						trace.WithAttributes(attribute.String("mistle.channel.kind", connectRequest.ChannelKind)),
-					)
-
-					switch connectRequest.ChannelKind {
-					case sessionprotocol.ChannelKindAgent:
-						relay, err := handleAgentConnectRequest(
-							requestContext,
-							conn,
-							connectRequest,
-							agentRuntimes,
-							runtimeClients,
-						)
-						if err != nil {
-							requestSpan.RecordError(err)
-							requestSpan.SetStatus(codes.Error, err.Error())
-							requestSpan.End()
-
-							if runContext.Err() != nil {
-								return nil
-							}
-							return err
-						}
-						activeRelay = relay
-					case sessionprotocol.ChannelKindPTY:
-						updatedPTYSession, relay, err := handlePTYConnectRequest(
-							requestContext,
-							conn,
-							connectRequest,
-							*activePTYSession,
-						)
-						if err != nil {
-							requestSpan.RecordError(err)
-							requestSpan.SetStatus(codes.Error, err.Error())
-							requestSpan.End()
-
-							if runContext.Err() != nil {
-								return nil
-							}
-							return err
-						}
-						*activePTYSession = updatedPTYSession
-						activeRelay = relay
-					default:
-						if err := writeStreamOpenError(requestContext, conn, sessionprotocol.StreamOpenError{
-							Type:     sessionprotocol.MessageTypeStreamOpenError,
-							StreamID: connectRequest.StreamID,
-							Code:     connectErrorCodeUnsupportedChannel,
-							Message:  fmt.Sprintf("channel kind '%s' is not supported", connectRequest.ChannelKind),
-						}); err != nil {
-							requestSpan.RecordError(err)
-							requestSpan.SetStatus(codes.Error, err.Error())
-							requestSpan.End()
-							return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", err)
-						}
-					}
-
-					requestSpan.End()
-					break
+					continue
 				}
 
-				select {
-				case activeRelay.MessageCh <- tunnelReadResult.Message:
-					if tunnelReadResult.Message.MessageType == websocket.MessageText {
-						controlMessageType, err := parseControlMessageType(tunnelReadResult.Message.Payload)
-						if err == nil && controlMessageType == sessionprotocol.MessageTypeStreamClose {
-							activeRelayResult := <-activeRelay.ResultCh
-							if err := finishActiveTunnelStreamRelay(&activeRelay, activePTYSession, activeRelayResult); err != nil {
-								if runContext.Err() != nil {
-									return nil
-								}
-								return err
-							}
+				if connectRequest.ChannelKind == sessionprotocol.ChannelKindPTY && activePTYRelay != nil {
+					ptyConnectRequest, err := parsePTYConnectRequest(connectRequest.RawPayload)
+					if err != nil {
+						if writeErr := writeStreamOpenError(runContext, conn, sessionprotocol.StreamOpenError{
+							Type:     sessionprotocol.MessageTypeStreamOpenError,
+							StreamID: connectRequest.StreamID,
+							Code:     connectErrorCodeInvalidConnectRequest,
+							Message:  err.Error(),
+						}); writeErr != nil {
+							return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 						}
+						continue
 					}
-					break
-				case activeRelayResult := <-activeRelay.ResultCh:
-					if err := finishActiveTunnelStreamRelay(&activeRelay, activePTYSession, activeRelayResult); err != nil {
+
+					if ptyConnectRequest.Channel.Session == sessionprotocol.PTYSessionModeAttach {
+						activeRelaysByStreamID[connectRequest.StreamID] = activePTYRelay
+					}
+
+					select {
+					case activePTYRelay.MessageCh <- tunnelReadResult.Message:
+						continue
+					case activeRelayResult := <-relayResultCh:
+						if err := finishActiveTunnelStreamRelay(
+							activeRelaysByStreamID,
+							&activePTYRelay,
+							activePTYSession,
+							activeRelayResult,
+						); err != nil {
+							if runContext.Err() != nil {
+								return nil
+							}
+							return err
+						}
+						continue
+					case <-runContext.Done():
+						return nil
+					}
+				}
+
+				requestContext, requestSpan := tracer.Start(
+					runContext,
+					"sandbox.tunnel.stream_open",
+					trace.WithAttributes(attribute.String("mistle.channel.kind", connectRequest.ChannelKind)),
+				)
+
+				switch connectRequest.ChannelKind {
+				case sessionprotocol.ChannelKindAgent:
+					relay, err := handleAgentConnectRequest(
+						requestContext,
+						conn,
+						connectRequest,
+						agentRuntimes,
+						runtimeClients,
+						relayResultCh,
+					)
+					if err != nil {
+						requestSpan.RecordError(err)
+						requestSpan.SetStatus(codes.Error, err.Error())
+						requestSpan.End()
+
 						if runContext.Err() != nil {
 							return nil
 						}
 						return err
 					}
-					continue
-				case <-runContext.Done():
-					return nil
+					if relay != nil {
+						activeRelaysByStreamID[connectRequest.StreamID] = relay
+					}
+				case sessionprotocol.ChannelKindPTY:
+					updatedPTYSession, relay, err := handlePTYConnectRequest(
+						requestContext,
+						conn,
+						connectRequest,
+						*activePTYSession,
+						relayResultCh,
+					)
+					if err != nil {
+						requestSpan.RecordError(err)
+						requestSpan.SetStatus(codes.Error, err.Error())
+						requestSpan.End()
+
+						if runContext.Err() != nil {
+							return nil
+						}
+						return err
+					}
+					*activePTYSession = updatedPTYSession
+					if relay != nil {
+						activePTYRelay = relay
+						activeRelaysByStreamID[connectRequest.StreamID] = relay
+					}
+				default:
+					if err := writeStreamOpenError(requestContext, conn, sessionprotocol.StreamOpenError{
+						Type:     sessionprotocol.MessageTypeStreamOpenError,
+						StreamID: connectRequest.StreamID,
+						Code:     connectErrorCodeUnsupportedChannel,
+						Message:  fmt.Sprintf("channel kind '%s' is not supported", connectRequest.ChannelKind),
+					}); err != nil {
+						requestSpan.RecordError(err)
+						requestSpan.SetStatus(codes.Error, err.Error())
+						requestSpan.End()
+						return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", err)
+					}
 				}
 
-				break
+				requestSpan.End()
+				continue
+			}
+
+			routing, err := parseTunnelMessageRouting(tunnelReadResult.Message)
+			if err != nil {
+				return fmt.Errorf("sandbox tunnel websocket read failed: %w", err)
+			}
+			if routing.ControlMessageType == sessionprotocol.MessageTypeStreamWindow {
+				continue
+			}
+
+			relay := activeRelaysByStreamID[routing.StreamID]
+			if relay == nil {
+				if err := writeUnboundStreamReset(runContext, conn, routing); err != nil {
+					return fmt.Errorf("failed to write stream.reset for unknown stream: %w", err)
+				}
+				continue
+			}
+
+			releasePTYAttachBinding := routing.ControlMessageType == sessionprotocol.MessageTypeStreamClose &&
+				relay.ChannelKind == sessionprotocol.ChannelKindPTY &&
+				routing.StreamID != relay.PrimaryStreamID
+
+			select {
+			case relay.MessageCh <- tunnelReadResult.Message:
+				if releasePTYAttachBinding {
+					delete(activeRelaysByStreamID, routing.StreamID)
+				}
+			case activeRelayResult := <-relayResultCh:
+				if err := finishActiveTunnelStreamRelay(
+					activeRelaysByStreamID,
+					&activePTYRelay,
+					activePTYSession,
+					activeRelayResult,
+				); err != nil {
+					if runContext.Err() != nil {
+						return nil
+					}
+					return err
+				}
+			case <-runContext.Done():
+				return nil
 			}
 		}
 	}

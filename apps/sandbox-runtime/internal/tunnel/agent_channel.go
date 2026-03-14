@@ -34,6 +34,7 @@ func handleAgentConnectRequest(
 	connectRequest connectRequest,
 	agentRuntimes []startup.AgentRuntime,
 	runtimeClients []startup.RuntimeClient,
+	relayResultCh chan<- activeTunnelStreamRelayResult,
 ) (*activeTunnelStreamRelay, error) {
 	agentEndpoint, err := resolveAgentEndpoint(agentRuntimes, runtimeClients)
 	if err != nil {
@@ -92,7 +93,7 @@ func handleAgentConnectRequest(
 		return nil, fmt.Errorf("failed to write sandbox tunnel stream.open acknowledgement: %w", err)
 	}
 
-	return startAgentRelay(ctx, tunnelConn, agentConn, connectRequest.StreamID), nil
+	return startAgentRelay(ctx, tunnelConn, agentConn, connectRequest.StreamID, relayResultCh), nil
 }
 
 func resolveAgentEndpoint(
@@ -282,21 +283,25 @@ func startAgentRelay(
 	tunnelConn *websocket.Conn,
 	agentConn *websocket.Conn,
 	streamID int,
+	relayResultCh chan<- activeTunnelStreamRelayResult,
 ) *activeTunnelStreamRelay {
 	relay := &activeTunnelStreamRelay{
-		MessageCh: make(chan tunnelMessage),
-		ResultCh:  make(chan activeTunnelStreamRelayResult, 1),
+		PrimaryStreamID: streamID,
+		ChannelKind:     sessionprotocol.ChannelKindAgent,
+		MessageCh:       make(chan tunnelMessage),
 	}
 
 	go func() {
 		defer agentConn.CloseNow()
 
-		result := activeTunnelStreamRelayResult{}
+		result := activeTunnelStreamRelayResult{
+			Relay: relay,
+		}
 		_, err := relayTunnelFrames(ctx, tunnelConn, agentConn, streamID, relay.MessageCh)
 		if err != nil {
 			result.Err = fmt.Errorf("sandbox tunnel websocket relay failed: %w", err)
 		}
-		relay.ResultCh <- result
+		relayResultCh <- result
 	}()
 
 	return relay
