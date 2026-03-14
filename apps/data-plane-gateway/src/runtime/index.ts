@@ -10,11 +10,7 @@ import { startServer } from "../server.js";
 import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory-relay-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
-import {
-  GatewayForwardingClient,
-  GatewayForwardingServer,
-  InteractiveStreamRouter,
-} from "../tunnel/gateway-forwarding/index.js";
+import { InteractiveStreamRouter } from "../tunnel/gateway-forwarding/index.js";
 import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
 import { SandboxOwnerLeaseHeartbeat } from "../tunnel/ownership/sandbox-owner-lease-heartbeat.js";
 import { StoreBackedSandboxOwnerResolver } from "../tunnel/ownership/store-backed-sandbox-owner-resolver.js";
@@ -60,11 +56,10 @@ export function createDataPlaneGatewayRuntime(
   const tunnelSessionRegistry = new TunnelSessionRegistry(
     new InMemoryTunnelSessionRegistryAdapter(DefaultMaxActiveBindingsPerSandbox),
   );
-  const gatewayForwardingServer = new GatewayForwardingServer(
-    new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),
-  );
-  const gatewayForwardingClient = new GatewayForwardingClient(
-    new LocalGatewayForwardingClientAdapter(nodeId, gatewayForwardingServer),
+  const gatewayForwardingServer = new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry);
+  const gatewayForwardingClient = new LocalGatewayForwardingClientAdapter(
+    nodeId,
+    gatewayForwardingServer,
   );
   const interactiveStreamRouter = new InteractiveStreamRouter(
     nodeId,

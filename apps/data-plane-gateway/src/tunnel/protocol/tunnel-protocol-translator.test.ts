@@ -8,8 +8,6 @@ import { describe, expect, it } from "vitest";
 
 import { LocalGatewayForwardingClientAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
-import { GatewayForwardingClient } from "../gateway-forwarding/gateway-forwarding-client.js";
-import { GatewayForwardingServer } from "../gateway-forwarding/gateway-forwarding-server.js";
 import { InteractiveStreamRouter } from "../gateway-forwarding/interactive-stream-router.js";
 import { InMemorySandboxOwnerStore } from "../ownership/adapters/in-memory-sandbox-owner-store.js";
 import { StoreBackedSandboxOwnerResolver } from "../ownership/store-backed-sandbox-owner-resolver.js";
@@ -47,12 +45,8 @@ async function createTranslatorHarness() {
     sessionId: BootstrapSessionId,
   });
 
-  const forwardingServer = new GatewayForwardingServer(
-    new LocalGatewayForwardingServerAdapter(registry),
-  );
-  const forwardingClient = new GatewayForwardingClient(
-    new LocalGatewayForwardingClientAdapter(LocalNodeId, forwardingServer),
-  );
+  const forwardingServer = new LocalGatewayForwardingServerAdapter(registry);
+  const forwardingClient = new LocalGatewayForwardingClientAdapter(LocalNodeId, forwardingServer);
   const router = new InteractiveStreamRouter(
     LocalNodeId,
     new StoreBackedSandboxOwnerResolver(LocalNodeId, ownerStore),
