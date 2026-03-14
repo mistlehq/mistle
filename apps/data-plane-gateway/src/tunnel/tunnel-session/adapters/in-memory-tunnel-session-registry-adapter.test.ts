@@ -4,7 +4,7 @@ import { InMemoryTunnelSessionRegistryAdapter } from "./in-memory-tunnel-session
 
 describe("InMemoryTunnelSessionRegistryAdapter", () => {
   it("replaces the bootstrap session for a sandbox instance and releases prior bindings", () => {
-    const adapter = new InMemoryTunnelSessionRegistryAdapter();
+    const adapter = new InMemoryTunnelSessionRegistryAdapter(2);
 
     const firstAttach = adapter.attachBootstrapSession({
       sandboxInstanceId: "sbi_test",
@@ -52,7 +52,7 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
   });
 
   it("binds, looks up, and unbinds client streams for the current bootstrap session", () => {
-    const adapter = new InMemoryTunnelSessionRegistryAdapter();
+    const adapter = new InMemoryTunnelSessionRegistryAdapter(2);
     adapter.attachBootstrapSession({
       sandboxInstanceId: "sbi_test",
       side: "bootstrap",
@@ -127,7 +127,7 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
   });
 
   it("only detaches the currently registered bootstrap session", () => {
-    const adapter = new InMemoryTunnelSessionRegistryAdapter();
+    const adapter = new InMemoryTunnelSessionRegistryAdapter(2);
     adapter.attachBootstrapSession({
       sandboxInstanceId: "sbi_test",
       side: "bootstrap",
@@ -173,7 +173,7 @@ describe("InMemoryTunnelSessionRegistryAdapter", () => {
   });
 
   it("releases all bindings for one client session without affecting others", () => {
-    const adapter = new InMemoryTunnelSessionRegistryAdapter();
+    const adapter = new InMemoryTunnelSessionRegistryAdapter(2);
     adapter.attachBootstrapSession({
       sandboxInstanceId: "sbi_test",
       side: "bootstrap",

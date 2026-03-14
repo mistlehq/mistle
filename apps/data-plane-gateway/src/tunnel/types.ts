@@ -8,6 +8,10 @@ export type LocalPeerDescriptor = {
   side: RelayPeerSide;
 };
 
+export type SessionPeerDescriptor = LocalPeerDescriptor & {
+  sessionId: string;
+};
+
 export type RelayTarget = LocalPeerDescriptor & {
   nodeId: string;
   sessionId: string;

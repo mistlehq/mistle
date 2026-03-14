@@ -1,7 +1,6 @@
 import { LocalPeerRegistry } from "./local-peer-registry/index.js";
 import { RelayTransport } from "./relay-transport/index.js";
 import type {
-  LocalPeerDescriptor,
   RelayCloseEnvelope,
   RelayFrameEnvelope,
   RelayPayload,
@@ -17,10 +16,6 @@ const CloseCodes: {
   REPLACED: 1012,
   PEER_DISCONNECTED: 1012,
 };
-
-function getOppositeSide(side: RelayPeerSide): RelayPeerSide {
-  return side === "bootstrap" ? "connection" : "bootstrap";
-}
 
 function isSamePeerLocation(left: RelayTarget, right: RelayTarget): boolean {
   return (
@@ -80,7 +75,10 @@ export class TunnelRelayCoordinator {
       socket: input.socket,
     });
 
-    const replacedPeer = this.peerRegistry.setPeer(target);
+    const replacedPeer =
+      input.side === "bootstrap"
+        ? this.peerRegistry.setBootstrapPeer(target)
+        : this.peerRegistry.setConnectionPeer(target);
     if (replacedPeer !== undefined) {
       void this.relayTransport
         .deliverEnvelope(
@@ -97,10 +95,16 @@ export class TunnelRelayCoordinator {
   }
 
   public isCurrentPeer(input: RelayTarget): boolean {
-    const current = this.peerRegistry.getPeer({
-      sandboxInstanceId: input.sandboxInstanceId,
-      side: input.side,
-    });
+    const current =
+      input.side === "bootstrap"
+        ? this.peerRegistry.getBootstrapPeer({
+            sandboxInstanceId: input.sandboxInstanceId,
+          })
+        : this.peerRegistry.getConnectionPeer({
+            sandboxInstanceId: input.sandboxInstanceId,
+            side: input.side,
+            sessionId: input.sessionId,
+          });
     if (current === undefined) {
       return false;
     }
@@ -112,11 +116,20 @@ export class TunnelRelayCoordinator {
     sandboxInstanceId: string;
     fromSide: RelayPeerSide;
     payload: RelayPayload;
+    targetSessionId?: string | undefined;
   }): Promise<void> {
-    const target = this.peerRegistry.getPeer({
-      sandboxInstanceId: input.sandboxInstanceId,
-      side: getOppositeSide(input.fromSide),
-    });
+    const target =
+      input.fromSide === "connection"
+        ? this.peerRegistry.getBootstrapPeer({
+            sandboxInstanceId: input.sandboxInstanceId,
+          })
+        : input.targetSessionId === undefined
+          ? undefined
+          : this.peerRegistry.getConnectionPeer({
+              sandboxInstanceId: input.sandboxInstanceId,
+              side: "connection",
+              sessionId: input.targetSessionId,
+            });
     if (target === undefined) {
       return;
     }
@@ -150,26 +163,34 @@ export class TunnelRelayCoordinator {
       return;
     }
 
-    const opposite = this.peerRegistry.getPeer({
+    const oppositePeers = this.peerRegistry.listConnectionPeers({
       sandboxInstanceId: input.target.sandboxInstanceId,
-      side: getOppositeSide(input.target.side),
     });
-    if (!input.notifyOppositePeer || opposite === undefined) {
+    if (!input.notifyOppositePeer || oppositePeers.length === 0) {
       return;
     }
 
-    void this.relayTransport
-      .deliverEnvelope(
-        toCloseEnvelope({
-          target: opposite,
-          closeCode: CloseCodes.PEER_DISCONNECTED,
-          closeReason: "Sandbox tunnel peer disconnected.",
-        }),
-      )
-      .catch(() => undefined);
+    for (const oppositePeer of oppositePeers) {
+      void this.relayTransport
+        .deliverEnvelope(
+          toCloseEnvelope({
+            target: oppositePeer,
+            closeCode: CloseCodes.PEER_DISCONNECTED,
+            closeReason: "Sandbox tunnel peer disconnected.",
+          }),
+        )
+        .catch(() => undefined);
+    }
   }
 
-  public getPeer(input: LocalPeerDescriptor): RelayTarget | undefined {
-    return this.peerRegistry.getPeer(input);
+  public getConnectionPeer(input: {
+    sandboxInstanceId: string;
+    sessionId: string;
+  }): RelayTarget | undefined {
+    return this.peerRegistry.getConnectionPeer({
+      sandboxInstanceId: input.sandboxInstanceId,
+      side: "connection",
+      sessionId: input.sessionId,
+    });
   }
 }
