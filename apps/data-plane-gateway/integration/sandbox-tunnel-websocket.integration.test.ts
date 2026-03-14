@@ -1994,4 +1994,116 @@ describe("sandbox tunnel websocket integration", () => {
     },
     IntegrationTestTimeoutMs,
   );
+
+  it(
+    "rejects opening an interactive stream when the sandbox-wide binding cap is reached",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionTokens = await Promise.all(
+        Array.from({ length: 5 }, () =>
+          mintConnectionToken({
+            config: {
+              connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+              tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+              tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+            },
+            jti: randomUUID(),
+            sandboxInstanceId,
+            ttlSeconds: 120,
+          }),
+        ),
+      );
+
+      let bootstrapSocket: WebSocket | undefined;
+      const clientSockets: WebSocket[] = [];
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        for (const connectionToken of connectionTokens) {
+          clientSockets.push(
+            await connectWebSocket(
+              `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+            ),
+          );
+        }
+
+        for (const [index, clientSocket] of clientSockets.slice(0, 4).entries()) {
+          const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+          await sendWebSocketMessage(
+            clientSocket,
+            JSON.stringify({
+              type: "stream.open",
+              streamId: 70 + index,
+              channel: {
+                kind: "agent",
+              },
+            }),
+          );
+          const forwardedOpen = await forwardedOpenPromise;
+
+          expect(forwardedOpen.isBinary).toBe(false);
+          expect(parseStreamMessage(forwardedOpen.data)).toEqual({
+            type: "stream.open",
+            streamId: index + 1,
+            channel: {
+              kind: "agent",
+            },
+          });
+        }
+
+        const rejectedClientSocket = clientSockets[4];
+        if (rejectedClientSocket === undefined) {
+          throw new Error("Expected the fifth client websocket to exist.");
+        }
+
+        const rejectedOpenPromise = waitForWebSocketMessage(rejectedClientSocket);
+        const bootstrapNoMessagePromise = waitForNoWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          rejectedClientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: 99,
+            channel: {
+              kind: "agent",
+            },
+          }),
+        );
+        const rejectedOpen = await rejectedOpenPromise;
+        await bootstrapNoMessagePromise;
+
+        expect(rejectedOpen.isBinary).toBe(false);
+        const rejectedOpenPayload = parseStreamMessage(rejectedOpen.data);
+        if (rejectedOpenPayload.type !== "stream.open.error") {
+          throw new Error("Expected rejected stream open to produce stream.open.error.");
+        }
+        expect(rejectedOpenPayload.streamId).toBe(99);
+        expect(rejectedOpenPayload.code).toBe("max_active_streams_exceeded");
+        expect(rejectedOpenPayload.message).toContain(
+          "maximum 4 active interactive stream bindings",
+        );
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          ...clientSockets.map(async (socket) => closeWebSocketIfOpen(socket)),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
 });
