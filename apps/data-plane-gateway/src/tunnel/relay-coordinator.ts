@@ -154,7 +154,7 @@ export class TunnelRelayCoordinator {
       sandboxInstanceId: input.target.sandboxInstanceId,
       side: getOppositeSide(input.target.side),
     });
-    if (opposite === undefined) {
+    if (!input.notifyOppositePeer || opposite === undefined) {
       return;
     }
 
