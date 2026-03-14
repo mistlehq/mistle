@@ -8,17 +8,17 @@ import { stopSandbox } from "./stop-sandbox.js";
 import type {
   CreateDataPlaneWorkerServicesInput,
   DataPlaneWorkerServices,
-  TunnelConnectAckPolicy,
+  TunnelReadinessPolicy,
 } from "./types.js";
 import {
   markSandboxInstanceFailed,
   markSandboxInstanceRunning,
 } from "./update-sandbox-instance-status.js";
-import { waitForSandboxTunnelConnectAck } from "./wait-for-sandbox-tunnel-connect-ack.js";
+import { waitForSandboxTunnelReadiness } from "./wait-for-sandbox-tunnel-readiness.js";
 
-const SandboxTunnelConnectAckPollIntervalMs = 250;
+const SandboxTunnelReadinessPollIntervalMs = 250;
 
-function resolveSandboxTunnelConnectAckTimeoutMs(config: DataPlaneWorkerRuntimeConfig): number {
+function resolveSandboxTunnelReadinessTimeoutMs(config: DataPlaneWorkerRuntimeConfig): number {
   const bootstrapTokenTtlSeconds = config.app.tunnel.bootstrapTokenTtlSeconds;
 
   if (!Number.isFinite(bootstrapTokenTtlSeconds) || bootstrapTokenTtlSeconds <= 0) {
@@ -28,12 +28,12 @@ function resolveSandboxTunnelConnectAckTimeoutMs(config: DataPlaneWorkerRuntimeC
   return bootstrapTokenTtlSeconds * 1000;
 }
 
-export function createDefaultTunnelConnectAckPolicy(
+export function createDefaultTunnelReadinessPolicy(
   config: DataPlaneWorkerRuntimeConfig,
-): TunnelConnectAckPolicy {
+): TunnelReadinessPolicy {
   return {
-    timeoutMs: resolveSandboxTunnelConnectAckTimeoutMs(config),
-    pollIntervalMs: SandboxTunnelConnectAckPollIntervalMs,
+    timeoutMs: resolveSandboxTunnelReadinessTimeoutMs(config),
+    pollIntervalMs: SandboxTunnelReadinessPollIntervalMs,
   };
 }
 
@@ -97,12 +97,12 @@ export function createDataPlaneWorkerServices(
           );
         },
       },
-      tunnelConnectAcks: {
-        waitForSandboxTunnelConnectAck: async (workflowInput) => {
-          return waitForSandboxTunnelConnectAck(
+      tunnelReadiness: {
+        waitForSandboxTunnelReadiness: async (workflowInput) => {
+          return waitForSandboxTunnelReadiness(
             {
               db: input.db,
-              policy: input.tunnelConnectAckPolicy,
+              policy: input.tunnelReadinessPolicy,
               clock: input.clock,
               sleeper: input.sleeper,
             },

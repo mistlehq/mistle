@@ -26,7 +26,6 @@ import { typeid } from "typeid-js";
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { BootstrapTunnelNotConnectedError } from "./bootstrap-tunnel-not-connected-error.js";
-import { insertSandboxTunnelConnectAck } from "./connect-ack.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import type { SandboxOwnerLeaseHeartbeat } from "./ownership/sandbox-owner-lease-heartbeat.js";
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
@@ -37,6 +36,7 @@ import {
   getSandboxTunnelSessionAttributes,
   getSandboxTunnelSessionSpanName,
 } from "./telemetry.js";
+import { recordSandboxTunnelTokenRedemption } from "./token-redemption-store.js";
 import {
   markSandboxTunnelConnected,
   markSandboxTunnelDisconnected,
@@ -1027,13 +1027,14 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
       }
 
       try {
-        const inserted = await insertSandboxTunnelConnectAck({
+        // Redeem the token before websocket upgrade so each issued tunnel token is single-use.
+        const inserted = await recordSandboxTunnelTokenRedemption({
           db: ctx.get("db"),
           tokenJti: verifiedTokenJti,
         });
 
         if (!inserted) {
-          return ctx.json({ error: "Sandbox tunnel token has already been acknowledged." }, 409);
+          return ctx.json({ error: "Sandbox tunnel token has already been redeemed." }, 409);
         }
       } catch (error) {
         logger.error(
@@ -1042,9 +1043,9 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             tokenJti: verifiedTokenJti,
             tokenKind: verifiedTokenKind,
           },
-          "Failed to persist sandbox tunnel token acknowledgement",
+          "Failed to persist sandbox tunnel token redemption",
         );
-        return ctx.json({ error: "Failed to acknowledge sandbox tunnel token." }, 500);
+        return ctx.json({ error: "Failed to redeem sandbox tunnel token." }, 500);
       }
 
       if (verifiedTokenKind === "bootstrap") {

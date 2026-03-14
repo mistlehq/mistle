@@ -86,7 +86,7 @@ async function waitForSandboxInstanceProjection(
 
 describe("sandbox tunnel connect endpoint integration", () => {
   it(
-    "accepts a valid bootstrap token and records exactly one ack",
+    "accepts a valid bootstrap token and records exactly one token redemption",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -108,8 +108,8 @@ describe("sandbox tunnel connect endpoint integration", () => {
         `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(token)}`,
       );
 
-      const recordedAck = await fixture.db.query.sandboxTunnelConnectAcks.findFirst({
-        where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
+      const recordedRedemption = await fixture.db.query.sandboxTunnelTokenRedemptions.findFirst({
+        where: (table, { eq }) => eq(table.tokenJti, jti),
       });
       const sandboxInstance = await waitForSandboxInstanceProjection({
         ...fixture,
@@ -122,7 +122,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
       });
 
       expect(sandboxInstance?.activeTunnelLeaseId).not.toBeNull();
-      expect(recordedAck?.bootstrapTokenJti).toBe(jti);
+      expect(recordedRedemption?.tokenJti).toBe(jti);
       expect(sandboxInstance?.tunnelConnectedAt).not.toBeNull();
       expect(sandboxInstance?.lastTunnelSeenAt).not.toBeNull();
       expect(sandboxInstance?.tunnelDisconnectedAt).toBeNull();
@@ -133,7 +133,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
   );
 
   it(
-    "accepts a valid connection token and records exactly one ack",
+    "accepts a valid connection token and records exactly one token redemption",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -168,11 +168,11 @@ describe("sandbox tunnel connect endpoint integration", () => {
         `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(token)}`,
       );
 
-      const recordedAck = await fixture.db.query.sandboxTunnelConnectAcks.findFirst({
-        where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
+      const recordedRedemption = await fixture.db.query.sandboxTunnelTokenRedemptions.findFirst({
+        where: (table, { eq }) => eq(table.tokenJti, jti),
       });
 
-      expect(recordedAck?.bootstrapTokenJti).toBe(jti);
+      expect(recordedRedemption?.tokenJti).toBe(jti);
 
       await closeWebSocket(socket);
       await closeWebSocket(bootstrapSocket);
@@ -314,13 +314,13 @@ describe("sandbox tunnel connect endpoint integration", () => {
       const failedConnect = await connectWebSocketExpectFailure(
         `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(token)}`,
       );
-      const recordedAck = await fixture.db.query.sandboxTunnelConnectAcks.findFirst({
-        where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
+      const recordedRedemption = await fixture.db.query.sandboxTunnelTokenRedemptions.findFirst({
+        where: (table, { eq }) => eq(table.tokenJti, jti),
       });
 
       expect(failedConnect.error).toBeInstanceOf(Error);
       expect(failedConnect.responseStatusCode).toBe(409);
-      expect(recordedAck).toBeUndefined();
+      expect(recordedRedemption).toBeUndefined();
     },
     IntegrationTestTimeoutMs,
   );
@@ -361,7 +361,7 @@ describe("sandbox tunnel connect endpoint integration", () => {
   );
 
   it(
-    "rejects reconnect attempts that reuse an acknowledged bootstrap token",
+    "rejects reconnect attempts that reuse a redeemed bootstrap token",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -387,19 +387,19 @@ describe("sandbox tunnel connect endpoint integration", () => {
       const failedConnect = await connectWebSocketExpectFailure(
         `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(token)}`,
       );
-      const recordedAcks = await fixture.db.query.sandboxTunnelConnectAcks.findMany({
-        where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
+      const recordedRedemptions = await fixture.db.query.sandboxTunnelTokenRedemptions.findMany({
+        where: (table, { eq }) => eq(table.tokenJti, jti),
       });
 
       expect(failedConnect.error).toBeInstanceOf(Error);
       expect(failedConnect.responseStatusCode).toBe(409);
-      expect(recordedAcks).toHaveLength(1);
+      expect(recordedRedemptions).toHaveLength(1);
     },
     IntegrationTestTimeoutMs,
   );
 
   it(
-    "rejects reconnect attempts that reuse an acknowledged connection token",
+    "rejects reconnect attempts that reuse a redeemed connection token",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -438,13 +438,13 @@ describe("sandbox tunnel connect endpoint integration", () => {
       const failedConnect = await connectWebSocketExpectFailure(
         `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(token)}`,
       );
-      const recordedAcks = await fixture.db.query.sandboxTunnelConnectAcks.findMany({
-        where: (table, { eq }) => eq(table.bootstrapTokenJti, jti),
+      const recordedRedemptions = await fixture.db.query.sandboxTunnelTokenRedemptions.findMany({
+        where: (table, { eq }) => eq(table.tokenJti, jti),
       });
 
       expect(failedConnect.error).toBeInstanceOf(Error);
       expect(failedConnect.responseStatusCode).toBe(409);
-      expect(recordedAcks).toHaveLength(1);
+      expect(recordedRedemptions).toHaveLength(1);
       await closeWebSocket(bootstrapSocket);
     },
     IntegrationTestTimeoutMs,

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import {
   createDataPlaneDatabase,
   sandboxInstances,
-  sandboxTunnelConnectAcks,
+  sandboxTunnelTokenRedemptions,
 } from "@mistle/db/data-plane";
 import {
   DATA_PLANE_MIGRATIONS_FOLDER_PATH,
@@ -20,7 +20,7 @@ import { Pool } from "pg";
 import { typeid } from "typeid-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { waitForSandboxTunnelConnectAck } from "../src/runtime/services/wait-for-sandbox-tunnel-connect-ack.js";
+import { waitForSandboxTunnelReadiness } from "../src/runtime/services/wait-for-sandbox-tunnel-readiness.js";
 
 const IntegrationTestTimeoutMs = 60_000;
 
@@ -64,7 +64,7 @@ async function insertSandboxInstanceRow(sandboxInstanceId: string): Promise<void
     });
 }
 
-describe("waitForSandboxTunnelConnectAck integration", () => {
+describe("waitForSandboxTunnelReadiness integration", () => {
   beforeAll(async () => {
     databaseStack = await startPostgresWithPgBouncer();
     await runDataPlaneMigrations({
@@ -86,17 +86,17 @@ describe("waitForSandboxTunnelConnectAck integration", () => {
   });
 
   it(
-    "does not report readiness when only the ack row exists",
+    "does not report readiness when only the token redemption row exists",
     async () => {
       const sandboxInstanceId = typeid("sbi").toString();
       const bootstrapTokenJti = randomUUID();
       await insertSandboxInstanceRow(sandboxInstanceId);
-      await createDatabase().insert(sandboxTunnelConnectAcks).values({
-        bootstrapTokenJti,
+      await createDatabase().insert(sandboxTunnelTokenRedemptions).values({
+        tokenJti: bootstrapTokenJti,
       });
 
       await expect(
-        waitForSandboxTunnelConnectAck(
+        waitForSandboxTunnelReadiness(
           {
             db: createDatabase(),
             policy: {
@@ -117,13 +117,13 @@ describe("waitForSandboxTunnelConnectAck integration", () => {
   );
 
   it(
-    "reports readiness after the ack row exists and the sandbox tunnel is connected",
+    "reports readiness after the token redemption row exists and the sandbox tunnel is connected",
     async () => {
       const sandboxInstanceId = typeid("sbi").toString();
       const bootstrapTokenJti = randomUUID();
       await insertSandboxInstanceRow(sandboxInstanceId);
 
-      const waitForTunnelReadiness = waitForSandboxTunnelConnectAck(
+      const waitForTunnelReadiness = waitForSandboxTunnelReadiness(
         {
           db: createDatabase(),
           policy: {
@@ -140,8 +140,8 @@ describe("waitForSandboxTunnelConnectAck integration", () => {
       );
 
       await systemSleeper.sleep(50);
-      await createDatabase().insert(sandboxTunnelConnectAcks).values({
-        bootstrapTokenJti,
+      await createDatabase().insert(sandboxTunnelTokenRedemptions).values({
+        tokenJti: bootstrapTokenJti,
       });
 
       await systemSleeper.sleep(50);
