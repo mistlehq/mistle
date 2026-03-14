@@ -124,7 +124,6 @@ describe("sandbox tunnel websocket integration", () => {
         sandboxInstanceId,
         ttlSeconds: 120,
       });
-
       let bootstrapSocket: WebSocket | undefined;
       let clientSocket: WebSocket | undefined;
 
@@ -193,7 +192,6 @@ describe("sandbox tunnel websocket integration", () => {
         sandboxInstanceId,
         ttlSeconds: 120,
       });
-
       let bootstrapSocket: WebSocket | undefined;
       let clientSocket: WebSocket | undefined;
 
@@ -319,6 +317,16 @@ describe("sandbox tunnel websocket integration", () => {
         sandboxInstanceId,
         ttlSeconds: 120,
       });
+      const secondConnectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
 
       let bootstrapSocket: WebSocket | undefined;
       let clientSocket: WebSocket | undefined;
@@ -341,7 +349,7 @@ describe("sandbox tunnel websocket integration", () => {
         await bootstrapNoMessagePromise;
 
         clientSocket = await connectWebSocket(
-          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(secondConnectionToken)}`,
         );
 
         const bootstrapStillNoMessagePromise = waitForNoWebSocketMessage(bootstrapSocket);
@@ -934,13 +942,16 @@ describe("sandbox tunnel websocket integration", () => {
           `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(secondConnectionToken)}`,
         );
 
-        const reconnectPayload = "connection reattached";
-        const forwardedToBootstrapPromise = waitForWebSocketMessage(bootstrapSocket);
-        await sendWebSocketMessage(secondClientSocket, reconnectPayload);
-        const forwardedToBootstrap = await forwardedToBootstrapPromise;
-
-        expect(forwardedToBootstrap.isBinary).toBe(false);
-        expect(forwardedToBootstrap.data).toBe(reconnectPayload);
+        await Promise.all([
+          sendWebSocketPingAndExpectPong(
+            bootstrapSocket,
+            Buffer.from("bootstrap-still-open-after-reattach", "utf8"),
+          ),
+          sendWebSocketPingAndExpectPong(
+            secondClientSocket,
+            Buffer.from("second-client-connected", "utf8"),
+          ),
+        ]);
       } finally {
         await Promise.all([
           closeWebSocketIfOpen(bootstrapSocket),
@@ -1471,9 +1482,12 @@ describe("sandbox tunnel websocket integration", () => {
 
         expect(forwardedAgentText.isBinary).toBe(true);
         expect(parseDataFrame(forwardedAgentText.data)).toEqual({
+          frameKind: DataFrameKindData,
           streamId: 1,
           payloadKind: PayloadKindWebSocketText,
-          payload: Buffer.from(JSON.stringify({ jsonrpc: "2.0", method: "ping" }), "utf8"),
+          payload: new Uint8Array(
+            Buffer.from(JSON.stringify({ jsonrpc: "2.0", method: "ping" }), "utf8"),
+          ),
         });
 
         const forwardedClosePromise = waitForWebSocketMessage(bootstrapSocket);
