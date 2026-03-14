@@ -138,73 +138,158 @@ func handleSandboxTunnelConnection(
 	agentRuntimes []startup.AgentRuntime,
 	runtimeClients []startup.RuntimeClient,
 ) error {
+	tunnelReadResultCh := make(chan tunnelReadResult, 1)
+	go readTunnelMessages(runContext, conn, tunnelReadResultCh)
+
+	var activeRelay *activeTunnelStreamRelay
+
 	for {
-		connectRequest, err := readConnectRequest(runContext, conn)
-		if err != nil {
-			if runContext.Err() != nil {
-				return nil
+		if activeRelay != nil {
+			select {
+			case activeRelayResult := <-activeRelay.ResultCh:
+				if err := finishActiveTunnelStreamRelay(&activeRelay, activePTYSession, activeRelayResult); err != nil {
+					if runContext.Err() != nil {
+						return nil
+					}
+					return err
+				}
+				continue
+			default:
 			}
-			return fmt.Errorf("sandbox tunnel websocket read failed: %w", err)
 		}
 
-		requestContext, requestSpan := tracer.Start(
-			runContext,
-			"sandbox.tunnel.stream_open",
-			trace.WithAttributes(attribute.String("mistle.channel.kind", connectRequest.ChannelKind)),
-		)
+		var activeRelayResultCh <-chan activeTunnelStreamRelayResult
+		if activeRelay != nil {
+			activeRelayResultCh = activeRelay.ResultCh
+		}
 
-		switch connectRequest.ChannelKind {
-		case sessionprotocol.ChannelKindAgent:
-			err := handleAgentConnectRequest(
-				requestContext,
-				conn,
-				connectRequest,
-				agentRuntimes,
-				runtimeClients,
-			)
-			if err != nil {
-				requestSpan.RecordError(err)
-				requestSpan.SetStatus(codes.Error, err.Error())
-				requestSpan.End()
-
+		select {
+		case <-runContext.Done():
+			return nil
+		case activeRelayResult := <-activeRelayResultCh:
+			if err := finishActiveTunnelStreamRelay(&activeRelay, activePTYSession, activeRelayResult); err != nil {
 				if runContext.Err() != nil {
 					return nil
 				}
 				return err
 			}
-		case sessionprotocol.ChannelKindPTY:
-			updatedPTYSession, err := handlePTYConnectRequest(
-				requestContext,
-				conn,
-				connectRequest,
-				*activePTYSession,
-			)
-			if err != nil {
-				requestSpan.RecordError(err)
-				requestSpan.SetStatus(codes.Error, err.Error())
-				requestSpan.End()
-
+		case tunnelReadResult := <-tunnelReadResultCh:
+			if tunnelReadResult.Err != nil {
 				if runContext.Err() != nil {
 					return nil
 				}
-				return err
+				return fmt.Errorf("sandbox tunnel websocket read failed: %w", tunnelReadResult.Err)
 			}
-			*activePTYSession = updatedPTYSession
-		default:
-			if err := writeStreamOpenError(requestContext, conn, sessionprotocol.StreamOpenError{
-				Type:     sessionprotocol.MessageTypeStreamOpenError,
-				StreamID: connectRequest.StreamID,
-				Code:     connectErrorCodeUnsupportedChannel,
-				Message:  fmt.Sprintf("channel kind '%s' is not supported", connectRequest.ChannelKind),
-			}); err != nil {
-				requestSpan.RecordError(err)
-				requestSpan.SetStatus(codes.Error, err.Error())
-				requestSpan.End()
-				return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", err)
+
+			for {
+				if activeRelay == nil {
+					connectRequest, err := parseConnectRequestMessage(
+						tunnelReadResult.Message.MessageType,
+						tunnelReadResult.Message.Payload,
+					)
+					if err != nil {
+						if tunnelReadResult.Message.MessageType == websocket.MessageText {
+							controlMessageType, parseControlErr := parseControlMessageType(tunnelReadResult.Message.Payload)
+							if parseControlErr == nil && controlMessageType == sessionprotocol.MessageTypeStreamClose {
+								break
+							}
+						}
+						return fmt.Errorf("sandbox tunnel websocket read failed: %w", err)
+					}
+
+					requestContext, requestSpan := tracer.Start(
+						runContext,
+						"sandbox.tunnel.stream_open",
+						trace.WithAttributes(attribute.String("mistle.channel.kind", connectRequest.ChannelKind)),
+					)
+
+					switch connectRequest.ChannelKind {
+					case sessionprotocol.ChannelKindAgent:
+						relay, err := handleAgentConnectRequest(
+							requestContext,
+							conn,
+							connectRequest,
+							agentRuntimes,
+							runtimeClients,
+						)
+						if err != nil {
+							requestSpan.RecordError(err)
+							requestSpan.SetStatus(codes.Error, err.Error())
+							requestSpan.End()
+
+							if runContext.Err() != nil {
+								return nil
+							}
+							return err
+						}
+						activeRelay = relay
+					case sessionprotocol.ChannelKindPTY:
+						updatedPTYSession, relay, err := handlePTYConnectRequest(
+							requestContext,
+							conn,
+							connectRequest,
+							*activePTYSession,
+						)
+						if err != nil {
+							requestSpan.RecordError(err)
+							requestSpan.SetStatus(codes.Error, err.Error())
+							requestSpan.End()
+
+							if runContext.Err() != nil {
+								return nil
+							}
+							return err
+						}
+						*activePTYSession = updatedPTYSession
+						activeRelay = relay
+					default:
+						if err := writeStreamOpenError(requestContext, conn, sessionprotocol.StreamOpenError{
+							Type:     sessionprotocol.MessageTypeStreamOpenError,
+							StreamID: connectRequest.StreamID,
+							Code:     connectErrorCodeUnsupportedChannel,
+							Message:  fmt.Sprintf("channel kind '%s' is not supported", connectRequest.ChannelKind),
+						}); err != nil {
+							requestSpan.RecordError(err)
+							requestSpan.SetStatus(codes.Error, err.Error())
+							requestSpan.End()
+							return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", err)
+						}
+					}
+
+					requestSpan.End()
+					break
+				}
+
+				select {
+				case activeRelay.MessageCh <- tunnelReadResult.Message:
+					if tunnelReadResult.Message.MessageType == websocket.MessageText {
+						controlMessageType, err := parseControlMessageType(tunnelReadResult.Message.Payload)
+						if err == nil && controlMessageType == sessionprotocol.MessageTypeStreamClose {
+							activeRelayResult := <-activeRelay.ResultCh
+							if err := finishActiveTunnelStreamRelay(&activeRelay, activePTYSession, activeRelayResult); err != nil {
+								if runContext.Err() != nil {
+									return nil
+								}
+								return err
+							}
+						}
+					}
+					break
+				case activeRelayResult := <-activeRelay.ResultCh:
+					if err := finishActiveTunnelStreamRelay(&activeRelay, activePTYSession, activeRelayResult); err != nil {
+						if runContext.Err() != nil {
+							return nil
+						}
+						return err
+					}
+					continue
+				case <-runContext.Done():
+					return nil
+				}
+
+				break
 			}
 		}
-
-		requestSpan.End()
 	}
 }
 

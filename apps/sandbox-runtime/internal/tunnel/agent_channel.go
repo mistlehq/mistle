@@ -34,7 +34,7 @@ func handleAgentConnectRequest(
 	connectRequest connectRequest,
 	agentRuntimes []startup.AgentRuntime,
 	runtimeClients []startup.RuntimeClient,
-) error {
+) (*activeTunnelStreamRelay, error) {
 	agentEndpoint, err := resolveAgentEndpoint(agentRuntimes, runtimeClients)
 	if err != nil {
 		if writeErr := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
@@ -43,9 +43,9 @@ func handleAgentConnectRequest(
 			Code:     connectErrorCodeAgentEndpointUnavailable,
 			Message:  err.Error(),
 		}); writeErr != nil {
-			return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
+			return nil, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 		}
-		return nil
+		return nil, nil
 	}
 	if agentEndpoint == nil {
 		if writeErr := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
@@ -54,9 +54,9 @@ func handleAgentConnectRequest(
 			Code:     connectErrorCodeAgentEndpointUnavailable,
 			Message:  "agent endpoint is not declared in runtime plan",
 		}); writeErr != nil {
-			return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
+			return nil, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 		}
-		return nil
+		return nil, nil
 	}
 
 	if agentEndpoint.ConnectionMode != "dedicated" {
@@ -66,9 +66,9 @@ func handleAgentConnectRequest(
 			Code:     connectErrorCodeUnsupportedConnectionMode,
 			Message:  fmt.Sprintf("connection mode '%s' is not supported", agentEndpoint.ConnectionMode),
 		}); err != nil {
-			return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", err)
+			return nil, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", err)
 		}
-		return nil
+		return nil, nil
 	}
 
 	agentConn, err := dialAgentEndpoint(ctx, agentEndpoint.TransportURL)
@@ -79,28 +79,20 @@ func handleAgentConnectRequest(
 			Code:     connectErrorCodeAgentEndpointDialFailed,
 			Message:  err.Error(),
 		}); writeErr != nil {
-			return fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
+			return nil, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 		}
-		return nil
+		return nil, nil
 	}
-	defer agentConn.CloseNow()
 
 	if err := writeStreamOpenOK(ctx, tunnelConn, sessionprotocol.StreamOpenOK{
 		Type:     sessionprotocol.MessageTypeStreamOpenOK,
 		StreamID: connectRequest.StreamID,
 	}); err != nil {
-		return fmt.Errorf("failed to write sandbox tunnel stream.open acknowledgement: %w", err)
+		agentConn.CloseNow()
+		return nil, fmt.Errorf("failed to write sandbox tunnel stream.open acknowledgement: %w", err)
 	}
 
-	relayResult, err := relayTunnelFrames(ctx, tunnelConn, agentConn, connectRequest.StreamID)
-	if err != nil {
-		return fmt.Errorf("sandbox tunnel websocket relay failed: %w", err)
-	}
-	if relayResult == agentRelayResultDisconnected {
-		return nil
-	}
-
-	return nil
+	return startAgentRelay(ctx, tunnelConn, agentConn, connectRequest.StreamID), nil
 }
 
 func resolveAgentEndpoint(
@@ -174,6 +166,7 @@ func relayTunnelFrames(
 	tunnelConn *websocket.Conn,
 	agentConn *websocket.Conn,
 	streamID int,
+	incomingMessages <-chan tunnelMessage,
 ) (agentRelayResult, error) {
 	relayContext, cancelAgentRelay := context.WithCancel(ctx)
 	defer cancelAgentRelay()
@@ -197,46 +190,65 @@ func relayTunnelFrames(
 				return agentRelayResultDisconnected, nil
 			}
 			return "", agentRelayErr
-		default:
-		}
-
-		messageType, payload, err := tunnelConn.Read(ctx)
-		if err != nil {
-			return "", fmt.Errorf("sandbox tunnel websocket read failed: %w", err)
-		}
-
-		if messageType != websocket.MessageText && messageType != websocket.MessageBinary {
-			return "", fmt.Errorf(
-				"sandbox tunnel websocket produced unsupported message type %s",
-				messageType.String(),
-			)
-		}
-
-		if messageType == websocket.MessageText {
-			controlMessageType, parseErr := parseControlMessageType(payload)
-			if parseErr == nil && controlMessageType == sessionprotocol.MessageTypeStreamClose {
-				streamClose, closeErr := parseStreamClose(payload)
-				if closeErr != nil {
-					return "", closeErr
-				}
-				if streamClose.StreamID != streamID {
-					return "", fmt.Errorf(
-						"stream.close streamId %d does not match active agent stream %d",
-						streamClose.StreamID,
-						streamID,
-					)
-				}
-				return agentRelayResultDisconnected, nil
+		case message := <-incomingMessages:
+			if message.MessageType != websocket.MessageText && message.MessageType != websocket.MessageBinary {
+				return "", fmt.Errorf(
+					"sandbox tunnel websocket produced unsupported message type %s",
+					message.MessageType.String(),
+				)
 			}
-		}
 
-		if err := agentConn.Write(ctx, messageType, payload); err != nil {
-			if isExpectedAgentDisconnect(err) {
-				return agentRelayResultDisconnected, nil
+			if message.MessageType == websocket.MessageText {
+				controlMessageType, parseErr := parseControlMessageType(message.Payload)
+				if parseErr == nil && controlMessageType == sessionprotocol.MessageTypeStreamClose {
+					streamClose, closeErr := parseStreamClose(message.Payload)
+					if closeErr != nil {
+						return "", closeErr
+					}
+					if streamClose.StreamID != streamID {
+						return "", fmt.Errorf(
+							"stream.close streamId %d does not match active agent stream %d",
+							streamClose.StreamID,
+							streamID,
+						)
+					}
+					return agentRelayResultDisconnected, nil
+				}
 			}
-			return "", fmt.Errorf("agent websocket write failed: %w", err)
+
+			if err := agentConn.Write(ctx, message.MessageType, message.Payload); err != nil {
+				if isExpectedAgentDisconnect(err) {
+					return agentRelayResultDisconnected, nil
+				}
+				return "", fmt.Errorf("agent websocket write failed: %w", err)
+			}
 		}
 	}
+}
+
+func startAgentRelay(
+	ctx context.Context,
+	tunnelConn *websocket.Conn,
+	agentConn *websocket.Conn,
+	streamID int,
+) *activeTunnelStreamRelay {
+	relay := &activeTunnelStreamRelay{
+		MessageCh: make(chan tunnelMessage),
+		ResultCh:  make(chan activeTunnelStreamRelayResult, 1),
+	}
+
+	go func() {
+		defer agentConn.CloseNow()
+
+		result := activeTunnelStreamRelayResult{}
+		_, err := relayTunnelFrames(ctx, tunnelConn, agentConn, streamID, relay.MessageCh)
+		if err != nil {
+			result.Err = fmt.Errorf("sandbox tunnel websocket relay failed: %w", err)
+		}
+		relay.ResultCh <- result
+	}()
+
+	return relay
 }
 
 func relayFramesDirection(
