@@ -123,12 +123,6 @@
 
 ## Language Guidance
 
-### File Naming
-
-- For `apps/dashboard`, all files and folders must use kebab-case names.
-- Exception: `apps/dashboard/README.md` is allowed as-is.
-- This is enforced by dashboard lint via `apps/dashboard/lint/check-file-names.ts`.
-
 ### TypeScript
 
 - `any` and `as` are forbidden.
