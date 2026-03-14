@@ -87,7 +87,7 @@ describe("InteractiveStreamRouter", () => {
         clientSessionId: "conn_1",
         clientStreamId: 7,
       }),
-    ).rejects.toThrow("does not have an active owner");
+    ).rejects.toThrow("Sandbox bootstrap tunnel is not connected");
   });
 
   it("treats release of an ownerless sandbox as a no-op", async () => {

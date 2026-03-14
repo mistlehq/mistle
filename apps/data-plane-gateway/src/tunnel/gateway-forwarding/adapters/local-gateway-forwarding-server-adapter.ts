@@ -1,3 +1,4 @@
+import { BootstrapTunnelNotConnectedError } from "../../bootstrap-tunnel-not-connected-error.js";
 import { TunnelSessionRegistry } from "../../tunnel-session/index.js";
 import type { GatewayForwardingServerAdapter } from "../gateway-forwarding-server-adapter.js";
 import type {
@@ -118,9 +119,7 @@ export class LocalGatewayForwardingServerAdapter implements GatewayForwardingSer
       sandboxInstanceId,
     });
     if (bootstrapTarget === undefined) {
-      throw new Error(
-        `Bootstrap tunnel session is not registered for sandbox '${sandboxInstanceId}'.`,
-      );
+      throw new BootstrapTunnelNotConnectedError(sandboxInstanceId);
     }
 
     return bootstrapTarget;
