@@ -608,7 +608,7 @@ describe("sandbox tunnel websocket integration", () => {
   );
 
   it(
-    "closes the connection peer when bootstrap peer disconnects",
+    "resets the active interactive stream and keeps the connection peer open when bootstrap peer disconnects",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -647,12 +647,63 @@ describe("sandbox tunnel websocket integration", () => {
           `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
         );
 
-        const clientClosedPromise = waitForWebSocketClose(clientSocket);
-        await closeWebSocket(bootstrapSocket);
-        const clientClosed = await clientClosedPromise;
+        const clientStreamId = 77;
+        const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: clientStreamId,
+            channel: {
+              kind: "agent",
+            },
+          }),
+        );
+        const forwardedOpen = await forwardedOpenPromise;
 
-        expect(clientClosed.code).toBe(1012);
-        expect(clientClosed.reason).toBe("Sandbox tunnel peer disconnected.");
+        expect(forwardedOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedOpen.data)).toEqual({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "agent",
+          },
+        });
+
+        const forwardedOpenOkPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        const forwardedOpenOk = await forwardedOpenOkPromise;
+
+        expect(forwardedOpenOk.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedOpenOk.data)).toEqual({
+          type: "stream.open.ok",
+          streamId: clientStreamId,
+        });
+
+        const clientResetPromise = waitForWebSocketMessage(clientSocket);
+        await closeWebSocket(bootstrapSocket);
+        bootstrapSocket = undefined;
+        const clientReset = await clientResetPromise;
+
+        expect(clientReset.isBinary).toBe(false);
+        expect(parseStreamMessage(clientReset.data)).toEqual({
+          type: "stream.reset",
+          streamId: clientStreamId,
+          code: "bootstrap_disconnected",
+          message:
+            "Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.",
+        });
+
+        await sendWebSocketPingAndExpectPong(
+          clientSocket,
+          Buffer.from("client-still-open-after-bootstrap-disconnect", "utf8"),
+        );
       } finally {
         await Promise.all([
           closeWebSocketIfOpen(bootstrapSocket),

@@ -576,10 +576,24 @@ function createReleasedInteractiveStreamResetPayload(binding: ClientStreamBindin
   });
 }
 
+function createBootstrapDisconnectedStreamResetPayload(binding: ClientStreamBinding): string {
+  const message =
+    binding.channelKind === "pty"
+      ? "Sandbox bootstrap tunnel disconnected and invalidated the active PTY stream."
+      : "Sandbox bootstrap tunnel disconnected and invalidated the active interactive stream.";
+
+  return createStreamResetPayload({
+    code: "bootstrap_disconnected",
+    message,
+    streamId: binding.clientStreamId,
+  });
+}
+
 async function notifyConnectionPeerOfReleasedInteractiveStreams(input: {
   relayCoordinator: TunnelRelayCoordinator;
   releasedBindings: ClientStreamBinding[];
   sandboxInstanceId: string;
+  toPayload?: (binding: ClientStreamBinding) => string;
 }): Promise<void> {
   const connectionPeer = input.relayCoordinator.getPeer({
     sandboxInstanceId: input.sandboxInstanceId,
@@ -601,7 +615,7 @@ async function notifyConnectionPeerOfReleasedInteractiveStreams(input: {
       input.relayCoordinator.forwardPeerMessage({
         sandboxInstanceId: input.sandboxInstanceId,
         fromSide: "bootstrap",
-        payload: createReleasedInteractiveStreamResetPayload(binding),
+        payload: (input.toPayload ?? createReleasedInteractiveStreamResetPayload)(binding),
       }),
     ),
   );
@@ -1134,8 +1148,28 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             if (relayTarget !== undefined) {
               const currentRelayTarget = relayTarget;
               if (requestedToken.kind === "bootstrap") {
-                input.tunnelSessionRegistry.detachBootstrapSession(currentRelayTarget);
-                input.relayCoordinator.detachPeer(currentRelayTarget);
+                const detachedBootstrapSession =
+                  input.tunnelSessionRegistry.detachBootstrapSession(currentRelayTarget);
+                input.relayCoordinator.detachPeerWithOptions({
+                  target: currentRelayTarget,
+                  notifyOppositePeer: false,
+                });
+                if (detachedBootstrapSession?.releasedBindings.length) {
+                  void notifyConnectionPeerOfReleasedInteractiveStreams({
+                    relayCoordinator: input.relayCoordinator,
+                    releasedBindings: detachedBootstrapSession.releasedBindings,
+                    sandboxInstanceId,
+                    toPayload: createBootstrapDisconnectedStreamResetPayload,
+                  }).catch((error: unknown) => {
+                    logger.error(
+                      {
+                        err: error,
+                        sandboxInstanceId,
+                      },
+                      "Failed notifying connection peer about disconnected interactive streams",
+                    );
+                  });
+                }
               } else {
                 void input.interactiveStreamRouter
                   .releaseClientSessionStreams({
