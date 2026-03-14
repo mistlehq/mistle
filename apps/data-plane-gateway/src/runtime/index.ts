@@ -28,6 +28,7 @@ import type {
 } from "../types.js";
 
 const OwnerLeaseRenewIntervalMs = 10_000;
+const DefaultMaxActiveBindingsPerSandbox = 32;
 
 export function createDataPlaneGatewayRuntime(
   config: DataPlaneGatewayRuntimeConfig,
@@ -39,7 +40,7 @@ export function createDataPlaneGatewayRuntime(
   const sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
   const sandboxOwnerResolver = new StoreBackedSandboxOwnerResolver(nodeId, sandboxOwnerStore);
   const tunnelSessionRegistry = new TunnelSessionRegistry(
-    new InMemoryTunnelSessionRegistryAdapter(),
+    new InMemoryTunnelSessionRegistryAdapter(DefaultMaxActiveBindingsPerSandbox),
   );
   const gatewayForwardingServer = new GatewayForwardingServer(
     new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),
