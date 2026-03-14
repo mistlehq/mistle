@@ -146,7 +146,7 @@ describe("SandboxTunnelSession", () => {
     ).toThrow(ClientSessionActiveStreamError);
   });
 
-  it("limits the default session to one active interactive stream", () => {
+  it("allows multiple active streams by default across different client sessions", () => {
     const session = new SandboxTunnelSession({
       sandboxInstanceId: "sbi_test",
       side: "bootstrap",
@@ -160,13 +160,19 @@ describe("SandboxTunnelSession", () => {
       clientStreamId: 7,
     });
 
-    expect(() =>
-      session.bindClientStream({
-        channelKind: "agent",
-        clientSessionId: "conn_2",
-        clientStreamId: 8,
-      }),
-    ).toThrow(TunnelSessionBindingLimitExceededError);
+    const secondBinding = session.bindClientStream({
+      channelKind: "agent",
+      clientSessionId: "conn_2",
+      clientStreamId: 8,
+    });
+
+    expect(secondBinding).toEqual({
+      channelKind: "agent",
+      clientSessionId: "conn_2",
+      clientStreamId: 8,
+      tunnelStreamId: 2,
+    });
+    expect(session.bindingCount).toBe(2);
   });
 
   it("rejects bindings beyond the configured session limit", () => {
