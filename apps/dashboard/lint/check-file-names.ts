@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const DashboardRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const IgnoredDirectories = new Set([".turbo", "dist", "node_modules"]);
-const AllowedFileNames = new Set(["README.md"]);
+const AllowedFileNames = new Set(["AGENTS.md", "README.md"]);
 const KebabCaseDirectoryPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const KebabCaseFilePattern = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\.[a-z0-9]+(?:-[a-z0-9]+)*)*$/;
 
