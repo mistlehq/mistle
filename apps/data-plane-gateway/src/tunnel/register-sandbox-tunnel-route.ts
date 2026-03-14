@@ -576,20 +576,17 @@ async function notifyConnectionPeerOfReleasedPTYStreams(input: {
   );
 }
 
-async function notifyBootstrapPeerOfReleasedPTYStreams(input: {
+async function notifyBootstrapPeerOfReleasedInteractiveStreams(input: {
   relayCoordinator: TunnelRelayCoordinator;
   releasedBindings: ClientStreamBinding[];
   sandboxInstanceId: string;
 }): Promise<void> {
-  const ptyBindings = input.releasedBindings.filter(
-    (binding: ClientStreamBinding) => binding.channelKind === "pty",
-  );
-  if (ptyBindings.length === 0) {
+  if (input.releasedBindings.length === 0) {
     return;
   }
 
   await Promise.all(
-    ptyBindings.map((binding: ClientStreamBinding) =>
+    input.releasedBindings.map((binding: ClientStreamBinding) =>
       input.relayCoordinator.forwardPeerMessage({
         sandboxInstanceId: input.sandboxInstanceId,
         fromSide: "connection",
@@ -1114,7 +1111,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                     clientSessionId: relaySessionId,
                   })
                   .then((result) =>
-                    notifyBootstrapPeerOfReleasedPTYStreams({
+                    notifyBootstrapPeerOfReleasedInteractiveStreams({
                       relayCoordinator: input.relayCoordinator,
                       releasedBindings: result.releasedBindings,
                       sandboxInstanceId,
@@ -1126,7 +1123,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                         err: error,
                         sandboxInstanceId,
                       },
-                      "Failed forwarding PTY stream.close during connection detach",
+                      "Failed forwarding stream.close during connection detach",
                     );
                   })
                   .finally(() => {
