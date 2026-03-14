@@ -1,27 +1,39 @@
 package tunnel
 
-// activeTunnelStreamRelay owns one active interactive stream while the tunnel
-// read loop remains centralized in client.go.
+// activeTunnelStreamRelay owns one active interactive stream handler while the
+// central tunnel loop in client.go routes messages by stream ID.
 type activeTunnelStreamRelay struct {
-	MessageCh chan tunnelMessage
-	ResultCh  chan activeTunnelStreamRelayResult
+	PrimaryStreamID int
+	ChannelKind     string
+	MessageCh       chan tunnelMessage
 }
 
-// activeTunnelStreamRelayResult reports stream completion back to the central
+// activeTunnelStreamRelayResult reports relay completion back to the central
 // tunnel loop and carries any PTY-session state updates that must outlive the
-// stream itself.
+// relay itself.
 type activeTunnelStreamRelayResult struct {
+	Relay             *activeTunnelStreamRelay
 	Err               error
 	PTYSession        *ptySession
 	UpdatesPTYSession bool
 }
 
 func finishActiveTunnelStreamRelay(
-	activeRelay **activeTunnelStreamRelay,
+	activeRelaysByStreamID map[int]*activeTunnelStreamRelay,
+	activePTYRelay **activeTunnelStreamRelay,
 	activePTYSession **ptySession,
 	result activeTunnelStreamRelayResult,
 ) error {
-	*activeRelay = nil
+	for streamID, relay := range activeRelaysByStreamID {
+		if relay != result.Relay {
+			continue
+		}
+
+		delete(activeRelaysByStreamID, streamID)
+	}
+	if *activePTYRelay == result.Relay {
+		*activePTYRelay = nil
+	}
 	if result.UpdatesPTYSession {
 		*activePTYSession = result.PTYSession
 	}
