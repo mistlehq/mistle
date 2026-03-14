@@ -798,7 +798,7 @@ describe("sandbox tunnel websocket integration", () => {
   );
 
   it(
-    "keeps multiple connection peers attached to the same bootstrap tunnel",
+    "keeps multiple connection peers attached and routes active streams independently",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -885,63 +885,13 @@ describe("sandbox tunnel websocket integration", () => {
           },
         });
 
-        const firstOpenOkPromise = waitForWebSocketMessage(firstClientSocket);
-        await sendWebSocketMessage(
-          bootstrapSocket,
-          JSON.stringify({
-            type: "stream.open.ok",
-            streamId: 1,
-          }),
-        );
-        const firstOpenOk = await firstOpenOkPromise;
-
-        expect(firstOpenOk.isBinary).toBe(false);
-        expect(parseStreamMessage(firstOpenOk.data)).toEqual({
-          type: "stream.open.ok",
-          streamId: firstClientStreamId,
-        });
-
-        const secondRejectedOpenPromise = waitForWebSocketMessage(secondClientSocket);
-        await sendWebSocketMessage(
-          secondClientSocket,
-          JSON.stringify({
-            type: "stream.open",
-            streamId: 88,
-            channel: {
-              kind: "pty",
-              session: "create",
-              cols: 80,
-              rows: 24,
-            },
-          }),
-        );
-        const secondRejectedOpen = await secondRejectedOpenPromise;
-
-        expect(secondRejectedOpen.isBinary).toBe(false);
-        const secondRejectedOpenPayload = parseStreamMessage(secondRejectedOpen.data);
-        if (secondRejectedOpenPayload.type !== "stream.open.error") {
-          throw new Error("Expected rejected stream open to produce stream.open.error.");
-        }
-        expect(secondRejectedOpenPayload.streamId).toBe(88);
-        expect(secondRejectedOpenPayload.code).toBe("max_active_streams_exceeded");
-
-        const firstClosePromise = waitForWebSocketMessage(bootstrapSocket);
-        await closeWebSocket(firstClientSocket);
-        firstClientSocket = undefined;
-        const firstClose = await firstClosePromise;
-
-        expect(firstClose.isBinary).toBe(false);
-        expect(parseStreamMessage(firstClose.data)).toEqual({
-          type: "stream.close",
-          streamId: 1,
-        });
-
+        const secondClientStreamId = 88;
         const secondOpenPromise = waitForWebSocketMessage(bootstrapSocket);
         await sendWebSocketMessage(
           secondClientSocket,
           JSON.stringify({
             type: "stream.open",
-            streamId: 89,
+            streamId: secondClientStreamId,
             channel: {
               kind: "agent",
             },
@@ -956,6 +906,159 @@ describe("sandbox tunnel websocket integration", () => {
           channel: {
             kind: "agent",
           },
+        });
+
+        const firstOpenOkPromise = waitForWebSocketMessage(firstClientSocket);
+        const secondOpenOkPromise = waitForWebSocketMessage(secondClientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 2,
+          }),
+        );
+        const [firstOpenOk, secondOpenOk] = await Promise.all([
+          firstOpenOkPromise,
+          secondOpenOkPromise,
+        ]);
+
+        expect(firstOpenOk.isBinary).toBe(false);
+        expect(parseStreamMessage(firstOpenOk.data)).toEqual({
+          type: "stream.open.ok",
+          streamId: firstClientStreamId,
+        });
+        expect(secondOpenOk.isBinary).toBe(false);
+        expect(parseStreamMessage(secondOpenOk.data)).toEqual({
+          type: "stream.open.ok",
+          streamId: secondClientStreamId,
+        });
+
+        const firstClientDataPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          firstClientSocket,
+          Buffer.from(
+            encodeDataFrame({
+              streamId: firstClientStreamId,
+              payloadKind: PayloadKindWebSocketBinary,
+              payload: new Uint8Array([0xaa, 0xbb, 0xcc]),
+            }),
+          ),
+        );
+        const firstClientData = await firstClientDataPromise;
+
+        expect(firstClientData.isBinary).toBe(true);
+        expect(parseDataFrame(firstClientData.data)).toEqual({
+          frameKind: DataFrameKindData,
+          streamId: 1,
+          payloadKind: PayloadKindWebSocketBinary,
+          payload: new Uint8Array([0xaa, 0xbb, 0xcc]),
+        });
+
+        const secondClientDataPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          secondClientSocket,
+          Buffer.from(
+            encodeDataFrame({
+              streamId: secondClientStreamId,
+              payloadKind: PayloadKindWebSocketBinary,
+              payload: new Uint8Array([0x11, 0x22, 0x33]),
+            }),
+          ),
+        );
+        const secondClientData = await secondClientDataPromise;
+
+        expect(secondClientData.isBinary).toBe(true);
+        expect(parseDataFrame(secondClientData.data)).toEqual({
+          frameKind: DataFrameKindData,
+          streamId: 2,
+          payloadKind: PayloadKindWebSocketBinary,
+          payload: new Uint8Array([0x11, 0x22, 0x33]),
+        });
+
+        const firstBootstrapDataPromise = waitForWebSocketMessage(firstClientSocket);
+        const secondBootstrapDataPromise = waitForWebSocketMessage(secondClientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          Buffer.from(
+            encodeDataFrame({
+              streamId: 1,
+              payloadKind: PayloadKindWebSocketBinary,
+              payload: new Uint8Array([0xde, 0xad]),
+            }),
+          ),
+        );
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          Buffer.from(
+            encodeDataFrame({
+              streamId: 2,
+              payloadKind: PayloadKindWebSocketBinary,
+              payload: new Uint8Array([0xbe, 0xef]),
+            }),
+          ),
+        );
+        const [firstBootstrapData, secondBootstrapData] = await Promise.all([
+          firstBootstrapDataPromise,
+          secondBootstrapDataPromise,
+        ]);
+
+        expect(firstBootstrapData.isBinary).toBe(true);
+        expect(parseDataFrame(firstBootstrapData.data)).toEqual({
+          frameKind: DataFrameKindData,
+          streamId: firstClientStreamId,
+          payloadKind: PayloadKindWebSocketBinary,
+          payload: new Uint8Array([0xde, 0xad]),
+        });
+        expect(secondBootstrapData.isBinary).toBe(true);
+        expect(parseDataFrame(secondBootstrapData.data)).toEqual({
+          frameKind: DataFrameKindData,
+          streamId: secondClientStreamId,
+          payloadKind: PayloadKindWebSocketBinary,
+          payload: new Uint8Array([0xbe, 0xef]),
+        });
+
+        const firstClosePromise = waitForWebSocketMessage(bootstrapSocket);
+        await closeWebSocket(firstClientSocket);
+        firstClientSocket = undefined;
+        const firstClose = await firstClosePromise;
+
+        expect(firstClose.isBinary).toBe(false);
+        expect(parseStreamMessage(firstClose.data)).toEqual({
+          type: "stream.close",
+          streamId: 1,
+        });
+
+        await sendWebSocketPingAndExpectPong(
+          secondClientSocket,
+          Buffer.from("second-client-still-open-after-first-close", "utf8"),
+        );
+
+        const secondClientStillRoutesPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          secondClientSocket,
+          Buffer.from(
+            encodeDataFrame({
+              streamId: secondClientStreamId,
+              payloadKind: PayloadKindWebSocketBinary,
+              payload: new Uint8Array([0x44, 0x55]),
+            }),
+          ),
+        );
+        const secondClientStillRoutes = await secondClientStillRoutesPromise;
+
+        expect(secondClientStillRoutes.isBinary).toBe(true);
+        expect(parseDataFrame(secondClientStillRoutes.data)).toEqual({
+          frameKind: DataFrameKindData,
+          streamId: 2,
+          payloadKind: PayloadKindWebSocketBinary,
+          payload: new Uint8Array([0x44, 0x55]),
         });
       } finally {
         await Promise.all([

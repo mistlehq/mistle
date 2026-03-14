@@ -25,7 +25,7 @@ function isSameBootstrapTarget(left: RelayTarget, right: RelayTarget): boolean {
 export class InMemoryTunnelSessionRegistryAdapter implements TunnelSessionRegistryAdapter {
   readonly #sessionsBySandboxInstanceId = new Map<string, SandboxTunnelSession>();
 
-  public constructor(private readonly maxBindingCount = 1) {}
+  public constructor(private readonly maxBindingCount?: number) {}
 
   public attachBootstrapSession(input: RelayTarget): AttachBootstrapSessionResult {
     const replacedSession = this.#sessionsBySandboxInstanceId.get(input.sandboxInstanceId);

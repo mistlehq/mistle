@@ -2,8 +2,6 @@ import type { StreamChannel } from "@mistle/sandbox-session-protocol";
 
 import type { RelayTarget } from "../types.js";
 
-const DefaultMaxBindingCount = 1;
-
 export type ClientStreamBinding = {
   channelKind: StreamChannel["kind"];
   clientSessionId: string;
@@ -41,14 +39,13 @@ export class SandboxTunnelSession {
    * Represents the live bootstrap tunnel state for one sandbox on the owner node.
    *
    * This class is intentionally a local implementation detail behind
-   * `TunnelSessionRegistryAdapter`. The current sandbox runtime processes one
-   * active interactive stream at a time on the bootstrap websocket, so the
-   * default binding limit stays at one even though multiple connection peers
-   * may be attached concurrently.
+   * `TunnelSessionRegistryAdapter`. The default binding configuration allows the
+   * owner-local bootstrap tunnel to carry multiple active interactive streams at
+   * once while still enforcing one active stream per client websocket session.
    */
   public constructor(
     public readonly bootstrapTarget: RelayTarget,
-    private readonly maxBindingCount = DefaultMaxBindingCount,
+    private readonly maxBindingCount?: number,
   ) {}
 
   public bindClientStream(input: {
@@ -62,7 +59,10 @@ export class SandboxTunnelSession {
     if ((this.#bindingCountsByClientSessionId.get(input.clientSessionId) ?? 0) > 0) {
       throw new ClientSessionActiveStreamError(input.clientSessionId);
     }
-    if (this.#bindingsByTunnelStreamId.size >= this.maxBindingCount) {
+    if (
+      this.maxBindingCount !== undefined &&
+      this.#bindingsByTunnelStreamId.size >= this.maxBindingCount
+    ) {
       throw new TunnelSessionBindingLimitExceededError(this.maxBindingCount);
     }
 
