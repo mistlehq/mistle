@@ -8,7 +8,11 @@ import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane
 import { mintConnectionToken } from "@mistle/gateway-connection-auth";
 import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import {
+  DataFrameKindData,
+  decodeDataFrame,
+  encodeDataFrame,
   parseStreamControlMessage,
+  PayloadKindWebSocketBinary,
   type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
 import { typeid } from "typeid-js";
@@ -38,6 +42,14 @@ function parseStreamMessage(data: string | Buffer): StreamControlMessage {
   }
 
   return parsedPayload;
+}
+
+function parseDataFrame(data: string | Buffer) {
+  if (typeof data === "string") {
+    throw new Error("Expected websocket message data to be binary.");
+  }
+
+  return decodeDataFrame(new Uint8Array(data));
 }
 
 async function insertSandboxInstanceRow(input: {
@@ -186,6 +198,121 @@ describe("sandbox tunnel websocket integration", () => {
           throw new Error("Expected binary websocket message to forward as Buffer.");
         }
         expect(forwardedToClient.data.equals(bootstrapBinaryPayload)).toBe(true);
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "remaps binary data frame stream ids between connection and bootstrap peers",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const clientStreamId = 77;
+        const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: clientStreamId,
+            channel: {
+              kind: "agent",
+            },
+          }),
+        );
+        await forwardedOpenPromise;
+
+        const forwardedOpenOkPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        await forwardedOpenOkPromise;
+
+        const forwardedClientDataPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          Buffer.from(
+            encodeDataFrame({
+              streamId: clientStreamId,
+              payloadKind: PayloadKindWebSocketBinary,
+              payload: new Uint8Array([0xaa, 0xbb, 0xcc]),
+            }),
+          ),
+        );
+        const forwardedClientData = await forwardedClientDataPromise;
+
+        expect(forwardedClientData.isBinary).toBe(true);
+        expect(parseDataFrame(forwardedClientData.data)).toEqual({
+          frameKind: DataFrameKindData,
+          streamId: 1,
+          payloadKind: PayloadKindWebSocketBinary,
+          payload: new Uint8Array([0xaa, 0xbb, 0xcc]),
+        });
+
+        const forwardedBootstrapDataPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          Buffer.from(
+            encodeDataFrame({
+              streamId: 1,
+              payloadKind: PayloadKindWebSocketBinary,
+              payload: new Uint8Array([0x11, 0x22, 0x33]),
+            }),
+          ),
+        );
+        const forwardedBootstrapData = await forwardedBootstrapDataPromise;
+
+        expect(forwardedBootstrapData.isBinary).toBe(true);
+        expect(parseDataFrame(forwardedBootstrapData.data)).toEqual({
+          frameKind: DataFrameKindData,
+          streamId: clientStreamId,
+          payloadKind: PayloadKindWebSocketBinary,
+          payload: new Uint8Array([0x11, 0x22, 0x33]),
+        });
       } finally {
         await Promise.all([
           closeWebSocketIfOpen(bootstrapSocket),

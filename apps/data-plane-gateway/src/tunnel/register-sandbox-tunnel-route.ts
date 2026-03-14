@@ -10,6 +10,12 @@ import {
   verifyBootstrapToken,
 } from "@mistle/gateway-tunnel-auth";
 import {
+  DataFrameHeaderByteLength,
+  DataFrameKindData,
+  MaxStreamId,
+  PayloadKindRawBytes,
+  PayloadKindWebSocketBinary,
+  PayloadKindWebSocketText,
   parseStreamControlMessage,
   type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
@@ -382,6 +388,71 @@ function createStreamResetPayload(input: {
   });
 }
 
+function replaceDataFrameStreamId(input: {
+  payload: ArrayBuffer;
+  streamId: number;
+}): ArrayBuffer | undefined {
+  if (!Number.isInteger(input.streamId) || input.streamId <= 0 || input.streamId > MaxStreamId) {
+    return undefined;
+  }
+
+  const remappedPayload = input.payload.slice(0);
+  const view = new DataView(remappedPayload);
+
+  if (view.byteLength < DataFrameHeaderByteLength) {
+    return undefined;
+  }
+
+  if (view.getUint8(0) !== DataFrameKindData) {
+    return undefined;
+  }
+
+  const currentStreamId = view.getUint32(1);
+  if (currentStreamId === 0 || currentStreamId > MaxStreamId) {
+    return undefined;
+  }
+
+  const payloadKind = view.getUint8(5);
+  if (
+    payloadKind !== PayloadKindRawBytes &&
+    payloadKind !== PayloadKindWebSocketText &&
+    payloadKind !== PayloadKindWebSocketBinary
+  ) {
+    return undefined;
+  }
+
+  view.setUint32(1, input.streamId);
+
+  return remappedPayload;
+}
+
+function readDataFrameStreamId(payload: ArrayBuffer): number | undefined {
+  const view = new DataView(payload);
+  if (view.byteLength < DataFrameHeaderByteLength) {
+    return undefined;
+  }
+
+  if (view.getUint8(0) !== DataFrameKindData) {
+    return undefined;
+  }
+
+  const streamId = view.getUint32(1);
+  if (streamId === 0 || streamId > MaxStreamId) {
+    return undefined;
+  }
+
+  const payloadKind = view.getUint8(5);
+  if (
+    payloadKind !== PayloadKindRawBytes &&
+    payloadKind !== PayloadKindWebSocketText &&
+    payloadKind !== PayloadKindWebSocketBinary
+  ) {
+    return undefined;
+  }
+
+  return streamId;
+}
+
 type RoutedTunnelMessage = {
   payload: string | ArrayBuffer;
   respondToCurrentPeer?: boolean | undefined;
@@ -392,6 +463,82 @@ type RoutedTunnelMessage = {
       }
     | undefined;
 };
+
+async function translateConnectionBinaryPayloadToBootstrap(input: {
+  clientSessionId: string;
+  interactiveStreamRouter: InteractiveStreamRouter;
+  payload: ArrayBuffer;
+  sandboxInstanceId: string;
+}): Promise<RoutedTunnelMessage> {
+  const streamId = readDataFrameStreamId(input.payload);
+  if (streamId === undefined) {
+    return {
+      payload: input.payload,
+    };
+  }
+
+  const route = await input.interactiveStreamRouter.findInteractiveStreamByClient({
+    sandboxInstanceId: input.sandboxInstanceId,
+    clientSessionId: input.clientSessionId,
+    clientStreamId: streamId,
+  });
+  if (route === undefined) {
+    return {
+      payload: input.payload,
+    };
+  }
+
+  const translatedPayload = replaceDataFrameStreamId({
+    payload: input.payload,
+    streamId: route.binding.tunnelStreamId,
+  });
+  if (translatedPayload === undefined) {
+    return {
+      payload: input.payload,
+    };
+  }
+
+  return {
+    payload: translatedPayload,
+  };
+}
+
+async function translateBootstrapBinaryPayloadToConnection(input: {
+  interactiveStreamRouter: InteractiveStreamRouter;
+  payload: ArrayBuffer;
+  sandboxInstanceId: string;
+}): Promise<RoutedTunnelMessage> {
+  const streamId = readDataFrameStreamId(input.payload);
+  if (streamId === undefined) {
+    return {
+      payload: input.payload,
+    };
+  }
+
+  const route = await input.interactiveStreamRouter.findInteractiveStreamByTunnel({
+    sandboxInstanceId: input.sandboxInstanceId,
+    tunnelStreamId: streamId,
+  });
+  if (route === undefined) {
+    return {
+      payload: input.payload,
+    };
+  }
+
+  const translatedPayload = replaceDataFrameStreamId({
+    payload: input.payload,
+    streamId: route.binding.clientStreamId,
+  });
+  if (translatedPayload === undefined) {
+    return {
+      payload: input.payload,
+    };
+  }
+
+  return {
+    payload: translatedPayload,
+  };
+}
 
 async function notifyConnectionPeerOfReleasedPTYStreams(input: {
   relayCoordinator: TunnelRelayCoordinator;
@@ -474,6 +621,20 @@ async function handleTunnelWebSocketMessage(input: {
             sandboxInstanceId: input.sandboxInstanceId,
           })
         : await translateBootstrapPayloadToConnection({
+            interactiveStreamRouter: input.interactiveStreamRouter,
+            payload: input.payload,
+            sandboxInstanceId: input.sandboxInstanceId,
+          });
+  } else {
+    routedMessage =
+      input.sourcePeerSide === "connection"
+        ? await translateConnectionBinaryPayloadToBootstrap({
+            clientSessionId: input.clientSessionId,
+            interactiveStreamRouter: input.interactiveStreamRouter,
+            payload: input.payload,
+            sandboxInstanceId: input.sandboxInstanceId,
+          })
+        : await translateBootstrapBinaryPayloadToConnection({
             interactiveStreamRouter: input.interactiveStreamRouter,
             payload: input.payload,
             sandboxInstanceId: input.sandboxInstanceId,
