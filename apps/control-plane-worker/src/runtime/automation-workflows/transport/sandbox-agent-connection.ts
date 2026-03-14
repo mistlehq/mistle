@@ -1,6 +1,12 @@
 import { randomInt } from "node:crypto";
 
-import type { StreamOpen, StreamOpenError, StreamOpenOK } from "@mistle/sandbox-session-protocol";
+import {
+  encodeDataFrame,
+  PayloadKindWebSocketText,
+  type StreamOpen,
+  type StreamOpenError,
+  type StreamOpenOK,
+} from "@mistle/sandbox-session-protocol";
 import { systemScheduler } from "@mistle/time";
 import WebSocket, { type RawData } from "ws";
 
@@ -108,6 +114,29 @@ function parseStreamOpenControlMessage(data: RawData): StreamOpenControlMessage 
 function sendTextFrame(socket: WebSocket, payload: string): Promise<void> {
   return new Promise((resolve, reject) => {
     socket.send(payload, (error) => {
+      if (error == null) {
+        resolve();
+        return;
+      }
+
+      reject(error);
+    });
+  });
+}
+
+function sendAgentTextDataFrame(
+  socket: WebSocket,
+  streamId: number,
+  payload: string,
+): Promise<void> {
+  const encodedPayload = encodeDataFrame({
+    streamId,
+    payloadKind: PayloadKindWebSocketText,
+    payload: new TextEncoder().encode(payload),
+  });
+
+  return new Promise((resolve, reject) => {
+    socket.send(encodedPayload, (error) => {
       if (error == null) {
         resolve();
         return;
@@ -257,7 +286,7 @@ export async function connectSandboxAgentConnection(
   return {
     streamId,
     socket,
-    sendText: async (message) => sendTextFrame(socket, message),
+    sendText: async (message) => sendAgentTextDataFrame(socket, streamId, message),
     close: async (closeInput) => closeSocket(socket, closeInput),
   };
 }

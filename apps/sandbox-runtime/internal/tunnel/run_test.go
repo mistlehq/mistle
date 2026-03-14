@@ -301,7 +301,16 @@ func TestRun(t *testing.T) {
 				}
 
 				agentPayload := `{"jsonrpc":"2.0","id":"req-1","method":"ping"}`
-				if err := conn.Write(handlerCtx, websocket.MessageText, []byte(agentPayload)); err != nil {
+				if err := conn.Write(
+					handlerCtx,
+					websocket.MessageBinary,
+					encodeTestDataFrame(
+						t,
+						11,
+						sessionprotocol.PayloadKindWebSocketText,
+						[]byte(agentPayload),
+					),
+				); err != nil {
 					handlerErrCh <- fmt.Errorf("expected gateway->runtime write to succeed: %w", err)
 					return
 				}
@@ -311,11 +320,24 @@ func TestRun(t *testing.T) {
 					handlerErrCh <- fmt.Errorf("expected runtime->gateway read to succeed: %w", err)
 					return
 				}
-				if responseType != websocket.MessageText {
-					handlerErrCh <- fmt.Errorf("expected runtime->gateway response to be text, got %s", responseType.String())
+				if responseType != websocket.MessageBinary {
+					handlerErrCh <- fmt.Errorf("expected runtime->gateway response to be binary, got %s", responseType.String())
 					return
 				}
-				gatewayResponseCh <- string(responsePayload)
+				dataFrame := decodeTestDataFrame(t, responsePayload)
+				if dataFrame.StreamID != 11 {
+					handlerErrCh <- fmt.Errorf("expected runtime->gateway response streamId 11, got %d", dataFrame.StreamID)
+					return
+				}
+				if dataFrame.PayloadKind != sessionprotocol.PayloadKindWebSocketText {
+					handlerErrCh <- fmt.Errorf(
+						"expected runtime->gateway response payloadKind %d, got %d",
+						sessionprotocol.PayloadKindWebSocketText,
+						dataFrame.PayloadKind,
+					)
+					return
+				}
+				gatewayResponseCh <- string(dataFrame.Payload)
 
 				_ = conn.Close(websocket.StatusNormalClosure, "test completed")
 			case "/tunnel/sandbox/sbi_tunnel_test_002/token-exchange":
@@ -597,7 +619,16 @@ func TestRun(t *testing.T) {
 				}
 
 				agentPayload := fmt.Sprintf(`{"jsonrpc":"2.0","id":"req-%d","method":"ping"}`, index+1)
-				if err := conn.Write(handlerCtx, websocket.MessageText, []byte(agentPayload)); err != nil {
+				if err := conn.Write(
+					handlerCtx,
+					websocket.MessageBinary,
+					encodeTestDataFrame(
+						t,
+						uint32(expectedStreamID),
+						sessionprotocol.PayloadKindWebSocketText,
+						[]byte(agentPayload),
+					),
+				); err != nil {
 					handlerErrCh <- fmt.Errorf("expected gateway->runtime write to succeed: %w", err)
 					return
 				}
@@ -607,13 +638,34 @@ func TestRun(t *testing.T) {
 					handlerErrCh <- fmt.Errorf("expected runtime->gateway read to succeed: %w", err)
 					return
 				}
-				if responseType != websocket.MessageText {
-					handlerErrCh <- fmt.Errorf("expected runtime->gateway response to be text, got %s", responseType.String())
+				if responseType != websocket.MessageBinary {
+					handlerErrCh <- fmt.Errorf("expected runtime->gateway response to be binary, got %s", responseType.String())
+					return
+				}
+				dataFrame := decodeTestDataFrame(t, responsePayload)
+				if dataFrame.StreamID != uint32(expectedStreamID) {
+					handlerErrCh <- fmt.Errorf(
+						"expected runtime->gateway response streamId %d, got %d",
+						expectedStreamID,
+						dataFrame.StreamID,
+					)
+					return
+				}
+				if dataFrame.PayloadKind != sessionprotocol.PayloadKindWebSocketText {
+					handlerErrCh <- fmt.Errorf(
+						"expected runtime->gateway response payloadKind %d, got %d",
+						sessionprotocol.PayloadKindWebSocketText,
+						dataFrame.PayloadKind,
+					)
 					return
 				}
 				expectedResponsePayload := `{"jsonrpc":"2.0","id":"res-1","result":{"ok":true}}`
-				if string(responsePayload) != expectedResponsePayload {
-					handlerErrCh <- fmt.Errorf("expected runtime->gateway response %q, got %q", expectedResponsePayload, string(responsePayload))
+				if string(dataFrame.Payload) != expectedResponsePayload {
+					handlerErrCh <- fmt.Errorf(
+						"expected runtime->gateway response %q, got %q",
+						expectedResponsePayload,
+						string(dataFrame.Payload),
+					)
 					return
 				}
 

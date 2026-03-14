@@ -28,6 +28,7 @@ class BrowserSandboxSessionSocket implements SandboxSessionSocket {
 
   constructor(connectionUrl: string) {
     this.#socket = new WebSocket(connectionUrl);
+    this.#socket.binaryType = "arraybuffer";
   }
 
   get readyState(): SandboxSessionSocket["readyState"] {
@@ -59,7 +60,13 @@ class BrowserSandboxSessionSocket implements SandboxSessionSocket {
     this.#socket.removeEventListener(eventName, wrappedListener);
   }
 
-  send(payload: string): void {
+  send(payload: ArrayBuffer | Uint8Array | string): void {
+    if (payload instanceof Uint8Array) {
+      const binaryPayload = new Uint8Array(payload);
+      this.#socket.send(binaryPayload);
+      return;
+    }
+
     this.#socket.send(payload);
   }
 
