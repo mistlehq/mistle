@@ -13,6 +13,7 @@ import {
 
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
+import { recordSandboxTunnelTokenRedemption } from "./token-redemption-store.js";
 
 const SandboxTunnelTokenExchangeRoutePath = "/tunnel/sandbox/:instanceId/token-exchange";
 
@@ -101,6 +102,27 @@ export function registerSandboxTunnelTokenExchangeRoute(
         { error: "Sandbox instance is not eligible for tunnel token exchange." },
         409,
       );
+    }
+
+    try {
+      const inserted = await recordSandboxTunnelTokenRedemption({
+        db: ctx.get("db"),
+        tokenJti: verifiedExchangeToken.jti,
+      });
+
+      if (!inserted) {
+        return ctx.json({ error: "Tunnel exchange token has already been redeemed." }, 409);
+      }
+    } catch (error) {
+      logger.error(
+        {
+          err: error,
+          sandboxInstanceId: requestedInstanceId,
+          tokenJti: verifiedExchangeToken.jti,
+        },
+        "Failed to persist tunnel exchange token redemption",
+      );
+      return ctx.json({ error: "Failed to redeem tunnel exchange token." }, 500);
     }
 
     try {

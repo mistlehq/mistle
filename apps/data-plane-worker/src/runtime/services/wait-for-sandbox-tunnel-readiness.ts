@@ -18,35 +18,23 @@ export async function waitForSandboxTunnelReadiness(
   if (deps.policy.pollIntervalMs <= 0) {
     throw new Error("Expected sandbox tunnel readiness poll interval to be positive.");
   }
-  if (input.bootstrapTokenJti.trim().length === 0) {
-    throw new Error("Expected bootstrap token JTI to be non-empty when waiting for readiness.");
-  }
   if (input.sandboxInstanceId.trim().length === 0) {
     throw new Error("Expected sandbox instance id to be non-empty when waiting for readiness.");
   }
 
   const deadlineMs = deps.clock.nowMs() + deps.policy.timeoutMs;
   while (true) {
-    const [tokenRedemption, sandboxInstance] = await Promise.all([
-      deps.db.query.sandboxTunnelTokenRedemptions.findFirst({
-        columns: {
-          tokenJti: true,
-        },
-        where: (table, { eq: whereEq }) => whereEq(table.tokenJti, input.bootstrapTokenJti),
-      }),
-      deps.db.query.sandboxInstances.findFirst({
-        columns: {
-          activeTunnelLeaseId: true,
-          tunnelConnectedAt: true,
-          lastTunnelSeenAt: true,
-          tunnelDisconnectedAt: true,
-        },
-        where: (table, { eq: whereEq }) => whereEq(table.id, input.sandboxInstanceId),
-      }),
-    ]);
+    const sandboxInstance = await deps.db.query.sandboxInstances.findFirst({
+      columns: {
+        activeTunnelLeaseId: true,
+        tunnelConnectedAt: true,
+        lastTunnelSeenAt: true,
+        tunnelDisconnectedAt: true,
+      },
+      where: (table, { eq: whereEq }) => whereEq(table.id, input.sandboxInstanceId),
+    });
 
     if (
-      tokenRedemption !== undefined &&
       sandboxInstance?.activeTunnelLeaseId !== null &&
       sandboxInstance?.activeTunnelLeaseId !== undefined &&
       sandboxInstance.tunnelConnectedAt !== null &&

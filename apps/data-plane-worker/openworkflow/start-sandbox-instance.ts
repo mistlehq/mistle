@@ -112,7 +112,6 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
       sandboxInstanceId: string;
       provider: SandboxProvider;
       providerSandboxId: string;
-      bootstrapTokenJti: string;
     };
     try {
       startedSandbox = await step.run({ name: "start-sandbox" }, async () => {
@@ -180,7 +179,6 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
         { name: "wait-for-sandbox-tunnel-readiness" },
         async () => {
           return startSandboxInstance.tunnelReadiness.waitForSandboxTunnelReadiness({
-            bootstrapTokenJti: startedSandbox.bootstrapTokenJti,
             sandboxInstanceId: startedSandbox.sandboxInstanceId,
           });
         },

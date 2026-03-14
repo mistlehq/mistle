@@ -1,10 +1,4 @@
-import { randomUUID } from "node:crypto";
-
-import {
-  createDataPlaneDatabase,
-  sandboxInstances,
-  sandboxTunnelTokenRedemptions,
-} from "@mistle/db/data-plane";
+import { createDataPlaneDatabase, sandboxInstances } from "@mistle/db/data-plane";
 import {
   DATA_PLANE_MIGRATIONS_FOLDER_PATH,
   MigrationTracking,
@@ -86,14 +80,10 @@ describe("waitForSandboxTunnelReadiness integration", () => {
   });
 
   it(
-    "does not report readiness when only the token redemption row exists",
+    "does not report readiness when the sandbox tunnel has not connected",
     async () => {
       const sandboxInstanceId = typeid("sbi").toString();
-      const bootstrapTokenJti = randomUUID();
       await insertSandboxInstanceRow(sandboxInstanceId);
-      await createDatabase().insert(sandboxTunnelTokenRedemptions).values({
-        tokenJti: bootstrapTokenJti,
-      });
 
       await expect(
         waitForSandboxTunnelReadiness(
@@ -107,7 +97,6 @@ describe("waitForSandboxTunnelReadiness integration", () => {
             sleeper: systemSleeper,
           },
           {
-            bootstrapTokenJti,
             sandboxInstanceId,
           },
         ),
@@ -117,10 +106,9 @@ describe("waitForSandboxTunnelReadiness integration", () => {
   );
 
   it(
-    "reports readiness after the token redemption row exists and the sandbox tunnel is connected",
+    "reports readiness after the sandbox tunnel is connected",
     async () => {
       const sandboxInstanceId = typeid("sbi").toString();
-      const bootstrapTokenJti = randomUUID();
       await insertSandboxInstanceRow(sandboxInstanceId);
 
       const waitForTunnelReadiness = waitForSandboxTunnelReadiness(
@@ -134,15 +122,9 @@ describe("waitForSandboxTunnelReadiness integration", () => {
           sleeper: systemSleeper,
         },
         {
-          bootstrapTokenJti,
           sandboxInstanceId,
         },
       );
-
-      await systemSleeper.sleep(50);
-      await createDatabase().insert(sandboxTunnelTokenRedemptions).values({
-        tokenJti: bootstrapTokenJti,
-      });
 
       await systemSleeper.sleep(50);
       await createDatabase()
