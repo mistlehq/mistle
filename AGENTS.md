@@ -120,10 +120,6 @@
 - If creating or updating a GitHub PR, use the `github-pr-authoring` skill.
 - Before opening a PR, ensure your branch is rebased onto the latest `main` (for example: `git fetch origin main && git rebase origin/main`).
 - If you open a PR, you must monitor its CI and address issues until the PR is green, unless the failure requires human intervention (e.g. missing GitHub secrets). Do not hack or workaround CI failures.
-- Title: use conventional commit format summarizing the PR.
-- Use the repository PR template in `.github/pull_request_template.md`.
-- When creating/editing PR descriptions with `gh pr create` or `gh pr edit`, use `--body-file` (or a true multiline heredoc). Do not pass escaped newline sequences like `\n` in a single-line string.
-- In PR descriptions and review instructions, use repo-relative file paths (for example `package.json`, `apps/control-plane-api/src/index.ts`), never absolute local filesystem paths.
 
 ## Language Guidance
 
