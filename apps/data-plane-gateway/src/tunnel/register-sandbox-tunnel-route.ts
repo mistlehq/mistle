@@ -328,6 +328,13 @@ async function translateConnectionPayloadToBootstrap(input: {
       message: controlMessage,
       streamId: route.binding.tunnelStreamId,
     }),
+    releaseInteractiveStream:
+      controlMessage.type === "stream.close" && route.binding.channelKind === "agent"
+        ? {
+            clientSessionId: route.binding.clientSessionId,
+            clientStreamId: route.binding.clientStreamId,
+          }
+        : undefined,
   };
 }
 
