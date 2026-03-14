@@ -89,4 +89,32 @@ describe("InteractiveStreamRouter", () => {
       }),
     ).rejects.toThrow("does not have an active owner");
   });
+
+  it("treats release of an ownerless sandbox as a no-op", async () => {
+    const forwardingClient = new GatewayForwardingClient(
+      new LocalGatewayForwardingClientAdapter(
+        "dpg_test",
+        new GatewayForwardingServer(
+          new LocalGatewayForwardingServerAdapter(
+            new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter()),
+          ),
+        ),
+      ),
+    );
+    const router = new InteractiveStreamRouter(
+      "dpg_test",
+      new StoreBackedSandboxOwnerResolver("dpg_test", new InMemorySandboxOwnerStore(systemClock)),
+      forwardingClient,
+    );
+
+    await expect(
+      router.releaseClientSessionStreams({
+        sandboxInstanceId: "sbi_missing",
+        clientSessionId: "conn_1",
+      }),
+    ).resolves.toEqual({
+      bootstrapTarget: undefined,
+      releasedBindings: [],
+    });
+  });
 });
