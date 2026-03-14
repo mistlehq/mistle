@@ -208,7 +208,15 @@ func relayTunnelFrames(
 						)
 					}
 					if err := sendWindow.add(streamWindow.Bytes); err != nil {
-						return "", err
+						if writeErr := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+							Type:     sessionprotocol.MessageTypeStreamReset,
+							StreamID: streamID,
+							Code:     streamResetCodeInvalidStreamWindow,
+							Message:  err.Error(),
+						}); writeErr != nil {
+							return "", fmt.Errorf("failed to write stream.reset for excessive agent stream.window: %w", writeErr)
+						}
+						return agentRelayResultDisconnected, nil
 					}
 					continue
 				}

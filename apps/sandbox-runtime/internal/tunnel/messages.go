@@ -22,6 +22,7 @@ const (
 	streamResetCodeInvalidStreamSignal         = "invalid_stream_signal"
 	streamResetCodeInvalidStreamClose          = "invalid_stream_close"
 	streamResetCodeInvalidStreamData           = "invalid_stream_data"
+	streamResetCodeInvalidStreamWindow         = "invalid_stream_window"
 	streamResetCodeStreamCloseFailed           = "stream_close_failed"
 	streamResetCodeTargetClosed                = "target_closed"
 )

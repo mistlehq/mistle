@@ -2,6 +2,7 @@ import {
   decodeDataFrame,
   DefaultStreamWindowBytes,
   encodeDataFrame,
+  MaxStreamWindowBytes,
   parseStreamControlMessage,
   PayloadKindWebSocketText,
 } from "@mistle/sandbox-session-protocol";
@@ -507,6 +508,29 @@ describe("sandbox session client", () => {
         payload: "second-message-after-window-update",
       }),
     ).not.toThrow();
+  });
+
+  it("fails fast when the server grants stream.window credit beyond the configured maximum", async () => {
+    const server = await createManagedTestServer("accept");
+    const client = createClient(server.url);
+
+    await expectClientToOpenAgentStream({
+      client,
+      server,
+    });
+
+    server.sendWindowUpdate(MaxStreamWindowBytes + 1);
+
+    await waitForCondition({
+      description: "client to enter error state after excessive stream.window credit",
+      timeoutMs: 500,
+      evaluate: () => client.state === "error",
+    });
+
+    expect(client.errorMessage).toBe(
+      `Sandbox session stream send window exceeds the configured maximum of ${String(MaxStreamWindowBytes)} bytes.`,
+    );
+    await server.socketClosed;
   });
 
   it("surfaces stream.open errors from the websocket handshake", async () => {

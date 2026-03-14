@@ -2,6 +2,7 @@ import {
   decodeDataFrame,
   DefaultStreamWindowBytes,
   encodeDataFrame,
+  MaxStreamWindowBytes,
   parseStreamControlMessage,
   PayloadKindWebSocketBinary,
   PayloadKindWebSocketText,
@@ -22,6 +23,7 @@ import type {
 } from "./types.js";
 
 const DefaultConnectTimeoutMs = 15_000;
+const ProtocolViolationCloseCode = 1008;
 const JsonTextEncoder = new TextEncoder();
 const JsonTextDecoder = new TextDecoder();
 
@@ -463,7 +465,15 @@ export class SandboxSessionClient {
         this.#streamId !== null &&
         controlMessage.streamId === this.#streamId
       ) {
-        this.#availableSendWindowBytes += controlMessage.bytes;
+        const nextAvailableSendWindowBytes = this.#availableSendWindowBytes + controlMessage.bytes;
+        if (nextAvailableSendWindowBytes > MaxStreamWindowBytes) {
+          this.#closeConnectedSocketWithError(
+            `Sandbox session stream send window exceeds the configured maximum of ${String(MaxStreamWindowBytes)} bytes.`,
+          );
+          return;
+        }
+
+        this.#availableSendWindowBytes = nextAvailableSendWindowBytes;
         return;
       }
       this.#emitParsedJsonMessage(textPayload);
@@ -527,6 +537,22 @@ export class SandboxSessionClient {
   readonly #handleSocketError = (): void => {
     this.#setState("error", "Sandbox websocket connection failed.");
   };
+
+  #closeConnectedSocketWithError(message: string): void {
+    const socket = this.#socket;
+    this.#socket = null;
+    this.#availableSendWindowBytes = 0;
+    this.#streamId = null;
+
+    if (socket !== null) {
+      socket.removeEventListener("message", this.#handleConnectedMessage);
+      socket.removeEventListener("close", this.#handleSocketClose);
+      socket.removeEventListener("error", this.#handleSocketError);
+      socket.close(ProtocolViolationCloseCode, message);
+    }
+
+    this.#setState("error", message);
+  }
 
   #sendReceiveWindowUpdate(bytes: number): void {
     const socket = this.#socket;
