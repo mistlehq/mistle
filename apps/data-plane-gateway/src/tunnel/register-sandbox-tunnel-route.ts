@@ -396,7 +396,7 @@ async function translateConnectionPayloadToBootstrap(input: {
       streamId: route.binding.tunnelStreamId,
     }),
     releaseInteractiveStream:
-      controlMessage.type === "stream.close" && route.binding.channelKind === "agent"
+      controlMessage.type === "stream.close"
         ? {
             clientSessionId: route.binding.clientSessionId,
             clientStreamId: route.binding.clientStreamId,
@@ -421,6 +421,13 @@ async function translateBootstrapPayloadToConnection(input: {
     tunnelStreamId: controlMessage.streamId,
   });
   if (route === undefined) {
+    if (hasPTYExitEvent(controlMessage)) {
+      return {
+        payload: input.payload,
+        dropMessage: true,
+      };
+    }
+
     return {
       payload: createUnboundInteractiveStreamResetPayload(controlMessage.streamId),
       respondToCurrentPeer: true,
@@ -517,6 +524,7 @@ function replaceDataFrameStreamId(input: {
 
 type RoutedTunnelMessage = {
   payload: string | ArrayBuffer;
+  dropMessage?: boolean | undefined;
   respondToCurrentPeer?: boolean | undefined;
   targetConnectionSessionId?: string | undefined;
   notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding | undefined;
@@ -819,6 +827,10 @@ async function handleTunnelWebSocketMessage(input: {
             payload: input.payload,
             sandboxInstanceId: input.sandboxInstanceId,
           });
+  }
+
+  if (routedMessage.dropMessage === true) {
+    return;
   }
 
   if (routedMessage.respondToCurrentPeer === true) {
