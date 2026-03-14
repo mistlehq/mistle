@@ -19,6 +19,7 @@ export const dataPlaneWorkerDevelopmentPreset = {
         },
         tunnel: {
           bootstrap_token_ttl_seconds: 120,
+          exchange_token_ttl_seconds: 3600,
         },
         sandbox: {
           tokenizer_proxy_egress_base_url:
