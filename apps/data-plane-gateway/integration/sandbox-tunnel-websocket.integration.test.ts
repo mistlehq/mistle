@@ -374,22 +374,86 @@ describe("sandbox tunnel websocket integration", () => {
           `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
         );
 
+        const firstClientStreamId = 77;
+        const forwardedInitialOpenPromise = waitForWebSocketMessage(firstBootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: firstClientStreamId,
+            channel: {
+              kind: "agent",
+            },
+          }),
+        );
+        const forwardedInitialOpen = await forwardedInitialOpenPromise;
+
+        expect(forwardedInitialOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedInitialOpen.data)).toEqual({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "agent",
+          },
+        });
+
+        const initialOpenOkPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          firstBootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        const initialOpenOk = await initialOpenOkPromise;
+
+        expect(initialOpenOk.isBinary).toBe(false);
+        expect(parseStreamMessage(initialOpenOk.data)).toEqual({
+          type: "stream.open.ok",
+          streamId: firstClientStreamId,
+        });
+
         const firstBootstrapClosedPromise = waitForWebSocketClose(firstBootstrapSocket);
+        const releasedStreamResetPromise = waitForWebSocketMessage(clientSocket);
         secondBootstrapSocket = await connectWebSocket(
           `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapTokenTwo)}`,
         );
         const firstBootstrapClosed = await firstBootstrapClosedPromise;
+        const releasedStreamReset = await releasedStreamResetPromise;
 
         expect(firstBootstrapClosed.code).toBe(1012);
         expect(firstBootstrapClosed.reason).toBe("Replaced by newer sandbox tunnel connection.");
+        expect(releasedStreamReset.isBinary).toBe(false);
+        expect(parseStreamMessage(releasedStreamReset.data)).toEqual({
+          type: "stream.reset",
+          streamId: firstClientStreamId,
+          code: "bootstrap_reconnected",
+          message:
+            "Sandbox bootstrap tunnel reconnected and invalidated the active interactive stream.",
+        });
 
-        const clientPayload = "message to replacement bootstrap socket";
-        const forwardedToReplacementPromise = waitForWebSocketMessage(secondBootstrapSocket);
-        await sendWebSocketMessage(clientSocket, clientPayload);
-        const forwardedToReplacement = await forwardedToReplacementPromise;
+        const replacementClientStreamId = 78;
+        const forwardedReplacementOpenPromise = waitForWebSocketMessage(secondBootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: replacementClientStreamId,
+            channel: {
+              kind: "agent",
+            },
+          }),
+        );
+        const forwardedReplacementOpen = await forwardedReplacementOpenPromise;
 
-        expect(forwardedToReplacement.isBinary).toBe(false);
-        expect(forwardedToReplacement.data).toBe(clientPayload);
+        expect(forwardedReplacementOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedReplacementOpen.data)).toEqual({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "agent",
+          },
+        });
       } finally {
         await Promise.all([
           closeWebSocketIfOpen(firstBootstrapSocket),

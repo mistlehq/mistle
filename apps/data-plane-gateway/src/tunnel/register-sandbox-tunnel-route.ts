@@ -540,7 +540,20 @@ async function translateBootstrapBinaryPayloadToConnection(input: {
   };
 }
 
-async function notifyConnectionPeerOfReleasedPTYStreams(input: {
+function createReleasedInteractiveStreamResetPayload(binding: ClientStreamBinding): string {
+  const message =
+    binding.channelKind === "pty"
+      ? "Sandbox bootstrap tunnel reconnected and invalidated the active PTY stream."
+      : "Sandbox bootstrap tunnel reconnected and invalidated the active interactive stream.";
+
+  return createStreamResetPayload({
+    code: "bootstrap_reconnected",
+    message,
+    streamId: binding.clientStreamId,
+  });
+}
+
+async function notifyConnectionPeerOfReleasedInteractiveStreams(input: {
   relayCoordinator: TunnelRelayCoordinator;
   releasedBindings: ClientStreamBinding[];
   sandboxInstanceId: string;
@@ -553,24 +566,19 @@ async function notifyConnectionPeerOfReleasedPTYStreams(input: {
     return;
   }
 
-  const ptyBindingsForCurrentConnection = input.releasedBindings.filter(
-    (binding: ClientStreamBinding) =>
-      binding.channelKind === "pty" && binding.clientSessionId === connectionPeer.sessionId,
+  const bindingsForCurrentConnection = input.releasedBindings.filter(
+    (binding: ClientStreamBinding) => binding.clientSessionId === connectionPeer.sessionId,
   );
-  if (ptyBindingsForCurrentConnection.length === 0) {
+  if (bindingsForCurrentConnection.length === 0) {
     return;
   }
 
   await Promise.all(
-    ptyBindingsForCurrentConnection.map((binding: ClientStreamBinding) =>
+    bindingsForCurrentConnection.map((binding: ClientStreamBinding) =>
       input.relayCoordinator.forwardPeerMessage({
         sandboxInstanceId: input.sandboxInstanceId,
         fromSide: "bootstrap",
-        payload: createStreamResetPayload({
-          code: "bootstrap_reconnected",
-          message: "Sandbox bootstrap tunnel reconnected and invalidated the active PTY stream.",
-          streamId: binding.clientStreamId,
-        }),
+        payload: createReleasedInteractiveStreamResetPayload(binding),
       }),
     ),
   );
@@ -952,7 +960,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
 
             if (requestedToken.kind === "bootstrap") {
               const attachResult = input.tunnelSessionRegistry.attachBootstrapSession(relayTarget);
-              void notifyConnectionPeerOfReleasedPTYStreams({
+              void notifyConnectionPeerOfReleasedInteractiveStreams({
                 relayCoordinator: input.relayCoordinator,
                 releasedBindings: attachResult.releasedBindings,
                 sandboxInstanceId,
@@ -960,18 +968,19 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 recordTunnelSessionError({
                   tunnelSessionSpan,
                   error,
-                  statusMessage: "Failed notifying connection peer about released PTY streams.",
+                  statusMessage:
+                    "Failed notifying connection peer about released interactive streams.",
                 });
                 logger.error(
                   {
                     err: error,
                     sandboxInstanceId,
                   },
-                  "Failed notifying connection peer about released PTY streams",
+                  "Failed notifying connection peer about released interactive streams",
                 );
                 ws.close(
                   CloseCodes.INTERNAL_ERROR,
-                  "Failed notifying connection peer about released PTY streams.",
+                  "Failed notifying connection peer about released interactive streams.",
                 );
               });
               void markSandboxTunnelConnected({
