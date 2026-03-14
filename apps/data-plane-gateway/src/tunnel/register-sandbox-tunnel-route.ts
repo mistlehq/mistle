@@ -309,14 +309,16 @@ async function translateConnectionPayloadToBootstrap(input: {
   });
   if (route === undefined) {
     return {
-      payload: input.payload,
+      payload: createUnboundInteractiveStreamResetPayload(controlMessage.streamId),
+      respondToCurrentPeer: true,
     };
   }
 
   if (controlMessage.type === "stream.signal") {
     if (route.binding.channelKind !== "pty" || !hasPTYResizeSignal(controlMessage)) {
       return {
-        payload: input.payload,
+        payload: createInvalidStreamSignalResetPayload(controlMessage.streamId),
+        respondToCurrentPeer: true,
       };
     }
   }
@@ -347,7 +349,8 @@ async function translateBootstrapPayloadToConnection(input: {
   });
   if (route === undefined) {
     return {
-      payload: input.payload,
+      payload: createUnboundInteractiveStreamResetPayload(controlMessage.streamId),
+      respondToCurrentPeer: true,
     };
   }
 
@@ -385,6 +388,22 @@ function createStreamResetPayload(input: {
     streamId: input.streamId,
     code: input.code,
     message: input.message,
+  });
+}
+
+function createUnboundInteractiveStreamResetPayload(streamId: number): string {
+  return createStreamResetPayload({
+    code: "interactive_stream_not_found",
+    message: "Interactive stream is not bound on this tunnel session.",
+    streamId,
+  });
+}
+
+function createInvalidStreamSignalResetPayload(streamId: number): string {
+  return createStreamResetPayload({
+    code: "invalid_stream_signal",
+    message: "Stream signal is not valid for the bound interactive stream.",
+    streamId,
   });
 }
 
@@ -484,7 +503,8 @@ async function translateConnectionBinaryPayloadToBootstrap(input: {
   });
   if (route === undefined) {
     return {
-      payload: input.payload,
+      payload: createUnboundInteractiveStreamResetPayload(streamId),
+      respondToCurrentPeer: true,
     };
   }
 
@@ -494,7 +514,8 @@ async function translateConnectionBinaryPayloadToBootstrap(input: {
   });
   if (translatedPayload === undefined) {
     return {
-      payload: input.payload,
+      payload: createUnboundInteractiveStreamResetPayload(streamId),
+      respondToCurrentPeer: true,
     };
   }
 
@@ -521,7 +542,8 @@ async function translateBootstrapBinaryPayloadToConnection(input: {
   });
   if (route === undefined) {
     return {
-      payload: input.payload,
+      payload: createUnboundInteractiveStreamResetPayload(streamId),
+      respondToCurrentPeer: true,
     };
   }
 
@@ -531,7 +553,8 @@ async function translateBootstrapBinaryPayloadToConnection(input: {
   });
   if (translatedPayload === undefined) {
     return {
-      payload: input.payload,
+      payload: createUnboundInteractiveStreamResetPayload(streamId),
+      respondToCurrentPeer: true,
     };
   }
 

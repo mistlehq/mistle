@@ -1,6 +1,8 @@
 import WebSocket, { type RawData } from "ws";
 
 const ConnectTimeoutMs = 4_000;
+const scheduleTimeout = globalThis.setTimeout.bind(globalThis);
+const cancelTimeout = globalThis.clearTimeout.bind(globalThis);
 type UnexpectedResponse = {
   statusCode?: number;
 };
@@ -149,6 +151,34 @@ export function waitForWebSocketMessage(socket: WebSocket): Promise<ReceivedWebS
       socket.off("message", onMessage);
       socket.off("error", onError);
     };
+
+    socket.once("message", onMessage);
+    socket.once("error", onError);
+  });
+}
+
+export function waitForNoWebSocketMessage(socket: WebSocket, timeoutMs = 150): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const onMessage = (): void => {
+      cleanup();
+      reject(new Error("Expected no websocket message."));
+    };
+
+    const onError = (error: Error): void => {
+      cleanup();
+      reject(error);
+    };
+
+    const cleanup = (): void => {
+      cancelTimeout(timeoutHandle);
+      socket.off("message", onMessage);
+      socket.off("error", onError);
+    };
+
+    const timeoutHandle = scheduleTimeout(() => {
+      cleanup();
+      resolve();
+    }, timeoutMs);
 
     socket.once("message", onMessage);
     socket.once("error", onError);
