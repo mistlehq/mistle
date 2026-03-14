@@ -24,6 +24,7 @@ import {
   closeWebSocket,
   connectWebSocket,
   sendWebSocketMessage,
+  waitForNoWebSocketMessage,
   sendWebSocketPingAndExpectPong,
   waitForWebSocketClose,
   waitForWebSocketMessage,
@@ -85,6 +86,147 @@ async function closeWebSocketIfOpen(socket: WebSocket | undefined): Promise<void
 }
 
 describe("sandbox tunnel websocket integration", () => {
+  it(
+    "responds to the connection peer when an interactive control message is not bound",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const bootstrapNoMessagePromise = waitForNoWebSocketMessage(bootstrapSocket);
+        const clientResetPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.close",
+            streamId: 77,
+          }),
+        );
+        const clientReset = await clientResetPromise;
+
+        expect(clientReset.isBinary).toBe(false);
+        expect(parseStreamMessage(clientReset.data)).toEqual({
+          type: "stream.reset",
+          streamId: 77,
+          code: "interactive_stream_not_found",
+          message: "Interactive stream is not bound on this tunnel session.",
+        });
+        await bootstrapNoMessagePromise;
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "responds to the bootstrap peer when an interactive data frame is not bound",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const clientNoMessagePromise = waitForNoWebSocketMessage(clientSocket);
+        const bootstrapResetPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          Buffer.from(
+            encodeDataFrame({
+              streamId: 1,
+              payloadKind: PayloadKindWebSocketBinary,
+              payload: new Uint8Array([0x41, 0x42]),
+            }),
+          ),
+        );
+        const bootstrapReset = await bootstrapResetPromise;
+
+        expect(bootstrapReset.isBinary).toBe(false);
+        expect(parseStreamMessage(bootstrapReset.data)).toEqual({
+          type: "stream.reset",
+          streamId: 1,
+          code: "interactive_stream_not_found",
+          message: "Interactive stream is not bound on this tunnel session.",
+        });
+        await clientNoMessagePromise;
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
   it(
     "accepts websocket connections for bootstrap and connection tokens and responds to ping on both",
     async ({ fixture }) => {
