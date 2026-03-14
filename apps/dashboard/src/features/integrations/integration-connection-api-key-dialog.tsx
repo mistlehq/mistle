@@ -20,6 +20,8 @@ export function IntegrationConnectionApiKeyDialog(input: {
 }): React.JSX.Element {
   return (
     <Dialog
+      isBusy={input.isPending}
+      isDismissible={!input.isPending}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
           input.onClose();
@@ -28,7 +30,7 @@ export function IntegrationConnectionApiKeyDialog(input: {
       open={input.isOpen}
     >
       {input.isOpen ? (
-        <DialogContent showCloseButton={!input.isPending}>
+        <DialogContent>
           <DialogHeader variant="sectioned">
             <DialogTitle>{`Update ${input.connectionDisplayName}`}</DialogTitle>
           </DialogHeader>

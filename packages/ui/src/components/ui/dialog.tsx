@@ -5,8 +5,47 @@ import * as React from "react";
 import { cn } from "../../lib/utils.js";
 import { Button } from "./button.js";
 
-function Dialog({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />;
+type DialogContextValue = {
+  isBusy: boolean;
+  isDismissible: boolean;
+};
+
+const DialogContext = React.createContext<DialogContextValue>({
+  isBusy: false,
+  isDismissible: true,
+});
+
+function Dialog({
+  isBusy = false,
+  isDismissible = true,
+  onOpenChange,
+  ...props
+}: DialogPrimitive.Root.Props & {
+  isBusy?: boolean;
+  isDismissible?: boolean;
+}) {
+  function handleOpenChange(
+    ...args: Parameters<NonNullable<DialogPrimitive.Root.Props["onOpenChange"]>>
+  ): void {
+    const [open] = args;
+    if (!isDismissible && !open) {
+      return;
+    }
+
+    onOpenChange?.(...args);
+  }
+
+  return (
+    <DialogContext.Provider value={{ isBusy, isDismissible }}>
+      <DialogPrimitive.Root
+        data-busy={isBusy ? "true" : undefined}
+        data-dismissible={isDismissible ? undefined : "false"}
+        data-slot="dialog"
+        onOpenChange={handleOpenChange}
+        {...props}
+      />
+    </DialogContext.Provider>
+  );
 }
 
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
@@ -42,10 +81,13 @@ function DialogContent({
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean;
 }) {
+  const { isBusy, isDismissible } = React.useContext(DialogContext);
+
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Popup
+        aria-busy={isBusy || undefined}
         data-slot="dialog-content"
         className={cn(
           "bg-background data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 ring-foreground/10 grid max-w-[calc(100%-2rem)] gap-6 rounded-xl p-6 text-sm ring-1 duration-100 sm:max-w-md fixed top-1/2 left-1/2 z-50 w-full -translate-x-1/2 -translate-y-1/2 outline-none",
@@ -54,7 +96,7 @@ function DialogContent({
         {...props}
       >
         {children}
-        {showCloseButton && (
+        {showCloseButton && isDismissible && (
           <DialogPrimitive.Close
             data-slot="dialog-close"
             render={<Button variant="ghost" className="absolute top-4 right-4" size="icon-sm" />}

@@ -22,17 +22,14 @@ type DeleteWebhookAutomationDialogProps = {
 export function DeleteWebhookAutomationDialog(
   input: DeleteWebhookAutomationDialogProps,
 ): React.JSX.Element {
-  function handleOpenChange(open: boolean): void {
-    if (input.isPending) {
-      return;
-    }
-
-    input.onOpenChange(open);
-  }
-
   return (
-    <Dialog onOpenChange={handleOpenChange} open={input.isOpen}>
-      <DialogContent showCloseButton={!input.isPending}>
+    <Dialog
+      isBusy={input.isPending}
+      isDismissible={!input.isPending}
+      onOpenChange={input.onOpenChange}
+      open={input.isOpen}
+    >
+      <DialogContent>
         <DialogHeader variant="sectioned">
           <DialogTitle>Delete automation</DialogTitle>
         </DialogHeader>

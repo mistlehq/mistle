@@ -76,3 +76,44 @@ export const Controlled = {
     );
   },
 };
+
+export const LockedWhileBusy = {
+  render: function Render() {
+    const [open, setOpen] = useState(true);
+
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Dialog isBusy isDismissible={false} onOpenChange={setOpen} open={open}>
+          <DialogTrigger render={<Button type="button" variant="outline" />}>
+            {open ? "Dialog locked" : "Reopen dialog"}
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader variant="sectioned">
+              <DialogTitle>Deleting workspace</DialogTitle>
+              <DialogDescription>
+                Escape, outside clicks, and the close button are disabled while the request is in
+                flight.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <p className="text-sm">
+                This demonstrates the shared nondismissible state for non-interruptible workflows.
+              </p>
+              <p className="text-muted-foreground text-sm">
+                Footer controls stay explicit, so callers still decide which actions remain enabled.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button disabled type="button" variant="outline">
+                Cancel
+              </Button>
+              <Button disabled type="button">
+                Deleting...
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
+  },
+};

@@ -31,9 +31,14 @@ export function MemberRoleChangeDialog(input: {
   onSaveRole: () => void;
 }): React.JSX.Element {
   return (
-    <Dialog onOpenChange={input.onOpenChange} open={input.open}>
+    <Dialog
+      isBusy={input.isUpdatingRole}
+      isDismissible={!input.isUpdatingRole}
+      onOpenChange={input.onOpenChange}
+      open={input.open}
+    >
       {input.roleChangeDialog ? (
-        <DialogContent showCloseButton={!input.isUpdatingRole}>
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Change role</DialogTitle>
             <DialogDescription>

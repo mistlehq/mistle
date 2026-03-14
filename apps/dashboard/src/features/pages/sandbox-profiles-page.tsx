@@ -209,6 +209,8 @@ export function SandboxProfilesPage(): React.JSX.Element {
       </div>
 
       <Dialog
+        isBusy={createMutation.isPending}
+        isDismissible={!createMutation.isPending}
         onOpenChange={(nextOpen) => {
           if (nextOpen) {
             openCreateDialog();
@@ -218,7 +220,7 @@ export function SandboxProfilesPage(): React.JSX.Element {
         }}
         open={isCreateDialogOpen}
       >
-        <DialogContent showCloseButton={!createMutation.isPending}>
+        <DialogContent>
           <DialogHeader variant="sectioned">
             <DialogTitle>Create profile</DialogTitle>
           </DialogHeader>

@@ -59,15 +59,14 @@ export function MemberInviteDialog(input: {
 
   return (
     <Dialog
+      isBusy={form.isSubmitting}
+      isDismissible={!form.isSubmitting}
       onOpenChange={(nextOpen) => {
-        if (form.isSubmitting) {
-          return;
-        }
         input.onOpenChange(nextOpen);
       }}
       open={input.open}
     >
-      <DialogContent showCloseButton={!form.isSubmitting}>
+      <DialogContent>
         <DialogHeader variant="sectioned">
           <DialogTitle>Invite members</DialogTitle>
         </DialogHeader>

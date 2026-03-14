@@ -71,6 +71,8 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
 
   return (
     <Dialog
+      isBusy={props.pending}
+      isDismissible={!props.pending}
       onOpenChange={(nextOpen) => {
         if (!nextOpen) {
           props.onClose();
