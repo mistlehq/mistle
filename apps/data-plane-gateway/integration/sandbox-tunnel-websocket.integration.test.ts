@@ -714,8 +714,10 @@ describe("sandbox tunnel websocket integration", () => {
           `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(firstConnectionToken)}`,
         );
 
+        const bootstrapNoMessagePromise = waitForNoWebSocketMessage(bootstrapSocket);
         await closeWebSocket(firstClientSocket);
         firstClientSocket = undefined;
+        await bootstrapNoMessagePromise;
 
         await sendWebSocketPingAndExpectPong(
           bootstrapSocket,
