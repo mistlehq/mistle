@@ -17,10 +17,6 @@ const CloseCodes: {
   REPLACED: 1012,
   PEER_DISCONNECTED: 1012,
 };
-const PeerDisconnectedControlPayload = JSON.stringify({
-  type: "disconnect",
-  reason: "Sandbox tunnel connection peer disconnected.",
-});
 
 function getOppositeSide(side: RelayPeerSide): RelayPeerSide {
   return side === "bootstrap" ? "connection" : "bootstrap";
@@ -151,24 +147,6 @@ export class TunnelRelayCoordinator {
     }
 
     if (input.target.side === "connection") {
-      if (!input.notifyOppositePeer) {
-        return;
-      }
-
-      const opposite = this.peerRegistry.getPeer({
-        sandboxInstanceId: input.target.sandboxInstanceId,
-        side: getOppositeSide(input.target.side),
-      });
-      if (opposite !== undefined) {
-        void this.relayTransport
-          .deliverEnvelope(
-            toFrameEnvelope({
-              target: opposite,
-              payload: PeerDisconnectedControlPayload,
-            }),
-          )
-          .catch(() => undefined);
-      }
       return;
     }
 
