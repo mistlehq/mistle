@@ -107,7 +107,7 @@ func TestRun(t *testing.T) {
 	t.Run("reconnects with an exchanged bootstrap token after the websocket closes", func(t *testing.T) {
 		tokenQueryValues := make(chan string, 2)
 		requestPathValues := make(chan string, 2)
-		handlerErrCh := make(chan error, 1)
+		handlerErrCh := make(chan error, 16)
 		runCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
@@ -201,7 +201,7 @@ func TestRun(t *testing.T) {
 	t.Run("connects to agent endpoint and relays websocket frames", func(t *testing.T) {
 		agentRequestCh := make(chan string, 1)
 		gatewayResponseCh := make(chan string, 1)
-		handlerErrCh := make(chan error, 1)
+		handlerErrCh := make(chan error, 16)
 		runCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -424,7 +424,7 @@ func TestRun(t *testing.T) {
 
 	t.Run("writes stream.open.error when agent endpoint is unavailable", func(t *testing.T) {
 		responseCh := make(chan sessionprotocol.StreamOpenError, 1)
-		handlerErrCh := make(chan error, 1)
+		handlerErrCh := make(chan error, 16)
 
 		gatewayServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			conn, err := websocket.Accept(writer, request, nil)
@@ -527,7 +527,7 @@ func TestRun(t *testing.T) {
 
 	t.Run("keeps bootstrap tunnel open for a second agent connection after the first closes", func(t *testing.T) {
 		agentRequestCh := make(chan string, 2)
-		handlerErrCh := make(chan error, 1)
+		handlerErrCh := make(chan error, 16)
 
 		agentServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			conn, err := websocket.Accept(writer, request, nil)
@@ -755,7 +755,7 @@ func TestRun(t *testing.T) {
 
 	t.Run("relays multiple agent streams concurrently over one bootstrap tunnel", func(t *testing.T) {
 		agentRequestCh := make(chan string, 2)
-		handlerErrCh := make(chan error, 1)
+		handlerErrCh := make(chan error, 16)
 		releaseAgentConnectionsCh := make(chan struct{})
 
 		agentServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -796,106 +796,118 @@ func TestRun(t *testing.T) {
 		defer cancelRun()
 
 		gatewayServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			conn, err := websocket.Accept(writer, request, nil)
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected gateway websocket accept to succeed: %w", err)
-				return
-			}
-			defer conn.CloseNow()
-
-			handlerCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-
-			for _, streamID := range []int{41, 42} {
-				connectRequestPayload, err := json.Marshal(sessionprotocol.StreamOpen{
-					Type:     sessionprotocol.MessageTypeStreamOpen,
-					StreamID: streamID,
-					Channel: sessionprotocol.StreamOpenChannel{
-						Kind: sessionprotocol.ChannelKindAgent,
-					},
-				})
+			switch request.URL.Path {
+			case "/tunnel/sandbox/sbi_tunnel_test_005":
+				conn, err := websocket.Accept(writer, request, nil)
 				if err != nil {
-					handlerErrCh <- fmt.Errorf("expected concurrent connect payload marshal to succeed: %w", err)
+					handlerErrCh <- fmt.Errorf("expected gateway websocket accept to succeed: %w", err)
 					return
 				}
-				if err := conn.Write(handlerCtx, websocket.MessageText, connectRequestPayload); err != nil {
-					handlerErrCh <- fmt.Errorf("expected concurrent connect write to succeed: %w", err)
+				defer conn.CloseNow()
+
+				handlerCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
+				for _, streamID := range []int{41, 42} {
+					connectRequestPayload, err := json.Marshal(sessionprotocol.StreamOpen{
+						Type:     sessionprotocol.MessageTypeStreamOpen,
+						StreamID: streamID,
+						Channel: sessionprotocol.StreamOpenChannel{
+							Kind: sessionprotocol.ChannelKindAgent,
+						},
+					})
+					if err != nil {
+						handlerErrCh <- fmt.Errorf("expected concurrent connect payload marshal to succeed: %w", err)
+						return
+					}
+					if err := conn.Write(handlerCtx, websocket.MessageText, connectRequestPayload); err != nil {
+						handlerErrCh <- fmt.Errorf("expected concurrent connect write to succeed: %w", err)
+						return
+					}
+
+					ackType, ackPayload, err := conn.Read(handlerCtx)
+					if err != nil {
+						handlerErrCh <- fmt.Errorf("expected concurrent connect ack read to succeed: %w", err)
+						return
+					}
+					if ackType != websocket.MessageText {
+						handlerErrCh <- fmt.Errorf("expected concurrent connect ack to be text, got %s", ackType.String())
+						return
+					}
+
+					var connectOK sessionprotocol.StreamOpenOK
+					if err := json.Unmarshal(ackPayload, &connectOK); err != nil {
+						handlerErrCh <- fmt.Errorf("expected concurrent connect ack decode to succeed: %w", err)
+						return
+					}
+					if connectOK.Type != sessionprotocol.MessageTypeStreamOpenOK || connectOK.StreamID != streamID {
+						handlerErrCh <- fmt.Errorf("expected concurrent connect ack for stream %d, got type=%s streamId=%d", streamID, connectOK.Type, connectOK.StreamID)
+						return
+					}
+				}
+
+				for _, streamID := range []int{41, 42} {
+					agentPayload := fmt.Sprintf(`{"jsonrpc":"2.0","id":"req-%d","method":"ping-%d"}`, streamID, streamID)
+					if err := conn.Write(
+						handlerCtx,
+						websocket.MessageBinary,
+						encodeTestDataFrame(
+							t,
+							uint32(streamID),
+							sessionprotocol.PayloadKindWebSocketText,
+							[]byte(agentPayload),
+						),
+					); err != nil {
+						handlerErrCh <- fmt.Errorf("expected concurrent gateway->runtime write to succeed: %w", err)
+						return
+					}
+				}
+
+				foundResponses := map[int]string{}
+				for len(foundResponses) < 2 {
+					responseType, responsePayload, err := conn.Read(handlerCtx)
+					if err != nil {
+						handlerErrCh <- fmt.Errorf("expected concurrent runtime->gateway read to succeed: %w", err)
+						return
+					}
+					if responseType != websocket.MessageBinary {
+						continue
+					}
+					dataFrame := decodeTestDataFrame(t, responsePayload)
+					if dataFrame.PayloadKind != sessionprotocol.PayloadKindWebSocketText {
+						handlerErrCh <- fmt.Errorf(
+							"expected concurrent agent response payloadKind %d, got %d",
+							sessionprotocol.PayloadKindWebSocketText,
+							dataFrame.PayloadKind,
+						)
+						return
+					}
+					foundResponses[int(dataFrame.StreamID)] = string(dataFrame.Payload)
+				}
+
+				expectedStream41 := `{"jsonrpc":"2.0","id":"res-{"jsonrpc":"2.0","id":"req-41","method":"ping-41"}","result":{"ok":true}}`
+				if foundResponses[41] != expectedStream41 {
+					handlerErrCh <- fmt.Errorf("expected concurrent response for stream 41 %q, got %q", expectedStream41, foundResponses[41])
+					return
+				}
+				expectedStream42 := `{"jsonrpc":"2.0","id":"res-{"jsonrpc":"2.0","id":"req-42","method":"ping-42"}","result":{"ok":true}}`
+				if foundResponses[42] != expectedStream42 {
+					handlerErrCh <- fmt.Errorf("expected concurrent response for stream 42 %q, got %q", expectedStream42, foundResponses[42])
 					return
 				}
 
-				ackType, ackPayload, err := conn.Read(handlerCtx)
-				if err != nil {
-					handlerErrCh <- fmt.Errorf("expected concurrent connect ack read to succeed: %w", err)
-					return
-				}
-				if ackType != websocket.MessageText {
-					handlerErrCh <- fmt.Errorf("expected concurrent connect ack to be text, got %s", ackType.String())
-					return
-				}
-
-				var connectOK sessionprotocol.StreamOpenOK
-				if err := json.Unmarshal(ackPayload, &connectOK); err != nil {
-					handlerErrCh <- fmt.Errorf("expected concurrent connect ack decode to succeed: %w", err)
-					return
-				}
-				if connectOK.Type != sessionprotocol.MessageTypeStreamOpenOK || connectOK.StreamID != streamID {
-					handlerErrCh <- fmt.Errorf("expected concurrent connect ack for stream %d, got type=%s streamId=%d", streamID, connectOK.Type, connectOK.StreamID)
-					return
-				}
+				close(releaseAgentConnectionsCh)
+				cancelRun()
+			case "/tunnel/sandbox/sbi_tunnel_test_005/token-exchange":
+				writeTestTunnelTokenExchangeResponse(
+					t,
+					writer,
+					"rotated-bootstrap-token-concurrent-agent",
+					testLongLivedTunnelExchangeToken(t),
+				)
+			default:
+				handlerErrCh <- fmt.Errorf("unexpected request path %q", request.URL.Path)
 			}
-
-			for _, streamID := range []int{41, 42} {
-				agentPayload := fmt.Sprintf(`{"jsonrpc":"2.0","id":"req-%d","method":"ping-%d"}`, streamID, streamID)
-				if err := conn.Write(
-					handlerCtx,
-					websocket.MessageBinary,
-					encodeTestDataFrame(
-						t,
-						uint32(streamID),
-						sessionprotocol.PayloadKindWebSocketText,
-						[]byte(agentPayload),
-					),
-				); err != nil {
-					handlerErrCh <- fmt.Errorf("expected concurrent gateway->runtime write to succeed: %w", err)
-					return
-				}
-			}
-
-			foundResponses := map[int]string{}
-			for len(foundResponses) < 2 {
-				responseType, responsePayload, err := conn.Read(handlerCtx)
-				if err != nil {
-					handlerErrCh <- fmt.Errorf("expected concurrent runtime->gateway read to succeed: %w", err)
-					return
-				}
-				if responseType != websocket.MessageBinary {
-					continue
-				}
-				dataFrame := decodeTestDataFrame(t, responsePayload)
-				if dataFrame.PayloadKind != sessionprotocol.PayloadKindWebSocketText {
-					handlerErrCh <- fmt.Errorf(
-						"expected concurrent agent response payloadKind %d, got %d",
-						sessionprotocol.PayloadKindWebSocketText,
-						dataFrame.PayloadKind,
-					)
-					return
-				}
-				foundResponses[int(dataFrame.StreamID)] = string(dataFrame.Payload)
-			}
-
-			expectedStream41 := `{"jsonrpc":"2.0","id":"res-{"jsonrpc":"2.0","id":"req-41","method":"ping-41"}","result":{"ok":true}}`
-			if foundResponses[41] != expectedStream41 {
-				handlerErrCh <- fmt.Errorf("expected concurrent response for stream 41 %q, got %q", expectedStream41, foundResponses[41])
-				return
-			}
-			expectedStream42 := `{"jsonrpc":"2.0","id":"res-{"jsonrpc":"2.0","id":"req-42","method":"ping-42"}","result":{"ok":true}}`
-			if foundResponses[42] != expectedStream42 {
-				handlerErrCh <- fmt.Errorf("expected concurrent response for stream 42 %q, got %q", expectedStream42, foundResponses[42])
-				return
-			}
-
-			close(releaseAgentConnectionsCh)
-			cancelRun()
 		}))
 		defer gatewayServer.Close()
 
@@ -976,7 +988,8 @@ func TestRun(t *testing.T) {
 
 	t.Run("relays agent and pty streams concurrently over one bootstrap tunnel", func(t *testing.T) {
 		agentRequestCh := make(chan string, 1)
-		handlerErrCh := make(chan error, 1)
+		handlerErrCh := make(chan error, 16)
+		releaseAgentConnectionCh := make(chan struct{})
 
 		agentServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			conn, err := websocket.Accept(writer, request, nil)
@@ -1004,6 +1017,8 @@ func TestRun(t *testing.T) {
 				handlerErrCh <- fmt.Errorf("expected mixed agent response write to succeed: %w", err)
 				return
 			}
+
+			<-releaseAgentConnectionCh
 		}))
 		defer agentServer.Close()
 
@@ -1011,153 +1026,166 @@ func TestRun(t *testing.T) {
 		defer cancelRun()
 
 		gatewayServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			conn, err := websocket.Accept(writer, request, nil)
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected gateway websocket accept to succeed: %w", err)
-				return
-			}
-			defer conn.CloseNow()
-
-			handlerCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
-
-			ptyOpenPayload, err := json.Marshal(sessionprotocol.StreamOpen{
-				Type:     sessionprotocol.MessageTypeStreamOpen,
-				StreamID: 51,
-				Channel: sessionprotocol.StreamOpenChannel{
-					Kind:    sessionprotocol.ChannelKindPTY,
-					Session: sessionprotocol.PTYSessionModeCreate,
-					Cols:    120,
-					Rows:    40,
-				},
-			})
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected mixed pty stream.open payload marshal to succeed: %w", err)
-				return
-			}
-			if err := conn.Write(handlerCtx, websocket.MessageText, ptyOpenPayload); err != nil {
-				handlerErrCh <- fmt.Errorf("expected mixed pty stream.open write to succeed: %w", err)
-				return
-			}
-
-			ptyAckType, ptyAckPayload, err := conn.Read(handlerCtx)
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected mixed pty ack read to succeed: %w", err)
-				return
-			}
-			if ptyAckType != websocket.MessageText {
-				handlerErrCh <- fmt.Errorf("expected mixed pty ack to be text, got %s", ptyAckType.String())
-				return
-			}
-			var ptyAck sessionprotocol.StreamOpenOK
-			if err := json.Unmarshal(ptyAckPayload, &ptyAck); err != nil {
-				handlerErrCh <- fmt.Errorf("expected mixed pty ack decode to succeed: %w", err)
-				return
-			}
-			if ptyAck.Type != sessionprotocol.MessageTypeStreamOpenOK || ptyAck.StreamID != 51 {
-				handlerErrCh <- fmt.Errorf("expected mixed pty ack for stream 51, got type=%s streamId=%d", ptyAck.Type, ptyAck.StreamID)
-				return
-			}
-
-			agentOpenPayload, err := json.Marshal(sessionprotocol.StreamOpen{
-				Type:     sessionprotocol.MessageTypeStreamOpen,
-				StreamID: 61,
-				Channel: sessionprotocol.StreamOpenChannel{
-					Kind: sessionprotocol.ChannelKindAgent,
-				},
-			})
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected mixed agent stream.open payload marshal to succeed: %w", err)
-				return
-			}
-			if err := conn.Write(handlerCtx, websocket.MessageText, agentOpenPayload); err != nil {
-				handlerErrCh <- fmt.Errorf("expected mixed agent stream.open write to succeed: %w", err)
-				return
-			}
-
-			agentAckType, agentAckPayload, err := conn.Read(handlerCtx)
-			if err != nil {
-				handlerErrCh <- fmt.Errorf("expected mixed agent ack read to succeed: %w", err)
-				return
-			}
-			if agentAckType != websocket.MessageText {
-				handlerErrCh <- fmt.Errorf("expected mixed agent ack to be text, got %s", agentAckType.String())
-				return
-			}
-			var agentAck sessionprotocol.StreamOpenOK
-			if err := json.Unmarshal(agentAckPayload, &agentAck); err != nil {
-				handlerErrCh <- fmt.Errorf("expected mixed agent ack decode to succeed: %w", err)
-				return
-			}
-			if agentAck.Type != sessionprotocol.MessageTypeStreamOpenOK || agentAck.StreamID != 61 {
-				handlerErrCh <- fmt.Errorf("expected mixed agent ack for stream 61, got type=%s streamId=%d", agentAck.Type, agentAck.StreamID)
-				return
-			}
-
-			if err := conn.Write(
-				handlerCtx,
-				websocket.MessageBinary,
-				encodeTestDataFrame(
-					t,
-					51,
-					sessionprotocol.PayloadKindRawBytes,
-					[]byte("printf '__MISTLE_PTY_AND_AGENT__\\n'\n"),
-				),
-			); err != nil {
-				handlerErrCh <- fmt.Errorf("expected mixed pty payload write to succeed: %w", err)
-				return
-			}
-			if err := conn.Write(
-				handlerCtx,
-				websocket.MessageBinary,
-				encodeTestDataFrame(
-					t,
-					61,
-					sessionprotocol.PayloadKindWebSocketText,
-					[]byte(`{"jsonrpc":"2.0","id":"req-mixed","method":"ping"}`),
-				),
-			); err != nil {
-				handlerErrCh <- fmt.Errorf("expected mixed agent payload write to succeed: %w", err)
-				return
-			}
-
-			foundPtyToken := false
-			foundAgentResponse := false
-			for !(foundPtyToken && foundAgentResponse) {
-				messageType, payload, err := conn.Read(handlerCtx)
+			switch request.URL.Path {
+			case "/tunnel/sandbox/sbi_tunnel_test_006":
+				conn, err := websocket.Accept(writer, request, nil)
 				if err != nil {
-					handlerErrCh <- fmt.Errorf("expected mixed tunnel read to succeed: %w", err)
+					handlerErrCh <- fmt.Errorf("expected gateway websocket accept to succeed: %w", err)
 					return
 				}
-				if messageType != websocket.MessageBinary {
-					continue
+				defer conn.CloseNow()
+
+				handlerCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+
+				ptyOpenPayload, err := json.Marshal(sessionprotocol.StreamOpen{
+					Type:     sessionprotocol.MessageTypeStreamOpen,
+					StreamID: 51,
+					Channel: sessionprotocol.StreamOpenChannel{
+						Kind:    sessionprotocol.ChannelKindPTY,
+						Session: sessionprotocol.PTYSessionModeCreate,
+						Cols:    120,
+						Rows:    40,
+					},
+				})
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected mixed pty stream.open payload marshal to succeed: %w", err)
+					return
+				}
+				if err := conn.Write(handlerCtx, websocket.MessageText, ptyOpenPayload); err != nil {
+					handlerErrCh <- fmt.Errorf("expected mixed pty stream.open write to succeed: %w", err)
+					return
 				}
 
-				dataFrame := decodeTestDataFrame(t, payload)
-				switch dataFrame.StreamID {
-				case 51:
-					if dataFrame.PayloadKind != sessionprotocol.PayloadKindRawBytes {
-						handlerErrCh <- fmt.Errorf("expected mixed PTY payloadKind %d, got %d", sessionprotocol.PayloadKindRawBytes, dataFrame.PayloadKind)
-						return
-					}
-					if bytes.Contains(dataFrame.Payload, []byte("__MISTLE_PTY_AND_AGENT__")) {
-						foundPtyToken = true
-					}
-				case 61:
-					if dataFrame.PayloadKind != sessionprotocol.PayloadKindWebSocketText {
-						handlerErrCh <- fmt.Errorf("expected mixed agent payloadKind %d, got %d", sessionprotocol.PayloadKindWebSocketText, dataFrame.PayloadKind)
-						return
-					}
-					if string(dataFrame.Payload) == `{"jsonrpc":"2.0","id":"res-mixed","result":{"ok":true}}` {
-						foundAgentResponse = true
-					}
-				default:
-					handlerErrCh <- fmt.Errorf("unexpected mixed streamId %d", dataFrame.StreamID)
+				ptyAckType, ptyAckPayload, err := conn.Read(handlerCtx)
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected mixed pty ack read to succeed: %w", err)
 					return
 				}
+				if ptyAckType != websocket.MessageText {
+					handlerErrCh <- fmt.Errorf("expected mixed pty ack to be text, got %s", ptyAckType.String())
+					return
+				}
+				var ptyAck sessionprotocol.StreamOpenOK
+				if err := json.Unmarshal(ptyAckPayload, &ptyAck); err != nil {
+					handlerErrCh <- fmt.Errorf("expected mixed pty ack decode to succeed: %w", err)
+					return
+				}
+				if ptyAck.Type != sessionprotocol.MessageTypeStreamOpenOK || ptyAck.StreamID != 51 {
+					handlerErrCh <- fmt.Errorf("expected mixed pty ack for stream 51, got type=%s streamId=%d", ptyAck.Type, ptyAck.StreamID)
+					return
+				}
+
+				agentOpenPayload, err := json.Marshal(sessionprotocol.StreamOpen{
+					Type:     sessionprotocol.MessageTypeStreamOpen,
+					StreamID: 61,
+					Channel: sessionprotocol.StreamOpenChannel{
+						Kind: sessionprotocol.ChannelKindAgent,
+					},
+				})
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected mixed agent stream.open payload marshal to succeed: %w", err)
+					return
+				}
+				if err := conn.Write(handlerCtx, websocket.MessageText, agentOpenPayload); err != nil {
+					handlerErrCh <- fmt.Errorf("expected mixed agent stream.open write to succeed: %w", err)
+					return
+				}
+
+				agentAckType, agentAckPayload, err := conn.Read(handlerCtx)
+				if err != nil {
+					handlerErrCh <- fmt.Errorf("expected mixed agent ack read to succeed: %w", err)
+					return
+				}
+				if agentAckType != websocket.MessageText {
+					handlerErrCh <- fmt.Errorf("expected mixed agent ack to be text, got %s", agentAckType.String())
+					return
+				}
+				var agentAck sessionprotocol.StreamOpenOK
+				if err := json.Unmarshal(agentAckPayload, &agentAck); err != nil {
+					handlerErrCh <- fmt.Errorf("expected mixed agent ack decode to succeed: %w", err)
+					return
+				}
+				if agentAck.Type != sessionprotocol.MessageTypeStreamOpenOK || agentAck.StreamID != 61 {
+					handlerErrCh <- fmt.Errorf("expected mixed agent ack for stream 61, got type=%s streamId=%d", agentAck.Type, agentAck.StreamID)
+					return
+				}
+
+				if err := conn.Write(
+					handlerCtx,
+					websocket.MessageBinary,
+					encodeTestDataFrame(
+						t,
+						51,
+						sessionprotocol.PayloadKindRawBytes,
+						[]byte("printf '__MISTLE_PTY_AND_AGENT__\\n'\n"),
+					),
+				); err != nil {
+					handlerErrCh <- fmt.Errorf("expected mixed pty payload write to succeed: %w", err)
+					return
+				}
+				if err := conn.Write(
+					handlerCtx,
+					websocket.MessageBinary,
+					encodeTestDataFrame(
+						t,
+						61,
+						sessionprotocol.PayloadKindWebSocketText,
+						[]byte(`{"jsonrpc":"2.0","id":"req-mixed","method":"ping"}`),
+					),
+				); err != nil {
+					handlerErrCh <- fmt.Errorf("expected mixed agent payload write to succeed: %w", err)
+					return
+				}
+
+				foundPtyToken := false
+				foundAgentResponse := false
+				for !(foundPtyToken && foundAgentResponse) {
+					messageType, payload, err := conn.Read(handlerCtx)
+					if err != nil {
+						handlerErrCh <- fmt.Errorf("expected mixed tunnel read to succeed: %w", err)
+						return
+					}
+					if messageType != websocket.MessageBinary {
+						continue
+					}
+
+					dataFrame := decodeTestDataFrame(t, payload)
+					switch dataFrame.StreamID {
+					case 51:
+						if dataFrame.PayloadKind != sessionprotocol.PayloadKindRawBytes {
+							handlerErrCh <- fmt.Errorf("expected mixed PTY payloadKind %d, got %d", sessionprotocol.PayloadKindRawBytes, dataFrame.PayloadKind)
+							return
+						}
+						if bytes.Contains(dataFrame.Payload, []byte("__MISTLE_PTY_AND_AGENT__")) {
+							foundPtyToken = true
+						}
+					case 61:
+						if dataFrame.PayloadKind != sessionprotocol.PayloadKindWebSocketText {
+							handlerErrCh <- fmt.Errorf("expected mixed agent payloadKind %d, got %d", sessionprotocol.PayloadKindWebSocketText, dataFrame.PayloadKind)
+							return
+						}
+						if string(dataFrame.Payload) == `{"jsonrpc":"2.0","id":"res-mixed","result":{"ok":true}}` {
+							foundAgentResponse = true
+						}
+					default:
+						handlerErrCh <- fmt.Errorf("unexpected mixed streamId %d", dataFrame.StreamID)
+						return
+					}
+				}
+
+				close(releaseAgentConnectionCh)
+				cancelRun()
+			case "/tunnel/sandbox/sbi_tunnel_test_006/token-exchange":
+				writeTestTunnelTokenExchangeResponse(
+					t,
+					writer,
+					"rotated-bootstrap-token-mixed-streams",
+					testLongLivedTunnelExchangeToken(t),
+				)
+			default:
+				handlerErrCh <- fmt.Errorf("unexpected request path %q", request.URL.Path)
 			}
-
-			cancelRun()
 		}))
 		defer gatewayServer.Close()
 
@@ -1232,7 +1260,7 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("connects to pty session, supports attach and resize, and closes cleanly", func(t *testing.T) {
-		handlerErrCh := make(chan error, 1)
+		handlerErrCh := make(chan error, 16)
 		runCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 		defer cancel()
 		gatewayConnectionCount := 0
@@ -1560,7 +1588,7 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("sends pty.exit when process exits without pty.close", func(t *testing.T) {
-		handlerErrCh := make(chan error, 1)
+		handlerErrCh := make(chan error, 16)
 		runCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 		defer cancel()
 		gatewayConnectionCount := 0
@@ -1683,7 +1711,7 @@ func TestRun(t *testing.T) {
 
 	t.Run("writes stream.open.error when attaching to a missing pty session", func(t *testing.T) {
 		responseCh := make(chan sessionprotocol.StreamOpenError, 1)
-		handlerErrCh := make(chan error, 1)
+		handlerErrCh := make(chan error, 16)
 
 		gatewayServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			conn, err := websocket.Accept(writer, request, nil)
