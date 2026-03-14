@@ -25,6 +25,7 @@ import { typeid } from "typeid-js";
 
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
+import { BootstrapTunnelNotConnectedError } from "./bootstrap-tunnel-not-connected-error.js";
 import { insertSandboxTunnelConnectAck } from "./connect-ack.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import type { SandboxOwnerLeaseHeartbeat } from "./ownership/sandbox-owner-lease-heartbeat.js";
@@ -211,6 +212,13 @@ function createStreamOpenErrorPayload(input: {
 }
 
 function toStreamOpenErrorPayload(input: { error: Error; streamId: number }): string {
+  if (input.error instanceof BootstrapTunnelNotConnectedError) {
+    return createStreamOpenErrorPayload({
+      code: "bootstrap_not_connected",
+      message: input.error.message,
+      streamId: input.streamId,
+    });
+  }
   if (input.error instanceof ClientSessionActiveStreamError) {
     return createStreamOpenErrorPayload({
       code: "client_session_already_open",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { BootstrapTunnelNotConnectedError } from "../../bootstrap-tunnel-not-connected-error.js";
 import { InMemoryTunnelSessionRegistryAdapter } from "../../tunnel-session/adapters/in-memory-tunnel-session-registry-adapter.js";
 import {
   ClientSessionActiveStreamError,
@@ -8,6 +9,26 @@ import {
 import { LocalGatewayForwardingServerAdapter } from "./local-gateway-forwarding-server-adapter.js";
 
 describe("LocalGatewayForwardingServerAdapter", () => {
+  it("fails opening a stream when the bootstrap tunnel is not connected", async () => {
+    const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter(1));
+    const adapter = new LocalGatewayForwardingServerAdapter(registry);
+
+    await expect(
+      adapter.openInteractiveStream(
+        {
+          sourceNodeId: "dpg_test",
+          targetNodeId: "dpg_test",
+        },
+        {
+          sandboxInstanceId: "sbi_test",
+          channelKind: "agent",
+          clientSessionId: "conn_1",
+          clientStreamId: 7,
+        },
+      ),
+    ).rejects.toThrow(BootstrapTunnelNotConnectedError);
+  });
+
   it("opens, looks up, closes, and releases interactive streams against the local registry", async () => {
     const registry = new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter(2));
     registry.attachBootstrapSession({

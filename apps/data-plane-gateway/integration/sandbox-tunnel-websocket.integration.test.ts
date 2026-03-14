@@ -790,6 +790,85 @@ describe("sandbox tunnel websocket integration", () => {
   );
 
   it(
+    "returns stream.open.error when the bootstrap peer disconnects before a new stream is opened",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        await closeWebSocket(bootstrapSocket);
+        bootstrapSocket = undefined;
+        await waitForNoWebSocketMessage(clientSocket);
+
+        const rejectedOpenPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: 2,
+            channel: {
+              kind: "agent",
+            },
+          }),
+        );
+        const rejectedOpen = await rejectedOpenPromise;
+
+        expect(rejectedOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(rejectedOpen.data)).toEqual({
+          type: "stream.open.error",
+          streamId: 2,
+          code: "bootstrap_not_connected",
+          message: `Sandbox bootstrap tunnel is not connected for sandbox '${sandboxInstanceId}'.`,
+        });
+
+        await sendWebSocketPingAndExpectPong(
+          clientSocket,
+          Buffer.from("client-still-open-after-open-error", "utf8"),
+        );
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
     "keeps the bootstrap peer connected when connection peer disconnects",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
