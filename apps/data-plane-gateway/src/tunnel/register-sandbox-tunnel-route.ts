@@ -1015,6 +1015,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 );
               });
               void markSandboxTunnelConnected({
+                activeTunnelLeaseId: bootstrapOwnerLeaseId,
                 db: ctx.get("db"),
                 sandboxInstanceId,
               }).catch((error: unknown) => {
@@ -1039,17 +1040,32 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 ttlMs: OwnerLeaseTtlMs,
                 onLeaseRenewed: () => {
                   void markSandboxTunnelSeen({
+                    activeTunnelLeaseId: bootstrapOwnerLeaseId,
                     db: ctx.get("db"),
                     sandboxInstanceId,
-                  }).catch((error: unknown) => {
-                    logger.error(
-                      {
-                        err: error,
-                        sandboxInstanceId,
-                      },
-                      "Failed to persist sandbox tunnel heartbeat timestamp",
-                    );
-                  });
+                  })
+                    .then((updated: boolean) => {
+                      if (updated) {
+                        return;
+                      }
+
+                      logger.info(
+                        {
+                          leaseId: bootstrapOwnerLeaseId,
+                          sandboxInstanceId,
+                        },
+                        "Skipped sandbox tunnel heartbeat update for stale bootstrap lease",
+                      );
+                    })
+                    .catch((error: unknown) => {
+                      logger.error(
+                        {
+                          err: error,
+                          sandboxInstanceId,
+                        },
+                        "Failed to persist sandbox tunnel heartbeat timestamp",
+                      );
+                    });
                 },
                 onLeaseLost: () => {
                   logger.error(
@@ -1123,17 +1139,32 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             sandboxOwnerLeaseHeartbeatHandle?.stop();
             if (requestedToken.kind === "bootstrap" && bootstrapOwnerLeaseId !== undefined) {
               void markSandboxTunnelDisconnected({
+                activeTunnelLeaseId: bootstrapOwnerLeaseId,
                 db: ctx.get("db"),
                 sandboxInstanceId,
-              }).catch((error: unknown) => {
-                logger.error(
-                  {
-                    err: error,
-                    sandboxInstanceId,
-                  },
-                  "Failed to persist sandbox tunnel disconnected timestamp",
-                );
-              });
+              })
+                .then((updated: boolean) => {
+                  if (updated) {
+                    return;
+                  }
+
+                  logger.info(
+                    {
+                      leaseId: bootstrapOwnerLeaseId,
+                      sandboxInstanceId,
+                    },
+                    "Skipped sandbox tunnel disconnected update for stale bootstrap lease",
+                  );
+                })
+                .catch((error: unknown) => {
+                  logger.error(
+                    {
+                      err: error,
+                      sandboxInstanceId,
+                    },
+                    "Failed to persist sandbox tunnel disconnected timestamp",
+                  );
+                });
               void input.sandboxOwnerStore.releaseOwner({
                 sandboxInstanceId,
                 leaseId: bootstrapOwnerLeaseId,

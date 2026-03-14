@@ -16,6 +16,7 @@ import {
   closeWebSocket,
   connectWebSocket,
   connectWebSocketExpectFailure,
+  waitForWebSocketClose,
 } from "./websocket-test-helpers.js";
 
 const IntegrationTestTimeoutMs = 30_000;
@@ -35,6 +36,7 @@ async function insertSandboxInstanceRow(input: {
     startedByKind: "system",
     startedById: "workflow_data_plane_gateway_integration",
     source: "webhook",
+    activeTunnelLeaseId: null,
     tunnelConnectedAt: null,
     lastTunnelSeenAt: null,
     tunnelDisconnectedAt: "2026-03-13T00:00:00.000Z",
@@ -45,12 +47,14 @@ async function waitForSandboxInstanceProjection(
   input: DataPlaneGatewayIntegrationFixture & {
     sandboxInstanceId: string;
     predicate: (sandboxInstance: {
+      activeTunnelLeaseId: string | null;
       tunnelConnectedAt: string | null;
       lastTunnelSeenAt: string | null;
       tunnelDisconnectedAt: string | null;
     }) => boolean;
   },
 ): Promise<{
+  activeTunnelLeaseId: string | null;
   tunnelConnectedAt: string | null;
   lastTunnelSeenAt: string | null;
   tunnelDisconnectedAt: string | null;
@@ -60,6 +64,7 @@ async function waitForSandboxInstanceProjection(
   while (Date.now() < deadline) {
     const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
       columns: {
+        activeTunnelLeaseId: true,
         tunnelConnectedAt: true,
         lastTunnelSeenAt: true,
         tunnelDisconnectedAt: true,
@@ -110,11 +115,13 @@ describe("sandbox tunnel connect endpoint integration", () => {
         ...fixture,
         sandboxInstanceId,
         predicate: (currentSandboxInstance) =>
+          currentSandboxInstance.activeTunnelLeaseId !== null &&
           currentSandboxInstance.tunnelConnectedAt !== null &&
           currentSandboxInstance.lastTunnelSeenAt !== null &&
           currentSandboxInstance.tunnelDisconnectedAt === null,
       });
 
+      expect(sandboxInstance?.activeTunnelLeaseId).not.toBeNull();
       expect(recordedAck?.bootstrapTokenJti).toBe(jti);
       expect(sandboxInstance?.tunnelConnectedAt).not.toBeNull();
       expect(sandboxInstance?.lastTunnelSeenAt).not.toBeNull();
@@ -204,6 +211,86 @@ describe("sandbox tunnel connect endpoint integration", () => {
       });
 
       expect(sandboxInstance?.tunnelDisconnectedAt).not.toBeNull();
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "does not mark the sandbox disconnected when a replaced bootstrap socket closes after a newer lease connects",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const firstToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const secondToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      const firstSocket = await connectWebSocket(
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(firstToken)}`,
+      );
+      const firstConnectedProjection = await waitForSandboxInstanceProjection({
+        ...fixture,
+        sandboxInstanceId,
+        predicate: (currentSandboxInstance) => currentSandboxInstance.activeTunnelLeaseId !== null,
+      });
+      const firstActiveTunnelLeaseId = firstConnectedProjection.activeTunnelLeaseId;
+      if (firstActiveTunnelLeaseId === null) {
+        throw new Error(
+          "Expected the first bootstrap connection to persist an active tunnel lease id.",
+        );
+      }
+
+      const firstSocketClosePromise = waitForWebSocketClose(firstSocket);
+      const secondSocket = await connectWebSocket(
+        `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(secondToken)}`,
+      );
+      const secondConnectedProjection = await waitForSandboxInstanceProjection({
+        ...fixture,
+        sandboxInstanceId,
+        predicate: (currentSandboxInstance) =>
+          currentSandboxInstance.activeTunnelLeaseId !== null &&
+          currentSandboxInstance.activeTunnelLeaseId !== firstActiveTunnelLeaseId &&
+          currentSandboxInstance.tunnelDisconnectedAt === null,
+      });
+
+      expect(secondConnectedProjection.activeTunnelLeaseId).not.toBe(firstActiveTunnelLeaseId);
+
+      const firstSocketClose = await firstSocketClosePromise;
+      expect(firstSocketClose.code).toBe(1012);
+
+      const projectionAfterStaleClose = await waitForSandboxInstanceProjection({
+        ...fixture,
+        sandboxInstanceId,
+        predicate: (currentSandboxInstance) =>
+          currentSandboxInstance.activeTunnelLeaseId ===
+          secondConnectedProjection.activeTunnelLeaseId,
+      });
+
+      expect(projectionAfterStaleClose.activeTunnelLeaseId).toBe(
+        secondConnectedProjection.activeTunnelLeaseId,
+      );
+      expect(projectionAfterStaleClose.tunnelDisconnectedAt).toBeNull();
+
+      await closeWebSocket(secondSocket);
     },
     IntegrationTestTimeoutMs,
   );
