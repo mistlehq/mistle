@@ -34,8 +34,8 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@mistle/time": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
+    "@mistle/time": "workspace:*",
     "ws": "^8.18.3"
   },
   "devDependencies": {
