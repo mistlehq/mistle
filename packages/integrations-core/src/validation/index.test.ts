@@ -813,6 +813,7 @@ describe("validateCompiledBindingResults", () => {
       ],
       agentRuntimes: [
         {
+          familyId: "openai",
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
@@ -837,6 +838,7 @@ describe("validateCompiledBindingResults", () => {
       artifactKey: "codex-cli",
       agentRuntimes: [
         {
+          familyId: "openai",
           runtimeKey: "codex-app-server",
           clientId: "missing-client",
           endpointKey: "app-server",
@@ -887,6 +889,7 @@ describe("validateCompiledBindingResults", () => {
       ],
       agentRuntimes: [
         {
+          familyId: "openai",
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",

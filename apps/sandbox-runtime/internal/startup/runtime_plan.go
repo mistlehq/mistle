@@ -159,6 +159,7 @@ type RuntimeFileSpec struct {
 
 type AgentRuntime struct {
 	BindingID   string `json:"bindingId"`
+	FamilyID    string `json:"familyId"`
 	RuntimeKey  string `json:"runtimeKey"`
 	ClientID    string `json:"clientId"`
 	EndpointKey string `json:"endpointKey"`
@@ -708,6 +709,9 @@ func validateAgentRuntime(
 	}
 	if strings.TrimSpace(agentRuntime.EndpointKey) == "" {
 		return fmt.Errorf("%s.endpointKey is required", location)
+	}
+	if strings.TrimSpace(agentRuntime.FamilyID) == "" {
+		return fmt.Errorf("%s.familyId is required", location)
 	}
 	endpoint, exists := endpointsByKey[agentRuntime.EndpointKey]
 	if !exists {

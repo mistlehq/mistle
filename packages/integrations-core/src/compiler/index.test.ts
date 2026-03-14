@@ -151,6 +151,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
       ],
       agentRuntimes: [
         {
+          familyId: "openai",
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
@@ -449,6 +450,7 @@ describe("compileRuntimePlan", () => {
     expect(runtimePlan.agentRuntimes).toEqual([
       {
         bindingId: "bind_openai_agent",
+        familyId: "openai",
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server",

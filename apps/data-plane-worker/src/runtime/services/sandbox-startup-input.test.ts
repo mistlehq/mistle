@@ -185,6 +185,7 @@ const RuntimePlanSchema = z.object({
   agentRuntimes: z.array(
     z.object({
       bindingId: z.string().min(1),
+      familyId: z.string().min(1),
       runtimeKey: z.string().min(1),
       clientId: z.string().min(1),
       endpointKey: z.string().min(1),

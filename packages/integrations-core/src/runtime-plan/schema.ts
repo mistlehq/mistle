@@ -198,6 +198,7 @@ const RuntimeClientSchema = z
 const CompiledAgentRuntimeSchema = z
   .object({
     bindingId: z.string().min(1),
+    familyId: z.string().min(1),
     runtimeKey: z.string().min(1),
     clientId: z.string().min(1),
     endpointKey: z.string().min(1),
@@ -403,6 +404,7 @@ function normalizeAgentRuntime(
 ): RuntimePlanAgentRuntime {
   return {
     bindingId: agentRuntime.bindingId,
+    familyId: agentRuntime.familyId,
     runtimeKey: agentRuntime.runtimeKey,
     clientId: agentRuntime.clientId,
     endpointKey: agentRuntime.endpointKey,

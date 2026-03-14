@@ -344,6 +344,7 @@ func TestReadStartupInput(t *testing.T) {
 					"agentRuntimes": [
 						{
 							"bindingId": "bind_openai",
+							"familyId": "openai",
 							"runtimeKey": "codex-app-server",
 							"clientId": "client_codex",
 							"endpointKey": "app-server"

@@ -751,6 +751,13 @@ function validateAgentRuntimes(input: {
     }
 
     for (const agentRuntime of compiledBindingResult.agentRuntimes) {
+      if (agentRuntime.familyId.trim().length === 0) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+          `Agent runtime for binding '${agentRuntime.bindingId}' must define a non-empty familyId.`,
+        );
+      }
+
       if (agentRuntime.runtimeKey.trim().length === 0) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,

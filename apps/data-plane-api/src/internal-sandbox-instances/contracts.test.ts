@@ -54,6 +54,7 @@ function createRuntimePlan() {
         agentRuntimes: [
           {
             bindingId: "ibd_123",
+            familyId: "openai",
             runtimeKey: "runtime_123",
             clientId: "client_123",
             endpointKey: "endpoint_123",

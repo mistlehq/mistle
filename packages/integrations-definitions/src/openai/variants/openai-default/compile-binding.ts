@@ -3,6 +3,7 @@ import { stringify as stringifyToml } from "smol-toml";
 
 import { resolveOpenAiCredentialSecretType } from "./auth.js";
 import type { OpenAiApiKeyBindingConfig } from "./binding-config-schema.js";
+import { OpenAiApiKeyDefinition } from "./definition.js";
 import type { OpenAiApiKeyTargetConfig } from "./target-config-schema.js";
 
 export type OpenAiApiKeyCompileBindingInput = CompileBindingInput<
@@ -168,6 +169,7 @@ export function compileOpenAiApiKeyBinding(
     ],
     agentRuntimes: [
       {
+        familyId: OpenAiApiKeyDefinition.familyId,
         runtimeKey: CodexAppServerProcessKey,
         clientId: input.binding.config.runtime,
         endpointKey: CodexAppServerEndpointKey,

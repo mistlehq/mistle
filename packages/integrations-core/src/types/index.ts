@@ -710,6 +710,7 @@ export type RuntimeClient = RuntimeClientBase<string>;
 export type CompileBindingEgressRoute = Omit<EgressCredentialRoute, "egressRuleId" | "bindingId">;
 
 export type CompileBindingAgentRuntime = {
+  familyId: string;
   runtimeKey: string;
   clientId: string;
   endpointKey: string;
