@@ -3,7 +3,14 @@
  */
 
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
-import { readTestContext, reserveAvailablePort, runCleanupTasks } from "@mistle/test-harness";
+import {
+  createIntegrationRuntimeScopeId,
+  createIntegrationRuntimeDatabaseName,
+  getCurrentVitestFilePath,
+  readTestContext,
+  reserveAvailablePort,
+  runCleanupTasks,
+} from "@mistle/test-harness";
 import { Pool, Client } from "pg";
 import { it as vitestIt } from "vitest";
 import { z } from "zod";
@@ -14,7 +21,7 @@ import type { DataPlaneGatewayRuntimeConfig } from "../src/types.js";
 const IntegrationBootstrapTokenSecret = "integration-bootstrap-token-secret";
 const IntegrationTokenIssuer = "integration-data-plane-worker";
 const IntegrationTokenAudience = "integration-data-plane-gateway";
-const WORKER_DATABASE_NAME_PREFIX = "mistle_data_plane_gateway_it_worker_";
+const RUNTIME_DATABASE_NAME_PREFIX = "mistle_data_plane_gateway_it_runtime";
 const TestContextId = "data-plane-gateway.integration";
 
 const SharedInfraConfigSchema = z
@@ -24,6 +31,7 @@ const SharedInfraConfigSchema = z
     databaseDirectHost: z.string().min(1),
     databaseDirectPort: z.number().int().min(1).max(65_535),
     templateDatabaseName: z.string().min(1),
+    integrationRunId: z.string().min(1),
   })
   .strict();
 
@@ -72,16 +80,17 @@ function createDatabaseUrl(input: {
   return `postgresql://${encodeURIComponent(input.username)}:${encodeURIComponent(input.password)}@${input.host}:${String(input.port)}/${input.databaseName}`;
 }
 
-function createWorkerScopedDatabaseName(poolId: string): string {
-  const normalizedPoolId = poolId.replace(/[^a-zA-Z0-9_]/gu, "_").toLowerCase();
-  if (normalizedPoolId.length === 0) {
-    throw new Error("VITEST_POOL_ID must contain at least one alphanumeric character.");
-  }
-
-  return assertSafeIdentifier(
-    `${WORKER_DATABASE_NAME_PREFIX}${normalizedPoolId}`,
-    "runtime database",
-  );
+function createFileScopedDatabaseName(input: {
+  integrationRunId: string;
+  filePath: string;
+  scopeId: string;
+}): string {
+  return createIntegrationRuntimeDatabaseName({
+    prefix: RUNTIME_DATABASE_NAME_PREFIX,
+    runId: input.integrationRunId,
+    filePath: input.filePath,
+    scopeId: input.scopeId,
+  });
 }
 
 async function resetWorkerDatabaseFromTemplate(input: {
@@ -120,14 +129,45 @@ async function resetWorkerDatabaseFromTemplate(input: {
   }
 }
 
+async function dropDatabaseIfExists(input: {
+  username: string;
+  password: string;
+  host: string;
+  port: number;
+  databaseName: string;
+}): Promise<void> {
+  const adminClient = new Client({
+    connectionString: createDatabaseUrl({
+      username: input.username,
+      password: input.password,
+      host: input.host,
+      port: input.port,
+      databaseName: "postgres",
+    }),
+  });
+
+  const quotedRuntimeDatabaseName = quoteIdentifier(
+    assertSafeIdentifier(input.databaseName, "runtime database"),
+  );
+
+  await adminClient.connect();
+  try {
+    await adminClient.query(`DROP DATABASE IF EXISTS ${quotedRuntimeDatabaseName} WITH (FORCE)`);
+  } finally {
+    await adminClient.end();
+  }
+}
+
 export const it = vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture }>({
   fixture: [
     async ({}, use) => {
       const cleanupTasks: Array<() => Promise<void>> = [];
       const sharedInfraConfig = await readSharedInfraConfig();
-      const workerScopedDatabaseName = createWorkerScopedDatabaseName(
-        process.env.VITEST_POOL_ID ?? "0",
-      );
+      const runtimeDatabaseName = createFileScopedDatabaseName({
+        integrationRunId: sharedInfraConfig.integrationRunId,
+        filePath: getCurrentVitestFilePath(),
+        scopeId: createIntegrationRuntimeScopeId(),
+      });
 
       try {
         await resetWorkerDatabaseFromTemplate({
@@ -136,7 +176,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture 
           host: sharedInfraConfig.databaseDirectHost,
           port: sharedInfraConfig.databaseDirectPort,
           templateDatabaseName: sharedInfraConfig.templateDatabaseName,
-          runtimeDatabaseName: workerScopedDatabaseName,
+          runtimeDatabaseName,
         });
 
         const runtimeDatabaseUrl = createDatabaseUrl({
@@ -144,7 +184,7 @@ export const it = vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture 
           password: sharedInfraConfig.databasePassword,
           host: sharedInfraConfig.databaseDirectHost,
           port: sharedInfraConfig.databaseDirectPort,
-          databaseName: workerScopedDatabaseName,
+          databaseName: runtimeDatabaseName,
         });
 
         const dbPool = new Pool({
@@ -187,6 +227,15 @@ export const it = vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture 
         await runtime.start();
         cleanupTasks.unshift(async () => {
           await runtime.stop();
+        });
+        cleanupTasks.push(async () => {
+          await dropDatabaseIfExists({
+            username: sharedInfraConfig.databaseUsername,
+            password: sharedInfraConfig.databasePassword,
+            host: sharedInfraConfig.databaseDirectHost,
+            port: sharedInfraConfig.databaseDirectPort,
+            databaseName: runtimeDatabaseName,
+          });
         });
 
         await use({

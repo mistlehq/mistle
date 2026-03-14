@@ -3,6 +3,7 @@ import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
 import { systemClock, systemScheduler } from "@mistle/time";
 import { typeid } from "typeid-js";
+import type { WebSocketServer } from "ws";
 
 import { createApp, stopApp } from "../app.js";
 import { startServer } from "../server.js";
@@ -29,6 +30,23 @@ import type {
 
 const OwnerLeaseRenewIntervalMs = 10_000;
 const DefaultMaxActiveBindingsPerSandbox = 32;
+
+function closeWebSocketServer(webSocketServer: WebSocketServer): Promise<void> {
+  for (const client of webSocketServer.clients) {
+    client.terminate();
+  }
+
+  return new Promise((resolve, reject) => {
+    webSocketServer.close((error?: Error) => {
+      if (error !== undefined) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
 
 export function createDataPlaneGatewayRuntime(
   config: DataPlaneGatewayRuntimeConfig,
@@ -99,6 +117,8 @@ export function createDataPlaneGatewayRuntime(
   let stopped = false;
 
   async function stopRuntimeResources(): Promise<void> {
+    await closeWebSocketServer(nodeWebSocket.wss);
+
     if (startedServer !== undefined) {
       await startedServer.close();
       startedServer = undefined;
