@@ -75,11 +75,20 @@ export class InteractiveStreamRouter {
   public async releaseClientSessionStreams(
     input: ReleaseClientSessionStreamsInput,
   ): Promise<ReleaseClientSessionStreamsResult> {
-    const targetNodeId = await this.resolveTargetNodeId(input.sandboxInstanceId);
+    const ownerResolution = await this.sandboxOwnerResolver.resolveOwner({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    if (ownerResolution.kind === "missing") {
+      return {
+        bootstrapTarget: undefined,
+        releasedBindings: [],
+      };
+    }
+
     return this.gatewayForwardingClient.releaseClientSessionStreams(
       {
         sourceNodeId: this.sourceNodeId,
-        targetNodeId,
+        targetNodeId: ownerResolution.owner.nodeId,
       },
       input,
     );
