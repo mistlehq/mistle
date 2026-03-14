@@ -1,9 +1,9 @@
 export {
-  CodexSessionClient,
+  SandboxSessionClient as CodexSessionClient,
   parseStreamOpenControlMessage,
   parseJsonRpcErrorResponse,
   parseJsonRpcNotification,
   parseJsonRpcServerRequest,
   parseJsonRpcSuccessResponse,
-} from "./session/client.js";
-export type { CodexSessionClientInput } from "./session/client.js";
+} from "@mistle/sandbox-session-client";
+export type { SandboxSessionClientInput as CodexSessionClientInput } from "@mistle/sandbox-session-client";

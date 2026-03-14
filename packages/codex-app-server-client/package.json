@@ -43,11 +43,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@mistle/sandbox-session-protocol": "workspace:*",
-    "ws": "^8.18.3",
+    "@mistle/sandbox-session-client": "workspace:*",
     "zod": "^4.1.12"
-  },
-  "devDependencies": {
-    "@types/ws": "^8.18.1"
   }
 }
