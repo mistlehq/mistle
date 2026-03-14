@@ -177,6 +177,59 @@ async function waitForCondition(input: {
   throw new Error(`Timed out waiting for ${input.description} after ${String(input.timeoutMs)}ms.`);
 }
 
+async function createManagedTestServer(mode: TestServerMode): Promise<TestServer> {
+  const server = await startTestServer(mode);
+  openServers.add(server);
+  return server;
+}
+
+function createClient(connectionUrl: string): SandboxSessionClient {
+  return new SandboxSessionClient({
+    connectionUrl,
+    runtime: createNodeSandboxSessionRuntime(),
+  });
+}
+
+type RecordedEvent = { type: string; state?: string; method?: string };
+
+function recordConnectionAndNotificationEvents(client: SandboxSessionClient): Array<RecordedEvent> {
+  const events: Array<RecordedEvent> = [];
+
+  client.onEvent((event) => {
+    if (event.type === "connection_state_changed") {
+      events.push({
+        type: event.type,
+        state: event.state,
+      });
+      return;
+    }
+
+    if (event.type === "notification") {
+      events.push({
+        type: event.type,
+        method: event.notification.method,
+      });
+    }
+  });
+
+  return events;
+}
+
+async function expectClientToOpenAgentStream(input: {
+  client: SandboxSessionClient;
+  server: TestServer;
+}): Promise<void> {
+  await input.client.connect();
+
+  expect(JSON.parse(await input.server.openRequest)).toEqual({
+    type: "stream.open",
+    streamId: 1,
+    channel: {
+      kind: "agent",
+    },
+  });
+}
+
 afterEach(async () => {
   await Promise.all(Array.from(openServers, (server) => server.close()));
   openServers.clear();
@@ -224,42 +277,13 @@ describe("sandbox session client", () => {
   });
 
   it("opens an agent stream over a real websocket and forwards notifications", async () => {
-    const server = await startTestServer("accept");
-    openServers.add(server);
+    const server = await createManagedTestServer("accept");
+    const client = createClient(server.url);
+    const events = recordConnectionAndNotificationEvents(client);
 
-    const client = new SandboxSessionClient({
-      connectionUrl: server.url,
-      runtime: createNodeSandboxSessionRuntime(),
-    });
-
-    const events: Array<{ type: string; state?: string; method?: string }> = [];
-    client.onEvent((event) => {
-      if (event.type === "connection_state_changed") {
-        events.push({
-          type: event.type,
-          state: event.state,
-        });
-        return;
-      }
-
-      if (event.type === "notification") {
-        events.push({
-          type: event.type,
-          method: event.notification.method,
-        });
-      }
-    });
-
-    await client.connect();
-    const openRequestText = await server.openRequest;
-    const parsedOpenRequest = JSON.parse(openRequestText);
-
-    expect(parsedOpenRequest).toEqual({
-      type: "stream.open",
-      streamId: 1,
-      channel: {
-        kind: "agent",
-      },
+    await expectClientToOpenAgentStream({
+      client,
+      server,
     });
     expect(client.state).toBe("connected_socket");
 
@@ -301,13 +325,8 @@ describe("sandbox session client", () => {
   });
 
   it("surfaces stream.open errors from the websocket handshake", async () => {
-    const server = await startTestServer("reject");
-    openServers.add(server);
-
-    const client = new SandboxSessionClient({
-      connectionUrl: server.url,
-      runtime: createNodeSandboxSessionRuntime(),
-    });
+    const server = await createManagedTestServer("reject");
+    const client = createClient(server.url);
 
     await expect(client.connect()).rejects.toThrow("agent endpoint unavailable");
     expect(client.state).toBe("error");
@@ -315,16 +334,13 @@ describe("sandbox session client", () => {
   });
 
   it("transitions to closed when the connected websocket closes", async () => {
-    const server = await startTestServer("accept");
-    openServers.add(server);
+    const server = await createManagedTestServer("accept");
+    const client = createClient(server.url);
 
-    const client = new SandboxSessionClient({
-      connectionUrl: server.url,
-      runtime: createNodeSandboxSessionRuntime(),
+    await expectClientToOpenAgentStream({
+      client,
+      server,
     });
-
-    await client.connect();
-    await server.openRequest;
 
     server.closeClientSocket();
 
