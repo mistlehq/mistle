@@ -7,18 +7,18 @@ description: Draft or update GitHub pull requests for this repository in the req
 
 ## Overview
 
-Use the repository PR template and PR rules to produce a GitHub PR that is ready for reviewers. Keep the workflow narrow: gather change context, fill the required sections well, and use `gh` in a way that preserves formatting.
+Produce a GitHub PR that is ready for reviewers and matches the repository PR contract. Keep the workflow narrow: gather change context, fill the required sections well, and use `gh` in a way that preserves formatting.
 
 ## Workflow
 
-1. Read `.github/pull_request_template.md` and the pull request section in the repository `AGENTS.md`.
+1. Read the pull request section in the repository `AGENTS.md`.
 2. Inspect the actual diff, changed files, and validation results before drafting. Do not invent tests, commands, or implications.
 3. Draft the PR body using the template headings exactly:
    - `## What was changed`
    - `## How to review`
    - `## What the implication was`
    - `## Checks and tests performed`
-4. Keep file references in the PR body repo-relative, not absolute.
+4. Keep file references in the PR body repo-relative, not absolute local filesystem paths.
 5. If opening or editing the PR through GitHub CLI, write the body to a file and use `gh pr create --body-file ...` or `gh pr edit --body-file ...`. Do not pass escaped newline sequences in a one-line argument.
 
 ## Section Expectations
@@ -52,7 +52,4 @@ If something was not run, say so directly.
 
 ## Guardrails
 
-- Use a conventional-commit PR title.
-- Ensure the branch is rebased onto the latest `main` before opening when the workflow calls for it.
-- After opening a PR, monitor CI and fix failures without hacks or workarounds unless human intervention is required.
-- Do not restate the full template in other instruction files; keep `.github/pull_request_template.md` as the GitHub-facing source of truth.
+- Treat `.github/pull_request_template.md` as the GitHub-facing contract, but do not depend on reading it to draft the PR body.
