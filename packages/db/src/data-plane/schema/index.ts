@@ -1,4 +1,9 @@
 export { DATA_PLANE_SCHEMA_NAME } from "./namespace.js";
+export { sandboxDetachedWorkLeases } from "./sandbox-detached-work-leases.js";
+export type {
+  InsertSandboxDetachedWorkLease,
+  SandboxDetachedWorkLease,
+} from "./sandbox-detached-work-leases.js";
 export {
   sandboxInstances,
   SandboxInstanceProviders,

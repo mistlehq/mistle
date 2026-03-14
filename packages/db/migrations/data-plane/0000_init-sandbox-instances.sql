@@ -34,11 +34,23 @@ CREATE TABLE "data_plane"."sandbox_instances" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "data_plane"."sandbox_detached_work_leases" (
+	"lease_id" text PRIMARY KEY NOT NULL,
+	"sandbox_instance_id" text NOT NULL,
+	"kind" text NOT NULL,
+	"protocol_family" text NOT NULL,
+	"external_execution_id" text,
+	"opened_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"last_seen_at" timestamp with time zone DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 ALTER TABLE "data_plane"."sandbox_instance_snapshots" ADD CONSTRAINT "sandbox_instance_snapshots_source_instance_id_sandbox_instances_id_fk" FOREIGN KEY ("source_instance_id") REFERENCES "data_plane"."sandbox_instances"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "data_plane"."sandbox_detached_work_leases" ADD CONSTRAINT "sandbox_detached_work_leases_sandbox_instance_id_sandbox_instances_id_fk" FOREIGN KEY ("sandbox_instance_id") REFERENCES "data_plane"."sandbox_instances"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "sandbox_instance_snapshots_organization_id_idx" ON "data_plane"."sandbox_instance_snapshots" USING btree ("organization_id");--> statement-breakpoint
 CREATE INDEX "sandbox_instance_snapshots_org_source_instance_idx" ON "data_plane"."sandbox_instance_snapshots" USING btree ("organization_id","source_instance_id");--> statement-breakpoint
 CREATE INDEX "sandbox_instance_snapshots_artifact_kind_idx" ON "data_plane"."sandbox_instance_snapshots" USING btree ("artifact_kind");--> statement-breakpoint
 CREATE INDEX "sandbox_instance_snapshots_source_instance_id_idx" ON "data_plane"."sandbox_instance_snapshots" USING btree ("source_instance_id");--> statement-breakpoint
+CREATE INDEX "sandbox_detached_work_leases_instance_last_seen_idx" ON "data_plane"."sandbox_detached_work_leases" USING btree ("sandbox_instance_id","last_seen_at");--> statement-breakpoint
 CREATE INDEX "sandbox_instances_organization_id_idx" ON "data_plane"."sandbox_instances" USING btree ("organization_id");--> statement-breakpoint
 CREATE INDEX "sandbox_instances_org_profile_version_idx" ON "data_plane"."sandbox_instances" USING btree ("organization_id","sandbox_profile_id","sandbox_profile_version");--> statement-breakpoint
 CREATE INDEX "sandbox_instances_org_status_updated_idx" ON "data_plane"."sandbox_instances" USING btree ("organization_id","status","updated_at");--> statement-breakpoint

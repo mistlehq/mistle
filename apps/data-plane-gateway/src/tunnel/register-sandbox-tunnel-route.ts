@@ -1,11 +1,13 @@
 import type { NodeWebSocket } from "@hono/node-ws";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
+import { parseDetachedWorkLeaseControlMessage } from "@mistle/sandbox-session-protocol";
 import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
+import { recordDetachedWorkLeaseObservation } from "./detached-work-lease-store.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import type { SandboxOwnerLeaseHeartbeat } from "./ownership/sandbox-owner-lease-heartbeat.js";
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
@@ -206,16 +208,33 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               return;
             }
 
-            void handleTunnelWebSocketMessage({
-              clientSessionId: relaySessionId,
-              currentSocket: ws,
-              interactiveStreamRouter: input.interactiveStreamRouter,
-              payload,
-              relayCoordinator: input.relayCoordinator,
-              sandboxInstanceId,
-              sourcePeerSide,
-              tunnelProtocolTranslator,
-            }).catch((error: unknown) => {
+            void (async () => {
+              await handleTunnelWebSocketMessage({
+                clientSessionId: relaySessionId,
+                currentSocket: ws,
+                interactiveStreamRouter: input.interactiveStreamRouter,
+                payload,
+                relayCoordinator: input.relayCoordinator,
+                sandboxInstanceId,
+                sourcePeerSide,
+                tunnelProtocolTranslator,
+              });
+
+              if (admittedRequest.kind !== "bootstrap" || typeof payload !== "string") {
+                return;
+              }
+
+              const detachedWorkLeaseControlMessage = parseDetachedWorkLeaseControlMessage(payload);
+              if (detachedWorkLeaseControlMessage === undefined) {
+                return;
+              }
+
+              await recordDetachedWorkLeaseObservation({
+                db: ctx.get("db"),
+                message: detachedWorkLeaseControlMessage,
+                sandboxInstanceId,
+              });
+            })().catch((error: unknown) => {
               if (error instanceof TunnelProtocolViolationError) {
                 logger.info(
                   {
