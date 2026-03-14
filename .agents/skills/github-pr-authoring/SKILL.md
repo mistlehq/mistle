@@ -17,15 +17,18 @@ Produce a GitHub PR that is ready for reviewers and matches the repository PR co
    - `## How to review`
    - `## What the implication was`
    - `## Checks and tests performed`
-3. Keep file references in the PR body repo-relative, not absolute local filesystem paths.
-4. Use a conventional-commit PR title that summarizes the change.
-5. If using `gh`, write the body to a file and use `gh pr create --body-file ...` or `gh pr edit --body-file ...`. Do not pass escaped newline sequences in a one-line argument.
+3. For bug fixes, include the original symptom in `## What was changed` as a short fenced `text` block. Use the exact error, failing output, or brief repro.
+4. Keep file references in the PR body repo-relative, not absolute local filesystem paths.
+5. Use a conventional-commit PR title that summarizes the change.
+6. If using `gh`, write the body to a file and use `gh pr create --body-file ...` or `gh pr edit --body-file ...`. Do not pass escaped newline sequences in a one-line argument.
 
 ## Section Expectations
 
 ### What was changed
 
 Write a summary no longer than one paragraph describing what was changed. After this summary, provide details including file references (this should be a bullet list with brief explanation about what was touched and why).
+
+For bug fixes, add an `Original symptom this addresses:` block right after the summary.
 
 ### How to review
 
