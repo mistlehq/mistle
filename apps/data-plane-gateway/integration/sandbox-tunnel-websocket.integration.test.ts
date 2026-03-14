@@ -12,6 +12,7 @@ import {
   decodeDataFrame,
   encodeDataFrame,
   parseStreamControlMessage,
+  PayloadKindRawBytes,
   PayloadKindWebSocketBinary,
   PayloadKindWebSocketText,
   type StreamControlMessage,
@@ -1226,6 +1227,158 @@ describe("sandbox tunnel websocket integration", () => {
   );
 
   it(
+    "resets a PTY stream when the client sends a websocket payload kind and releases the binding",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const firstClientStreamId = 41;
+        const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: firstClientStreamId,
+            channel: {
+              kind: "pty",
+              session: "create",
+              cols: 120,
+              rows: 40,
+            },
+          }),
+        );
+        const forwardedOpen = await forwardedOpenPromise;
+
+        expect(forwardedOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedOpen.data)).toEqual({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "pty",
+            session: "create",
+            cols: 120,
+            rows: 40,
+          },
+        });
+
+        const openOkPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        const openOk = await openOkPromise;
+
+        expect(openOk.isBinary).toBe(false);
+        expect(parseStreamMessage(openOk.data)).toEqual({
+          type: "stream.open.ok",
+          streamId: firstClientStreamId,
+        });
+
+        const clientResetPromise = waitForWebSocketMessage(clientSocket);
+        const bootstrapClosePromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          Buffer.from(
+            encodeDataFrame({
+              streamId: firstClientStreamId,
+              payloadKind: PayloadKindWebSocketBinary,
+              payload: new Uint8Array([0xaa, 0xbb]),
+            }),
+          ),
+        );
+        const [clientReset, bootstrapClose] = await Promise.all([
+          clientResetPromise,
+          bootstrapClosePromise,
+        ]);
+
+        expect(clientReset.isBinary).toBe(false);
+        expect(parseStreamMessage(clientReset.data)).toEqual({
+          type: "stream.reset",
+          streamId: firstClientStreamId,
+          code: "invalid_stream_data",
+          message: "PTY streams only accept raw-bytes data frames.",
+        });
+        expect(bootstrapClose.isBinary).toBe(false);
+        expect(parseStreamMessage(bootstrapClose.data)).toEqual({
+          type: "stream.close",
+          streamId: 1,
+        });
+
+        const secondForwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: 42,
+            channel: {
+              kind: "pty",
+              session: "create",
+              cols: 80,
+              rows: 24,
+            },
+          }),
+        );
+        const secondForwardedOpen = await secondForwardedOpenPromise;
+
+        expect(secondForwardedOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(secondForwardedOpen.data)).toEqual({
+          type: "stream.open",
+          streamId: 2,
+          channel: {
+            kind: "pty",
+            session: "create",
+            cols: 80,
+            rows: 24,
+          },
+        });
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
     "routes agent stream opens through gateway bindings and closes agent streams on connection detach",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
@@ -1478,6 +1631,146 @@ describe("sandbox tunnel websocket integration", () => {
         expect(parseStreamMessage(secondForwardedOpenOk.data)).toEqual({
           type: "stream.open.ok",
           streamId: 78,
+        });
+      } finally {
+        await Promise.all([
+          closeWebSocketIfOpen(bootstrapSocket),
+          closeWebSocketIfOpen(clientSocket),
+        ]);
+      }
+    },
+    IntegrationTestTimeoutMs,
+  );
+
+  it(
+    "resets an agent stream when the bootstrap peer sends raw bytes and releases the binding",
+    async ({ fixture }) => {
+      const sandboxInstanceId = typeid("sbi").toString();
+      await insertSandboxInstanceRow({
+        fixture,
+        sandboxInstanceId,
+      });
+      const bootstrapToken = await mintBootstrapToken({
+        config: {
+          bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.bootstrap.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.bootstrap.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+      const connectionToken = await mintConnectionToken({
+        config: {
+          connectionTokenSecret: fixture.config.sandbox.connect.tokenSecret,
+          tokenIssuer: fixture.config.sandbox.connect.tokenIssuer,
+          tokenAudience: fixture.config.sandbox.connect.tokenAudience,
+        },
+        jti: randomUUID(),
+        sandboxInstanceId,
+        ttlSeconds: 120,
+      });
+
+      let bootstrapSocket: WebSocket | undefined;
+      let clientSocket: WebSocket | undefined;
+
+      try {
+        bootstrapSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(bootstrapToken)}`,
+        );
+        clientSocket = await connectWebSocket(
+          `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?connect_token=${encodeURIComponent(connectionToken)}`,
+        );
+
+        const firstClientStreamId = 77;
+        const forwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: firstClientStreamId,
+            channel: {
+              kind: "agent",
+            },
+          }),
+        );
+        const forwardedOpen = await forwardedOpenPromise;
+
+        expect(forwardedOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(forwardedOpen.data)).toEqual({
+          type: "stream.open",
+          streamId: 1,
+          channel: {
+            kind: "agent",
+          },
+        });
+
+        const openOkPromise = waitForWebSocketMessage(clientSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          JSON.stringify({
+            type: "stream.open.ok",
+            streamId: 1,
+          }),
+        );
+        const openOk = await openOkPromise;
+
+        expect(openOk.isBinary).toBe(false);
+        expect(parseStreamMessage(openOk.data)).toEqual({
+          type: "stream.open.ok",
+          streamId: firstClientStreamId,
+        });
+
+        const clientResetPromise = waitForWebSocketMessage(clientSocket);
+        const bootstrapClosePromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          bootstrapSocket,
+          Buffer.from(
+            encodeDataFrame({
+              streamId: 1,
+              payloadKind: PayloadKindRawBytes,
+              payload: new Uint8Array([0xde, 0xad, 0xbe, 0xef]),
+            }),
+          ),
+        );
+        const [clientReset, bootstrapClose] = await Promise.all([
+          clientResetPromise,
+          bootstrapClosePromise,
+        ]);
+
+        expect(clientReset.isBinary).toBe(false);
+        expect(parseStreamMessage(clientReset.data)).toEqual({
+          type: "stream.reset",
+          streamId: firstClientStreamId,
+          code: "invalid_stream_data",
+          message: "Agent streams only accept websocket text or websocket binary data frames.",
+        });
+        expect(bootstrapClose.isBinary).toBe(false);
+        expect(parseStreamMessage(bootstrapClose.data)).toEqual({
+          type: "stream.close",
+          streamId: 1,
+        });
+
+        const secondForwardedOpenPromise = waitForWebSocketMessage(bootstrapSocket);
+        await sendWebSocketMessage(
+          clientSocket,
+          JSON.stringify({
+            type: "stream.open",
+            streamId: 78,
+            channel: {
+              kind: "agent",
+            },
+          }),
+        );
+        const secondForwardedOpen = await secondForwardedOpenPromise;
+
+        expect(secondForwardedOpen.isBinary).toBe(false);
+        expect(parseStreamMessage(secondForwardedOpen.data)).toEqual({
+          type: "stream.open",
+          streamId: 2,
+          channel: {
+            kind: "agent",
+          },
         });
       } finally {
         await Promise.all([
