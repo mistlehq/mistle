@@ -61,17 +61,18 @@ export function finalizeTunnelSession(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     tokenKind: input.tokenKind,
   };
+  const expectedClose = closeClassification.logLevel !== "warn";
   const logMessage =
     input.tokenKind === "bootstrap"
-      ? closeClassification.logLevel === "info"
+      ? expectedClose
         ? "Sandbox bootstrap tunnel disconnected"
         : "Sandbox bootstrap tunnel disconnected unexpectedly"
-      : closeClassification.logLevel === "info"
+      : expectedClose
         ? "Sandbox connection peer detached"
         : "Sandbox connection peer detached unexpectedly";
 
-  if (closeClassification.logLevel === "info") {
-    logger.info(logData, logMessage);
+  if (closeClassification.logLevel === "debug") {
+    logger.debug(logData, logMessage);
   } else {
     logger.warn(logData, logMessage);
   }

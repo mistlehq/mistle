@@ -214,7 +214,7 @@ export class TunnelSessionService {
           return;
         }
 
-        logger.info(
+        logger.debug(
           {
             leaseId: input.leaseId,
             sandboxInstanceId: input.sandboxInstanceId,

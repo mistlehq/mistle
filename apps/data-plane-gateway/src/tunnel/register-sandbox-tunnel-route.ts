@@ -135,7 +135,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 }),
               },
             );
-            logger.info(
+            logger.debug(
               {
                 sandboxInstanceId,
                 peerSide: sourcePeerSide,

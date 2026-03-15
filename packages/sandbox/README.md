@@ -25,10 +25,10 @@ Integration test execution is gated at package level with `MISTLE_TEST_SANDBOX_I
 MISTLE_TEST_SANDBOX_INTEGRATION=1 MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=modal pnpm --filter @mistle/sandbox test:integration
 ```
 
-Docker integration tests also require `MISTLE_SANDBOX_DOCKER_SOCKET_PATH` (for example `/var/run/docker.sock`):
+Docker integration tests default `MISTLE_SANDBOX_DOCKER_SOCKET_PATH` to `/var/run/docker.sock`. Set it explicitly if your Docker socket is elsewhere:
 
 ```bash
-MISTLE_TEST_SANDBOX_INTEGRATION=1 MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker MISTLE_SANDBOX_DOCKER_SOCKET_PATH=/var/run/docker.sock pnpm --filter @mistle/sandbox test:integration
+MISTLE_TEST_SANDBOX_INTEGRATION=1 MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS=docker pnpm --filter @mistle/sandbox test:integration
 ```
 
 List of valid providers for MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS:

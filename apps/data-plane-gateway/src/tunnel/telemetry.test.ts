@@ -38,7 +38,20 @@ describe("tunnel session telemetry", () => {
       }),
     ).toEqual({
       outcome: "replaced",
-      logLevel: "info",
+      logLevel: "debug",
+      spanStatusCode: SpanStatusCode.UNSET,
+    });
+  });
+
+  it("downgrades closes without a status frame to low-signal peer disconnects", () => {
+    expect(
+      classifySandboxTunnelClose({
+        closeCode: 1005,
+        closeReason: "",
+      }),
+    ).toEqual({
+      outcome: "peer_disconnected",
+      logLevel: "debug",
       spanStatusCode: SpanStatusCode.UNSET,
     });
   });

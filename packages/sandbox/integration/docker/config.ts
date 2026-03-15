@@ -9,8 +9,9 @@ const DockerAdapterIntegrationConfigSchema = z
       .string()
       .trim()
       .min(1, {
-        message: `MISTLE_SANDBOX_DOCKER_SOCKET_PATH is required when ${DOCKER_INTEGRATION_ENABLEMENT_MESSAGE}.`,
-      }),
+        message: `MISTLE_SANDBOX_DOCKER_SOCKET_PATH must be non-empty when ${DOCKER_INTEGRATION_ENABLEMENT_MESSAGE}.`,
+      })
+      .default("/var/run/docker.sock"),
   })
   .strip();
 
