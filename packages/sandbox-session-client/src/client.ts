@@ -1,4 +1,15 @@
-import type { StreamOpen, StreamOpenError, StreamOpenOK } from "@mistle/sandbox-session-protocol";
+import {
+  decodeDataFrame,
+  DefaultStreamWindowBytes,
+  encodeDataFrame,
+  MaxStreamWindowBytes,
+  parseStreamControlMessage,
+  PayloadKindWebSocketBinary,
+  PayloadKindWebSocketText,
+  type StreamOpen,
+  type StreamOpenError,
+  type StreamOpenOK,
+} from "@mistle/sandbox-session-protocol";
 
 import {
   SandboxSessionSocketReadyStates,
@@ -16,6 +27,9 @@ import type {
 } from "./types.js";
 
 const DefaultConnectTimeoutMs = 15_000;
+const ProtocolViolationCloseCode = 1008;
+const JsonTextEncoder = new TextEncoder();
+const JsonTextDecoder = new TextDecoder();
 
 export type SandboxSessionClientInput = {
   connectionUrl: string;
@@ -173,6 +187,18 @@ function readTextPayload(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
+function readBinaryPayload(value: unknown): ArrayBuffer | Uint8Array | null {
+  if (value instanceof ArrayBuffer || value instanceof Uint8Array) {
+    return value;
+  }
+
+  return null;
+}
+
+function toUint8Array(value: ArrayBuffer | Uint8Array): Uint8Array {
+  return value instanceof Uint8Array ? value : new Uint8Array(value);
+}
+
 function readMessageEventPayload(event: unknown): unknown {
   if (typeof event === "object" && event !== null && "data" in event) {
     return event.data;
@@ -191,6 +217,7 @@ export class SandboxSessionClient {
   #state: SandboxSessionConnectionState = "idle";
   #errorMessage: string | null = null;
   #openError: StreamOpenError | null = null;
+  #availableSendWindowBytes = 0;
   #streamId: number | null = null;
 
   constructor(input: SandboxSessionClientInput) {
@@ -267,6 +294,7 @@ export class SandboxSessionClient {
         cleanup();
         this.#setState("error", error.message);
         this.#socket = null;
+        this.#streamId = null;
         socket.close();
         reject(error);
       };
@@ -277,6 +305,8 @@ export class SandboxSessionClient {
         }
         settled = true;
         cleanup();
+        this.#availableSendWindowBytes = DefaultStreamWindowBytes;
+        this.#streamId = streamId;
         this.#setState("connected_socket", null);
         socket.addEventListener("message", this.#handleConnectedMessage);
         socket.addEventListener("close", this.#handleSocketClose);
@@ -340,6 +370,8 @@ export class SandboxSessionClient {
   disconnect(closeCode = 1000, reason = "Disconnected by dashboard."): void {
     const socket = this.#socket;
     this.#socket = null;
+    this.#availableSendWindowBytes = 0;
+    this.#streamId = null;
 
     if (socket === null) {
       this.#setState("closed", null);
@@ -362,8 +394,23 @@ export class SandboxSessionClient {
     if (socket === null || socket.readyState !== SandboxSessionSocketReadyStates.OPEN) {
       throw new Error("Sandbox session socket is not open.");
     }
+    if (this.#streamId === null) {
+      throw new Error("Sandbox session stream is not open.");
+    }
 
-    await socket.send(payload);
+    const encodedPayload = JsonTextEncoder.encode(payload);
+    if (encodedPayload.byteLength > this.#availableSendWindowBytes) {
+      throw new Error("Sandbox session stream send window is exhausted.");
+    }
+    this.#availableSendWindowBytes -= encodedPayload.byteLength;
+
+    await socket.send(
+      encodeDataFrame({
+        streamId: this.#streamId,
+        payloadKind: PayloadKindWebSocketText,
+        payload: encodedPayload,
+      }),
+    );
   }
 
   markInitializing(): void {
@@ -390,19 +437,14 @@ export class SandboxSessionClient {
     }
   }
 
-  readonly #handleConnectedMessage = (event: unknown): void => {
-    const messagePayload = readTextPayload(readMessageEventPayload(event));
-    if (messagePayload === null) {
-      return;
-    }
-
+  #emitParsedJsonMessage(payload: string): void {
     let parsedPayload: unknown;
     try {
-      parsedPayload = JSON.parse(messagePayload);
+      parsedPayload = JSON.parse(payload);
     } catch {
       this.#emit({
         type: "unhandled_message",
-        payload: messagePayload,
+        payload,
       });
       return;
     }
@@ -447,10 +489,82 @@ export class SandboxSessionClient {
       type: "unhandled_message",
       payload: parsedPayload,
     });
+  }
+
+  readonly #handleConnectedMessage = (event: unknown): void => {
+    const messagePayload = readMessageEventPayload(event);
+    const textPayload = readTextPayload(messagePayload);
+    if (textPayload !== null) {
+      const controlMessage = parseStreamControlMessage(textPayload);
+      if (
+        controlMessage?.type === "stream.window" &&
+        this.#streamId !== null &&
+        controlMessage.streamId === this.#streamId
+      ) {
+        const nextAvailableSendWindowBytes = this.#availableSendWindowBytes + controlMessage.bytes;
+        if (nextAvailableSendWindowBytes > MaxStreamWindowBytes) {
+          this.#closeConnectedSocketWithError(
+            `Sandbox session stream send window exceeds the configured maximum of ${String(MaxStreamWindowBytes)} bytes.`,
+          );
+          return;
+        }
+
+        this.#availableSendWindowBytes = nextAvailableSendWindowBytes;
+        return;
+      }
+      this.#emitParsedJsonMessage(textPayload);
+      return;
+    }
+
+    const binaryPayload = readBinaryPayload(messagePayload);
+    if (binaryPayload === null) {
+      return;
+    }
+
+    let dataFrame: ReturnType<typeof decodeDataFrame>;
+    try {
+      dataFrame = decodeDataFrame(toUint8Array(binaryPayload));
+    } catch {
+      this.#emit({
+        type: "unhandled_message",
+        payload: binaryPayload,
+      });
+      return;
+    }
+
+    if (this.#streamId !== null && dataFrame.streamId !== this.#streamId) {
+      this.#emit({
+        type: "unhandled_message",
+        payload: dataFrame,
+      });
+      return;
+    }
+
+    if (dataFrame.payloadKind === PayloadKindWebSocketText) {
+      this.#sendReceiveWindowUpdate(dataFrame.payload.byteLength);
+      this.#emitParsedJsonMessage(JsonTextDecoder.decode(dataFrame.payload));
+      return;
+    }
+
+    if (dataFrame.payloadKind === PayloadKindWebSocketBinary) {
+      this.#sendReceiveWindowUpdate(dataFrame.payload.byteLength);
+      this.#emit({
+        type: "unhandled_message",
+        payload: dataFrame.payload,
+      });
+      return;
+    }
+
+    this.#emit({
+      type: "unhandled_message",
+      payload: dataFrame,
+    });
   };
 
   readonly #handleSocketClose = (): void => {
     this.#socket = null;
+    this.#availableSendWindowBytes = 0;
+    this.#streamId = null;
     if (this.#state !== "closed") {
       this.#setState("closed", "Sandbox websocket connection closed.");
     }
@@ -459,4 +573,44 @@ export class SandboxSessionClient {
   readonly #handleSocketError = (): void => {
     this.#setState("error", "Sandbox websocket connection failed.");
   };
+
+  #closeConnectedSocketWithError(message: string): void {
+    const socket = this.#socket;
+    this.#socket = null;
+    this.#availableSendWindowBytes = 0;
+    this.#streamId = null;
+
+    if (socket !== null) {
+      socket.removeEventListener("message", this.#handleConnectedMessage);
+      socket.removeEventListener("close", this.#handleSocketClose);
+      socket.removeEventListener("error", this.#handleSocketError);
+      socket.close(ProtocolViolationCloseCode, message);
+    }
+
+    this.#setState("error", message);
+  }
+
+  #sendReceiveWindowUpdate(bytes: number): void {
+    const socket = this.#socket;
+    if (socket === null || socket.readyState !== SandboxSessionSocketReadyStates.OPEN) {
+      return;
+    }
+    if (this.#streamId === null || bytes <= 0) {
+      return;
+    }
+
+    void socket
+      .send(
+        JSON.stringify({
+          type: "stream.window",
+          streamId: this.#streamId,
+          bytes,
+        }),
+      )
+      .catch(() => {
+        this.#closeConnectedSocketWithError(
+          "Failed to send sandbox session stream.window acknowledgement.",
+        );
+      });
+  }
 }

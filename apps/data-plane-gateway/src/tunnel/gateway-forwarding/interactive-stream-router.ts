@@ -1,5 +1,6 @@
+import { BootstrapTunnelNotConnectedError } from "../bootstrap-tunnel-not-connected-error.js";
 import type { SandboxOwnerResolver } from "../ownership/sandbox-owner-resolver.js";
-import { GatewayForwardingClient } from "./gateway-forwarding-client.js";
+import type { GatewayForwardingClientAdapter } from "./gateway-forwarding-client-adapter.js";
 import type {
   CloseInteractiveStreamInput,
   FindInteractiveStreamByClientInput,
@@ -17,7 +18,7 @@ export class InteractiveStreamRouter {
   public constructor(
     private readonly sourceNodeId: string,
     private readonly sandboxOwnerResolver: SandboxOwnerResolver,
-    private readonly gatewayForwardingClient: GatewayForwardingClient,
+    private readonly gatewayForwardingClient: GatewayForwardingClientAdapter,
   ) {}
 
   public async openInteractiveStream(
@@ -99,7 +100,7 @@ export class InteractiveStreamRouter {
       sandboxInstanceId,
     });
     if (ownerResolution.kind === "missing") {
-      throw new Error(`Sandbox '${sandboxInstanceId}' does not have an active owner.`);
+      throw new BootstrapTunnelNotConnectedError(sandboxInstanceId);
     }
 
     return ownerResolution.owner.nodeId;

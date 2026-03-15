@@ -6,6 +6,11 @@ import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 
+import {
+  decodeDataFrame,
+  encodeDataFrame,
+  PayloadKindWebSocketText,
+} from "@mistle/sandbox-session-protocol";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 import { z } from "zod";
@@ -393,6 +398,66 @@ function sendJson(socket: WebSocket, payload: unknown): void {
   socket.send(JSON.stringify(payload));
 }
 
+function sendAgentJson(socket: WebSocket, streamId: number, payload: unknown): void {
+  if (socket.readyState !== WebSocket.OPEN) {
+    throw new Error(`Websocket is not open. Current readyState: ${String(socket.readyState)}.`);
+  }
+
+  const encodedPayload = encodeDataFrame({
+    streamId,
+    payloadKind: PayloadKindWebSocketText,
+    payload: Buffer.from(JSON.stringify(payload), "utf8"),
+  });
+  socket.send(encodedPayload);
+}
+
+function toUint8Array(data: unknown): Uint8Array | null {
+  if (data instanceof ArrayBuffer) {
+    return new Uint8Array(data);
+  }
+  if (ArrayBuffer.isView(data)) {
+    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+  }
+
+  return null;
+}
+
+function parseTunnelJsonMessage(data: unknown): Promise<{
+  parsed: unknown;
+  raw: string;
+}> {
+  if (typeof data === "string") {
+    return Promise.resolve({
+      parsed: JSON.parse(data),
+      raw: data,
+    });
+  }
+
+  if (data instanceof Blob) {
+    return data.arrayBuffer().then((rawPayload) => parseTunnelJsonMessage(rawPayload));
+  }
+
+  const binaryPayload = toUint8Array(data);
+  if (binaryPayload === null) {
+    return Promise.reject(
+      new Error(`Unsupported websocket message data type: ${String(typeof data)}.`),
+    );
+  }
+
+  const dataFrame = decodeDataFrame(binaryPayload);
+  if (dataFrame.payloadKind !== PayloadKindWebSocketText) {
+    throw new Error(
+      `Expected websocket text payload kind ${String(PayloadKindWebSocketText)}, received ${String(dataFrame.payloadKind)}.`,
+    );
+  }
+
+  const raw = Buffer.from(dataFrame.payload).toString("utf8");
+  return Promise.resolve({
+    parsed: JSON.parse(raw),
+    raw,
+  });
+}
+
 async function websocketDataToUtf8(data: unknown): Promise<string> {
   if (typeof data === "string") {
     return data;
@@ -462,29 +527,35 @@ function getWebSocketJsonMessagePump(socket: WebSocket): WebSocketJsonMessagePum
     drainWebSocketJsonMessagePump(pump);
   };
 
+  async function enqueueParsedMessage(data: unknown): Promise<void> {
+    try {
+      const parsedMessage = await parseTunnelJsonMessage(data);
+      enqueue({
+        kind: "message",
+        payload: parsedMessage.parsed,
+      });
+    } catch (error) {
+      enqueue({
+        kind: "error",
+        error: new Error(
+          `Failed to parse websocket message as JSON: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        ),
+      });
+    }
+  }
+
   const onMessage = (event: unknown): void => {
-    void (async () => {
-      try {
-        if (!isRecord(event)) {
-          throw new Error("Websocket message event payload was not an object.");
-        }
-        const text = await websocketDataToUtf8(event.data);
-        const parsed: unknown = JSON.parse(text);
-        enqueue({
-          kind: "message",
-          payload: parsed,
-        });
-      } catch (error) {
-        enqueue({
-          kind: "error",
-          error: new Error(
-            `Failed to parse websocket message as JSON: ${
-              error instanceof Error ? error.message : String(error)
-            }`,
-          ),
-        });
-      }
-    })();
+    if (!isRecord(event)) {
+      enqueue({
+        kind: "error",
+        error: new Error("Websocket message event payload was not an object."),
+      });
+      return;
+    }
+
+    void enqueueParsedMessage(event.data);
   };
 
   const onError = (): void => {
@@ -712,39 +783,46 @@ function attachWebSocketTrace(input: {
   socket: WebSocket;
   sink: WebSocketTraceEntry[];
 }): () => void {
-  const onMessage = (event: unknown): void => {
-    void (async () => {
+  async function traceMessage(data: unknown): Promise<void> {
+    try {
+      const parsedMessage = await parseTunnelJsonMessage(data);
+      pushWebSocketTraceEntry({
+        sink: input.sink,
+        summary: describeJsonRpcMessage(parsedMessage.parsed),
+        raw: parsedMessage.raw,
+      });
+    } catch (parseError) {
       try {
-        if (!isRecord(event)) {
-          pushWebSocketTraceEntry({
-            sink: input.sink,
-            summary: "event/message malformed",
-          });
-          return;
-        }
-
-        const raw = await websocketDataToUtf8(event.data);
-        try {
-          const parsed: unknown = JSON.parse(raw);
-          pushWebSocketTraceEntry({
-            sink: input.sink,
-            summary: describeJsonRpcMessage(parsed),
-            raw,
-          });
-        } catch (parseError) {
-          pushWebSocketTraceEntry({
-            sink: input.sink,
-            summary: `json/parse_error ${describeUnknownError(parseError)}`,
-            raw,
-          });
-        }
+        const raw = await websocketDataToUtf8(data);
+        pushWebSocketTraceEntry({
+          sink: input.sink,
+          summary: `json/parse_error ${describeUnknownError(parseError)}`,
+          raw,
+        });
       } catch (traceError) {
         pushWebSocketTraceEntry({
           sink: input.sink,
           summary: `event/message trace_error ${describeUnknownError(traceError)}`,
         });
       }
-    })();
+    }
+  }
+
+  const onMessage = (event: unknown): void => {
+    if (!isRecord(event)) {
+      pushWebSocketTraceEntry({
+        sink: input.sink,
+        summary: "event/message malformed",
+      });
+      return;
+    }
+
+    void traceMessage(event.data).catch((traceError: unknown) => {
+      pushWebSocketTraceEntry({
+        sink: input.sink,
+        summary: `event/message trace_error ${describeUnknownError(traceError)}`,
+      });
+    });
   };
 
   const onClose = (event: unknown): void => {
@@ -1453,7 +1531,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
           stepTrace,
           stepName: "json-rpc initialize",
           action: async () => {
-            sendJson(websocket, {
+            sendAgentJson(websocket, handshakeStreamId, {
               method: "initialize",
               id: 0,
               params: {
@@ -1476,7 +1554,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
           stepTrace,
           stepName: "json-rpc initialized notification",
           action: async () => {
-            sendJson(websocket, {
+            sendAgentJson(websocket, handshakeStreamId, {
               method: "initialized",
               params: {},
             });
@@ -1487,7 +1565,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
           stepTrace,
           stepName: "json-rpc thread/start",
           action: async () => {
-            sendJson(websocket, {
+            sendAgentJson(websocket, handshakeStreamId, {
               method: "thread/start",
               id: 1,
               params: {
@@ -1516,7 +1594,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
           stepTrace,
           stepName: "json-rpc turn/start",
           action: async () => {
-            sendJson(websocket, {
+            sendAgentJson(websocket, handshakeStreamId, {
               method: "turn/start",
               id: 2,
               params: {
@@ -1985,11 +2063,11 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
           sink: websocketTraceEntries,
         });
 
+        const handshakeStreamId = 1;
         await runStep({
           stepTrace,
           stepName: "connect and initialize Codex app-server",
           action: async () => {
-            const handshakeStreamId = 1;
             sendJson(websocket, {
               type: "stream.open",
               streamId: handshakeStreamId,
@@ -2003,7 +2081,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
               timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
             });
 
-            sendJson(websocket, {
+            sendAgentJson(websocket, handshakeStreamId, {
               method: "initialize",
               id: 0,
               params: {
@@ -2020,7 +2098,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
               timeoutMs: WEBSOCKET_MESSAGE_TIMEOUT_MS,
             });
 
-            sendJson(websocket, {
+            sendAgentJson(websocket, handshakeStreamId, {
               method: "initialized",
               params: {},
             });
@@ -2031,7 +2109,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
           stepTrace,
           stepName: "json-rpc thread/start",
           action: async () => {
-            sendJson(websocket, {
+            sendAgentJson(websocket, handshakeStreamId, {
               method: "thread/start",
               id: 1,
               params: {
@@ -2060,7 +2138,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
           stepTrace,
           stepName: "json-rpc turn/start",
           action: async () => {
-            sendJson(websocket, {
+            sendAgentJson(websocket, handshakeStreamId, {
               method: "turn/start",
               id: 2,
               params: {
@@ -2144,7 +2222,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
                   stepTrace,
                   stepName: "json-rpc thread/read",
                   action: async () => {
-                    sendJson(websocket, {
+                    sendAgentJson(websocket, handshakeStreamId, {
                       method: "thread/read",
                       id: 3,
                       params: {

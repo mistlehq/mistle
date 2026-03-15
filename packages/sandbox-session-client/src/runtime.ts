@@ -38,7 +38,7 @@ export interface SandboxSessionSocket {
     eventName: EventName,
     listener: SandboxSessionSocketEventMap[EventName],
   ): void;
-  send(payload: string): Promise<void>;
+  send(payload: ArrayBuffer | Uint8Array | string): Promise<void>;
   close(code?: number, reason?: string): void;
 }
 

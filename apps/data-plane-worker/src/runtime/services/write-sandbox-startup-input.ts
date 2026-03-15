@@ -16,7 +16,7 @@ export async function writeSandboxStartupInput(input: {
   sandboxInstanceId: string;
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   sandbox: SandboxHandle;
-}): Promise<string> {
+}): Promise<void> {
   const bootstrapTokenJti = randomUUID();
   const tunnelExchangeTokenJti = randomUUID();
   const tunnelGatewayWsUrl = createSandboxTunnelGatewayWsUrl({
@@ -58,8 +58,6 @@ export async function writeSandboxStartupInput(input: {
       }),
     });
     await input.sandbox.closeStdin();
-
-    return bootstrapTokenJti;
   } catch (writeError) {
     try {
       await input.sandboxAdapter.stop({

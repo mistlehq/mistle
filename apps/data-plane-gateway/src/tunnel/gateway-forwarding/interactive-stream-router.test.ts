@@ -7,8 +7,6 @@ import { InMemoryTunnelSessionRegistryAdapter } from "../tunnel-session/adapters
 import { TunnelSessionRegistry } from "../tunnel-session/index.js";
 import { LocalGatewayForwardingClientAdapter } from "./adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "./adapters/local-gateway-forwarding-server-adapter.js";
-import { GatewayForwardingClient } from "./gateway-forwarding-client.js";
-import { GatewayForwardingServer } from "./gateway-forwarding-server.js";
 import { InteractiveStreamRouter } from "./interactive-stream-router.js";
 
 describe("InteractiveStreamRouter", () => {
@@ -28,11 +26,9 @@ describe("InteractiveStreamRouter", () => {
       nodeId: "dpg_test",
       sessionId: "sess_bootstrap",
     });
-    const forwardingClient = new GatewayForwardingClient(
-      new LocalGatewayForwardingClientAdapter(
-        "dpg_test",
-        new GatewayForwardingServer(new LocalGatewayForwardingServerAdapter(registry)),
-      ),
+    const forwardingClient = new LocalGatewayForwardingClientAdapter(
+      "dpg_test",
+      new LocalGatewayForwardingServerAdapter(registry),
     );
     const router = new InteractiveStreamRouter(
       "dpg_test",
@@ -64,14 +60,10 @@ describe("InteractiveStreamRouter", () => {
   });
 
   it("fails fast when no owner is registered for the sandbox", async () => {
-    const forwardingClient = new GatewayForwardingClient(
-      new LocalGatewayForwardingClientAdapter(
-        "dpg_test",
-        new GatewayForwardingServer(
-          new LocalGatewayForwardingServerAdapter(
-            new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter()),
-          ),
-        ),
+    const forwardingClient = new LocalGatewayForwardingClientAdapter(
+      "dpg_test",
+      new LocalGatewayForwardingServerAdapter(
+        new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter()),
       ),
     );
     const router = new InteractiveStreamRouter(
@@ -87,18 +79,14 @@ describe("InteractiveStreamRouter", () => {
         clientSessionId: "conn_1",
         clientStreamId: 7,
       }),
-    ).rejects.toThrow("does not have an active owner");
+    ).rejects.toThrow("Sandbox bootstrap tunnel is not connected");
   });
 
   it("treats release of an ownerless sandbox as a no-op", async () => {
-    const forwardingClient = new GatewayForwardingClient(
-      new LocalGatewayForwardingClientAdapter(
-        "dpg_test",
-        new GatewayForwardingServer(
-          new LocalGatewayForwardingServerAdapter(
-            new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter()),
-          ),
-        ),
+    const forwardingClient = new LocalGatewayForwardingClientAdapter(
+      "dpg_test",
+      new LocalGatewayForwardingServerAdapter(
+        new TunnelSessionRegistry(new InMemoryTunnelSessionRegistryAdapter()),
       ),
     );
     const router = new InteractiveStreamRouter(

@@ -17,11 +17,7 @@ type connectRequest struct {
 	RawPayload  []byte
 }
 
-func readConnectRequest(ctx context.Context, tunnelConn *websocket.Conn) (connectRequest, error) {
-	messageType, payload, err := tunnelConn.Read(ctx)
-	if err != nil {
-		return connectRequest{}, err
-	}
+func parseConnectRequestMessage(messageType websocket.MessageType, payload []byte) (connectRequest, error) {
 	if messageType != websocket.MessageText {
 		return connectRequest{}, fmt.Errorf(
 			"expected connect request websocket text message, got %s",
@@ -59,6 +55,15 @@ func readConnectRequest(ctx context.Context, tunnelConn *websocket.Conn) (connec
 		ChannelKind: envelope.Channel.Kind,
 		RawPayload:  payload,
 	}, nil
+}
+
+func readConnectRequest(ctx context.Context, tunnelConn *websocket.Conn) (connectRequest, error) {
+	messageType, payload, err := tunnelConn.Read(ctx)
+	if err != nil {
+		return connectRequest{}, err
+	}
+
+	return parseConnectRequestMessage(messageType, payload)
 }
 
 func parsePTYConnectRequest(payload []byte) (sessionprotocol.StreamOpen, error) {

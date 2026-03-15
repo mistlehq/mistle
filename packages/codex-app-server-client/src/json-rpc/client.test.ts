@@ -1,3 +1,8 @@
+import {
+  decodeDataFrame,
+  parseStreamControlMessage,
+  PayloadKindWebSocketText,
+} from "@mistle/sandbox-session-protocol";
 import { afterEach, describe, expect, it } from "vitest";
 import { type RawData, WebSocketServer } from "ws";
 
@@ -62,8 +67,33 @@ function toText(data: RawData): string {
   return Buffer.concat(data).toString("utf8");
 }
 
-function parseJson(value: RawData): unknown {
-  return JSON.parse(toText(value));
+function toUint8Array(data: RawData): Uint8Array {
+  if (typeof data === "string") {
+    return new TextEncoder().encode(data);
+  }
+  if (data instanceof ArrayBuffer) {
+    return new Uint8Array(data);
+  }
+  if (Buffer.isBuffer(data)) {
+    return new Uint8Array(data);
+  }
+
+  return new Uint8Array(Buffer.concat(data));
+}
+
+function parseJson(value: string): unknown {
+  return JSON.parse(value);
+}
+
+function decodeAgentTextPayload(data: RawData): string {
+  const dataFrame = decodeDataFrame(toUint8Array(data));
+  if (dataFrame.payloadKind !== PayloadKindWebSocketText) {
+    throw new Error(
+      `Expected websocket text payload kind ${String(PayloadKindWebSocketText)}, received ${String(dataFrame.payloadKind)}.`,
+    );
+  }
+
+  return new TextDecoder().decode(dataFrame.payload);
 }
 
 async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer> {
@@ -90,7 +120,7 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
     socket.on("message", (message: RawData) => {
       if (!didHandleOpen) {
         didHandleOpen = true;
-        const payload = parseJson(message);
+        const payload = parseJson(toText(message));
         if (
           typeof payload !== "object" ||
           payload === null ||
@@ -113,7 +143,12 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
         return;
       }
 
-      const payload = parseJson(message);
+      const controlMessage = parseStreamControlMessage(toText(message));
+      if (controlMessage?.type === "stream.window") {
+        return;
+      }
+
+      const payload = parseJson(decodeAgentTextPayload(message));
       if (
         typeof payload !== "object" ||
         payload === null ||

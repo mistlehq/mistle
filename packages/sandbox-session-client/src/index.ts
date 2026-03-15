@@ -10,4 +10,4 @@ export type {
   SandboxSessionSocketMessageEvent,
   SandboxSessionSocketReadyState,
 } from "./runtime.js";
-export { SandboxSessionSendGuarantees } from "./runtime.js";
+export { SandboxSessionSendGuarantees, SandboxSessionSocketReadyStates } from "./runtime.js";

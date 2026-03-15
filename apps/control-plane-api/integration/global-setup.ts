@@ -10,8 +10,10 @@ import {
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import {
   acquireSharedPostgresInfra,
+  createIntegrationTemplateDatabaseName,
   DEFAULT_SHARED_INTEGRATION_INFRA_KEY,
   removeTestContext,
+  resolveIntegrationRunId,
   writeTestContext,
 } from "@mistle/test-harness";
 import { Client as PgClient, Pool } from "pg";
@@ -26,7 +28,7 @@ import { syncIntegrationTargets } from "../scripts/integration-targets/sync-inte
 import { createControlPlaneBackend } from "../src/openworkflow/index.js";
 
 const SHARED_INFRA_KEY = DEFAULT_SHARED_INTEGRATION_INFRA_KEY;
-const TEMPLATE_DATABASE_NAME = "mistle_control_plane_api_it_template";
+const TEMPLATE_DATABASE_NAME_PREFIX = "mistle_control_plane_api_it_template";
 const WORKFLOW_NAMESPACE_ID = "integration";
 const INTERNAL_AUTH_SERVICE_TOKEN = "integration-service-token";
 const INTEGRATIONS_MASTER_KEY_VERSION = 1;
@@ -81,10 +83,40 @@ async function resetTemplateDatabase(input: {
   }
 }
 
+async function dropDatabaseIfExists(input: {
+  username: string;
+  password: string;
+  host: string;
+  port: number;
+  databaseName: string;
+}): Promise<void> {
+  const adminClient = new PgClient({
+    host: input.host,
+    port: input.port,
+    user: input.username,
+    password: input.password,
+    database: "postgres",
+  });
+  const safeDatabaseName = assertSafeIdentifier(input.databaseName, "template database name");
+  const quotedDatabaseName = quoteIdentifier(safeDatabaseName);
+
+  await adminClient.connect();
+  try {
+    await adminClient.query(`DROP DATABASE IF EXISTS ${quotedDatabaseName} WITH (FORCE)`);
+  } finally {
+    await adminClient.end();
+  }
+}
+
 export default async function setup(): Promise<() => Promise<void>> {
+  const integrationRunId = resolveIntegrationRunId();
   const sharedInfraLease = await acquireSharedPostgresInfra({
     key: SHARED_INFRA_KEY,
     postgres: {},
+  });
+  const templateDatabaseName = createIntegrationTemplateDatabaseName({
+    prefix: TEMPLATE_DATABASE_NAME_PREFIX,
+    runId: integrationRunId,
   });
 
   try {
@@ -94,7 +126,7 @@ export default async function setup(): Promise<() => Promise<void>> {
       password: postgresService.postgres.password,
       host: postgresService.postgres.host,
       port: postgresService.postgres.port,
-      databaseName: TEMPLATE_DATABASE_NAME,
+      databaseName: templateDatabaseName,
     });
 
     const templateDirectUrl = createDatabaseUrl({
@@ -102,7 +134,7 @@ export default async function setup(): Promise<() => Promise<void>> {
       password: postgresService.postgres.password,
       host: postgresService.postgres.host,
       port: postgresService.postgres.port,
-      databaseName: TEMPLATE_DATABASE_NAME,
+      databaseName: templateDatabaseName,
     });
 
     await runControlPlaneMigrations({
@@ -161,19 +193,34 @@ export default async function setup(): Promise<() => Promise<void>> {
         databasePassword: postgresService.postgres.password,
         databaseDirectHost: postgresService.postgres.host,
         databaseDirectPort: postgresService.postgres.port,
-        templateDatabaseName: TEMPLATE_DATABASE_NAME,
+        templateDatabaseName: templateDatabaseName,
+        integrationRunId,
         workflowNamespaceId: WORKFLOW_NAMESPACE_ID,
         internalAuthServiceToken: INTERNAL_AUTH_SERVICE_TOKEN,
       },
     });
   } catch (error) {
     await removeTestContext(TestContextId);
+    await dropDatabaseIfExists({
+      username: sharedInfraLease.infra.postgres.postgres.username,
+      password: sharedInfraLease.infra.postgres.postgres.password,
+      host: sharedInfraLease.infra.postgres.postgres.host,
+      port: sharedInfraLease.infra.postgres.postgres.port,
+      databaseName: templateDatabaseName,
+    });
     await sharedInfraLease.release();
     throw error;
   }
 
   return async () => {
     await removeTestContext(TestContextId);
+    await dropDatabaseIfExists({
+      username: sharedInfraLease.infra.postgres.postgres.username,
+      password: sharedInfraLease.infra.postgres.postgres.password,
+      host: sharedInfraLease.infra.postgres.postgres.host,
+      port: sharedInfraLease.infra.postgres.postgres.port,
+      databaseName: templateDatabaseName,
+    });
     await sharedInfraLease.release();
   };
 }

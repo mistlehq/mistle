@@ -1,6 +1,7 @@
 export {
   SandboxSessionClient,
   SandboxSessionSendGuarantees,
+  SandboxSessionSocketReadyStates,
   parseJsonRpcErrorResponse,
   parseJsonRpcNotification,
   parseJsonRpcServerRequest,

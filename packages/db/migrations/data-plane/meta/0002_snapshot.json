@@ -353,6 +353,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "active_tunnel_lease_id": {
+          "name": "active_tunnel_lease_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "tunnel_disconnected_at": {
           "name": "tunnel_disconnected_at",
           "type": "timestamp with time zone",
@@ -497,12 +503,12 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "data_plane.sandbox_tunnel_connect_acks": {
-      "name": "sandbox_tunnel_connect_acks",
+    "data_plane.sandbox_tunnel_token_redemptions": {
+      "name": "sandbox_tunnel_token_redemptions",
       "schema": "data_plane",
       "columns": {
-        "bootstrap_token_jti": {
-          "name": "bootstrap_token_jti",
+        "token_jti": {
+          "name": "token_jti",
           "type": "text",
           "primaryKey": true,
           "notNull": true
@@ -516,8 +522,8 @@
         }
       },
       "indexes": {
-        "sandbox_tunnel_connect_acks_connected_at_idx": {
-          "name": "sandbox_tunnel_connect_acks_connected_at_idx",
+        "sandbox_tunnel_token_redemptions_connected_at_idx": {
+          "name": "sandbox_tunnel_token_redemptions_connected_at_idx",
           "columns": [
             {
               "expression": "connected_at",

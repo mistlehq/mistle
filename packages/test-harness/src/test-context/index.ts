@@ -64,3 +64,6 @@ export async function removeTestContext(id: string): Promise<void> {
     force: true,
   });
 }
+
+export * from "./current-vitest-file.js";
+export * from "./integration-run-id.js";

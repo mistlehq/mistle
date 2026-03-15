@@ -24,6 +24,7 @@ CREATE TABLE "data_plane"."sandbox_instances" (
 	"started_at" timestamp with time zone,
 	"tunnel_connected_at" timestamp with time zone,
 	"last_tunnel_seen_at" timestamp with time zone,
+	"active_tunnel_lease_id" text,
 	"tunnel_disconnected_at" timestamp with time zone,
 	"stopped_at" timestamp with time zone,
 	"failed_at" timestamp with time zone,

@@ -1,5 +1,5 @@
 import type { GatewayForwardingClientAdapter } from "../gateway-forwarding-client-adapter.js";
-import { GatewayForwardingServer } from "../gateway-forwarding-server.js";
+import type { GatewayForwardingServerAdapter } from "../gateway-forwarding-server-adapter.js";
 import type {
   CloseInteractiveStreamInput,
   FindInteractiveStreamByClientInput,
@@ -17,7 +17,7 @@ import type {
 export class LocalGatewayForwardingClientAdapter implements GatewayForwardingClientAdapter {
   public constructor(
     private readonly localNodeId: string,
-    private readonly gatewayForwardingServer: GatewayForwardingServer,
+    private readonly gatewayForwardingServer: GatewayForwardingServerAdapter,
   ) {}
 
   public async openInteractiveStream(

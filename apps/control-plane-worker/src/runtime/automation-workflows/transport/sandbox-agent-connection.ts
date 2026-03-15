@@ -1,4 +1,8 @@
-import { SandboxSessionClient, type SandboxSessionSocket } from "@mistle/sandbox-session-client";
+import {
+  SandboxSessionClient,
+  type SandboxSessionSocket,
+  SandboxSessionSocketReadyStates,
+} from "@mistle/sandbox-session-client";
 import { createNodeSandboxSessionRuntime } from "@mistle/sandbox-session-client/node";
 
 const DefaultConnectTimeoutMs = 15_000;
@@ -77,10 +81,10 @@ export async function connectSandboxAgentConnection(
   return {
     streamId,
     socket,
-    sendText: async (message) => await client.sendText(message),
+    sendText: (message) => client.sendText(message),
     close: async (closeInput) =>
       await new Promise<void>((resolve, reject) => {
-        if (socket.readyState === 3) {
+        if (socket.readyState === SandboxSessionSocketReadyStates.CLOSED) {
           client.disconnect(
             closeInput?.code ?? DefaultCloseCode,
             closeInput?.reason ?? DefaultCloseReason,

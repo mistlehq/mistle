@@ -15,16 +15,11 @@ import (
 
 const ptyOutputReadBufferBytes = 4096
 
-type websocketReadResult struct {
-	MessageType websocket.MessageType
-	Payload     []byte
-	Err         error
-}
-
 type ptyControlAction string
 
 const (
 	ptyControlActionContinue     ptyControlAction = "continue"
+	ptyControlActionDetachStream ptyControlAction = "detach-stream"
 	ptyControlActionCloseSession ptyControlAction = "close-session"
 )
 
@@ -33,7 +28,8 @@ func handlePTYConnectRequest(
 	tunnelConn *websocket.Conn,
 	connectRequest connectRequest,
 	activePTYSession *ptySession,
-) (*ptySession, error) {
+	relayResultCh chan<- activeTunnelStreamRelayResult,
+) (*ptySession, *activeTunnelStreamRelay, error) {
 	ptyConnectRequest, err := parsePTYConnectRequest(connectRequest.RawPayload)
 	if err != nil {
 		if writeErr := writeStreamOpenError(ctx, tunnelConn, sessionprotocol.StreamOpenError{
@@ -42,9 +38,9 @@ func handlePTYConnectRequest(
 			Code:     connectErrorCodeInvalidConnectRequest,
 			Message:  err.Error(),
 		}); writeErr != nil {
-			return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
+			return activePTYSession, nil, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 		}
-		return activePTYSession, nil
+		return activePTYSession, nil, nil
 	}
 
 	if ptyConnectRequest.Channel.Session == sessionprotocol.PTYSessionModeCreate {
@@ -55,9 +51,9 @@ func handlePTYConnectRequest(
 				Code:     connectErrorCodePTYSessionExists,
 				Message:  "pty session already exists",
 			}); writeErr != nil {
-				return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
+				return activePTYSession, nil, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 			}
-			return activePTYSession, nil
+			return activePTYSession, nil, nil
 		}
 
 		activePTYSession, err = startPTYSession(ptyConnectRequest)
@@ -68,9 +64,9 @@ func handlePTYConnectRequest(
 				Code:     connectErrorCodePTYSessionCreateFailed,
 				Message:  err.Error(),
 			}); writeErr != nil {
-				return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
+				return activePTYSession, nil, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 			}
-			return activePTYSession, nil
+			return activePTYSession, nil, nil
 		}
 	}
 
@@ -82,9 +78,9 @@ func handlePTYConnectRequest(
 				Code:     connectErrorCodePTYSessionUnavailable,
 				Message:  "pty session is not available",
 			}); writeErr != nil {
-				return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
+				return activePTYSession, nil, fmt.Errorf("failed to write sandbox tunnel stream.open error: %w", writeErr)
 			}
-			return activePTYSession, nil
+			return activePTYSession, nil, nil
 		}
 	}
 
@@ -92,18 +88,47 @@ func handlePTYConnectRequest(
 		Type:     sessionprotocol.MessageTypeStreamOpenOK,
 		StreamID: connectRequest.StreamID,
 	}); err != nil {
-		return activePTYSession, fmt.Errorf("failed to write sandbox tunnel stream.open acknowledgement: %w", err)
+		return activePTYSession, nil, fmt.Errorf("failed to write sandbox tunnel stream.open acknowledgement: %w", err)
 	}
 
-	if err := relayPTYSession(ctx, tunnelConn, activePTYSession, connectRequest.StreamID); err != nil {
-		return activePTYSession, fmt.Errorf("sandbox tunnel pty relay failed: %w", err)
+	return activePTYSession, startPTYRelay(
+		ctx,
+		tunnelConn,
+		activePTYSession,
+		connectRequest.StreamID,
+		relayResultCh,
+	), nil
+}
+
+func startPTYRelay(
+	ctx context.Context,
+	tunnelConn *websocket.Conn,
+	session *ptySession,
+	streamID int,
+	relayResultCh chan<- activeTunnelStreamRelayResult,
+) *activeTunnelStreamRelay {
+	relay := &activeTunnelStreamRelay{
+		PrimaryStreamID: streamID,
+		ChannelKind:     sessionprotocol.ChannelKindPTY,
+		MessageCh:       make(chan tunnelMessage),
 	}
 
-	if activePTYSession.IsExited() {
-		activePTYSession = nil
-	}
+	go func() {
+		result := activeTunnelStreamRelayResult{
+			Relay:             relay,
+			PTYSession:        session,
+			UpdatesPTYSession: true,
+		}
+		if err := relayPTYSession(ctx, tunnelConn, session, streamID, relay.MessageCh); err != nil {
+			result.Err = fmt.Errorf("sandbox tunnel pty relay failed: %w", err)
+		}
+		if session.IsExited() {
+			result.PTYSession = nil
+		}
+		relayResultCh <- result
+	}()
 
-	return activePTYSession, nil
+	return relay
 }
 
 func relayPTYSession(
@@ -111,42 +136,124 @@ func relayPTYSession(
 	tunnelConn *websocket.Conn,
 	session *ptySession,
 	streamID int,
+	incomingMessages <-chan tunnelMessage,
 ) error {
 	relayContext, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	wsReadCh := make(chan websocketReadResult, 1)
-	go readWebsocketMessages(relayContext, tunnelConn, wsReadCh)
-
+	attachedStreamIDs := map[int]struct{}{
+		streamID: {},
+	}
+	sendWindowsByStreamID := map[int]*streamSendWindow{
+		streamID: newStreamSendWindow(),
+	}
 	ptyOutputCh := make(chan []byte, 8)
 	ptyOutputErrCh := make(chan error, 1)
 	go readPTYOutput(session, ptyOutputCh, ptyOutputErrCh)
 
 	for {
 		select {
-		case wsReadResult := <-wsReadCh:
-			if wsReadResult.Err != nil {
-				return fmt.Errorf("sandbox tunnel websocket read failed: %w", wsReadResult.Err)
-			}
-
-			switch wsReadResult.MessageType {
+		case message := <-incomingMessages:
+			switch message.MessageType {
 			case websocket.MessageBinary:
+				dataFrame, err := sessionprotocol.DecodeDataFrame(message.Payload)
+				if err != nil {
+					if writeErr := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+						Type:     sessionprotocol.MessageTypeStreamReset,
+						StreamID: streamID,
+						Code:     streamResetCodeInvalidStreamData,
+						Message:  err.Error(),
+					}); writeErr != nil {
+						return fmt.Errorf("failed to write stream.reset for invalid pty data frame: %w", writeErr)
+					}
+					return nil
+				}
+				if _, isAttachedStream := attachedStreamIDs[int(dataFrame.StreamID)]; !isAttachedStream {
+					if err := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+						Type:     sessionprotocol.MessageTypeStreamReset,
+						StreamID: int(dataFrame.StreamID),
+						Code:     streamResetCodeInvalidStreamData,
+						Message:  fmt.Sprintf("stream data frame streamId %d is not attached to the active PTY session", dataFrame.StreamID),
+					}); err != nil {
+						return fmt.Errorf("failed to write stream.reset for mismatched pty data frame: %w", err)
+					}
+					return nil
+				}
+				if dataFrame.PayloadKind != sessionprotocol.PayloadKindRawBytes {
+					if err := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+						Type:     sessionprotocol.MessageTypeStreamReset,
+						StreamID: streamID,
+						Code:     streamResetCodeInvalidStreamData,
+						Message:  fmt.Sprintf("pty stream payloadKind %d is not supported", dataFrame.PayloadKind),
+					}); err != nil {
+						return fmt.Errorf("failed to write stream.reset for unsupported pty payload kind: %w", err)
+					}
+					return nil
+				}
 				if session.IsExited() {
 					continue
 				}
-				if _, err := session.terminal.Write(wsReadResult.Payload); err != nil {
+				if _, err := session.terminal.Write(dataFrame.Payload); err != nil {
 					return fmt.Errorf("failed to write pty stdin payload: %w", err)
 				}
+				if err := writeStreamWindow(relayContext, tunnelConn, sessionprotocol.StreamWindow{
+					Type:     sessionprotocol.MessageTypeStreamWindow,
+					StreamID: int(dataFrame.StreamID),
+					Bytes:    len(dataFrame.Payload),
+				}); err != nil {
+					return fmt.Errorf("failed to write stream.window for consumed pty data: %w", err)
+				}
 			case websocket.MessageText:
+				controlMessageType, err := parseControlMessageType(message.Payload)
+				if err == nil && controlMessageType == sessionprotocol.MessageTypeStreamWindow {
+					streamWindow, windowErr := parseStreamWindow(message.Payload)
+					if windowErr != nil {
+						return windowErr
+					}
+					sendWindow := sendWindowsByStreamID[streamWindow.StreamID]
+					if sendWindow == nil {
+						if err := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+							Type:     sessionprotocol.MessageTypeStreamReset,
+							StreamID: streamWindow.StreamID,
+							Code:     streamResetCodeInvalidStreamData,
+							Message:  fmt.Sprintf("stream.window streamId %d is not attached to the active PTY session", streamWindow.StreamID),
+						}); err != nil {
+							return fmt.Errorf("failed to write stream.reset for mismatched pty stream.window: %w", err)
+						}
+						return nil
+					}
+					if err := sendWindow.add(streamWindow.Bytes); err != nil {
+						if writeErr := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+							Type:     sessionprotocol.MessageTypeStreamReset,
+							StreamID: streamWindow.StreamID,
+							Code:     streamResetCodeInvalidStreamWindow,
+							Message:  err.Error(),
+						}); writeErr != nil {
+							return fmt.Errorf("failed to write stream.reset for excessive pty stream.window: %w", writeErr)
+						}
+						if streamWindow.StreamID != streamID {
+							delete(attachedStreamIDs, streamWindow.StreamID)
+							delete(sendWindowsByStreamID, streamWindow.StreamID)
+							continue
+						}
+						return nil
+					}
+					continue
+				}
 				controlAction, err := handlePTYControlMessage(
 					relayContext,
 					tunnelConn,
 					session,
 					streamID,
-					wsReadResult.Payload,
+					attachedStreamIDs,
+					sendWindowsByStreamID,
+					message.Payload,
 				)
 				if err != nil {
 					return err
+				}
+				if controlAction == ptyControlActionDetachStream {
+					continue
 				}
 				if controlAction == ptyControlActionCloseSession {
 					return nil
@@ -154,12 +261,41 @@ func relayPTYSession(
 			default:
 				return fmt.Errorf(
 					"unsupported websocket message type for pty session: %s",
-					wsReadResult.MessageType.String(),
+					message.MessageType.String(),
 				)
 			}
 		case outputPayload := <-ptyOutputCh:
-			if err := tunnelConn.Write(relayContext, websocket.MessageBinary, outputPayload); err != nil {
-				return fmt.Errorf("failed to write pty output to websocket: %w", err)
+			for attachedStreamID := range attachedStreamIDs {
+				sendWindow := sendWindowsByStreamID[attachedStreamID]
+				if sendWindow == nil {
+					continue
+				}
+				if !sendWindow.tryConsume(len(outputPayload)) {
+					if err := writeStreamReset(relayContext, tunnelConn, sessionprotocol.StreamReset{
+						Type:     sessionprotocol.MessageTypeStreamReset,
+						StreamID: attachedStreamID,
+						Code:     streamResetCodeStreamWindowExhausted,
+						Message:  "pty stream send window is exhausted",
+					}); err != nil {
+						return fmt.Errorf("failed to write stream.reset for exhausted pty send window: %w", err)
+					}
+					delete(attachedStreamIDs, attachedStreamID)
+					delete(sendWindowsByStreamID, attachedStreamID)
+					if attachedStreamID == streamID {
+						_ = session.CloseTerminal()
+						return nil
+					}
+					continue
+				}
+				if err := writeBinaryDataFrame(
+					relayContext,
+					tunnelConn,
+					uint32(attachedStreamID),
+					sessionprotocol.PayloadKindRawBytes,
+					outputPayload,
+				); err != nil {
+					return fmt.Errorf("failed to write pty output data frame: %w", err)
+				}
 			}
 		case ptyOutputErr := <-ptyOutputErrCh:
 			if ptyOutputErr == nil ||
@@ -170,37 +306,20 @@ func relayPTYSession(
 			}
 			return fmt.Errorf("failed to read pty output: %w", ptyOutputErr)
 		case <-session.exitedCh:
-			if err := writeStreamEvent(relayContext, tunnelConn, sessionprotocol.StreamEvent{
-				Type:     sessionprotocol.MessageTypeStreamEvent,
-				StreamID: streamID,
-				Event: sessionprotocol.PTYExitEvent{
-					Type:     sessionprotocol.MessageTypePTYExit,
-					ExitCode: session.ExitCode(),
-				},
-			}); err != nil {
-				return fmt.Errorf("failed to write pty exit message: %w", err)
+			for attachedStreamID := range attachedStreamIDs {
+				if err := writeStreamEvent(relayContext, tunnelConn, sessionprotocol.StreamEvent{
+					Type:     sessionprotocol.MessageTypeStreamEvent,
+					StreamID: attachedStreamID,
+					Event: sessionprotocol.PTYExitEvent{
+						Type:     sessionprotocol.MessageTypePTYExit,
+						ExitCode: session.ExitCode(),
+					},
+				}); err != nil {
+					return fmt.Errorf("failed to write pty exit message: %w", err)
+				}
 			}
 			_ = session.CloseTerminal()
 			return nil
-		}
-	}
-}
-
-func readWebsocketMessages(ctx context.Context, connection *websocket.Conn, resultCh chan<- websocketReadResult) {
-	for {
-		messageType, payload, err := connection.Read(ctx)
-		select {
-		case resultCh <- websocketReadResult{
-			MessageType: messageType,
-			Payload:     payload,
-			Err:         err,
-		}:
-		case <-ctx.Done():
-			return
-		}
-
-		if err != nil {
-			return
 		}
 	}
 }
@@ -226,6 +345,8 @@ func handlePTYControlMessage(
 	tunnelConn *websocket.Conn,
 	session *ptySession,
 	streamID int,
+	attachedStreamIDs map[int]struct{},
+	sendWindowsByStreamID map[int]*streamSendWindow,
 	payload []byte,
 ) (ptyControlAction, error) {
 	messageType, err := parseControlMessageType(payload)
@@ -260,6 +381,8 @@ func handlePTYControlMessage(
 			return ptyControlActionContinue, nil
 		}
 
+		attachedStreamIDs[connectRequest.StreamID] = struct{}{}
+		sendWindowsByStreamID[connectRequest.StreamID] = newStreamSendWindow()
 		if err := writeStreamOpenOK(ctx, tunnelConn, sessionprotocol.StreamOpenOK{
 			Type:     sessionprotocol.MessageTypeStreamOpenOK,
 			StreamID: connectRequest.StreamID,
@@ -281,12 +404,12 @@ func handlePTYControlMessage(
 			}
 			return ptyControlActionCloseSession, nil
 		}
-		if signalMessage.StreamID != streamID {
+		if _, isAttachedStream := attachedStreamIDs[signalMessage.StreamID]; !isAttachedStream {
 			if err := writeStreamReset(ctx, tunnelConn, sessionprotocol.StreamReset{
 				Type:     sessionprotocol.MessageTypeStreamReset,
-				StreamID: streamID,
+				StreamID: signalMessage.StreamID,
 				Code:     streamResetCodeInvalidStreamSignal,
-				Message:  fmt.Sprintf("stream signal streamId %d does not match active PTY stream %d", signalMessage.StreamID, streamID),
+				Message:  fmt.Sprintf("stream signal streamId %d is not attached to the active PTY session", signalMessage.StreamID),
 			}); err != nil {
 				return ptyControlActionCloseSession, fmt.Errorf("failed to write stream.reset for mismatched pty signal: %w", err)
 			}
@@ -309,16 +432,21 @@ func handlePTYControlMessage(
 			}
 			return ptyControlActionCloseSession, nil
 		}
-		if closeRequest.StreamID != streamID {
+		if _, isAttachedStream := attachedStreamIDs[closeRequest.StreamID]; !isAttachedStream {
 			if err := writeStreamReset(ctx, tunnelConn, sessionprotocol.StreamReset{
 				Type:     sessionprotocol.MessageTypeStreamReset,
-				StreamID: streamID,
+				StreamID: closeRequest.StreamID,
 				Code:     streamResetCodeInvalidStreamClose,
-				Message:  fmt.Sprintf("stream close streamId %d does not match active PTY stream %d", closeRequest.StreamID, streamID),
+				Message:  fmt.Sprintf("stream close streamId %d is not attached to the active PTY session", closeRequest.StreamID),
 			}); err != nil {
 				return ptyControlActionCloseSession, fmt.Errorf("failed to write stream.reset for mismatched pty close: %w", err)
 			}
 			return ptyControlActionCloseSession, nil
+		}
+		if closeRequest.StreamID != streamID {
+			delete(attachedStreamIDs, closeRequest.StreamID)
+			delete(sendWindowsByStreamID, closeRequest.StreamID)
+			return ptyControlActionDetachStream, nil
 		}
 
 		exitCode, terminateErr := session.Terminate()
@@ -334,15 +462,17 @@ func handlePTYControlMessage(
 			return ptyControlActionCloseSession, nil
 		}
 
-		if err := writeStreamEvent(ctx, tunnelConn, sessionprotocol.StreamEvent{
-			Type:     sessionprotocol.MessageTypeStreamEvent,
-			StreamID: streamID,
-			Event: sessionprotocol.PTYExitEvent{
-				Type:     sessionprotocol.MessageTypePTYExit,
-				ExitCode: exitCode,
-			},
-		}); err != nil {
-			return ptyControlActionCloseSession, fmt.Errorf("failed to write stream.event for pty close: %w", err)
+		for attachedStreamID := range attachedStreamIDs {
+			if err := writeStreamEvent(ctx, tunnelConn, sessionprotocol.StreamEvent{
+				Type:     sessionprotocol.MessageTypeStreamEvent,
+				StreamID: attachedStreamID,
+				Event: sessionprotocol.PTYExitEvent{
+					Type:     sessionprotocol.MessageTypePTYExit,
+					ExitCode: exitCode,
+				},
+			}); err != nil {
+				return ptyControlActionCloseSession, fmt.Errorf("failed to write stream.event for pty close: %w", err)
+			}
 		}
 
 		_ = session.CloseTerminal()

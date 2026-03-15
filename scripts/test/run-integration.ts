@@ -7,6 +7,7 @@ import {
   acquireSharedPostgresMailpitInfra,
   DEFAULT_SHARED_INTEGRATION_INFRA_KEY,
 } from "../../packages/test-harness/src/index.ts";
+import { ensureIntegrationRunId } from "./integration-run-id.ts";
 
 const INTEGRATION_SCRIPT = "test:integration";
 const WORKSPACE_DIRECTORIES: ReadonlyArray<string> = ["apps", "packages"];
@@ -233,6 +234,8 @@ async function runTargets(input: {
 
 async function main(): Promise<void> {
   debugLog("main: start");
+  const integrationRunId = ensureIntegrationRunId(process.env);
+  debugLog(`main: integrationRunId=${integrationRunId}`);
   const discoveredTargets = await discoverIntegrationTargets();
   debugLog(`main: discoveredTargets=${String(discoveredTargets.length)}`);
   const requestedTargets = process.argv.slice(2).filter((argument) => argument !== "--");

@@ -518,6 +518,9 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
+      '@mistle/test-harness':
+        specifier: workspace:*
+        version: link:../../packages/test-harness
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
@@ -561,6 +564,9 @@ importers:
         specifier: ^4.1.12
         version: 4.3.6
     devDependencies:
+      '@mistle/sandbox-session-protocol':
+        specifier: workspace:*
+        version: link:../sandbox-session-protocol
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
@@ -1003,6 +1009,9 @@ importers:
       '@mistle/db':
         specifier: workspace:*
         version: link:../packages/db
+      '@mistle/sandbox-session-protocol':
+        specifier: workspace:*
+        version: link:../packages/sandbox-session-protocol
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../packages/test-harness

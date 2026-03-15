@@ -3,17 +3,14 @@ import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
 import { systemClock, systemScheduler } from "@mistle/time";
 import { typeid } from "typeid-js";
+import type { WebSocketServer } from "ws";
 
 import { createApp, stopApp } from "../app.js";
 import { startServer } from "../server.js";
 import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory-relay-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
-import {
-  GatewayForwardingClient,
-  GatewayForwardingServer,
-  InteractiveStreamRouter,
-} from "../tunnel/gateway-forwarding/index.js";
+import { InteractiveStreamRouter } from "../tunnel/gateway-forwarding/index.js";
 import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
 import { SandboxOwnerLeaseHeartbeat } from "../tunnel/ownership/sandbox-owner-lease-heartbeat.js";
 import { StoreBackedSandboxOwnerResolver } from "../tunnel/ownership/store-backed-sandbox-owner-resolver.js";
@@ -28,6 +25,24 @@ import type {
 } from "../types.js";
 
 const OwnerLeaseRenewIntervalMs = 10_000;
+const DefaultMaxActiveBindingsPerSandbox = 32;
+
+function closeWebSocketServer(webSocketServer: WebSocketServer): Promise<void> {
+  for (const client of webSocketServer.clients) {
+    client.terminate();
+  }
+
+  return new Promise((resolve, reject) => {
+    webSocketServer.close((error?: Error) => {
+      if (error !== undefined) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
 
 export function createDataPlaneGatewayRuntime(
   config: DataPlaneGatewayRuntimeConfig,
@@ -39,13 +54,12 @@ export function createDataPlaneGatewayRuntime(
   const sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
   const sandboxOwnerResolver = new StoreBackedSandboxOwnerResolver(nodeId, sandboxOwnerStore);
   const tunnelSessionRegistry = new TunnelSessionRegistry(
-    new InMemoryTunnelSessionRegistryAdapter(),
+    new InMemoryTunnelSessionRegistryAdapter(DefaultMaxActiveBindingsPerSandbox),
   );
-  const gatewayForwardingServer = new GatewayForwardingServer(
-    new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry),
-  );
-  const gatewayForwardingClient = new GatewayForwardingClient(
-    new LocalGatewayForwardingClientAdapter(nodeId, gatewayForwardingServer),
+  const gatewayForwardingServer = new LocalGatewayForwardingServerAdapter(tunnelSessionRegistry);
+  const gatewayForwardingClient = new LocalGatewayForwardingClientAdapter(
+    nodeId,
+    gatewayForwardingServer,
   );
   const interactiveStreamRouter = new InteractiveStreamRouter(
     nodeId,
@@ -98,6 +112,8 @@ export function createDataPlaneGatewayRuntime(
   let stopped = false;
 
   async function stopRuntimeResources(): Promise<void> {
+    await closeWebSocketServer(nodeWebSocket.wss);
+
     if (startedServer !== undefined) {
       await startedServer.close();
       startedServer = undefined;

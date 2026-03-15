@@ -1,3 +1,11 @@
+import {
+  decodeDataFrame,
+  DefaultStreamWindowBytes,
+  encodeDataFrame,
+  MaxStreamWindowBytes,
+  parseStreamControlMessage,
+  PayloadKindWebSocketText,
+} from "@mistle/sandbox-session-protocol";
 import { systemSleeper } from "@mistle/time";
 import { afterEach, describe, expect, it } from "vitest";
 import { type RawData, WebSocketServer } from "ws";
@@ -18,9 +26,12 @@ type TestServerMode = "accept" | "close_after_payload" | "reject";
 type TestServer = {
   url: string;
   openRequest: Promise<string>;
-  payload: Promise<string>;
+  payload: Promise<{ streamId: number; payload: string }>;
+  receivedPayloads: Array<{ streamId: number; payload: string }>;
   socketClosed: Promise<void>;
+  windowUpdate: Promise<{ bytes: number; streamId: number }>;
   sendNotification: (payload: unknown) => void;
+  sendWindowUpdate: (bytes: number) => void;
   closeClientSocket: () => void;
   close: () => Promise<void>;
 };
@@ -50,24 +61,51 @@ function createDeferred<T>(): Deferred<T> {
   };
 }
 
-function toText(data: RawData): string {
+function toUint8Array(data: RawData): Uint8Array {
   if (typeof data === "string") {
-    return data;
+    return new TextEncoder().encode(data);
   }
   if (data instanceof ArrayBuffer) {
-    return Buffer.from(data).toString("utf8");
+    return new Uint8Array(data);
   }
   if (Buffer.isBuffer(data)) {
-    return data.toString("utf8");
+    return new Uint8Array(data);
   }
 
-  return Buffer.concat(data).toString("utf8");
+  return new Uint8Array(Buffer.concat(data));
+}
+
+function toText(data: RawData): string {
+  return new TextDecoder().decode(toUint8Array(data));
+}
+
+function encodeAgentTextDataFrame(streamId: number, payload: string): Uint8Array {
+  return encodeDataFrame({
+    streamId,
+    payloadKind: PayloadKindWebSocketText,
+    payload: new TextEncoder().encode(payload),
+  });
+}
+
+function decodeAgentTextDataFrame(data: RawData): { streamId: number; payload: string } {
+  const dataFrame = decodeDataFrame(toUint8Array(data));
+  if (dataFrame.payloadKind !== PayloadKindWebSocketText) {
+    throw new Error(
+      `Expected websocket text payload kind ${String(PayloadKindWebSocketText)}, received ${String(dataFrame.payloadKind)}.`,
+    );
+  }
+
+  return {
+    streamId: dataFrame.streamId,
+    payload: new TextDecoder().decode(dataFrame.payload),
+  };
 }
 
 async function startTestServer(mode: TestServerMode): Promise<TestServer> {
   const openRequestDeferred = createDeferred<string>();
-  const payloadDeferred = createDeferred<string>();
+  const payloadDeferred = createDeferred<{ streamId: number; payload: string }>();
   const socketClosedDeferred = createDeferred<void>();
+  const windowUpdateDeferred = createDeferred<{ bytes: number; streamId: number }>();
 
   const wsServer = new WebSocketServer({
     host: "127.0.0.1",
@@ -80,42 +118,76 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
   });
 
   let connectedSocket: import("ws").WebSocket | null = null;
+  let activeStreamId: number | null = null;
+  const receivedPayloads: Array<{ streamId: number; payload: string }> = [];
 
   wsServer.on("connection", (socket) => {
     connectedSocket = socket;
-    let didHandleOpenRequest = false;
+    let didHandleConnect = false;
 
     socket.on("message", (message) => {
-      const payloadText = toText(message);
-      if (!didHandleOpenRequest) {
-        didHandleOpenRequest = true;
-        openRequestDeferred.resolve(payloadText);
-
-        const controlMessage = parseStreamOpenControlMessage(
-          JSON.stringify({
-            type: mode === "reject" ? "stream.open.error" : "stream.open.ok",
-            streamId: 1,
-            ...(mode === "reject"
-              ? {
-                  code: "agent_endpoint_unavailable",
-                  message: "agent endpoint unavailable",
-                }
-              : {}),
-          }),
-        );
-        if (controlMessage === null) {
-          openRequestDeferred.reject(new Error("Expected valid stream.open control message."));
+      if (didHandleConnect) {
+        const controlMessage = parseStreamControlMessage(toText(message));
+        if (controlMessage?.type === "stream.window") {
+          windowUpdateDeferred.resolve({
+            bytes: controlMessage.bytes,
+            streamId: controlMessage.streamId,
+          });
           return;
         }
 
-        socket.send(JSON.stringify(controlMessage));
+        try {
+          const decodedPayload = decodeAgentTextDataFrame(message);
+          receivedPayloads.push(decodedPayload);
+          if (receivedPayloads.length === 1) {
+            payloadDeferred.resolve(decodedPayload);
+          }
+        } catch (error) {
+          payloadDeferred.reject(error);
+        }
+
+        if (mode === "close_after_payload") {
+          socket.close(1011, "close after payload");
+        }
         return;
       }
 
-      payloadDeferred.resolve(payloadText);
-      if (mode === "close_after_payload") {
-        socket.close(1011, "close after payload");
+      didHandleConnect = true;
+      const openRequestText = toText(message);
+      openRequestDeferred.resolve(openRequestText);
+      const parsedOpenRequest = JSON.parse(openRequestText);
+      if (
+        typeof parsedOpenRequest !== "object" ||
+        parsedOpenRequest === null ||
+        Array.isArray(parsedOpenRequest) ||
+        !("streamId" in parsedOpenRequest) ||
+        typeof parsedOpenRequest.streamId !== "number"
+      ) {
+        openRequestDeferred.reject(
+          new Error("Expected stream.open to provide a numeric streamId."),
+        );
+        return;
       }
+      activeStreamId = parsedOpenRequest.streamId;
+
+      const controlMessage = parseStreamOpenControlMessage(
+        JSON.stringify({
+          type: mode === "reject" ? "stream.open.error" : "stream.open.ok",
+          streamId: 1,
+          ...(mode === "reject"
+            ? {
+                code: "agent_endpoint_unavailable",
+                message: "agent endpoint unavailable",
+              }
+            : {}),
+        }),
+      );
+      if (controlMessage === null) {
+        openRequestDeferred.reject(new Error("Expected valid stream.open control message."));
+        return;
+      }
+
+      socket.send(JSON.stringify(controlMessage));
     });
 
     socket.on("close", () => {
@@ -138,13 +210,34 @@ async function startTestServer(mode: TestServerMode): Promise<TestServer> {
     url: `ws://127.0.0.1:${String(address.port)}`,
     openRequest: openRequestDeferred.promise,
     payload: payloadDeferred.promise,
+    receivedPayloads,
     socketClosed: socketClosedDeferred.promise,
+    windowUpdate: windowUpdateDeferred.promise,
     sendNotification: (payload) => {
       if (connectedSocket === null) {
         throw new Error("Expected websocket client to be connected before sending payload.");
       }
+      if (activeStreamId === null) {
+        throw new Error("Expected stream.open to complete before sending framed payload.");
+      }
 
-      connectedSocket.send(JSON.stringify(payload));
+      connectedSocket.send(encodeAgentTextDataFrame(activeStreamId, JSON.stringify(payload)));
+    },
+    sendWindowUpdate: (bytes) => {
+      if (connectedSocket === null) {
+        throw new Error("Expected websocket client to be connected before sending window update.");
+      }
+      if (activeStreamId === null) {
+        throw new Error("Expected stream.open to complete before sending window update.");
+      }
+
+      connectedSocket.send(
+        JSON.stringify({
+          type: "stream.window",
+          streamId: activeStreamId,
+          bytes,
+        }),
+      );
     },
     closeClientSocket: () => {
       if (connectedSocket === null) {
@@ -347,6 +440,103 @@ describe("sandbox session client", () => {
     expect(client.state).toBe("closed");
   });
 
+  it("sends framed websocket text data after the agent stream opens", async () => {
+    const server = await createManagedTestServer("accept");
+    const client = createClient(server.url);
+
+    await expectClientToOpenAgentStream({
+      client,
+      server,
+    });
+
+    await client.sendJson({
+      jsonrpc: "2.0",
+      id: "req-1",
+      method: "ping",
+    });
+
+    expect(await server.payload).toEqual({
+      streamId: 1,
+      payload: JSON.stringify({
+        jsonrpc: "2.0",
+        id: "req-1",
+        method: "ping",
+      }),
+    });
+  });
+
+  it("returns stream.window credit after consuming an inbound framed payload", async () => {
+    const server = await createManagedTestServer("accept");
+    const client = createClient(server.url);
+
+    await expectClientToOpenAgentStream({
+      client,
+      server,
+    });
+
+    const notificationPayload = {
+      method: "turn/completed",
+      params: {
+        turn: {
+          id: "turn_123",
+        },
+      },
+    };
+    server.sendNotification(notificationPayload);
+
+    expect(await server.windowUpdate).toEqual({
+      bytes: Buffer.byteLength(JSON.stringify(notificationPayload)),
+      streamId: 1,
+    });
+  });
+
+  it("restores send credit when the server grants stream.window bytes", async () => {
+    const server = await createManagedTestServer("accept");
+    const client = createClient(server.url);
+
+    await expectClientToOpenAgentStream({
+      client,
+      server,
+    });
+
+    let exhaustionError: Error | null = null;
+    for (let iteration = 0; iteration < DefaultStreamWindowBytes; iteration += 1) {
+      try {
+        await client.sendJson({
+          payload: "x".repeat(1024),
+        });
+      } catch (error) {
+        if (!(error instanceof Error)) {
+          throw error;
+        }
+        exhaustionError = error;
+        break;
+      }
+    }
+
+    expect(exhaustionError?.message).toBe("Sandbox session stream send window is exhausted.");
+
+    server.sendWindowUpdate(MaxStreamWindowBytes);
+
+    await client.sendJson({
+      payload: "recovered",
+    });
+
+    await waitForCondition({
+      description: "recovered payload to reach the server",
+      timeoutMs: 500,
+      evaluate: () => server.receivedPayloads.length >= 2,
+    });
+
+    const recoveredPayload = server.receivedPayloads.at(-1);
+    expect(recoveredPayload).toEqual({
+      streamId: 1,
+      payload: JSON.stringify({
+        payload: "recovered",
+      }),
+    });
+  });
+
   it("surfaces stream.open errors from the websocket handshake", async () => {
     const server = await createManagedTestServer("reject");
     const client = createClient(server.url);
@@ -387,7 +577,10 @@ describe("sandbox session client", () => {
 
     expect(client.sendGuarantee).toBe(SandboxSessionSendGuarantees.QUEUED);
     await client.sendText(JSON.stringify({ method: "initialized" }));
-    expect(await server.payload).toBe(JSON.stringify({ method: "initialized" }));
+    expect(await server.payload).toEqual({
+      streamId: 1,
+      payload: JSON.stringify({ method: "initialized" }),
+    });
     await server.socketClosed;
   });
 
