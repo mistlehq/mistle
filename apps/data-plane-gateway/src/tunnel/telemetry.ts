@@ -5,6 +5,7 @@ import type { RelayPeerSide } from "./types.js";
 type TunnelTokenKind = "bootstrap" | "connection";
 
 const NormalCloseCodes = new Set([1000, 1001]);
+const NoStatusReceivedCloseCode = 1005;
 const ReplacedCloseReason = "Replaced by newer sandbox tunnel connection.";
 const PeerDisconnectedCloseReason = "Sandbox tunnel peer disconnected.";
 
@@ -28,7 +29,7 @@ export function getSandboxTunnelSessionAttributes(input: {
 
 export function classifySandboxTunnelClose(input: { closeCode: number; closeReason: string }): {
   outcome: "normal" | "replaced" | "peer_disconnected" | "error";
-  logLevel: "info" | "warn";
+  logLevel: "debug" | "info" | "warn";
   spanStatusCode: SpanStatusCode;
   spanStatusMessage?: string;
 } {
@@ -52,6 +53,14 @@ export function classifySandboxTunnelClose(input: { closeCode: number; closeReas
     return {
       outcome: "peer_disconnected",
       logLevel: "info",
+      spanStatusCode: SpanStatusCode.UNSET,
+    };
+  }
+
+  if (input.closeCode === NoStatusReceivedCloseCode && input.closeReason.length === 0) {
+    return {
+      outcome: "peer_disconnected",
+      logLevel: "debug",
       spanStatusCode: SpanStatusCode.UNSET,
     };
   }
