@@ -8,16 +8,11 @@ import type {
   ActiveAutomationConversationDeliveryTask,
   EnsuredAutomationSandbox,
   HandleAutomationConversationDeliveryWorkflowInput,
-  ResolvedAutomationConversationDeliveryRoute,
   PreparedAutomationRun,
+  ResolvedAutomationConversationDeliveryRoute,
 } from "../workflow-types.js";
 import {
-  acquireAutomationConnection,
   ensureAutomationSandbox,
-  markAutomationRunCompleted,
-  markAutomationRunFailed,
-  markAutomationRunIgnored,
-  prepareAutomationRun,
   type AcquireAutomationConnectionDependencies,
   type EnsureAutomationSandboxDependencies,
 } from "./automation-run.js";
@@ -34,11 +29,8 @@ import {
   AutomationConversationPersistenceErrorCodes,
   claimNextAutomationConversationDeliveryTask,
   createAutomationConversationRoute,
-  finalizeAutomationConversationDeliveryTask,
   findActiveAutomationConversationDeliveryTask,
-  idleAutomationConversationDeliveryProcessorIfEmpty,
   markAutomationConversationDeliveryTaskDelivering,
-  resolveAutomationConversationDeliveryTaskAction,
   updateAutomationConversationExecution,
 } from "./persistence/index.js";
 
@@ -123,47 +115,6 @@ export async function claimOrResumeAutomationConversationDeliveryTask(
   };
 }
 
-export async function idleAutomationConversationDeliveryProcessor(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: HandleAutomationConversationDeliveryWorkflowInput,
-): Promise<boolean> {
-  return idleAutomationConversationDeliveryProcessorIfEmpty(
-    {
-      db: ctx.db,
-    },
-    input,
-  );
-}
-
-export async function resolveAutomationConversationDeliveryActiveTaskAction(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: {
-    taskId: string;
-    generation: number;
-  },
-) {
-  return resolveAutomationConversationDeliveryTaskAction(
-    {
-      db: ctx.db,
-    },
-    input,
-  );
-}
-
-export async function prepareConversationDeliveryAutomationRun(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: { automationRunId: string },
-): Promise<PreparedAutomationRun> {
-  return prepareAutomationRun(
-    {
-      db: ctx.db,
-    },
-    {
-      automationRunId: input.automationRunId,
-    },
-  );
-}
-
 export async function resolveAutomationConversationDeliveryRoute(
   ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
   input: {
@@ -237,25 +188,6 @@ export async function ensureConversationDeliverySandbox(
     {
       preparedAutomationRun: input.preparedAutomationRun,
     },
-  );
-}
-
-export async function acquireConversationDeliveryConnection(
-  ctx: Pick<
-    HandleAutomationConversationDeliveryDependencies,
-    "getSandboxInstance" | "mintSandboxConnectionToken"
-  >,
-  input: {
-    preparedAutomationRun: PreparedAutomationRun;
-    ensuredAutomationSandbox: EnsuredAutomationSandbox;
-  },
-): Promise<AcquiredAutomationConnection> {
-  return acquireAutomationConnection(
-    {
-      getSandboxInstance: ctx.getSandboxInstance,
-      mintSandboxConnectionToken: ctx.mintSandboxConnectionToken,
-    },
-    input,
   );
 }
 
@@ -396,67 +328,4 @@ export async function deliverConversationAutomationPayload(
     },
   );
 }
-
-export async function completeConversationDeliveryAutomationRun(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: {
-    automationRunId: string;
-  },
-): Promise<void> {
-  await markAutomationRunCompleted(
-    {
-      db: ctx.db,
-    },
-    input,
-  );
-}
-
-export async function ignoreAutomationConversationDeliveryAutomationRun(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: {
-    automationRunId: string;
-  },
-): Promise<void> {
-  await markAutomationRunIgnored(
-    {
-      db: ctx.db,
-    },
-    input,
-  );
-}
-
-export async function failConversationDeliveryAutomationRun(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: {
-    automationRunId: string;
-    failureCode: string;
-    failureMessage: string;
-  },
-): Promise<void> {
-  await markAutomationRunFailed(
-    {
-      db: ctx.db,
-    },
-    input,
-  );
-}
-
-export async function finalizeAutomationConversationDeliveryActiveTask(
-  ctx: Pick<HandleAutomationConversationDeliveryDependencies, "db">,
-  input: {
-    taskId: string;
-    generation: number;
-    status: "completed" | "failed" | "ignored";
-    failureCode?: string | null;
-    failureMessage?: string | null;
-  },
-): Promise<void> {
-  await finalizeAutomationConversationDeliveryTask(
-    {
-      db: ctx.db,
-    },
-    input,
-  );
-}
-
 export { AutomationConversationDeliveryTaskActions };

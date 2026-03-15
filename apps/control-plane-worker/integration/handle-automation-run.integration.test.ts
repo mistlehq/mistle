@@ -47,13 +47,13 @@ import { HandleAutomationRunWorkflow } from "../openworkflow/handle-automation-r
 import {
   AutomationConversationDeliveryTaskActions,
   claimOrResumeAutomationConversationDeliveryTask,
-  finalizeAutomationConversationDeliveryActiveTask,
+  finalizeAutomationConversationDeliveryTask,
   handoffAutomationRunDelivery,
-  ignoreAutomationConversationDeliveryAutomationRun,
-  idleAutomationConversationDeliveryProcessor,
+  idleAutomationConversationDeliveryProcessorIfEmpty,
+  markAutomationRunIgnored,
   markAutomationRunFailed,
   prepareAutomationRun,
-  resolveAutomationConversationDeliveryActiveTaskAction,
+  resolveAutomationConversationDeliveryTaskAction,
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
 } from "../src/runtime/workflows/index.js";
@@ -1141,7 +1141,7 @@ describe("handleAutomationRun integration", () => {
           throw new Error("Expected newer task to be claimable.");
         }
         expect(
-          await resolveAutomationConversationDeliveryActiveTaskAction(
+          await resolveAutomationConversationDeliveryTaskAction(
             {
               db: database.db,
             },
@@ -1158,7 +1158,7 @@ describe("handleAutomationRun integration", () => {
             status: AutomationRunStatuses.COMPLETED,
           })
           .where(eq(automationRuns.id, newerAutomationRunId));
-        await finalizeAutomationConversationDeliveryActiveTask(
+        await finalizeAutomationConversationDeliveryTask(
           {
             db: database.db,
           },
@@ -1219,7 +1219,7 @@ describe("handleAutomationRun integration", () => {
           throw new Error("Expected older task to be claimable.");
         }
         expect(
-          await resolveAutomationConversationDeliveryActiveTaskAction(
+          await resolveAutomationConversationDeliveryTaskAction(
             {
               db: database.db,
             },
@@ -1229,7 +1229,7 @@ describe("handleAutomationRun integration", () => {
             },
           ),
         ).toBe(AutomationConversationDeliveryTaskActions.IGNORE);
-        await ignoreAutomationConversationDeliveryAutomationRun(
+        await markAutomationRunIgnored(
           {
             db: database.db,
           },
@@ -1237,7 +1237,7 @@ describe("handleAutomationRun integration", () => {
             automationRunId: claimedOlderTask.automationRunId,
           },
         );
-        await finalizeAutomationConversationDeliveryActiveTask(
+        await finalizeAutomationConversationDeliveryTask(
           {
             db: database.db,
           },
@@ -1247,7 +1247,7 @@ describe("handleAutomationRun integration", () => {
             status: "ignored",
           },
         );
-        await idleAutomationConversationDeliveryProcessor(
+        await idleAutomationConversationDeliveryProcessorIfEmpty(
           {
             db: database.db,
           },

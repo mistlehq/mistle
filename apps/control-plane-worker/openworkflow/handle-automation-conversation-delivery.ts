@@ -4,17 +4,17 @@ import { defineWorkflow } from "openworkflow";
 import { getWorkflowContext } from "../src/openworkflow/context.js";
 import { executeConversationProviderDelivery } from "../src/runtime/automation-workflows/provider/execute-conversation-provider-delivery.js";
 import {
-  acquireConversationDeliveryConnection,
+  acquireAutomationConnection,
   claimOrResumeAutomationConversationDeliveryTask,
-  completeConversationDeliveryAutomationRun,
   deliverConversationAutomationPayload,
   ensureConversationDeliverySandbox,
-  failConversationDeliveryAutomationRun,
-  finalizeAutomationConversationDeliveryActiveTask,
-  idleAutomationConversationDeliveryProcessor,
-  ignoreAutomationConversationDeliveryAutomationRun,
-  prepareConversationDeliveryAutomationRun,
-  resolveAutomationConversationDeliveryActiveTaskAction,
+  finalizeAutomationConversationDeliveryTask,
+  idleAutomationConversationDeliveryProcessorIfEmpty,
+  markAutomationRunCompleted,
+  markAutomationRunFailed,
+  markAutomationRunIgnored,
+  prepareAutomationRun,
+  resolveAutomationConversationDeliveryTaskAction,
   resolveAutomationConversationDeliveryRoute,
   resolveAutomationRunFailure,
 } from "../src/runtime/workflows/index.js";
@@ -46,7 +46,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
         const didIdleProcessor = await step.run(
           { name: `idle-conversation-delivery-processor-if-empty:${String(iteration)}` },
           async () =>
-            idleAutomationConversationDeliveryProcessor(
+            idleAutomationConversationDeliveryProcessorIfEmpty(
               {
                 db,
               },
@@ -72,7 +72,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
           }),
         },
         async () =>
-          resolveAutomationConversationDeliveryActiveTaskAction(
+          resolveAutomationConversationDeliveryTaskAction(
             {
               db,
             },
@@ -92,7 +92,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            ignoreAutomationConversationDeliveryAutomationRun(
+            markAutomationRunIgnored(
               {
                 db,
               },
@@ -110,7 +110,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            finalizeAutomationConversationDeliveryActiveTask(
+            finalizeAutomationConversationDeliveryTask(
               {
                 db,
               },
@@ -137,7 +137,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            prepareConversationDeliveryAutomationRun(
+            prepareAutomationRun(
               {
                 db,
               },
@@ -196,7 +196,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            acquireConversationDeliveryConnection(
+            acquireAutomationConnection(
               {
                 getSandboxInstance: (sandboxInput) =>
                   controlPlaneInternalClient.getSandboxInstance(sandboxInput),
@@ -242,7 +242,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            completeConversationDeliveryAutomationRun(
+            markAutomationRunCompleted(
               {
                 db,
               },
@@ -260,7 +260,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            finalizeAutomationConversationDeliveryActiveTask(
+            finalizeAutomationConversationDeliveryTask(
               {
                 db,
               },
@@ -284,7 +284,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            failConversationDeliveryAutomationRun(
+            markAutomationRunFailed(
               {
                 db,
               },
@@ -304,7 +304,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            finalizeAutomationConversationDeliveryActiveTask(
+            finalizeAutomationConversationDeliveryTask(
               {
                 db,
               },
