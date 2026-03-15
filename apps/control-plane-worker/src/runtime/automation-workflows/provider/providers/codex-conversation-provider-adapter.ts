@@ -252,35 +252,35 @@ async function sendJsonRpcRequest(
   rpcClient: CodexJsonRpcClient,
   input: { method: string; params?: unknown },
 ): Promise<unknown> {
-  return await withRequestTimeout(input.method, rpcClient.call(input.method, input.params)).catch(
-    (error: unknown) => {
-      if (error instanceof CodexJsonRpcRequestError) {
-        throw new ConversationProviderError({
-          code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
-          message: `Codex app-server request '${input.method}' failed (${String(error.code)}): ${error.message.replace(/^JSON-RPC request .* failed with code .*: /u, "")}`,
-          cause: {
-            method: error.method,
-            errorCode: error.code,
-            errorMessage: error.message.replace(/^JSON-RPC request .* failed with code .*: /u, ""),
-            ...(error.data === undefined ? {} : { errorData: error.data }),
-          },
-        });
-      }
+  const requestHandle = rpcClient.callWithHandle(input.method, input.params);
+  return await withRequestTimeout(input.method, requestHandle).catch((error: unknown) => {
+    if (error instanceof CodexJsonRpcRequestError) {
+      throw new ConversationProviderError({
+        code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
+        message: `Codex app-server request '${input.method}' failed (${String(error.code)}): ${error.message.replace(/^JSON-RPC request .* failed with code .*: /u, "")}`,
+        cause: {
+          method: error.method,
+          errorCode: error.code,
+          errorMessage: error.message.replace(/^JSON-RPC request .* failed with code .*: /u, ""),
+          ...(error.data === undefined ? {} : { errorData: error.data }),
+        },
+      });
+    }
 
-      throw wrapProviderRequestFailure(input.method, error);
-    },
-  );
+    throw wrapProviderRequestFailure(input.method, error);
+  });
 }
 
 async function initializeCodexSession(rpcClient: CodexJsonRpcClient): Promise<void> {
-  const initializeResult = await withRequestTimeout(
-    "initialize",
-    rpcClient.initialize({
-      clientInfo: CodexInitializeClientInfo,
-    }),
-  ).catch((error: unknown) => {
-    throw wrapProviderRequestFailure("initialize", error);
+  const initializeHandle = rpcClient.callWithHandle("initialize", {
+    clientInfo: CodexInitializeClientInfo,
   });
+  const initializeResult = await withRequestTimeout("initialize", initializeHandle).catch(
+    (error: unknown) => {
+      throw wrapProviderRequestFailure("initialize", error);
+    },
+  );
+  await rpcClient.notify("initialized", {});
   if (!isRecord(initializeResult) || typeof initializeResult.userAgent !== "string") {
     throw new ConversationProviderError({
       code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
@@ -322,7 +322,10 @@ function wrapProviderRequestFailure(method: string, error: unknown): Conversatio
   });
 }
 
-async function withRequestTimeout<T>(method: string, promise: Promise<T>): Promise<T> {
+async function withRequestTimeout<T>(
+  method: string,
+  handle: { promise: Promise<T>; cancel: (error?: Error) => void },
+): Promise<T> {
   return await new Promise<T>((resolve, reject) => {
     let settled = false;
     const timeout: TimerHandle = systemScheduler.schedule(() => {
@@ -330,6 +333,12 @@ async function withRequestTimeout<T>(method: string, promise: Promise<T>): Promi
         return;
       }
       settled = true;
+      handle.cancel(
+        new ConversationProviderError({
+          code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
+          message: `Timed out waiting ${String(CodexJsonRpcRequestTimeoutMs)}ms for Codex app-server request '${method}'.`,
+        }),
+      );
       reject(
         new ConversationProviderError({
           code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
@@ -347,7 +356,7 @@ async function withRequestTimeout<T>(method: string, promise: Promise<T>): Promi
       callback();
     };
 
-    void promise.then(
+    void handle.promise.then(
       (value) => {
         settle(() => resolve(value));
       },

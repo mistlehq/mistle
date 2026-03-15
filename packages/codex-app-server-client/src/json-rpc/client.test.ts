@@ -29,6 +29,7 @@ type TestServer = {
   threadListRequest: Promise<string>;
   socketClosed: Promise<void>;
   closeClientSocket: () => void;
+  sendThreadListResult: (result: unknown) => void;
   close: () => Promise<void>;
 };
 
@@ -117,6 +118,7 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
 
   let connectedSocket: import("ws").WebSocket | null = null;
   let didHandleOpen = false;
+  let latestThreadListRequestId: string | number | null = null;
 
   wsServer.on("connection", (socket: import("ws").WebSocket) => {
     connectedSocket = socket;
@@ -188,6 +190,10 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
       }
 
       if (payload.method === "thread/list") {
+        latestThreadListRequestId =
+          "id" in payload && (typeof payload.id === "string" || typeof payload.id === "number")
+            ? payload.id
+            : null;
         if (mode === "error_on_thread_list") {
           socket.send(
             JSON.stringify({
@@ -244,6 +250,21 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
       }
 
       connectedSocket.close(1011, "forced close");
+    },
+    sendThreadListResult: (result) => {
+      if (connectedSocket === null) {
+        throw new Error("Expected websocket client to be connected before sending a response.");
+      }
+      if (latestThreadListRequestId === null) {
+        throw new Error("Expected a thread/list request before sending a response.");
+      }
+
+      connectedSocket.send(
+        JSON.stringify({
+          id: latestThreadListRequestId,
+          result,
+        }),
+      );
     },
     close: async () => {
       if (connectedSocket !== null) {
@@ -335,6 +356,26 @@ describe("codex json-rpc client", () => {
     expect(sessionClient.state).toBe("ready");
   });
 
+  it("still marks a browser session ready when the ready probe gets a JSON-RPC error", async () => {
+    const server = await startJsonRpcTestServer("error_on_thread_list");
+    openServers.add(server);
+
+    const sessionClient = new CodexSessionClient({
+      connectionUrl: server.url,
+      runtime: createBrowserCodexSessionRuntime(),
+    });
+    await sessionClient.connect();
+
+    const rpcClient = new CodexJsonRpcClient(sessionClient);
+
+    await rpcClient.initialize();
+
+    expect(JSON.parse(await server.initializedNotification)).toMatchObject({
+      method: "initialized",
+    });
+    expect(sessionClient.state).toBe("ready");
+  });
+
   it("surfaces structured request errors for failed Codex calls", async () => {
     const server = await startJsonRpcTestServer("error_on_thread_list");
     openServers.add(server);
@@ -355,6 +396,37 @@ describe("codex json-rpc client", () => {
         threadId: "thread_missing",
       },
     } satisfies Partial<CodexJsonRpcRequestError>);
+  });
+
+  it("cancels pending requests so late responses are ignored", async () => {
+    const server = await startJsonRpcTestServer("stay_open");
+    openServers.add(server);
+
+    const sessionClient = new CodexSessionClient({
+      connectionUrl: server.url,
+      runtime: createNodeCodexSessionRuntime(),
+    });
+    await sessionClient.connect();
+
+    const rpcClient = new CodexJsonRpcClient(sessionClient);
+    const requestHandle = rpcClient.callWithHandle("thread/list", {
+      limit: 1,
+    });
+
+    await server.threadListRequest;
+    requestHandle.cancel(new Error("request canceled"));
+
+    await expect(requestHandle.promise).rejects.toThrow("request canceled");
+
+    server.sendThreadListResult({
+      items: [],
+      nextCursor: null,
+    });
+
+    await expect(rpcClient.call("thread/list", { limit: 1 })).resolves.toMatchObject({
+      items: [],
+      nextCursor: null,
+    });
   });
 
   it("fails browser initialize when the socket closes after initialized but before the ready probe completes", async () => {

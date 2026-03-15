@@ -14,8 +14,14 @@ import type {
 
 type PendingRequest = {
   method: string;
+  settled: boolean;
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
+};
+
+export type CodexJsonRpcCallHandle = {
+  promise: Promise<unknown>;
+  cancel: (error?: Error) => void;
 };
 
 type NotificationListener = (notification: CodexJsonRpcNotification) => void;
@@ -93,12 +99,17 @@ export class CodexJsonRpcClient {
   }
 
   async call(method: string, params?: unknown): Promise<unknown> {
+    return await this.callWithHandle(method, params).promise;
+  }
+
+  callWithHandle(method: string, params?: unknown): CodexJsonRpcCallHandle {
     const id = this.#nextId;
     this.#nextId += 1;
 
-    return await new Promise<unknown>((resolve, reject) => {
+    const promise = new Promise<unknown>((resolve, reject) => {
       this.#pendingRequests.set(id, {
         method,
+        settled: false,
         resolve,
         reject,
       });
@@ -110,10 +121,19 @@ export class CodexJsonRpcClient {
           ...(params === undefined ? {} : { params }),
         })
         .catch((error: unknown) => {
-          this.#pendingRequests.delete(id);
-          reject(error instanceof Error ? error : new Error(String(error)));
+          this.#rejectPendingRequest(id, error instanceof Error ? error : new Error(String(error)));
         });
     });
+
+    return {
+      promise,
+      cancel: (error) => {
+        this.#rejectPendingRequest(
+          id,
+          error ?? new Error(`JSON-RPC request ${String(id)} was canceled.`),
+        );
+      },
+    };
   }
 
   async notify(method: string, params?: unknown): Promise<void> {
@@ -166,6 +186,7 @@ export class CodexJsonRpcClient {
       }
 
       this.#pendingRequests.delete(event.response.id);
+      pendingRequest.settled = true;
       if (isErrorResponse(event.response)) {
         pendingRequest.reject(
           new CodexJsonRpcRequestError({
@@ -195,9 +216,21 @@ export class CodexJsonRpcClient {
 
   #rejectAllPendingRequests(error: Error): void {
     for (const pendingRequest of this.#pendingRequests.values()) {
+      pendingRequest.settled = true;
       pendingRequest.reject(error);
     }
     this.#pendingRequests.clear();
+  }
+
+  #rejectPendingRequest(id: CodexJsonRpcId, error: Error): void {
+    const pendingRequest = this.#pendingRequests.get(id);
+    if (pendingRequest === undefined || pendingRequest.settled) {
+      return;
+    }
+
+    this.#pendingRequests.delete(id);
+    pendingRequest.settled = true;
+    pendingRequest.reject(error);
   }
 
   async #confirmReadyState(sendGuarantee: SandboxSessionSendGuarantee | null): Promise<void> {
@@ -205,8 +238,15 @@ export class CodexJsonRpcClient {
       return;
     }
 
-    await this.call("thread/list", {
-      limit: 1,
-    });
+    try {
+      await this.call("thread/list", {
+        limit: 1,
+      });
+    } catch (error) {
+      if (error instanceof CodexJsonRpcRequestError) {
+        return;
+      }
+      throw error;
+    }
   }
 }
