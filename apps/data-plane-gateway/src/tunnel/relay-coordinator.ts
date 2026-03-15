@@ -1,5 +1,5 @@
-import { LocalPeerRegistry } from "./local-peer-registry/index.js";
-import { RelayTransport } from "./relay-transport/index.js";
+import type { LocalPeerRegistryAdapter } from "./local-peer-registry/local-peer-registry-adapter.js";
+import type { RelayTransportAdapter } from "./relay-transport/relay-transport-adapter.js";
 import type {
   RelayCloseEnvelope,
   RelayFrameEnvelope,
@@ -53,8 +53,8 @@ function toCloseEnvelope(input: {
 export class TunnelRelayCoordinator {
   public constructor(
     private readonly nodeId: string,
-    private readonly peerRegistry: LocalPeerRegistry,
-    private readonly relayTransport: RelayTransport,
+    private readonly peerRegistry: LocalPeerRegistryAdapter,
+    private readonly relayTransport: RelayTransportAdapter,
   ) {}
 
   public attachPeer(input: {
