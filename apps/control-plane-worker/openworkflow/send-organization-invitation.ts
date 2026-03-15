@@ -7,9 +7,7 @@ import { getWorkflowContext } from "../src/openworkflow/context.js";
 export const SendOrganizationInvitationWorkflow = defineWorkflow(
   SendOrganizationInvitationWorkflowSpec,
   async ({ input: { email, invitationUrl, inviterDisplayName, organizationName, role }, step }) => {
-    const {
-      services: { emailDelivery },
-    } = await getWorkflowContext();
+    const { emailDelivery } = await getWorkflowContext();
 
     return step.run(
       {

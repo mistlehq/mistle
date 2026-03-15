@@ -28,11 +28,20 @@ import {
   OpenAiReasoningEfforts,
   OpenAiRuntimes,
 } from "@mistle/integrations-definitions";
-import type { HandleAutomationRunWorkflowInput } from "@mistle/workflow-registry/control-plane";
+import {
+  HandleAutomationRunWorkflowSpec,
+  HandleIntegrationWebhookEventWorkflowSpec,
+  type HandleAutomationRunWorkflowInput,
+} from "@mistle/workflow-registry/control-plane";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
-import { handleIntegrationWebhookEvent } from "../src/runtime/services/handle-integration-webhook-event.js";
+import { HandleIntegrationWebhookEventWorkflow } from "../openworkflow/handle-integration-webhook-event.js";
+import {
+  markIntegrationWebhookEventFailed,
+  markIntegrationWebhookEventProcessed,
+  prepareIntegrationWebhookEvent,
+} from "../src/runtime/services/handle-integration-webhook-event.js";
 import {
   markAutomationRunCompleted,
   markAutomationRunFailed,
@@ -40,6 +49,7 @@ import {
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
 } from "../src/runtime/workflows/index.js";
+import { withOpenWorkflowRuntime } from "./openworkflow-test-support.js";
 import { it } from "./test-context.js";
 
 const TestTimeoutMs = 120_000;
@@ -118,6 +128,65 @@ async function seedOpenAiAgentBinding(input: {
 }
 
 describe("handleIntegrationWebhookEvent integration", () => {
+  async function executeHandleIntegrationWebhookEvent(input: {
+    db: ReturnType<typeof createControlPlaneDatabase>;
+    webhookEventId: string;
+    enqueueAutomationRuns: (input: { automationRunIds: ReadonlyArray<string> }) => Promise<void>;
+    enqueueResourceSync: (input: {
+      organizationId: string;
+      connectionId: string;
+      kind: string;
+    }) => Promise<void>;
+  }) {
+    const preparedWebhookEvent = await prepareIntegrationWebhookEvent(
+      {
+        db: input.db,
+        integrationRegistry: createIntegrationRegistry(),
+      },
+      {
+        webhookEventId: input.webhookEventId,
+      },
+    );
+    if (preparedWebhookEvent.finalized) {
+      return {
+        webhookEventId: input.webhookEventId,
+      };
+    }
+
+    try {
+      for (const resourceSyncRequest of preparedWebhookEvent.resourceSyncRequests) {
+        await input.enqueueResourceSync(resourceSyncRequest);
+      }
+      if (preparedWebhookEvent.automationRunIds.length > 0) {
+        await input.enqueueAutomationRuns({
+          automationRunIds: preparedWebhookEvent.automationRunIds,
+        });
+      }
+      await markIntegrationWebhookEventProcessed(
+        {
+          db: input.db,
+        },
+        {
+          webhookEventId: input.webhookEventId,
+        },
+      );
+    } catch (error) {
+      await markIntegrationWebhookEventFailed(
+        {
+          db: input.db,
+        },
+        {
+          webhookEventId: input.webhookEventId,
+        },
+      );
+      throw error;
+    }
+
+    return {
+      webhookEventId: input.webhookEventId,
+    };
+  }
+
   async function executeHandleAutomationRunSteps(input: {
     db: ReturnType<typeof createControlPlaneDatabase>;
     automationRunId: string;
@@ -147,6 +216,165 @@ describe("handleIntegrationWebhookEvent integration", () => {
       throw error;
     }
   }
+
+  it(
+    "runs the workflow entrypoint and schedules automation-run workflows",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const organizationId = "org_worker_webhook_workflow";
+        const targetKey = "github-cloud-worker-webhook-workflow";
+        const connectionId = "icn_worker_webhook_workflow";
+        const sandboxProfileId = "sbp_worker_webhook_workflow";
+        const automationId = "atm_worker_webhook_workflow";
+        const automationTargetId = "atg_worker_webhook_workflow";
+        const webhookEventId = "iwe_worker_webhook_workflow";
+
+        await database.db.insert(organizations).values({
+          id: organizationId,
+          name: "Worker Webhook Workflow",
+          slug: "worker-webhook-workflow",
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey,
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: connectionId,
+          organizationId,
+          targetKey,
+          displayName: "Worker webhook workflow connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "999999",
+          config: {},
+        });
+        await database.db.insert(sandboxProfiles).values({
+          id: sandboxProfileId,
+          organizationId,
+          displayName: "Worker Webhook Workflow Profile",
+          status: "active",
+        });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 3,
+          suffix: "worker_webhook_workflow",
+        });
+        await database.db.insert(automations).values({
+          id: automationId,
+          organizationId,
+          kind: AutomationKinds.WEBHOOK,
+          name: "Worker Webhook Workflow Automation",
+          enabled: true,
+        });
+        await database.db.insert(webhookAutomations).values({
+          automationId,
+          integrationConnectionId: connectionId,
+          eventTypes: ["github.issue_comment.created"],
+          payloadFilter: null,
+          inputTemplate: "Respond to {{payload.comment.body}}",
+          conversationKeyTemplate: "issue-{{payload.issue.number}}",
+          idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
+        });
+        await database.db.insert(automationTargets).values({
+          id: automationTargetId,
+          automationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 3,
+        });
+        await database.db.insert(integrationWebhookEvents).values({
+          id: webhookEventId,
+          organizationId,
+          integrationConnectionId: connectionId,
+          targetKey,
+          eventType: "github.issue_comment.created",
+          providerEventType: "issue_comment",
+          externalEventId: "evt_webhook_workflow",
+          externalDeliveryId: "delivery_webhook_workflow",
+          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
+          sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+          payload: {
+            issue: {
+              number: 14,
+            },
+            comment: {
+              body: "launch",
+            },
+          },
+          status: IntegrationWebhookEventStatuses.RECEIVED,
+        });
+
+        await withOpenWorkflowRuntime({
+          fixture,
+          run: async ({ runtime, workflowContext }) => {
+            workflowContext.openWorkflow.implementWorkflow(
+              HandleIntegrationWebhookEventWorkflow.spec,
+              HandleIntegrationWebhookEventWorkflow.fn,
+            );
+            const worker = workflowContext.openWorkflow.newWorker({
+              concurrency: 1,
+            });
+
+            const handle = await workflowContext.openWorkflow.runWorkflow(
+              HandleIntegrationWebhookEventWorkflowSpec,
+              {
+                webhookEventId,
+              },
+              {
+                idempotencyKey: `handle-webhook:${webhookEventId}`,
+              },
+            );
+
+            try {
+              expect(await worker.tick()).toBe(1);
+              await expect(handle.result({ timeoutMs: TestTimeoutMs })).resolves.toEqual({
+                webhookEventId,
+              });
+
+              const queuedAutomationRun = await database.db.query.automationRuns.findFirst({
+                where: (table, { eq: whereEq }) =>
+                  whereEq(table.sourceWebhookEventId, webhookEventId),
+              });
+              expect(queuedAutomationRun?.id).toBeTruthy();
+
+              const workflowRuns = await runtime.backend.listWorkflowRuns({
+                limit: 20,
+              });
+              const automationRunWorkflow = workflowRuns.data.find(
+                (workflowRun) =>
+                  workflowRun.workflowName === HandleAutomationRunWorkflowSpec.name &&
+                  workflowRun.idempotencyKey === queuedAutomationRun?.id,
+              );
+
+              expect(automationRunWorkflow).toBeDefined();
+              expect(automationRunWorkflow?.status).toBe("pending");
+            } finally {
+              await worker.stop();
+            }
+          },
+        });
+
+        const persistedWebhookEvent = await database.db.query.integrationWebhookEvents.findFirst({
+          where: (table, { eq: whereEq }) => whereEq(table.id, webhookEventId),
+        });
+        expect(persistedWebhookEvent?.status).toBe(IntegrationWebhookEventStatuses.PROCESSED);
+        expect(persistedWebhookEvent?.finalizedAt).not.toBeNull();
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
 
   it(
     "resolves matching webhook automations and queues automation runs",
@@ -252,24 +480,19 @@ describe("handleIntegrationWebhookEvent integration", () => {
           status: IntegrationWebhookEventStatuses.RECEIVED,
         });
 
-        const workflowOutput = await handleIntegrationWebhookEvent(
-          {
-            db: database.db,
-            integrationRegistry: createIntegrationRegistry(),
-            enqueueAutomationRuns: async ({ automationRunIds }) => {
-              for (const automationRunId of automationRunIds) {
-                await executeHandleAutomationRunSteps({
-                  db: database.db,
-                  automationRunId,
-                });
-              }
-            },
-            enqueueResourceSync: async () => {},
+        const workflowOutput = await executeHandleIntegrationWebhookEvent({
+          db: database.db,
+          webhookEventId,
+          enqueueAutomationRuns: async ({ automationRunIds }) => {
+            for (const automationRunId of automationRunIds) {
+              await executeHandleAutomationRunSteps({
+                db: database.db,
+                automationRunId,
+              });
+            }
           },
-          {
-            webhookEventId,
-          },
-        );
+          enqueueResourceSync: async () => {},
+        });
 
         expect(workflowOutput).toEqual({
           webhookEventId,
@@ -359,17 +582,12 @@ describe("handleIntegrationWebhookEvent integration", () => {
           status: IntegrationWebhookEventStatuses.RECEIVED,
         });
 
-        const workflowOutput = await handleIntegrationWebhookEvent(
-          {
-            db: database.db,
-            integrationRegistry: createIntegrationRegistry(),
-            enqueueAutomationRuns: async () => {},
-            enqueueResourceSync: async () => {},
-          },
-          {
-            webhookEventId,
-          },
-        );
+        const workflowOutput = await executeHandleIntegrationWebhookEvent({
+          db: database.db,
+          webhookEventId,
+          enqueueAutomationRuns: async () => {},
+          enqueueResourceSync: async () => {},
+        });
 
         expect(workflowOutput).toEqual({
           webhookEventId,
@@ -451,17 +669,12 @@ describe("handleIntegrationWebhookEvent integration", () => {
           status: IntegrationWebhookEventStatuses.RECEIVED,
         });
 
-        const workflowOutput = await handleIntegrationWebhookEvent(
-          {
-            db: database.db,
-            integrationRegistry: createIntegrationRegistry(),
-            enqueueAutomationRuns: async () => {},
-            enqueueResourceSync: async () => {},
-          },
-          {
-            webhookEventId,
-          },
-        );
+        const workflowOutput = await executeHandleIntegrationWebhookEvent({
+          db: database.db,
+          webhookEventId,
+          enqueueAutomationRuns: async () => {},
+          enqueueResourceSync: async () => {},
+        });
 
         expect(workflowOutput).toEqual({
           webhookEventId,

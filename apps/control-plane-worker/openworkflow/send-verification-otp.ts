@@ -7,9 +7,7 @@ import { getWorkflowContext } from "../src/openworkflow/context.js";
 export const SendVerificationOTPWorkflow = defineWorkflow(
   SendVerificationOTPWorkflowSpec,
   async ({ input: { email, expiresInSeconds, otp, type }, step }) => {
-    const {
-      services: { emailDelivery },
-    } = await getWorkflowContext();
+    const { emailDelivery } = await getWorkflowContext();
 
     return step.run(
       {

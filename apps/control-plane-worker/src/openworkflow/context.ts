@@ -1,78 +1,29 @@
+import { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import type { DataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
+import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { Pool } from "pg";
 
-import { createControlPlaneWorkerServices } from "../runtime/services/index.js";
-import {
-  type ControlPlaneAutomationConversationDeliveryServices,
-  type ControlPlaneAutomationRunServices,
-  type ControlPlaneIntegrationConnectionResourceServices,
-  type ControlPlaneIntegrationWebhookServices,
-  type ControlPlaneSandboxInstanceServices,
-  type ControlPlaneSandboxProfileServices,
-  type ControlPlaneWorkerEmailDelivery,
-} from "../runtime/workflow-types.js";
+import { createEmailSender } from "../runtime/services/create-email-sender.js";
+import type { ControlPlaneWorkerEmailDelivery } from "../runtime/workflow-types.js";
 import { createControlPlaneOpenWorkflow } from "./client.js";
 import { getOpenWorkflowRuntime } from "./runtime.js";
-
-type RequiredWorkflowServices = {
-  automationConversationDelivery: ControlPlaneAutomationConversationDeliveryServices;
-  automationRuns: ControlPlaneAutomationRunServices;
-  emailDelivery: ControlPlaneWorkerEmailDelivery;
-  integrationConnectionResources: ControlPlaneIntegrationConnectionResourceServices;
-  integrationWebhooks: ControlPlaneIntegrationWebhookServices;
-  sandboxInstances: ControlPlaneSandboxInstanceServices;
-  sandboxProfiles: ControlPlaneSandboxProfileServices;
-};
 
 export type WorkflowContext = {
   db: ControlPlaneDatabase;
   dbPool: Pool;
-  dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "startSandboxInstance">;
+  controlPlaneInternalClient: ControlPlaneInternalClient;
+  dataPlaneClient: DataPlaneSandboxInstancesClient;
+  emailDelivery: ControlPlaneWorkerEmailDelivery;
+  integrationRegistry: IntegrationRegistry;
   openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>;
-  services: RequiredWorkflowServices;
 };
 
 let workflowContextPromise: Promise<WorkflowContext> | undefined;
 let closeWorkflowContextPromise: Promise<void> | undefined;
 let shutdownHandlersRegistered = false;
-
-function requireWorkflowServices(
-  services: ReturnType<typeof createControlPlaneWorkerServices>,
-): RequiredWorkflowServices {
-  if (services.automationConversationDelivery === undefined) {
-    throw new Error("Expected automation conversation delivery workflow services.");
-  }
-  if (services.automationRuns === undefined) {
-    throw new Error("Expected automation run workflow services.");
-  }
-  if (services.emailDelivery === undefined) {
-    throw new Error("Expected email delivery workflow services.");
-  }
-  if (services.integrationConnectionResources === undefined) {
-    throw new Error("Expected integration connection resource workflow services.");
-  }
-  if (services.integrationWebhooks === undefined) {
-    throw new Error("Expected integration webhook workflow services.");
-  }
-  if (services.sandboxInstances === undefined) {
-    throw new Error("Expected sandbox instance workflow services.");
-  }
-  if (services.sandboxProfiles === undefined) {
-    throw new Error("Expected sandbox profile workflow services.");
-  }
-
-  return {
-    automationConversationDelivery: services.automationConversationDelivery,
-    automationRuns: services.automationRuns,
-    emailDelivery: services.emailDelivery,
-    integrationConnectionResources: services.integrationConnectionResources,
-    integrationWebhooks: services.integrationWebhooks,
-    sandboxInstances: services.sandboxInstances,
-    sandboxProfiles: services.sandboxProfiles,
-  };
-}
 
 async function createWorkflowContext(): Promise<WorkflowContext> {
   const { backend, globalConfig, workerConfig } = await getOpenWorkflowRuntime();
@@ -89,20 +40,27 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
       baseUrl: workerConfig.dataPlaneApi.baseUrl,
       serviceToken: globalConfig.internalAuth.serviceToken,
     });
-    const services = createControlPlaneWorkerServices({
-      config: workerConfig,
+    const controlPlaneInternalClient = new ControlPlaneInternalClient({
+      baseUrl: workerConfig.controlPlaneApi.baseUrl,
       internalAuthServiceToken: globalConfig.internalAuth.serviceToken,
-      db,
-      openWorkflow,
-      dataPlaneSandboxInstancesClient: dataPlaneClient,
     });
+    const emailDelivery = {
+      emailSender: createEmailSender(workerConfig),
+      from: {
+        email: workerConfig.email.fromAddress,
+        name: workerConfig.email.fromName,
+      },
+    } satisfies ControlPlaneWorkerEmailDelivery;
+    const integrationRegistry = createIntegrationRegistry();
 
     return {
+      controlPlaneInternalClient,
+      dataPlaneClient,
       db,
       dbPool,
-      dataPlaneClient,
+      emailDelivery,
+      integrationRegistry,
       openWorkflow,
-      services: requireWorkflowServices(services),
     };
   } catch (error) {
     await dbPool.end();

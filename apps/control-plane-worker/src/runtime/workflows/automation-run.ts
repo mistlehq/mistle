@@ -24,7 +24,6 @@ import {
   claimAutomationConversation,
   enqueueAutomationConversationDeliveryTask,
   ensureAutomationConversationDeliveryProcessor,
-  setAutomationConversationDeliveryProcessorIdle,
 } from "./persistence/index.js";
 
 export type HandleAutomationRunDependencies = {
@@ -33,10 +32,12 @@ export type HandleAutomationRunDependencies = {
 
 export type HandoffAutomationRunDeliveryDependencies = {
   db: ControlPlaneDatabase;
-  enqueueConversationDeliveryWorkflow: (input: {
-    conversationId: string;
-    generation: number;
-  }) => Promise<void>;
+};
+
+export type HandoffAutomationRunDeliveryOutput = {
+  conversationId: string;
+  generation: number;
+  shouldStart: boolean;
 };
 
 export type EnsureAutomationSandboxDependencies = {
@@ -624,7 +625,7 @@ export async function prepareAutomationRun(
 export async function handoffAutomationRunDelivery(
   ctx: HandoffAutomationRunDeliveryDependencies,
   input: HandoffAutomationRunDeliveryInput,
-): Promise<void> {
+): Promise<HandoffAutomationRunDeliveryOutput> {
   const enqueuedTask = await enqueueAutomationConversationDeliveryTask(
     {
       db: ctx.db,
@@ -637,7 +638,7 @@ export async function handoffAutomationRunDelivery(
     },
   );
 
-  const ensuredProcessor = await ensureAutomationConversationDeliveryProcessor(
+  return ensureAutomationConversationDeliveryProcessor(
     {
       db: ctx.db,
     },
@@ -645,33 +646,6 @@ export async function handoffAutomationRunDelivery(
       conversationId: enqueuedTask.conversationId,
     },
   );
-  if (!ensuredProcessor.shouldStart) {
-    return;
-  }
-
-  try {
-    await ctx.enqueueConversationDeliveryWorkflow({
-      conversationId: ensuredProcessor.conversationId,
-      generation: ensuredProcessor.generation,
-    });
-  } catch (error) {
-    await setAutomationConversationDeliveryProcessorIdle(
-      {
-        db: ctx.db,
-      },
-      {
-        conversationId: ensuredProcessor.conversationId,
-        generation: ensuredProcessor.generation,
-      },
-    );
-
-    throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
-      message:
-        error instanceof Error ? error.message : "Failed to start conversation delivery workflow.",
-      cause: error,
-    });
-  }
 }
 
 export async function ensureAutomationSandbox(

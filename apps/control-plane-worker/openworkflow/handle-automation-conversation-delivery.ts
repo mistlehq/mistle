@@ -2,6 +2,22 @@ import { HandleAutomationConversationDeliveryWorkflowSpec } from "@mistle/workfl
 import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "../src/openworkflow/context.js";
+import { executeConversationProviderDelivery } from "../src/runtime/automation-workflows/provider/execute-conversation-provider-delivery.js";
+import {
+  acquireConversationDeliveryConnection,
+  claimOrResumeAutomationConversationDeliveryTask,
+  completeConversationDeliveryAutomationRun,
+  deliverConversationAutomationPayload,
+  ensureConversationDeliverySandbox,
+  failConversationDeliveryAutomationRun,
+  finalizeAutomationConversationDeliveryActiveTask,
+  idleAutomationConversationDeliveryProcessor,
+  ignoreAutomationConversationDeliveryAutomationRun,
+  prepareConversationDeliveryAutomationRun,
+  resolveAutomationConversationDeliveryActiveTaskAction,
+  resolveAutomationConversationDeliveryRoute,
+  resolveAutomationRunFailure,
+} from "../src/runtime/workflows/index.js";
 
 function getConversationDeliveryStepName(input: { prefix: string; taskId: string }) {
   return `${input.prefix}:${input.taskId}`;
@@ -10,9 +26,7 @@ function getConversationDeliveryStepName(input: { prefix: string; taskId: string
 export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
   HandleAutomationConversationDeliveryWorkflowSpec,
   async ({ input, step }) => {
-    const {
-      services: { automationConversationDelivery },
-    } = await getWorkflowContext();
+    const { controlPlaneInternalClient, db } = await getWorkflowContext();
 
     let iteration = 0;
 
@@ -20,14 +34,22 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
       const activeTask = await step.run(
         { name: `claim-or-resume-conversation-delivery-task:${String(iteration)}` },
         async () =>
-          automationConversationDelivery.claimOrResumeAutomationConversationDeliveryTask(input),
+          claimOrResumeAutomationConversationDeliveryTask(
+            {
+              db,
+            },
+            input,
+          ),
       );
 
       if (activeTask === null) {
         const didIdleProcessor = await step.run(
           { name: `idle-conversation-delivery-processor-if-empty:${String(iteration)}` },
           async () =>
-            automationConversationDelivery.idleAutomationConversationDeliveryProcessorIfEmpty(
+            idleAutomationConversationDeliveryProcessor(
+              {
+                db,
+              },
               input,
             ),
         );
@@ -50,10 +72,15 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
           }),
         },
         async () =>
-          automationConversationDelivery.resolveAutomationConversationDeliveryTaskAction({
-            taskId: activeTask.taskId,
-            generation: input.generation,
-          }),
+          resolveAutomationConversationDeliveryActiveTaskAction(
+            {
+              db,
+            },
+            {
+              taskId: activeTask.taskId,
+              generation: input.generation,
+            },
+          ),
       );
 
       if (taskAction === "ignore") {
@@ -65,9 +92,14 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            automationConversationDelivery.markAutomationRunIgnored({
-              automationRunId: activeTask.automationRunId,
-            }),
+            ignoreAutomationConversationDeliveryAutomationRun(
+              {
+                db,
+              },
+              {
+                automationRunId: activeTask.automationRunId,
+              },
+            ),
         );
 
         await step.run(
@@ -78,11 +110,18 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            automationConversationDelivery.finalizeAutomationConversationDeliveryTask({
-              taskId: activeTask.taskId,
-              generation: input.generation,
-              status: "ignored",
-            }),
+            finalizeAutomationConversationDeliveryActiveTask(
+              {
+                db,
+              },
+              {
+                taskId: activeTask.taskId,
+                generation: input.generation,
+                status: "ignored",
+                failureCode: null,
+                failureMessage: null,
+              },
+            ),
         );
 
         iteration += 1;
@@ -98,9 +137,14 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            automationConversationDelivery.prepareAutomationRun({
-              automationRunId: activeTask.automationRunId,
-            }),
+            prepareConversationDeliveryAutomationRun(
+              {
+                db,
+              },
+              {
+                automationRunId: activeTask.automationRunId,
+              },
+            ),
         );
 
         const resolvedAutomationConversationRoute = await step.run(
@@ -111,9 +155,14 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            automationConversationDelivery.resolveAutomationConversationDeliveryRoute({
-              conversationId: preparedAutomationRun.conversationId,
-            }),
+            resolveAutomationConversationDeliveryRoute(
+              {
+                db,
+              },
+              {
+                conversationId: preparedAutomationRun.conversationId,
+              },
+            ),
         );
 
         const ensuredAutomationSandbox = await step.run(
@@ -124,10 +173,19 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            automationConversationDelivery.ensureAutomationSandbox({
-              preparedAutomationRun,
-              resolvedAutomationConversationRoute,
-            }),
+            ensureConversationDeliverySandbox(
+              {
+                db,
+                getSandboxInstance: (sandboxInput) =>
+                  controlPlaneInternalClient.getSandboxInstance(sandboxInput),
+                startSandboxProfileInstance: (startInput) =>
+                  controlPlaneInternalClient.startSandboxProfileInstance(startInput),
+              },
+              {
+                preparedAutomationRun,
+                resolvedAutomationConversationRoute,
+              },
+            ),
         );
 
         const acquiredAutomationConnection = await step.run(
@@ -138,10 +196,18 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            automationConversationDelivery.acquireAutomationConnection({
-              preparedAutomationRun,
-              ensuredAutomationSandbox,
-            }),
+            acquireConversationDeliveryConnection(
+              {
+                getSandboxInstance: (sandboxInput) =>
+                  controlPlaneInternalClient.getSandboxInstance(sandboxInput),
+                mintSandboxConnectionToken: (mintInput) =>
+                  controlPlaneInternalClient.mintSandboxConnectionToken(mintInput),
+              },
+              {
+                preparedAutomationRun,
+                ensuredAutomationSandbox,
+              },
+            ),
         );
 
         await step.run(
@@ -152,14 +218,20 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            automationConversationDelivery.deliverAutomationPayload({
-              taskId: activeTask.taskId,
-              generation: input.generation,
-              preparedAutomationRun,
-              resolvedAutomationConversationRoute,
-              ensuredAutomationSandbox,
-              acquiredAutomationConnection,
-            }),
+            deliverConversationAutomationPayload(
+              {
+                db,
+                executeConversationProviderDelivery,
+              },
+              {
+                taskId: activeTask.taskId,
+                generation: input.generation,
+                preparedAutomationRun,
+                resolvedAutomationConversationRoute,
+                ensuredAutomationSandbox,
+                acquiredAutomationConnection,
+              },
+            ),
         );
 
         await step.run(
@@ -170,9 +242,14 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            automationConversationDelivery.markAutomationRunCompleted({
-              automationRunId: activeTask.automationRunId,
-            }),
+            completeConversationDeliveryAutomationRun(
+              {
+                db,
+              },
+              {
+                automationRunId: activeTask.automationRunId,
+              },
+            ),
         );
 
         await step.run(
@@ -183,16 +260,21 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            automationConversationDelivery.finalizeAutomationConversationDeliveryTask({
-              taskId: activeTask.taskId,
-              generation: input.generation,
-              status: "completed",
-            }),
+            finalizeAutomationConversationDeliveryActiveTask(
+              {
+                db,
+              },
+              {
+                taskId: activeTask.taskId,
+                generation: input.generation,
+                status: "completed",
+                failureCode: null,
+                failureMessage: null,
+              },
+            ),
         );
       } catch (error) {
-        const failure = automationConversationDelivery.resolveAutomationRunFailure({
-          error,
-        });
+        const failure = resolveAutomationRunFailure(error);
 
         await step.run(
           {
@@ -202,11 +284,16 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            automationConversationDelivery.markAutomationRunFailed({
-              automationRunId: activeTask.automationRunId,
-              failureCode: failure.code,
-              failureMessage: failure.message,
-            }),
+            failConversationDeliveryAutomationRun(
+              {
+                db,
+              },
+              {
+                automationRunId: activeTask.automationRunId,
+                failureCode: failure.code,
+                failureMessage: failure.message,
+              },
+            ),
         );
 
         await step.run(
@@ -217,13 +304,18 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             }),
           },
           async () =>
-            automationConversationDelivery.finalizeAutomationConversationDeliveryTask({
-              taskId: activeTask.taskId,
-              generation: input.generation,
-              status: "failed",
-              failureCode: failure.code,
-              failureMessage: failure.message,
-            }),
+            finalizeAutomationConversationDeliveryActiveTask(
+              {
+                db,
+              },
+              {
+                taskId: activeTask.taskId,
+                generation: input.generation,
+                status: "failed",
+                failureCode: failure.code,
+                failureMessage: failure.message,
+              },
+            ),
         );
       }
 

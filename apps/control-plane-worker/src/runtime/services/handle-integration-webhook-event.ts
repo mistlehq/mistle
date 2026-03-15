@@ -6,10 +6,7 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
-import type {
-  HandleIntegrationWebhookEventWorkflowInput,
-  HandleIntegrationWebhookEventWorkflowOutput,
-} from "@mistle/workflow-registry/control-plane";
+import type { HandleIntegrationWebhookEventWorkflowInput } from "@mistle/workflow-registry/control-plane";
 import { eq, sql } from "drizzle-orm";
 
 import { resolveWebhookAutomationTargets } from "./resolve-webhook-automation-targets.js";
@@ -17,12 +14,19 @@ import { resolveWebhookAutomationTargets } from "./resolve-webhook-automation-ta
 type HandleIntegrationWebhookEventDependencies = {
   db: ControlPlaneDatabase;
   integrationRegistry: IntegrationRegistry;
-  enqueueAutomationRuns: (input: { automationRunIds: ReadonlyArray<string> }) => Promise<void>;
-  enqueueResourceSync: (input: {
-    organizationId: string;
-    connectionId: string;
-    kind: string;
-  }) => Promise<void>;
+};
+
+export type IntegrationWebhookResourceSyncRequest = {
+  organizationId: string;
+  connectionId: string;
+  kind: string;
+};
+
+export type PrepareIntegrationWebhookEventOutput = {
+  webhookEventId: string;
+  automationRunIds: ReadonlyArray<string>;
+  resourceSyncRequests: ReadonlyArray<IntegrationWebhookResourceSyncRequest>;
+  finalized: boolean;
 };
 
 function isTerminalWebhookEventStatus(input: string): boolean {
@@ -82,10 +86,10 @@ async function resolveResourceSyncKindsForWebhookEvent(input: {
   return matchedTrigger?.resourceKinds ?? [];
 }
 
-export async function handleIntegrationWebhookEvent(
+export async function prepareIntegrationWebhookEvent(
   deps: HandleIntegrationWebhookEventDependencies,
   input: HandleIntegrationWebhookEventWorkflowInput,
-): Promise<HandleIntegrationWebhookEventWorkflowOutput> {
+): Promise<PrepareIntegrationWebhookEventOutput> {
   const webhookEvent = await deps.db.query.integrationWebhookEvents.findFirst({
     where: (table, { eq: whereEq }) => whereEq(table.id, input.webhookEventId),
   });
@@ -95,6 +99,9 @@ export async function handleIntegrationWebhookEvent(
 
   if (isTerminalWebhookEventStatus(webhookEvent.status)) {
     return {
+      automationRunIds: [],
+      finalized: true,
+      resourceSyncRequests: [],
       webhookEventId: input.webhookEventId,
     };
   }
@@ -113,13 +120,11 @@ export async function handleIntegrationWebhookEvent(
       targetKey: webhookEvent.targetKey,
       eventType: webhookEvent.eventType,
     });
-    for (const kind of resourceSyncKinds) {
-      await deps.enqueueResourceSync({
-        organizationId: webhookEvent.organizationId,
-        connectionId: webhookEvent.integrationConnectionId,
-        kind,
-      });
-    }
+    const resourceSyncRequests = resourceSyncKinds.map((kind) => ({
+      organizationId: webhookEvent.organizationId,
+      connectionId: webhookEvent.integrationConnectionId,
+      kind,
+    }));
 
     const resolvedTargets = await resolveWebhookAutomationTargets(deps.db, {
       organizationId: webhookEvent.organizationId,
@@ -136,10 +141,14 @@ export async function handleIntegrationWebhookEvent(
       });
 
       return {
+        automationRunIds: [],
+        finalized: true,
+        resourceSyncRequests: [],
         webhookEventId: input.webhookEventId,
       };
     }
 
+    let queuedAutomationRunIds: ReadonlyArray<string> = [];
     if (resolvedTargets.length > 0) {
       await deps.db
         .insert(automationRuns)
@@ -170,20 +179,15 @@ export async function handleIntegrationWebhookEvent(
           ),
       });
 
-      const queuedAutomationRunIds = queuedAutomationRuns.map((queuedRun) => queuedRun.id);
-      if (queuedAutomationRunIds.length > 0) {
-        await deps.enqueueAutomationRuns({
-          automationRunIds: queuedAutomationRunIds,
-        });
-      }
+      queuedAutomationRunIds = queuedAutomationRuns.map((queuedRun) => queuedRun.id);
     }
 
-    await updateWebhookEventStatus({
-      db: deps.db,
+    return {
+      automationRunIds: queuedAutomationRunIds,
+      finalized: false,
+      resourceSyncRequests,
       webhookEventId: input.webhookEventId,
-      status: IntegrationWebhookEventStatuses.PROCESSED,
-      finalized: true,
-    });
+    };
   } catch (error) {
     await updateWebhookEventStatus({
       db: deps.db,
@@ -194,8 +198,28 @@ export async function handleIntegrationWebhookEvent(
 
     throw error;
   }
+}
 
-  return {
+export async function markIntegrationWebhookEventProcessed(
+  deps: Pick<HandleIntegrationWebhookEventDependencies, "db">,
+  input: { webhookEventId: string },
+): Promise<void> {
+  await updateWebhookEventStatus({
+    db: deps.db,
     webhookEventId: input.webhookEventId,
-  };
+    status: IntegrationWebhookEventStatuses.PROCESSED,
+    finalized: true,
+  });
+}
+
+export async function markIntegrationWebhookEventFailed(
+  deps: Pick<HandleIntegrationWebhookEventDependencies, "db">,
+  input: { webhookEventId: string },
+): Promise<void> {
+  await updateWebhookEventStatus({
+    db: deps.db,
+    webhookEventId: input.webhookEventId,
+    status: IntegrationWebhookEventStatuses.FAILED,
+    finalized: true,
+  });
 }

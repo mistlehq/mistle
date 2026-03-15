@@ -1,18 +1,33 @@
-import { HandleAutomationRunWorkflowSpec } from "@mistle/workflow-registry/control-plane";
+import {
+  HandleAutomationConversationDeliveryWorkflowSpec,
+  HandleAutomationRunWorkflowSpec,
+} from "@mistle/workflow-registry/control-plane";
 import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "../src/openworkflow/context.js";
+import {
+  handoffAutomationRunDelivery,
+  markAutomationRunFailed,
+  prepareAutomationRun,
+  resolveAutomationRunFailure,
+  setAutomationConversationDeliveryProcessorIdle,
+  transitionAutomationRunToRunning,
+} from "../src/runtime/workflows/index.js";
 
 export const HandleAutomationRunWorkflow = defineWorkflow(
   HandleAutomationRunWorkflowSpec,
   async ({ input, step }) => {
-    const {
-      services: { automationRuns },
-    } = await getWorkflowContext();
+    const { db, openWorkflow } = await getWorkflowContext();
 
     const transitionResult = await step.run(
       { name: "transition-automation-run-to-running" },
-      async () => automationRuns.transitionAutomationRunToRunning(input),
+      async () =>
+        transitionAutomationRunToRunning(
+          {
+            db,
+          },
+          input,
+        ),
     );
     if (!transitionResult.shouldProcess) {
       return {
@@ -22,24 +37,65 @@ export const HandleAutomationRunWorkflow = defineWorkflow(
 
     try {
       const preparedAutomationRun = await step.run({ name: "prepare-automation-run" }, async () =>
-        automationRuns.prepareAutomationRun(input),
+        prepareAutomationRun(
+          {
+            db,
+          },
+          input,
+        ),
       );
 
-      await step.run({ name: "handoff-automation-run-delivery" }, async () =>
-        automationRuns.handoffAutomationRunDelivery({
-          preparedAutomationRun,
-        }),
-      );
-    } catch (error) {
-      const failure = automationRuns.resolveAutomationRunFailure({
-        error,
+      await step.run({ name: "handoff-automation-run-delivery" }, async () => {
+        const deliveryHandoff = await handoffAutomationRunDelivery(
+          {
+            db,
+          },
+          {
+            preparedAutomationRun,
+          },
+        );
+
+        if (!deliveryHandoff.shouldStart) {
+          return;
+        }
+
+        try {
+          await openWorkflow.runWorkflow(
+            HandleAutomationConversationDeliveryWorkflowSpec,
+            {
+              conversationId: deliveryHandoff.conversationId,
+              generation: deliveryHandoff.generation,
+            },
+            {
+              idempotencyKey: `automation-conversation-delivery:${deliveryHandoff.conversationId}:${String(deliveryHandoff.generation)}`,
+            },
+          );
+        } catch (error) {
+          await setAutomationConversationDeliveryProcessorIdle(
+            {
+              db,
+            },
+            {
+              conversationId: deliveryHandoff.conversationId,
+              generation: deliveryHandoff.generation,
+            },
+          );
+          throw error;
+        }
       });
+    } catch (error) {
+      const failure = resolveAutomationRunFailure(error);
       await step.run({ name: "mark-automation-run-failed" }, async () =>
-        automationRuns.markAutomationRunFailed({
-          automationRunId: input.automationRunId,
-          failureCode: failure.code,
-          failureMessage: failure.message,
-        }),
+        markAutomationRunFailed(
+          {
+            db,
+          },
+          {
+            automationRunId: input.automationRunId,
+            failureCode: failure.code,
+            failureMessage: failure.message,
+          },
+        ),
       );
       throw error;
     }
