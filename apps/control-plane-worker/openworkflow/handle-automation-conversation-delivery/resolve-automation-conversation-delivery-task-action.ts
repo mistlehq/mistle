@@ -1,14 +1,14 @@
 import {
   type AutomationConversationDeliveryTask,
   AutomationConversationDeliveryTaskStatuses,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
-} from "./errors.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
-
+} from "../../src/runtime/workflows/persistence/errors.js";
 export const AutomationConversationDeliveryTaskActions = {
   DELIVER: "deliver",
   IGNORE: "ignore",
@@ -45,7 +45,9 @@ function assertTaskIsActiveForGeneration(input: {
 }
 
 export async function resolveAutomationConversationDeliveryTaskAction(
-  ctx: AutomationConversationPersistenceDependencies,
+  ctx: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: {
     taskId: string;
     generation: number;

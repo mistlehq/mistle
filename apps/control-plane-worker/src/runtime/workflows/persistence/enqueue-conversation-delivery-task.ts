@@ -1,14 +1,14 @@
 import {
   automationConversationDeliveryTasks,
   AutomationConversationDeliveryTaskStatuses,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
 } from "./errors.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
-
 export type EnqueueAutomationConversationDeliveryTaskInput = {
   conversationId: string;
   automationRunId: string;
@@ -17,7 +17,9 @@ export type EnqueueAutomationConversationDeliveryTaskInput = {
 };
 
 export async function enqueueAutomationConversationDeliveryTask(
-  ctx: AutomationConversationPersistenceDependencies,
+  ctx: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: EnqueueAutomationConversationDeliveryTaskInput,
 ) {
   const insertedRows = await ctx.db

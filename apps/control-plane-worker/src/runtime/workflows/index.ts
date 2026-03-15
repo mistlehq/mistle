@@ -1,5 +1,4 @@
 export * from "./automation-run.js";
-export * from "./conversation-delivery.js";
 export {
   AutomationConversationDeliverySandboxActions,
   AutomationConversationRouteBindingActions,
@@ -22,12 +21,8 @@ export {
   ensureAutomationConversationDeliveryProcessor,
   type EnsureAutomationConversationDeliveryProcessorInput,
   type EnsureAutomationConversationDeliveryProcessorOutput,
-  finalizeAutomationConversationDeliveryTask,
-  type FinalizeAutomationConversationDeliveryTaskInput,
   findActiveAutomationConversationDeliveryTask,
   type FindActiveAutomationConversationDeliveryTaskInput,
-  idleAutomationConversationDeliveryProcessorIfEmpty,
-  type IdleAutomationConversationDeliveryProcessorIfEmptyInput,
   markAutomationConversationDeliveryTaskDelivering,
   type MarkAutomationConversationDeliveryTaskDeliveringInput,
   rebindAutomationConversationSandbox,
@@ -41,8 +36,4 @@ export {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
   type AutomationConversationPersistenceErrorCode,
-  AutomationConversationDeliveryTaskActions,
-  resolveAutomationConversationDeliveryTaskAction,
-  type AutomationConversationDeliveryTaskAction,
 } from "./persistence/index.js";
-export type { AutomationConversationPersistenceDependencies } from "./persistence/index.js";

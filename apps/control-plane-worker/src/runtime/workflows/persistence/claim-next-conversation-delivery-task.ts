@@ -1,10 +1,10 @@
 import {
   automationConversationDeliveryTasks,
   AutomationConversationDeliveryTaskStatuses,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
-
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
 
 export type ClaimNextConversationDeliveryTaskInput = {
   conversationId: string;
@@ -12,7 +12,9 @@ export type ClaimNextConversationDeliveryTaskInput = {
 };
 
 export async function claimNextAutomationConversationDeliveryTask(
-  ctx: AutomationConversationPersistenceDependencies,
+  ctx: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: ClaimNextConversationDeliveryTaskInput,
 ) {
   return ctx.db.transaction(async (tx) => {

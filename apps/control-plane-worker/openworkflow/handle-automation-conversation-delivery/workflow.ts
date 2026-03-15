@@ -1,23 +1,24 @@
 import { HandleAutomationConversationDeliveryWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { defineWorkflow } from "openworkflow";
 
-import { getWorkflowContext } from "../src/openworkflow/context.js";
-import { executeConversationProviderDelivery } from "../src/runtime/automation-workflows/provider/execute-conversation-provider-delivery.js";
+import { getWorkflowContext } from "../../src/openworkflow/context.js";
 import {
-  acquireAutomationConnection,
-  claimOrResumeAutomationConversationDeliveryTask,
-  deliverConversationAutomationPayload,
-  ensureConversationDeliverySandbox,
-  finalizeAutomationConversationDeliveryTask,
-  idleAutomationConversationDeliveryProcessorIfEmpty,
+  prepareAutomationRun,
+  resolveAutomationRunFailure,
+} from "../../src/runtime/workflows/automation-run.js";
+import {
   markAutomationRunCompleted,
   markAutomationRunFailed,
   markAutomationRunIgnored,
-  prepareAutomationRun,
-  resolveAutomationConversationDeliveryTaskAction,
-  resolveAutomationConversationDeliveryRoute,
-  resolveAutomationRunFailure,
-} from "../src/runtime/workflows/index.js";
+} from "../shared/automation-run.js";
+import { acquireAutomationConnection } from "./acquire-automation-connection.js";
+import { claimOrResumeAutomationConversationDeliveryTask } from "./claim-or-resume-automation-conversation-delivery-task.js";
+import { deliverConversationAutomationPayload } from "./deliver-conversation-automation-payload.js";
+import { ensureConversationDeliverySandbox } from "./ensure-conversation-delivery-sandbox.js";
+import { finalizeAutomationConversationDeliveryTask } from "./finalize-automation-conversation-delivery-task.js";
+import { idleAutomationConversationDeliveryProcessorIfEmpty } from "./idle-automation-conversation-delivery-processor-if-empty.js";
+import { resolveAutomationConversationDeliveryRoute } from "./resolve-automation-conversation-delivery-route.js";
+import { resolveAutomationConversationDeliveryTaskAction } from "./resolve-automation-conversation-delivery-task-action.js";
 
 function getConversationDeliveryStepName(input: { prefix: string; taskId: string }) {
   return `${input.prefix}:${input.taskId}`;
@@ -176,10 +177,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             ensureConversationDeliverySandbox(
               {
                 db,
-                getSandboxInstance: (sandboxInput) =>
-                  controlPlaneInternalClient.getSandboxInstance(sandboxInput),
-                startSandboxProfileInstance: (startInput) =>
-                  controlPlaneInternalClient.startSandboxProfileInstance(startInput),
+                controlPlaneInternalClient,
               },
               {
                 preparedAutomationRun,
@@ -198,10 +196,7 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
           async () =>
             acquireAutomationConnection(
               {
-                getSandboxInstance: (sandboxInput) =>
-                  controlPlaneInternalClient.getSandboxInstance(sandboxInput),
-                mintSandboxConnectionToken: (mintInput) =>
-                  controlPlaneInternalClient.mintSandboxConnectionToken(mintInput),
+                controlPlaneInternalClient,
               },
               {
                 preparedAutomationRun,
@@ -221,7 +216,6 @@ export const HandleAutomationConversationDeliveryWorkflow = defineWorkflow(
             deliverConversationAutomationPayload(
               {
                 db,
-                executeConversationProviderDelivery,
               },
               {
                 taskId: activeTask.taskId,

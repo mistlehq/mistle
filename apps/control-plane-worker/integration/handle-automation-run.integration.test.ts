@@ -43,17 +43,21 @@ import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
-import { HandleAutomationRunWorkflow } from "../openworkflow/handle-automation-run.js";
+import { claimOrResumeAutomationConversationDeliveryTask } from "../openworkflow/handle-automation-conversation-delivery/claim-or-resume-automation-conversation-delivery-task.js";
+import { finalizeAutomationConversationDeliveryTask } from "../openworkflow/handle-automation-conversation-delivery/finalize-automation-conversation-delivery-task.js";
+import { idleAutomationConversationDeliveryProcessorIfEmpty } from "../openworkflow/handle-automation-conversation-delivery/idle-automation-conversation-delivery-processor-if-empty.js";
 import {
   AutomationConversationDeliveryTaskActions,
-  claimOrResumeAutomationConversationDeliveryTask,
-  finalizeAutomationConversationDeliveryTask,
-  handoffAutomationRunDelivery,
-  idleAutomationConversationDeliveryProcessorIfEmpty,
-  markAutomationRunIgnored,
-  markAutomationRunFailed,
-  prepareAutomationRun,
   resolveAutomationConversationDeliveryTaskAction,
+} from "../openworkflow/handle-automation-conversation-delivery/resolve-automation-conversation-delivery-task-action.js";
+import { HandleAutomationRunWorkflow } from "../openworkflow/handle-automation-run.js";
+import {
+  markAutomationRunFailed,
+  markAutomationRunIgnored,
+} from "../openworkflow/shared/automation-run.js";
+import {
+  handoffAutomationRunDelivery,
+  prepareAutomationRun,
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
 } from "../src/runtime/workflows/index.js";

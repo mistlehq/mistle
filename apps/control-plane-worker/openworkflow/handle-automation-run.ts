@@ -7,12 +7,12 @@ import { defineWorkflow } from "openworkflow";
 import { getWorkflowContext } from "../src/openworkflow/context.js";
 import {
   handoffAutomationRunDelivery,
-  markAutomationRunFailed,
   prepareAutomationRun,
   resolveAutomationRunFailure,
   setAutomationConversationDeliveryProcessorIdle,
   transitionAutomationRunToRunning,
 } from "../src/runtime/workflows/index.js";
+import { markAutomationRunFailed } from "./shared/automation-run.js";
 
 export const HandleAutomationRunWorkflow = defineWorkflow(
   HandleAutomationRunWorkflowSpec,

@@ -1,6 +1,8 @@
 import {
   automationConversationDeliveryProcessors,
   AutomationConversationDeliveryProcessorStatuses,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -8,8 +10,6 @@ import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
 } from "./errors.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
-
 export type EnsureAutomationConversationDeliveryProcessorInput = {
   conversationId: string;
 };
@@ -21,7 +21,9 @@ export type EnsureAutomationConversationDeliveryProcessorOutput = {
 };
 
 export async function ensureAutomationConversationDeliveryProcessor(
-  ctx: AutomationConversationPersistenceDependencies,
+  ctx: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: EnsureAutomationConversationDeliveryProcessorInput,
 ): Promise<EnsureAutomationConversationDeliveryProcessorOutput> {
   const insertedRows = await ctx.db

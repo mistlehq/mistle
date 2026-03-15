@@ -2,21 +2,23 @@ import {
   automationConversationRoutes,
   AutomationConversationRouteStatuses,
   AutomationConversationStatuses,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
 } from "./errors.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
-
 export type CreateAutomationConversationRouteInput = {
   conversationId: string;
   sandboxInstanceId: string;
 };
 
 export async function createAutomationConversationRoute(
-  deps: AutomationConversationPersistenceDependencies,
+  deps: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: CreateAutomationConversationRouteInput,
 ) {
   const existingAutomationConversation = await deps.db.query.automationConversations.findFirst({

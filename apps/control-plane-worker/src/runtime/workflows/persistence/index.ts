@@ -24,17 +24,9 @@ export {
   type EnsureAutomationConversationDeliveryProcessorOutput,
 } from "./ensure-conversation-delivery-processor.js";
 export {
-  finalizeAutomationConversationDeliveryTask,
-  type FinalizeAutomationConversationDeliveryTaskInput,
-} from "./finalize-conversation-delivery-task.js";
-export {
   findActiveAutomationConversationDeliveryTask,
   type FindActiveAutomationConversationDeliveryTaskInput,
 } from "./find-active-conversation-delivery-task.js";
-export {
-  idleAutomationConversationDeliveryProcessorIfEmpty,
-  type IdleAutomationConversationDeliveryProcessorIfEmptyInput,
-} from "./idle-conversation-delivery-processor-if-empty.js";
 export {
   markAutomationConversationDeliveryTaskDelivering,
   type MarkAutomationConversationDeliveryTaskDeliveringInput,
@@ -56,13 +48,7 @@ export {
   type UpdateAutomationConversationExecutionInput,
 } from "./update-conversation-execution.js";
 export {
-  AutomationConversationDeliveryTaskActions,
-  resolveAutomationConversationDeliveryTaskAction,
-  type AutomationConversationDeliveryTaskAction,
-} from "./resolve-conversation-delivery-task-action.js";
-export {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
   type AutomationConversationPersistenceErrorCode,
 } from "./errors.js";
-export type { AutomationConversationPersistenceDependencies } from "./types.js";
