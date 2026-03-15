@@ -1,6 +1,8 @@
-import { AutomationConversationDeliveryTaskStatuses } from "@mistle/db/control-plane";
-
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
+import {
+  AutomationConversationDeliveryTaskStatuses,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
+} from "@mistle/db/control-plane";
 
 export type FindActiveAutomationConversationDeliveryTaskInput = {
   conversationId: string;
@@ -8,7 +10,9 @@ export type FindActiveAutomationConversationDeliveryTaskInput = {
 };
 
 export async function findActiveAutomationConversationDeliveryTask(
-  ctx: AutomationConversationPersistenceDependencies,
+  ctx: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: FindActiveAutomationConversationDeliveryTaskInput,
 ) {
   return ctx.db.query.automationConversationDeliveryTasks.findFirst({

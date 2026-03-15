@@ -1,7 +1,10 @@
-import { AutomationConversationDeliveryTaskStatuses } from "@mistle/db/control-plane";
+import {
+  AutomationConversationDeliveryTaskStatuses,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
+} from "@mistle/db/control-plane";
 
-import { setAutomationConversationDeliveryProcessorIdle } from "./set-conversation-delivery-processor-idle.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
+import { setAutomationConversationDeliveryProcessorIdle } from "../../src/runtime/workflows/persistence/set-conversation-delivery-processor-idle.js";
 
 export type IdleAutomationConversationDeliveryProcessorIfEmptyInput = {
   conversationId: string;
@@ -9,7 +12,9 @@ export type IdleAutomationConversationDeliveryProcessorIfEmptyInput = {
 };
 
 export async function idleAutomationConversationDeliveryProcessorIfEmpty(
-  ctx: AutomationConversationPersistenceDependencies,
+  ctx: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: IdleAutomationConversationDeliveryProcessorIfEmptyInput,
 ): Promise<boolean> {
   return ctx.db.transaction(async (tx) => {

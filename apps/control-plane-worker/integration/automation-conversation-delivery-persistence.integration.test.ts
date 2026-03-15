@@ -30,17 +30,17 @@ import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
+import { finalizeAutomationConversationDeliveryTask } from "../openworkflow/handle-automation-conversation-delivery/finalize-automation-conversation-delivery-task.js";
+import { idleAutomationConversationDeliveryProcessorIfEmpty } from "../openworkflow/handle-automation-conversation-delivery/idle-automation-conversation-delivery-processor-if-empty.js";
+import { resolveAutomationConversationDeliveryTaskAction } from "../openworkflow/handle-automation-conversation-delivery/resolve-automation-conversation-delivery-task-action.js";
 import {
   AutomationConversationPersistenceErrorCodes,
   claimAutomationConversation,
   claimNextAutomationConversationDeliveryTask,
   ensureAutomationConversationDeliveryProcessor,
   enqueueAutomationConversationDeliveryTask,
-  finalizeAutomationConversationDeliveryTask,
   findActiveAutomationConversationDeliveryTask,
-  idleAutomationConversationDeliveryProcessorIfEmpty,
   markAutomationConversationDeliveryTaskDelivering,
-  resolveAutomationConversationDeliveryTaskAction,
 } from "../src/runtime/workflows/index.js";
 import { it } from "./test-context.js";
 

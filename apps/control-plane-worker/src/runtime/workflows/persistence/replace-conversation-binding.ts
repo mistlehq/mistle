@@ -3,6 +3,8 @@ import {
   automationConversations,
   AutomationConversationRouteStatuses,
   AutomationConversationStatuses,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 import { eq, sql } from "drizzle-orm";
 
@@ -10,8 +12,6 @@ import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
 } from "./errors.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
-
 export type ReplaceAutomationConversationBindingInput = {
   routeId: string;
   sandboxInstanceId: string;
@@ -21,7 +21,9 @@ export type ReplaceAutomationConversationBindingInput = {
 };
 
 export async function replaceAutomationConversationBinding(
-  deps: AutomationConversationPersistenceDependencies,
+  deps: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: ReplaceAutomationConversationBindingInput,
 ) {
   return deps.db.transaction(async (transaction) => {

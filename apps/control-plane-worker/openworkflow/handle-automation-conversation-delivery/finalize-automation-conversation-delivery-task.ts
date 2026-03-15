@@ -3,15 +3,15 @@ import {
   automationConversationDeliveryTasks,
   AutomationConversationDeliveryTaskStatuses,
   type AutomationConversationDeliveryTaskStatus,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 import { and, eq, or, sql } from "drizzle-orm";
 
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
-} from "./errors.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
-
+} from "../../src/runtime/workflows/persistence/errors.js";
 const FinalAutomationConversationDeliveryTaskStatuses =
   new Set<AutomationConversationDeliveryTaskStatus>([
     AutomationConversationDeliveryTaskStatuses.COMPLETED,
@@ -28,7 +28,9 @@ export type FinalizeAutomationConversationDeliveryTaskInput = {
 };
 
 export async function finalizeAutomationConversationDeliveryTask(
-  ctx: AutomationConversationPersistenceDependencies,
+  ctx: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: FinalizeAutomationConversationDeliveryTaskInput,
 ) {
   if (!FinalAutomationConversationDeliveryTaskStatuses.has(input.status)) {

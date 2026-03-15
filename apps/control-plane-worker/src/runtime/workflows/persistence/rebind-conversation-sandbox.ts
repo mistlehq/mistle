@@ -2,6 +2,8 @@ import {
   automationConversationRoutes,
   AutomationConversationRouteStatuses,
   AutomationConversationStatuses,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 import { eq, sql } from "drizzle-orm";
 
@@ -9,15 +11,15 @@ import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
 } from "./errors.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
-
 export type RebindAutomationConversationSandboxInput = {
   routeId: string;
   sandboxInstanceId: string;
 };
 
 export async function rebindAutomationConversationSandbox(
-  deps: AutomationConversationPersistenceDependencies,
+  deps: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: RebindAutomationConversationSandboxInput,
 ) {
   return deps.db.transaction(async (transaction) => {

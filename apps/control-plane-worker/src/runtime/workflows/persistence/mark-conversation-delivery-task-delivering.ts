@@ -1,6 +1,8 @@
 import {
   automationConversationDeliveryTasks,
   AutomationConversationDeliveryTaskStatuses,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -8,15 +10,15 @@ import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
 } from "./errors.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
-
 export type MarkAutomationConversationDeliveryTaskDeliveringInput = {
   taskId: string;
   generation: number;
 };
 
 export async function markAutomationConversationDeliveryTaskDelivering(
-  deps: AutomationConversationPersistenceDependencies,
+  deps: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: MarkAutomationConversationDeliveryTaskDeliveringInput,
 ) {
   const updatedRows = await deps.db

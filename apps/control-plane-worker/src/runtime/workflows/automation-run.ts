@@ -8,16 +8,13 @@ import {
   AutomationConversationOwnerKinds,
   IntegrationBindingKinds,
 } from "@mistle/db/control-plane";
-import { systemSleeper } from "@mistle/time";
 import { and, eq, sql } from "drizzle-orm";
 
 import { renderTemplateString } from "../automations/index.js";
 import type {
-  AcquiredAutomationConnection,
   EnsuredAutomationSandbox,
   HandleAutomationRunWorkflowInput,
   HandoffAutomationRunDeliveryInput,
-  MarkAutomationRunFailedInput,
   PreparedAutomationRun,
 } from "../workflow-types.js";
 import {
@@ -25,14 +22,6 @@ import {
   enqueueAutomationConversationDeliveryTask,
   ensureAutomationConversationDeliveryProcessor,
 } from "./persistence/index.js";
-
-export type HandleAutomationRunDependencies = {
-  db: ControlPlaneDatabase;
-};
-
-export type HandoffAutomationRunDeliveryDependencies = {
-  db: ControlPlaneDatabase;
-};
 
 export type HandoffAutomationRunDeliveryOutput = {
   conversationId: string;
@@ -57,27 +46,8 @@ export type EnsureAutomationSandboxDependencies = {
   }>;
 };
 
-export type AcquireAutomationConnectionDependencies = {
-  getSandboxInstance: (input: { organizationId: string; instanceId: string }) => Promise<{
-    id: string;
-    status: "starting" | "running" | "stopped" | "failed";
-    failureCode: string | null;
-    failureMessage: string | null;
-  }>;
-  mintSandboxConnectionToken: (input: { organizationId: string; instanceId: string }) => Promise<{
-    instanceId: string;
-    url: string;
-    token: string;
-    expiresAt: string;
-  }>;
-};
-
 export type TransitionAutomationRunToRunningOutput = {
   shouldProcess: boolean;
-};
-
-export type MarkAutomationRunIgnoredInput = {
-  automationRunId: string;
 };
 
 const TerminalAutomationRunStatuses = new Set<AutomationRunStatus>([
@@ -86,10 +56,8 @@ const TerminalAutomationRunStatuses = new Set<AutomationRunStatus>([
   AutomationRunStatuses.IGNORED,
   AutomationRunStatuses.DUPLICATE,
 ]);
-const SandboxStartTimeoutMs = 5 * 60 * 1000;
-const SandboxStartPollIntervalMs = 1_000;
 
-const AutomationRunFailureCodes = {
+export const AutomationRunFailureCodes = {
   AUTOMATION_RUN_NOT_FOUND: "automation_run_not_found",
   AUTOMATION_NOT_FOUND: "automation_not_found",
   AUTOMATION_TARGET_REFERENCE_MISSING: "automation_target_reference_missing",
@@ -117,6 +85,14 @@ class AutomationRunExecutionError extends Error {
   }
 }
 
+export function createAutomationRunExecutionError(input: {
+  code: string;
+  message: string;
+  cause?: unknown;
+}) {
+  return new AutomationRunExecutionError(input);
+}
+
 export function resolveAutomationRunFailure(input: unknown): { code: string; message: string } {
   if (input instanceof AutomationRunExecutionError) {
     return {
@@ -139,7 +115,9 @@ export function resolveAutomationRunFailure(input: unknown): { code: string; mes
 }
 
 export async function transitionAutomationRunToRunning(
-  ctx: HandleAutomationRunDependencies,
+  ctx: {
+    db: ControlPlaneDatabase;
+  },
   input: HandleAutomationRunWorkflowInput,
 ): Promise<TransitionAutomationRunToRunningOutput> {
   const transitionedRows = await ctx.db
@@ -406,7 +384,9 @@ async function resolveAutomationConversationIntegrationFamilyId(
 }
 
 export async function prepareAutomationRun(
-  ctx: HandleAutomationRunDependencies,
+  ctx: {
+    db: ControlPlaneDatabase;
+  },
   input: HandleAutomationRunWorkflowInput,
 ): Promise<PreparedAutomationRun> {
   const automationRun = await ctx.db.query.automationRuns.findFirst({
@@ -623,7 +603,9 @@ export async function prepareAutomationRun(
 }
 
 export async function handoffAutomationRunDelivery(
-  ctx: HandoffAutomationRunDeliveryDependencies,
+  ctx: {
+    db: ControlPlaneDatabase;
+  },
   input: HandoffAutomationRunDeliveryInput,
 ): Promise<HandoffAutomationRunDeliveryOutput> {
   const enqueuedTask = await enqueueAutomationConversationDeliveryTask(
@@ -687,205 +669,4 @@ export async function ensureAutomationSandbox(
     sandboxInstanceId: startedSandbox.sandboxInstanceId,
     startupWorkflowRunId: startedSandbox.workflowRunId,
   };
-}
-
-export async function acquireAutomationConnection(
-  ctx: AcquireAutomationConnectionDependencies,
-  input: {
-    preparedAutomationRun: PreparedAutomationRun;
-    ensuredAutomationSandbox: EnsuredAutomationSandbox;
-  },
-): Promise<AcquiredAutomationConnection> {
-  if (input.preparedAutomationRun.renderedConversationKey.trim().length === 0) {
-    throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.TEMPLATE_RENDER_FAILED,
-      message: "Rendered automation conversation key template must not be empty.",
-    });
-  }
-
-  const deadline = Date.now() + SandboxStartTimeoutMs;
-  let isSandboxRunning = false;
-  while (Date.now() < deadline) {
-    const sandboxInstance = await ctx.getSandboxInstance({
-      organizationId: input.preparedAutomationRun.organizationId,
-      instanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
-    });
-
-    if (sandboxInstance.status === "running") {
-      isSandboxRunning = true;
-      break;
-    }
-
-    if (sandboxInstance.status === "failed" || sandboxInstance.status === "stopped") {
-      throw new AutomationRunExecutionError({
-        code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
-        message:
-          sandboxInstance.failureMessage ??
-          `Sandbox instance '${sandboxInstance.id}' entered terminal status '${sandboxInstance.status}' before it became ready.`,
-      });
-    }
-
-    await systemSleeper.sleep(SandboxStartPollIntervalMs);
-  }
-
-  if (!isSandboxRunning) {
-    throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
-      message: `Sandbox instance '${input.ensuredAutomationSandbox.sandboxInstanceId}' did not become ready before the automation timeout elapsed.`,
-    });
-  }
-
-  const connection = await ctx.mintSandboxConnectionToken({
-    organizationId: input.preparedAutomationRun.organizationId,
-    instanceId: input.ensuredAutomationSandbox.sandboxInstanceId,
-  });
-
-  return {
-    instanceId: connection.instanceId,
-    url: connection.url,
-    token: connection.token,
-    expiresAt: connection.expiresAt,
-  };
-}
-
-export async function markAutomationRunCompleted(
-  ctx: HandleAutomationRunDependencies,
-  input: HandleAutomationRunWorkflowInput,
-): Promise<void> {
-  const updatedRows = await ctx.db
-    .update(automationRuns)
-    .set({
-      status: AutomationRunStatuses.COMPLETED,
-      failureCode: null,
-      failureMessage: null,
-      finishedAt: sql`now()`,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(automationRuns.id, input.automationRunId),
-        eq(automationRuns.status, AutomationRunStatuses.RUNNING),
-      ),
-    )
-    .returning({
-      id: automationRuns.id,
-    });
-  if (updatedRows.length > 0) {
-    return;
-  }
-
-  const existingRun = await ctx.db.query.automationRuns.findFirst({
-    where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
-  });
-  if (existingRun === undefined) {
-    throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.AUTOMATION_RUN_NOT_FOUND,
-      message: `Automation run '${input.automationRunId}' was not found.`,
-    });
-  }
-
-  if (existingRun.status === AutomationRunStatuses.COMPLETED) {
-    return;
-  }
-
-  throw new AutomationRunExecutionError({
-    code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
-    message: `Automation run '${input.automationRunId}' could not be marked completed from status '${existingRun.status}'.`,
-  });
-}
-
-export async function markAutomationRunFailed(
-  ctx: HandleAutomationRunDependencies,
-  input: MarkAutomationRunFailedInput,
-): Promise<void> {
-  const updatedRows = await ctx.db
-    .update(automationRuns)
-    .set({
-      status: AutomationRunStatuses.FAILED,
-      failureCode: input.failureCode,
-      failureMessage: input.failureMessage,
-      finishedAt: sql`now()`,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(automationRuns.id, input.automationRunId),
-        eq(automationRuns.status, AutomationRunStatuses.RUNNING),
-      ),
-    )
-    .returning({
-      id: automationRuns.id,
-    });
-  if (updatedRows.length > 0) {
-    return;
-  }
-
-  const existingRun = await ctx.db.query.automationRuns.findFirst({
-    where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
-  });
-  if (existingRun === undefined) {
-    throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.AUTOMATION_RUN_NOT_FOUND,
-      message: `Automation run '${input.automationRunId}' was not found.`,
-    });
-  }
-
-  if (
-    existingRun.status === AutomationRunStatuses.FAILED &&
-    existingRun.failureCode === input.failureCode &&
-    existingRun.failureMessage === input.failureMessage
-  ) {
-    return;
-  }
-
-  throw new AutomationRunExecutionError({
-    code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
-    message: `Automation run '${input.automationRunId}' could not be marked failed from status '${existingRun.status}'.`,
-  });
-}
-
-export async function markAutomationRunIgnored(
-  ctx: HandleAutomationRunDependencies,
-  input: MarkAutomationRunIgnoredInput,
-): Promise<void> {
-  const updatedRows = await ctx.db
-    .update(automationRuns)
-    .set({
-      status: AutomationRunStatuses.IGNORED,
-      failureCode: null,
-      failureMessage: null,
-      finishedAt: sql`now()`,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(automationRuns.id, input.automationRunId),
-        eq(automationRuns.status, AutomationRunStatuses.RUNNING),
-      ),
-    )
-    .returning({
-      id: automationRuns.id,
-    });
-  if (updatedRows.length > 0) {
-    return;
-  }
-
-  const existingRun = await ctx.db.query.automationRuns.findFirst({
-    where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
-  });
-  if (existingRun === undefined) {
-    throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.AUTOMATION_RUN_NOT_FOUND,
-      message: `Automation run '${input.automationRunId}' was not found.`,
-    });
-  }
-
-  if (existingRun.status === AutomationRunStatuses.IGNORED) {
-    return;
-  }
-
-  throw new AutomationRunExecutionError({
-    code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
-    message: `Automation run '${input.automationRunId}' could not be marked ignored from status '${existingRun.status}'.`,
-  });
 }

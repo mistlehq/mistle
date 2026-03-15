@@ -6,6 +6,8 @@ import {
   type AutomationConversationIntegrationFamilyId,
   type InsertAutomationConversation,
   type AutomationConversationOwnerKind,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 import { typeid } from "typeid-js";
 
@@ -13,8 +15,6 @@ import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
 } from "./errors.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
-
 export type ClaimAutomationConversationInput = {
   organizationId: string;
   ownerKind: AutomationConversationOwnerKind;
@@ -29,7 +29,9 @@ export type ClaimAutomationConversationInput = {
 };
 
 export async function claimAutomationConversation(
-  ctx: AutomationConversationPersistenceDependencies,
+  ctx: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: ClaimAutomationConversationInput,
 ) {
   if (input.title !== undefined && input.title !== null) {

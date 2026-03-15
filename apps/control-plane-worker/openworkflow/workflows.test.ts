@@ -10,7 +10,7 @@ import {
 } from "@mistle/workflow-registry/control-plane";
 import { describe, expect, it } from "vitest";
 
-import { HandleAutomationConversationDeliveryWorkflow } from "./handle-automation-conversation-delivery.js";
+import { HandleAutomationConversationDeliveryWorkflow } from "./handle-automation-conversation-delivery/workflow.js";
 import { HandleAutomationRunWorkflow } from "./handle-automation-run.js";
 import { HandleIntegrationWebhookEventWorkflow } from "./handle-integration-webhook-event.js";
 import { RequestDeleteSandboxProfileWorkflow } from "./request-delete-sandbox-profile.js";

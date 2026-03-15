@@ -38,13 +38,15 @@ import { describe, expect } from "vitest";
 
 import { HandleIntegrationWebhookEventWorkflow } from "../openworkflow/handle-integration-webhook-event.js";
 import {
+  markAutomationRunCompleted,
+  markAutomationRunFailed,
+} from "../openworkflow/shared/automation-run.js";
+import {
   markIntegrationWebhookEventFailed,
   markIntegrationWebhookEventProcessed,
   prepareIntegrationWebhookEvent,
 } from "../src/runtime/services/handle-integration-webhook-event.js";
 import {
-  markAutomationRunCompleted,
-  markAutomationRunFailed,
   prepareAutomationRun,
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,

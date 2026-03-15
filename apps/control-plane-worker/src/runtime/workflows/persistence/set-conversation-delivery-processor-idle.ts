@@ -1,10 +1,10 @@
 import {
   automationConversationDeliveryProcessors,
   AutomationConversationDeliveryProcessorStatuses,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 import { and, eq, sql } from "drizzle-orm";
-
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
 
 export type SetAutomationConversationDeliveryProcessorIdleInput = {
   conversationId: string;
@@ -12,7 +12,9 @@ export type SetAutomationConversationDeliveryProcessorIdleInput = {
 };
 
 export async function setAutomationConversationDeliveryProcessorIdle(
-  ctx: AutomationConversationPersistenceDependencies,
+  ctx: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: SetAutomationConversationDeliveryProcessorIdleInput,
 ): Promise<boolean> {
   const updatedRows = await ctx.db

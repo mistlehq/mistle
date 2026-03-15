@@ -3,6 +3,8 @@ import {
   automationConversations,
   AutomationConversationRouteStatuses,
   AutomationConversationStatuses,
+  type ControlPlaneDatabase,
+  type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 import { eq, sql } from "drizzle-orm";
 
@@ -10,8 +12,6 @@ import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
 } from "./errors.js";
-import type { AutomationConversationPersistenceDependencies } from "./types.js";
-
 export type UpdateAutomationConversationExecutionInput = {
   routeId: string;
   providerExecutionId: string | null;
@@ -19,7 +19,9 @@ export type UpdateAutomationConversationExecutionInput = {
 };
 
 export async function updateAutomationConversationExecution(
-  deps: AutomationConversationPersistenceDependencies,
+  deps: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+  },
   input: UpdateAutomationConversationExecutionInput,
 ) {
   return deps.db.transaction(async (transaction) => {
