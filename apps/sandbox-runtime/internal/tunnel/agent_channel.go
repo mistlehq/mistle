@@ -16,6 +16,7 @@ import (
 const agentEndpointDialTimeout = 5 * time.Second
 
 type resolvedAgentEndpoint struct {
+	RuntimeKey     string
 	ClientID       string
 	EndpointKey    string
 	ConnectionMode string
@@ -32,6 +33,7 @@ func handleAgentConnectRequest(
 	ctx context.Context,
 	tunnelConn *websocket.Conn,
 	connectRequest connectRequest,
+	executionLeases *executionLeaseEngine,
 	agentRuntimes []startup.AgentRuntime,
 	runtimeClients []startup.RuntimeClient,
 	relayResultCh chan<- activeTunnelStreamRelayResult,
@@ -93,7 +95,21 @@ func handleAgentConnectRequest(
 		return nil, fmt.Errorf("failed to write sandbox tunnel stream.open acknowledgement: %w", err)
 	}
 
-	return startAgentRelay(ctx, tunnelConn, agentConn, connectRequest.StreamID, relayResultCh), nil
+	observer := newAgentExecutionLeaseObserver(agentExecutionLeaseObserverInput{
+		Context:         ctx,
+		AgentRuntime:    startup.AgentRuntime{RuntimeKey: agentEndpoint.RuntimeKey},
+		TransportURL:    agentEndpoint.TransportURL,
+		ExecutionLeases: executionLeases,
+	})
+
+	return startAgentRelay(
+		ctx,
+		tunnelConn,
+		agentConn,
+		connectRequest.StreamID,
+		observer,
+		relayResultCh,
+	), nil
 }
 
 func resolveAgentEndpoint(
@@ -126,6 +142,7 @@ func resolveAgentEndpoint(
 			}
 
 			return &resolvedAgentEndpoint{
+				RuntimeKey:     agentRuntime.RuntimeKey,
 				ClientID:       runtimeClient.ClientID,
 				EndpointKey:    endpoint.EndpointKey,
 				ConnectionMode: endpoint.ConnectionMode,
@@ -167,6 +184,7 @@ func relayTunnelFrames(
 	tunnelConn *websocket.Conn,
 	agentConn *websocket.Conn,
 	streamID int,
+	observer agentExecutionLeaseObserver,
 	incomingMessages <-chan tunnelMessage,
 ) (agentRelayResult, error) {
 	relayContext, cancelAgentRelay := context.WithCancel(ctx)
@@ -181,6 +199,7 @@ func relayTunnelFrames(
 		sendWindow,
 		tunnelConn,
 		uint32(streamID),
+		observer,
 	)
 
 	for {
@@ -301,6 +320,9 @@ func relayTunnelFrames(
 				}
 				return "", fmt.Errorf("agent websocket write failed: %w", err)
 			}
+			if agentMessageType == websocket.MessageText && observer != nil {
+				observer.ObserveClientMessage(dataFrame.Payload)
+			}
 			if err := writeStreamWindow(relayContext, tunnelConn, sessionprotocol.StreamWindow{
 				Type:     sessionprotocol.MessageTypeStreamWindow,
 				StreamID: streamID,
@@ -317,6 +339,7 @@ func startAgentRelay(
 	tunnelConn *websocket.Conn,
 	agentConn *websocket.Conn,
 	streamID int,
+	observer agentExecutionLeaseObserver,
 	relayResultCh chan<- activeTunnelStreamRelayResult,
 ) *activeTunnelStreamRelay {
 	relay := &activeTunnelStreamRelay{
@@ -331,9 +354,11 @@ func startAgentRelay(
 		result := activeTunnelStreamRelayResult{
 			Relay: relay,
 		}
-		_, err := relayTunnelFrames(ctx, tunnelConn, agentConn, streamID, relay.MessageCh)
+		relayResult, err := relayTunnelFrames(ctx, tunnelConn, agentConn, streamID, observer, relay.MessageCh)
 		if err != nil {
 			result.Err = fmt.Errorf("sandbox tunnel websocket relay failed: %w", err)
+		} else if relayResult == agentRelayResultDisconnected && observer != nil {
+			observer.HandleStreamDisconnected()
 		}
 		relayResultCh <- result
 	}()
@@ -348,6 +373,7 @@ func relayAgentFramesDirection(
 	sendWindow *streamSendWindow,
 	target *websocket.Conn,
 	streamID uint32,
+	observer agentExecutionLeaseObserver,
 ) {
 	for {
 		messageType, payload, err := source.Read(ctx)
@@ -379,6 +405,9 @@ func relayAgentFramesDirection(
 		switch messageType {
 		case websocket.MessageText:
 			payloadKind = sessionprotocol.PayloadKindWebSocketText
+			if observer != nil {
+				observer.ObserveAgentMessage(payload)
+			}
 		case websocket.MessageBinary:
 			payloadKind = sessionprotocol.PayloadKindWebSocketBinary
 		default:

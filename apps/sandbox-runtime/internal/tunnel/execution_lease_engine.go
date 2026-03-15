@@ -9,6 +9,14 @@ import (
 	"github.com/mistlehq/mistle/apps/sandbox-runtime/internal/sessionprotocol"
 )
 
+type executionLeaseAlreadyTrackedError struct {
+	LeaseID string
+}
+
+func (err executionLeaseAlreadyTrackedError) Error() string {
+	return fmt.Sprintf("execution lease %q is already tracked", err.LeaseID)
+}
+
 type executionLeaseRegistry struct {
 	mu         sync.RWMutex
 	leasesByID map[string]sessionprotocol.ExecutionLease
@@ -25,7 +33,7 @@ func (registry *executionLeaseRegistry) Add(lease sessionprotocol.ExecutionLease
 	defer registry.mu.Unlock()
 
 	if _, exists := registry.leasesByID[lease.ID]; exists {
-		return fmt.Errorf("execution lease %q is already tracked", lease.ID)
+		return executionLeaseAlreadyTrackedError{LeaseID: lease.ID}
 	}
 
 	registry.leasesByID[lease.ID] = lease
@@ -48,8 +56,8 @@ func (registry *executionLeaseRegistry) Remove(leaseID string) {
 }
 
 type executionLeaseEngine struct {
-	mu       sync.RWMutex
-	registry *executionLeaseRegistry
+	mu         sync.RWMutex
+	registry   *executionLeaseRegistry
 	tunnelConn *websocket.Conn
 }
 
@@ -132,6 +140,10 @@ func (engine *executionLeaseEngine) Renew(ctx context.Context, leaseID string) e
 
 func (engine *executionLeaseEngine) Remove(leaseID string) {
 	engine.registry.Remove(leaseID)
+}
+
+func (engine *executionLeaseEngine) Has(leaseID string) bool {
+	return engine.registry.Has(leaseID)
 }
 
 func (engine *executionLeaseEngine) currentTunnelConnection() *websocket.Conn {
