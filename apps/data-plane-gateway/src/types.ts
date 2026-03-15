@@ -3,6 +3,8 @@ import { AppIds, type loadConfig } from "@mistle/config";
 import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import type { Context, Hono } from "hono";
 
+import type { AdmittedSandboxTunnelWebSocketRequest } from "./tunnel/admission/sandbox-tunnel-websocket-admission.js";
+
 type LoadDataPlaneGatewayConfigResult = ReturnType<
   typeof loadConfig<typeof AppIds.DATA_PLANE_GATEWAY>
 >;
@@ -21,8 +23,7 @@ export type AppContextBindings = {
 export type AppContextVariables = {
   config: DataPlaneGatewayConfig;
   db: DataPlaneDatabase;
-  sandboxOwnerLeaseId?: string;
-  sandboxRelaySessionId?: string;
+  sandboxTunnelAdmission?: AdmittedSandboxTunnelWebSocketRequest;
 };
 
 export type AppContext = Context<AppContextBindings>;
