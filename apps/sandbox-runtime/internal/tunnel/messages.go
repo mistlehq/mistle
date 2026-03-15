@@ -67,6 +67,22 @@ func writeStreamWindow(
 	return writeTextJSONMessage(ctx, tunnelConn, streamWindow)
 }
 
+func writeLeaseCreate(
+	ctx context.Context,
+	tunnelConn *websocket.Conn,
+	leaseCreate sessionprotocol.LeaseCreate,
+) error {
+	return writeTextJSONMessage(ctx, tunnelConn, leaseCreate)
+}
+
+func writeLeaseRenew(
+	ctx context.Context,
+	tunnelConn *websocket.Conn,
+	leaseRenew sessionprotocol.LeaseRenew,
+) error {
+	return writeTextJSONMessage(ctx, tunnelConn, leaseRenew)
+}
+
 func writeTextJSONMessage(ctx context.Context, tunnelConn *websocket.Conn, payload any) error {
 	encodedPayload, err := json.Marshal(payload)
 	if err != nil {
