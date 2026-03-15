@@ -34,11 +34,16 @@ import {
   OpenAiReasoningEfforts,
   OpenAiRuntimes,
 } from "@mistle/integrations-definitions";
-import type { HandleAutomationRunWorkflowInput } from "@mistle/workflow-registry/control-plane";
+import {
+  HandleAutomationConversationDeliveryWorkflowSpec,
+  HandleAutomationRunWorkflowSpec,
+  type HandleAutomationRunWorkflowInput,
+} from "@mistle/workflow-registry/control-plane";
 import { eq } from "drizzle-orm";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
+import { HandleAutomationRunWorkflow } from "../openworkflow/handle-automation-run.js";
 import {
   AutomationConversationDeliveryTaskActions,
   claimOrResumeAutomationConversationDeliveryTask,
@@ -52,6 +57,7 @@ import {
   resolveAutomationRunFailure,
   transitionAutomationRunToRunning,
 } from "../src/runtime/workflows/index.js";
+import { withOpenWorkflowRuntime } from "./openworkflow-test-support.js";
 import { it } from "./test-context.js";
 
 const TestTimeoutMs = 120_000;
@@ -157,7 +163,6 @@ describe("handleAutomationRun integration", () => {
       await handoffAutomationRunDelivery(
         {
           db: input.db,
-          enqueueConversationDeliveryWorkflow: async () => {},
         },
         {
           preparedAutomationRun,
@@ -179,6 +184,190 @@ describe("handleAutomationRun integration", () => {
       throw error;
     }
   }
+
+  it(
+    "runs the workflow entrypoint and schedules conversation delivery",
+    async ({ fixture }) => {
+      const database = await createTestDatabase({
+        databaseUrl: fixture.config.workflow.databaseUrl,
+      });
+
+      try {
+        const organizationId = "org_worker_automation_workflow";
+        const sandboxProfileId = "sbp_worker_automation_workflow";
+        const automationId = "atm_worker_automation_workflow";
+        const automationTargetId = "atg_worker_automation_workflow";
+        const webhookEventId = "iwe_worker_automation_workflow";
+        const automationRunId = "aru_worker_automation_workflow";
+        const connectionId = "icn_worker_automation_workflow";
+        const targetKey = "github-cloud-worker-automation-workflow";
+
+        await database.db.insert(organizations).values({
+          id: organizationId,
+          name: "Worker Automation Workflow",
+          slug: "worker-automation-workflow",
+        });
+        await database.db.insert(sandboxProfiles).values({
+          id: sandboxProfileId,
+          organizationId,
+          displayName: "Automation Workflow Profile",
+          status: "active",
+        });
+        await seedOpenAiAgentBinding({
+          db: database.db,
+          organizationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 4,
+          suffix: "worker_automation_workflow",
+        });
+        await database.db.insert(integrationTargets).values({
+          targetKey,
+          familyId: "github",
+          variantId: "github-cloud",
+          enabled: true,
+          config: {
+            api_base_url: "https://api.github.com",
+            web_base_url: "https://github.com",
+          },
+        });
+        await database.db.insert(integrationConnections).values({
+          id: connectionId,
+          organizationId,
+          targetKey,
+          displayName: "Worker automation workflow connection",
+          status: IntegrationConnectionStatuses.ACTIVE,
+          externalSubjectId: "654321",
+          config: {},
+        });
+        await database.db.insert(automations).values({
+          id: automationId,
+          organizationId,
+          kind: AutomationKinds.WEBHOOK,
+          name: "Automation Workflow",
+          enabled: true,
+        });
+        await database.db.insert(webhookAutomations).values({
+          automationId,
+          integrationConnectionId: connectionId,
+          eventTypes: ["github.issue_comment.created"],
+          payloadFilter: null,
+          inputTemplate: "Reply to {{payload.comment.body}}",
+          conversationKeyTemplate: "issue-{{payload.issue.number}}",
+          idempotencyKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
+        });
+        await database.db.insert(automationTargets).values({
+          id: automationTargetId,
+          automationId,
+          sandboxProfileId,
+          sandboxProfileVersion: 4,
+        });
+        await database.db.insert(integrationWebhookEvents).values({
+          id: webhookEventId,
+          organizationId,
+          integrationConnectionId: connectionId,
+          targetKey,
+          eventType: "github.issue_comment.created",
+          providerEventType: "issue_comment",
+          externalEventId: "evt_automation_workflow",
+          externalDeliveryId: "delivery_automation_workflow",
+          sourceOccurredAt: "2026-03-09T00:00:00.000Z",
+          sourceOrderKey: "2026-03-09T00:00:00Z#0001",
+          payload: {
+            issue: {
+              number: 27,
+            },
+            comment: {
+              body: "ship it",
+            },
+          },
+          status: IntegrationWebhookEventStatuses.PROCESSED,
+          finalizedAt: "2026-03-09T00:00:01.000Z",
+        });
+        await database.db.insert(automationRuns).values({
+          id: automationRunId,
+          automationId,
+          automationTargetId,
+          sourceWebhookEventId: webhookEventId,
+          status: AutomationRunStatuses.QUEUED,
+        });
+
+        await withOpenWorkflowRuntime({
+          fixture,
+          run: async ({ runtime, workflowContext }) => {
+            workflowContext.openWorkflow.implementWorkflow(
+              HandleAutomationRunWorkflow.spec,
+              HandleAutomationRunWorkflow.fn,
+            );
+            const worker = workflowContext.openWorkflow.newWorker({
+              concurrency: 1,
+            });
+
+            const handle = await workflowContext.openWorkflow.runWorkflow(
+              HandleAutomationRunWorkflowSpec,
+              {
+                automationRunId,
+              },
+              {
+                idempotencyKey: `handle-automation-run:${automationRunId}`,
+              },
+            );
+
+            try {
+              expect(await worker.tick()).toBe(1);
+              await expect(handle.result({ timeoutMs: TestTimeoutMs })).resolves.toEqual({
+                automationRunId,
+              });
+
+              const preparedAutomationRun = await database.db.query.automationRuns.findFirst({
+                where: (table, { eq: whereEq }) => whereEq(table.id, automationRunId),
+              });
+
+              expect(preparedAutomationRun?.conversationId).toBeTruthy();
+
+              const workflowRuns = await runtime.backend.listWorkflowRuns({
+                limit: 20,
+              });
+              const deliveryRun = workflowRuns.data.find(
+                (workflowRun) =>
+                  workflowRun.workflowName ===
+                    HandleAutomationConversationDeliveryWorkflowSpec.name &&
+                  workflowRun.idempotencyKey ===
+                    `automation-conversation-delivery:${preparedAutomationRun?.conversationId ?? ""}:1`,
+              );
+
+              expect(deliveryRun).toBeDefined();
+              expect(deliveryRun?.status).toBe("pending");
+            } finally {
+              await worker.stop();
+            }
+          },
+        });
+
+        const persistedAutomationRun = await database.db.query.automationRuns.findFirst({
+          where: (table, { eq: whereEq }) => whereEq(table.id, automationRunId),
+        });
+        expect(persistedAutomationRun?.status).toBe(AutomationRunStatuses.RUNNING);
+        expect(persistedAutomationRun?.conversationId).toBeTruthy();
+        expect(persistedAutomationRun?.renderedInput).toBe("Reply to ship it");
+        expect(persistedAutomationRun?.renderedConversationKey).toBe("issue-27");
+
+        const deliveryProcessor =
+          await database.db.query.automationConversationDeliveryProcessors.findFirst({
+            where: (table, { eq: whereEq }) =>
+              whereEq(table.conversationId, persistedAutomationRun?.conversationId ?? ""),
+          });
+        expect(deliveryProcessor).toMatchObject({
+          conversationId: persistedAutomationRun?.conversationId,
+          generation: 1,
+          status: AutomationConversationDeliveryProcessorStatuses.RUNNING,
+          activeWorkflowRunId: null,
+        });
+      } finally {
+        await database.stop();
+      }
+    },
+    TestTimeoutMs,
+  );
 
   it(
     "prepares a structured automation run context with rendered templates",
