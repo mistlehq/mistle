@@ -7,6 +7,10 @@ import type {
   DataPlaneWorkerServices,
   StartSandboxInstanceWorkflowServices,
 } from "../workflow-types.js";
+import type {
+  ReadSandboxExecutionLeaseStateInput,
+  ReadSandboxExecutionLeaseStateOutput,
+} from "./read-sandbox-execution-lease-state.js";
 
 export type TunnelReadinessPolicy = {
   timeoutMs: number;
@@ -16,6 +20,7 @@ export type TunnelReadinessPolicy = {
 export type SandboxLifecycleService = StartSandboxInstanceWorkflowServices["sandboxLifecycle"];
 export type SandboxInstanceStoreService = StartSandboxInstanceWorkflowServices["sandboxInstances"];
 export type TunnelReadinessService = StartSandboxInstanceWorkflowServices["tunnelReadiness"];
+export type ExecutionLeaseService = DataPlaneWorkerServices["executionLeases"];
 
 export type StartSandboxInput = Parameters<SandboxLifecycleService["startSandbox"]>[0];
 export type StartSandboxOutput = Awaited<ReturnType<SandboxLifecycleService["startSandbox"]>>;
@@ -38,6 +43,10 @@ export type MarkSandboxInstanceFailedInput = Parameters<
 export type WaitForSandboxTunnelReadinessInput = Parameters<
   TunnelReadinessService["waitForSandboxTunnelReadiness"]
 >[0];
+export type ReadSandboxExecutionLeaseStateService =
+  ExecutionLeaseService["readSandboxExecutionLeaseState"];
+export type ReadSandboxExecutionLeaseStateServiceInput = ReadSandboxExecutionLeaseStateInput;
+export type ReadSandboxExecutionLeaseStateServiceOutput = ReadSandboxExecutionLeaseStateOutput;
 
 export type CreateDataPlaneWorkerServicesInput = {
   config: DataPlaneWorkerRuntimeConfig;

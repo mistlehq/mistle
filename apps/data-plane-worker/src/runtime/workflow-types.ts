@@ -49,4 +49,13 @@ export type StartSandboxInstanceWorkflowServices = {
 
 export type DataPlaneWorkerServices = {
   startSandboxInstance: StartSandboxInstanceWorkflowServices;
+  executionLeases: {
+    readSandboxExecutionLeaseState: (input: {
+      sandboxInstanceId: string;
+      freshSince: string;
+    }) => Promise<{
+      newestLastSeenAt: string | null;
+      hasFreshExecutionLease: boolean;
+    }>;
+  };
 };

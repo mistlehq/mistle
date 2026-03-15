@@ -3,6 +3,7 @@ import {
   ensureSandboxInstance,
   persistSandboxInstanceProvisioning,
 } from "./insert-sandbox-instance.js";
+import { readSandboxExecutionLeaseState } from "./read-sandbox-execution-lease-state.js";
 import { startSandbox } from "./start-sandbox.js";
 import { stopSandbox } from "./stop-sandbox.js";
 import type {
@@ -109,6 +110,16 @@ export function createDataPlaneWorkerServices(
             workflowInput,
           );
         },
+      },
+    },
+    executionLeases: {
+      readSandboxExecutionLeaseState: async (workflowInput) => {
+        return readSandboxExecutionLeaseState(
+          {
+            db: input.db,
+          },
+          workflowInput,
+        );
       },
     },
   } satisfies DataPlaneWorkerServices;
