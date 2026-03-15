@@ -27,6 +27,13 @@
       "import": "./src/thread-items.ts",
       "default": "./src/thread-items.ts"
     },
+    "./generated/codex-app-server/ts/*.js": {
+      "types": "./src/generated/codex-app-server/ts/*.ts",
+      "node": "./dist/generated/codex-app-server/ts/*.js",
+      "import": "./src/generated/codex-app-server/ts/*.ts",
+      "default": "./src/generated/codex-app-server/ts/*.ts"
+    },
+    "./generated/codex-app-server/json-schema/*": "./generated/codex-app-server/json-schema/*",
     "./*.js": {
       "types": "./src/*.ts",
       "node": "./dist/*.js",
@@ -39,6 +46,7 @@
     "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run --passWithNoTests",
+    "codex:app-server:generate": "tsx scripts/generate-codex-app-server-types.ts",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },

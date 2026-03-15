@@ -29,11 +29,16 @@ type RunCommandInput = {
 const CodexRepository = "openai/codex";
 const CodexLatestReleaseApiUrl = `https://api.github.com/repos/${CodexRepository}/releases/latest`;
 const ScriptDirectoryPath = dirname(fileURLToPath(import.meta.url));
-const AppRootPath = resolve(ScriptDirectoryPath, "..");
-const GeneratedTypesOutputPath = resolve(AppRootPath, "src", "generated", "codex-app-server", "ts");
-const GeneratedJsonSchemaOutputPath = resolve(
-  AppRootPath,
+const PackageRootPath = resolve(ScriptDirectoryPath, "..");
+const GeneratedTypesOutputPath = resolve(
+  PackageRootPath,
   "src",
+  "generated",
+  "codex-app-server",
+  "ts",
+);
+const GeneratedJsonSchemaOutputPath = resolve(
+  PackageRootPath,
   "generated",
   "codex-app-server",
   "json-schema",
@@ -286,7 +291,7 @@ async function run(): Promise<void> {
     runCommandOrThrow({
       command: codexBinaryPath,
       args: ["app-server", "generate-ts", "--out", GeneratedTypesOutputPath],
-      cwd: AppRootPath,
+      cwd: PackageRootPath,
     });
     await normalizeGeneratedTypeScriptImports(GeneratedTypesOutputPath);
 
@@ -294,7 +299,7 @@ async function run(): Promise<void> {
     runCommandOrThrow({
       command: codexBinaryPath,
       args: ["app-server", "generate-json-schema", "--out", GeneratedJsonSchemaOutputPath],
-      cwd: AppRootPath,
+      cwd: PackageRootPath,
     });
 
     console.log("Codex app-server artifacts generated.");
