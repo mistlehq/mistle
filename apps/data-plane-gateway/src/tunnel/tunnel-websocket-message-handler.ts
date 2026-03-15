@@ -1,5 +1,8 @@
+import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import type { WSContext, WSMessageReceive } from "hono/ws";
 
+import { ExecutionLeaseRepository } from "./execution-lease-repository.js";
+import { SandboxExecutionLeaseNotFoundError } from "./execution-lease-store.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import {
   TunnelProtocolTranslator,
@@ -33,6 +36,8 @@ export function toTunnelForwardPayload(data: WSMessageReceive): string | ArrayBu
 export async function handleTunnelWebSocketMessage(input: {
   clientSessionId: string;
   currentSocket: Pick<WSContext, "send">;
+  db: DataPlaneDatabase;
+  executionLeaseRepository: ExecutionLeaseRepository;
   interactiveStreamRouter: InteractiveStreamRouter;
   payload: string | ArrayBuffer;
   relayCoordinator: TunnelRelayCoordinator;
@@ -46,6 +51,22 @@ export async function handleTunnelWebSocketMessage(input: {
     sandboxInstanceId: input.sandboxInstanceId,
     sourcePeerSide: input.sourcePeerSide,
   });
+
+  if (translation.executionLeaseControlMessage !== undefined) {
+    try {
+      await input.executionLeaseRepository.applyControlMessage({
+        db: input.db,
+        message: translation.executionLeaseControlMessage,
+        sandboxInstanceId: input.sandboxInstanceId,
+      });
+    } catch (error) {
+      if (error instanceof SandboxExecutionLeaseNotFoundError) {
+        throw new TunnelProtocolViolationError(error.message);
+      }
+
+      throw error;
+    }
+  }
 
   if (translation.delivery.kind === "drop") {
     return;
