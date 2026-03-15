@@ -20,26 +20,21 @@ import type { SandboxOwnerLeaseHeartbeat } from "./ownership/sandbox-owner-lease
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
 import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
 import {
-  createBootstrapDisconnectedStreamResetPayload,
-  createReleasedInteractiveStreamResetPayload,
-  createStreamClosePayload,
   TunnelProtocolTranslator,
   TunnelProtocolViolationError,
 } from "./protocol/tunnel-protocol-translator.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
+import { TunnelLivelinessRepository } from "./session/tunnel-liveliness-repository.js";
+import { type AttachedTunnelPeer, TunnelSessionService } from "./session/tunnel-session-service.js";
 import {
   classifySandboxTunnelClose,
   getSandboxTunnelSessionAttributes,
   getSandboxTunnelSessionSpanName,
 } from "./telemetry.js";
 import { recordSandboxTunnelTokenRedemption } from "./token-redemption-store.js";
-import {
-  markSandboxTunnelConnected,
-  markSandboxTunnelDisconnected,
-  markSandboxTunnelSeen,
-} from "./tunnel-liveliness-store.js";
-import { type ClientStreamBinding, type TunnelSessionRegistry } from "./tunnel-session/index.js";
-import type { RelayPeerSide, RelayTarget } from "./types.js";
+import { notifyBootstrapPeerOfReleasedInteractiveStreams } from "./tunnel-peer-notifier.js";
+import type { TunnelSessionRegistry } from "./tunnel-session/index.js";
+import type { RelayPeerSide } from "./types.js";
 
 const SandboxTunnelRoutePath = "/tunnel/sandbox/:instanceId";
 
@@ -154,48 +149,6 @@ function toForwardPayload(data: WSMessageReceive): string | ArrayBuffer | undefi
 
 function toSourcePeerSide(tokenKind: TokenKind): RelayPeerSide {
   return tokenKind;
-}
-
-async function notifyConnectionPeerOfReleasedInteractiveStreams(input: {
-  relayCoordinator: TunnelRelayCoordinator;
-  releasedBindings: ClientStreamBinding[];
-  sandboxInstanceId: string;
-  toPayload?: (binding: ClientStreamBinding) => string;
-}): Promise<void> {
-  if (input.releasedBindings.length === 0) {
-    return;
-  }
-
-  await Promise.all(
-    input.releasedBindings.map((binding: ClientStreamBinding) =>
-      input.relayCoordinator.forwardPeerMessage({
-        sandboxInstanceId: input.sandboxInstanceId,
-        fromSide: "bootstrap",
-        payload: (input.toPayload ?? createReleasedInteractiveStreamResetPayload)(binding),
-        targetSessionId: binding.clientSessionId,
-      }),
-    ),
-  );
-}
-
-async function notifyBootstrapPeerOfReleasedInteractiveStreams(input: {
-  relayCoordinator: TunnelRelayCoordinator;
-  releasedBindings: ClientStreamBinding[];
-  sandboxInstanceId: string;
-}): Promise<void> {
-  if (input.releasedBindings.length === 0) {
-    return;
-  }
-
-  await Promise.all(
-    input.releasedBindings.map((binding: ClientStreamBinding) =>
-      input.relayCoordinator.forwardPeerMessage({
-        sandboxInstanceId: input.sandboxInstanceId,
-        fromSide: "connection",
-        payload: createStreamClosePayload(binding),
-      }),
-    ),
-  );
 }
 
 async function handleTunnelWebSocketMessage(input: {
@@ -338,6 +291,14 @@ function finalizeTunnelSession(input: {
 
 export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInput): void {
   const tunnelProtocolTranslator = new TunnelProtocolTranslator(input.interactiveStreamRouter);
+  const tunnelSessionService = new TunnelSessionService(
+    input.interactiveStreamRouter,
+    input.relayCoordinator,
+    input.tunnelSessionRegistry,
+    input.sandboxOwnerStore,
+    input.sandboxOwnerLeaseHeartbeat,
+    new TunnelLivelinessRepository(),
+  );
 
   input.app.get(
     SandboxTunnelRoutePath,
@@ -490,13 +451,10 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
         if (requestedToken.kind === "connection" && connectionRelaySessionId === undefined) {
           throw new Error("Expected sandbox relay session id for connection websocket request.");
         }
-        let relayTarget: RelayTarget | undefined;
-        let sandboxOwnerLeaseHeartbeatHandle:
-          | ReturnType<SandboxOwnerLeaseHeartbeat["start"]>
-          | undefined;
+        let attachedPeer: AttachedTunnelPeer | undefined;
         let tunnelSessionSpan: Span | undefined;
         let tunnelOpenedAtMs: number | undefined;
-        const relaySessionId =
+        const relaySessionId: string =
           requestedToken.kind === "bootstrap" ? bootstrapRelaySessionId : connectionRelaySessionId;
 
         return {
@@ -531,116 +489,42 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 : "Sandbox connection peer attached",
             );
 
-            relayTarget = input.relayCoordinator.attachPeer({
-              sandboxInstanceId,
-              side: sourcePeerSide,
-              sessionId:
-                requestedToken.kind === "bootstrap"
-                  ? bootstrapRelaySessionId
-                  : connectionRelaySessionId,
-              socket: ws,
-            });
-
             if (requestedToken.kind === "bootstrap") {
-              const attachResult = input.tunnelSessionRegistry.attachBootstrapSession(relayTarget);
-              void notifyConnectionPeerOfReleasedInteractiveStreams({
-                relayCoordinator: input.relayCoordinator,
-                releasedBindings: attachResult.releasedBindings,
-                sandboxInstanceId,
-              }).catch((error: unknown) => {
-                recordTunnelSessionError({
-                  tunnelSessionSpan,
-                  error,
-                  statusMessage:
-                    "Failed notifying connection peer about released interactive streams.",
-                });
-                logger.error(
-                  {
-                    err: error,
-                    sandboxInstanceId,
-                  },
-                  "Failed notifying connection peer about released interactive streams",
-                );
-                ws.close(
-                  CloseCodes.INTERNAL_ERROR,
-                  "Failed notifying connection peer about released interactive streams.",
-                );
-              });
-              void markSandboxTunnelConnected({
-                activeTunnelLeaseId: bootstrapOwnerLeaseId,
+              attachedPeer = tunnelSessionService.attachBootstrapPeer({
                 db: ctx.get("db"),
-                sandboxInstanceId,
-              }).catch((error: unknown) => {
-                recordTunnelSessionError({
-                  tunnelSessionSpan,
-                  error,
-                  statusMessage: "Failed to persist sandbox tunnel connection.",
-                });
-                logger.error(
-                  {
-                    err: error,
-                    sandboxInstanceId,
-                  },
-                  "Failed to persist sandbox tunnel connected timestamp",
-                );
-                ws.close(CloseCodes.INTERNAL_ERROR, "Failed to persist sandbox tunnel connection.");
-              });
-
-              sandboxOwnerLeaseHeartbeatHandle = input.sandboxOwnerLeaseHeartbeat.start({
-                sandboxInstanceId,
                 leaseId: bootstrapOwnerLeaseId,
-                ttlMs: OwnerLeaseTtlMs,
-                onLeaseRenewed: () => {
-                  void markSandboxTunnelSeen({
-                    activeTunnelLeaseId: bootstrapOwnerLeaseId,
-                    db: ctx.get("db"),
-                    sandboxInstanceId,
-                  })
-                    .then((updated: boolean) => {
-                      if (updated) {
-                        return;
-                      }
-
-                      logger.info(
-                        {
-                          leaseId: bootstrapOwnerLeaseId,
-                          sandboxInstanceId,
-                        },
-                        "Skipped sandbox tunnel heartbeat update for stale bootstrap lease",
-                      );
-                    })
-                    .catch((error: unknown) => {
-                      logger.error(
-                        {
-                          err: error,
-                          sandboxInstanceId,
-                        },
-                        "Failed to persist sandbox tunnel heartbeat timestamp",
-                      );
-                    });
+                onFatalError: (failure) => {
+                  recordTunnelSessionError({
+                    tunnelSessionSpan,
+                    error: failure.error,
+                    statusMessage: failure.statusMessage,
+                  });
+                  ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
                 },
-                onLeaseLost: () => {
-                  logger.error(
-                    {
-                      sandboxInstanceId,
-                      leaseId: bootstrapOwnerLeaseId,
-                    },
-                    "Lost sandbox ownership while bootstrap websocket was still connected",
-                  );
+                onLeaseLost: (failure) => {
                   tunnelSessionSpan?.addEvent("sandbox.tunnel.owner_lease.lost");
                   tunnelSessionSpan?.setStatus({
                     code: SpanStatusCode.ERROR,
-                    message: "Sandbox ownership lease could not be renewed.",
+                    message: failure.statusMessage,
                   });
-                  ws.close(
-                    CloseCodes.INTERNAL_ERROR,
-                    "Sandbox ownership lease could not be renewed.",
-                  );
+                  ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
                 },
+                ownerLeaseTtlMs: OwnerLeaseTtlMs,
+                relaySessionId,
+                sandboxInstanceId,
+                socket: ws,
               });
+              return;
             }
+
+            attachedPeer = tunnelSessionService.attachConnectionPeer({
+              relaySessionId,
+              sandboxInstanceId,
+              socket: ws,
+            });
           },
           onMessage: (event, ws) => {
+            const relayTarget = attachedPeer?.relayTarget;
             if (relayTarget === undefined) {
               ws.close(
                 CloseCodes.INTERNAL_ERROR,
@@ -701,90 +585,19 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             });
           },
           onClose: (event) => {
-            sandboxOwnerLeaseHeartbeatHandle?.stop();
-            if (requestedToken.kind === "bootstrap" && bootstrapOwnerLeaseId !== undefined) {
-              void markSandboxTunnelDisconnected({
-                activeTunnelLeaseId: bootstrapOwnerLeaseId,
-                db: ctx.get("db"),
-                sandboxInstanceId,
-              })
-                .then((updated: boolean) => {
-                  if (updated) {
-                    return;
-                  }
-
-                  logger.info(
-                    {
-                      leaseId: bootstrapOwnerLeaseId,
-                      sandboxInstanceId,
-                    },
-                    "Skipped sandbox tunnel disconnected update for stale bootstrap lease",
-                  );
-                })
-                .catch((error: unknown) => {
-                  logger.error(
-                    {
-                      err: error,
-                      sandboxInstanceId,
-                    },
-                    "Failed to persist sandbox tunnel disconnected timestamp",
-                  );
-                });
-              void input.sandboxOwnerStore.releaseOwner({
-                sandboxInstanceId,
-                leaseId: bootstrapOwnerLeaseId,
-              });
-            }
-            if (relayTarget !== undefined) {
-              const currentRelayTarget = relayTarget;
+            if (attachedPeer !== undefined) {
               if (requestedToken.kind === "bootstrap") {
-                const detachedBootstrapSession =
-                  input.tunnelSessionRegistry.detachBootstrapSession(currentRelayTarget);
-                input.relayCoordinator.detachPeerWithOptions({
-                  target: currentRelayTarget,
-                  notifyOppositePeer: false,
+                void tunnelSessionService.detachBootstrapPeer({
+                  attachedPeer,
+                  db: ctx.get("db"),
+                  leaseId: bootstrapOwnerLeaseId,
+                  sandboxInstanceId,
                 });
-                if (detachedBootstrapSession?.releasedBindings.length) {
-                  void notifyConnectionPeerOfReleasedInteractiveStreams({
-                    relayCoordinator: input.relayCoordinator,
-                    releasedBindings: detachedBootstrapSession.releasedBindings,
-                    sandboxInstanceId,
-                    toPayload: createBootstrapDisconnectedStreamResetPayload,
-                  }).catch((error: unknown) => {
-                    logger.error(
-                      {
-                        err: error,
-                        sandboxInstanceId,
-                      },
-                      "Failed notifying connection peer about disconnected interactive streams",
-                    );
-                  });
-                }
               } else {
-                void input.interactiveStreamRouter
-                  .releaseClientSessionStreams({
-                    sandboxInstanceId,
-                    clientSessionId: relaySessionId,
-                  })
-                  .then((result) =>
-                    notifyBootstrapPeerOfReleasedInteractiveStreams({
-                      relayCoordinator: input.relayCoordinator,
-                      releasedBindings: result.releasedBindings,
-                      sandboxInstanceId,
-                    }),
-                  )
-                  .catch((error: unknown) => {
-                    logger.error(
-                      {
-                        err: error,
-                        sandboxInstanceId,
-                      },
-                      "Failed forwarding stream.close during connection detach",
-                    );
-                  })
-                  .finally(() => {
-                    input.relayCoordinator.detachPeer(currentRelayTarget);
-                  });
+                void tunnelSessionService.detachConnectionPeer({
+                  attachedPeer,
+                  sandboxInstanceId,
+                });
               }
             }
             finalizeTunnelSession({
