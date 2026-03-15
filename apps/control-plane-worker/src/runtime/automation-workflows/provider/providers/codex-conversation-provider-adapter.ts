@@ -255,13 +255,14 @@ async function sendJsonRpcRequest(
   const requestHandle = rpcClient.callWithHandle(input.method, input.params);
   return await withRequestTimeout(input.method, requestHandle).catch((error: unknown) => {
     if (error instanceof CodexJsonRpcRequestError) {
+      const errorMessage = readJsonRpcErrorMessage(error);
       throw new ConversationProviderError({
         code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
-        message: `Codex app-server request '${input.method}' failed (${String(error.code)}): ${error.message.replace(/^JSON-RPC request .* failed with code .*: /u, "")}`,
+        message: `Codex app-server request '${input.method}' failed (${String(error.code)}): ${errorMessage}`,
         cause: {
           method: error.method,
           errorCode: error.code,
-          errorMessage: error.message.replace(/^JSON-RPC request .* failed with code .*: /u, ""),
+          errorMessage,
           ...(error.data === undefined ? {} : { errorData: error.data }),
         },
       });
