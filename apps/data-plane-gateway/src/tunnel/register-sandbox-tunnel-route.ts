@@ -2,7 +2,6 @@ import type { NodeWebSocket } from "@hono/node-ws";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
 import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
-import type { WSContext, WSMessageReceive } from "hono/ws";
 
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
@@ -11,20 +10,18 @@ import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import type { SandboxOwnerLeaseHeartbeat } from "./ownership/sandbox-owner-lease-heartbeat.js";
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
 import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
-import {
-  TunnelProtocolTranslator,
-  TunnelProtocolViolationError,
-} from "./protocol/tunnel-protocol-translator.js";
+import { TunnelProtocolTranslator } from "./protocol/tunnel-protocol-translator.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
 import { TunnelLivelinessRepository } from "./session/tunnel-liveliness-repository.js";
 import { type AttachedTunnelPeer, TunnelSessionService } from "./session/tunnel-session-service.js";
-import {
-  classifySandboxTunnelClose,
-  getSandboxTunnelSessionAttributes,
-  getSandboxTunnelSessionSpanName,
-} from "./telemetry.js";
-import { notifyBootstrapPeerOfReleasedInteractiveStreams } from "./tunnel-peer-notifier.js";
+import { getSandboxTunnelSessionAttributes, getSandboxTunnelSessionSpanName } from "./telemetry.js";
+import { finalizeTunnelSession, recordTunnelSessionError } from "./tunnel-session-observability.js";
 import type { TunnelSessionRegistry } from "./tunnel-session/index.js";
+import {
+  handleTunnelWebSocketMessage,
+  toTunnelForwardPayload,
+  TunnelProtocolViolationError,
+} from "./tunnel-websocket-message-handler.js";
 import type { RelayPeerSide } from "./types.js";
 
 const SandboxTunnelRoutePath = "/tunnel/sandbox/:instanceId";
@@ -55,157 +52,8 @@ const CloseCodes: {
 const OwnerLeaseTtlMs = 30_000;
 const TunnelLifecycleTracer = trace.getTracer("@mistle/data-plane-gateway");
 
-function toForwardPayload(data: WSMessageReceive): string | ArrayBuffer | undefined {
-  if (typeof data === "string") {
-    return data;
-  }
-  if (data instanceof ArrayBuffer) {
-    return data;
-  }
-
-  return undefined;
-}
-
 function toSourcePeerSide(tokenKind: TokenKind): RelayPeerSide {
   return tokenKind;
-}
-
-async function handleTunnelWebSocketMessage(input: {
-  clientSessionId: string;
-  currentSocket: Pick<WSContext, "close" | "send">;
-  interactiveStreamRouter: InteractiveStreamRouter;
-  payload: string | ArrayBuffer;
-  relayCoordinator: TunnelRelayCoordinator;
-  sandboxInstanceId: string;
-  sourcePeerSide: RelayPeerSide;
-  tunnelProtocolTranslator: TunnelProtocolTranslator;
-}): Promise<void> {
-  const translation = await input.tunnelProtocolTranslator.translateInboundMessage({
-    clientSessionId: input.clientSessionId,
-    payload: input.payload,
-    sandboxInstanceId: input.sandboxInstanceId,
-    sourcePeerSide: input.sourcePeerSide,
-  });
-
-  if (translation.delivery.kind === "drop") {
-    return;
-  }
-
-  if (translation.delivery.kind === "respond") {
-    input.currentSocket.send(translation.delivery.payload);
-  } else {
-    await input.relayCoordinator.forwardPeerMessage({
-      sandboxInstanceId: input.sandboxInstanceId,
-      fromSide: input.sourcePeerSide,
-      payload: translation.delivery.payload,
-      targetSessionId: translation.delivery.targetConnectionSessionId,
-    });
-  }
-
-  if (translation.releaseInteractiveStream !== undefined) {
-    await input.interactiveStreamRouter.closeInteractiveStream({
-      sandboxInstanceId: input.sandboxInstanceId,
-      clientSessionId: translation.releaseInteractiveStream.clientSessionId,
-      clientStreamId: translation.releaseInteractiveStream.clientStreamId,
-    });
-  }
-  if (translation.notifyBootstrapPeerOfReleasedStream !== undefined) {
-    await notifyBootstrapPeerOfReleasedInteractiveStreams({
-      relayCoordinator: input.relayCoordinator,
-      releasedBindings: [translation.notifyBootstrapPeerOfReleasedStream],
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
-  }
-}
-
-function normalizeError(error: unknown): Error {
-  if (error instanceof Error) {
-    return error;
-  }
-
-  return new Error(`Unexpected non-Error throwable: ${String(error)}`);
-}
-
-function recordTunnelSessionError(input: {
-  tunnelSessionSpan: Span | undefined;
-  error: unknown;
-  statusMessage: string;
-}): void {
-  if (input.tunnelSessionSpan === undefined) {
-    return;
-  }
-
-  input.tunnelSessionSpan.recordException(normalizeError(input.error));
-  input.tunnelSessionSpan.setStatus({
-    code: SpanStatusCode.ERROR,
-    message: input.statusMessage,
-  });
-}
-
-function finalizeTunnelSession(input: {
-  closeCode: number;
-  closeReason: string;
-  openedAtMs: number | undefined;
-  peerSide: RelayPeerSide;
-  relaySessionId: string;
-  sandboxInstanceId: string;
-  tokenKind: TokenKind;
-  tunnelSessionSpan: Span | undefined;
-}): void {
-  const closeClassification = classifySandboxTunnelClose({
-    closeCode: input.closeCode,
-    closeReason: input.closeReason,
-  });
-  const durationMs = input.openedAtMs === undefined ? undefined : Date.now() - input.openedAtMs;
-  const logData = {
-    closeCode: input.closeCode,
-    closeOutcome: closeClassification.outcome,
-    closeReason: input.closeReason,
-    durationMs,
-    peerSide: input.peerSide,
-    relaySessionId: input.relaySessionId,
-    sandboxInstanceId: input.sandboxInstanceId,
-    tokenKind: input.tokenKind,
-  };
-  const logMessage =
-    input.tokenKind === "bootstrap"
-      ? closeClassification.logLevel === "info"
-        ? "Sandbox bootstrap tunnel disconnected"
-        : "Sandbox bootstrap tunnel disconnected unexpectedly"
-      : closeClassification.logLevel === "info"
-        ? "Sandbox connection peer detached"
-        : "Sandbox connection peer detached unexpectedly";
-
-  if (closeClassification.logLevel === "info") {
-    logger.info(logData, logMessage);
-  } else {
-    logger.warn(logData, logMessage);
-  }
-
-  if (input.tunnelSessionSpan === undefined) {
-    return;
-  }
-
-  input.tunnelSessionSpan.setAttributes({
-    "mistle.sandbox.tunnel.close_code": input.closeCode,
-    "mistle.sandbox.tunnel.close_outcome": closeClassification.outcome,
-    "mistle.sandbox.tunnel.close_reason": input.closeReason,
-    ...(durationMs === undefined
-      ? {}
-      : {
-          "mistle.sandbox.tunnel.duration_ms": durationMs,
-        }),
-  });
-  if (closeClassification.spanStatusCode === SpanStatusCode.ERROR) {
-    const statusMessage =
-      closeClassification.spanStatusMessage ??
-      `Sandbox tunnel websocket closed with code ${String(input.closeCode)}.`;
-    input.tunnelSessionSpan.setStatus({
-      code: closeClassification.spanStatusCode,
-      message: statusMessage,
-    });
-  }
-  input.tunnelSessionSpan.end();
 }
 
 export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInput): void {
@@ -352,7 +200,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               return;
             }
 
-            const payload = toForwardPayload(event.data);
+            const payload = toTunnelForwardPayload(event.data);
             if (payload === undefined) {
               ws.close(CloseCodes.INTERNAL_ERROR, "Unsupported websocket message type.");
               return;
