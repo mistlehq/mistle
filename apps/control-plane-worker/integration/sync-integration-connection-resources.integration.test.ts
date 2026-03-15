@@ -19,7 +19,7 @@ import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
-import { syncIntegrationConnectionResources } from "../src/runtime/services/sync-integration-connection-resources.js";
+import { syncIntegrationConnectionResources } from "../openworkflow/sync-integration-connection-resources/sync-integration-connection-resources.js";
 import { it } from "./test-context.js";
 
 async function createTestDatabase(input: { databaseUrl: string }) {
