@@ -71,9 +71,7 @@ export function finalizeTunnelSession(input: {
         ? "Sandbox connection peer detached"
         : "Sandbox connection peer detached unexpectedly";
 
-  if (closeClassification.logLevel === "info") {
-    logger.info(logData, logMessage);
-  } else if (closeClassification.logLevel === "debug") {
+  if (closeClassification.logLevel === "debug") {
     logger.debug(logData, logMessage);
   } else {
     logger.warn(logData, logMessage);

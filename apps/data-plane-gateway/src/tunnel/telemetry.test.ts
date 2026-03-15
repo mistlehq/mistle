@@ -38,7 +38,7 @@ describe("tunnel session telemetry", () => {
       }),
     ).toEqual({
       outcome: "replaced",
-      logLevel: "info",
+      logLevel: "debug",
       spanStatusCode: SpanStatusCode.UNSET,
     });
   });

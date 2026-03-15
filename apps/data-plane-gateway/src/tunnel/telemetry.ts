@@ -29,14 +29,14 @@ export function getSandboxTunnelSessionAttributes(input: {
 
 export function classifySandboxTunnelClose(input: { closeCode: number; closeReason: string }): {
   outcome: "normal" | "replaced" | "peer_disconnected" | "error";
-  logLevel: "debug" | "info" | "warn";
+  logLevel: "debug" | "warn";
   spanStatusCode: SpanStatusCode;
   spanStatusMessage?: string;
 } {
   if (NormalCloseCodes.has(input.closeCode)) {
     return {
       outcome: "normal",
-      logLevel: "info",
+      logLevel: "debug",
       spanStatusCode: SpanStatusCode.UNSET,
     };
   }
@@ -44,7 +44,7 @@ export function classifySandboxTunnelClose(input: { closeCode: number; closeReas
   if (input.closeReason === ReplacedCloseReason) {
     return {
       outcome: "replaced",
-      logLevel: "info",
+      logLevel: "debug",
       spanStatusCode: SpanStatusCode.UNSET,
     };
   }
@@ -52,7 +52,7 @@ export function classifySandboxTunnelClose(input: { closeCode: number; closeReas
   if (input.closeReason === PeerDisconnectedCloseReason) {
     return {
       outcome: "peer_disconnected",
-      logLevel: "info",
+      logLevel: "debug",
       spanStatusCode: SpanStatusCode.UNSET,
     };
   }
