@@ -57,7 +57,7 @@ type SandboxTunnelAdmissionResult =
       rejection: SandboxTunnelAdmissionRejection;
     };
 
-type RegisterSandboxTunnelWebSocketAdmissionInput = {
+type SandboxTunnelWebSocketAdmissionConfig = {
   bootstrapTokenConfig: BootstrapTokenConfig;
   connectionTokenConfig: ConnectionTokenConfig;
   gatewayNodeId: string;
@@ -66,7 +66,7 @@ type RegisterSandboxTunnelWebSocketAdmissionInput = {
 };
 
 export class SandboxTunnelWebSocketAdmission {
-  public constructor(private readonly input: RegisterSandboxTunnelWebSocketAdmissionInput) {}
+  public constructor(private readonly config: SandboxTunnelWebSocketAdmissionConfig) {}
 
   /**
    * Verifies tunnel websocket request tokens, enforces single-use redemption, and
@@ -108,7 +108,7 @@ export class SandboxTunnelWebSocketAdmission {
     const verifiedToken = verifiedTokenResult.verifiedToken;
 
     if (verifiedToken.tokenKind === "connection") {
-      const ownerResolution = await this.input.sandboxOwnerResolver.resolveOwner({
+      const ownerResolution = await this.config.sandboxOwnerResolver.resolveOwner({
         sandboxInstanceId: input.requestedInstanceId,
       });
       if (ownerResolution.kind === "missing") {
@@ -177,9 +177,9 @@ export class SandboxTunnelWebSocketAdmission {
 
     const relaySessionId = typeid("dts").toString();
     try {
-      const owner = await this.input.sandboxOwnerStore.claimOwner({
+      const owner = await this.config.sandboxOwnerStore.claimOwner({
         sandboxInstanceId: input.requestedInstanceId,
-        nodeId: this.input.gatewayNodeId,
+        nodeId: this.config.gatewayNodeId,
         sessionId: relaySessionId,
         ttlMs: OwnerLeaseTtlMs,
       });
@@ -276,7 +276,7 @@ export class SandboxTunnelWebSocketAdmission {
 
   private async verifyBootstrapToken(token: string): Promise<VerifiedRequestedTunnelToken> {
     const verificationResult = await verifyBootstrapToken({
-      config: this.input.bootstrapTokenConfig,
+      config: this.config.bootstrapTokenConfig,
       token,
     });
     return {
@@ -288,7 +288,7 @@ export class SandboxTunnelWebSocketAdmission {
 
   private async verifyConnectionToken(token: string): Promise<VerifiedRequestedTunnelToken> {
     const verificationResult = await verifyConnectionToken({
-      config: this.input.connectionTokenConfig,
+      config: this.config.connectionTokenConfig,
       token,
     });
     return {
