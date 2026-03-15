@@ -9,7 +9,7 @@ import { type RawData, WebSocketServer } from "ws";
 import { createBrowserCodexSessionRuntime } from "../browser.js";
 import { CodexSessionClient } from "../index.js";
 import { createNodeCodexSessionRuntime } from "../node.js";
-import { CodexJsonRpcClient } from "./client.js";
+import { CodexJsonRpcClient, CodexJsonRpcRequestError } from "./client.js";
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -17,7 +17,11 @@ type Deferred<T> = {
   reject: (reason: unknown) => void;
 };
 
-type TestServerMode = "close_after_initialized" | "close_before_initialized" | "stay_open";
+type TestServerMode =
+  | "close_after_initialized"
+  | "close_before_initialized"
+  | "error_on_thread_list"
+  | "stay_open";
 
 type TestServer = {
   url: string;
@@ -184,6 +188,22 @@ async function startJsonRpcTestServer(mode: TestServerMode): Promise<TestServer>
       }
 
       if (payload.method === "thread/list") {
+        if (mode === "error_on_thread_list") {
+          socket.send(
+            JSON.stringify({
+              id: "id" in payload ? payload.id : 0,
+              error: {
+                code: -32600,
+                message: "invalid thread id: thread_missing",
+                data: {
+                  threadId: "thread_missing",
+                },
+              },
+            }),
+          );
+          return;
+        }
+
         threadListRequestDeferred.resolve(JSON.stringify(payload));
         socket.send(
           JSON.stringify({
@@ -313,6 +333,28 @@ describe("codex json-rpc client", () => {
       },
     });
     expect(sessionClient.state).toBe("ready");
+  });
+
+  it("surfaces structured request errors for failed Codex calls", async () => {
+    const server = await startJsonRpcTestServer("error_on_thread_list");
+    openServers.add(server);
+
+    const sessionClient = new CodexSessionClient({
+      connectionUrl: server.url,
+      runtime: createNodeCodexSessionRuntime(),
+    });
+    await sessionClient.connect();
+
+    const rpcClient = new CodexJsonRpcClient(sessionClient);
+
+    await expect(rpcClient.call("thread/list", { limit: 1 })).rejects.toMatchObject({
+      name: "CodexJsonRpcRequestError",
+      method: "thread/list",
+      code: -32600,
+      data: {
+        threadId: "thread_missing",
+      },
+    } satisfies Partial<CodexJsonRpcRequestError>);
   });
 
   it("fails browser initialize when the socket closes after initialized but before the ready probe completes", async () => {

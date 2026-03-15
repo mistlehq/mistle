@@ -13,6 +13,7 @@ import type {
 } from "@mistle/sandbox-session-client";
 
 type PendingRequest = {
+  method: string;
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
 };
@@ -24,6 +25,32 @@ function isErrorResponse(
   response: CodexJsonRpcSuccessResponse | CodexJsonRpcErrorResponse,
 ): response is CodexJsonRpcErrorResponse {
   return "error" in response;
+}
+
+export class CodexJsonRpcRequestError extends Error {
+  readonly method: string;
+  readonly id: CodexJsonRpcId;
+  readonly code: number;
+  readonly data?: unknown;
+
+  constructor(input: {
+    method: string;
+    id: CodexJsonRpcId;
+    code: number;
+    message: string;
+    data?: unknown;
+  }) {
+    super(
+      `JSON-RPC request ${String(input.id)} failed with code ${String(input.code)}: ${input.message}`,
+    );
+    this.name = "CodexJsonRpcRequestError";
+    this.method = input.method;
+    this.id = input.id;
+    this.code = input.code;
+    if (input.data !== undefined) {
+      this.data = input.data;
+    }
+  }
 }
 
 export class CodexJsonRpcClient {
@@ -47,9 +74,9 @@ export class CodexJsonRpcClient {
     this.#rejectAllPendingRequests(new Error("Codex JSON-RPC client disposed."));
   }
 
-  async initialize(input?: { clientInfo?: { name: string; version: string } }): Promise<void> {
+  async initialize(input?: { clientInfo?: { name: string; version: string } }): Promise<unknown> {
     this.#sessionClient.markInitializing();
-    await this.call("initialize", {
+    const initializeResult = await this.call("initialize", {
       clientInfo: input?.clientInfo ?? {
         name: "mistle-dashboard",
         version: "0.1.0",
@@ -62,6 +89,7 @@ export class CodexJsonRpcClient {
       throw new Error("Codex session connection ended before initialization completed.");
     }
     this.#sessionClient.markReady();
+    return initializeResult;
   }
 
   async call(method: string, params?: unknown): Promise<unknown> {
@@ -70,6 +98,7 @@ export class CodexJsonRpcClient {
 
     return await new Promise<unknown>((resolve, reject) => {
       this.#pendingRequests.set(id, {
+        method,
         resolve,
         reject,
       });
@@ -139,9 +168,13 @@ export class CodexJsonRpcClient {
       this.#pendingRequests.delete(event.response.id);
       if (isErrorResponse(event.response)) {
         pendingRequest.reject(
-          new Error(
-            `JSON-RPC request ${String(event.response.id)} failed with code ${String(event.response.error.code)}: ${event.response.error.message}`,
-          ),
+          new CodexJsonRpcRequestError({
+            method: pendingRequest.method,
+            id: event.response.id,
+            code: event.response.error.code,
+            message: event.response.error.message,
+            ...(event.response.error.data === undefined ? {} : { data: event.response.error.data }),
+          }),
         );
         return;
       }

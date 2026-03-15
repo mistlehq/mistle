@@ -22,6 +22,7 @@ export type CloseSandboxAgentConnectionInput = {
 export type SandboxAgentConnection = {
   streamId: number;
   socket: SandboxSessionSocket;
+  sessionClient: SandboxSessionClient;
   sendText: (message: string) => Promise<void>;
   close: (input?: CloseSandboxAgentConnectionInput) => Promise<void>;
 };
@@ -81,6 +82,7 @@ export async function connectSandboxAgentConnection(
   return {
     streamId,
     socket,
+    sessionClient: client,
     sendText: (message) => client.sendText(message),
     close: async (closeInput) =>
       await new Promise<void>((resolve, reject) => {

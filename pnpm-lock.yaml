@@ -168,6 +168,9 @@ importers:
 
   apps/control-plane-worker:
     dependencies:
+      '@mistle/codex-app-server-client':
+        specifier: workspace:*
+        version: link:../../packages/codex-app-server-client
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
