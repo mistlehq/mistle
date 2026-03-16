@@ -598,6 +598,16 @@ export class SandboxPtyClient {
       return true;
     }
 
+    if (controlMessage.type === "stream.reset") {
+      pendingOpen.timeoutTask.cancel();
+      this.#resetInfo = {
+        code: controlMessage.code,
+        message: controlMessage.message,
+      };
+      pendingOpen.reject(createStreamResetError(this.#resetInfo));
+      return true;
+    }
+
     return false;
   }
 
@@ -616,7 +626,7 @@ export class SandboxPtyClient {
       return;
     }
 
-    this.#setState(SandboxPtyStates.EXITED);
+    this.#setState(SandboxPtyStates.CONNECTED);
   }
 
   #handleReset(resetInfo: SandboxPtyResetInfo): void {

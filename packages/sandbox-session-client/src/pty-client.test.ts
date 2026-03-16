@@ -418,6 +418,36 @@ describe("SandboxPtyClient", () => {
     expect(client.state).toBe(SandboxPtyStates.ERROR);
   });
 
+  it("fails open immediately when the server resets the PTY stream", async () => {
+    const server = await startPtyTestServer();
+    startedServers.push(server);
+    const client = new SandboxPtyClient({
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+
+    await client.connect();
+    const openPromise = client.open({
+      cols: 80,
+      rows: 24,
+    });
+    await server.waitForNextMessage();
+    server.sendReset({
+      code: "invalid_stream_data",
+      message: "stream setup invalidated before open completed",
+      streamId: 1,
+    });
+
+    await expect(openPromise).rejects.toThrowError(
+      "Sandbox PTY stream reset (invalid_stream_data): stream setup invalidated before open completed",
+    );
+    expect(client.state).toBe(SandboxPtyStates.ERROR);
+    expect(client.resetInfo).toEqual({
+      code: "invalid_stream_data",
+      message: "stream setup invalidated before open completed",
+    });
+  });
+
   it("rejects resize before the PTY stream is open", async () => {
     const server = await startPtyTestServer();
     startedServers.push(server);
@@ -629,6 +659,60 @@ describe("SandboxPtyClient", () => {
     expect(client.streamId).toBe(2);
   });
 
+  it("returns to the connected state after an unsolicited pty.exit", async () => {
+    const server = await startPtyTestServer();
+    startedServers.push(server);
+    const client = new SandboxPtyClient({
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+
+    await client.connect();
+    const firstOpenPromise = client.open({
+      cols: 80,
+      rows: 24,
+    });
+    await server.waitForNextMessage();
+    server.sendOpenOk(1);
+    await firstOpenPromise;
+
+    server.sendPtyExit({
+      exitCode: 0,
+      streamId: 1,
+    });
+    await waitForEventLoopTurn();
+
+    expect(client.state).toBe(SandboxPtyStates.CONNECTED);
+    expect(client.streamId).toBeNull();
+    expect(client.exitInfo).toEqual({
+      exitCode: 0,
+    });
+
+    const secondOpenPromise = client.open({
+      cols: 100,
+      rows: 30,
+    });
+    const secondOpenRequest = await server.waitForNextMessage();
+    expect(secondOpenRequest).toEqual({
+      kind: "control",
+      message: {
+        type: "stream.open",
+        streamId: 2,
+        channel: {
+          kind: "pty",
+          session: "create",
+          cols: 100,
+          rows: 30,
+        },
+      },
+    });
+    server.sendOpenOk(2);
+    await secondOpenPromise;
+
+    expect(client.state).toBe(SandboxPtyStates.OPEN);
+    expect(client.streamId).toBe(2);
+  });
+
   it("surfaces stream.reset as an error and preserves reset details", async () => {
     const server = await startPtyTestServer();
     startedServers.push(server);
@@ -708,6 +792,7 @@ describe("SandboxPtyClient", () => {
       bytes: 1,
       streamId: 1,
     });
+    await waitForEventLoopTurn();
     await waitForEventLoopTurn();
     await client.write(new Uint8Array([7]));
 
