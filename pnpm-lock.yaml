@@ -247,9 +247,6 @@ importers:
 
   apps/dashboard:
     dependencies:
-      '@mistle/codex-app-server-client':
-        specifier: workspace:*
-        version: link:../../packages/codex-app-server-client
       '@mistle/integrations-core':
         specifier: workspace:*
         version: link:../../packages/integrations-core
@@ -753,12 +750,21 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
+      '@mistle/sandbox-session-protocol':
+        specifier: workspace:*
+        version: link:../sandbox-session-protocol
       '@octokit/webhooks-examples':
         specifier: ^7.6.1
         version: 7.6.1
       '@octokit/webhooks-types':
         specifier: ^7.6.1
         version: 7.6.1
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      ws:
+        specifier: ^8.18.3
+        version: 8.19.0
 
   packages/logging:
     dependencies:

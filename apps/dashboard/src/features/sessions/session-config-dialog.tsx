@@ -1,4 +1,4 @@
-import type { CodexSessionConnectionState } from "@mistle/codex-app-server-client";
+import type { CodexSessionConnectionState } from "@mistle/integrations-definitions/openai/agent/browser";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@mistle/ui";
 
 import type { ConnectedCodexSession } from "../codex-client/codex-session-types.js";

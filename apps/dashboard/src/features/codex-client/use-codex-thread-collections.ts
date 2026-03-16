@@ -3,7 +3,7 @@ import {
   listLoadedCodexThreads,
   type CodexJsonRpcClient,
   type CodexThreadSummary,
-} from "@mistle/codex-app-server-client";
+} from "@mistle/integrations-definitions/openai/agent/browser";
 import { useCallback, useState, type MutableRefObject } from "react";
 
 type RefreshInput = {

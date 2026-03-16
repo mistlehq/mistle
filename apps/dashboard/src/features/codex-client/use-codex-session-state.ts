@@ -14,8 +14,8 @@ import {
   type CodexExternalAgentMigrationItem,
   type CodexModelSummary,
   type CodexThreadSummary,
-} from "@mistle/codex-app-server-client";
-import { createBrowserCodexSessionRuntime } from "@mistle/codex-app-server-client/browser";
+  createBrowserCodexSessionRuntime,
+} from "@mistle/integrations-definitions/openai/agent/browser";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 

@@ -1,15 +1,15 @@
-import { z } from "zod";
-
 import type {
   CodexJsonRpcNotification,
   CodexThreadReadTurn,
-} from "../../../../../packages/codex-app-server-client/src/index.ts";
+} from "@mistle/integrations-definitions/openai/agent/browser";
 import {
   buildCodexTurnTimelineFromNormalized,
   normalizeCodexThreadItem,
   type CodexTimelineEntry,
   type NormalizedCodexThreadItem,
-} from "../../../../../packages/codex-app-server-client/src/thread-items.ts";
+} from "@mistle/integrations-definitions/openai/agent/browser";
+import { z } from "zod";
+
 import type {
   ChatAssistantEntry,
   ChatCommandEntry,

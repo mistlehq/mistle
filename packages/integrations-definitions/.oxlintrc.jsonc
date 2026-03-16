@@ -34,5 +34,38 @@
         ],
       },
     },
+    {
+      "files": [
+        "src/openai/agent.ts",
+        "src/openai/variants/openai-default/agent/session-client.ts",
+        "src/openai/variants/openai-default/agent/session-types.ts",
+        "src/openai/variants/openai-default/agent/codex-json-rpc.ts",
+        "src/openai/variants/openai-default/agent/codex-operations.ts",
+        "src/openai/variants/openai-default/agent/is-record.ts",
+        "src/openai/variants/openai-default/agent/thread-items.ts",
+        "src/openai/variants/openai-default/agent/thread-items/**/*.ts",
+      ],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": [
+                  "node:*",
+                  "@octokit/*",
+                  "@mistle/codex-app-server-client",
+                  "@mistle/codex-app-server-client/*",
+                  "**/*.server",
+                  "**/*.server.js",
+                  "**/*.server.ts",
+                ],
+                "message": "OpenAI browser-safe agent modules must remain browser-safe and must not depend on Node or the transitional codex-app-server-client package.",
+              },
+            ],
+          },
+        ],
+      },
+    },
   ],
 }
