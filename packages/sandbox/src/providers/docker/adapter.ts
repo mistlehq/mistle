@@ -1,4 +1,8 @@
-import { SandboxConfigurationError, SandboxProviderNotImplementedError } from "../../errors.js";
+import {
+  SandboxConfigurationError,
+  SandboxProviderNotImplementedError,
+  SandboxResourceNotFoundError,
+} from "../../errors.js";
 import {
   SandboxImageKind,
   SandboxProvider,
@@ -9,6 +13,7 @@ import {
   type SandboxStartRequest,
   type SandboxStopRequest,
 } from "../../types.js";
+import { DockerClientError, DockerClientErrorCodes } from "./client-errors.js";
 import type { DockerClient } from "./client.js";
 
 export class DockerSandboxAdapter implements SandboxAdapter {
@@ -62,7 +67,19 @@ export class DockerSandboxAdapter implements SandboxAdapter {
       throw new SandboxConfigurationError("Sandbox id is required.");
     }
 
-    await this.#client.stopSandbox({ sandboxId: request.sandboxId });
+    try {
+      await this.#client.stopSandbox({ sandboxId: request.sandboxId });
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw new SandboxResourceNotFoundError({
+          resourceType: "sandbox",
+          resourceId: request.sandboxId,
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
   }
 }
 

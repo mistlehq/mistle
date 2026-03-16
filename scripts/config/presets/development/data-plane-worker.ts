@@ -21,6 +21,12 @@ export const dataPlaneWorkerDevelopmentPreset = {
           bootstrap_token_ttl_seconds: 120,
           exchange_token_ttl_seconds: 3600,
         },
+        reaper: {
+          poll_interval_seconds: 30,
+          webhook_idle_timeout_seconds: 300,
+          execution_lease_freshness_seconds: 30,
+          tunnel_disconnect_grace_seconds: 60,
+        },
         sandbox: {
           tokenizer_proxy_egress_base_url:
             "http://tokenizer-proxy-relay:5025/tokenizer-proxy/egress",

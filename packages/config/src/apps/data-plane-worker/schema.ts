@@ -31,6 +31,15 @@ export const DataPlaneWorkerTunnelConfigSchema = z
   })
   .strict();
 
+export const DataPlaneWorkerReaperConfigSchema = z
+  .object({
+    pollIntervalSeconds: z.number().int().min(1),
+    webhookIdleTimeoutSeconds: z.number().int().min(1),
+    executionLeaseFreshnessSeconds: z.number().int().min(1),
+    tunnelDisconnectGraceSeconds: z.number().int().min(1),
+  })
+  .strict();
+
 export const DataPlaneWorkerSandboxModalConfigSchema = z
   .object({
     tokenId: z.string().min(1),
@@ -76,6 +85,7 @@ export const DataPlaneWorkerConfigSchema = z
     database: DataPlaneWorkerDatabaseConfigSchema,
     workflow: DataPlaneWorkerWorkflowConfigSchema,
     tunnel: DataPlaneWorkerTunnelConfigSchema,
+    reaper: DataPlaneWorkerReaperConfigSchema,
     sandbox: DataPlaneWorkerSandboxConfigSchema,
   })
   .strict();
@@ -86,6 +96,7 @@ export const PartialDataPlaneWorkerConfigSchema = z
     database: DataPlaneWorkerDatabaseConfigSchema.partial().optional(),
     workflow: DataPlaneWorkerWorkflowConfigSchema.partial().optional(),
     tunnel: DataPlaneWorkerTunnelConfigSchema.partial().optional(),
+    reaper: DataPlaneWorkerReaperConfigSchema.partial().optional(),
     sandbox: PartialDataPlaneWorkerSandboxConfigSchema.optional(),
   })
   .strict();

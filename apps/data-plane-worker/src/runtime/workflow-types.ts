@@ -2,6 +2,7 @@ import type { SandboxProvider } from "@mistle/sandbox";
 import type {
   StartSandboxInstanceWorkflowImageInput,
   StartSandboxInstanceWorkflowInput,
+  StopSandboxInstanceWorkflowInput,
 } from "@mistle/workflow-registry/data-plane";
 
 export type StartSandboxInstanceWorkflowServices = {
@@ -49,4 +50,7 @@ export type StartSandboxInstanceWorkflowServices = {
 
 export type DataPlaneWorkerServices = {
   startSandboxInstance: StartSandboxInstanceWorkflowServices;
+  stopSandboxInstance: {
+    stopSandboxInstance: (input: StopSandboxInstanceWorkflowInput) => Promise<void>;
+  };
 };

@@ -12,6 +12,7 @@ import { getOpenWorkflowRuntime } from "./runtime.js";
 
 type RequiredWorkflowServices = {
   startSandboxInstance: DataPlaneWorkerServices["startSandboxInstance"];
+  stopSandboxInstance: DataPlaneWorkerServices["stopSandboxInstance"];
 };
 
 export type WorkflowContext = {
@@ -28,9 +29,13 @@ function requireWorkflowServices(services: DataPlaneWorkerServices): RequiredWor
   if (services.startSandboxInstance === undefined) {
     throw new Error("Expected start sandbox instance workflow services.");
   }
+  if (services.stopSandboxInstance === undefined) {
+    throw new Error("Expected stop sandbox instance workflow services.");
+  }
 
   return {
     startSandboxInstance: services.startSandboxInstance,
+    stopSandboxInstance: services.stopSandboxInstance,
   };
 }
 

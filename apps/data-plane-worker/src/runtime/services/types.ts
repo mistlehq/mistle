@@ -1,6 +1,7 @@
 import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import type { SandboxAdapter } from "@mistle/sandbox";
 import type { Clock, Sleeper } from "@mistle/time";
+import type { StopSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
 import type {
@@ -20,6 +21,7 @@ export type TunnelReadinessService = StartSandboxInstanceWorkflowServices["tunne
 export type StartSandboxInput = Parameters<SandboxLifecycleService["startSandbox"]>[0];
 export type StartSandboxOutput = Awaited<ReturnType<SandboxLifecycleService["startSandbox"]>>;
 export type StopSandboxInput = Parameters<SandboxLifecycleService["stopSandbox"]>[0];
+export type StopSandboxInstanceInput = StopSandboxInstanceWorkflowInput;
 export type EnsureSandboxInstanceInput = Parameters<
   SandboxInstanceStoreService["ensureSandboxInstance"]
 >[0];

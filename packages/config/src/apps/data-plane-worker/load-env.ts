@@ -2,6 +2,7 @@ import { createEnvLoader, hasEntries, parseBooleanEnv } from "../../core/load-en
 import {
   type PartialDataPlaneWorkerConfigInput,
   DataPlaneWorkerDatabaseConfigSchema,
+  DataPlaneWorkerReaperConfigSchema,
   DataPlaneWorkerSandboxDockerConfigSchema,
   DataPlaneWorkerSandboxModalConfigSchema,
   DataPlaneWorkerServerConfigSchema,
@@ -61,6 +62,29 @@ const loadTunnelEnv = createEnvLoader<typeof DataPlaneWorkerTunnelConfigSchema>(
   {
     key: "exchangeTokenTtlSeconds",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS",
+    parse: Number,
+  },
+]);
+
+const loadReaperEnv = createEnvLoader<typeof DataPlaneWorkerReaperConfigSchema>([
+  {
+    key: "pollIntervalSeconds",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_POLL_INTERVAL_SECONDS",
+    parse: Number,
+  },
+  {
+    key: "webhookIdleTimeoutSeconds",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_WEBHOOK_IDLE_TIMEOUT_SECONDS",
+    parse: Number,
+  },
+  {
+    key: "executionLeaseFreshnessSeconds",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_EXECUTION_LEASE_FRESHNESS_SECONDS",
+    parse: Number,
+  },
+  {
+    key: "tunnelDisconnectGraceSeconds",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_TUNNEL_DISCONNECT_GRACE_SECONDS",
     parse: Number,
   },
 ]);
@@ -133,6 +157,11 @@ export function loadDataPlaneWorkerFromEnv(
   const tunnel = loadTunnelEnv(env);
   if (hasEntries(tunnel)) {
     partialConfig.tunnel = tunnel;
+  }
+
+  const reaper = loadReaperEnv(env);
+  if (hasEntries(reaper)) {
+    partialConfig.reaper = reaper;
   }
 
   const sandbox = loadSandboxEnv(env);
