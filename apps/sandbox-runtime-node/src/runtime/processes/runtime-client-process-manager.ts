@@ -27,21 +27,6 @@ export type RuntimeClientProcessManager = {
   unexpectedExit: Promise<RuntimeClientProcessExit>;
 };
 
-function createDeferred<T>(): {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-} {
-  let resolvePromise!: (value: T) => void;
-  const promise = new Promise<T>((resolve) => {
-    resolvePromise = resolve;
-  });
-
-  return {
-    promise,
-    resolve: resolvePromise,
-  };
-}
-
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -381,9 +366,12 @@ export async function startRuntimeClientProcessManager(
   processes: ReadonlyArray<RuntimeClientProcessSpec>,
 ): Promise<RuntimeClientProcessManager> {
   const startedProcesses: RunningRuntimeClientProcess[] = [];
-  const unexpectedExitDeferred = createDeferred<RuntimeClientProcessExit>();
   let stopRequested = false;
   let unexpectedExitResolved = false;
+  let resolveUnexpectedExit!: (value: RuntimeClientProcessExit) => void;
+  const unexpectedExit = new Promise<RuntimeClientProcessExit>((resolve) => {
+    resolveUnexpectedExit = resolve;
+  });
 
   async function stop(): Promise<void> {
     stopRequested = true;
@@ -414,7 +402,7 @@ export async function startRuntimeClientProcessManager(
       }
 
       unexpectedExitResolved = true;
-      unexpectedExitDeferred.resolve({
+      resolveUnexpectedExit({
         processKey: process.spec.processKey,
         err: process.exitError() ?? new Error("process exited"),
       });
@@ -449,6 +437,6 @@ export async function startRuntimeClientProcessManager(
 
   return {
     stop,
-    unexpectedExit: unexpectedExitDeferred.promise,
+    unexpectedExit,
   };
 }
