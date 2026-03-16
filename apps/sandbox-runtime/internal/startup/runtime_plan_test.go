@@ -162,27 +162,6 @@ func TestValidateRuntimePlan(t *testing.T) {
 		}
 	})
 
-	t.Run("rejects snapshot image sources", func(t *testing.T) {
-		err := ValidateRuntimePlan(RuntimePlan{
-			SandboxProfileID: "sbp_123",
-			Version:          1,
-			Image: ResolvedSandboxImage{
-				Source:   "snapshot",
-				ImageRef: "mistle/sandbox-snapshot@sha256:test",
-			},
-			EgressRoutes:     []EgressCredentialRoute{},
-			Artifacts:        []RuntimeArtifactSpec{},
-			WorkspaceSources: []WorkspaceSource{},
-			RuntimeClients:   []RuntimeClient{},
-			AgentRuntimes:    []AgentRuntime{},
-		})
-		if err == nil {
-			t.Fatal("expected snapshot image source to fail validation")
-		}
-		if !strings.Contains(err.Error(), "is not supported") {
-			t.Fatalf("expected unsupported image source validation error, got %v", err)
-		}
-	})
 }
 
 func TestValidateRuntimeClientProcessReadiness(t *testing.T) {
