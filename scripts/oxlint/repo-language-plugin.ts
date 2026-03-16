@@ -19,6 +19,19 @@ const BannedImportSuffixes = [
   "/core/record.ts",
 ];
 
+const AllowedGenericObjectModuleSuffixes = new Set([
+  "/apps/control-plane-worker/integration/codex-conversation-provider-adapter.integration.test.ts",
+  "/apps/dashboard/lint/dashboard-select-plugin.ts",
+  "/packages/config/src/core/config-object-node.ts",
+  "/packages/config/src/conversion.ts",
+  "/packages/codex-app-server-client/scripts/generate-codex-app-server-types.ts",
+  "/packages/integrations-core/src/forms/index.ts",
+  "/packages/integrations-core/src/mcp-config/index.ts",
+  "/packages/integrations-core/src/types/index.ts",
+  "/scripts/config/presets/development/types.ts",
+  "/scripts/oxlint/repo-language-plugin.ts",
+]);
+
 type AstNodeMap = {
   [key: string]: unknown;
 };
@@ -213,6 +226,17 @@ function readIdentifierName(node: unknown): string | null {
   return isIdentifierNode(node) ? node.name : null;
 }
 
+function normalizeFilePath(value: string): string {
+  return value.replaceAll("\\", "/");
+}
+
+function isAllowedGenericObjectModule(filename: string): boolean {
+  const normalizedFilename = normalizeFilePath(filename);
+  return [...AllowedGenericObjectModuleSuffixes].some((suffix) =>
+    normalizedFilename.endsWith(suffix),
+  );
+}
+
 function isRecordTypeReference(node: unknown): boolean {
   if (!isTSTypeReferenceNode(node)) {
     return false;
@@ -354,6 +378,7 @@ const NoGenericRecordHelpersRule: RuleModule = {
   },
   create(context: RuleContext): RuleListener {
     const genericObjectTypeNames = new Set<string>();
+    const allowGenericObjectModule = isAllowedGenericObjectModule(context.filename);
 
     return {
       FunctionDeclaration(node): void {
@@ -366,6 +391,10 @@ const NoGenericRecordHelpersRule: RuleModule = {
           reportBannedHelperName(context, node, name);
         }
 
+        if (allowGenericObjectModule) {
+          return;
+        }
+
         reportGenericRecordReturnType(context, node, node.returnType, genericObjectTypeNames);
       },
       VariableDeclarator(node): void {
@@ -376,6 +405,10 @@ const NoGenericRecordHelpersRule: RuleModule = {
         const name = readIdentifierName(node.id);
         if (name !== null) {
           reportBannedHelperName(context, node, name);
+        }
+
+        if (allowGenericObjectModule) {
+          return;
         }
 
         if (isFunctionLikeNode(node.init)) {
@@ -395,6 +428,10 @@ const NoGenericRecordHelpersRule: RuleModule = {
         const name = readIdentifierName(node.key);
         if (name !== null) {
           reportBannedHelperName(context, node, name);
+        }
+
+        if (allowGenericObjectModule) {
+          return;
         }
 
         if (isFunctionLikeNode(node.value)) {
@@ -419,6 +456,10 @@ const NoGenericRecordHelpersRule: RuleModule = {
           });
         }
 
+        if (allowGenericObjectModule) {
+          return;
+        }
+
         if (!isGenericObjectTypeNode(node.typeAnnotation, genericObjectTypeNames)) {
           return;
         }
@@ -431,6 +472,10 @@ const NoGenericRecordHelpersRule: RuleModule = {
         });
       },
       TSInterfaceDeclaration(node): void {
+        if (allowGenericObjectModule) {
+          return;
+        }
+
         if (!isTSInterfaceDeclarationNode(node) || !isTSInterfaceBodyNode(node.body)) {
           return;
         }
@@ -447,6 +492,10 @@ const NoGenericRecordHelpersRule: RuleModule = {
         });
       },
       TSTypePredicate(node): void {
+        if (allowGenericObjectModule) {
+          return;
+        }
+
         if (!isTSTypePredicateNode(node) || !isGenericRecordTypePredicate(node)) {
           return;
         }

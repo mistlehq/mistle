@@ -1,4 +1,5 @@
 export interface RuleContext {
+  filename: string;
   report(input: { node: unknown; messageId: string; data?: Record<string, string> }): void;
 }
 
