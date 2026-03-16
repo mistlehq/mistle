@@ -20,7 +20,7 @@ Follow the repo's database migration workflow exactly. Keep migration generation
 pnpm --filter @mistle/db exec drizzle-kit generate --config packages/db/drizzle.control-plane.config.ts --name add-descriptive-change-name
 ```
 
-   For data-plane:
+For data-plane:
 
 ```bash
 pnpm --filter @mistle/db exec drizzle-kit generate --config packages/db/drizzle.data-plane.config.ts --name add-descriptive-change-name
@@ -35,7 +35,7 @@ pnpm --filter @mistle/db exec drizzle-kit generate --config packages/db/drizzle.
 pnpm --filter @mistle/control-plane-api db:migrate
 ```
 
-   For data-plane:
+For data-plane:
 
 ```bash
 pnpm --filter @mistle/data-plane-api db:migrate
