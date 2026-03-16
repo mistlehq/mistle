@@ -10,19 +10,6 @@ type CommandResult = {
   timedOut: boolean;
 };
 
-function mergeCommandEnvironment(
-  overrides: Record<string, string> | undefined,
-): NodeJS.ProcessEnv | undefined {
-  if (overrides === undefined) {
-    return undefined;
-  }
-
-  return {
-    ...process.env,
-    ...overrides,
-  };
-}
-
 function combineCommandOutput(result: CommandResult): string {
   const outputParts = [result.stdout.trim(), result.stderr.trim()].filter(
     (value) => value.length > 0,
@@ -53,7 +40,7 @@ async function executeCommand(command: RuntimeArtifactCommand): Promise<CommandR
   return await new Promise<CommandResult>((resolve, reject) => {
     const child = spawn(executable, args, {
       cwd: command.cwd,
-      env: mergeCommandEnvironment(command.env),
+      env: command.env === undefined ? undefined : { ...process.env, ...command.env },
       stdio: ["ignore", "pipe", "pipe"],
     });
 
