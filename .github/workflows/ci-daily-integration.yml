@@ -31,16 +31,18 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
-      - name: Cache pnpm store
-        uses: actions/cache@v5
+      - name: Restore pnpm store cache
+        id: pnpm-store-cache
+        uses: actions/cache/restore@v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - name: Cache Turbo local cache
-        uses: actions/cache@v5
+      - name: Restore Turbo local cache
+        id: turbo-cache
+        uses: actions/cache/restore@v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
@@ -51,6 +53,16 @@ jobs:
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
 
+      - name: Save pnpm store cache
+        if: steps.pnpm-store-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Generate CI config
+        run: nix develop --command pnpm run config:init:ci
+
       - name: Fetch Infisical secrets
         uses: Infisical/secrets-action@v1.0.11
         with:
@@ -60,4 +72,13 @@ jobs:
           env-slug: ci
 
       - name: Run daily integration suite in Nix shell
+        env:
+          MISTLE_CONFIG_PATH: ${{ github.workspace }}/config/config.ci.toml
         run: nix develop --command pnpm test:integration
+
+      - name: Save Turbo local cache
+        if: ${{ always() && !cancelled() && steps.turbo-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
