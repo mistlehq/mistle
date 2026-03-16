@@ -31,6 +31,26 @@ function createOpenAiDefinition(): IntegrationDefinition<
     targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
     supportedAuthSchemes: ["api-key"],
+    agent: {
+      createConversationProvider: () => ({
+        connect: async () => ({
+          request: async () => ({ ok: true }),
+          close: async () => {},
+        }),
+        inspectConversation: async () => ({
+          exists: true,
+          status: "idle",
+          activeExecutionId: null,
+        }),
+        createConversation: async () => ({
+          providerConversationId: "thread_123",
+        }),
+        resumeConversation: async () => {},
+        startExecution: async () => ({
+          providerExecutionId: null,
+        }),
+      }),
+    },
     mcpConfig: {
       clientId: "codex-cli",
       fileId: "codex_config",
