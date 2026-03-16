@@ -565,6 +565,36 @@ describe("SandboxPtyClient", () => {
     ]);
   });
 
+  it("rejects invalid PTY open dimensions before sending a protocol message", async () => {
+    const server = await startPtyTestServer();
+    startedServers.push(server);
+    const client = new SandboxPtyClient({
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+
+    await client.connect();
+
+    await expect(
+      client.open({
+        cols: Number.NaN,
+        rows: 24,
+      }),
+    ).rejects.toThrowError("Sandbox PTY open size must use positive integer rows and columns.");
+    await expect(
+      client.open({
+        cols: 80.5,
+        rows: 24,
+      }),
+    ).rejects.toThrowError("Sandbox PTY open size must use positive integer rows and columns.");
+    await expect(
+      client.open({
+        cols: Number.POSITIVE_INFINITY,
+        rows: 24,
+      }),
+    ).rejects.toThrowError("Sandbox PTY open size must use positive integer rows and columns.");
+  });
+
   it("rejects resize before the PTY stream is open", async () => {
     const server = await startPtyTestServer();
     startedServers.push(server);
@@ -581,6 +611,43 @@ describe("SandboxPtyClient", () => {
         rows: 40,
       }),
     ).rejects.toThrowError("Sandbox PTY stream is not open.");
+  });
+
+  it("rejects invalid PTY resize dimensions before sending a protocol message", async () => {
+    const server = await startPtyTestServer();
+    startedServers.push(server);
+    const client = new SandboxPtyClient({
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+
+    await client.connect();
+    const openPromise = client.open({
+      cols: 80,
+      rows: 24,
+    });
+    await server.waitForNextMessage();
+    server.sendOpenOk(1);
+    await openPromise;
+
+    await expect(
+      client.resize({
+        cols: Number.NaN,
+        rows: 24,
+      }),
+    ).rejects.toThrowError("Sandbox PTY resize must use positive integer rows and columns.");
+    await expect(
+      client.resize({
+        cols: 80,
+        rows: 24.5,
+      }),
+    ).rejects.toThrowError("Sandbox PTY resize must use positive integer rows and columns.");
+    await expect(
+      client.resize({
+        cols: Number.POSITIVE_INFINITY,
+        rows: 24,
+      }),
+    ).rejects.toThrowError("Sandbox PTY resize must use positive integer rows and columns.");
   });
 
   it("sends PTY resize signals for the active stream", async () => {

@@ -113,6 +113,10 @@ function createStreamResetError(input: SandboxPtyResetInfo): Error {
   return new Error(`Sandbox PTY stream reset (${input.code}): ${input.message}`);
 }
 
+function isPositiveInteger(value: number): boolean {
+  return Number.isInteger(value) && Number.isFinite(value) && value > 0;
+}
+
 export class SandboxPtyClient {
   readonly #connectionUrl: string;
   readonly #runtime: SandboxSessionRuntime;
@@ -267,8 +271,8 @@ export class SandboxPtyClient {
   }
 
   async open(options: SandboxPtyOpenOptions): Promise<void> {
-    if (options.cols <= 0 || options.rows <= 0) {
-      throw new Error("Sandbox PTY open size must use positive rows and columns.");
+    if (!isPositiveInteger(options.cols) || !isPositiveInteger(options.rows)) {
+      throw new Error("Sandbox PTY open size must use positive integer rows and columns.");
     }
     if (this.#state !== SandboxPtyStates.CONNECTED) {
       throw new Error("Sandbox PTY stream can only open from the connected state.");
@@ -355,18 +359,26 @@ export class SandboxPtyClient {
     }
 
     this.#availableSendWindowBytes -= payload.byteLength;
-    await socket.send(
-      encodeDataFrame({
-        streamId,
-        payloadKind: PayloadKindRawBytes,
-        payload,
-      }),
-    );
+    try {
+      await socket.send(
+        encodeDataFrame({
+          streamId,
+          payloadKind: PayloadKindRawBytes,
+          payload,
+        }),
+      );
+    } catch (error) {
+      this.#availableSendWindowBytes += payload.byteLength;
+      const resolvedError =
+        error instanceof Error ? error : new Error("Failed to send sandbox PTY input payload.");
+      this.#closeConnectedSocketWithError(resolvedError);
+      throw resolvedError;
+    }
   }
 
   async resize(input: { cols: number; rows: number }): Promise<void> {
-    if (input.cols <= 0 || input.rows <= 0) {
-      throw new Error("Sandbox PTY resize must use positive rows and columns.");
+    if (!isPositiveInteger(input.cols) || !isPositiveInteger(input.rows)) {
+      throw new Error("Sandbox PTY resize must use positive integer rows and columns.");
     }
     if (this.#state !== SandboxPtyStates.OPEN) {
       throw new Error("Sandbox PTY stream is not open.");
