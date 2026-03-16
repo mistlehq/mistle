@@ -21,6 +21,10 @@
             python.pkgs.pip
             pkgs.pipx
             pkgs.pnpm
+            pkgs.rustc
+            pkgs.cargo
+            pkgs.rustfmt
+            pkgs.clippy
             pkgs.go_1_26
             pkgs.cloudflared
             pkgs.docker
