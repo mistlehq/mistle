@@ -76,8 +76,6 @@ cp sample.env.test .env.test
 
 `.env.test` is only for manual test inputs such as `MISTLE_TEST_OPENAI_API_KEY`, `MISTLE_TEST_GITHUB_TOKEN`, `MISTLE_TEST_GITHUB_TEST_REPOSITORY`, `MISTLE_TEST_GITHUB_INSTALLATION_ID`, and sandbox integration toggles like `MISTLE_TEST_SANDBOX_INTEGRATION`. Generated integration and system test runtime context is written under `.local/test-context/*.json` during suite setup and should not be added to `.env.test`.
 
-Provider-specific sandbox integration inputs such as `MISTLE_SANDBOX_DOCKER_SOCKET_PATH`, `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`, `MISTLE_SANDBOX_MODAL_APP_NAME`, and `MISTLE_SANDBOX_MODAL_ENVIRONMENT` are also test-only and belong in `.env.test` when running those integrations locally.
-
 4. Create a Cloudflare named tunnel (one-time):
 
 ```bash
@@ -171,21 +169,3 @@ pnpm lint
 pnpm typecheck
 pnpm test
 ```
-
-### Daily Integration CI
-
-GitHub Actions workflow [.github/workflows/ci-daily-integration.yml](./.github/workflows/ci-daily-integration.yml) runs `pnpm test:integration` on a daily schedule and on manual dispatch.
-
-The workflow expects Infisical OIDC setup outside the repo:
-
-- GitHub Actions repository variable `INFISICAL_IDENTITY_ID`
-- Infisical project `mistle-integration-tests`
-- Infisical environment `ci`
-
-The workflow fetches secrets directly into the job environment via Infisical's GitHub Actions OIDC flow, so no long-lived Infisical token is stored in GitHub. Current daily integration secrets expected from Infisical are:
-
-- `MISTLE_TEST_OPENAI_API_KEY`
-- `MISTLE_TEST_SANDBOX_INTEGRATION`
-- `MISTLE_TEST_SANDBOX_INTEGRATION_PROVIDERS`
-- `MISTLE_SANDBOX_DOCKER_SOCKET_PATH` when Docker is enabled and the default socket path is not correct
-- `MODAL_TOKEN_ID`, `MODAL_TOKEN_SECRET`, `MISTLE_SANDBOX_MODAL_APP_NAME`, and optional `MISTLE_SANDBOX_MODAL_ENVIRONMENT` when Modal is enabled

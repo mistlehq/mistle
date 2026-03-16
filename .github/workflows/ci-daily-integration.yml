@@ -1,4 +1,4 @@
-name: Daily Integration
+name: CI - Integration (Daily)
 
 on:
   schedule:
