@@ -16,8 +16,8 @@ import {
   closeWebSocket,
   connectWebSocket,
   sendWebSocketMessage,
+  sendWebSocketPingAndExpectPong,
   waitForNoWebSocketMessage,
-  waitForWebSocketClose,
 } from "./websocket-test-helpers.js";
 
 const IntegrationTestTimeoutMs = 30_000;
@@ -197,7 +197,7 @@ describe("sandbox execution lease integration", () => {
   );
 
   it(
-    "closes the bootstrap websocket when renewing an unknown execution lease",
+    "keeps the bootstrap websocket open when renewing an unknown execution lease",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -220,7 +220,7 @@ describe("sandbox execution lease integration", () => {
       );
 
       try {
-        const closePromise = waitForWebSocketClose(bootstrapSocket);
+        const noResponsePromise = waitForNoWebSocketMessage(bootstrapSocket);
         await sendWebSocketMessage(
           bootstrapSocket,
           JSON.stringify({
@@ -229,13 +229,8 @@ describe("sandbox execution lease integration", () => {
           }),
         );
 
-        await expect(closePromise).resolves.toEqual({
-          code: 1008,
-          reason: "Execution lease 'sxl_missing' was not found for sandbox '".concat(
-            sandboxInstanceId,
-            "'.",
-          ),
-        });
+        await noResponsePromise;
+        await sendWebSocketPingAndExpectPong(bootstrapSocket, Buffer.from("lease-renew-miss"));
 
         const missingLease = await fixture.db.query.sandboxExecutionLeases.findFirst({
           where: (table, { eq }) => eq(table.id, "sxl_missing"),

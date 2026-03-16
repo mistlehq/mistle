@@ -61,7 +61,7 @@ export async function handleTunnelWebSocketMessage(input: {
       });
     } catch (error) {
       if (error instanceof SandboxExecutionLeaseNotFoundError) {
-        throw new TunnelProtocolViolationError(error.message);
+        return;
       }
 
       throw error;
