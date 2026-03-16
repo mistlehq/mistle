@@ -44,6 +44,7 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
   const clientRef = useRef<SandboxPtyClient | null>(null);
   const connectedSandboxInstanceIdRef = useRef<string | null>(null);
   const listenerCleanupRef = useRef<(() => void)[]>([]);
+  const openGenerationRef = useRef(0);
 
   const [connectedSandboxInstanceId, setConnectedSandboxInstanceId] = useState<string | null>(null);
   const [ptyState, setPtyState] = useState<SandboxPtyState>(SandboxPtyStates.IDLE);
@@ -56,6 +57,15 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
     setOutputChunks([]);
   }, []);
 
+  const isCurrentGeneration = useCallback((generation: number): boolean => {
+    return openGenerationRef.current === generation;
+  }, []);
+
+  const clearConnectedSandboxInstanceId = useCallback((): void => {
+    connectedSandboxInstanceIdRef.current = null;
+    setConnectedSandboxInstanceId(null);
+  }, []);
+
   const detachClientListeners = useCallback((): void => {
     for (const unsubscribe of listenerCleanupRef.current) {
       unsubscribe();
@@ -65,35 +75,55 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
   }, []);
 
   const bindClient = useCallback(
-    (client: SandboxPtyClient): void => {
+    (client: SandboxPtyClient, generation: number): void => {
       detachClientListeners();
       listenerCleanupRef.current = [
         client.onState((nextState) => {
+          if (!isCurrentGeneration(generation)) {
+            return;
+          }
+
           setPtyState(nextState);
         }),
         client.onData((chunk) => {
+          if (!isCurrentGeneration(generation)) {
+            return;
+          }
+
           setOutputChunks((currentChunks) => [...currentChunks, chunk]);
         }),
         client.onError((error) => {
+          if (!isCurrentGeneration(generation)) {
+            return;
+          }
+
           setErrorMessage(error.message);
         }),
         client.onExit((nextExitInfo) => {
+          if (!isCurrentGeneration(generation)) {
+            return;
+          }
+
           setExitInfo(nextExitInfo);
         }),
         client.onReset((nextResetInfo) => {
+          if (!isCurrentGeneration(generation)) {
+            return;
+          }
+
           setResetInfo(nextResetInfo);
         }),
       ];
     },
-    [detachClientListeners],
+    [detachClientListeners, isCurrentGeneration],
   );
 
   const disconnectPty = useCallback(async (): Promise<void> => {
+    openGenerationRef.current += 1;
     const client = clientRef.current;
     if (client === null) {
       setPtyState(SandboxPtyStates.CLOSED);
-      connectedSandboxInstanceIdRef.current = null;
-      setConnectedSandboxInstanceId(null);
+      clearConnectedSandboxInstanceId();
       return;
     }
 
@@ -102,16 +132,18 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
     } finally {
       detachClientListeners();
       clientRef.current = null;
-      connectedSandboxInstanceIdRef.current = null;
-      setConnectedSandboxInstanceId(null);
+      clearConnectedSandboxInstanceId();
     }
-  }, [detachClientListeners]);
+  }, [clearConnectedSandboxInstanceId, detachClientListeners]);
 
   const openPty = useCallback(
     async (input: { sandboxInstanceId: string } & SandboxPtyOpenOptions): Promise<void> => {
       if (!isNonEmptyString(input.sandboxInstanceId)) {
         throw new Error("Sandbox instance id is required to open a PTY session.");
       }
+
+      const generation = openGenerationRef.current + 1;
+      openGenerationRef.current = generation;
 
       const existingClient = clientRef.current;
       const existingSandboxInstanceId = connectedSandboxInstanceIdRef.current;
@@ -124,6 +156,7 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
       setExitInfo(null);
       setResetInfo(null);
       setOutputChunks([]);
+      clearConnectedSandboxInstanceId();
 
       if (canReuseConnection) {
         await existingClient.open({
@@ -131,41 +164,73 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
           rows: input.rows,
           ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
         });
+
+        if (isCurrentGeneration(generation)) {
+          connectedSandboxInstanceIdRef.current = input.sandboxInstanceId;
+          setConnectedSandboxInstanceId(input.sandboxInstanceId);
+        }
+
         return;
       }
 
       if (existingClient !== null) {
         await disconnectPty();
+        if (!isCurrentGeneration(generation)) {
+          throw new Error("Sandbox PTY connection attempt was superseded.");
+        }
       }
 
       const mintedConnection = await mintSandboxInstanceConnectionToken({
         instanceId: input.sandboxInstanceId,
       });
+      if (!isCurrentGeneration(generation)) {
+        throw new Error("Sandbox PTY connection attempt was superseded.");
+      }
+
       const client = new SandboxPtyClient({
         connectionUrl: mintedConnection.connectionUrl,
         runtime: createBrowserSandboxSessionRuntime(),
       });
 
       clientRef.current = client;
-      connectedSandboxInstanceIdRef.current = input.sandboxInstanceId;
-      setConnectedSandboxInstanceId(input.sandboxInstanceId);
-      bindClient(client);
+      bindClient(client, generation);
 
       try {
         await client.connect();
+        if (!isCurrentGeneration(generation)) {
+          await client.disconnect();
+          throw new Error("Sandbox PTY connection attempt was superseded.");
+        }
+
         await client.open({
           cols: input.cols,
           rows: input.rows,
           ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
         });
+        if (!isCurrentGeneration(generation)) {
+          await client.disconnect();
+          throw new Error("Sandbox PTY connection attempt was superseded.");
+        }
+
+        connectedSandboxInstanceIdRef.current = input.sandboxInstanceId;
+        setConnectedSandboxInstanceId(input.sandboxInstanceId);
       } catch (error) {
+        if (clientRef.current === client) {
+          clientRef.current = null;
+        }
+
         const resolvedError =
           error instanceof Error ? error : new Error("Could not open sandbox PTY session.");
-        setErrorMessage(resolvedError.message);
+
+        if (isCurrentGeneration(generation)) {
+          clearConnectedSandboxInstanceId();
+          setErrorMessage(resolvedError.message);
+        }
+
         throw resolvedError;
       }
     },
-    [bindClient, disconnectPty],
+    [bindClient, clearConnectedSandboxInstanceId, disconnectPty, isCurrentGeneration],
   );
 
   const writeInput = useCallback(async (data: string | Uint8Array): Promise<void> => {
@@ -204,9 +269,9 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
 
       detachClientListeners();
       clientRef.current = null;
-      connectedSandboxInstanceIdRef.current = null;
+      clearConnectedSandboxInstanceId();
     };
-  }, [detachClientListeners]);
+  }, [clearConnectedSandboxInstanceId, detachClientListeners]);
 
   return {
     actions: {
