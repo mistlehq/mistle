@@ -35,24 +35,6 @@ type PutProfileVersionIntegrationBindingsResult = {
 
 const IntegrationRegistry = createIntegrationRegistry();
 
-type BindingConfigObject = {
-  [key: string]: unknown;
-};
-
-function parseBindingConfigObject(value: unknown): BindingConfigObject {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error("Expected parsed binding config to be an object.");
-  }
-
-  const record: BindingConfigObject = {};
-
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
-}
-
 function findDuplicateBindingId(
   bindings: PutProfileVersionIntegrationBindingsInput["bindings"],
 ): string | undefined {
@@ -315,7 +297,7 @@ export async function putProfileVersionIntegrationBindings(
     validatedBindings.push({
       ...(binding.clientRef === undefined ? {} : { clientRef: binding.clientRef }),
       bindingIdOrDraftIndex: binding.id ?? `draft:${String(bindingIndex)}`,
-      bindingConfig: parseBindingConfigObject(validationResult.parsed.bindingConfig),
+      bindingConfig: validationResult.parsed.bindingConfig,
       connectionId: binding.connectionId,
       definition,
     });

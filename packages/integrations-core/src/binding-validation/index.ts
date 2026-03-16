@@ -8,21 +8,6 @@ import type {
   IntegrationTarget,
 } from "../types/index.js";
 
-type BindingConfigObject = {
-  [key: string]: unknown;
-};
-
-function parseBindingConfigObject(value: unknown): BindingConfigObject | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return null;
-  }
-  const record: BindingConfigObject = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-  return record;
-}
-
 function sanitizeSchemaFailureMessage(input: {
   familyId: string;
   variantId: string;
@@ -50,8 +35,8 @@ export function runDefinitionBindingWriteValidation(input: {
   | {
       ok: true;
       parsed: {
-        targetConfig: unknown;
-        bindingConfig: unknown;
+        targetConfig: Record<string, unknown>;
+        bindingConfig: Record<string, unknown>;
         connectionConfig: Record<string, unknown>;
       };
     }
@@ -62,11 +47,18 @@ export function runDefinitionBindingWriteValidation(input: {
   let parsedTargetConfig: Record<string, unknown>;
   try {
     const targetConfigCandidate = input.definition.targetConfigSchema.parse(input.target.config);
-    const targetConfigRecord = parseBindingConfigObject(targetConfigCandidate);
-    if (targetConfigRecord === null) {
+    if (
+      typeof targetConfigCandidate !== "object" ||
+      targetConfigCandidate === null ||
+      Array.isArray(targetConfigCandidate)
+    ) {
       throw new Error("Target config must be an object.");
     }
-    parsedTargetConfig = targetConfigRecord;
+
+    parsedTargetConfig = {};
+    for (const [key, entryValue] of Object.entries(targetConfigCandidate)) {
+      parsedTargetConfig[key] = entryValue;
+    }
   } catch {
     return {
       ok: false,
@@ -87,11 +79,18 @@ export function runDefinitionBindingWriteValidation(input: {
   let parsedBindingConfig: Record<string, unknown>;
   try {
     const bindingConfigCandidate = input.definition.bindingConfigSchema.parse(input.binding.config);
-    const bindingConfigRecord = parseBindingConfigObject(bindingConfigCandidate);
-    if (bindingConfigRecord === null) {
+    if (
+      typeof bindingConfigCandidate !== "object" ||
+      bindingConfigCandidate === null ||
+      Array.isArray(bindingConfigCandidate)
+    ) {
       throw new Error("Binding config must be an object.");
     }
-    parsedBindingConfig = bindingConfigRecord;
+
+    parsedBindingConfig = {};
+    for (const [key, entryValue] of Object.entries(bindingConfigCandidate)) {
+      parsedBindingConfig[key] = entryValue;
+    }
   } catch {
     return {
       ok: false,
@@ -114,11 +113,18 @@ export function runDefinitionBindingWriteValidation(input: {
     const connectionConfigCandidate = input.definition.connectionConfigSchema
       ? input.definition.connectionConfigSchema.parse(input.connection.config)
       : input.connection.config;
-    const connectionConfigRecord = parseBindingConfigObject(connectionConfigCandidate);
-    if (connectionConfigRecord === null) {
+    if (
+      typeof connectionConfigCandidate !== "object" ||
+      connectionConfigCandidate === null ||
+      Array.isArray(connectionConfigCandidate)
+    ) {
       throw new Error("Connection config must be an object.");
     }
-    parsedConnectionConfig = connectionConfigRecord;
+
+    parsedConnectionConfig = {};
+    for (const [key, entryValue] of Object.entries(connectionConfigCandidate)) {
+      parsedConnectionConfig[key] = entryValue;
+    }
   } catch {
     return {
       ok: false,
