@@ -50,8 +50,18 @@ async function recoverLateSteerExecution(input: {
   connection: Awaited<ReturnType<ReturnType<typeof getConversationProviderAdapter>["connect"]>>;
   conversationId: string;
   providerConversationId: string;
+  providerExecutionId: string;
   inputText: string;
 }) {
+  if (input.adapter.recoverLateSteer !== undefined) {
+    return await input.adapter.recoverLateSteer({
+      connection: input.connection,
+      providerConversationId: input.providerConversationId,
+      providerExecutionId: input.providerExecutionId,
+      inputText: input.inputText,
+    });
+  }
+
   const inspectResult = await input.adapter.inspectAutomationConversation({
     connection: input.connection,
     providerConversationId: input.providerConversationId,
@@ -121,6 +131,12 @@ export async function executeConversationProviderDelivery(
         });
         break;
       case AutomationConversationExecutionActions.STEER:
+        if (input.providerExecutionId === null) {
+          throw new ConversationDeliveryExecutionError(
+            `AutomationConversation '${input.conversationId}' is missing provider execution id while attempting late steer recovery.`,
+          );
+        }
+
         try {
           executionUpdate = await steerConversationExecution({
             adapter,
@@ -140,6 +156,7 @@ export async function executeConversationProviderDelivery(
             connection,
             conversationId: input.conversationId,
             providerConversationId,
+            providerExecutionId: input.providerExecutionId,
             inputText: input.inputText,
           });
         }

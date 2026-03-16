@@ -6,8 +6,8 @@ export type AgentConversationRequest = {
 };
 
 export type AgentConversationConnection = {
-  request(input: AgentConversationRequest): Promise<unknown>;
-  close(): Promise<void>;
+  request(this: void, input: AgentConversationRequest): Promise<unknown>;
+  close(this: void): Promise<void>;
 };
 
 export type AgentConversationConnectInput = {
@@ -77,20 +77,27 @@ export type AgentConversationInterruptExecutionInput = {
 };
 
 export type AgentConversationProvider = {
-  connect(input: AgentConversationConnectInput): Promise<AgentConversationConnection>;
+  connect(this: void, input: AgentConversationConnectInput): Promise<AgentConversationConnection>;
   inspectConversation(
+    this: void,
     input: AgentConversationInspectInput,
   ): Promise<AgentConversationInspectResult>;
-  createConversation(input: AgentConversationCreateInput): Promise<AgentConversationCreateResult>;
-  resumeConversation(input: AgentConversationResumeInput): Promise<void>;
+  createConversation(
+    this: void,
+    input: AgentConversationCreateInput,
+  ): Promise<AgentConversationCreateResult>;
+  resumeConversation(this: void, input: AgentConversationResumeInput): Promise<void>;
   startExecution(
+    this: void,
     input: AgentConversationStartExecutionInput,
   ): Promise<AgentConversationStartExecutionResult>;
   steerExecution?(
+    this: void,
     input: AgentConversationSteerExecutionInput,
   ): Promise<AgentConversationSteerExecutionResult>;
   recoverLateSteer?(
+    this: void,
     input: AgentConversationRecoverLateSteerInput,
   ): Promise<AgentConversationRecoverLateSteerResult>;
-  interruptExecution?(input: AgentConversationInterruptExecutionInput): Promise<void>;
+  interruptExecution?(this: void, input: AgentConversationInterruptExecutionInput): Promise<void>;
 };
