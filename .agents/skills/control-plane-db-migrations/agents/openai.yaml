@@ -1,0 +1,4 @@
+interface:
+  display_name: "Control-Plane DB Migrations"
+  short_description: "Handle control-plane Drizzle migrations"
+  default_prompt: "Use $control-plane-db-migrations to generate or apply control-plane database migrations in this repository."
