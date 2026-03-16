@@ -535,6 +535,9 @@ importers:
 
   apps/sandbox-runtime-node:
     dependencies:
+      '@mistle/integrations-core':
+        specifier: workspace:*
+        version: link:../../packages/integrations-core
       '@mistle/sandbox-rs-napi':
         specifier: workspace:*
         version: link:../../packages/sandbox-rs-napi

@@ -1,11 +1,15 @@
 import { z } from "zod";
 
-import { RuntimeFileWriteMode, type CompiledRuntimePlan } from "../types/index.js";
+import {
+  RuntimeFileWriteMode,
+  SandboxImageSources,
+  type CompiledRuntimePlan,
+} from "../types/index.js";
 
 const ResolvedSandboxImageSchema = z.discriminatedUnion("source", [
   z
     .object({
-      source: z.literal("profile-base"),
+      source: z.literal(SandboxImageSources.PROFILE_BASE),
       imageRef: z.string().min(1),
       sandboxProfileId: z.string().min(1),
       version: z.number().int().min(1),
@@ -13,7 +17,7 @@ const ResolvedSandboxImageSchema = z.discriminatedUnion("source", [
     .strict(),
   z
     .object({
-      source: z.literal("base"),
+      source: z.literal(SandboxImageSources.BASE),
       imageRef: z.string().min(1),
     })
     .strict(),
