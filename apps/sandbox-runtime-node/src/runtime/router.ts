@@ -1,7 +1,11 @@
 import type { IncomingMessage, RequestListener, ServerResponse } from "node:http";
 
+export type RouterState = {
+  startupReady: boolean;
+};
+
 export type RouterInput = {
-  bootstrapTokenLoaded: boolean;
+  state: RouterState;
   proxyHandler?: RequestListener;
 };
 
@@ -26,7 +30,7 @@ function healthHandler(
     return;
   }
 
-  if (!input.bootstrapTokenLoaded) {
+  if (!input.state.startupReady) {
     writeJsonResponse(response, 503, `{"ok":false}`);
     return;
   }

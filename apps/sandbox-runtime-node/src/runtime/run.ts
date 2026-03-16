@@ -79,11 +79,14 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     reader: input.stdin,
     maxBytes: DefaultStartupInputMaxBytes,
   });
+  const state = {
+    startupReady: false,
+  };
 
   const listenAddress = parseListenAddress(config.listenAddr);
   const server = createServer(
     createRouter({
-      bootstrapTokenLoaded: startupInput.bootstrapToken.length > 0,
+      state,
     }),
   );
 
@@ -103,6 +106,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     await applyRuntimePlan({
       runtimePlan: startupInput.runtimePlan,
     });
+    state.startupReady = true;
   } catch (error) {
     await new Promise<void>((resolve, reject) => {
       server.close((closeError) => {

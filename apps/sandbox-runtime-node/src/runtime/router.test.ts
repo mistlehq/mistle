@@ -42,11 +42,13 @@ afterEach(async () => {
 });
 
 describe("createRouter", () => {
-  it("returns healthy payload when bootstrap token is loaded", async () => {
+  it("returns healthy payload when startup is ready", async () => {
     const baseUrl = await startServer(
       createServer(
         createRouter({
-          bootstrapTokenLoaded: true,
+          state: {
+            startupReady: true,
+          },
         }),
       ),
     );
@@ -62,7 +64,9 @@ describe("createRouter", () => {
     const baseUrl = await startServer(
       createServer(
         createRouter({
-          bootstrapTokenLoaded: true,
+          state: {
+            startupReady: true,
+          },
         }),
       ),
     );
@@ -72,11 +76,13 @@ describe("createRouter", () => {
     expect(response.status).toBe(404);
   });
 
-  it("returns unhealthy payload when bootstrap token is not loaded", async () => {
+  it("returns unhealthy payload when startup is not ready", async () => {
     const baseUrl = await startServer(
       createServer(
         createRouter({
-          bootstrapTokenLoaded: false,
+          state: {
+            startupReady: false,
+          },
         }),
       ),
     );
@@ -95,7 +101,9 @@ describe("createRouter", () => {
     const baseUrl = await startServer(
       createServer(
         createRouter({
-          bootstrapTokenLoaded: true,
+          state: {
+            startupReady: true,
+          },
           proxyHandler: (request, response) => {
             forwardedMethod = request.method ?? "";
             forwardedUrl = request.url ?? "";
