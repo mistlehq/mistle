@@ -169,6 +169,7 @@ func handleSandboxTunnelConnection(
 	tracer trace.Tracer,
 	conn *websocket.Conn,
 	activePTYSession **ptySession,
+	executionLeases *executionLeaseEngine,
 	agentRuntimes []startup.AgentRuntime,
 	runtimeClients []startup.RuntimeClient,
 ) error {
@@ -397,6 +398,7 @@ func Run(input RunInput) error {
 		runSpan.SetStatus(codes.Error, err.Error())
 		return err
 	}
+	executionLeases := newExecutionLeaseEngine()
 
 	dialHTTPClient := httpclient.NewDirectClient(http.DefaultClient)
 	tokenExchangeHTTPClient := telemetry.NewHTTPClient(httpclient.NewDirectClient(http.DefaultClient))
@@ -459,15 +461,18 @@ func Run(input RunInput) error {
 			}
 			continue
 		}
+		executionLeases.AttachTunnelConnection(conn)
 
 		connectionErr := handleSandboxTunnelConnection(
 			runContext,
 			tracer,
 			conn,
 			&activePTYSession,
+			executionLeases,
 			input.AgentRuntimes,
 			input.RuntimeClients,
 		)
+		executionLeases.DetachTunnelConnection(conn)
 		conn.CloseNow()
 		if connectionErr == nil {
 			return nil
