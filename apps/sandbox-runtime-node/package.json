@@ -3,20 +3,22 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build:native": "pnpm --filter @mistle/sandbox-rs-napi build",
     "dev": "tsx watch src/main.ts",
-    "dev:bootstrap": "tsx watch src/bootstrap/main.ts",
+    "dev:bootstrap": "pnpm run build:native && tsx watch src/bootstrap/main.ts",
     "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "start": "node dist/main.js",
-    "start:bootstrap": "node dist/bootstrap/main.js",
+    "start:bootstrap": "pnpm run build:native && node dist/bootstrap/main.js",
     "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts --passWithNoTests",
-    "test:integration": "vitest run -c vitest.integration.config.ts --passWithNoTests",
+    "test:integration": "pnpm run build:native && vitest run -c vitest.integration.config.ts --passWithNoTests",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
     "@mistle/integrations-core": "workspace:*",
-    "@mistle/sandbox-rs-napi": "workspace:*"
+    "@mistle/sandbox-rs-napi": "workspace:*",
+    "undici": "7.24.4"
   }
 }

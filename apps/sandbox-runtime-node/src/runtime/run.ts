@@ -1,20 +1,26 @@
 import { once } from "node:events";
-import { createServer, type Server } from "node:http";
+import { type Server } from "node:http";
 
 import { applyRuntimePlan } from "../runtime-plan/index.js";
 import { loadRuntimeConfig, type RuntimeConfig } from "./config.js";
+import { createRuntimeHttpServer } from "./http-server.js";
 import {
   startRuntimeClientProcessManager,
   type RuntimeClientProcessExit,
   type RuntimeClientProcessManager,
 } from "./processes/runtime-client-process-manager.js";
 import { flattenRuntimeClientProcesses } from "./processes/runtime-client-processes.js";
+import { loadProxyCertificateAuthority } from "./proxy/load-proxy-ca.js";
+import {
+  resolveBaselineProxyEnvironment,
+  applyEnvironmentEntries,
+} from "./proxy/proxy-environment.js";
+import { createProxyServer } from "./proxy/proxy-server.js";
 import {
   readStartupInput,
   DefaultStartupInputMaxBytes,
   type StartupInput,
 } from "./read-startup-input.js";
-import { createRouter } from "./router.js";
 
 type LookupEnv = (key: string) => string | undefined;
 
@@ -102,13 +108,18 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
   const state = {
     startupReady: false,
   };
+  const certificateAuthority = loadProxyCertificateAuthority(config);
+  const proxyServer = createProxyServer({
+    runtimePlan: startupInput.runtimePlan,
+    tokenizerProxyEgressBaseUrl: config.tokenizerProxyEgressBaseUrl,
+    ...(certificateAuthority === undefined ? {} : { certificateAuthority }),
+  });
 
   const listenAddress = parseListenAddress(config.listenAddr);
-  const server = createServer(
-    createRouter({
-      state,
-    }),
-  );
+  const server = createRuntimeHttpServer({
+    state,
+    proxyServer,
+  });
 
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
@@ -122,6 +133,13 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     );
   });
 
+  const restoreProxyEnvironment = applyEnvironmentEntries(
+    resolveBaselineProxyEnvironment({
+      listenAddr: config.listenAddr,
+      tokenizerProxyEgressBaseUrl: config.tokenizerProxyEgressBaseUrl,
+    }),
+  );
+
   let processManager: RuntimeClientProcessManager | undefined;
   try {
     await applyRuntimePlan({
@@ -132,6 +150,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     );
     state.startupReady = true;
   } catch (error) {
+    restoreProxyEnvironment();
     await closeServer(server);
 
     throw new Error(
@@ -156,10 +175,13 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     unexpectedProcessExit,
     close: async () => {
       await closeServer(server);
+      await proxyServer.close();
 
       if (processManager !== undefined) {
         await processManager.stop();
       }
+
+      restoreProxyEnvironment();
     },
     closed,
   };
