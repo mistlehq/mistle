@@ -8,11 +8,12 @@
     "start": "node dist/main.js",
     "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
     "typecheck": "tsgo --noEmit",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run -c vitest.config.ts --passWithNoTests",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
+    "@mistle/integrations-core": "workspace:*",
     "@mistle/sandbox-rs-napi": "workspace:*"
   }
 }
