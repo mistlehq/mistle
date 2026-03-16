@@ -9,6 +9,10 @@
       "import": "./src/index.ts",
       "default": "./src/index.ts"
     },
+    "./agent": {
+      "types": "./src/agent.server.ts",
+      "node": "./dist/agent.server.js"
+    },
     "./openai/agent": {
       "types": "./src/openai/agent.server.ts",
       "node": "./dist/openai/agent.server.js"

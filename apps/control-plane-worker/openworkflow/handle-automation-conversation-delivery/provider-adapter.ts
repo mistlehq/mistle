@@ -1,5 +1,5 @@
 import type { AgentConversationProvider } from "@mistle/integrations-core";
-import { createOpenAiCodexConversationProvider } from "@mistle/integrations-definitions/openai/agent";
+import { resolveAgentConversationProvider } from "@mistle/integrations-definitions/agent";
 
 export type ProviderAutomationConversationStatus = "idle" | "active" | "error";
 
@@ -95,12 +95,7 @@ export type ConversationProviderAdapter = {
 export function getConversationProviderAdapter(
   integrationFamilyId: string,
 ): ConversationProviderAdapter {
-  switch (integrationFamilyId) {
-    case "openai":
-      return adaptConversationProvider(createOpenAiCodexConversationProvider());
-  }
-
-  throw new Error(`Unsupported conversation integration family '${integrationFamilyId}'.`);
+  return adaptConversationProvider(resolveAgentConversationProvider(integrationFamilyId));
 }
 
 function adaptConversationProvider(
