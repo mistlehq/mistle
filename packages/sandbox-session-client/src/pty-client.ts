@@ -297,7 +297,15 @@ export class SandboxPtyClient {
         this.#pendingOpen = null;
         this.#streamId = null;
         this.#availableSendWindowBytes = 0;
-        this.#setErrorState(error);
+        this.#error = error;
+        if (
+          this.#socket !== null &&
+          this.#socket.readyState === SandboxSessionSocketReadyStates.OPEN
+        ) {
+          this.#setState(SandboxPtyStates.CONNECTED);
+        } else {
+          this.#setErrorState(error);
+        }
         reject(error);
       };
 
@@ -642,7 +650,17 @@ export class SandboxPtyClient {
     }
 
     const resetError = createStreamResetError(resetInfo);
-    this.#rejectPendingClose(resetError);
+    this.#error = resetError;
+    if (this.#pendingClose !== null) {
+      this.#rejectPendingClose(resetError);
+      return;
+    }
+
+    if (this.#socket !== null && this.#socket.readyState === SandboxSessionSocketReadyStates.OPEN) {
+      this.#setState(SandboxPtyStates.CONNECTED);
+      return;
+    }
+
     this.#setErrorState(resetError);
   }
 

@@ -415,7 +415,56 @@ describe("SandboxPtyClient", () => {
     });
 
     await expect(openPromise).rejects.toThrowError("pty unavailable");
-    expect(client.state).toBe(SandboxPtyStates.ERROR);
+    expect(client.state).toBe(SandboxPtyStates.CONNECTED);
+    expect(client.error?.message).toBe("pty unavailable");
+  });
+
+  it("can retry open on the same websocket after stream.open.error", async () => {
+    const server = await startPtyTestServer();
+    startedServers.push(server);
+    const client = new SandboxPtyClient({
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+
+    await client.connect();
+    const firstOpenPromise = client.open({
+      cols: 80,
+      rows: 24,
+    });
+    await server.waitForNextMessage();
+    server.sendOpenError({
+      code: "bootstrap_not_connected",
+      message: "bootstrap unavailable",
+      streamId: 1,
+    });
+
+    await expect(firstOpenPromise).rejects.toThrowError("bootstrap unavailable");
+    expect(client.state).toBe(SandboxPtyStates.CONNECTED);
+
+    const secondOpenPromise = client.open({
+      cols: 100,
+      rows: 30,
+    });
+    const secondOpenRequest = await server.waitForNextMessage();
+    expect(secondOpenRequest).toEqual({
+      kind: "control",
+      message: {
+        type: "stream.open",
+        streamId: 2,
+        channel: {
+          kind: "pty",
+          session: "create",
+          cols: 100,
+          rows: 30,
+        },
+      },
+    });
+    server.sendOpenOk(2);
+    await secondOpenPromise;
+
+    expect(client.state).toBe(SandboxPtyStates.OPEN);
+    expect(client.streamId).toBe(2);
   });
 
   it("fails open immediately when the server resets the PTY stream", async () => {
@@ -445,7 +494,7 @@ describe("SandboxPtyClient", () => {
     await expect(openPromise).rejects.toThrowError(
       "Sandbox PTY stream reset (invalid_stream_data): stream setup invalidated before open completed",
     );
-    expect(client.state).toBe(SandboxPtyStates.ERROR);
+    expect(client.state).toBe(SandboxPtyStates.CONNECTED);
     expect(client.resetInfo).toEqual({
       code: "invalid_stream_data",
       message: "stream setup invalidated before open completed",
@@ -753,7 +802,10 @@ describe("SandboxPtyClient", () => {
     });
     await resetDeferred.promise;
 
-    expect(client.state).toBe(SandboxPtyStates.ERROR);
+    expect(client.state).toBe(SandboxPtyStates.CONNECTED);
+    expect(client.error?.message).toBe(
+      "Sandbox PTY stream reset (bootstrap_reconnected): Sandbox bootstrap tunnel reconnected and invalidated the active PTY stream.",
+    );
     expect(client.resetInfo).toEqual({
       code: "bootstrap_reconnected",
       message: "Sandbox bootstrap tunnel reconnected and invalidated the active PTY stream.",
@@ -765,6 +817,57 @@ describe("SandboxPtyClient", () => {
       },
     ]);
     await expect(client.write("pwd\n")).rejects.toThrowError("Sandbox PTY stream is not open.");
+  });
+
+  it("can reopen after stream.reset on the same websocket", async () => {
+    const server = await startPtyTestServer();
+    startedServers.push(server);
+    const client = new SandboxPtyClient({
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+
+    await client.connect();
+    const firstOpenPromise = client.open({
+      cols: 80,
+      rows: 24,
+    });
+    await server.waitForNextMessage();
+    server.sendOpenOk(1);
+    await firstOpenPromise;
+
+    server.sendReset({
+      code: "bootstrap_reconnected",
+      message: "Sandbox bootstrap tunnel reconnected and invalidated the active PTY stream.",
+      streamId: 1,
+    });
+    await waitForEventLoopTurn();
+
+    expect(client.state).toBe(SandboxPtyStates.CONNECTED);
+
+    const secondOpenPromise = client.open({
+      cols: 110,
+      rows: 35,
+    });
+    const secondOpenRequest = await server.waitForNextMessage();
+    expect(secondOpenRequest).toEqual({
+      kind: "control",
+      message: {
+        type: "stream.open",
+        streamId: 2,
+        channel: {
+          kind: "pty",
+          session: "create",
+          cols: 110,
+          rows: 35,
+        },
+      },
+    });
+    server.sendOpenOk(2);
+    await secondOpenPromise;
+
+    expect(client.state).toBe(SandboxPtyStates.OPEN);
+    expect(client.streamId).toBe(2);
   });
 
   it("maintains the PTY send window", async () => {
