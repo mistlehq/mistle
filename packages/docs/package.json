@@ -15,6 +15,6 @@
     "format:check": "oxfmt --check ."
   },
   "devDependencies": {
-    "mint": "4.2.423"
+    "mint": "4.2.434"
   }
 }
