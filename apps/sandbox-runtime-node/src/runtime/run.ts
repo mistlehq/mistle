@@ -2,13 +2,13 @@ import { once } from "node:events";
 import { createServer, type Server } from "node:http";
 
 import { applyRuntimePlan } from "../runtime-plan/index.js";
-import { createRouter } from "../server/router.js";
+import { loadRuntimeConfig, type RuntimeConfig } from "./config.js";
 import {
   readStartupInput,
   DefaultStartupInputMaxBytes,
   type StartupInput,
-} from "../startup/read-startup-input.js";
-import { loadRuntimeConfig, type RuntimeConfig } from "./config.js";
+} from "./read-startup-input.js";
+import { createRouter } from "./router.js";
 
 type LookupEnv = (key: string) => string | undefined;
 
