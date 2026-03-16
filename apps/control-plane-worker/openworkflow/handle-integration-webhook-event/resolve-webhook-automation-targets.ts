@@ -1,6 +1,9 @@
 import { AutomationKinds, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 
-import { evaluateWebhookPayloadFilter, parseWebhookPayloadFilter } from "../automations/index.js";
+import {
+  evaluateWebhookPayloadFilter,
+  parseWebhookPayloadFilter,
+} from "../../src/runtime/automations/index.js";
 
 type ResolveWebhookAutomationTargetsInput = {
   organizationId: string;
@@ -14,10 +17,6 @@ export type ResolvedWebhookAutomationTarget = {
   automationTargetId: string;
   sandboxProfileId: string;
   sandboxProfileVersion: number | null;
-};
-
-type EligibleWebhookAutomation = {
-  automationId: string;
 };
 
 function isWebhookAutomationMatched(input: {
@@ -69,7 +68,7 @@ export async function resolveWebhookAutomationTargets(
   });
   const enabledAutomationsById = new Set(enabledAutomations.map((automation) => automation.id));
 
-  const eligibleWebhookAutomations: EligibleWebhookAutomation[] = [];
+  const eligibleWebhookAutomations: { automationId: string }[] = [];
   for (const candidateWebhookAutomation of candidateWebhookAutomations) {
     if (!enabledAutomationsById.has(candidateWebhookAutomation.automationId)) {
       continue;

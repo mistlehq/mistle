@@ -36,16 +36,14 @@ import {
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
-import { HandleIntegrationWebhookEventWorkflow } from "../openworkflow/handle-integration-webhook-event.js";
+import { markIntegrationWebhookEventFailed } from "../openworkflow/handle-integration-webhook-event/mark-integration-webhook-event-failed.js";
+import { markIntegrationWebhookEventProcessed } from "../openworkflow/handle-integration-webhook-event/mark-integration-webhook-event-processed.js";
+import { prepareIntegrationWebhookEvent } from "../openworkflow/handle-integration-webhook-event/prepare-integration-webhook-event.js";
+import { HandleIntegrationWebhookEventWorkflow } from "../openworkflow/handle-integration-webhook-event/workflow.js";
 import {
   markAutomationRunCompleted,
   markAutomationRunFailed,
 } from "../openworkflow/shared/automation-run.js";
-import {
-  markIntegrationWebhookEventFailed,
-  markIntegrationWebhookEventProcessed,
-  prepareIntegrationWebhookEvent,
-} from "../src/runtime/services/handle-integration-webhook-event.js";
 import {
   prepareAutomationRun,
   resolveAutomationRunFailure,
