@@ -603,7 +603,7 @@ describe("SandboxPtyClient", () => {
     });
   });
 
-  it("returns to the connected state after the close timeout when no terminal event arrives", async () => {
+  it("rejects close on timeout and keeps waiting for terminal completion", async () => {
     const server = await startPtyTestServer();
     startedServers.push(server);
     const client = new SandboxPtyClient({
@@ -630,7 +630,18 @@ describe("SandboxPtyClient", () => {
         streamId: 1,
       },
     });
-    await closePromise;
+    await expect(closePromise).rejects.toThrowError(
+      "Timed out while waiting for sandbox PTY close confirmation.",
+    );
+
+    expect(client.state).toBe(SandboxPtyStates.CLOSING);
+    expect(client.streamId).toBe(1);
+
+    server.sendPtyExit({
+      exitCode: 0,
+      streamId: 1,
+    });
+    await waitForEventLoopTurn();
 
     expect(client.state).toBe(SandboxPtyStates.CONNECTED);
     expect(client.streamId).toBeNull();
@@ -675,7 +686,6 @@ describe("SandboxPtyClient", () => {
     const server = await startPtyTestServer();
     startedServers.push(server);
     const client = new SandboxPtyClient({
-      closeTimeoutMs: 5,
       connectionUrl: server.url,
       runtime: createNodeSandboxSessionRuntime(),
     });
@@ -691,6 +701,10 @@ describe("SandboxPtyClient", () => {
 
     const firstClosePromise = client.close();
     await server.waitForNextMessage();
+    server.sendPtyExit({
+      exitCode: 0,
+      streamId: 1,
+    });
     await firstClosePromise;
 
     const secondOpenPromise = client.open({

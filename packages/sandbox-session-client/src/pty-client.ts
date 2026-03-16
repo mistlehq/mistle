@@ -398,8 +398,14 @@ export class SandboxPtyClient {
     this.#setState(SandboxPtyStates.CLOSING);
 
     const closePromise = new Promise<void>((resolve, reject) => {
+      const timeoutError = new Error("Timed out while waiting for sandbox PTY close confirmation.");
       const timeoutTask = this.#runtime.scheduleTimeout(() => {
-        succeed();
+        const pendingClose = this.#pendingClose;
+        if (pendingClose === null || pendingClose.streamId !== streamId) {
+          return;
+        }
+
+        reject(timeoutError);
       }, this.#closeTimeoutMs);
 
       const succeed = (): void => {
