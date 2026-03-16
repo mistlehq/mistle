@@ -53,7 +53,73 @@ function readComposerConfigSnapshot(configJson: string | null): ComposerConfigSn
   };
 }
 
-export function useCodexSessionPageController(input: { sandboxInstanceId: string | null }) {
+type CodexSessionWorkbenchState = {
+  hasTopAlert: boolean;
+  sandboxFailureMessage: string | null;
+  sandboxStatusQuery: ReturnType<
+    typeof useQuery<Awaited<ReturnType<typeof getSandboxInstanceStatus>>, Error>
+  >;
+  sessionHeaderStatusUi: ReturnType<typeof resolveSessionHeaderStatusUi>;
+  startErrorMessage: string | null;
+  moreActionsState: {
+    agentConnectionState: ReturnType<
+      typeof useCodexSessionState
+    >["lifecycle"]["agentConnectionState"];
+    configJson: string | null;
+    configRequirementsJson: string | null;
+    connectedSession: ReturnType<typeof useCodexSessionState>["lifecycle"]["connectedSession"];
+    isReadingConfig: boolean;
+    isReadingConfigRequirements: boolean;
+    loadConfigSetup: () => void;
+  };
+};
+
+type CodexSessionPaneState = {
+  chatState: ReturnType<typeof useCodexSessionState>["chat"]["chatState"];
+  composerProps: {
+    canInterruptTurn: boolean;
+    canSteerTurn: boolean;
+    completedErrorMessage: string | null;
+    composerText: string;
+    isConnected: boolean;
+    isInterruptingTurn: boolean;
+    isStartingTurn: boolean;
+    isSteeringTurn: boolean;
+    isUpdatingComposerConfig: boolean;
+    modelOptions: Array<{
+      value: string;
+      label: string;
+    }>;
+    onComposerTextChange: (nextText: string) => void;
+    onModelChange: (nextModel: string) => void;
+    onReasoningEffortChange: (nextReasoningEffort: string) => void;
+    onSubmit: () => void;
+    selectedModel: string | null;
+    selectedReasoningEffort: string | null;
+  };
+  serverRequestsState: {
+    isRespondingToServerRequest: boolean;
+    pendingServerRequests: ReturnType<
+      typeof useCodexSessionState
+    >["serverRequests"]["pendingServerRequests"];
+    respondToServerRequest: (requestId: string | number, result: unknown) => void;
+  };
+};
+
+type UseCodexSessionPageControllerResult = {
+  workbench: CodexSessionWorkbenchState;
+  codexPane: CodexSessionPaneState;
+};
+
+export type {
+  CodexSessionPaneState,
+  CodexSessionWorkbenchState,
+  UseCodexSessionPageControllerResult,
+};
+
+export function useCodexSessionPageController(input: {
+  sandboxInstanceId: string | null;
+}): UseCodexSessionPageControllerResult {
   const [composerText, setComposerText] = useState("");
   const [hasAttemptedAutoConnect, setHasAttemptedAutoConnect] = useState(false);
   const [selectedComposerModel, setSelectedComposerModel] = useState<string | null>(null);
@@ -240,47 +306,51 @@ export function useCodexSessionPageController(input: { sandboxInstanceId: string
   }, [composerText, hasActiveTurn, interruptTurn, startTurn, steerTurn]);
 
   return {
-    composerText,
-    composerModelOptions,
-    setComposerText,
-    setComposerModel,
-    setComposerReasoningEffort,
-    selectedComposerModel,
-    selectedComposerReasoningEffort,
-    sandboxStatusQuery,
-    sessionHeaderStatusUi,
-    sandboxFailureMessage,
-    hasTopAlert,
-    startErrorMessage,
-    chatState: chat.chatState,
-    composerState: {
-      canInterruptTurn: chat.canInterruptTurn,
-      canSteerTurn: chat.canSteerTurn,
-      completedErrorMessage: chat.chatState.completedErrorMessage,
-      isConnected: lifecycle.connectedSession !== null,
-      isInterruptingTurn: chat.isInterruptingTurn,
-      isStartingTurn: chat.isStartingTurn,
-      isSteeringTurn: chat.isSteeringTurn,
-      isUpdatingComposerConfig:
-        admin.isBatchWritingConfig ||
-        admin.isLoadingModels ||
-        admin.isReadingConfig ||
-        admin.isWritingConfigValue,
+    workbench: {
+      hasTopAlert,
+      sandboxFailureMessage,
+      sandboxStatusQuery,
+      sessionHeaderStatusUi,
+      startErrorMessage,
+      moreActionsState: {
+        agentConnectionState: lifecycle.agentConnectionState,
+        configJson: admin.configJson,
+        configRequirementsJson: admin.configRequirementsJson,
+        connectedSession: lifecycle.connectedSession,
+        isReadingConfig: admin.isReadingConfig,
+        isReadingConfigRequirements: admin.isReadingConfigRequirements,
+        loadConfigSetup,
+      },
     },
-    moreActionsState: {
-      agentConnectionState: lifecycle.agentConnectionState,
-      configJson: admin.configJson,
-      configRequirementsJson: admin.configRequirementsJson,
-      connectedSession: lifecycle.connectedSession,
-      isReadingConfig: admin.isReadingConfig,
-      isReadingConfigRequirements: admin.isReadingConfigRequirements,
-      loadConfigSetup,
+    codexPane: {
+      chatState: chat.chatState,
+      composerProps: {
+        canInterruptTurn: chat.canInterruptTurn,
+        canSteerTurn: chat.canSteerTurn,
+        completedErrorMessage: chat.chatState.completedErrorMessage,
+        composerText,
+        isConnected: lifecycle.connectedSession !== null,
+        isInterruptingTurn: chat.isInterruptingTurn,
+        isStartingTurn: chat.isStartingTurn,
+        isSteeringTurn: chat.isSteeringTurn,
+        isUpdatingComposerConfig:
+          admin.isBatchWritingConfig ||
+          admin.isLoadingModels ||
+          admin.isReadingConfig ||
+          admin.isWritingConfigValue,
+        modelOptions: composerModelOptions,
+        onComposerTextChange: setComposerText,
+        onModelChange: setComposerModel,
+        onReasoningEffortChange: setComposerReasoningEffort,
+        onSubmit: submitComposer,
+        selectedModel: selectedComposerModel,
+        selectedReasoningEffort: selectedComposerReasoningEffort,
+      },
+      serverRequestsState: {
+        isRespondingToServerRequest: serverRequests.isRespondingToServerRequest,
+        pendingServerRequests: serverRequests.pendingServerRequests,
+        respondToServerRequest: serverRequests.respondToServerRequest,
+      },
     },
-    serverRequestsState: {
-      isRespondingToServerRequest: serverRequests.isRespondingToServerRequest,
-      pendingServerRequests: serverRequests.pendingServerRequests,
-      respondToServerRequest: serverRequests.respondToServerRequest,
-    },
-    submitComposer,
   };
 }

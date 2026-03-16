@@ -12,7 +12,7 @@ import {
 import { CodexSessionPageView } from "./codex-session-page-view.js";
 
 const meta = {
-  title: "Dashboard/Pages/CodexSessionPageView",
+  title: "Dashboard/Pages/Legacy/CodexSessionPageView",
   component: CodexSessionPageView,
   tags: ["autodocs"],
   parameters: {
