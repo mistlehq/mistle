@@ -665,7 +665,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       });
 
       try {
-        rpcClient.respond(input.requestId, input.result);
+        await rpcClient.respond(input.requestId, input.result);
       } catch (error) {
         dispatchServerRequestsAction({
           type: "server_request_response_failed",

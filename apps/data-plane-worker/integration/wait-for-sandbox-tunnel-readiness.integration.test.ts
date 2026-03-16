@@ -4,10 +4,7 @@ import {
   MigrationTracking,
   runDataPlaneMigrations,
 } from "@mistle/db/migrator";
-import {
-  startPostgresWithPgBouncer,
-  type PostgresWithPgBouncerService,
-} from "@mistle/test-harness";
+import { startPostgresWithPgBouncer } from "@mistle/test-harness";
 import { systemClock, systemSleeper } from "@mistle/time";
 import { eq } from "drizzle-orm";
 import { Pool } from "pg";
@@ -17,8 +14,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { waitForSandboxTunnelReadiness } from "../src/runtime/services/wait-for-sandbox-tunnel-readiness.js";
 
 const IntegrationTestTimeoutMs = 60_000;
+type DatabaseStack = {
+  directUrl: string;
+  stop: () => Promise<void>;
+};
 
-let databaseStack: PostgresWithPgBouncerService | undefined;
+let databaseStack: DatabaseStack | undefined;
 let dbPool: Pool | undefined;
 
 function getDbPool(): Pool {
@@ -29,7 +30,7 @@ function getDbPool(): Pool {
   return dbPool;
 }
 
-function getDatabaseStack(): PostgresWithPgBouncerService {
+function getDatabaseStack(): DatabaseStack {
   if (databaseStack === undefined) {
     throw new Error("Expected integration database stack to be initialized.");
   }

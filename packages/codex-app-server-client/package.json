@@ -53,5 +53,10 @@
   "dependencies": {
     "@mistle/sandbox-session-client": "workspace:*",
     "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@mistle/sandbox-session-protocol": "workspace:*",
+    "@types/ws": "^8.18.1",
+    "ws": "^8.19.0"
   }
 }

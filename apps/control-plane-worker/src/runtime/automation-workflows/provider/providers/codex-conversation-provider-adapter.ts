@@ -1,7 +1,8 @@
-import { randomUUID } from "node:crypto";
-
+import {
+  CodexJsonRpcClient,
+  CodexJsonRpcRequestError,
+} from "@mistle/codex-app-server-client/json-rpc/client.js";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
-import WebSocket, { type RawData } from "ws";
 
 import { connectSandboxAgentConnection } from "../../transport/sandbox-agent-connection.js";
 import type {
@@ -29,23 +30,6 @@ export type CodexStartExecutionInputItem = {
   text: string;
 };
 
-type JsonRpcErrorValue = {
-  code?: number;
-  message?: string;
-  data?: unknown;
-};
-
-type JsonRpcResponsePayload = {
-  id?: string | number;
-  result?: unknown;
-  error?: JsonRpcErrorValue;
-};
-
-type JsonRpcClientConnection = {
-  socket: WebSocket;
-  sendText: (payload: string) => Promise<void>;
-};
-
 type CodexRequestFailureCause = {
   method: string;
   errorCode: number | null;
@@ -59,62 +43,8 @@ const CodexInitializeClientInfo = {
   version: "0.1.0",
 } as const;
 
-function toText(data: RawData): string {
-  if (typeof data === "string") {
-    return data;
-  }
-  if (Buffer.isBuffer(data)) {
-    return data.toString("utf8");
-  }
-  if (data instanceof ArrayBuffer) {
-    return Buffer.from(data).toString("utf8");
-  }
-
-  return Buffer.concat(data).toString("utf8");
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseJsonRpcResponsePayload(data: RawData): JsonRpcResponsePayload | null {
-  const payloadText = toText(data);
-
-  let parsedPayload: unknown;
-  try {
-    parsedPayload = JSON.parse(payloadText);
-  } catch {
-    return null;
-  }
-  if (!isRecord(parsedPayload)) {
-    return null;
-  }
-
-  let parsedError: JsonRpcErrorValue | undefined;
-  if (isRecord(parsedPayload.error)) {
-    parsedError = {};
-    if ("data" in parsedPayload.error) {
-      parsedError.data = parsedPayload.error.data;
-    }
-    if (typeof parsedPayload.error.code === "number") {
-      parsedError.code = parsedPayload.error.code;
-    }
-    if (typeof parsedPayload.error.message === "string") {
-      parsedError.message = parsedPayload.error.message;
-    }
-  }
-
-  const responsePayload: JsonRpcResponsePayload = {
-    result: parsedPayload.result,
-  };
-  if (typeof parsedPayload.id === "string" || typeof parsedPayload.id === "number") {
-    responsePayload.id = parsedPayload.id;
-  }
-  if (parsedError !== undefined) {
-    responsePayload.error = parsedError;
-  }
-
-  return responsePayload;
 }
 
 function readNestedString(value: unknown, path: readonly string[]): string | null {
@@ -319,169 +249,122 @@ function isProviderExecutionMissingError(error: unknown): boolean {
 }
 
 async function sendJsonRpcRequest(
-  connection: JsonRpcClientConnection,
+  rpcClient: CodexJsonRpcClient,
   input: { method: string; params?: unknown },
 ): Promise<unknown> {
-  const requestId = randomUUID();
-
-  return await new Promise<unknown>((resolve, reject) => {
-    const socket = connection.socket;
-    let settled = false;
-    const timeout: TimerHandle = systemScheduler.schedule(() => {
-      fail(
-        new ConversationProviderError({
-          code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
-          message: `Timed out waiting ${String(CodexJsonRpcRequestTimeoutMs)}ms for Codex app-server request '${input.method}'.`,
-        }),
-      );
-    }, CodexJsonRpcRequestTimeoutMs);
-
-    function cleanup(): void {
-      systemScheduler.cancel(timeout);
-      socket.off("message", handleMessage);
-      socket.off("error", handleError);
-      socket.off("close", handleClose);
+  const requestHandle = rpcClient.callWithHandle(input.method, input.params);
+  return await withRequestTimeout(input.method, requestHandle).catch((error: unknown) => {
+    if (error instanceof CodexJsonRpcRequestError) {
+      const errorMessage = readJsonRpcErrorMessage(error);
+      throw new ConversationProviderError({
+        code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
+        message: `Codex app-server request '${input.method}' failed (${String(error.code)}): ${errorMessage}`,
+        cause: {
+          method: error.method,
+          errorCode: error.code,
+          errorMessage,
+          ...(error.data === undefined ? {} : { errorData: error.data }),
+        },
+      });
     }
 
-    function fail(error: Error): void {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-      reject(error);
-    }
-
-    function succeed(value: unknown): void {
-      if (settled) {
-        return;
-      }
-      settled = true;
-      cleanup();
-      resolve(value);
-    }
-
-    function handleMessage(data: RawData): void {
-      const responsePayload = parseJsonRpcResponsePayload(data);
-      if (responsePayload === null) {
-        return;
-      }
-
-      if (responsePayload.id !== requestId) {
-        return;
-      }
-
-      if (responsePayload.error !== undefined) {
-        const errorCode =
-          responsePayload.error.code === undefined
-            ? "unknown_code"
-            : String(responsePayload.error.code);
-        const errorMessage =
-          responsePayload.error.message === undefined
-            ? "Codex app-server JSON-RPC request failed without an error message."
-            : responsePayload.error.message;
-        const rpcErrorCode = responsePayload.error.code ?? null;
-        fail(
-          new ConversationProviderError({
-            code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
-            message: `Codex app-server request '${input.method}' failed (${errorCode}): ${errorMessage}`,
-            cause: {
-              method: input.method,
-              errorCode: rpcErrorCode,
-              errorMessage,
-              errorData: responsePayload.error.data,
-            },
-          }),
-        );
-        return;
-      }
-
-      if (responsePayload.result === undefined) {
-        fail(
-          new ConversationProviderError({
-            code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
-            message: `Codex app-server request '${input.method}' did not return a JSON-RPC result.`,
-          }),
-        );
-        return;
-      }
-
-      succeed(responsePayload.result);
-    }
-
-    function handleError(error: Error): void {
-      fail(error);
-    }
-
-    function handleClose(): void {
-      fail(new Error("Codex app-server websocket closed before JSON-RPC response."));
-    }
-
-    socket.on("message", handleMessage);
-    socket.on("error", handleError);
-    socket.on("close", handleClose);
-
-    const requestPayload =
-      input.params === undefined
-        ? {
-            id: requestId,
-            method: input.method,
-          }
-        : {
-            id: requestId,
-            method: input.method,
-            params: input.params,
-          };
-    void connection.sendText(JSON.stringify(requestPayload)).catch((error: unknown) => {
-      fail(
-        error instanceof Error
-          ? error
-          : new Error(`Failed to send Codex app-server request '${input.method}'.`),
-      );
-    });
+    throw wrapProviderRequestFailure(input.method, error);
   });
 }
 
-async function sendJsonRpcNotification(
-  connection: JsonRpcClientConnection,
-  input: { method: string; params?: unknown },
-): Promise<void> {
-  const requestPayload =
-    input.params === undefined
-      ? {
-          method: input.method,
-        }
-      : {
-          method: input.method,
-          params: input.params,
-        };
-  try {
-    await connection.sendText(JSON.stringify(requestPayload));
-  } catch (error) {
-    throw new ConversationProviderError({
-      code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
-      message: `Failed to send Codex app-server notification '${input.method}'.`,
-      cause: error,
-    });
-  }
-}
-
-async function initializeCodexSession(connection: JsonRpcClientConnection): Promise<void> {
-  const initializeResult = await sendJsonRpcRequest(connection, {
-    method: "initialize",
-    params: {
-      clientInfo: CodexInitializeClientInfo,
+async function initializeCodexSession(rpcClient: CodexJsonRpcClient): Promise<void> {
+  const initializeHandle = rpcClient.callWithHandle("initialize", {
+    clientInfo: CodexInitializeClientInfo,
+  });
+  const initializeResult = await withRequestTimeout("initialize", initializeHandle).catch(
+    (error: unknown) => {
+      throw wrapProviderRequestFailure("initialize", error);
     },
-  });
+  );
+  await rpcClient.notify("initialized", {});
   if (!isRecord(initializeResult) || typeof initializeResult.userAgent !== "string") {
     throw new ConversationProviderError({
       code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
       message: "Codex initialize response did not include userAgent.",
     });
   }
+}
 
-  await sendJsonRpcNotification(connection, {
-    method: "initialized",
+function readJsonRpcErrorMessage(error: CodexJsonRpcRequestError): string {
+  const prefix = `JSON-RPC request ${String(error.id)} failed with code ${String(error.code)}: `;
+  return error.message.startsWith(prefix) ? error.message.slice(prefix.length) : error.message;
+}
+
+function wrapProviderRequestFailure(method: string, error: unknown): ConversationProviderError {
+  if (error instanceof ConversationProviderError) {
+    return error;
+  }
+
+  if (error instanceof CodexJsonRpcRequestError) {
+    return new ConversationProviderError({
+      code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
+      message: `Codex app-server request '${method}' failed (${String(error.code)}): ${readJsonRpcErrorMessage(error)}`,
+      cause: {
+        method: error.method,
+        errorCode: error.code,
+        errorMessage: readJsonRpcErrorMessage(error),
+        ...(error.data === undefined ? {} : { errorData: error.data }),
+      },
+    });
+  }
+
+  return new ConversationProviderError({
+    code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
+    message:
+      error instanceof Error
+        ? error.message
+        : `Codex app-server request '${method}' failed with a non-error exception.`,
+    cause: error,
+  });
+}
+
+async function withRequestTimeout<T>(
+  method: string,
+  handle: { promise: Promise<T>; cancel: (error?: Error) => void },
+): Promise<T> {
+  return await new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const timeout: TimerHandle = systemScheduler.schedule(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      handle.cancel(
+        new ConversationProviderError({
+          code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
+          message: `Timed out waiting ${String(CodexJsonRpcRequestTimeoutMs)}ms for Codex app-server request '${method}'.`,
+        }),
+      );
+      reject(
+        new ConversationProviderError({
+          code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
+          message: `Timed out waiting ${String(CodexJsonRpcRequestTimeoutMs)}ms for Codex app-server request '${method}'.`,
+        }),
+      );
+    }, CodexJsonRpcRequestTimeoutMs);
+
+    const settle = (callback: () => void): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      systemScheduler.cancel(timeout);
+      callback();
+    };
+
+    void handle.promise.then(
+      (value) => {
+        settle(() => resolve(value));
+      },
+      (error: unknown) => {
+        settle(() => reject(error));
+      },
+    );
   });
 }
 
@@ -528,18 +411,16 @@ export function createCodexConversationProviderAdapter(): ConversationProviderAd
       }
       const connection = await connectSandboxAgentConnection(connectInput);
       try {
-        const jsonRpcConnection: JsonRpcClientConnection = {
-          socket: connection.socket,
-          sendText: connection.sendText,
-        };
+        const rpcClient = new CodexJsonRpcClient(connection.sessionClient);
 
-        await initializeCodexSession(jsonRpcConnection);
+        await initializeCodexSession(rpcClient);
 
         const providerConnection: ProviderConnection = {
           request: async (requestInput) => {
-            return await sendJsonRpcRequest(jsonRpcConnection, requestInput);
+            return await sendJsonRpcRequest(rpcClient, requestInput);
           },
           close: async () => {
+            rpcClient.dispose();
             await connection.close();
           },
         };

@@ -19,8 +19,17 @@ export type SandboxSessionSocketEventMap = {
 
 export type SandboxSessionSocketEventName = keyof SandboxSessionSocketEventMap;
 
+export const SandboxSessionSendGuarantees = {
+  QUEUED: "queued",
+  WRITTEN: "written",
+} as const;
+
+export type SandboxSessionSendGuarantee =
+  (typeof SandboxSessionSendGuarantees)[keyof typeof SandboxSessionSendGuarantees];
+
 export interface SandboxSessionSocket {
   readonly readyState: SandboxSessionSocketReadyState;
+  readonly sendGuarantee: SandboxSessionSendGuarantee;
   addEventListener<EventName extends SandboxSessionSocketEventName>(
     eventName: EventName,
     listener: SandboxSessionSocketEventMap[EventName],
@@ -29,7 +38,7 @@ export interface SandboxSessionSocket {
     eventName: EventName,
     listener: SandboxSessionSocketEventMap[EventName],
   ): void;
-  send(payload: ArrayBuffer | Uint8Array | string): void;
+  send(payload: ArrayBuffer | Uint8Array | string): Promise<void>;
   close(code?: number, reason?: string): void;
 }
 

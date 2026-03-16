@@ -11,7 +11,11 @@ import {
   type StreamOpenOK,
 } from "@mistle/sandbox-session-protocol";
 
-import { SandboxSessionSocketReadyStates, type SandboxSessionRuntime } from "./runtime.js";
+import {
+  SandboxSessionSocketReadyStates,
+  type SandboxSessionRuntime,
+  type SandboxSessionSendGuarantee,
+} from "./runtime.js";
 import { isRecord } from "./shared/is-record.js";
 import type {
   JsonRpcErrorResponse,
@@ -212,6 +216,7 @@ export class SandboxSessionClient {
   #socket: import("./runtime.js").SandboxSessionSocket | null = null;
   #state: SandboxSessionConnectionState = "idle";
   #errorMessage: string | null = null;
+  #openError: StreamOpenError | null = null;
   #availableSendWindowBytes = 0;
   #streamId: number | null = null;
 
@@ -229,6 +234,22 @@ export class SandboxSessionClient {
     return this.#errorMessage;
   }
 
+  get openError(): StreamOpenError | null {
+    return this.#openError;
+  }
+
+  get socket(): import("./runtime.js").SandboxSessionSocket | null {
+    return this.#socket;
+  }
+
+  get streamId(): number | null {
+    return this.#streamId;
+  }
+
+  get sendGuarantee(): SandboxSessionSendGuarantee | null {
+    return this.#socket?.sendGuarantee ?? null;
+  }
+
   onEvent(listener: EventListener): () => void {
     this.#listeners.add(listener);
     return () => {
@@ -241,6 +262,8 @@ export class SandboxSessionClient {
       throw new Error("Sandbox session client is already connected or connecting.");
     }
 
+    this.#openError = null;
+    this.#streamId = null;
     this.#setState("connecting_socket", null);
 
     const socket = this.#runtime.createSocket(this.#connectionUrl);
@@ -248,6 +271,7 @@ export class SandboxSessionClient {
 
     await new Promise<void>((resolve, reject) => {
       const streamId = this.#runtime.createStreamId();
+      this.#streamId = streamId;
       let settled = false;
 
       const timeoutTask = this.#runtime.scheduleTimeout(() => {
@@ -299,7 +323,13 @@ export class SandboxSessionClient {
             kind: "agent",
           },
         };
-        socket.send(JSON.stringify(openMessage));
+        void socket.send(JSON.stringify(openMessage)).catch((error: unknown) => {
+          fail(
+            error instanceof Error
+              ? error
+              : new Error("Failed to send sandbox agent stream.open request."),
+          );
+        });
       };
 
       const handleMessage = (event: unknown): void => {
@@ -318,6 +348,7 @@ export class SandboxSessionClient {
           return;
         }
 
+        this.#openError = controlMessage;
         fail(new Error(controlMessage.message));
       };
 
@@ -354,7 +385,11 @@ export class SandboxSessionClient {
     this.#setState("closed", null);
   }
 
-  sendJson(payload: unknown): void {
+  async sendJson(payload: unknown): Promise<void> {
+    await this.sendText(JSON.stringify(payload));
+  }
+
+  async sendText(payload: string): Promise<void> {
     const socket = this.#socket;
     if (socket === null || socket.readyState !== SandboxSessionSocketReadyStates.OPEN) {
       throw new Error("Sandbox session socket is not open.");
@@ -362,13 +397,14 @@ export class SandboxSessionClient {
     if (this.#streamId === null) {
       throw new Error("Sandbox session stream is not open.");
     }
-    const encodedPayload = JsonTextEncoder.encode(JSON.stringify(payload));
+
+    const encodedPayload = JsonTextEncoder.encode(payload);
     if (encodedPayload.byteLength > this.#availableSendWindowBytes) {
       throw new Error("Sandbox session stream send window is exhausted.");
     }
     this.#availableSendWindowBytes -= encodedPayload.byteLength;
 
-    socket.send(
+    await socket.send(
       encodeDataFrame({
         streamId: this.#streamId,
         payloadKind: PayloadKindWebSocketText,
@@ -563,12 +599,18 @@ export class SandboxSessionClient {
       return;
     }
 
-    socket.send(
-      JSON.stringify({
-        type: "stream.window",
-        streamId: this.#streamId,
-        bytes,
-      }),
-    );
+    void socket
+      .send(
+        JSON.stringify({
+          type: "stream.window",
+          streamId: this.#streamId,
+          bytes,
+        }),
+      )
+      .catch(() => {
+        this.#closeConnectedSocketWithError(
+          "Failed to send sandbox session stream.window acknowledgement.",
+        );
+      });
   }
 }

@@ -1,5 +1,6 @@
 import {
   type SandboxScheduledTask,
+  SandboxSessionSendGuarantees,
   type SandboxSessionRuntime,
   type SandboxSessionSocket,
   type SandboxSessionSocketEventMap,
@@ -35,6 +36,10 @@ class BrowserSandboxSessionSocket implements SandboxSessionSocket {
     return toReadyState(this.#socket.readyState);
   }
 
+  get sendGuarantee(): SandboxSessionSocket["sendGuarantee"] {
+    return SandboxSessionSendGuarantees.QUEUED;
+  }
+
   addEventListener<EventName extends SandboxSessionSocketEventName>(
     eventName: EventName,
     listener: SandboxSessionSocketEventMap[EventName],
@@ -60,14 +65,23 @@ class BrowserSandboxSessionSocket implements SandboxSessionSocket {
     this.#socket.removeEventListener(eventName, wrappedListener);
   }
 
-  send(payload: ArrayBuffer | Uint8Array | string): void {
-    if (payload instanceof Uint8Array) {
-      const binaryPayload = new Uint8Array(payload);
-      this.#socket.send(binaryPayload);
-      return;
+  send(payload: ArrayBuffer | Uint8Array | string): Promise<void> {
+    if (this.#socket.readyState !== SandboxSessionSocketReadyStates.OPEN) {
+      return Promise.reject(new Error("Sandbox session socket is not open."));
     }
 
-    this.#socket.send(payload);
+    try {
+      if (payload instanceof Uint8Array) {
+        this.#socket.send(new Uint8Array(payload));
+        return Promise.resolve();
+      }
+
+      this.#socket.send(payload);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+
+    return Promise.resolve();
   }
 
   close(code?: number, reason?: string): void {
@@ -76,14 +90,14 @@ class BrowserSandboxSessionSocket implements SandboxSessionSocket {
 }
 
 class BrowserSandboxScheduledTask implements SandboxScheduledTask {
-  readonly #timeoutId: number;
+  readonly #timeoutId: ReturnType<typeof globalThis.setTimeout>;
 
-  constructor(timeoutId: number) {
+  constructor(timeoutId: ReturnType<typeof globalThis.setTimeout>) {
     this.#timeoutId = timeoutId;
   }
 
   cancel(): void {
-    window.clearTimeout(this.#timeoutId);
+    globalThis.clearTimeout(this.#timeoutId);
   }
 }
 
@@ -104,6 +118,6 @@ export function createBrowserSandboxSessionRuntime(): SandboxSessionRuntime {
     createSocket: (connectionUrl) => new BrowserSandboxSessionSocket(connectionUrl),
     createStreamId,
     scheduleTimeout: (callback, timeoutMs) =>
-      new BrowserSandboxScheduledTask(window.setTimeout(callback, timeoutMs)),
+      new BrowserSandboxScheduledTask(globalThis.setTimeout(callback, timeoutMs)),
   };
 }

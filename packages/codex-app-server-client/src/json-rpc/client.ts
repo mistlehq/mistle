@@ -1,4 +1,8 @@
-import { SandboxSessionClient } from "@mistle/sandbox-session-client";
+import {
+  SandboxSessionClient,
+  SandboxSessionSendGuarantees,
+  type SandboxSessionSendGuarantee,
+} from "@mistle/sandbox-session-client";
 import type {
   JsonRpcErrorResponse as CodexJsonRpcErrorResponse,
   JsonRpcId as CodexJsonRpcId,
@@ -9,8 +13,15 @@ import type {
 } from "@mistle/sandbox-session-client";
 
 type PendingRequest = {
+  method: string;
+  settled: boolean;
   resolve: (value: unknown) => void;
   reject: (error: Error) => void;
+};
+
+export type CodexJsonRpcCallHandle = {
+  promise: Promise<unknown>;
+  cancel: (error?: Error) => void;
 };
 
 type NotificationListener = (notification: CodexJsonRpcNotification) => void;
@@ -20,6 +31,32 @@ function isErrorResponse(
   response: CodexJsonRpcSuccessResponse | CodexJsonRpcErrorResponse,
 ): response is CodexJsonRpcErrorResponse {
   return "error" in response;
+}
+
+export class CodexJsonRpcRequestError extends Error {
+  readonly method: string;
+  readonly id: CodexJsonRpcId;
+  readonly code: number;
+  readonly data?: unknown;
+
+  constructor(input: {
+    method: string;
+    id: CodexJsonRpcId;
+    code: number;
+    message: string;
+    data?: unknown;
+  }) {
+    super(
+      `JSON-RPC request ${String(input.id)} failed with code ${String(input.code)}: ${input.message}`,
+    );
+    this.name = "CodexJsonRpcRequestError";
+    this.method = input.method;
+    this.id = input.id;
+    this.code = input.code;
+    if (input.data !== undefined) {
+      this.data = input.data;
+    }
+  }
 }
 
 export class CodexJsonRpcClient {
@@ -43,50 +80,71 @@ export class CodexJsonRpcClient {
     this.#rejectAllPendingRequests(new Error("Codex JSON-RPC client disposed."));
   }
 
-  async initialize(input?: { clientInfo?: { name: string; version: string } }): Promise<void> {
+  async initialize(input?: { clientInfo?: { name: string; version: string } }): Promise<unknown> {
     this.#sessionClient.markInitializing();
-    await this.call("initialize", {
+    const initializeResult = await this.call("initialize", {
       clientInfo: input?.clientInfo ?? {
         name: "mistle-dashboard",
         version: "0.1.0",
       },
     });
-    this.notify("initialized", {});
+    const sendGuarantee = this.#sessionClient.sendGuarantee;
+    await this.notify("initialized", {});
+    await this.#confirmReadyState(sendGuarantee);
+    if (this.#sessionClient.state !== "initializing") {
+      throw new Error("Codex session connection ended before initialization completed.");
+    }
     this.#sessionClient.markReady();
+    return initializeResult;
   }
 
   async call(method: string, params?: unknown): Promise<unknown> {
+    return await this.callWithHandle(method, params).promise;
+  }
+
+  callWithHandle(method: string, params?: unknown): CodexJsonRpcCallHandle {
     const id = this.#nextId;
     this.#nextId += 1;
 
-    return await new Promise<unknown>((resolve, reject) => {
+    const promise = new Promise<unknown>((resolve, reject) => {
       this.#pendingRequests.set(id, {
+        method,
+        settled: false,
         resolve,
         reject,
       });
 
-      try {
-        this.#sessionClient.sendJson({
+      void this.#sessionClient
+        .sendJson({
           id,
           method,
           ...(params === undefined ? {} : { params }),
+        })
+        .catch((error: unknown) => {
+          this.#rejectPendingRequest(id, error instanceof Error ? error : new Error(String(error)));
         });
-      } catch (error) {
-        this.#pendingRequests.delete(id);
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
     });
+
+    return {
+      promise,
+      cancel: (error) => {
+        this.#rejectPendingRequest(
+          id,
+          error ?? new Error(`JSON-RPC request ${String(id)} was canceled.`),
+        );
+      },
+    };
   }
 
-  notify(method: string, params?: unknown): void {
-    this.#sessionClient.sendJson({
+  async notify(method: string, params?: unknown): Promise<void> {
+    await this.#sessionClient.sendJson({
       method,
       ...(params === undefined ? {} : { params }),
     });
   }
 
-  respond(id: CodexJsonRpcId, result: unknown): void {
-    this.#sessionClient.sendJson({
+  async respond(id: CodexJsonRpcId, result: unknown): Promise<void> {
+    await this.#sessionClient.sendJson({
       id,
       result,
     });
@@ -128,11 +186,16 @@ export class CodexJsonRpcClient {
       }
 
       this.#pendingRequests.delete(event.response.id);
+      pendingRequest.settled = true;
       if (isErrorResponse(event.response)) {
         pendingRequest.reject(
-          new Error(
-            `JSON-RPC request ${String(event.response.id)} failed with code ${String(event.response.error.code)}: ${event.response.error.message}`,
-          ),
+          new CodexJsonRpcRequestError({
+            method: pendingRequest.method,
+            id: event.response.id,
+            code: event.response.error.code,
+            message: event.response.error.message,
+            ...(event.response.error.data === undefined ? {} : { data: event.response.error.data }),
+          }),
         );
         return;
       }
@@ -153,8 +216,37 @@ export class CodexJsonRpcClient {
 
   #rejectAllPendingRequests(error: Error): void {
     for (const pendingRequest of this.#pendingRequests.values()) {
+      pendingRequest.settled = true;
       pendingRequest.reject(error);
     }
     this.#pendingRequests.clear();
+  }
+
+  #rejectPendingRequest(id: CodexJsonRpcId, error: Error): void {
+    const pendingRequest = this.#pendingRequests.get(id);
+    if (pendingRequest === undefined || pendingRequest.settled) {
+      return;
+    }
+
+    this.#pendingRequests.delete(id);
+    pendingRequest.settled = true;
+    pendingRequest.reject(error);
+  }
+
+  async #confirmReadyState(sendGuarantee: SandboxSessionSendGuarantee | null): Promise<void> {
+    if (sendGuarantee !== SandboxSessionSendGuarantees.QUEUED) {
+      return;
+    }
+
+    try {
+      await this.call("thread/list", {
+        limit: 1,
+      });
+    } catch (error) {
+      if (error instanceof CodexJsonRpcRequestError) {
+        return;
+      }
+      throw error;
+    }
   }
 }
