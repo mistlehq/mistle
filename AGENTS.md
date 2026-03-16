@@ -103,7 +103,7 @@
 
 ## Database Migrations
 
-- Use the `control-plane-db-migrations` skill for control-plane database migration work in this repository.
+- Use the `db-migrations` skill for database migration work in this repository.
 
 ## Database Conventions
 
