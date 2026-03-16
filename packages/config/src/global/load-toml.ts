@@ -1,16 +1,16 @@
-import { asObjectRecord } from "../core/record.js";
+import { coerceConfigObjectNode } from "../core/config-object-node.js";
 import { type PartialGlobalConfigInput, PartialGlobalConfigSchema } from "./schema.js";
 
 export function loadGlobalFromToml(tomlRoot: Record<string, unknown>): PartialGlobalConfigInput {
-  const global = asObjectRecord(tomlRoot.global);
-  const telemetry = asObjectRecord(global.telemetry);
-  const telemetryTraces = asObjectRecord(telemetry.traces);
-  const telemetryLogs = asObjectRecord(telemetry.logs);
-  const telemetryMetrics = asObjectRecord(telemetry.metrics);
-  const internalAuth = asObjectRecord(global.internal_auth);
-  const sandbox = asObjectRecord(global.sandbox);
-  const sandboxBootstrap = asObjectRecord(sandbox.bootstrap);
-  const sandboxConnect = asObjectRecord(sandbox.connect);
+  const global = coerceConfigObjectNode(tomlRoot.global);
+  const telemetry = coerceConfigObjectNode(global.telemetry);
+  const telemetryTraces = coerceConfigObjectNode(telemetry.traces);
+  const telemetryLogs = coerceConfigObjectNode(telemetry.logs);
+  const telemetryMetrics = coerceConfigObjectNode(telemetry.metrics);
+  const internalAuth = coerceConfigObjectNode(global.internal_auth);
+  const sandbox = coerceConfigObjectNode(global.sandbox);
+  const sandboxBootstrap = coerceConfigObjectNode(sandbox.bootstrap);
+  const sandboxConnect = coerceConfigObjectNode(sandbox.connect);
 
   return PartialGlobalConfigSchema.parse({
     env: global.env,

@@ -1,4 +1,4 @@
-import { asObjectRecord } from "../../core/record.js";
+import { coerceConfigObjectNode } from "../../core/config-object-node.js";
 import {
   type PartialTokenizerProxyConfigInput,
   PartialTokenizerProxyConfigSchema,
@@ -7,10 +7,10 @@ import {
 export function loadTokenizerProxyFromToml(
   tomlRoot: Record<string, unknown>,
 ): PartialTokenizerProxyConfigInput {
-  const apps = asObjectRecord(tomlRoot.apps);
-  const tokenizerProxy = asObjectRecord(apps.tokenizer_proxy);
-  const server = asObjectRecord(tokenizerProxy.server);
-  const controlPlaneApi = asObjectRecord(tokenizerProxy.control_plane_api);
+  const apps = coerceConfigObjectNode(tomlRoot.apps);
+  const tokenizerProxy = coerceConfigObjectNode(apps.tokenizer_proxy);
+  const server = coerceConfigObjectNode(tokenizerProxy.server);
+  const controlPlaneApi = coerceConfigObjectNode(tokenizerProxy.control_plane_api);
 
   return PartialTokenizerProxyConfigSchema.parse({
     server: {

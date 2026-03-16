@@ -1,16 +1,20 @@
-export function isObjectRecord(value: unknown): value is Record<string, unknown> {
+export type ConfigObjectNode = {
+  [key: string]: unknown;
+};
+
+export function isConfigObjectNode(value: unknown): value is ConfigObjectNode {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-export function asObjectRecord(value: unknown): Record<string, unknown> {
-  return isObjectRecord(value) ? value : {};
+export function coerceConfigObjectNode(value: unknown): ConfigObjectNode {
+  return isConfigObjectNode(value) ? value : {};
 }
 
-export function getValueAtPath(root: unknown, path: readonly string[]): unknown {
+export function getConfigValueAtPath(root: unknown, path: readonly string[]): unknown {
   let current = root;
 
   for (const segment of path) {
-    if (!isObjectRecord(current)) {
+    if (!isConfigObjectNode(current)) {
       return undefined;
     }
 
@@ -20,21 +24,21 @@ export function getValueAtPath(root: unknown, path: readonly string[]): unknown 
   return current;
 }
 
-export function setValueAtPath(
-  root: Record<string, unknown>,
+export function setConfigValueAtPath(
+  root: ConfigObjectNode,
   path: readonly string[],
   value: unknown,
-): Record<string, unknown> {
+): ConfigObjectNode {
   if (path.length === 0) {
     return root;
   }
 
-  const nextRoot: Record<string, unknown> = { ...root };
+  const nextRoot: ConfigObjectNode = { ...root };
   let cursor = nextRoot;
 
   for (let index = 0; index < path.length - 1; index += 1) {
     const segment = path[index]!;
-    const nextSegment = asObjectRecord(cursor[segment]);
+    const nextSegment = coerceConfigObjectNode(cursor[segment]);
     const clonedSegment = { ...nextSegment };
     cursor[segment] = clonedSegment;
     cursor = clonedSegment;

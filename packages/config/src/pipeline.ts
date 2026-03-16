@@ -1,5 +1,5 @@
+import { getConfigValueAtPath, setConfigValueAtPath } from "./core/config-object-node.js";
 import type { ConfigModule } from "./core/module.js";
-import { getValueAtPath, setValueAtPath } from "./core/record.js";
 
 export function loadFromToml(
   modules: readonly ConfigModule[],
@@ -9,7 +9,7 @@ export function loadFromToml(
 
   for (const module of modules) {
     const moduleValue = module.loadToml(tomlRoot);
-    loaded = setValueAtPath(loaded, module.namespace, moduleValue);
+    loaded = setConfigValueAtPath(loaded, module.namespace, moduleValue);
   }
 
   return loaded;
@@ -23,7 +23,7 @@ export function loadFromEnv(
 
   for (const module of modules) {
     const moduleValue = module.loadEnv(env);
-    loaded = setValueAtPath(loaded, module.namespace, moduleValue);
+    loaded = setConfigValueAtPath(loaded, module.namespace, moduleValue);
   }
 
   return loaded;
@@ -36,9 +36,9 @@ export function validateModules(
   let validated: Record<string, unknown> = {};
 
   for (const module of modules) {
-    const value = getValueAtPath(mergedRoot, module.namespace);
+    const value = getConfigValueAtPath(mergedRoot, module.namespace);
     const parsedValue = module.schema.parse(value);
-    validated = setValueAtPath(validated, module.namespace, parsedValue);
+    validated = setConfigValueAtPath(validated, module.namespace, parsedValue);
   }
 
   return validated;

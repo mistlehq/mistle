@@ -1,11 +1,11 @@
-import { asObjectRecord, isObjectRecord } from "./record.js";
+import { coerceConfigObjectNode, isConfigObjectNode } from "./config-object-node.js";
 
 function mergeUnknown(baseValue: unknown, overrideValue: unknown): unknown {
   if (overrideValue === undefined) {
     return baseValue;
   }
 
-  if (isObjectRecord(baseValue) && isObjectRecord(overrideValue)) {
+  if (isConfigObjectNode(baseValue) && isConfigObjectNode(overrideValue)) {
     return mergeConfigObjects(baseValue, overrideValue);
   }
 
@@ -30,5 +30,5 @@ export function mergeConfigRoots(
   baseRoot: unknown,
   overrideRoot: unknown,
 ): Record<string, unknown> {
-  return mergeConfigObjects(asObjectRecord(baseRoot), asObjectRecord(overrideRoot));
+  return mergeConfigObjects(coerceConfigObjectNode(baseRoot), coerceConfigObjectNode(overrideRoot));
 }

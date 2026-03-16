@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
+import { coerceConfigObjectNode } from "./core/config-object-node.js";
 import type { ConfigModule } from "./core/module.js";
-import { asObjectRecord } from "./core/record.js";
 import { loadFromEnv, loadFromToml, validateModules } from "./pipeline.js";
 
 const GlobalSchema = z
@@ -23,7 +23,7 @@ const modules: readonly ConfigModule[] = [
     namespace: ["global"],
     schema: GlobalSchema,
     loadToml: (tomlRoot) => {
-      const globalRecord = asObjectRecord(tomlRoot.global);
+      const globalRecord = coerceConfigObjectNode(tomlRoot.global);
       return GlobalSchema.partial().parse({
         env: globalRecord.env,
       });
@@ -37,8 +37,8 @@ const modules: readonly ConfigModule[] = [
     namespace: ["apps", "control_plane_api"],
     schema: AppSchema,
     loadToml: (tomlRoot) => {
-      const apps = asObjectRecord(tomlRoot.apps);
-      const controlPlaneApi = asObjectRecord(apps.control_plane_api);
+      const apps = coerceConfigObjectNode(tomlRoot.apps);
+      const controlPlaneApi = coerceConfigObjectNode(apps.control_plane_api);
       return AppSchema.partial().parse({
         host: controlPlaneApi.host,
         port: controlPlaneApi.port,

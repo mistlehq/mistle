@@ -1,14 +1,14 @@
-import { asObjectRecord } from "../../core/record.js";
+import { coerceConfigObjectNode } from "../../core/config-object-node.js";
 import { type PartialDataPlaneApiConfigInput, PartialDataPlaneApiConfigSchema } from "./schema.js";
 
 export function loadDataPlaneApiFromToml(
   tomlRoot: Record<string, unknown>,
 ): PartialDataPlaneApiConfigInput {
-  const apps = asObjectRecord(tomlRoot.apps);
-  const dataPlaneApi = asObjectRecord(apps.data_plane_api);
-  const server = asObjectRecord(dataPlaneApi.server);
-  const database = asObjectRecord(dataPlaneApi.database);
-  const workflow = asObjectRecord(dataPlaneApi.workflow);
+  const apps = coerceConfigObjectNode(tomlRoot.apps);
+  const dataPlaneApi = coerceConfigObjectNode(apps.data_plane_api);
+  const server = coerceConfigObjectNode(dataPlaneApi.server);
+  const database = coerceConfigObjectNode(dataPlaneApi.database);
+  const workflow = coerceConfigObjectNode(dataPlaneApi.workflow);
 
   return PartialDataPlaneApiConfigSchema.parse({
     server: {

@@ -10,9 +10,9 @@ import { dataPlaneGatewayConfigModule } from "./apps/data-plane-gateway/index.js
 import { dataPlaneWorkerConfigModule } from "./apps/data-plane-worker/index.js";
 import { getDataPlaneWorkerSandboxProviderValidationIssue } from "./apps/data-plane-worker/schema.js";
 import { tokenizerProxyConfigModule } from "./apps/tokenizer-proxy/index.js";
+import { coerceConfigObjectNode, getConfigValueAtPath } from "./core/config-object-node.js";
 import { mergeConfigRoots } from "./core/merge.js";
 import { type ConfigModule } from "./core/module.js";
-import { asObjectRecord, getValueAtPath } from "./core/record.js";
 import { globalConfigModule } from "./global/index.js";
 import {
   AppIds,
@@ -67,7 +67,7 @@ function parseModuleValue<TSchema extends z.ZodType>(
   module: ConfigModule<TSchema>,
   root: Record<string, unknown>,
 ): z.output<TSchema> {
-  return module.schema.parse(getValueAtPath(root, module.namespace));
+  return module.schema.parse(getConfigValueAtPath(root, module.namespace));
 }
 
 function loadValidatedRoot(
@@ -77,7 +77,9 @@ function loadValidatedRoot(
   const { configPath, env } = resolveLoadInputs(options);
 
   const parsedTomlRoot =
-    configPath === undefined ? {} : asObjectRecord(parseToml(readFileSync(configPath, "utf8")));
+    configPath === undefined
+      ? {}
+      : coerceConfigObjectNode(parseToml(readFileSync(configPath, "utf8")));
 
   const tomlLoadedRoot = loadFromToml(modules, parsedTomlRoot);
   const envLoadedRoot = loadFromEnv(modules, env);

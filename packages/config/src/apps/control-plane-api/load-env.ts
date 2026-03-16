@@ -1,5 +1,5 @@
+import { coerceConfigObjectNode } from "../../core/config-object-node.js";
 import { createEnvLoader, hasEntries } from "../../core/load-env.js";
-import { asObjectRecord } from "../../core/record.js";
 import {
   type PartialControlPlaneApiConfigInput,
   ControlPlaneApiAuthConfigSchema,
@@ -102,7 +102,7 @@ const loadIntegrationsEnv = createEnvLoader<typeof ControlPlaneApiIntegrationsCo
     envVar: "MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON",
     parse: (value): Record<string, string> => {
       try {
-        const parsedValue = asObjectRecord(JSON.parse(value));
+        const parsedValue = coerceConfigObjectNode(JSON.parse(value));
         const normalizedValue: Record<string, string> = {};
 
         for (const [version, keyValue] of Object.entries(parsedValue)) {

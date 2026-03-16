@@ -1,5 +1,5 @@
+import { coerceConfigObjectNode } from "../../core/config-object-node.js";
 import { hasEntries } from "../../core/load-env.js";
-import { asObjectRecord } from "../../core/record.js";
 import {
   type PartialControlPlaneApiConfigInput,
   PartialControlPlaneApiConfigSchema,
@@ -8,15 +8,15 @@ import {
 export function loadControlPlaneApiFromToml(
   tomlRoot: Record<string, unknown>,
 ): PartialControlPlaneApiConfigInput {
-  const apps = asObjectRecord(tomlRoot.apps);
-  const controlPlaneApi = asObjectRecord(apps.control_plane_api);
-  const server = asObjectRecord(controlPlaneApi.server);
-  const database = asObjectRecord(controlPlaneApi.database);
-  const auth = asObjectRecord(controlPlaneApi.auth);
-  const dashboard = asObjectRecord(controlPlaneApi.dashboard);
-  const workflow = asObjectRecord(controlPlaneApi.workflow);
-  const dataPlaneApi = asObjectRecord(controlPlaneApi.data_plane_api);
-  const integrations = asObjectRecord(controlPlaneApi.integrations);
+  const apps = coerceConfigObjectNode(tomlRoot.apps);
+  const controlPlaneApi = coerceConfigObjectNode(apps.control_plane_api);
+  const server = coerceConfigObjectNode(controlPlaneApi.server);
+  const database = coerceConfigObjectNode(controlPlaneApi.database);
+  const auth = coerceConfigObjectNode(controlPlaneApi.auth);
+  const dashboard = coerceConfigObjectNode(controlPlaneApi.dashboard);
+  const workflow = coerceConfigObjectNode(controlPlaneApi.workflow);
+  const dataPlaneApi = coerceConfigObjectNode(controlPlaneApi.data_plane_api);
+  const integrations = coerceConfigObjectNode(controlPlaneApi.integrations);
 
   let partialConfig: Record<string, unknown> = {
     server: {
@@ -51,7 +51,7 @@ export function loadControlPlaneApiFromToml(
       ...partialConfig,
       integrations: {
         activeMasterEncryptionKeyVersion: integrations.active_master_encryption_key_version,
-        masterEncryptionKeys: asObjectRecord(integrations.master_encryption_keys),
+        masterEncryptionKeys: coerceConfigObjectNode(integrations.master_encryption_keys),
       },
     };
   }

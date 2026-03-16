@@ -1,5 +1,5 @@
+import { coerceConfigObjectNode } from "../../core/config-object-node.js";
 import { hasEntries } from "../../core/load-env.js";
-import { asObjectRecord } from "../../core/record.js";
 import {
   type PartialDataPlaneWorkerConfigInput,
   PartialDataPlaneWorkerConfigSchema,
@@ -8,16 +8,16 @@ import {
 export function loadDataPlaneWorkerFromToml(
   tomlRoot: Record<string, unknown>,
 ): PartialDataPlaneWorkerConfigInput {
-  const apps = asObjectRecord(tomlRoot.apps);
-  const dataPlaneWorker = asObjectRecord(apps.data_plane_worker);
-  const server = asObjectRecord(dataPlaneWorker.server);
-  const database = asObjectRecord(dataPlaneWorker.database);
-  const workflow = asObjectRecord(dataPlaneWorker.workflow);
-  const tunnel = asObjectRecord(dataPlaneWorker.tunnel);
-  const reaper = asObjectRecord(dataPlaneWorker.reaper);
-  const sandbox = asObjectRecord(dataPlaneWorker.sandbox);
-  const sandboxModal = asObjectRecord(sandbox.modal);
-  const sandboxDocker = asObjectRecord(sandbox.docker);
+  const apps = coerceConfigObjectNode(tomlRoot.apps);
+  const dataPlaneWorker = coerceConfigObjectNode(apps.data_plane_worker);
+  const server = coerceConfigObjectNode(dataPlaneWorker.server);
+  const database = coerceConfigObjectNode(dataPlaneWorker.database);
+  const workflow = coerceConfigObjectNode(dataPlaneWorker.workflow);
+  const tunnel = coerceConfigObjectNode(dataPlaneWorker.tunnel);
+  const reaper = coerceConfigObjectNode(dataPlaneWorker.reaper);
+  const sandbox = coerceConfigObjectNode(dataPlaneWorker.sandbox);
+  const sandboxModal = coerceConfigObjectNode(sandbox.modal);
+  const sandboxDocker = coerceConfigObjectNode(sandbox.docker);
 
   const sandboxConfig: Record<string, unknown> = {
     tokenizerProxyEgressBaseUrl: sandbox.tokenizer_proxy_egress_base_url,

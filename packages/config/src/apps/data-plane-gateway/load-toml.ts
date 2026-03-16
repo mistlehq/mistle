@@ -1,4 +1,4 @@
-import { asObjectRecord } from "../../core/record.js";
+import { coerceConfigObjectNode } from "../../core/config-object-node.js";
 import {
   type PartialDataPlaneGatewayConfigInput,
   PartialDataPlaneGatewayConfigSchema,
@@ -7,10 +7,10 @@ import {
 export function loadDataPlaneGatewayFromToml(
   tomlRoot: Record<string, unknown>,
 ): PartialDataPlaneGatewayConfigInput {
-  const apps = asObjectRecord(tomlRoot.apps);
-  const dataPlaneGateway = asObjectRecord(apps.data_plane_gateway);
-  const server = asObjectRecord(dataPlaneGateway.server);
-  const database = asObjectRecord(dataPlaneGateway.database);
+  const apps = coerceConfigObjectNode(tomlRoot.apps);
+  const dataPlaneGateway = coerceConfigObjectNode(apps.data_plane_gateway);
+  const server = coerceConfigObjectNode(dataPlaneGateway.server);
+  const database = coerceConfigObjectNode(dataPlaneGateway.database);
 
   return PartialDataPlaneGatewayConfigSchema.parse({
     server: {

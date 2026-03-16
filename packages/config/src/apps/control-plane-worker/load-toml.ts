@@ -1,4 +1,4 @@
-import { asObjectRecord } from "../../core/record.js";
+import { coerceConfigObjectNode } from "../../core/config-object-node.js";
 import {
   type PartialControlPlaneWorkerConfigInput,
   PartialControlPlaneWorkerConfigSchema,
@@ -7,13 +7,13 @@ import {
 export function loadControlPlaneWorkerFromToml(
   tomlRoot: Record<string, unknown>,
 ): PartialControlPlaneWorkerConfigInput {
-  const apps = asObjectRecord(tomlRoot.apps);
-  const controlPlaneWorker = asObjectRecord(apps.control_plane_worker);
-  const server = asObjectRecord(controlPlaneWorker.server);
-  const workflow = asObjectRecord(controlPlaneWorker.workflow);
-  const email = asObjectRecord(controlPlaneWorker.email);
-  const dataPlaneApi = asObjectRecord(controlPlaneWorker.data_plane_api);
-  const controlPlaneApi = asObjectRecord(controlPlaneWorker.control_plane_api);
+  const apps = coerceConfigObjectNode(tomlRoot.apps);
+  const controlPlaneWorker = coerceConfigObjectNode(apps.control_plane_worker);
+  const server = coerceConfigObjectNode(controlPlaneWorker.server);
+  const workflow = coerceConfigObjectNode(controlPlaneWorker.workflow);
+  const email = coerceConfigObjectNode(controlPlaneWorker.email);
+  const dataPlaneApi = coerceConfigObjectNode(controlPlaneWorker.data_plane_api);
+  const controlPlaneApi = coerceConfigObjectNode(controlPlaneWorker.control_plane_api);
 
   return PartialControlPlaneWorkerConfigSchema.parse({
     server: {

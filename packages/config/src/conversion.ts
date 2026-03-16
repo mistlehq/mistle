@@ -3,7 +3,11 @@ import { parseEnv as parseDotenv } from "node:util";
 import { parse as parseToml, stringify as stringifyToml } from "smol-toml";
 
 import { configEnvTomlMappings, type EnvValueFormat } from "./conversion-mappings.js";
-import { isObjectRecord, getValueAtPath, setValueAtPath } from "./core/record.js";
+import {
+  isConfigObjectNode,
+  getConfigValueAtPath,
+  setConfigValueAtPath,
+} from "./core/config-object-node.js";
 import { configModules } from "./modules.js";
 import { loadFromEnv, loadFromToml } from "./pipeline.js";
 
@@ -88,12 +92,12 @@ function mapConfigToTomlRoot(configRoot: Record<string, unknown>): Record<string
   let tomlRoot: Record<string, unknown> = {};
 
   for (const mapping of configEnvTomlMappings) {
-    const value = getValueAtPath(configRoot, mapping.configPath);
+    const value = getConfigValueAtPath(configRoot, mapping.configPath);
     if (value === undefined) {
       continue;
     }
 
-    tomlRoot = setValueAtPath(tomlRoot, mapping.tomlPath, value);
+    tomlRoot = setConfigValueAtPath(tomlRoot, mapping.tomlPath, value);
   }
 
   return tomlRoot;
@@ -103,7 +107,7 @@ function mapConfigToEnvRecord(configRoot: Record<string, unknown>): NodeJS.Proce
   const envRecord: NodeJS.ProcessEnv = {};
 
   for (const mapping of configEnvTomlMappings) {
-    const value = getValueAtPath(configRoot, mapping.configPath);
+    const value = getConfigValueAtPath(configRoot, mapping.configPath);
     if (value === undefined) {
       continue;
     }
@@ -129,7 +133,7 @@ function quoteEnvFileValue(value: string): string {
 }
 
 function assertTomlRoot(value: unknown): Record<string, unknown> {
-  if (!isObjectRecord(value)) {
+  if (!isConfigObjectNode(value)) {
     throw new Error("Invalid TOML content. Expected a top-level TOML table.");
   }
 
