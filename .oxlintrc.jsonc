@@ -198,6 +198,36 @@
       },
     },
     {
+      "files": ["apps/dashboard/**/*.ts", "apps/dashboard/**/*.tsx"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "paths": [
+              {
+                "name": "@mistle/integrations-definitions/openai/agent",
+                "message": "Dashboard must not import the server-only OpenAI agent entrypoint. Use @mistle/integrations-definitions/openai/agent/browser.",
+              },
+            ],
+            "patterns": [
+              {
+                "group": ["@mistle/codex-app-server-client", "@mistle/codex-app-server-client/*"],
+                "message": "Dashboard Codex imports must come through @mistle/integrations-definitions/openai/agent/browser.",
+              },
+              {
+                "group": ["../../../../../packages/codex-app-server-client/src/**"],
+                "message": "Do not deep-import codex-app-server-client source files from dashboard code.",
+              },
+              {
+                "group": ["../../../../../packages/integrations-definitions/src/**"],
+                "message": "Do not deep-import integrations-definitions source files from dashboard code. Use the exported OpenAI browser entrypoint.",
+              },
+            ],
+          },
+        ],
+      },
+    },
+    {
       "files": [
         "apps/control-plane-api/src/**/*.ts",
         "apps/control-plane-worker/src/**/*.ts",

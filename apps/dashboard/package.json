@@ -17,7 +17,6 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@mistle/codex-app-server-client": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/integrations-definitions": "workspace:*",
     "@mistle/sandbox-session-client": "workspace:*",

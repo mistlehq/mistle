@@ -1,4 +1,4 @@
-import type { CodexThreadSummary } from "@mistle/codex-app-server-client";
+import type { CodexThreadSummary } from "@mistle/integrations-definitions/openai/agent/browser";
 
 function resolveThreadRecency(thread: CodexThreadSummary): number {
   if (thread.updatedAt !== null) {

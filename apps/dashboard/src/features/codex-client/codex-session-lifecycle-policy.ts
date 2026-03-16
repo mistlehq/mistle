@@ -1,7 +1,7 @@
 import type {
   CodexSessionConnectionState,
   CodexThreadSummary,
-} from "@mistle/codex-app-server-client";
+} from "@mistle/integrations-definitions/openai/agent/browser";
 
 import { selectPreferredThreadId } from "../sessions/thread-selection.js";
 
