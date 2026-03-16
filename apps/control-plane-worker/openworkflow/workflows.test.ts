@@ -17,7 +17,7 @@ import { RequestDeleteSandboxProfileWorkflow } from "./request-delete-sandbox-pr
 import { SendOrganizationInvitationWorkflow } from "./send-organization-invitation.js";
 import { SendVerificationOTPWorkflow } from "./send-verification-otp.js";
 import { StartSandboxProfileInstanceWorkflow } from "./start-sandbox-profile-instance.js";
-import { SyncIntegrationConnectionResourcesWorkflow } from "./sync-integration-connection-resources.js";
+import { SyncIntegrationConnectionResourcesWorkflow } from "./sync-integration-connection-resources/workflow.js";
 
 describe("control-plane worker openworkflow entrypoints", () => {
   it("preserves the handle automation conversation delivery workflow identity", () => {
