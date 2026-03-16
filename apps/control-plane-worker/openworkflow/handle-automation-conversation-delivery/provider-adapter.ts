@@ -1,8 +1,5 @@
-import { OpenAiApiKeyDefinition } from "@mistle/integrations-definitions";
-
-import { createCodexConversationProviderAdapter } from "./codex-conversation-provider-adapter.js";
-
-const OpenAiIntegrationFamilyId = OpenAiApiKeyDefinition.familyId;
+import type { AgentConversationProvider } from "@mistle/integrations-core";
+import { createOpenAiCodexConversationProvider } from "@mistle/integrations-definitions/openai/agent";
 
 export type ProviderAutomationConversationStatus = "idle" | "active" | "error";
 
@@ -65,6 +62,13 @@ export type ProviderSteerExecutionInput = {
   inputText: string;
 };
 
+export type ProviderRecoverLateSteerInput = {
+  connection: ProviderConnection;
+  providerConversationId: string;
+  providerExecutionId: string;
+  inputText: string;
+};
+
 export type ProviderInterruptExecutionInput = {
   connection: ProviderConnection;
   providerConversationId: string;
@@ -82,6 +86,9 @@ export type ConversationProviderAdapter = {
   resumeAutomationConversation: (input: ProviderResumeConversationInput) => Promise<void>;
   startExecution: (input: ProviderStartExecutionInput) => Promise<ProviderStartExecutionOutput>;
   steerExecution?: (input: ProviderSteerExecutionInput) => Promise<ProviderSteerExecutionOutput>;
+  recoverLateSteer?: (
+    input: ProviderRecoverLateSteerInput,
+  ) => Promise<ProviderStartExecutionOutput>;
   interruptExecution?: (input: ProviderInterruptExecutionInput) => Promise<void>;
 };
 
@@ -89,9 +96,40 @@ export function getConversationProviderAdapter(
   integrationFamilyId: string,
 ): ConversationProviderAdapter {
   switch (integrationFamilyId) {
-    case OpenAiIntegrationFamilyId:
-      return createCodexConversationProviderAdapter();
+    case "openai":
+      return adaptConversationProvider(createOpenAiCodexConversationProvider());
   }
 
   throw new Error(`Unsupported conversation integration family '${integrationFamilyId}'.`);
+}
+
+function adaptConversationProvider(
+  provider: AgentConversationProvider,
+): ConversationProviderAdapter {
+  const steerExecution = provider.steerExecution;
+  const recoverLateSteer = provider.recoverLateSteer;
+  const interruptExecution = provider.interruptExecution;
+
+  return {
+    connect: async (input) => await provider.connect(input),
+    inspectAutomationConversation: async (input) => await provider.inspectConversation(input),
+    createAutomationConversation: async (input) => await provider.createConversation(input),
+    resumeAutomationConversation: async (input) => await provider.resumeConversation(input),
+    startExecution: async (input) => await provider.startExecution(input),
+    ...(steerExecution === undefined
+      ? {}
+      : {
+          steerExecution: async (input) => await steerExecution(input),
+        }),
+    ...(recoverLateSteer === undefined
+      ? {}
+      : {
+          recoverLateSteer: async (input) => await recoverLateSteer(input),
+        }),
+    ...(interruptExecution === undefined
+      ? {}
+      : {
+          interruptExecution: async (input) => await interruptExecution(input),
+        }),
+  };
 }

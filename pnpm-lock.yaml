@@ -722,9 +722,18 @@ importers:
 
   packages/integrations-definitions:
     dependencies:
+      '@mistle/codex-app-server-client':
+        specifier: workspace:*
+        version: link:../codex-app-server-client
       '@mistle/integrations-core':
         specifier: workspace:*
         version: link:../integrations-core
+      '@mistle/sandbox-session-client':
+        specifier: workspace:*
+        version: link:../sandbox-session-client
+      '@mistle/time':
+        specifier: workspace:*
+        version: link:../time
       '@octokit/auth-app':
         specifier: ^8.2.0
         version: 8.2.0
