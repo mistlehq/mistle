@@ -1,16 +1,23 @@
-import { isRecord } from "../shared/is-record.js";
 import type {
   NormalizedCodexThreadItem,
   NormalizedCommandAction,
   NormalizedFileChange,
 } from "./types.js";
 
-function readOptionalString(record: Record<string, unknown>, key: string): string | null {
+type ThreadItemObject = {
+  [key: string]: unknown;
+};
+
+function isThreadItemObject(value: unknown): value is ThreadItemObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readOptionalString(record: ThreadItemObject, key: string): string | null {
   const value = record[key];
   return typeof value === "string" ? value : null;
 }
 
-function readOptionalNumber(record: Record<string, unknown>, key: string): number | null {
+function readOptionalNumber(record: ThreadItemObject, key: string): number | null {
   const value = record[key];
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
@@ -40,7 +47,7 @@ function collectTextFragments(value: unknown, depth: number): string[] {
     return value.flatMap((entry) => collectTextFragments(entry, depth + 1));
   }
 
-  if (!isRecord(value)) {
+  if (!isThreadItemObject(value)) {
     return [];
   }
 
@@ -78,7 +85,7 @@ function parseFileChanges(value: unknown): readonly NormalizedFileChange[] {
 
   const changes: NormalizedFileChange[] = [];
   for (const entry of value) {
-    if (!isRecord(entry)) {
+    if (!isThreadItemObject(entry)) {
       continue;
     }
 
@@ -110,7 +117,7 @@ function normalizeCommandActions(value: unknown): readonly NormalizedCommandActi
 
   const actions: NormalizedCommandAction[] = [];
   for (const entry of value) {
-    if (!isRecord(entry)) {
+    if (!isThreadItemObject(entry)) {
       continue;
     }
 
@@ -171,7 +178,7 @@ function mapTransportStatus(value: string): "streaming" | "completed" {
 }
 
 function normalizeToolCall(input: {
-  item: Record<string, unknown>;
+  item: ThreadItemObject;
   turnId: string;
   toolType: "dynamic" | "mcp" | "collab";
   title: string | null;
@@ -196,7 +203,7 @@ function normalizeToolCall(input: {
   ];
 }
 
-function readRequiredId(item: Record<string, unknown>): string {
+function readRequiredId(item: ThreadItemObject): string {
   const id = readOptionalString(item, "id");
   if (id === null || id.length === 0) {
     throw new Error(`Thread item is missing a valid id. Payload: ${JSON.stringify(item)}`);
@@ -205,7 +212,7 @@ function readRequiredId(item: Record<string, unknown>): string {
   return id;
 }
 
-function readRequiredType(item: Record<string, unknown>): string {
+function readRequiredType(item: ThreadItemObject): string {
   const type = readOptionalString(item, "type");
   if (type === null || type.length === 0) {
     throw new Error(`Thread item is missing a valid type. Payload: ${JSON.stringify(item)}`);
@@ -218,7 +225,7 @@ export function normalizeCodexThreadItem(input: {
   turnId: string;
   item: unknown;
 }): readonly NormalizedCodexThreadItem[] {
-  if (!isRecord(input.item)) {
+  if (!isThreadItemObject(input.item)) {
     throw new Error(`Thread item must be an object. Payload: ${JSON.stringify(input.item)}`);
   }
 

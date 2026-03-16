@@ -42,7 +42,11 @@ const RETRYABLE_SMTP_ERROR_CODES = new Set<string>([
   "ETIMEDOUT",
 ]);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+type SmtpTransportObject = {
+  [key: string]: unknown;
+};
+
+function isSmtpTransportObject(value: unknown): value is SmtpTransportObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -67,7 +71,7 @@ function normalizeRecipientList(value: unknown): string[] {
       continue;
     }
 
-    if (isRecord(recipient) && typeof recipient.address === "string") {
+    if (isSmtpTransportObject(recipient) && typeof recipient.address === "string") {
       normalized.push(recipient.address);
     }
   }
@@ -104,7 +108,7 @@ function getErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  if (isRecord(error) && typeof error.message === "string") {
+  if (isSmtpTransportObject(error) && typeof error.message === "string") {
     return error.message;
   }
 
@@ -112,7 +116,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 function getErrorCode(error: unknown): string | undefined {
-  if (isRecord(error) && typeof error.code === "string") {
+  if (isSmtpTransportObject(error) && typeof error.code === "string") {
     return error.code;
   }
 

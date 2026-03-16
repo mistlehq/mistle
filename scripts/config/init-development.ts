@@ -17,12 +17,12 @@ const GENERATED_HEADER = [
   "",
 ].join("\n");
 
-function isRecord(value: unknown): value is ConfigRecord {
+function isConfigObjectNode(value: unknown): value is ConfigRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function asRecord(value: unknown): ConfigRecord {
-  if (!isRecord(value)) {
+function coerceConfigObjectNode(value: unknown): ConfigRecord {
+  if (!isConfigObjectNode(value)) {
     return {};
   }
 
@@ -34,7 +34,7 @@ function deepClone(value: unknown): unknown {
     return value.map((item) => deepClone(item));
   }
 
-  if (isRecord(value)) {
+  if (isConfigObjectNode(value)) {
     const clonedEntries: [string, unknown][] = [];
 
     for (const [key, entryValue] of Object.entries(value)) {
@@ -53,7 +53,7 @@ function mergeRecords(base: ConfigRecord, override: ConfigRecord): ConfigRecord 
   for (const [key, overrideValue] of Object.entries(override)) {
     const baseValue = merged[key];
 
-    if (isRecord(baseValue) && isRecord(overrideValue)) {
+    if (isConfigObjectNode(baseValue) && isConfigObjectNode(overrideValue)) {
       merged[key] = mergeRecords(baseValue, overrideValue);
       continue;
     }
@@ -68,7 +68,7 @@ function buildDevelopmentDefaults(): ConfigRecord {
   let defaults: ConfigRecord = {};
 
   for (const presetModule of developmentPresetModules) {
-    defaults = mergeRecords(defaults, asRecord(presetModule.defaults));
+    defaults = mergeRecords(defaults, coerceConfigObjectNode(presetModule.defaults));
   }
 
   return defaults;
@@ -78,7 +78,7 @@ function getValueAtPath(root: ConfigRecord, path: readonly string[]): unknown {
   let current: unknown = root;
 
   for (const segment of path) {
-    if (!isRecord(current)) {
+    if (!isConfigObjectNode(current)) {
       return undefined;
     }
 
@@ -103,7 +103,7 @@ function setValueAtPath(root: ConfigRecord, path: readonly string[], value: unkn
     }
 
     const existing = cursor[segment];
-    const nextSegment: ConfigRecord = isRecord(existing) ? { ...existing } : {};
+    const nextSegment: ConfigRecord = isConfigObjectNode(existing) ? { ...existing } : {};
     cursor[segment] = nextSegment;
     cursor = nextSegment;
   }
@@ -157,7 +157,7 @@ function main(): void {
   }
 
   const sampleContent = readFileSync(SAMPLE_PATH, "utf8");
-  const sampleConfigRoot = asRecord(parseToml(sampleContent));
+  const sampleConfigRoot = coerceConfigObjectNode(parseToml(sampleContent));
 
   const defaults = buildDevelopmentDefaults();
   const withDefaults = mergeRecords(sampleConfigRoot, defaults);

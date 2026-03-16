@@ -221,7 +221,11 @@ function requireEnv(name: string): string {
   return value;
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+type CodexSystemTestObject = {
+  [key: string]: unknown;
+};
+
+function isCodexSystemTestObject(value: unknown): value is CodexSystemTestObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -547,7 +551,7 @@ function getWebSocketJsonMessagePump(socket: WebSocket): WebSocketJsonMessagePum
   }
 
   const onMessage = (event: unknown): void => {
-    if (!isRecord(event)) {
+    if (!isCodexSystemTestObject(event)) {
       enqueue({
         kind: "error",
         error: new Error("Websocket message event payload was not an object."),
@@ -629,7 +633,7 @@ function formatJsonForError(value: unknown): string {
 }
 
 function describeWebSocketCloseEvent(event: unknown): string {
-  if (!isRecord(event)) {
+  if (!isCodexSystemTestObject(event)) {
     return "unknown close event";
   }
 
@@ -704,7 +708,7 @@ function readErrorField(error: unknown, field: "stdout" | "stderr"): unknown {
 }
 
 function readRecordField(input: unknown, key: string): unknown {
-  if (!isRecord(input)) {
+  if (!isCodexSystemTestObject(input)) {
     return undefined;
   }
 
@@ -737,7 +741,7 @@ async function runDiagnosticCommand(input: {
 }
 
 function describeJsonRpcMessage(message: unknown): string {
-  if (!isRecord(message)) {
+  if (!isCodexSystemTestObject(message)) {
     return "non-object";
   }
 
@@ -809,7 +813,7 @@ function attachWebSocketTrace(input: {
   }
 
   const onMessage = (event: unknown): void => {
-    if (!isRecord(event)) {
+    if (!isCodexSystemTestObject(event)) {
       pushWebSocketTraceEntry({
         sink: input.sink,
         summary: "event/message malformed",
@@ -1036,7 +1040,7 @@ async function waitForJsonRpcResult(input: {
 }
 
 function collectAgentMessageText(input: { method: string; params: unknown; sink: string[] }): void {
-  if (!isRecord(input.params)) {
+  if (!isCodexSystemTestObject(input.params)) {
     return;
   }
 
@@ -1053,7 +1057,7 @@ function collectAgentMessageText(input: { method: string; params: unknown; sink:
   }
 
   const item = input.params.item;
-  if (!isRecord(item)) {
+  if (!isCodexSystemTestObject(item)) {
     return;
   }
 
@@ -1073,7 +1077,7 @@ function collectAgentMessageText(input: { method: string; params: unknown; sink:
   }
 
   for (const contentPart of content) {
-    if (!isRecord(contentPart)) {
+    if (!isCodexSystemTestObject(contentPart)) {
       continue;
     }
     const contentText = readOptionalStringField(contentPart, "text");
@@ -1090,12 +1094,12 @@ function parseTurnCompletedNotification(message: unknown): TurnCompletion | null
   }
 
   const params = notification.data.params;
-  if (!isRecord(params)) {
+  if (!isCodexSystemTestObject(params)) {
     return null;
   }
 
   const turn = params.turn;
-  if (!isRecord(turn)) {
+  if (!isCodexSystemTestObject(turn)) {
     return null;
   }
 
@@ -1106,7 +1110,9 @@ function parseTurnCompletedNotification(message: unknown): TurnCompletion | null
   }
 
   const error = turn.error;
-  const errorMessage = isRecord(error) ? readOptionalStringField(error, "message") : null;
+  const errorMessage = isCodexSystemTestObject(error)
+    ? readOptionalStringField(error, "message")
+    : null;
 
   return {
     turnId,
@@ -1120,12 +1126,12 @@ function collectCommandExecutionItem(input: {
   params: unknown;
   sink: CommandExecutionItem[];
 }): void {
-  if (input.method !== "item/completed" || !isRecord(input.params)) {
+  if (input.method !== "item/completed" || !isCodexSystemTestObject(input.params)) {
     return;
   }
 
   const item = input.params.item;
-  if (!isRecord(item)) {
+  if (!isCodexSystemTestObject(item)) {
     return;
   }
 
@@ -1225,7 +1231,7 @@ function readCommandExecutionItemsForTurn(input: {
   const items = turn.items ?? [];
   const commandExecutions: CommandExecutionItem[] = [];
   for (const item of items) {
-    if (!isRecord(item)) {
+    if (!isCodexSystemTestObject(item)) {
       continue;
     }
     const itemType = readOptionalStringField(item, "type");
@@ -1343,7 +1349,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
           status: 201,
           description: "OpenAI API-key connection creation",
         });
-        if (!isRecord(createConnectionPayload)) {
+        if (!isCodexSystemTestObject(createConnectionPayload)) {
           throw new Error("Expected OpenAI API-key connection response to be an object.");
         }
         const connectionId = readNonEmptyStringField(createConnectionPayload, "id");
@@ -1376,7 +1382,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
           status: 201,
           description: "sandbox profile creation",
         });
-        if (!isRecord(createProfilePayload)) {
+        if (!isCodexSystemTestObject(createProfilePayload)) {
           throw new Error("Expected sandbox profile creation response to be an object.");
         }
         const profileId = readNonEmptyStringField(createProfilePayload, "id");
@@ -1485,7 +1491,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
           status: 201,
           description: "sandbox connection token minting",
         });
-        if (!isRecord(mintConnectionTokenPayload)) {
+        if (!isCodexSystemTestObject(mintConnectionTokenPayload)) {
           throw new Error("Expected sandbox connection token response to be an object.");
         }
         const mintedUrl = readNonEmptyStringField(mintConnectionTokenPayload, "url");
@@ -1734,7 +1740,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
               status: 201,
               description: "OpenAI API-key connection creation",
             });
-            if (!isRecord(payload)) {
+            if (!isCodexSystemTestObject(payload)) {
               throw new Error("Expected OpenAI API-key connection response to be an object.");
             }
 
@@ -1928,7 +1934,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
               status: 201,
               description: "sandbox profile creation",
             });
-            if (!isRecord(payload)) {
+            if (!isCodexSystemTestObject(payload)) {
               throw new Error("Expected sandbox profile creation response to be an object.");
             }
 
@@ -2045,7 +2051,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
               status: 201,
               description: "sandbox connection token minting",
             });
-            if (!isRecord(mintConnectionTokenPayload)) {
+            if (!isCodexSystemTestObject(mintConnectionTokenPayload)) {
               throw new Error("Expected sandbox connection token response to be an object.");
             }
             const mintedUrl = readNonEmptyStringField(mintConnectionTokenPayload, "url");

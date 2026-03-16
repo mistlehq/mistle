@@ -8,11 +8,15 @@ import type {
   IntegrationTarget,
 } from "../types/index.js";
 
-function toUnknownRecord(value: unknown): Record<string, unknown> | null {
+type BindingConfigObject = {
+  [key: string]: unknown;
+};
+
+function parseBindingConfigObject(value: unknown): BindingConfigObject | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return null;
   }
-  const record: Record<string, unknown> = {};
+  const record: BindingConfigObject = {};
   for (const [key, entryValue] of Object.entries(value)) {
     record[key] = entryValue;
   }
@@ -58,7 +62,7 @@ export function runDefinitionBindingWriteValidation(input: {
   let parsedTargetConfig: Record<string, unknown>;
   try {
     const targetConfigCandidate = input.definition.targetConfigSchema.parse(input.target.config);
-    const targetConfigRecord = toUnknownRecord(targetConfigCandidate);
+    const targetConfigRecord = parseBindingConfigObject(targetConfigCandidate);
     if (targetConfigRecord === null) {
       throw new Error("Target config must be an object.");
     }
@@ -83,7 +87,7 @@ export function runDefinitionBindingWriteValidation(input: {
   let parsedBindingConfig: Record<string, unknown>;
   try {
     const bindingConfigCandidate = input.definition.bindingConfigSchema.parse(input.binding.config);
-    const bindingConfigRecord = toUnknownRecord(bindingConfigCandidate);
+    const bindingConfigRecord = parseBindingConfigObject(bindingConfigCandidate);
     if (bindingConfigRecord === null) {
       throw new Error("Binding config must be an object.");
     }
@@ -110,7 +114,7 @@ export function runDefinitionBindingWriteValidation(input: {
     const connectionConfigCandidate = input.definition.connectionConfigSchema
       ? input.definition.connectionConfigSchema.parse(input.connection.config)
       : input.connection.config;
-    const connectionConfigRecord = toUnknownRecord(connectionConfigCandidate);
+    const connectionConfigRecord = parseBindingConfigObject(connectionConfigCandidate);
     if (connectionConfigRecord === null) {
       throw new Error("Connection config must be an object.");
     }

@@ -43,7 +43,11 @@ const CodexInitializeClientInfo = {
   version: "0.1.0",
 } as const;
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+type CodexPayloadObject = {
+  [key: string]: unknown;
+};
+
+function isCodexPayloadObject(value: unknown): value is CodexPayloadObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -55,7 +59,7 @@ function readNestedString(value: unknown, path: readonly string[]): string | nul
 function readNestedValue(value: unknown, path: readonly string[]): unknown {
   let currentValue: unknown = value;
   for (const segment of path) {
-    if (!isRecord(currentValue) || !(segment in currentValue)) {
+    if (!isCodexPayloadObject(currentValue) || !(segment in currentValue)) {
       return null;
     }
     currentValue = currentValue[segment];
@@ -65,7 +69,7 @@ function readNestedValue(value: unknown, path: readonly string[]): unknown {
 }
 
 function normalizeThreadStatus(statusValue: unknown): ProviderInspectConversationOutput["status"] {
-  if (!isRecord(statusValue) || typeof statusValue.type !== "string") {
+  if (!isCodexPayloadObject(statusValue) || typeof statusValue.type !== "string") {
     throw new ConversationProviderError({
       code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
       message: "Codex inspect did not return thread.status.type.",
@@ -132,7 +136,7 @@ function readCodexRequestFailureCause(error: unknown): CodexRequestFailureCause 
     return null;
   }
 
-  if (!isRecord(error.cause)) {
+  if (!isCodexPayloadObject(error.cause)) {
     return null;
   }
 
@@ -282,7 +286,7 @@ async function initializeCodexSession(rpcClient: CodexJsonRpcClient): Promise<vo
     },
   );
   await rpcClient.notify("initialized", {});
-  if (!isRecord(initializeResult) || typeof initializeResult.userAgent !== "string") {
+  if (!isCodexPayloadObject(initializeResult) || typeof initializeResult.userAgent !== "string") {
     throw new ConversationProviderError({
       code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
       message: "Codex initialize response did not include userAgent.",

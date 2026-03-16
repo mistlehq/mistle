@@ -17,12 +17,16 @@ import {
 
 const registry = createIntegrationRegistry();
 
-function toUnknownRecord(value: unknown): Record<string, unknown> | null {
+type OauthHandlerObject = {
+  [key: string]: unknown;
+};
+
+function parseOauthHandlerObject(value: unknown): OauthHandlerObject | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
     return null;
   }
 
-  const record: Record<string, unknown> = {};
+  const record: OauthHandlerObject = {};
   for (const [key, entryValue] of Object.entries(value)) {
     record[key] = entryValue;
   }
@@ -30,8 +34,8 @@ function toUnknownRecord(value: unknown): Record<string, unknown> | null {
   return record;
 }
 
-function toStringRecord(value: unknown): Record<string, string> | null {
-  const record = toUnknownRecord(value);
+function parseOauthSecretRecord(value: unknown): Record<string, string> | null {
+  const record = parseOauthHandlerObject(value);
   if (record === null) {
     return null;
   }
@@ -126,7 +130,7 @@ export async function resolveOauthHandlerTargetOrThrow(
   let parsedConfig: Record<string, unknown>;
   try {
     const parsedConfigCandidate = definition.targetConfigSchema.parse(target.config);
-    const targetConfigRecord = toUnknownRecord(parsedConfigCandidate);
+    const targetConfigRecord = parseOauthHandlerObject(parsedConfigCandidate);
     if (targetConfigRecord === null) {
       throw new Error("Target config must be an object.");
     }
@@ -145,7 +149,7 @@ export async function resolveOauthHandlerTargetOrThrow(
   let parsedSecrets: Record<string, string>;
   try {
     const parsedSecretsCandidate = definition.targetSecretSchema.parse(targetSecrets);
-    const targetSecretsRecord = toStringRecord(parsedSecretsCandidate);
+    const targetSecretsRecord = parseOauthSecretRecord(parsedSecretsCandidate);
     if (targetSecretsRecord === null) {
       throw new Error("Target secrets must be a string record.");
     }

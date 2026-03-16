@@ -27,12 +27,12 @@ const CI_DEFAULTS: ConfigRecord = {
   },
 };
 
-function isRecord(value: unknown): value is ConfigRecord {
+function isConfigObjectNode(value: unknown): value is ConfigRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function asRecord(value: unknown): ConfigRecord {
-  if (!isRecord(value)) {
+function coerceConfigObjectNode(value: unknown): ConfigRecord {
+  if (!isConfigObjectNode(value)) {
     return {};
   }
 
@@ -44,7 +44,7 @@ function deepClone(value: unknown): unknown {
     return value.map((item) => deepClone(item));
   }
 
-  if (isRecord(value)) {
+  if (isConfigObjectNode(value)) {
     const clonedEntries: [string, unknown][] = [];
 
     for (const [key, entryValue] of Object.entries(value)) {
@@ -63,7 +63,7 @@ function mergeRecords(base: ConfigRecord, override: ConfigRecord): ConfigRecord 
   for (const [key, overrideValue] of Object.entries(override)) {
     const baseValue = merged[key];
 
-    if (isRecord(baseValue) && isRecord(overrideValue)) {
+    if (isConfigObjectNode(baseValue) && isConfigObjectNode(overrideValue)) {
       merged[key] = mergeRecords(baseValue, overrideValue);
       continue;
     }
@@ -84,7 +84,7 @@ function main(): void {
   }
 
   const sampleContent = readFileSync(SAMPLE_PATH, "utf8");
-  const sampleConfig = asRecord(parseToml(sampleContent));
+  const sampleConfig = coerceConfigObjectNode(parseToml(sampleContent));
   const ciConfig = mergeRecords(sampleConfig, CI_DEFAULTS);
   const ciContent = `${GENERATED_HEADER}${stringifyToml(ciConfig)}`;
 

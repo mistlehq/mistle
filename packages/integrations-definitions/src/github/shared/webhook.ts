@@ -4,6 +4,7 @@ import type {
   IntegrationWebhookVerifyResult,
 } from "@mistle/integrations-core";
 import { verify } from "@octokit/webhooks-methods";
+import { z } from "zod";
 
 import { GitHubFamilyId } from "./constants.js";
 import type { GitHubTargetConfig } from "./target-config-schema.js";
@@ -12,10 +13,26 @@ import type { GitHubTargetSecrets } from "./target-secret-schema.js";
 const GitHubWebhookEventHeaderName = "x-github-event";
 const GitHubWebhookDeliveryHeaderName = "x-github-delivery";
 const GitHubWebhookSignatureHeaderName = "x-hub-signature-256";
+const GitHubWebhookPayloadSchema = z
+  .object({
+    installation: z
+      .object({
+        id: z.union([z.number().int(), z.string().trim().min(1)]),
+      })
+      .catchall(z.unknown())
+      .optional(),
+    action: z.string().trim().min(1).optional(),
+    comment: z
+      .object({
+        id: z.union([z.number().int(), z.string().trim().min(1)]).optional(),
+        created_at: z.string().trim().min(1).optional(),
+      })
+      .catchall(z.unknown())
+      .optional(),
+  })
+  .catchall(z.unknown());
 
-function isRecord(input: unknown): input is Record<string, unknown> {
-  return typeof input === "object" && input !== null;
-}
+type GitHubWebhookPayload = z.infer<typeof GitHubWebhookPayloadSchema>;
 
 function decodeRawBody(input: Uint8Array): string {
   return new TextDecoder().decode(input);
@@ -40,7 +57,7 @@ function resolveHeaderValue(input: {
   return undefined;
 }
 
-function parseJsonPayload(input: Uint8Array): Record<string, unknown> {
+function parseJsonPayload(input: Uint8Array): GitHubWebhookPayload {
   const decodedBody = decodeRawBody(input);
   let parsedPayload: unknown;
 
@@ -50,11 +67,12 @@ function parseJsonPayload(input: Uint8Array): Record<string, unknown> {
     throw new Error("GitHub webhook payload must be valid JSON.");
   }
 
-  if (!isRecord(parsedPayload)) {
+  const payloadResult = GitHubWebhookPayloadSchema.safeParse(parsedPayload);
+  if (!payloadResult.success) {
     throw new Error("GitHub webhook payload must be a JSON object.");
   }
 
-  return parsedPayload;
+  return payloadResult.data;
 }
 
 function resolveProviderEventType(input: Readonly<Record<string, string>>): string {
@@ -83,10 +101,9 @@ function resolveDeliveryId(input: Readonly<Record<string, string>>): string {
   return deliveryIdHeader.trim();
 }
 
-function resolveInstallationId(input: Record<string, unknown>): string {
+function resolveInstallationId(input: GitHubWebhookPayload): string {
   const installation = input.installation;
-
-  if (!isRecord(installation)) {
+  if (installation === undefined) {
     throw new Error("GitHub webhook payload is missing installation context.");
   }
 
@@ -102,17 +119,20 @@ function resolveInstallationId(input: Record<string, unknown>): string {
   throw new Error("GitHub webhook payload is missing installation.id.");
 }
 
-function resolveAction(input: Record<string, unknown>): string {
+function resolveAction(input: GitHubWebhookPayload): string {
   const action = input.action;
 
-  if (typeof action === "string" && action.trim().length > 0) {
-    return action.trim();
+  if (action !== undefined) {
+    return action;
   }
 
   return "unknown";
 }
 
-function resolveNumericIdentifier(input: Record<string, unknown>, key: string): string | null {
+function resolveNumericIdentifier(
+  input: GitHubWebhookPayload,
+  key: keyof GitHubWebhookPayload,
+): string | null {
   const value = input[key];
   if (typeof value === "number" && Number.isInteger(value) && value >= 0) {
     return value.toString().padStart(20, "0");
@@ -126,7 +146,10 @@ function resolveNumericIdentifier(input: Record<string, unknown>, key: string): 
   return null;
 }
 
-function resolveTimestampField(input: Record<string, unknown>, key: string): string | null {
+function resolveTimestampField(
+  input: GitHubWebhookPayload,
+  key: keyof GitHubWebhookPayload,
+): string | null {
   const value = input[key];
   if (typeof value !== "string" || value.trim().length === 0) {
     return null;
@@ -136,12 +159,12 @@ function resolveTimestampField(input: Record<string, unknown>, key: string): str
   return Number.isNaN(Date.parse(normalizedValue)) ? null : normalizedValue;
 }
 
-function resolveCommentOrdering(input: Record<string, unknown>): {
+function resolveCommentOrdering(input: GitHubWebhookPayload): {
   occurredAt?: string;
   sourceOrderKey?: string;
 } {
   const comment = input.comment;
-  if (!isRecord(comment)) {
+  if (comment === undefined) {
     return {};
   }
 

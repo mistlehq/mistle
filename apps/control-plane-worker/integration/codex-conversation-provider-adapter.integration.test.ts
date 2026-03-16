@@ -98,13 +98,13 @@ async function resolveIntegrationModel(connection: ProviderConnection): Promise<
     method: "model/list",
     params: {},
   });
-  if (!isRecord(modelListResult) || !Array.isArray(modelListResult.data)) {
+  if (!isCodexTestPayloadObject(modelListResult) || !Array.isArray(modelListResult.data)) {
     throw new Error("Codex model/list response did not include a data array.");
   }
 
   const availableModels: string[] = [];
   for (const modelEntry of modelListResult.data) {
-    if (!isRecord(modelEntry) || typeof modelEntry.model !== "string") {
+    if (!isCodexTestPayloadObject(modelEntry) || typeof modelEntry.model !== "string") {
       continue;
     }
     availableModels.push(modelEntry.model);
@@ -137,7 +137,11 @@ function toText(data: RawData): string {
   return Buffer.concat(data).toString("utf8");
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+type CodexTestPayloadObject = {
+  [key: string]: unknown;
+};
+
+function isCodexTestPayloadObject(value: unknown): value is CodexTestPayloadObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -150,7 +154,7 @@ function parseJsonRpcResponsePayload(data: RawData): JsonRpcResponsePayload | nu
   } catch {
     return null;
   }
-  if (!isRecord(parsedPayload)) {
+  if (!isCodexTestPayloadObject(parsedPayload)) {
     return null;
   }
 
@@ -159,7 +163,7 @@ function parseJsonRpcResponsePayload(data: RawData): JsonRpcResponsePayload | nu
   }
 
   if ("error" in parsedPayload) {
-    if (!isRecord(parsedPayload.error)) {
+    if (!isCodexTestPayloadObject(parsedPayload.error)) {
       return null;
     }
     if (
@@ -373,7 +377,10 @@ async function connectInitializedCodexConnection(wsUrl: string): Promise<Provide
       },
     },
   });
-  if (!isRecord(initializeResult) || typeof initializeResult.userAgent !== "string") {
+  if (
+    !isCodexTestPayloadObject(initializeResult) ||
+    typeof initializeResult.userAgent !== "string"
+  ) {
     await connection.close();
     throw new Error("Codex initialize response did not include userAgent.");
   }
@@ -403,22 +410,22 @@ function hasPersistedUserMessageText(input: {
   expectedText: string;
 }): boolean {
   const { threadReadResult, expectedText } = input;
-  if (!isRecord(threadReadResult)) {
+  if (!isCodexTestPayloadObject(threadReadResult)) {
     throw new Error("thread/read result must be an object.");
   }
   const thread = threadReadResult.thread;
-  if (!isRecord(thread) || !Array.isArray(thread.turns)) {
+  if (!isCodexTestPayloadObject(thread) || !Array.isArray(thread.turns)) {
     throw new Error("thread/read result.thread.turns must be an array.");
   }
 
   for (let turnIndex = thread.turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
     const turn = thread.turns[turnIndex];
-    if (!isRecord(turn) || !Array.isArray(turn.items)) {
+    if (!isCodexTestPayloadObject(turn) || !Array.isArray(turn.items)) {
       continue;
     }
     for (let itemIndex = turn.items.length - 1; itemIndex >= 0; itemIndex -= 1) {
       const item = turn.items[itemIndex];
-      if (!isRecord(item)) {
+      if (!isCodexTestPayloadObject(item)) {
         continue;
       }
       if (item.type !== "userMessage") {
@@ -428,7 +435,7 @@ function hasPersistedUserMessageText(input: {
         throw new Error("thread/read userMessage item must include content array.");
       }
       for (const contentItem of item.content) {
-        if (!isRecord(contentItem)) {
+        if (!isCodexTestPayloadObject(contentItem)) {
           continue;
         }
         if (contentItem.type !== "text" || typeof contentItem.text !== "string") {
@@ -449,22 +456,22 @@ function hasPersistedAgentMessageText(input: {
   expectedText: string;
 }): boolean {
   const { threadReadResult } = input;
-  if (!isRecord(threadReadResult)) {
+  if (!isCodexTestPayloadObject(threadReadResult)) {
     throw new Error("thread/read result must be an object.");
   }
   const thread = threadReadResult.thread;
-  if (!isRecord(thread) || !Array.isArray(thread.turns)) {
+  if (!isCodexTestPayloadObject(thread) || !Array.isArray(thread.turns)) {
     throw new Error("thread/read result.thread.turns must be an array.");
   }
 
   for (let turnIndex = thread.turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
     const turn = thread.turns[turnIndex];
-    if (!isRecord(turn) || !Array.isArray(turn.items)) {
+    if (!isCodexTestPayloadObject(turn) || !Array.isArray(turn.items)) {
       continue;
     }
     for (let itemIndex = turn.items.length - 1; itemIndex >= 0; itemIndex -= 1) {
       const item = turn.items[itemIndex];
-      if (!isRecord(item)) {
+      if (!isCodexTestPayloadObject(item)) {
         continue;
       }
       if (item.type !== "agentMessage" || typeof item.text !== "string") {
@@ -481,22 +488,22 @@ function hasPersistedAgentMessageText(input: {
 }
 
 function readLatestAgentMessageText(threadReadResult: unknown): string | null {
-  if (!isRecord(threadReadResult)) {
+  if (!isCodexTestPayloadObject(threadReadResult)) {
     throw new Error("thread/read result must be an object.");
   }
   const thread = threadReadResult.thread;
-  if (!isRecord(thread) || !Array.isArray(thread.turns)) {
+  if (!isCodexTestPayloadObject(thread) || !Array.isArray(thread.turns)) {
     throw new Error("thread/read result.thread.turns must be an array.");
   }
 
   for (let turnIndex = thread.turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
     const turn = thread.turns[turnIndex];
-    if (!isRecord(turn) || !Array.isArray(turn.items)) {
+    if (!isCodexTestPayloadObject(turn) || !Array.isArray(turn.items)) {
       continue;
     }
     for (let itemIndex = turn.items.length - 1; itemIndex >= 0; itemIndex -= 1) {
       const item = turn.items[itemIndex];
-      if (!isRecord(item)) {
+      if (!isCodexTestPayloadObject(item)) {
         continue;
       }
       if (item.type === "agentMessage" && typeof item.text === "string") {
@@ -509,17 +516,17 @@ function readLatestAgentMessageText(threadReadResult: unknown): string | null {
 }
 
 function readLatestTurnErrorMessage(threadReadResult: unknown): string | null {
-  if (!isRecord(threadReadResult)) {
+  if (!isCodexTestPayloadObject(threadReadResult)) {
     throw new Error("thread/read result must be an object.");
   }
   const thread = threadReadResult.thread;
-  if (!isRecord(thread) || !Array.isArray(thread.turns)) {
+  if (!isCodexTestPayloadObject(thread) || !Array.isArray(thread.turns)) {
     throw new Error("thread/read result.thread.turns must be an array.");
   }
 
   for (let turnIndex = thread.turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
     const turn = thread.turns[turnIndex];
-    if (!isRecord(turn) || !isRecord(turn.error)) {
+    if (!isCodexTestPayloadObject(turn) || !isCodexTestPayloadObject(turn.error)) {
       continue;
     }
     if (typeof turn.error.message === "string") {
@@ -570,11 +577,15 @@ async function waitForPromptToPersistInTurnHistory(input: {
 }
 
 function readThreadStatusType(threadReadResult: unknown): string {
-  if (!isRecord(threadReadResult)) {
+  if (!isCodexTestPayloadObject(threadReadResult)) {
     throw new Error("thread/read result must be an object.");
   }
   const thread = threadReadResult.thread;
-  if (!isRecord(thread) || !isRecord(thread.status) || typeof thread.status.type !== "string") {
+  if (
+    !isCodexTestPayloadObject(thread) ||
+    !isCodexTestPayloadObject(thread.status) ||
+    typeof thread.status.type !== "string"
+  ) {
     throw new Error("thread/read result.thread.status.type must be a string.");
   }
 
@@ -582,11 +593,11 @@ function readThreadStatusType(threadReadResult: unknown): string {
 }
 
 function readThreadRolloutPath(threadReadResult: unknown): string | null {
-  if (!isRecord(threadReadResult)) {
+  if (!isCodexTestPayloadObject(threadReadResult)) {
     throw new Error("thread/read result must be an object.");
   }
   const thread = threadReadResult.thread;
-  if (!isRecord(thread)) {
+  if (!isCodexTestPayloadObject(thread)) {
     throw new Error("thread/read result.thread must be an object.");
   }
   if (typeof thread.path !== "string" || thread.path.length === 0) {

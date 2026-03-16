@@ -26,10 +26,6 @@ function debugLog(message: string): void {
   console.error(`[run-integration] ${message}`);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 function parsePositiveInteger(input: {
   value: string | undefined;
   variableName: string;
@@ -59,7 +55,7 @@ function resolveDefaultTargetConcurrency(): number {
 }
 
 function readScriptsField(value: unknown): Record<string, string> | undefined {
-  if (!isRecord(value)) {
+  if (typeof value !== "object" || value === null) {
     return undefined;
   }
 
@@ -71,6 +67,10 @@ function readScriptsField(value: unknown): Record<string, string> | undefined {
     scripts[key] = fieldValue;
   }
   return scripts;
+}
+
+function readPackageJsonField(value: object, key: "name" | "scripts"): unknown {
+  return Object.getOwnPropertyDescriptor(value, key)?.value;
 }
 
 function parsePackageNameAndScripts(
@@ -86,12 +86,12 @@ function parsePackageNameAndScripts(
     );
   }
 
-  if (!isRecord(parsed)) {
+  if (typeof parsed !== "object" || parsed === null) {
     throw new Error(`Expected ${sourcePath} to contain a JSON object.`);
   }
 
-  const nameField = parsed["name"];
-  const scripts = readScriptsField(parsed["scripts"]);
+  const nameField = readPackageJsonField(parsed, "name");
+  const scripts = readScriptsField(readPackageJsonField(parsed, "scripts"));
 
   if (typeof nameField !== "string" || scripts === undefined) {
     return undefined;

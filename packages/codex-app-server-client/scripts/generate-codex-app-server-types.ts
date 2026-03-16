@@ -45,12 +45,16 @@ const GeneratedJsonSchemaOutputPath = resolve(
 );
 const ScriptUserAgent = "mistle-codex-app-server-types-generator";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+type GitHubReleaseApiObject = {
+  [key: string]: unknown;
+};
+
+function isGitHubReleaseApiObject(value: unknown): value is GitHubReleaseApiObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function parseGitHubReleaseAsset(value: unknown): GitHubReleaseAsset {
-  if (!isRecord(value)) {
+  if (!isGitHubReleaseApiObject(value)) {
     throw new Error("GitHub release asset payload must be an object.");
   }
 
@@ -71,7 +75,7 @@ function parseGitHubReleaseAsset(value: unknown): GitHubReleaseAsset {
 }
 
 function parseGitHubReleasePayload(value: unknown): GitHubRelease {
-  if (!isRecord(value)) {
+  if (!isGitHubReleaseApiObject(value)) {
     throw new Error("GitHub latest release payload must be an object.");
   }
 

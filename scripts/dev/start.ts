@@ -37,19 +37,15 @@ type RunInput = {
   stdio?: "inherit" | "pipe";
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function getValueAtPath(root: unknown, path: readonly string[]): unknown {
   let current: unknown = root;
 
   for (const segment of path) {
-    if (!isRecord(current)) {
+    if (typeof current !== "object" || current === null || Array.isArray(current)) {
       return undefined;
     }
 
-    current = current[segment];
+    current = Object.getOwnPropertyDescriptor(current, segment)?.value;
   }
 
   return current;

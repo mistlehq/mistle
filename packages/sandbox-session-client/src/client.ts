@@ -16,7 +16,6 @@ import {
   type SandboxSessionRuntime,
   type SandboxSessionSendGuarantee,
 } from "./runtime.js";
-import { isRecord } from "./shared/is-record.js";
 import type {
   JsonRpcErrorResponse,
   JsonRpcNotification,
@@ -38,6 +37,41 @@ export type SandboxSessionClientInput = {
 };
 
 type EventListener = (event: SandboxSessionEvent) => void;
+
+type StreamOpenControlMessageCandidate = {
+  type?: unknown;
+  streamId?: unknown;
+  code?: unknown;
+  message?: unknown;
+};
+
+type JsonRpcEnvelopeCandidate = {
+  id?: unknown;
+  method?: unknown;
+  result?: unknown;
+  error?: unknown;
+  params?: unknown;
+};
+
+type JsonRpcErrorCandidate = {
+  code?: unknown;
+  message?: unknown;
+  data?: unknown;
+};
+
+function isStreamOpenControlMessageCandidate(
+  value: unknown,
+): value is StreamOpenControlMessageCandidate {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isJsonRpcEnvelopeCandidate(value: unknown): value is JsonRpcEnvelopeCandidate {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isJsonRpcErrorCandidate(value: unknown): value is JsonRpcErrorCandidate {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 function readString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
@@ -71,7 +105,7 @@ export function parseStreamOpenControlMessage(
     return null;
   }
 
-  if (!isRecord(parsedPayload)) {
+  if (!isStreamOpenControlMessageCandidate(parsedPayload)) {
     return null;
   }
 
@@ -107,7 +141,7 @@ export function parseStreamOpenControlMessage(
 }
 
 export function parseJsonRpcSuccessResponse(value: unknown): JsonRpcSuccessResponse | null {
-  if (!isRecord(value) || !("result" in value)) {
+  if (!isJsonRpcEnvelopeCandidate(value) || !("result" in value)) {
     return null;
   }
 
@@ -123,13 +157,13 @@ export function parseJsonRpcSuccessResponse(value: unknown): JsonRpcSuccessRespo
 }
 
 export function parseJsonRpcErrorResponse(value: unknown): JsonRpcErrorResponse | null {
-  if (!isRecord(value)) {
+  if (!isJsonRpcEnvelopeCandidate(value)) {
     return null;
   }
 
   const id = readJsonRpcId(value.id);
   const error = value.error;
-  if (id === null || !isRecord(error)) {
+  if (id === null || !isJsonRpcErrorCandidate(error)) {
     return null;
   }
 
@@ -150,7 +184,7 @@ export function parseJsonRpcErrorResponse(value: unknown): JsonRpcErrorResponse 
 }
 
 export function parseJsonRpcNotification(value: unknown): JsonRpcNotification | null {
-  if (!isRecord(value) || "id" in value) {
+  if (!isJsonRpcEnvelopeCandidate(value) || "id" in value) {
     return null;
   }
 
@@ -166,7 +200,7 @@ export function parseJsonRpcNotification(value: unknown): JsonRpcNotification | 
 }
 
 export function parseJsonRpcServerRequest(value: unknown): JsonRpcServerRequest | null {
-  if (!isRecord(value)) {
+  if (!isJsonRpcEnvelopeCandidate(value)) {
     return null;
   }
 

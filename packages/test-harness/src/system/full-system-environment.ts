@@ -43,10 +43,6 @@ const SANDBOX_BASE_IMAGE_DOCKER_TARGET = "sandbox-base-dev";
 
 const execFileAsync = promisify(execFile);
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 type SharedPostgresOptions = Omit<
   StartPostgresWithPgBouncerInput,
   (typeof OMITTED_POSTGRES_OPTIONS)[number]
@@ -107,11 +103,11 @@ function createDatabaseUrl(input: {
 }
 
 function readErrorString(error: unknown, key: "stdout" | "stderr"): string {
-  if (!isRecord(error)) {
+  if (typeof error !== "object" || error === null || Array.isArray(error)) {
     return "";
   }
 
-  const value = error[key];
+  const value = Object.getOwnPropertyDescriptor(error, key)?.value;
   if (typeof value === "string") {
     return value.trim();
   }

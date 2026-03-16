@@ -7,14 +7,16 @@ import type {
   ResolvedIntegrationMcpServer,
 } from "../types/index.js";
 
-type ObjectRecord = Record<string, unknown>;
+type McpConfigObject = {
+  [key: string]: unknown;
+};
 
-function isObjectRecord(input: unknown): input is ObjectRecord {
+function isMcpConfigObject(input: unknown): input is McpConfigObject {
   return typeof input === "object" && input !== null && !Array.isArray(input);
 }
 
-function assertObjectRecord(input: unknown, message: string): ObjectRecord {
-  if (!isObjectRecord(input)) {
+function assertMcpConfigObject(input: unknown, message: string): McpConfigObject {
+  if (!isMcpConfigObject(input)) {
     throw new IntegrationCompilerError(CompilerErrorCodes.MCP_CONFLICT, message);
   }
 
@@ -22,7 +24,7 @@ function assertObjectRecord(input: unknown, message: string): ObjectRecord {
 }
 
 function setObjectValueAtPath(input: {
-  root: ObjectRecord;
+  root: McpConfigObject;
   path: ReadonlyArray<string>;
   value: unknown;
   invalidPathMessage: string;
@@ -39,7 +41,7 @@ function setObjectValueAtPath(input: {
 
   const existingValue = input.root[firstKey];
   if (existingValue === undefined) {
-    const nextValue: ObjectRecord = {};
+    const nextValue: McpConfigObject = {};
     input.root[firstKey] = nextValue;
     setObjectValueAtPath({
       root: nextValue,
@@ -50,7 +52,7 @@ function setObjectValueAtPath(input: {
     return;
   }
 
-  if (!isObjectRecord(existingValue)) {
+  if (!isMcpConfigObject(existingValue)) {
     throw new IntegrationCompilerError(CompilerErrorCodes.MCP_CONFLICT, input.invalidPathMessage);
   }
 
@@ -65,9 +67,9 @@ function setObjectValueAtPath(input: {
 function createMcpServerConfig(input: {
   server: ResolvedIntegrationMcpServer["server"];
   format: IntegrationMcpConfig["format"];
-}): ObjectRecord {
+}): McpConfigObject {
   if (input.server.transport === "stdio") {
-    const config: ObjectRecord = {};
+    const config: McpConfigObject = {};
 
     if (input.server.command !== undefined) {
       config.command = input.server.command;
@@ -84,7 +86,7 @@ function createMcpServerConfig(input: {
     return config;
   }
 
-  const config: ObjectRecord = {};
+  const config: McpConfigObject = {};
 
   if (input.server.url !== undefined) {
     config.url = input.server.url;
@@ -102,8 +104,8 @@ function createMcpServerConfig(input: {
 function createMcpConfigValue(input: {
   mcpServers: ReadonlyArray<ResolvedIntegrationMcpServer>;
   format: IntegrationMcpConfig["format"];
-}): ObjectRecord {
-  const mcpConfigValue: ObjectRecord = {};
+}): McpConfigObject {
+  const mcpConfigValue: McpConfigObject = {};
 
   for (const mcpServer of input.mcpServers) {
     mcpConfigValue[mcpServer.server.serverName] = createMcpServerConfig({
@@ -131,7 +133,7 @@ function replaceJsonMcpConfig(input: {
     );
   }
 
-  const root = assertObjectRecord(
+  const root = assertMcpConfigObject(
     parsedContent,
     `MCP config target '${input.mcpConfig.fileId}' must contain a JSON object.`,
   );
@@ -165,7 +167,7 @@ function replaceTomlMcpConfig(input: {
     );
   }
 
-  const root = assertObjectRecord(
+  const root = assertMcpConfigObject(
     parsedContent,
     `MCP config target '${input.mcpConfig.fileId}' must contain a TOML table.`,
   );

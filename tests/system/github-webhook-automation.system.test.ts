@@ -265,7 +265,11 @@ async function waitForCondition<T>(input: {
   throw new Error(`Timed out waiting for ${input.description} after ${String(input.timeoutMs)}ms.`);
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+type GitHubWebhookTestObject = {
+  [key: string]: unknown;
+};
+
+function isGitHubWebhookTestObject(value: unknown): value is GitHubWebhookTestObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
@@ -273,29 +277,33 @@ function hasPersistedUserMessageText(input: {
   threadReadResult: unknown;
   expectedSubstring: string;
 }): boolean {
-  if (!isRecord(input.threadReadResult)) {
+  if (!isGitHubWebhookTestObject(input.threadReadResult)) {
     throw new Error("thread/read result must be an object.");
   }
 
   const thread = input.threadReadResult.thread;
-  if (!isRecord(thread) || !Array.isArray(thread.turns)) {
+  if (!isGitHubWebhookTestObject(thread) || !Array.isArray(thread.turns)) {
     throw new Error("thread/read result.thread.turns must be an array.");
   }
 
   for (let turnIndex = thread.turns.length - 1; turnIndex >= 0; turnIndex -= 1) {
     const turn = thread.turns[turnIndex];
-    if (!isRecord(turn) || !Array.isArray(turn.items)) {
+    if (!isGitHubWebhookTestObject(turn) || !Array.isArray(turn.items)) {
       continue;
     }
 
     for (let itemIndex = turn.items.length - 1; itemIndex >= 0; itemIndex -= 1) {
       const item = turn.items[itemIndex];
-      if (!isRecord(item) || item.type !== "userMessage" || !Array.isArray(item.content)) {
+      if (
+        !isGitHubWebhookTestObject(item) ||
+        item.type !== "userMessage" ||
+        !Array.isArray(item.content)
+      ) {
         continue;
       }
 
       for (const contentItem of item.content) {
-        if (!isRecord(contentItem)) {
+        if (!isGitHubWebhookTestObject(contentItem)) {
           continue;
         }
         if (contentItem.type !== "text" || typeof contentItem.text !== "string") {
@@ -551,7 +559,9 @@ describeIf("system GitHub webhook automation", () => {
             });
 
             for (const event of events) {
-              const comment = isRecord(event.payload.comment) ? event.payload.comment : null;
+              const comment = isGitHubWebhookTestObject(event.payload.comment)
+                ? event.payload.comment
+                : null;
               const body = comment === null ? null : comment.body;
               if (
                 event.eventType === "github.issue_comment.created" &&
