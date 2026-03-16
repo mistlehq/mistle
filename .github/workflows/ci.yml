@@ -31,16 +31,18 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
-      - name: Cache pnpm store
-        uses: actions/cache@v5
+      - name: Restore pnpm store cache
+        id: static-pnpm-store-cache
+        uses: actions/cache/restore@v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - name: Cache Turbo local cache
-        uses: actions/cache@v5
+      - name: Restore Turbo local cache
+        id: static-turbo-cache
+        uses: actions/cache/restore@v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
@@ -51,6 +53,13 @@ jobs:
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
 
+      - name: Save pnpm store cache
+        if: steps.static-pnpm-store-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Generate CI config
         run: nix develop --command pnpm run config:init:ci
 
@@ -60,6 +69,13 @@ jobs:
 
       - name: Run static checks in Nix shell
         run: nix develop --command bash -lc "pnpm format:check && pnpm lint && pnpm typecheck"
+
+      - name: Save Turbo local cache
+        if: ${{ always() && !cancelled() && steps.static-turbo-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
 
   test:
     name: Test
@@ -78,16 +94,18 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
-      - name: Cache pnpm store
-        uses: actions/cache@v5
+      - name: Restore pnpm store cache
+        id: test-pnpm-store-cache
+        uses: actions/cache/restore@v5
         with:
           path: ~/.local/share/pnpm/store
           key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-store-
 
-      - name: Cache Turbo local cache
-        uses: actions/cache@v5
+      - name: Restore Turbo local cache
+        id: test-turbo-cache
+        uses: actions/cache/restore@v5
         with:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
@@ -98,8 +116,22 @@ jobs:
       - name: Install dependencies in Nix shell
         run: nix develop --command pnpm install --frozen-lockfile
 
+      - name: Save pnpm store cache
+        if: steps.test-pnpm-store-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/.local/share/pnpm/store
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+
       - name: Generate CI config
         run: nix develop --command pnpm run config:init:ci
 
       - name: Run tests in Nix shell
         run: nix develop --command pnpm test
+
+      - name: Save Turbo local cache
+        if: ${{ always() && !cancelled() && steps.test-turbo-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: .turbo/cache
+          key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
