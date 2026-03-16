@@ -9,6 +9,7 @@ export type RuleListener = Record<string, NodeListener | undefined> & {
   VariableDeclarator?: NodeListener;
   MethodDefinition?: NodeListener;
   TSTypeAliasDeclaration?: NodeListener;
+  TSInterfaceDeclaration?: NodeListener;
   TSTypePredicate?: NodeListener;
   ImportDeclaration?: NodeListener;
 };

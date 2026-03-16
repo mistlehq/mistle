@@ -67,6 +67,11 @@ type TSTypeReferenceNode = {
   typeArguments: TSTypeParameterInstantiationNode | null;
 };
 
+type TSTypeLiteralNode = {
+  type: "TSTypeLiteral";
+  members: unknown[];
+};
+
 type TSTypeParameterInstantiationNode = {
   type: "TSTypeParameterInstantiation";
   params: unknown[];
@@ -80,6 +85,27 @@ type TSTypeAliasDeclarationNode = {
   type: "TSTypeAliasDeclaration";
   id: IdentifierNode;
   typeAnnotation: unknown;
+};
+
+type TSInterfaceBodyNode = {
+  type: "TSInterfaceBody";
+  body: unknown[];
+};
+
+type TSInterfaceDeclarationNode = {
+  type: "TSInterfaceDeclaration";
+  id: IdentifierNode;
+  body: unknown;
+};
+
+type TSIndexSignatureNode = {
+  type: "TSIndexSignature";
+  parameters: unknown[];
+  typeAnnotation?: TSTypeAnnotationNode | null;
+};
+
+type IdentifierWithTypeAnnotationNode = IdentifierNode & {
+  typeAnnotation?: TSTypeAnnotationNode | null;
 };
 
 type ImportDeclarationNode = {
@@ -130,6 +156,10 @@ function isTSTypeReferenceNode(node: unknown): node is TSTypeReferenceNode {
   return isAstNodeObject(node) && node.type === "TSTypeReference" && "typeName" in node;
 }
 
+function isTSTypeLiteralNode(node: unknown): node is TSTypeLiteralNode {
+  return isAstNodeObject(node) && node.type === "TSTypeLiteral" && Array.isArray(node.members);
+}
+
 function isTSTypeParameterInstantiationNode(
   node: unknown,
 ): node is TSTypeParameterInstantiationNode {
@@ -148,6 +178,31 @@ function isTSTypeAliasDeclarationNode(node: unknown): node is TSTypeAliasDeclara
   return (
     isAstNodeObject(node) && node.type === "TSTypeAliasDeclaration" && isIdentifierNode(node.id)
   );
+}
+
+function isTSInterfaceBodyNode(node: unknown): node is TSInterfaceBodyNode {
+  return isAstNodeObject(node) && node.type === "TSInterfaceBody" && Array.isArray(node.body);
+}
+
+function isTSInterfaceDeclarationNode(node: unknown): node is TSInterfaceDeclarationNode {
+  return (
+    isAstNodeObject(node) &&
+    node.type === "TSInterfaceDeclaration" &&
+    isIdentifierNode(node.id) &&
+    "body" in node
+  );
+}
+
+function isTSIndexSignatureNode(node: unknown): node is TSIndexSignatureNode {
+  return (
+    isAstNodeObject(node) && node.type === "TSIndexSignature" && Array.isArray(node.parameters)
+  );
+}
+
+function isIdentifierWithTypeAnnotationNode(
+  node: unknown,
+): node is IdentifierWithTypeAnnotationNode {
+  return isIdentifierNode(node);
 }
 
 function isImportDeclarationNode(node: unknown): node is ImportDeclarationNode {
@@ -181,7 +236,7 @@ function isGenericRecordTypeAnnotation(node: unknown): boolean {
     return false;
   }
 
-  return isRecordTypeReference(node.typeAnnotation);
+  return isGenericObjectTypeNode(node.typeAnnotation, new Set<string>());
 }
 
 function isGenericRecordTypePredicate(node: unknown): boolean {
@@ -190,6 +245,56 @@ function isGenericRecordTypePredicate(node: unknown): boolean {
   }
 
   return isGenericRecordTypeAnnotation(node.typeAnnotation);
+}
+
+function isStringIndexSignatureNode(node: unknown): boolean {
+  if (!isTSIndexSignatureNode(node) || node.parameters.length !== 1) {
+    return false;
+  }
+
+  const [parameter] = node.parameters;
+  if (!isIdentifierWithTypeAnnotationNode(parameter) || parameter.typeAnnotation === undefined) {
+    return false;
+  }
+
+  const parameterTypeAnnotation = parameter.typeAnnotation;
+  if (
+    !isTSTypeAnnotationNode(parameterTypeAnnotation) ||
+    !isStringKeywordNode(parameterTypeAnnotation.typeAnnotation)
+  ) {
+    return false;
+  }
+
+  return (
+    node.typeAnnotation !== undefined &&
+    node.typeAnnotation !== null &&
+    isTSTypeAnnotationNode(node.typeAnnotation) &&
+    isTSUnknownKeywordNode(node.typeAnnotation.typeAnnotation)
+  );
+}
+
+function hasGenericUnknownObjectIndexSignature(members: readonly unknown[]): boolean {
+  return members.some((member) => isStringIndexSignatureNode(member));
+}
+
+function isGenericObjectTypeNode(
+  node: unknown,
+  genericObjectTypeNames: ReadonlySet<string>,
+): boolean {
+  if (isRecordTypeReference(node)) {
+    return true;
+  }
+
+  if (isTSTypeLiteralNode(node)) {
+    return hasGenericUnknownObjectIndexSignature(node.members);
+  }
+
+  if (!isTSTypeReferenceNode(node)) {
+    return false;
+  }
+
+  const typeName = readIdentifierName(node.typeName);
+  return typeName !== null && genericObjectTypeNames.has(typeName);
 }
 
 function reportBannedHelperName(context: RuleContext, node: unknown, name: string): void {
@@ -208,14 +313,19 @@ function reportGenericRecordReturnType(
   context: RuleContext,
   node: unknown,
   returnType: unknown,
+  genericObjectTypeNames: ReadonlySet<string>,
 ): void {
-  if (!isGenericRecordTypePredicate(returnType)) {
+  if (!isTSTypeAnnotationNode(returnType)) {
+    return;
+  }
+
+  if (!isGenericObjectTypeNode(returnType.typeAnnotation, genericObjectTypeNames)) {
     return;
   }
 
   context.report({
     node,
-    messageId: "bannedGenericRecordPredicate",
+    messageId: "bannedGenericObjectReturnType",
   });
 }
 
@@ -232,6 +342,10 @@ const NoGenericRecordHelpersRule: RuleModule = {
         "Avoid the generic '{{name}}' alias. Use Zod at boundaries or a domain-specific named shape instead.",
       bannedGenericImport:
         "Avoid shared generic record utilities. Inline the check or use a domain-specific local helper.",
+      bannedGenericObjectReturnType:
+        "Avoid returning generic unknown-object map types. Push normalization to a boundary or use a domain-specific type.",
+      bannedGenericObjectType:
+        "Avoid generic unknown-object map type '{{name}}'. Push normalization to a boundary or use a domain-specific type.",
       bannedGenericRecordPredicate:
         "Avoid type predicates to Record<string, unknown>. Use an inline check or a domain-specific named shape.",
       bannedHelperName:
@@ -239,6 +353,8 @@ const NoGenericRecordHelpersRule: RuleModule = {
     },
   },
   create(context: RuleContext): RuleListener {
+    const genericObjectTypeNames = new Set<string>();
+
     return {
       FunctionDeclaration(node): void {
         if (!isFunctionLikeNode(node)) {
@@ -250,7 +366,7 @@ const NoGenericRecordHelpersRule: RuleModule = {
           reportBannedHelperName(context, node, name);
         }
 
-        reportGenericRecordReturnType(context, node, node.returnType);
+        reportGenericRecordReturnType(context, node, node.returnType, genericObjectTypeNames);
       },
       VariableDeclarator(node): void {
         if (!isVariableDeclaratorNode(node)) {
@@ -263,7 +379,12 @@ const NoGenericRecordHelpersRule: RuleModule = {
         }
 
         if (isFunctionLikeNode(node.init)) {
-          reportGenericRecordReturnType(context, node.init, node.init.returnType);
+          reportGenericRecordReturnType(
+            context,
+            node.init,
+            node.init.returnType,
+            genericObjectTypeNames,
+          );
         }
       },
       MethodDefinition(node): void {
@@ -277,7 +398,12 @@ const NoGenericRecordHelpersRule: RuleModule = {
         }
 
         if (isFunctionLikeNode(node.value)) {
-          reportGenericRecordReturnType(context, node.value, node.value.returnType);
+          reportGenericRecordReturnType(
+            context,
+            node.value,
+            node.value.returnType,
+            genericObjectTypeNames,
+          );
         }
       },
       TSTypeAliasDeclaration(node): void {
@@ -285,13 +411,38 @@ const NoGenericRecordHelpersRule: RuleModule = {
           return;
         }
 
-        if (!BannedAliasNames.has(node.id.name)) {
+        if (BannedAliasNames.has(node.id.name)) {
+          context.report({
+            node,
+            messageId: "bannedAliasName",
+            data: { name: node.id.name },
+          });
+        }
+
+        if (!isGenericObjectTypeNode(node.typeAnnotation, genericObjectTypeNames)) {
           return;
         }
 
+        genericObjectTypeNames.add(node.id.name);
         context.report({
           node,
-          messageId: "bannedAliasName",
+          messageId: "bannedGenericObjectType",
+          data: { name: node.id.name },
+        });
+      },
+      TSInterfaceDeclaration(node): void {
+        if (!isTSInterfaceDeclarationNode(node) || !isTSInterfaceBodyNode(node.body)) {
+          return;
+        }
+
+        if (!hasGenericUnknownObjectIndexSignature(node.body.body)) {
+          return;
+        }
+
+        genericObjectTypeNames.add(node.id.name);
+        context.report({
+          node,
+          messageId: "bannedGenericObjectType",
           data: { name: node.id.name },
         });
       },
