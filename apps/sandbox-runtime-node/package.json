@@ -4,8 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/main.ts",
+    "dev:bootstrap": "tsx watch src/bootstrap/main.ts",
     "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
     "start": "node dist/main.js",
+    "start:bootstrap": "node dist/bootstrap/main.js",
     "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
     "typecheck": "tsgo --noEmit",
     "test": "vitest run -c vitest.config.ts --passWithNoTests",
