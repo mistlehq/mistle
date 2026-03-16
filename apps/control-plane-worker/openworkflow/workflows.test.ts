@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 import { HandleAutomationConversationDeliveryWorkflow } from "./handle-automation-conversation-delivery/workflow.js";
 import { HandleAutomationRunWorkflow } from "./handle-automation-run.js";
 import { HandleIntegrationWebhookEventWorkflow } from "./handle-integration-webhook-event.js";
-import { RequestDeleteSandboxProfileWorkflow } from "./request-delete-sandbox-profile.js";
+import { RequestDeleteSandboxProfileWorkflow } from "./request-delete-sandbox-profile/workflow.js";
 import { SendOrganizationInvitationWorkflow } from "./send-organization-invitation.js";
 import { SendVerificationOTPWorkflow } from "./send-verification-otp.js";
 import { StartSandboxProfileInstanceWorkflow } from "./start-sandbox-profile-instance/workflow.js";
