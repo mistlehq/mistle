@@ -50,17 +50,17 @@ import {
   AutomationConversationDeliveryTaskActions,
   resolveAutomationConversationDeliveryTaskAction,
 } from "../openworkflow/handle-automation-conversation-delivery/resolve-automation-conversation-delivery-task-action.js";
-import { HandleAutomationRunWorkflow } from "../openworkflow/handle-automation-run.js";
+import { handoffAutomationRunDelivery } from "../openworkflow/handle-automation-run/handoff-automation-run-delivery.js";
+import { transitionAutomationRunToRunning } from "../openworkflow/handle-automation-run/transition-automation-run-to-running.js";
+import { HandleAutomationRunWorkflow } from "../openworkflow/handle-automation-run/workflow.js";
 import {
   markAutomationRunFailed,
   markAutomationRunIgnored,
 } from "../openworkflow/shared/automation-run.js";
 import {
-  handoffAutomationRunDelivery,
   prepareAutomationRun,
   resolveAutomationRunFailure,
-  transitionAutomationRunToRunning,
-} from "../src/runtime/workflows/index.js";
+} from "../src/runtime/workflows/automation-run.js";
 import { withOpenWorkflowRuntime } from "./openworkflow-test-support.js";
 import { it } from "./test-context.js";
 

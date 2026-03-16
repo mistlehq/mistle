@@ -2,49 +2,26 @@ import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-
 import {
   automationRuns,
   AutomationRunStatuses,
-  type AutomationRunStatus,
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   AutomationConversationCreatedByKinds,
   AutomationConversationOwnerKinds,
   IntegrationBindingKinds,
 } from "@mistle/db/control-plane";
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { renderTemplateString } from "../automations/index.js";
 import type {
   EnsuredAutomationSandbox,
   HandleAutomationRunWorkflowInput,
-  HandoffAutomationRunDeliveryInput,
   PreparedAutomationRun,
 } from "../workflow-types.js";
-import {
-  claimAutomationConversation,
-  enqueueAutomationConversationDeliveryTask,
-  ensureAutomationConversationDeliveryProcessor,
-} from "./persistence/index.js";
-
-export type HandoffAutomationRunDeliveryOutput = {
-  conversationId: string;
-  generation: number;
-  shouldStart: boolean;
-};
+import { claimAutomationConversation } from "./persistence/index.js";
 
 export type EnsureAutomationSandboxDependencies = {
   db: ControlPlaneDatabase;
   controlPlaneInternalClient: Pick<ControlPlaneInternalClient, "startSandboxProfileInstance">;
 };
-
-export type TransitionAutomationRunToRunningOutput = {
-  shouldProcess: boolean;
-};
-
-const TerminalAutomationRunStatuses = new Set<AutomationRunStatus>([
-  AutomationRunStatuses.COMPLETED,
-  AutomationRunStatuses.FAILED,
-  AutomationRunStatuses.IGNORED,
-  AutomationRunStatuses.DUPLICATE,
-]);
 
 export const AutomationRunFailureCodes = {
   AUTOMATION_RUN_NOT_FOUND: "automation_run_not_found",
@@ -101,62 +78,6 @@ export function resolveAutomationRunFailure(input: unknown): { code: string; mes
     code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
     message: "Automation run execution failed with a non-error exception.",
   };
-}
-
-export async function transitionAutomationRunToRunning(
-  ctx: {
-    db: ControlPlaneDatabase;
-  },
-  input: HandleAutomationRunWorkflowInput,
-): Promise<TransitionAutomationRunToRunningOutput> {
-  const transitionedRows = await ctx.db
-    .update(automationRuns)
-    .set({
-      status: AutomationRunStatuses.RUNNING,
-      startedAt: sql`now()`,
-      updatedAt: sql`now()`,
-    })
-    .where(
-      and(
-        eq(automationRuns.id, input.automationRunId),
-        eq(automationRuns.status, AutomationRunStatuses.QUEUED),
-      ),
-    )
-    .returning();
-
-  const transitionedRun = transitionedRows[0];
-  if (transitionedRun !== undefined) {
-    return {
-      shouldProcess: true,
-    };
-  }
-
-  const existingRun = await ctx.db.query.automationRuns.findFirst({
-    where: (table, { eq: whereEq }) => whereEq(table.id, input.automationRunId),
-  });
-  if (existingRun === undefined) {
-    throw new AutomationRunExecutionError({
-      code: AutomationRunFailureCodes.AUTOMATION_RUN_NOT_FOUND,
-      message: `Automation run '${input.automationRunId}' was not found.`,
-    });
-  }
-
-  if (TerminalAutomationRunStatuses.has(existingRun.status)) {
-    return {
-      shouldProcess: false,
-    };
-  }
-
-  if (existingRun.status === AutomationRunStatuses.RUNNING) {
-    return {
-      shouldProcess: true,
-    };
-  }
-
-  throw new AutomationRunExecutionError({
-    code: AutomationRunFailureCodes.AUTOMATION_RUN_EXECUTION_FAILED,
-    message: `Automation run '${input.automationRunId}' is in unsupported status '${existingRun.status}'.`,
-  });
 }
 
 function compileTemplates(input: {
@@ -589,34 +510,6 @@ export async function prepareAutomationRun(
     renderedConversationKey: compiledTemplates.renderedConversationKey,
     renderedIdempotencyKey: compiledTemplates.renderedIdempotencyKey,
   };
-}
-
-export async function handoffAutomationRunDelivery(
-  ctx: {
-    db: ControlPlaneDatabase;
-  },
-  input: HandoffAutomationRunDeliveryInput,
-): Promise<HandoffAutomationRunDeliveryOutput> {
-  const enqueuedTask = await enqueueAutomationConversationDeliveryTask(
-    {
-      db: ctx.db,
-    },
-    {
-      conversationId: input.preparedAutomationRun.conversationId,
-      automationRunId: input.preparedAutomationRun.automationRunId,
-      sourceWebhookEventId: input.preparedAutomationRun.webhookEventId,
-      sourceOrderKey: input.preparedAutomationRun.webhookSourceOrderKey,
-    },
-  );
-
-  return ensureAutomationConversationDeliveryProcessor(
-    {
-      db: ctx.db,
-    },
-    {
-      conversationId: enqueuedTask.conversationId,
-    },
-  );
 }
 
 export async function ensureAutomationSandbox(

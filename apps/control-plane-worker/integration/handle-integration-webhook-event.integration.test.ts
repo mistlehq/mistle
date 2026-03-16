@@ -36,6 +36,7 @@ import {
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
+import { transitionAutomationRunToRunning } from "../openworkflow/handle-automation-run/transition-automation-run-to-running.js";
 import { markIntegrationWebhookEventFailed } from "../openworkflow/handle-integration-webhook-event/mark-integration-webhook-event-failed.js";
 import { markIntegrationWebhookEventProcessed } from "../openworkflow/handle-integration-webhook-event/mark-integration-webhook-event-processed.js";
 import { prepareIntegrationWebhookEvent } from "../openworkflow/handle-integration-webhook-event/prepare-integration-webhook-event.js";
@@ -47,8 +48,7 @@ import {
 import {
   prepareAutomationRun,
   resolveAutomationRunFailure,
-  transitionAutomationRunToRunning,
-} from "../src/runtime/workflows/index.js";
+} from "../src/runtime/workflows/automation-run.js";
 import { withOpenWorkflowRuntime } from "./openworkflow-test-support.js";
 import { it } from "./test-context.js";
 

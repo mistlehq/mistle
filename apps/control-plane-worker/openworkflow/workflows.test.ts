@@ -11,7 +11,7 @@ import {
 import { describe, expect, it } from "vitest";
 
 import { HandleAutomationConversationDeliveryWorkflow } from "./handle-automation-conversation-delivery/workflow.js";
-import { HandleAutomationRunWorkflow } from "./handle-automation-run.js";
+import { HandleAutomationRunWorkflow } from "./handle-automation-run/workflow.js";
 import { HandleIntegrationWebhookEventWorkflow } from "./handle-integration-webhook-event/workflow.js";
 import { RequestDeleteSandboxProfileWorkflow } from "./request-delete-sandbox-profile/workflow.js";
 import { SendOrganizationInvitationWorkflow } from "./send-organization-invitation.js";
