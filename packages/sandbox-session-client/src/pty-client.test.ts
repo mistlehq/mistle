@@ -93,6 +93,22 @@ async function waitForEventLoopTurn(): Promise<void> {
   });
 }
 
+async function expectNoServerMessageWithin(
+  server: PtyTestServer,
+  timeoutMs: number,
+): Promise<void> {
+  await expect(
+    Promise.race([
+      server.waitForNextMessage().then((message) => {
+        throw new Error(`Expected no server message, but received ${JSON.stringify(message)}.`);
+      }),
+      new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, timeoutMs);
+      }),
+    ]),
+  ).resolves.toBeUndefined();
+}
+
 function toUint8Array(data: RawData): Uint8Array {
   if (typeof data === "string") {
     return new TextEncoder().encode(data);
@@ -593,6 +609,7 @@ describe("SandboxPtyClient", () => {
         rows: 24,
       }),
     ).rejects.toThrowError("Sandbox PTY open size must use positive integer rows and columns.");
+    await expectNoServerMessageWithin(server, 20);
   });
 
   it("rejects resize before the PTY stream is open", async () => {
@@ -648,6 +665,7 @@ describe("SandboxPtyClient", () => {
         rows: 24,
       }),
     ).rejects.toThrowError("Sandbox PTY resize must use positive integer rows and columns.");
+    await expectNoServerMessageWithin(server, 20);
   });
 
   it("sends PTY resize signals for the active stream", async () => {
