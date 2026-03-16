@@ -133,6 +133,7 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
       detachClientListeners();
       clientRef.current = null;
       clearConnectedSandboxInstanceId();
+      setPtyState(SandboxPtyStates.CLOSED);
     }
   }, [clearConnectedSandboxInstanceId, detachClientListeners]);
 
@@ -215,8 +216,14 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
         connectedSandboxInstanceIdRef.current = input.sandboxInstanceId;
         setConnectedSandboxInstanceId(input.sandboxInstanceId);
       } catch (error) {
-        if (clientRef.current === client) {
-          clientRef.current = null;
+        try {
+          await client.disconnect();
+        } catch {
+          // Preserve the original PTY open failure.
+        } finally {
+          if (clientRef.current === client) {
+            clientRef.current = null;
+          }
         }
 
         const resolvedError =
