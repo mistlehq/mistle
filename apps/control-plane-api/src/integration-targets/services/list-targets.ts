@@ -56,6 +56,7 @@ function resolveTargetMetadata(input: {
     label: string;
     kind: "api-key" | "oauth2" | "redirect";
   }[];
+  supportedWebhookEvents?: IntegrationTargetListItem["supportedWebhookEvents"];
 } {
   const definition = IntegrationRegistry.getDefinition({
     familyId: input.familyId,
@@ -86,6 +87,13 @@ function resolveTargetMetadata(input: {
           label: method.label,
           kind: method.kind,
         })),
+        ...(definition.supportedWebhookEvents === undefined
+          ? {}
+          : {
+              supportedWebhookEvents: definition.supportedWebhookEvents.map((eventDefinition) => ({
+                ...eventDefinition,
+              })),
+            }),
       };
     }
 
@@ -103,6 +111,13 @@ function resolveTargetMetadata(input: {
       label: method.label,
       kind: method.kind,
     })),
+    ...(definition.supportedWebhookEvents === undefined
+      ? {}
+      : {
+          supportedWebhookEvents: definition.supportedWebhookEvents.map((eventDefinition) => ({
+            ...eventDefinition,
+          })),
+        }),
   };
 }
 
@@ -214,6 +229,9 @@ export async function listIntegrationTargets(
           ...(resolvedMetadata.connectionMethods === undefined
             ? {}
             : { connectionMethods: resolvedMetadata.connectionMethods }),
+          ...(resolvedMetadata.supportedWebhookEvents === undefined
+            ? {}
+            : { supportedWebhookEvents: resolvedMetadata.supportedWebhookEvents }),
           targetHealth: projectedTargetUi.targetHealth,
           ...(target.displayNameOverride === null
             ? {}

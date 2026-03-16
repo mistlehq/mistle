@@ -1966,6 +1966,12 @@ export interface paths {
                 enabled: boolean;
                 familyId: string;
                 logoKey?: string;
+                supportedWebhookEvents?: {
+                  category?: string;
+                  displayName: string;
+                  eventType: string;
+                  providerEventType: string;
+                }[];
                 targetHealth: {
                   /** @enum {string} */
                   configStatus: "valid" | "invalid";

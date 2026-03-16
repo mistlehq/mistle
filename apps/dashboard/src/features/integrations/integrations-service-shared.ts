@@ -31,6 +31,18 @@ export const IntegrationTargetSchema = z
       )
       .min(1)
       .optional(),
+    supportedWebhookEvents: z
+      .array(
+        z
+          .object({
+            eventType: z.string().min(1),
+            providerEventType: z.string().min(1),
+            displayName: z.string().min(1),
+            category: z.string().min(1).optional(),
+          })
+          .strict(),
+      )
+      .optional(),
     displayNameOverride: z.string().min(1).optional(),
     descriptionOverride: z.string().min(1).optional(),
     targetHealth: z

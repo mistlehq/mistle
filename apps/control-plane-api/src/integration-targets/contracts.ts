@@ -14,6 +14,15 @@ const IntegrationConnectionMethodSchema = z
   })
   .strict();
 
+export const IntegrationWebhookEventDefinitionSchema = z
+  .object({
+    eventType: z.string().min(1),
+    providerEventType: z.string().min(1),
+    displayName: z.string().min(1),
+    category: z.string().min(1).optional(),
+  })
+  .strict();
+
 export const IntegrationTargetSchema = z
   .object({
     targetKey: z.string().min(1),
@@ -25,6 +34,7 @@ export const IntegrationTargetSchema = z
     description: z.string().min(1),
     logoKey: z.string().min(1).optional(),
     connectionMethods: z.array(IntegrationConnectionMethodSchema).min(1).optional(),
+    supportedWebhookEvents: z.array(IntegrationWebhookEventDefinitionSchema).optional(),
     displayNameOverride: z.string().min(1).optional(),
     descriptionOverride: z.string().min(1).optional(),
     targetHealth: z

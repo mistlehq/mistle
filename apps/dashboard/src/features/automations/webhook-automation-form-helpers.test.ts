@@ -18,7 +18,11 @@ const SampleAutomation: WebhookAutomation = {
   conversationKeyTemplate: "{{event.repository.id}}",
   idempotencyKeyTemplate: null,
   eventTypes: ["push", "pull_request"],
-  payloadFilter: { action: "opened" },
+  payloadFilter: {
+    op: "eq",
+    path: ["action"],
+    value: "opened",
+  },
   target: {
     id: "target_123",
     sandboxProfileId: "sbp_repo",
@@ -38,7 +42,10 @@ describe("toWebhookAutomationFormValues", () => {
       inputTemplate: "",
       conversationKeyTemplate: "",
       idempotencyKeyTemplate: "",
-      eventTypesText: "",
+      eventTypes: [],
+      payloadFilterEditorMode: "builder",
+      payloadFilterBuilderMode: "all",
+      payloadFilterConditions: [],
       payloadFilterText: "",
     });
   });
@@ -52,8 +59,28 @@ describe("toWebhookAutomationFormValues", () => {
       inputTemplate: '{"ref":"{{event.ref}}"}',
       conversationKeyTemplate: "{{event.repository.id}}",
       idempotencyKeyTemplate: "",
-      eventTypesText: "push,pull_request",
-      payloadFilterText: JSON.stringify({ action: "opened" }, null, 2),
+      eventTypes: ["push", "pull_request"],
+      payloadFilterEditorMode: "builder",
+      payloadFilterBuilderMode: "all",
+      payloadFilterConditions: [
+        {
+          id: "condition_0",
+          pathText: "action",
+          operator: "eq",
+          valueType: "string",
+          valueText: "opened",
+          valuesText: "",
+        },
+      ],
+      payloadFilterText: JSON.stringify(
+        {
+          op: "eq",
+          path: ["action"],
+          value: "opened",
+        },
+        null,
+        2,
+      ),
     });
   });
 });
@@ -69,7 +96,19 @@ describe("validateWebhookAutomationFormValues", () => {
         inputTemplate: "",
         conversationKeyTemplate: "",
         idempotencyKeyTemplate: "",
-        eventTypesText: "",
+        eventTypes: [],
+        payloadFilterEditorMode: "builder",
+        payloadFilterBuilderMode: "all",
+        payloadFilterConditions: [
+          {
+            id: "condition_0",
+            pathText: "",
+            operator: "contains",
+            valueType: "string",
+            valueText: "",
+            valuesText: "",
+          },
+        ],
         payloadFilterText: "[]",
       }),
     ).toEqual({
@@ -78,7 +117,8 @@ describe("validateWebhookAutomationFormValues", () => {
       sandboxProfileId: "Select a sandbox profile.",
       inputTemplate: "Input template is required.",
       conversationKeyTemplate: "Conversation key template is required.",
-      payloadFilterText: "Payload filter must be a JSON object.",
+      payloadFilterText:
+        "Conditions must include a field path and valid value for the selected operator.",
     });
   });
 });
@@ -94,8 +134,20 @@ describe("automation payload transforms", () => {
         inputTemplate: '{"ref":"{{event.ref}}"}',
         conversationKeyTemplate: "{{event.repository.id}}",
         idempotencyKeyTemplate: " ",
-        eventTypesText: "push, pull_request",
-        payloadFilterText: '{\n  "action": "opened"\n}',
+        eventTypes: ["push", "pull_request"],
+        payloadFilterEditorMode: "builder",
+        payloadFilterBuilderMode: "all",
+        payloadFilterConditions: [
+          {
+            id: "condition_0",
+            pathText: "action",
+            operator: "eq",
+            valueType: "string",
+            valueText: "opened",
+            valuesText: "",
+          },
+        ],
+        payloadFilterText: "",
       }),
     ).toEqual({
       name: "GitHub pushes to repo triage",
@@ -105,7 +157,11 @@ describe("automation payload transforms", () => {
       conversationKeyTemplate: "{{event.repository.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["push", "pull_request"],
-      payloadFilter: { action: "opened" },
+      payloadFilter: {
+        op: "eq",
+        path: ["action"],
+        value: "opened",
+      },
       target: {
         sandboxProfileId: "sbp_repo",
       },
@@ -122,7 +178,10 @@ describe("automation payload transforms", () => {
         inputTemplate: "{}",
         conversationKeyTemplate: "{{event.id}}",
         idempotencyKeyTemplate: "",
-        eventTypesText: "",
+        eventTypes: [],
+        payloadFilterEditorMode: "builder",
+        payloadFilterBuilderMode: "all",
+        payloadFilterConditions: [],
         payloadFilterText: "",
       }),
     ).toEqual({
@@ -134,6 +193,42 @@ describe("automation payload transforms", () => {
       idempotencyKeyTemplate: null,
       eventTypes: null,
       payloadFilter: null,
+      target: {
+        sandboxProfileId: "sbp_repo",
+      },
+    });
+  });
+
+  it("builds the update payload from raw JSON when the JSON editor is selected", () => {
+    expect(
+      toUpdateWebhookAutomationPayload({
+        name: "Issue comments routing",
+        integrationConnectionId: "conn_github",
+        sandboxProfileId: "sbp_repo",
+        enabled: true,
+        inputTemplate: "{}",
+        conversationKeyTemplate: "{{event.id}}",
+        idempotencyKeyTemplate: "",
+        eventTypes: ["push"],
+        payloadFilterEditorMode: "json",
+        payloadFilterBuilderMode: "all",
+        payloadFilterConditions: [],
+        payloadFilterText:
+          '{\n  "op": "contains",\n  "path": ["repository", "full_name"],\n  "value": "mistle"\n}',
+      }),
+    ).toEqual({
+      name: "Issue comments routing",
+      enabled: true,
+      integrationConnectionId: "conn_github",
+      inputTemplate: "{}",
+      conversationKeyTemplate: "{{event.id}}",
+      idempotencyKeyTemplate: null,
+      eventTypes: ["push"],
+      payloadFilter: {
+        op: "contains",
+        path: ["repository", "full_name"],
+        value: "mistle",
+      },
       target: {
         sandboxProfileId: "sbp_repo",
       },

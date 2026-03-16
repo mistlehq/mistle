@@ -40,6 +40,29 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
       "Integration definition logoKey must be non-empty.",
     );
   }
+
+  for (const supportedWebhookEvent of input.supportedWebhookEvents ?? []) {
+    if (supportedWebhookEvent.eventType.trim().length === 0) {
+      throw new IntegrationDefinitionRegistryError(
+        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        "Integration definition supportedWebhookEvents[*].eventType must be non-empty.",
+      );
+    }
+
+    if (supportedWebhookEvent.providerEventType.trim().length === 0) {
+      throw new IntegrationDefinitionRegistryError(
+        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        "Integration definition supportedWebhookEvents[*].providerEventType must be non-empty.",
+      );
+    }
+
+    if (supportedWebhookEvent.displayName.trim().length === 0) {
+      throw new IntegrationDefinitionRegistryError(
+        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        "Integration definition supportedWebhookEvents[*].displayName must be non-empty.",
+      );
+    }
+  }
 }
 
 export class IntegrationRegistry implements IntegrationDefinitionResolver {

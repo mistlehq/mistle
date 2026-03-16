@@ -3,7 +3,10 @@ import type {
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
-import type { WebhookAutomationFormOption } from "./webhook-automation-form.js";
+import type {
+  WebhookAutomationEventOption,
+  WebhookAutomationFormOption,
+} from "./webhook-automation-form.js";
 import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-view.js";
 import type { WebhookAutomation } from "./webhook-automations-types.js";
 
@@ -103,6 +106,70 @@ export function buildWebhookAutomationSandboxProfileOptions(input: {
       description: profile.status,
     })),
   );
+}
+
+export function buildWebhookAutomationEventOptions(input: {
+  connections: readonly IntegrationConnection[];
+  targets: readonly IntegrationTarget[];
+  preservedConnectionId?: string;
+  selectedEventTypes: readonly string[];
+}): readonly WebhookAutomationEventOption[] {
+  const selectedEventTypes = new Set(input.selectedEventTypes);
+  const eligibleConnections = input.connections.filter(
+    (connection) => connection.status === "active" || connection.id === input.preservedConnectionId,
+  );
+  const eligibleTargetKeys = new Set(eligibleConnections.map((connection) => connection.targetKey));
+  const supportedEventOptionsByType = new Map<string, WebhookAutomationEventOption>();
+
+  for (const target of input.targets) {
+    if (!eligibleTargetKeys.has(target.targetKey)) {
+      continue;
+    }
+
+    for (const eventDefinition of target.supportedWebhookEvents ?? []) {
+      if (supportedEventOptionsByType.has(eventDefinition.eventType)) {
+        continue;
+      }
+
+      supportedEventOptionsByType.set(eventDefinition.eventType, {
+        value: eventDefinition.eventType,
+        label: eventDefinition.displayName,
+        ...(target.logoKey === undefined ? {} : { logoKey: target.logoKey }),
+        ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
+      });
+    }
+  }
+
+  const supportedEventOptions = Array.from(supportedEventOptionsByType.values());
+  const missingEventOptions = input.selectedEventTypes
+    .filter(
+      (selectedEventType) =>
+        !supportedEventOptions.some((eventOption) => eventOption.value === selectedEventType),
+    )
+    .map((selectedEventType) => ({
+      value: selectedEventType,
+      label: selectedEventType,
+      description: "No longer available from your connected integrations.",
+      category: "Unavailable",
+      unavailable: true,
+    }));
+
+  return [...supportedEventOptions, ...missingEventOptions].sort((left, right) => {
+    const leftSelected = selectedEventTypes.has(left.value);
+    const rightSelected = selectedEventTypes.has(right.value);
+    if (leftSelected !== rightSelected) {
+      return leftSelected ? -1 : 1;
+    }
+
+    const leftCategory = left.category ?? "";
+    const rightCategory = right.category ?? "";
+    const categoryComparison = leftCategory.localeCompare(rightCategory);
+    if (categoryComparison !== 0) {
+      return categoryComparison;
+    }
+
+    return left.label.localeCompare(right.label);
+  });
 }
 
 export function buildWebhookAutomationListItems(input: {

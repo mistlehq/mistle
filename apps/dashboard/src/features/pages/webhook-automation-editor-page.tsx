@@ -66,6 +66,7 @@ export function WebhookAutomationEditorPage(
             onSubmit={state.onSubmit}
             onValueChange={state.onValueChange}
             sandboxProfileOptions={state.sandboxProfileOptions}
+            webhookEventOptions={state.webhookEventOptions}
             values={state.values}
           />
 

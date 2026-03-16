@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { useWebhookAutomationPrerequisites } from "./use-webhook-automation-prerequisites.js";
@@ -9,7 +9,11 @@ import {
   toWebhookAutomationFormValues,
   validateWebhookAutomationFormValues,
 } from "./webhook-automation-form-helpers.js";
-import type { WebhookAutomationFormValues } from "./webhook-automation-form.js";
+import type {
+  PayloadFilterConditionDraft,
+  WebhookAutomationFormValues,
+} from "./webhook-automation-form.js";
+import { buildWebhookAutomationEventOptions } from "./webhook-automation-list-helpers.js";
 import {
   AUTOMATIONS_QUERY_KEY_PREFIX,
   webhookAutomationDetailQueryKey,
@@ -49,6 +53,13 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
     label: string;
     description?: string;
   }[];
+  webhookEventOptions: readonly {
+    value: string;
+    label: string;
+    description?: string;
+    category?: string;
+    unavailable?: boolean;
+  }[];
   values: WebhookAutomationFormValues;
   fieldErrors: Partial<Record<keyof WebhookAutomationFormValues, string>>;
   formError: string | null;
@@ -62,7 +73,10 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
   onRequestDelete: (() => void) | null;
   onConfirmDelete: () => void;
   onSubmit: () => void;
-  onValueChange: (key: keyof WebhookAutomationFormValues, value: string | boolean) => void;
+  onValueChange: (
+    key: keyof WebhookAutomationFormValues,
+    value: string | boolean | string[] | PayloadFilterConditionDraft[],
+  ) => void;
 } {
   const queryClient = useQueryClient();
   const automationQuery = useQuery({
@@ -100,6 +114,22 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
   const [formError, setFormError] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const webhookEventOptions = useMemo(
+    () =>
+      prerequisites.integrationDirectoryQuery.data === undefined
+        ? []
+        : buildWebhookAutomationEventOptions({
+            connections: prerequisites.integrationDirectoryQuery.data.connections,
+            targets: prerequisites.integrationDirectoryQuery.data.targets,
+            preservedConnectionId: formValues.integrationConnectionId,
+            selectedEventTypes: formValues.eventTypes,
+          }),
+    [
+      formValues.eventTypes,
+      formValues.integrationConnectionId,
+      prerequisites.integrationDirectoryQuery.data,
+    ],
+  );
 
   const createMutation = useMutation({
     mutationFn: async (values: WebhookAutomationFormValues) =>
@@ -187,7 +217,10 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
     }
   }, [automationQuery.data, input.mode]);
 
-  function onValueChange(key: keyof WebhookAutomationFormValues, value: string | boolean): void {
+  function onValueChange(
+    key: keyof WebhookAutomationFormValues,
+    value: string | boolean | string[] | PayloadFilterConditionDraft[],
+  ): void {
     setFormValues((currentValues) => ({
       ...currentValues,
       [key]: value,
@@ -243,6 +276,7 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
   return {
     connectionOptions: prerequisites.connectionOptions,
     sandboxProfileOptions: prerequisites.sandboxProfileOptions,
+    webhookEventOptions,
     values: formValues,
     fieldErrors,
     formError,

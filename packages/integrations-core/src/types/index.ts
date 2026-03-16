@@ -952,6 +952,13 @@ export type IntegrationMcpConfig = {
   path: ReadonlyArray<string>;
 };
 
+export type IntegrationWebhookEventDefinition = {
+  eventType: string;
+  providerEventType: string;
+  displayName: string;
+  category?: string | undefined;
+};
+
 export type IntegrationDefinition<
   TTargetConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
     Record<string, unknown>
@@ -1010,6 +1017,7 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>
   >;
+  supportedWebhookEvents?: ReadonlyArray<IntegrationWebhookEventDefinition>;
   webhookHandler?: IntegrationWebhookHandler<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,

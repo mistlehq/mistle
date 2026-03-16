@@ -3650,6 +3650,32 @@
                             },
                             "minItems": 1
                           },
+                          "supportedWebhookEvents": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "eventType": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "providerEventType": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "displayName": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "category": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": ["eventType", "providerEventType", "displayName"],
+                              "additionalProperties": false
+                            }
+                          },
                           "displayNameOverride": {
                             "type": "string",
                             "minLength": 1

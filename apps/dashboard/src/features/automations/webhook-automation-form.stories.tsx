@@ -4,6 +4,7 @@ import { useState } from "react";
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
 import {
   WebhookAutomationForm,
+  type WebhookAutomationEventOption,
   type WebhookAutomationFormOption,
   type WebhookAutomationFormValues,
   type WebhookAutomationFormValueKey,
@@ -35,6 +36,33 @@ const SandboxProfileOptions: readonly WebhookAutomationFormOption[] = [
   },
 ];
 
+const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
+  {
+    value: "github.issue_comment.created",
+    label: "Issue comment created",
+    category: "Issues",
+    logoKey: "github",
+  },
+  {
+    value: "github.issues.opened",
+    label: "Issue opened",
+    category: "Issues",
+    logoKey: "github",
+  },
+  {
+    value: "github.pull_request.opened",
+    label: "Pull request opened",
+    category: "Pull requests",
+    logoKey: "github",
+  },
+  {
+    value: "github.pull_request_review_comment.created",
+    label: "Pull request review comment created",
+    category: "Pull requests",
+    logoKey: "github",
+  },
+];
+
 const CreateValues: WebhookAutomationFormValues = {
   name: "GitHub pushes to repo triage",
   integrationConnectionId: "conn_github_prod",
@@ -43,8 +71,20 @@ const CreateValues: WebhookAutomationFormValues = {
   inputTemplate: '{\n  "repo": "{{payload.repository.full_name}}",\n  "ref": "{{payload.ref}}"\n}',
   conversationKeyTemplate: "{{payload.repository.full_name}}:{{payload.ref}}",
   idempotencyKeyTemplate: "{{delivery.id}}",
-  eventTypesText: "push,pull_request",
-  payloadFilterText: '{\n  "repository": "mistle"\n}',
+  eventTypes: ["github.pull_request.opened", "github.issue_comment.created"],
+  payloadFilterEditorMode: "builder",
+  payloadFilterBuilderMode: "all",
+  payloadFilterConditions: [
+    {
+      id: "condition_0",
+      pathText: "action",
+      operator: "eq",
+      valueType: "string",
+      valueText: "opened",
+      valuesText: "",
+    },
+  ],
+  payloadFilterText: '{\n  "op": "eq",\n  "path": [\n    "action"\n  ],\n  "value": "opened"\n}',
 };
 
 function StoryHarness(input: {
@@ -57,6 +97,7 @@ function StoryHarness(input: {
   onDelete?: (() => void) | null;
   connectionOptions?: readonly WebhookAutomationFormOption[];
   sandboxProfileOptions?: readonly WebhookAutomationFormOption[];
+  webhookEventOptions?: readonly WebhookAutomationEventOption[];
 }): React.JSX.Element {
   const [values, setValues] = useState(input.values);
 
@@ -77,6 +118,7 @@ function StoryHarness(input: {
         }));
       }}
       sandboxProfileOptions={input.sandboxProfileOptions ?? SandboxProfileOptions}
+      webhookEventOptions={input.webhookEventOptions ?? GitHubWebhookEventOptions}
       values={values}
     />
   );
@@ -109,11 +151,19 @@ export const Edit: Story = {
     values: {
       ...CreateValues,
       enabled: false,
-      eventTypesText: "payout.failed",
+      eventTypes: ["stripe.payout.failed"],
       name: "Stripe payouts incident intake",
       integrationConnectionId: "conn_stripe_prod",
       sandboxProfileId: "sbp_finance_investigator",
     },
+    webhookEventOptions: [
+      {
+        value: "stripe.payout.failed",
+        label: "Payout failed",
+        category: "Payouts",
+        logoKey: "stripe",
+      },
+    ],
   },
 };
 
@@ -132,11 +182,22 @@ export const ValidationErrors: Story = {
       name: "",
       integrationConnectionId: "",
       sandboxProfileId: "",
+      eventTypes: [],
+      payloadFilterConditions: [
+        {
+          id: "condition_0",
+          pathText: "",
+          operator: "eq",
+          valueType: "string",
+          valueText: "",
+          valuesText: "",
+        },
+      ],
     },
   },
 };
 
-export const NoConnectionsAvailable: Story = {
+export const NoConnectedIntegrations: Story = {
   args: {
     mode: "create",
     connectionOptions: [],
@@ -144,7 +205,9 @@ export const NoConnectionsAvailable: Story = {
     values: {
       ...CreateValues,
       integrationConnectionId: "",
+      eventTypes: [],
     },
+    webhookEventOptions: [],
   },
 };
 
@@ -155,5 +218,38 @@ export const Saving: Story = {
     isSaving: true,
     onDelete: function onDelete() {},
     values: CreateValues,
+  },
+};
+
+export const NoTriggersAvailable: Story = {
+  args: {
+    mode: "create",
+    values: {
+      ...CreateValues,
+      eventTypes: [],
+    },
+    webhookEventOptions: [],
+  },
+};
+
+export const UnavailableSavedEvent: Story = {
+  args: {
+    mode: "edit",
+    onDelete: function onDelete() {},
+    values: {
+      ...CreateValues,
+      eventTypes: ["github.issue_comment.created", "github.push.deleted"],
+    },
+    webhookEventOptions: [
+      ...GitHubWebhookEventOptions,
+      {
+        value: "github.push.deleted",
+        label: "github.push.deleted",
+        description: "No longer available from your connected integrations.",
+        category: "Unavailable",
+        logoKey: "github",
+        unavailable: true,
+      },
+    ],
   },
 };

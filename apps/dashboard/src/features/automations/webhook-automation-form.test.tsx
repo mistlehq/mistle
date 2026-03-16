@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   WebhookAutomationForm,
+  type WebhookAutomationEventOption,
   type WebhookAutomationFormOption,
   type WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
@@ -25,6 +26,21 @@ const SandboxProfileOptions: readonly WebhookAutomationFormOption[] = [
   },
 ];
 
+const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
+  {
+    value: "github.issue_comment.created",
+    label: "Issue comment created",
+    category: "Issues",
+    logoKey: "github",
+  },
+  {
+    value: "github.pull_request.opened",
+    label: "Pull request opened",
+    category: "Pull requests",
+    logoKey: "github",
+  },
+];
+
 const FormValues: WebhookAutomationFormValues = {
   name: "Repo triage",
   integrationConnectionId: "icn_01kkk1g84mfetvga8a4b853k27",
@@ -33,7 +49,10 @@ const FormValues: WebhookAutomationFormValues = {
   inputTemplate: "{}",
   conversationKeyTemplate: "{{payload.repository.full_name}}",
   idempotencyKeyTemplate: "",
-  eventTypesText: "push",
+  eventTypes: ["github.issue_comment.created"],
+  payloadFilterEditorMode: "builder",
+  payloadFilterBuilderMode: "all",
+  payloadFilterConditions: [],
   payloadFilterText: "",
 };
 
@@ -51,6 +70,7 @@ describe("WebhookAutomationForm", () => {
         onSubmit={() => {}}
         onValueChange={() => {}}
         sandboxProfileOptions={SandboxProfileOptions}
+        webhookEventOptions={WebhookEventOptions}
         values={FormValues}
       />,
     );
@@ -59,5 +79,27 @@ describe("WebhookAutomationForm", () => {
     expect(screen.getByText("Repo Maintainer")).toBeDefined();
     expect(screen.queryByText("icn_01kkk1g84mfetvga8a4b853k27")).toBeNull();
     expect(screen.queryByText("sbp_01kkk1mbmxfetvga8kcmw612jj")).toBeNull();
+  });
+
+  it("shows selected trigger event labels instead of raw event types", () => {
+    render(
+      <WebhookAutomationForm
+        connectionOptions={ConnectionOptions}
+        fieldErrors={{}}
+        formError={null}
+        isDeleting={false}
+        isSaving={false}
+        mode="create"
+        onDelete={null}
+        onSubmit={() => {}}
+        onValueChange={() => {}}
+        sandboxProfileOptions={SandboxProfileOptions}
+        webhookEventOptions={WebhookEventOptions}
+        values={FormValues}
+      />,
+    );
+
+    expect(screen.getAllByText("Issue comment created").length).toBeGreaterThan(0);
+    expect(screen.queryByText("github.issue_comment.created")).toBeNull();
   });
 });
