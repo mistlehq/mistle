@@ -2,12 +2,12 @@ import { sandboxProfiles, type ControlPlaneDatabase } from "@mistle/db/control-p
 import { and, eq } from "drizzle-orm";
 
 export async function deleteSandboxProfile(
-  deps: {
+  ctx: {
     db: ControlPlaneDatabase;
   },
   input: { organizationId: string; profileId: string },
 ): Promise<void> {
-  await deps.db
+  await ctx.db
     .delete(sandboxProfiles)
     .where(
       and(
