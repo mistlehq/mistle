@@ -174,6 +174,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
+          adapterKey: "openai-codex",
         },
       ],
     }),
@@ -449,6 +450,7 @@ describe("compileRuntimePlan", () => {
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server",
+        adapterKey: "openai-codex",
       },
     ]);
   });

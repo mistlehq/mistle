@@ -57,6 +57,7 @@ function createRuntimePlan() {
             runtimeKey: "runtime_123",
             clientId: "client_123",
             endpointKey: "endpoint_123",
+            adapterKey: "test-agent",
           },
         ],
       },

@@ -788,6 +788,13 @@ function validateAgentRuntimes(input: {
         );
       }
 
+      if (agentRuntime.adapterKey.trim().length === 0) {
+        throw new IntegrationCompilerError(
+          CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,
+          `Agent runtime '${agentRuntime.runtimeKey}' for binding '${agentRuntime.bindingId}' must define a non-empty adapterKey.`,
+        );
+      }
+
       if (!endpointKeys.has(agentRuntime.endpointKey)) {
         throw new IntegrationCompilerError(
           CompilerErrorCodes.AGENT_RUNTIME_CONFLICT,

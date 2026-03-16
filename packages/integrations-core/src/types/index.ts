@@ -710,6 +710,7 @@ export type CompileBindingAgentRuntime = {
   runtimeKey: string;
   clientId: string;
   endpointKey: string;
+  adapterKey: string;
 };
 
 export type CompiledAgentRuntime = CompileBindingAgentRuntime & {

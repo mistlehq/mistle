@@ -170,6 +170,7 @@ const RuntimePlanSchema = z.object({
       runtimeKey: z.string().min(1),
       clientId: z.string().min(1),
       endpointKey: z.string().min(1),
+      adapterKey: z.string().min(1),
     }),
   ),
 });
