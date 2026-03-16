@@ -4,7 +4,14 @@
     "builtin": true,
   },
   "plugins": ["eslint", "typescript", "node", "vitest"],
+  "jsPlugins": [
+    {
+      "name": "repo-language",
+      "specifier": "./scripts/oxlint/repo-language-plugin.ts",
+    },
+  ],
   "rules": {
+    "repo-language/no-generic-record-helpers": "error",
     "typescript/no-deprecated": "error",
     "eslint/no-restricted-imports": [
       "error",

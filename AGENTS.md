@@ -130,6 +130,11 @@
 - NEVER remove or downgrade code to fix type errors from outdated dependencies; upgrade the dependency instead.
 - Always ask before removing functionality or code that appears to be intentional.
 - If the app is for a browser, assume we use all modern browsers unless otherwise specified, we don't need most polyfills.
+- Use Zod at trust boundaries: parsed JSON, HTTP payloads, env/config input, storage payloads, webhook payloads, and other external data.
+- Do not add generic object-shape helpers such as `isRecord`, `isObjectRecord`, `toRecord`, `asRecord`, `resolveRecord`, `toUnknownRecord`, `asObjectRecord`, `UnknownRecord`, or `ObjectRecord`.
+- If a non-Zod object check is simple, inline it at the use site.
+- If a non-Zod object check is too complex to inline, extract a file-local helper named for the domain being checked rather than for the generic object operation.
+- File-local object guards should narrow to a domain-specific named shape, not `Record<string, unknown>`.
 - Avoid IIFEs; use module scope or named functions for one-off initialization.
 - Avoid unnecessary inline closures, especially in hot paths or render loops; prefer named functions when it improves clarity or stable references. Closures are fine when they make intent clearer.
 
