@@ -10,7 +10,7 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs { inherit system; };
-        nodejs = if pkgs ? nodejs_24 then pkgs.nodejs_24 else pkgs.nodejs;
+        nodejs = if pkgs ? nodejs_25 then pkgs.nodejs_25 else pkgs.nodejs;
         python = if pkgs ? python313 then pkgs.python313 else pkgs.python3;
       in
       {
