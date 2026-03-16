@@ -228,8 +228,13 @@ export class SandboxPtyClient {
         settled = true;
         cleanup();
         this.#socket = null;
-        this.#setErrorState(error);
+        if (this.#disconnectPromise !== null) {
+          this.#setState(SandboxPtyStates.CLOSED);
+        } else {
+          this.#setErrorState(error);
+        }
         socket.close();
+        this.#resolveDisconnectWaiters();
         reject(error);
       };
 
@@ -492,19 +497,16 @@ export class SandboxPtyClient {
     this.#pendingClose = null;
     if (pendingClose !== null) {
       pendingClose.timeoutTask.cancel();
-      pendingClose.resolve();
+      pendingClose.reject(
+        new Error("Sandbox PTY websocket closed before close confirmation was received."),
+      );
     }
 
     if (this.#state !== SandboxPtyStates.ERROR && this.#state !== SandboxPtyStates.CLOSED) {
       this.#setState(SandboxPtyStates.CLOSED);
     }
 
-    const disconnectResolve = this.#disconnectResolve;
-    this.#disconnectResolve = null;
-    this.#disconnectPromise = null;
-    if (disconnectResolve !== null) {
-      disconnectResolve();
-    }
+    this.#resolveDisconnectWaiters();
   };
 
   readonly #handleSocketError = (): void => {
@@ -755,6 +757,15 @@ export class SandboxPtyClient {
     this.#setState(SandboxPtyStates.ERROR);
     for (const listener of this.#errorListeners) {
       listener(error);
+    }
+  }
+
+  #resolveDisconnectWaiters(): void {
+    const disconnectResolve = this.#disconnectResolve;
+    this.#disconnectResolve = null;
+    this.#disconnectPromise = null;
+    if (disconnectResolve !== null) {
+      disconnectResolve();
     }
   }
 }

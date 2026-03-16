@@ -1,3 +1,5 @@
+import { createServer as createNetServer, type Socket as NetSocket } from "node:net";
+
 import {
   decodeDataFrame,
   DefaultStreamWindowBytes,
@@ -51,6 +53,11 @@ type PtyTestServer = {
   sendWindowUpdate: (input: { bytes: number; streamId: number }) => void;
   url: string;
   waitForNextMessage: () => Promise<ReceivedServerMessage>;
+};
+
+type HangingTcpServer = {
+  close: () => Promise<void>;
+  url: string;
 };
 
 function createDeferred<T>(): Deferred<T> {
@@ -306,6 +313,7 @@ async function startPtyTestServer(): Promise<PtyTestServer> {
 }
 
 const startedServers: PtyTestServer[] = [];
+const startedNetServers: HangingTcpServer[] = [];
 
 afterEach(async () => {
   while (startedServers.length > 0) {
@@ -314,7 +322,57 @@ afterEach(async () => {
       await server.close();
     }
   }
+
+  while (startedNetServers.length > 0) {
+    const server = startedNetServers.pop();
+    if (server !== undefined) {
+      await server.close();
+    }
+  }
 });
+
+async function startHangingTcpServer(): Promise<HangingTcpServer> {
+  const sockets = new Set<NetSocket>();
+  const server = createNetServer((socket) => {
+    sockets.add(socket);
+    socket.once("close", () => {
+      sockets.delete(socket);
+    });
+    socket.on("error", () => {});
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("listening", () => resolve());
+    server.once("error", (error) => reject(error));
+    server.listen(0, "127.0.0.1");
+  });
+
+  const address = server.address();
+  if (typeof address !== "object" || address === null) {
+    throw new Error("Expected TCP server to expose a socket address.");
+  }
+
+  return {
+    close: async () => {
+      for (const socket of sockets) {
+        socket.destroy();
+      }
+      sockets.clear();
+
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => {
+          if (error == null) {
+            resolve();
+            return;
+          }
+
+          reject(error);
+        });
+      });
+    },
+    url: `ws://127.0.0.1:${String(address.port)}`,
+  };
+}
 
 describe("SandboxPtyClient", () => {
   it("connects and opens a PTY stream successfully", async () => {
@@ -647,6 +705,36 @@ describe("SandboxPtyClient", () => {
     expect(client.streamId).toBeNull();
   });
 
+  it("rejects close when the websocket drops before pty.exit arrives", async () => {
+    const server = await startPtyTestServer();
+    startedServers.push(server);
+    const client = new SandboxPtyClient({
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+
+    await client.connect();
+    const openPromise = client.open({
+      cols: 80,
+      rows: 24,
+    });
+    await server.waitForNextMessage();
+    server.sendOpenOk(1);
+    await openPromise;
+
+    const closePromise = client.close();
+    await server.waitForNextMessage();
+    server.closeClientSocket();
+
+    await expect(closePromise).rejects.toThrowError(
+      "Sandbox PTY websocket closed before close confirmation was received.",
+    );
+    await client.disconnect();
+
+    expect(client.state).toBe(SandboxPtyStates.ERROR);
+    expect(client.streamId).toBeNull();
+  });
+
   it("rejects close when the runtime reports stream_close_failed", async () => {
     const server = await startPtyTestServer();
     startedServers.push(server);
@@ -960,6 +1048,26 @@ describe("SandboxPtyClient", () => {
     expect(client.state).toBe(SandboxPtyStates.CLOSED);
     expect(client.exitInfo).toBeNull();
     expect(exits).toEqual([]);
+  });
+
+  it("allows disconnect during connect without hanging", async () => {
+    const server = await startHangingTcpServer();
+    startedNetServers.push(server);
+    const client = new SandboxPtyClient({
+      connectTimeoutMs: 5_000,
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+
+    const connectPromise = client.connect();
+    await waitForEventLoopTurn();
+
+    await client.disconnect();
+
+    await expect(connectPromise).rejects.toThrowError(
+      /Sandbox PTY websocket connection (failed|closed before becoming ready)\./u,
+    );
+    expect(client.state).toBe(SandboxPtyStates.CLOSED);
   });
 
   it("surfaces malformed active-stream payloads as protocol errors", async () => {
