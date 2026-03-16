@@ -4,7 +4,7 @@ import type {
   ChatFileChangeEntry,
   ChatSemanticGroupEntry,
 } from "../chat/chat-types.js";
-import type { CodexSessionPageComposerProps } from "../pages/codex-session-page-view.js";
+import type { CodexSessionPaneComposerProps } from "../pages/codex-session-pane.js";
 import type {
   CodexCommandApprovalRequestEntry,
   CodexFileChangeApprovalRequestEntry,
@@ -830,7 +830,7 @@ export const CodexStoryPanelEntries: readonly CodexServerRequestEntry[] = [
 
 export const CodexStorySessionServerRequests: readonly CodexServerRequestEntry[] = [];
 
-export const CodexStorySessionComposerProps: CodexSessionPageComposerProps = {
+export const CodexStorySessionComposerProps: CodexSessionPaneComposerProps = {
   composerText: "Focus on dashboard asset ownership next.",
   modelOptions: [
     { value: "gpt-5", label: "GPT-5" },

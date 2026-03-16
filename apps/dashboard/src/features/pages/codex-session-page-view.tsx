@@ -1,12 +1,16 @@
-import { Alert, AlertDescription, AlertTitle } from "@mistle/ui";
-
 import type { ChatEntry } from "../chat/chat-types.js";
-import { ChatComposer } from "../chat/components/chat-composer.js";
-import { ChatThread } from "../chat/components/chat-thread.js";
-import { CodexServerRequestsPanel } from "../codex-client/codex-server-requests-panel.js";
 import type { CodexServerRequestEntry } from "../codex-client/codex-server-requests-state.js";
+import {
+  CodexSessionPaneBottomPanel,
+  CodexSessionPaneMainContent,
+  type CodexSessionPaneComposerProps,
+} from "./codex-session-pane.js";
+import {
+  SessionWorkbenchPageView,
+  type SessionWorkbenchAlert,
+} from "./session-workbench-page-view.js";
 
-export type CodexSessionPageComposerProps = React.ComponentProps<typeof ChatComposer>;
+export type CodexSessionPageComposerProps = CodexSessionPaneComposerProps;
 
 type CodexSessionPageViewProps = {
   sandboxInstanceId: string | null;
@@ -33,66 +37,48 @@ export function CodexSessionPageView({
   onRespondToServerRequest,
   composerProps,
 }: CodexSessionPageViewProps): React.JSX.Element {
-  if (sandboxInstanceId === null) {
-    return (
-      <Alert variant="destructive">
-        <AlertTitle>Session id is missing</AlertTitle>
-        <AlertDescription>Open a session from the Sessions page.</AlertDescription>
-      </Alert>
-    );
+  const alerts: SessionWorkbenchAlert[] = [];
+  if (sandboxStatusErrorMessage !== null) {
+    alerts.push({
+      title: "Could not load sandbox status",
+      description: sandboxStatusErrorMessage,
+    });
+  }
+  if (startErrorMessage !== null) {
+    alerts.push({
+      title: "Session connection error",
+      description: startErrorMessage,
+    });
+  }
+  if (sandboxFailureMessage !== null) {
+    alerts.push({
+      title: "Sandbox failed",
+      description: sandboxFailureMessage,
+    });
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      {hasTopAlert ? (
-        <div className="mx-auto flex w-full max-w-3xl flex-none flex-col gap-4 px-4 py-6">
-          {sandboxStatusErrorMessage === null ? null : (
-            <Alert variant="destructive">
-              <AlertTitle>Could not load sandbox status</AlertTitle>
-              <AlertDescription>{sandboxStatusErrorMessage}</AlertDescription>
-            </Alert>
-          )}
-          {startErrorMessage === null ? null : (
-            <Alert variant="destructive">
-              <AlertTitle>Session connection error</AlertTitle>
-              <AlertDescription>{startErrorMessage}</AlertDescription>
-            </Alert>
-          )}
-          {sandboxFailureMessage === null ? null : (
-            <Alert variant="destructive">
-              <AlertTitle>Sandbox failed</AlertTitle>
-              <AlertDescription>{sandboxFailureMessage}</AlertDescription>
-            </Alert>
-          )}
-        </div>
-      ) : null}
-
-      <div
-        aria-label="Conversation chat"
-        className="min-h-0 flex-1 overflow-y-auto"
-        role="region"
-        style={{ scrollbarGutter: "stable both-edges" }}
-      >
-        <div className="mx-auto w-full max-w-3xl px-4 pb-4">
-          <ChatThread
-            entries={chatEntries}
-            isRespondingToServerRequest={isRespondingToServerRequest}
-            onRespondToServerRequest={onRespondToServerRequest}
-            pendingServerRequests={serverRequestPanelEntries}
-          />
-        </div>
-      </div>
-
-      <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
-        <div className="mx-auto w-full max-w-3xl px-4">
-          <CodexServerRequestsPanel
-            entries={serverRequestPanelEntries}
-            isRespondingToServerRequest={isRespondingToServerRequest}
-            onRespondToServerRequest={onRespondToServerRequest}
-          />
-          <ChatComposer {...composerProps} />
-        </div>
-      </div>
-    </div>
+    <SessionWorkbenchPageView
+      alerts={hasTopAlert ? alerts : []}
+      bottomPanel={
+        <CodexSessionPaneBottomPanel
+          chatEntries={chatEntries}
+          composerProps={composerProps}
+          isRespondingToServerRequest={isRespondingToServerRequest}
+          onRespondToServerRequest={onRespondToServerRequest}
+          serverRequestPanelEntries={serverRequestPanelEntries}
+        />
+      }
+      mainContent={
+        <CodexSessionPaneMainContent
+          chatEntries={chatEntries}
+          composerProps={composerProps}
+          isRespondingToServerRequest={isRespondingToServerRequest}
+          onRespondToServerRequest={onRespondToServerRequest}
+          serverRequestPanelEntries={serverRequestPanelEntries}
+        />
+      }
+      sandboxInstanceId={sandboxInstanceId}
+    />
   );
 }

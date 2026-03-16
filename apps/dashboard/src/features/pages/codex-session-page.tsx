@@ -4,48 +4,38 @@ import { useParams } from "react-router";
 import { SessionMoreActions } from "../sessions/session-more-actions.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import {
-  CodexSessionPageView,
-  type CodexSessionPageComposerProps,
-} from "./codex-session-page-view.js";
+  CodexSessionPaneBottomPanel,
+  CodexSessionPaneMainContent,
+  type CodexSessionPaneComposerProps,
+} from "./codex-session-pane.js";
+import {
+  SessionWorkbenchPageView,
+  type SessionWorkbenchAlert,
+} from "./session-workbench-page-view.js";
 import { useCodexSessionPageController } from "./use-codex-session-page-controller.js";
 
 export function CodexSessionPage(): React.JSX.Element {
   const params = useParams();
   const sandboxInstanceId = params["sandboxInstanceId"] ?? null;
-  const {
-    composerText,
-    composerModelOptions,
-    composerState,
-    selectedComposerModel,
-    selectedComposerReasoningEffort,
-    setComposerModel,
-    setComposerReasoningEffort,
-    setComposerText,
-    hasTopAlert,
-    moreActionsState,
-    serverRequestsState,
-    sandboxFailureMessage,
-    sandboxStatusQuery,
-    sessionHeaderStatusUi,
-    startErrorMessage,
-    submitComposer,
-    chatState,
-  } = useCodexSessionPageController({
+  const { codexPane, workbench } = useCodexSessionPageController({
     sandboxInstanceId,
   });
   const headerActions = (
     <div className="flex items-center gap-2">
-      <Badge className={sessionHeaderStatusUi.className} variant={sessionHeaderStatusUi.variant}>
-        {sessionHeaderStatusUi.label}
+      <Badge
+        className={workbench.sessionHeaderStatusUi.className}
+        variant={workbench.sessionHeaderStatusUi.variant}
+      >
+        {workbench.sessionHeaderStatusUi.label}
       </Badge>
       <SessionMoreActions
-        agentConnectionState={moreActionsState.agentConnectionState}
-        configJson={moreActionsState.configJson}
-        configRequirementsJson={moreActionsState.configRequirementsJson}
-        connectedSession={moreActionsState.connectedSession}
-        isReadingConfig={moreActionsState.isReadingConfig}
-        isReadingConfigRequirements={moreActionsState.isReadingConfigRequirements}
-        onLoadConfigSetup={moreActionsState.loadConfigSetup}
+        agentConnectionState={workbench.moreActionsState.agentConnectionState}
+        configJson={workbench.moreActionsState.configJson}
+        configRequirementsJson={workbench.moreActionsState.configRequirementsJson}
+        connectedSession={workbench.moreActionsState.connectedSession}
+        isReadingConfig={workbench.moreActionsState.isReadingConfig}
+        isReadingConfigRequirements={workbench.moreActionsState.isReadingConfigRequirements}
+        onLoadConfigSetup={workbench.moreActionsState.loadConfigSetup}
         sandboxInstanceId={sandboxInstanceId}
       />
     </div>
@@ -53,7 +43,7 @@ export function CodexSessionPage(): React.JSX.Element {
   useAppShellHeaderActions(headerActions);
 
   const chatItemIds = new Set(
-    chatState.entries.flatMap((entry) => {
+    codexPane.chatState.entries.flatMap((entry) => {
       if (entry.kind === "semantic-group") {
         return entry.items.map((item) => item.id);
       }
@@ -65,71 +55,93 @@ export function CodexSessionPage(): React.JSX.Element {
       return [];
     }),
   );
-  const unmatchedServerRequests = serverRequestsState.pendingServerRequests.filter((entry) => {
-    if (entry.kind !== "command-approval" && entry.kind !== "file-change-approval") {
-      return true;
-    }
+  const unmatchedServerRequests = codexPane.serverRequestsState.pendingServerRequests.filter(
+    (entry) => {
+      if (entry.kind !== "command-approval" && entry.kind !== "file-change-approval") {
+        return true;
+      }
 
-    return !chatItemIds.has(entry.itemId);
-  });
+      return !chatItemIds.has(entry.itemId);
+    },
+  );
+
+  const alerts: SessionWorkbenchAlert[] = [];
+  if (workbench.sandboxStatusQuery.isError) {
+    alerts.push({
+      title: "Could not load sandbox status",
+      description:
+        workbench.sandboxStatusQuery.error instanceof Error
+          ? workbench.sandboxStatusQuery.error.message
+          : "Could not load sandbox status.",
+    });
+  }
+  if (workbench.startErrorMessage !== null) {
+    alerts.push({
+      title: "Session connection error",
+      description: workbench.startErrorMessage,
+    });
+  }
+  if (workbench.sandboxFailureMessage !== null) {
+    alerts.push({
+      title: "Sandbox failed",
+      description: workbench.sandboxFailureMessage,
+    });
+  }
 
   if (sandboxInstanceId === null) {
     return (
-      <CodexSessionPageView
-        chatEntries={[]}
-        composerProps={createEmptyComposerProps()}
-        hasTopAlert={false}
-        isRespondingToServerRequest={false}
-        onRespondToServerRequest={function onRespondToServerRequest() {}}
-        sandboxFailureMessage={null}
+      <SessionWorkbenchPageView
+        alerts={[]}
+        bottomPanel={
+          <CodexSessionPaneBottomPanel
+            chatEntries={[]}
+            composerProps={createEmptyComposerProps()}
+            isRespondingToServerRequest={false}
+            onRespondToServerRequest={function onRespondToServerRequest() {}}
+            serverRequestPanelEntries={[]}
+          />
+        }
+        mainContent={
+          <CodexSessionPaneMainContent
+            chatEntries={[]}
+            composerProps={createEmptyComposerProps()}
+            isRespondingToServerRequest={false}
+            onRespondToServerRequest={function onRespondToServerRequest() {}}
+            serverRequestPanelEntries={[]}
+          />
+        }
         sandboxInstanceId={null}
-        sandboxStatusErrorMessage={null}
-        serverRequestPanelEntries={[]}
-        startErrorMessage={null}
       />
     );
   }
 
   return (
-    <CodexSessionPageView
-      chatEntries={chatState.entries}
-      composerProps={{
-        canInterruptTurn: composerState.canInterruptTurn,
-        canSteerTurn: composerState.canSteerTurn,
-        completedErrorMessage: composerState.completedErrorMessage,
-        composerText,
-        isConnected: composerState.isConnected,
-        isInterruptingTurn: composerState.isInterruptingTurn,
-        isStartingTurn: composerState.isStartingTurn,
-        isSteeringTurn: composerState.isSteeringTurn,
-        isUpdatingComposerConfig: composerState.isUpdatingComposerConfig,
-        modelOptions: composerModelOptions,
-        onComposerTextChange: setComposerText,
-        onModelChange: setComposerModel,
-        onReasoningEffortChange: setComposerReasoningEffort,
-        onSubmit: submitComposer,
-        selectedModel: selectedComposerModel,
-        selectedReasoningEffort: selectedComposerReasoningEffort,
-      }}
-      hasTopAlert={hasTopAlert}
-      isRespondingToServerRequest={serverRequestsState.isRespondingToServerRequest}
-      onRespondToServerRequest={serverRequestsState.respondToServerRequest}
-      sandboxFailureMessage={sandboxFailureMessage}
-      sandboxInstanceId={sandboxInstanceId}
-      sandboxStatusErrorMessage={
-        sandboxStatusQuery.isError
-          ? sandboxStatusQuery.error instanceof Error
-            ? sandboxStatusQuery.error.message
-            : "Could not load sandbox status."
-          : null
+    <SessionWorkbenchPageView
+      alerts={workbench.hasTopAlert ? alerts : []}
+      bottomPanel={
+        <CodexSessionPaneBottomPanel
+          chatEntries={codexPane.chatState.entries}
+          composerProps={codexPane.composerProps}
+          isRespondingToServerRequest={codexPane.serverRequestsState.isRespondingToServerRequest}
+          onRespondToServerRequest={codexPane.serverRequestsState.respondToServerRequest}
+          serverRequestPanelEntries={unmatchedServerRequests}
+        />
       }
-      serverRequestPanelEntries={unmatchedServerRequests}
-      startErrorMessage={startErrorMessage}
+      mainContent={
+        <CodexSessionPaneMainContent
+          chatEntries={codexPane.chatState.entries}
+          composerProps={codexPane.composerProps}
+          isRespondingToServerRequest={codexPane.serverRequestsState.isRespondingToServerRequest}
+          onRespondToServerRequest={codexPane.serverRequestsState.respondToServerRequest}
+          serverRequestPanelEntries={unmatchedServerRequests}
+        />
+      }
+      sandboxInstanceId={sandboxInstanceId}
     />
   );
 }
 
-function createEmptyComposerProps(): CodexSessionPageComposerProps {
+function createEmptyComposerProps(): CodexSessionPaneComposerProps {
   return {
     canInterruptTurn: false,
     canSteerTurn: false,
