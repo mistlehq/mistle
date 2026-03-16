@@ -2,7 +2,10 @@ import {
   PayloadKindRawBytes,
   PayloadKindWebSocketBinary,
   PayloadKindWebSocketText,
+  parseBootstrapControlMessage,
   parseStreamControlMessage,
+  type BootstrapControlMessage,
+  type LeaseControlMessage,
   type StreamControlMessage,
 } from "@mistle/sandbox-session-protocol";
 
@@ -37,6 +40,7 @@ export type TunnelProtocolDelivery =
 
 export type TunnelProtocolTranslation = {
   delivery: TunnelProtocolDelivery;
+  executionLeaseControlMessage?: LeaseControlMessage;
   notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding;
   releaseInteractiveStream?: ReleaseInteractiveStream;
 };
@@ -168,7 +172,7 @@ function toStreamOpenErrorPayload(input: { error: Error; streamId: number }): st
 function createUnsupportedTextPayloadErrorMessage(side: RelayPeerSide): string {
   return side === "connection"
     ? "Connection websocket text payloads must be valid stream control messages."
-    : "Bootstrap websocket text payloads must be valid stream control messages.";
+    : "Bootstrap websocket text payloads must be valid bootstrap control messages.";
 }
 
 function createUnsupportedBinaryPayloadErrorMessage(side: RelayPeerSide): string {
@@ -186,7 +190,7 @@ function isConnectionControlMessageAllowed(message: StreamControlMessage): boole
   );
 }
 
-function isBootstrapControlMessageAllowed(message: StreamControlMessage): boolean {
+function isBootstrapStreamControlMessageAllowed(message: StreamControlMessage): boolean {
   return (
     message.type === "stream.open.ok" ||
     message.type === "stream.open.error" ||
@@ -206,8 +210,12 @@ function assertConnectionControlMessageAllowed(message: StreamControlMessage): v
   );
 }
 
-function assertBootstrapControlMessageAllowed(message: StreamControlMessage): void {
-  if (isBootstrapControlMessageAllowed(message)) {
+function assertBootstrapControlMessageAllowed(message: BootstrapControlMessage): void {
+  if (message.type === "lease.create" || message.type === "lease.renew") {
+    return;
+  }
+
+  if (isBootstrapStreamControlMessageAllowed(message)) {
     return;
   }
 
@@ -261,11 +269,17 @@ function createRespondDelivery(payload: RelayPayload): TunnelProtocolDelivery {
 
 function createTranslation(input: {
   delivery: TunnelProtocolDelivery;
+  executionLeaseControlMessage?: LeaseControlMessage | undefined;
   notifyBootstrapPeerOfReleasedStream?: ClientStreamBinding | undefined;
   releaseInteractiveStream?: ReleaseInteractiveStream | undefined;
 }): TunnelProtocolTranslation {
   return {
     delivery: input.delivery,
+    ...(input.executionLeaseControlMessage === undefined
+      ? {}
+      : {
+          executionLeaseControlMessage: input.executionLeaseControlMessage,
+        }),
     ...(input.notifyBootstrapPeerOfReleasedStream === undefined
       ? {}
       : {
@@ -444,11 +458,19 @@ export class TunnelProtocolTranslator {
   private async translateBootstrapTextPayload(
     input: TranslateTunnelInboundMessageInput & { payload: string; sourcePeerSide: "bootstrap" },
   ): Promise<TunnelProtocolTranslation> {
-    const controlMessage = parseStreamControlMessage(input.payload);
+    const controlMessage = parseBootstrapControlMessage(input.payload);
     if (controlMessage === undefined) {
       throw new TunnelProtocolViolationError(createUnsupportedTextPayloadErrorMessage("bootstrap"));
     }
     assertBootstrapControlMessageAllowed(controlMessage);
+    if (controlMessage.type === "lease.create" || controlMessage.type === "lease.renew") {
+      return createTranslation({
+        delivery: {
+          kind: "drop",
+        },
+        executionLeaseControlMessage: controlMessage,
+      });
+    }
 
     const route = await this.interactiveStreamRouter.findInteractiveStreamByTunnel({
       sandboxInstanceId: input.sandboxInstanceId,

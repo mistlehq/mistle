@@ -6,6 +6,7 @@ import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 import { logger } from "../logger.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
+import { ExecutionLeaseRepository } from "./execution-lease-repository.js";
 import type { InteractiveStreamRouter } from "./gateway-forwarding/index.js";
 import type { SandboxOwnerLeaseHeartbeat } from "./ownership/sandbox-owner-lease-heartbeat.js";
 import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js";
@@ -65,6 +66,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     sandboxOwnerStore: input.sandboxOwnerStore,
   });
   const tunnelProtocolTranslator = new TunnelProtocolTranslator(input.interactiveStreamRouter);
+  const executionLeaseRepository = new ExecutionLeaseRepository();
   const tunnelSessionService = new TunnelSessionService(
     input.interactiveStreamRouter,
     input.relayCoordinator,
@@ -209,6 +211,8 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             void handleTunnelWebSocketMessage({
               clientSessionId: relaySessionId,
               currentSocket: ws,
+              db: ctx.get("db"),
+              executionLeaseRepository,
               interactiveStreamRouter: input.interactiveStreamRouter,
               payload,
               relayCoordinator: input.relayCoordinator,

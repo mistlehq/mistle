@@ -14,6 +14,12 @@ export type {
   SandboxInstanceStarterKind,
   SandboxInstanceStatus,
 } from "./sandbox-instances.js";
+export { sandboxExecutionLeases } from "./sandbox-execution-leases.js";
+export type {
+  InsertSandboxExecutionLease,
+  SandboxExecutionLease,
+  SandboxExecutionLeaseMetadata,
+} from "./sandbox-execution-leases.js";
 export { sandboxInstanceRuntimePlans } from "./sandbox-instance-runtime-plans.js";
 export type {
   InsertSandboxInstanceRuntimePlan,

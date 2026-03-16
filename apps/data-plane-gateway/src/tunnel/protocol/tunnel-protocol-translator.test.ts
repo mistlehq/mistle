@@ -154,6 +154,46 @@ describe("TunnelProtocolTranslator", () => {
     });
   });
 
+  it("keeps bootstrap lease control messages local to the gateway", async () => {
+    const { translator } = await createTranslatorHarness();
+
+    await expect(
+      translator.translateInboundMessage({
+        clientSessionId: BootstrapSessionId,
+        payload: JSON.stringify({
+          type: "lease.create",
+          lease: {
+            id: "sxl_test",
+            kind: "agent_execution",
+            source: "codex",
+            externalExecutionId: "turn_123",
+            metadata: {
+              threadId: "thr_123",
+            },
+          },
+        }),
+        sandboxInstanceId: SandboxInstanceId,
+        sourcePeerSide: "bootstrap",
+      }),
+    ).resolves.toEqual({
+      delivery: {
+        kind: "drop",
+      },
+      executionLeaseControlMessage: {
+        type: "lease.create",
+        lease: {
+          id: "sxl_test",
+          kind: "agent_execution",
+          source: "codex",
+          externalExecutionId: "turn_123",
+          metadata: {
+            threadId: "thr_123",
+          },
+        },
+      },
+    });
+  });
+
   it("responds with a reset and releases the binding when connection binary data is invalid for the channel", async () => {
     const { router, translator } = await createTranslatorHarness();
 
