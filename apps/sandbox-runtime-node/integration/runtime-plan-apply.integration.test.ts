@@ -204,6 +204,41 @@ describe("applyRuntimePlan", () => {
     await expect(readFile(configPath, "utf8")).resolves.toBe('model = "user-choice"');
   });
 
+  it("overwrites existing runtime files by default", async () => {
+    const tempDirectory = await createTemporaryDirectory("mistle-runtime-plan-overwrite-");
+    const configPath = join(tempDirectory, "codex", "config.toml");
+    await mkdir(dirname(configPath), {
+      recursive: true,
+      mode: 0o755,
+    });
+    await writeFile(configPath, 'model = "old-value"', "utf8");
+
+    await applyRuntimePlan({
+      runtimePlan: createRuntimePlan({
+        runtimeClients: [
+          {
+            clientId: "client_codex",
+            setup: {
+              env: {},
+              files: [
+                {
+                  fileId: "file_codex_config",
+                  path: configPath,
+                  mode: 0o600,
+                  content: 'model = "new-value"',
+                },
+              ],
+            },
+            processes: [],
+            endpoints: [],
+          },
+        ],
+      }),
+    });
+
+    await expect(readFile(configPath, "utf8")).resolves.toBe('model = "new-value"');
+  });
+
   it("returns an error when a parent directory cannot be created", async () => {
     const tempDirectory = await createTemporaryDirectory("mistle-runtime-plan-parent-dir-");
     const blockingPath = join(tempDirectory, "not-a-directory");
@@ -233,6 +268,40 @@ describe("applyRuntimePlan", () => {
         }),
       }),
     ).rejects.toThrow("failed to create parent directory");
+  });
+
+  it("returns an error when a runtime file path cannot be written", async () => {
+    const tempDirectory = await createTemporaryDirectory("mistle-runtime-plan-write-file-");
+    const directoryPath = join(tempDirectory, "codex", "config.toml");
+    await mkdir(directoryPath, {
+      recursive: true,
+      mode: 0o755,
+    });
+
+    await expect(
+      applyRuntimePlan({
+        runtimePlan: createRuntimePlan({
+          runtimeClients: [
+            {
+              clientId: "client_failure",
+              setup: {
+                env: {},
+                files: [
+                  {
+                    fileId: "file_failure",
+                    path: directoryPath,
+                    mode: 0o600,
+                    content: 'value = "x"',
+                  },
+                ],
+              },
+              processes: [],
+              endpoints: [],
+            },
+          ],
+        }),
+      }),
+    ).rejects.toThrow(`failed to write file ${directoryPath}`);
   });
 
   it("runs install commands before applying runtime files", async () => {
@@ -289,6 +358,53 @@ describe("applyRuntimePlan", () => {
 
     await expect(readFile(artifactMarkerPath, "utf8")).resolves.toBe("artifact-install");
     await expect(readFile(sharedPath, "utf8")).resolves.toBe("runtime-file-content");
+  });
+
+  it("runs install commands before applying workspace sources", async () => {
+    const repository = await seedBareGitRepository();
+    const runtimeDirectory = await createTemporaryDirectory(
+      "mistle-runtime-plan-artifact-before-workspace-",
+    );
+    const clonePath = join(runtimeDirectory, "workspace", "repos", "mistlehq", "mistle");
+
+    await applyRuntimePlan({
+      runtimePlan: createRuntimePlan({
+        artifacts: [
+          {
+            artifactKey: "artifact_repo_update",
+            name: "Artifact Repo Update",
+            lifecycle: {
+              install: [
+                {
+                  args: [
+                    "sh",
+                    "-euc",
+                    'printf "\\nartifact-before-clone\\n" >> README.md; git add README.md; git commit -m "artifact update"; git push origin HEAD:refs/heads/main',
+                  ],
+                  cwd: repository.workTreeRoot,
+                  env: {
+                    GIT_TERMINAL_PROMPT: "0",
+                  },
+                },
+              ],
+              remove: [],
+            },
+          },
+        ],
+        workspaceSources: [
+          {
+            sourceKind: "git-clone",
+            resourceKind: "repository",
+            path: clonePath,
+            originUrl: repository.bareRepositoryPath,
+          },
+        ],
+      }),
+    });
+
+    await expect(readFile(join(clonePath, "README.md"), "utf8")).resolves.toContain(
+      "artifact-before-clone",
+    );
   });
 
   it("runs install commands for profile-base sources and does not need update commands", async () => {
@@ -355,6 +471,87 @@ describe("applyRuntimePlan", () => {
     ).rejects.toThrow("runtime plan artifacts[0] lifecycle.install[0] failed");
   });
 
+  it("includes stdout in artifact command failure output", async () => {
+    await expect(
+      applyRuntimePlan({
+        runtimePlan: createRuntimePlan({
+          artifacts: [
+            {
+              artifactKey: "artifact_cli",
+              name: "Artifact CLI",
+              lifecycle: {
+                install: [
+                  {
+                    args: ["sh", "-euc", 'printf "stdout-only"; exit 7'],
+                  },
+                ],
+                remove: [],
+              },
+            },
+          ],
+        }),
+      }),
+    ).rejects.toThrow("artifact command failed with exit code 7 (output=stdout-only)");
+  });
+
+  it("combines stdout and stderr in artifact command failure output", async () => {
+    await expect(
+      applyRuntimePlan({
+        runtimePlan: createRuntimePlan({
+          artifacts: [
+            {
+              artifactKey: "artifact_cli",
+              name: "Artifact CLI",
+              lifecycle: {
+                install: [
+                  {
+                    args: ["sh", "-euc", 'printf "stdout-line"; printf "stderr-line" >&2; exit 7'],
+                  },
+                ],
+                remove: [],
+              },
+            },
+          ],
+        }),
+      }),
+    ).rejects.toThrow("artifact command failed with exit code 7 (output=stdout-line\nstderr-line)");
+  });
+
+  it("runs artifact commands with the declared cwd and env", async () => {
+    const tempDirectory = await createTemporaryDirectory("mistle-runtime-plan-artifact-env-");
+    const workingDirectory = join(tempDirectory, "work");
+    const outputPath = join(workingDirectory, "artifact-output.txt");
+    await mkdir(workingDirectory, {
+      recursive: true,
+      mode: 0o755,
+    });
+
+    await applyRuntimePlan({
+      runtimePlan: createRuntimePlan({
+        artifacts: [
+          {
+            artifactKey: "artifact_cli",
+            name: "Artifact CLI",
+            lifecycle: {
+              install: [
+                {
+                  args: ["sh", "-euc", 'printf "%s" "$TOKEN" > artifact-output.txt'],
+                  cwd: workingDirectory,
+                  env: {
+                    TOKEN: "artifact-env",
+                  },
+                },
+              ],
+              remove: [],
+            },
+          },
+        ],
+      }),
+    });
+
+    await expect(readFile(outputPath, "utf8")).resolves.toBe("artifact-env");
+  });
+
   it("returns explicit error when an artifact command times out", async () => {
     await expect(
       applyRuntimePlan({
@@ -408,6 +605,51 @@ describe("applyRuntimePlan", () => {
     expect(runGit(clonePath, ["rev-parse", "refs/remotes/origin/main"]).trim()).toBe(nextCommitId);
   });
 
+  it("runs workspace sources before applying runtime files", async () => {
+    const repository = await seedBareGitRepository();
+    const runtimeDirectory = await createTemporaryDirectory(
+      "mistle-runtime-plan-workspace-before-files-",
+    );
+    const clonePath = join(runtimeDirectory, "workspace", "repos", "mistlehq", "mistle");
+    const readmePath = join(clonePath, "README.md");
+
+    await applyRuntimePlan({
+      runtimePlan: createRuntimePlan({
+        workspaceSources: [
+          {
+            sourceKind: "git-clone",
+            resourceKind: "repository",
+            path: clonePath,
+            originUrl: repository.bareRepositoryPath,
+          },
+        ],
+        runtimeClients: [
+          {
+            clientId: "client_codex",
+            setup: {
+              env: {},
+              files: [
+                {
+                  fileId: "file_readme_override",
+                  path: readmePath,
+                  mode: 0o644,
+                  content: "runtime-file-content\n",
+                },
+              ],
+            },
+            processes: [],
+            endpoints: [],
+          },
+        ],
+      }),
+    });
+
+    await expect(readFile(readmePath, "utf8")).resolves.toBe("runtime-file-content\n");
+    expect(runGit(clonePath, ["config", "--local", "--get", "remote.origin.url"]).trim()).toBe(
+      repository.bareRepositoryPath,
+    );
+  });
+
   it("fails when the workspace source target already exists", async () => {
     const repository = await seedBareGitRepository();
     const runtimeDirectory = await createTemporaryDirectory(
@@ -434,5 +676,50 @@ describe("applyRuntimePlan", () => {
         }),
       }),
     ).rejects.toThrow(`workspace source path '${clonePath}' already exists`);
+  });
+
+  it("fails when a workspace source parent directory cannot be created", async () => {
+    const repository = await seedBareGitRepository();
+    const runtimeDirectory = await createTemporaryDirectory(
+      "mistle-runtime-plan-workspace-parent-dir-",
+    );
+    const blockingPath = join(runtimeDirectory, "not-a-directory");
+    await writeFile(blockingPath, "blocking-file", "utf8");
+
+    await expect(
+      applyRuntimePlan({
+        runtimePlan: createRuntimePlan({
+          workspaceSources: [
+            {
+              sourceKind: "git-clone",
+              resourceKind: "repository",
+              path: join(blockingPath, "mistle"),
+              originUrl: repository.bareRepositoryPath,
+            },
+          ],
+        }),
+      }),
+    ).rejects.toThrow("failed to create parent directory");
+  });
+
+  it("wraps git clone failures for invalid workspace source origins", async () => {
+    const runtimeDirectory = await createTemporaryDirectory("mistle-runtime-plan-bad-origin-");
+    const clonePath = join(runtimeDirectory, "workspace", "repos", "mistlehq", "mistle");
+    const missingOriginPath = join(runtimeDirectory, "repos", "missing.git");
+
+    await expect(
+      applyRuntimePlan({
+        runtimePlan: createRuntimePlan({
+          workspaceSources: [
+            {
+              sourceKind: "git-clone",
+              resourceKind: "repository",
+              path: clonePath,
+              originUrl: missingOriginPath,
+            },
+          ],
+        }),
+      }),
+    ).rejects.toThrow("failed to clone repository");
   });
 });
