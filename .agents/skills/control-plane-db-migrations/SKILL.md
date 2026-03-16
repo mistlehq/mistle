@@ -13,14 +13,14 @@ Follow the repo's control-plane migration workflow exactly. Keep migration gener
    Use this skill for `packages/db/src/control-plane/schema/**`, `packages/db/migrations/control-plane/**`, and control-plane migration execution via `apps/control-plane-api`.
    If the task is about data-plane migrations, inspect the data-plane config and scripts instead of reusing this workflow blindly.
 2. Make schema changes first in `packages/db/src/control-plane/schema/**`.
-3. Generate the migration from the repository root with Drizzle:
+3. Generate the migration from the repository root with Drizzle and always provide a descriptive kebab-case name:
 
 ```bash
-pnpm exec drizzle-kit generate --config packages/db/drizzle.control-plane.config.ts
+pnpm --filter @mistle/db exec drizzle-kit generate --config packages/db/drizzle.control-plane.config.ts --name add-descriptive-change-name
 ```
 
 4. Review the generated files in `packages/db/migrations/control-plane/`.
-   Expect a new `NNNN_*.sql`, a new `meta/*_snapshot.json`, and an updated `meta/_journal.json`.
+   Expect a new `NNNN_<descriptive-kebab-name>.sql`, a new `meta/*_snapshot.json`, and an updated `meta/_journal.json`.
 5. Apply the migration through the control-plane app script:
 
 ```bash
@@ -30,6 +30,7 @@ pnpm --filter @mistle/control-plane-api db:migrate
 ## Rules
 
 - Generate migrations only with `drizzle-kit`.
+- Migrations must be named. Pass `--name` and use a short descriptive kebab-case name that matches the schema change.
 - Never handwrite migration SQL, `meta/_journal.json`, or snapshot files.
 - Use the migration application script exposed by `apps/control-plane-api/package.json`; do not bypass it with an ad hoc runner for normal control-plane migration tasks.
 - If the migrator reports a missing journal file, generate the migration first instead of trying to patch migration metadata manually.
