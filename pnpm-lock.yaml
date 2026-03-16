@@ -275,8 +275,8 @@ importers:
         specifier: ~6.4.1
         version: 6.4.1(react@19.2.4)
       '@rjsf/validator-ajv8':
-        specifier: ~6.3.1
-        version: 6.3.1(@rjsf/utils@6.4.1(react@19.2.4))
+        specifier: ~6.4.1
+        version: 6.4.1(@rjsf/utils@6.4.1(react@19.2.4))
       '@streamdown/code':
         specifier: ^1.1.0
         version: 1.1.0(react@19.2.4)
@@ -4936,11 +4936,11 @@ packages:
     peerDependencies:
       react: '>=18'
 
-  '@rjsf/validator-ajv8@6.3.1':
-    resolution: {integrity: sha512-2RHDxBc0gBplPniau5UZj7aznpTelSBm1b3DNybok8L0NuIfmndbp9kNXgFuRvlyfsQSyYmZSBjbzeYqr0Hpcw==}
+  '@rjsf/validator-ajv8@6.4.1':
+    resolution: {integrity: sha512-Gx28sRIV7E4CYs2c7BxOGLX44p5IlJE+IaD7GbVk1S+6TxDATqFBSYYZukLB+/vNk3urpndQMreQLKW3W7POHQ==}
     engines: {node: '>=20'}
     peerDependencies:
-      '@rjsf/utils': ^6.3.x
+      '@rjsf/utils': ^6.4.x
 
   '@rolldown/pluginutils@1.0.0-rc.3':
     resolution: {integrity: sha512-eybk3TjzzzV97Dlj5c+XrBFW57eTNhzod66y9HrBlzJ6NsCrWCp/2kaPS3K9wJmurBC0Tdw4yPjXKZqlznim3Q==}
@@ -15943,7 +15943,7 @@ snapshots:
       react: 19.2.4
       react-is: 18.3.1
 
-  '@rjsf/validator-ajv8@6.3.1(@rjsf/utils@6.4.1(react@19.2.4))':
+  '@rjsf/validator-ajv8@6.4.1(@rjsf/utils@6.4.1(react@19.2.4))':
     dependencies:
       '@rjsf/utils': 6.4.1(react@19.2.4)
       ajv: 8.18.0
