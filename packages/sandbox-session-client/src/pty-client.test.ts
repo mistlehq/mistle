@@ -473,7 +473,7 @@ describe("SandboxPtyClient", () => {
     });
   });
 
-  it("returns to the connected state after closing an open PTY stream", async () => {
+  it("returns to the connected state after receiving pty.exit for close", async () => {
     const server = await startPtyTestServer();
     startedServers.push(server);
     const client = new SandboxPtyClient({
@@ -501,17 +501,92 @@ describe("SandboxPtyClient", () => {
         streamId: 1,
       },
     });
+    server.sendPtyExit({
+      exitCode: 0,
+      streamId: 1,
+    });
     await closePromise;
 
     expect(client.state).toBe(SandboxPtyStates.CONNECTED);
     expect(client.streamId).toBeNull();
-    expect(client.exitInfo).toBeNull();
+    expect(client.exitInfo).toEqual({
+      exitCode: 0,
+    });
+  });
+
+  it("returns to the connected state after the close timeout when no terminal event arrives", async () => {
+    const server = await startPtyTestServer();
+    startedServers.push(server);
+    const client = new SandboxPtyClient({
+      closeTimeoutMs: 5,
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+
+    await client.connect();
+    const openPromise = client.open({
+      cols: 80,
+      rows: 24,
+    });
+    await server.waitForNextMessage();
+    server.sendOpenOk(1);
+    await openPromise;
+
+    const closePromise = client.close();
+    const closeRequest = await server.waitForNextMessage();
+    expect(closeRequest).toEqual({
+      kind: "control",
+      message: {
+        type: "stream.close",
+        streamId: 1,
+      },
+    });
+    await closePromise;
+
+    expect(client.state).toBe(SandboxPtyStates.CONNECTED);
+    expect(client.streamId).toBeNull();
+  });
+
+  it("rejects close when the runtime reports stream_close_failed", async () => {
+    const server = await startPtyTestServer();
+    startedServers.push(server);
+    const client = new SandboxPtyClient({
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
+    });
+
+    await client.connect();
+    const openPromise = client.open({
+      cols: 80,
+      rows: 24,
+    });
+    await server.waitForNextMessage();
+    server.sendOpenOk(1);
+    await openPromise;
+
+    const closePromise = client.close();
+    await server.waitForNextMessage();
+    server.sendReset({
+      code: "stream_close_failed",
+      message: "failed to terminate pty session",
+      streamId: 1,
+    });
+
+    await expect(closePromise).rejects.toThrowError(
+      "Sandbox PTY stream reset (stream_close_failed): failed to terminate pty session",
+    );
+    expect(client.state).toBe(SandboxPtyStates.ERROR);
+    expect(client.resetInfo).toEqual({
+      code: "stream_close_failed",
+      message: "failed to terminate pty session",
+    });
   });
 
   it("can reopen a PTY on the same websocket after stream.close", async () => {
     const server = await startPtyTestServer();
     startedServers.push(server);
     const client = new SandboxPtyClient({
+      closeTimeoutMs: 5,
       connectionUrl: server.url,
       runtime: createNodeSandboxSessionRuntime(),
     });
