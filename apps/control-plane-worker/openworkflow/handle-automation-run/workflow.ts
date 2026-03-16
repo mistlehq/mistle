@@ -4,12 +4,12 @@ import {
 } from "@mistle/workflow-registry/control-plane";
 import { defineWorkflow } from "openworkflow";
 
-import { getWorkflowContext } from "../../src/openworkflow/context.js";
 import {
   prepareAutomationRun,
   resolveAutomationRunFailure,
 } from "../../src/runtime/workflows/automation-run.js";
 import { setAutomationConversationDeliveryProcessorIdle } from "../../src/runtime/workflows/persistence/set-conversation-delivery-processor-idle.js";
+import { getWorkflowContext } from "../core/context.js";
 import { markAutomationRunFailed } from "../shared/automation-run.js";
 import { handoffAutomationRunDelivery } from "./handoff-automation-run-delivery.js";
 import { transitionAutomationRunToRunning } from "./transition-automation-run-to-running.js";

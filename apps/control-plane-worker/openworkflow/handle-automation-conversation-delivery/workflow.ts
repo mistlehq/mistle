@@ -1,11 +1,11 @@
 import { HandleAutomationConversationDeliveryWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { defineWorkflow } from "openworkflow";
 
-import { getWorkflowContext } from "../../src/openworkflow/context.js";
 import {
   prepareAutomationRun,
   resolveAutomationRunFailure,
 } from "../../src/runtime/workflows/automation-run.js";
+import { getWorkflowContext } from "../core/context.js";
 import {
   markAutomationRunCompleted,
   markAutomationRunFailed,

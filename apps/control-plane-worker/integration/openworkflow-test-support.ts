@@ -1,5 +1,5 @@
-import { closeWorkflowContext, getWorkflowContext } from "../src/openworkflow/context.js";
-import { closeOpenWorkflowRuntime, getOpenWorkflowRuntime } from "../src/openworkflow/runtime.js";
+import { closeWorkflowContext, getWorkflowContext } from "../openworkflow/core/context.js";
+import { closeOpenWorkflowRuntime, getOpenWorkflowRuntime } from "../openworkflow/core/runtime.js";
 import type { ControlPlaneWorkerIntegrationFixture } from "./test-context.js";
 
 function assignEnvironment(overrides: Record<string, string | undefined>): () => void {

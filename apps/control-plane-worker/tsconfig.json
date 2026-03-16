@@ -4,6 +4,8 @@
     "jsx": "react-jsx"
   },
   "include": [
+    "instrument.ts",
+    "logger.ts",
     "openworkflow.config.ts",
     "openworkflow/**/*.ts",
     "src/**/*.ts",

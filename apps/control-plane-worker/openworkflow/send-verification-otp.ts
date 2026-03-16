@@ -2,7 +2,7 @@ import { EmailTemplateIds, sendEmail } from "@mistle/emails";
 import { SendVerificationOTPWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { defineWorkflow } from "openworkflow";
 
-import { getWorkflowContext } from "../src/openworkflow/context.js";
+import { getWorkflowContext } from "./core/context.js";
 
 export const SendVerificationOTPWorkflow = defineWorkflow(
   SendVerificationOTPWorkflowSpec,
