@@ -141,7 +141,6 @@ environment_name = "production"
 #
 # [apps.data_plane_worker.sandbox.docker]
 # socket_path = "/var/run/docker.sock"
-# snapshot_repository = "registry.example.com/mistle/snapshots"
 
 [apps.tokenizer_proxy.server]
 host = "0.0.0.0"

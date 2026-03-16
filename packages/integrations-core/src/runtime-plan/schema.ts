@@ -5,13 +5,6 @@ import { RuntimeFileWriteMode, type CompiledRuntimePlan } from "../types/index.j
 const ResolvedSandboxImageSchema = z.discriminatedUnion("source", [
   z
     .object({
-      source: z.literal("snapshot"),
-      imageRef: z.string().min(1),
-      instanceId: z.string().min(1),
-    })
-    .strict(),
-  z
-    .object({
       source: z.literal("profile-base"),
       imageRef: z.string().min(1),
       sandboxProfileId: z.string().min(1),
@@ -82,13 +75,6 @@ const CompiledRuntimeArtifactSpecSchema = z
         remove: z.array(RuntimeArtifactCommandSchema).readonly(),
       })
       .strict(),
-  })
-  .strict();
-
-const CompiledRuntimeArtifactRemovalSpecSchema = z
-  .object({
-    artifactKey: z.string().min(1),
-    commands: z.array(RuntimeArtifactCommandSchema).readonly(),
   })
   .strict();
 
@@ -217,7 +203,6 @@ const CompiledWorkspaceSourceSchema = z.discriminatedUnion("sourceKind", [
 
 type RuntimePlanRoute = CompiledRuntimePlan["egressRoutes"][number];
 type RuntimePlanArtifact = CompiledRuntimePlan["artifacts"][number];
-type RuntimePlanArtifactRemoval = CompiledRuntimePlan["artifactRemovals"][number];
 type RuntimePlanArtifactCommand = RuntimePlanArtifact["lifecycle"]["install"][number];
 type RuntimePlanRuntimeClient = CompiledRuntimePlan["runtimeClients"][number];
 type RuntimePlanRuntimeClientProcess = RuntimePlanRuntimeClient["processes"][number];
@@ -292,15 +277,6 @@ function normalizeArtifact(
           }),
       remove: artifact.lifecycle.remove.map(normalizeRuntimeArtifactCommand),
     },
-  };
-}
-
-function normalizeArtifactRemoval(
-  artifactRemoval: z.output<typeof CompiledRuntimeArtifactRemovalSpecSchema>,
-): RuntimePlanArtifactRemoval {
-  return {
-    artifactKey: artifactRemoval.artifactKey,
-    commands: artifactRemoval.commands.map(normalizeRuntimeArtifactCommand),
   };
 }
 
@@ -416,7 +392,6 @@ const CompiledRuntimePlanValidationSchema = z
     image: ResolvedSandboxImageSchema,
     egressRoutes: z.array(EgressCredentialRouteSchema).readonly(),
     artifacts: z.array(CompiledRuntimeArtifactSpecSchema).readonly(),
-    artifactRemovals: z.array(CompiledRuntimeArtifactRemovalSpecSchema).readonly(),
     workspaceSources: z.array(CompiledWorkspaceSourceSchema).readonly(),
     runtimeClients: z.array(RuntimeClientSchema).readonly(),
     agentRuntimes: z.array(CompiledAgentRuntimeSchema).readonly(),
@@ -430,7 +405,6 @@ export const CompiledRuntimePlanSchema = CompiledRuntimePlanValidationSchema.tra
     image: runtimePlan.image,
     egressRoutes: runtimePlan.egressRoutes.map(normalizeRoute),
     artifacts: runtimePlan.artifacts.map(normalizeArtifact),
-    artifactRemovals: runtimePlan.artifactRemovals.map(normalizeArtifactRemoval),
     workspaceSources: runtimePlan.workspaceSources.map(normalizeWorkspaceSource),
     runtimeClients: runtimePlan.runtimeClients.map(normalizeRuntimeClient),
     agentRuntimes: runtimePlan.agentRuntimes.map(normalizeAgentRuntime),

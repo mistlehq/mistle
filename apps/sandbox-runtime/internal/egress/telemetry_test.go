@@ -20,4 +20,3 @@ func TestBuildProxyMediationBaseAttributes(t *testing.T) {
 		t.Fatalf("unexpected url.path attribute: %s=%s", attributes[2].Key, attributes[2].Value.AsString())
 	}
 }
-

@@ -315,7 +315,6 @@ describe("parseConfigRecord", () => {
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
             docker: {
               socketPath: "/var/run/docker.sock",
-              snapshotRepository: "localhost:5001/mistle/snapshots",
               networkName: "mistle-sandbox-dev",
               tracesEndpoint: "http://otel-lgtm:4318/v1/traces",
             },

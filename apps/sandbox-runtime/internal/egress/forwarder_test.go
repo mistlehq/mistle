@@ -35,7 +35,7 @@ func TestForwarderBuildForwardRequestUsesHeaderAddressedTokenizerPath(t *testing
 		incomingRequest: incomingRequest,
 		route: startup.EgressCredentialRoute{
 			EgressRuleID: "egress_rule_openai",
-			BindingID: "ibd_openai",
+			BindingID:    "ibd_openai",
 			Upstream: startup.EgressRouteUpstream{
 				BaseURL: "https://api.openai.com/v1",
 			},

@@ -50,12 +50,12 @@ describe("mapModalClientError", () => {
 
   it("maps modal timeout errors", () => {
     const mapped = mapModalClientError(
-      ModalClientOperationIds.SNAPSHOT_SANDBOX,
-      new ModalSandboxTimeoutError("snapshot timed out"),
+      ModalClientOperationIds.START_SANDBOX,
+      new ModalSandboxTimeoutError("operation timed out"),
     );
 
     expect(mapped.code).toBe(ModalClientErrorCodes.TIMEOUT);
-    expect(mapped.operation).toBe(ModalClientOperationIds.SNAPSHOT_SANDBOX);
+    expect(mapped.operation).toBe(ModalClientOperationIds.START_SANDBOX);
     expect(mapped.retryable).toBe(true);
   });
 

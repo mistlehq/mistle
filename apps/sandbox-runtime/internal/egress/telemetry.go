@@ -11,4 +11,3 @@ func buildProxyMediationBaseAttributes(classificationHost string, classification
 		attribute.String("url.path", classificationPath),
 	}
 }
-

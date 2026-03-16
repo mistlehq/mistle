@@ -259,7 +259,6 @@ describe("assembleCompiledRuntimePlan", () => {
 
     expect(plan.egressRoutes[0]?.egressRuleId).toBe("egress_rule_a");
     expect(plan.artifacts.map((artifact) => artifact.artifactKey)).toEqual(["codex-cli", "gh-cli"]);
-    expect(plan.artifactRemovals).toEqual([]);
     expect(plan.artifacts[1]?.env).toEqual({
       A_VAR: "one",
       Z_VAR: "two",
@@ -537,68 +536,5 @@ describe("assembleCompiledRuntimePlan", () => {
         expect(error.code).toBe(CompilerErrorCodes.RUNTIME_CLIENT_SETUP_CONFLICT);
       }
     }
-  });
-
-  it("includes artifact removals from previous compiled bindings when artifact key is absent in current plan", () => {
-    const plan = assembleCompiledRuntimePlan({
-      sandboxProfileId: "sbp_123",
-      version: 4,
-      image: {
-        source: "snapshot",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-snapshots@sha256:test",
-        instanceId: "sbi_123",
-      },
-      compiledBindingResults: [
-        {
-          egressRoutes: [],
-          artifacts: [
-            {
-              artifactKey: "codex-cli",
-              name: "Codex CLI",
-              lifecycle: {
-                install: [{ args: ["echo", "install-codex"] }],
-                remove: [{ args: ["rm", "-f", "/usr/local/bin/codex"] }],
-              },
-            },
-          ],
-          runtimeClients: [],
-          workspaceSources: [],
-          agentRuntimes: [],
-        },
-      ],
-      previousCompiledBindingResults: [
-        {
-          egressRoutes: [],
-          artifacts: [
-            {
-              artifactKey: "codex-cli",
-              name: "Codex CLI",
-              lifecycle: {
-                install: [{ args: ["echo", "install-codex"] }],
-                remove: [{ args: ["rm", "-f", "/usr/local/bin/codex"] }],
-              },
-            },
-            {
-              artifactKey: "gh-cli",
-              name: "GitHub CLI",
-              lifecycle: {
-                install: [{ args: ["echo", "install-gh"] }],
-                remove: [{ args: ["rm", "-f", "/usr/local/bin/gh"] }],
-              },
-            },
-          ],
-          runtimeClients: [],
-          workspaceSources: [],
-          agentRuntimes: [],
-        },
-      ],
-    });
-
-    expect(plan.artifactRemovals).toEqual([
-      {
-        artifactKey: "gh-cli",
-        commands: [{ args: ["rm", "-f", "/usr/local/bin/gh"] }],
-      },
-    ]);
   });
 });

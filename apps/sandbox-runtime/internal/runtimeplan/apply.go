@@ -19,7 +19,6 @@ type ApplyInput struct {
 }
 
 const (
-	runtimeImageSourceSnapshot    = "snapshot"
 	runtimeImageSourceProfileBase = "profile-base"
 	runtimeImageSourceBase        = "base"
 	runtimeFileWriteModeIfAbsent  = "if-absent"
@@ -38,22 +37,6 @@ func Apply(input ApplyInput) error {
 	commandSet, err := resolveArtifactLifecycleCommandSet(input.RuntimePlan.Image.Source)
 	if err != nil {
 		return err
-	}
-
-	if input.RuntimePlan.Image.Source == runtimeImageSourceSnapshot {
-		for removalIndex, removal := range input.RuntimePlan.ArtifactRemovals {
-			for commandIndex, command := range removal.Commands {
-				if err := runRuntimeArtifactCommand(command); err != nil {
-					return fmt.Errorf(
-						"runtime plan artifactRemovals[%d] commands[%d] failed (artifactKey=%s): %w",
-						removalIndex,
-						commandIndex,
-						removal.ArtifactKey,
-						err,
-					)
-				}
-			}
-		}
 	}
 
 	for artifactIndex, artifact := range input.RuntimePlan.Artifacts {
@@ -151,8 +134,6 @@ func runGitCommand(args []string) error {
 
 func resolveArtifactLifecycleCommandSet(source string) (artifactLifecycleCommandSet, error) {
 	switch source {
-	case runtimeImageSourceSnapshot:
-		return artifactLifecycleCommandSetUpdate, nil
 	case runtimeImageSourceProfileBase, runtimeImageSourceBase:
 		return artifactLifecycleCommandSetInstall, nil
 	default:

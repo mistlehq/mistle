@@ -619,11 +619,6 @@ export type CompiledRuntimeArtifactSpec = {
   lifecycle: RuntimeArtifactLifecycle<ReadonlyArray<RuntimeArtifactCommand>>;
 };
 
-export type CompiledRuntimeArtifactRemovalSpec = {
-  artifactKey: string;
-  commands: ReadonlyArray<RuntimeArtifactCommand>;
-};
-
 export const RuntimeFileWriteMode = {
   OVERWRITE: "overwrite",
   IF_ABSENT: "if-absent",
@@ -916,11 +911,6 @@ export type TriggerRule = {
 
 export type ResolvedSandboxImage =
   | {
-      source: "snapshot";
-      imageRef: string;
-      instanceId: string;
-    }
-  | {
       source: "profile-base";
       imageRef: string;
       sandboxProfileId: string;
@@ -937,7 +927,6 @@ export type CompiledRuntimePlan = {
   image: ResolvedSandboxImage;
   egressRoutes: ReadonlyArray<EgressCredentialRoute>;
   artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
-  artifactRemovals: ReadonlyArray<CompiledRuntimeArtifactRemovalSpec>;
   workspaceSources: ReadonlyArray<CompiledWorkspaceSource>;
   runtimeClients: ReadonlyArray<RuntimeClient>;
   agentRuntimes: ReadonlyArray<CompiledAgentRuntime>;
@@ -969,6 +958,5 @@ export type CompileRuntimePlanInput = {
   version: number;
   image: ResolvedSandboxImage;
   bindings: ReadonlyArray<CompileRuntimePlanBindingInput>;
-  previousBindings?: ReadonlyArray<CompileRuntimePlanBindingInput>;
   registry: IntegrationDefinitionResolver;
 };

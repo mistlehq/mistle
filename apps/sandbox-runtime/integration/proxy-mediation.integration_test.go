@@ -320,7 +320,7 @@ func TestProxyMediation(t *testing.T) {
 		runtimePlan := buildProxyMediationRuntimePlan()
 		runtimePlan.EgressRoutes = append(runtimePlan.EgressRoutes, startup.EgressCredentialRoute{
 			EgressRuleID: "egress_rule_openai_duplicate",
-			BindingID: "ibd_openai_duplicate",
+			BindingID:    "ibd_openai_duplicate",
 			Match: startup.EgressRouteMatch{
 				Hosts:        []string{"api.openai.com"},
 				PathPrefixes: []string{"/v1"},
@@ -424,7 +424,7 @@ func buildProxyMediationRuntimePlan() startup.RuntimePlan {
 		EgressRoutes: []startup.EgressCredentialRoute{
 			{
 				EgressRuleID: "egress_rule_openai",
-				BindingID: "ibd_openai",
+				BindingID:    "ibd_openai",
 				Match: startup.EgressRouteMatch{
 					Hosts:        []string{"api.openai.com"},
 					PathPrefixes: []string{"/v1"},

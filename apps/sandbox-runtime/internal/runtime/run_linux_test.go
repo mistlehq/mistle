@@ -16,7 +16,7 @@ import (
 
 const runDumpabilityHelperModeEnv = "MISTLE_RUN_DUMPABILITY_HELPER_MODE"
 
-const invalidRuntimePlanStartupInputJSON = `{"bootstrapToken":"test-token","tunnelExchangeToken":"test-exchange-token","tunnelGatewayWsUrl":"ws://127.0.0.1:5003/tunnel/sandbox","runtimePlan":{"sandboxProfileId":"sbp_test","version":1,"image":{"source":"base","imageRef":"mistle/sandbox-base:dev"},"egressRoutes":[],"artifacts":[],"artifactRemovals":[],"runtimeClients":[{"clientId":"client_test","setup":{"env":{},"files":[{"fileId":"file_test","path":"/tmp","mode":420,"content":"invalid-target"}]},"processes":[],"endpoints":[]}],"workspaceSources":[],"agentRuntimes":[]}}`
+const invalidRuntimePlanStartupInputJSON = `{"bootstrapToken":"test-token","tunnelExchangeToken":"test-exchange-token","tunnelGatewayWsUrl":"ws://127.0.0.1:5003/tunnel/sandbox","runtimePlan":{"sandboxProfileId":"sbp_test","version":1,"image":{"source":"base","imageRef":"mistle/sandbox-base:dev"},"egressRoutes":[],"artifacts":[],"runtimeClients":[{"clientId":"client_test","setup":{"env":{},"files":[{"fileId":"file_test","path":"/tmp","mode":420,"content":"invalid-target"}]},"processes":[],"endpoints":[]}],"workspaceSources":[],"agentRuntimes":[]}}`
 
 func TestRunMarksCurrentProcessNonDumpableWithoutProxyCA(t *testing.T) {
 	helperCommand := exec.Command(

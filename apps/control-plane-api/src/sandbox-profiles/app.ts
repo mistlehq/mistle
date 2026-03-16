@@ -236,7 +236,6 @@ export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_RO
               }),
           image: {
             imageId: ctx.get("sandboxConfig").defaultBaseImage,
-            kind: "base",
             createdAt: new Date().toISOString(),
           },
         });

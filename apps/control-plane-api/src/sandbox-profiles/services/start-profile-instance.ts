@@ -17,7 +17,6 @@ type StartProfileInstanceInput = {
   source: SandboxInstanceSource;
   image: {
     imageId: string;
-    kind: "base" | "snapshot";
     createdAt: string;
   };
 };

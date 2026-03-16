@@ -34,7 +34,6 @@ export function loadDataPlaneWorkerFromToml(
   if (hasEntries(sandboxDocker)) {
     sandboxConfig.docker = {
       socketPath: sandboxDocker.socket_path,
-      snapshotRepository: sandboxDocker.snapshot_repository,
       networkName: sandboxDocker.network_name,
       tracesEndpoint: sandboxDocker.traces_endpoint,
     };

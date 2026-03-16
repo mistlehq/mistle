@@ -338,29 +338,6 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
   };
 }
 
-function createOpenAiNoArtifactDefinition(): IntegrationDefinition<
-  typeof OpenAiTargetConfigSchema,
-  typeof EmptyTargetSecretsSchema,
-  typeof OpenAiBindingConfigSchema
-> {
-  return {
-    familyId: "openai",
-    variantId: "openai-no-artifacts",
-    kind: "agent",
-    displayName: "OpenAI (No Artifacts)",
-    logoKey: "openai",
-    targetConfigSchema: OpenAiTargetConfigSchema,
-    targetSecretSchema: EmptyTargetSecretsSchema,
-    bindingConfigSchema: OpenAiBindingConfigSchema,
-    supportedAuthSchemes: ["api-key"],
-    compileBinding: () => ({
-      egressRoutes: [],
-      artifacts: [],
-      runtimeClients: [],
-    }),
-  };
-}
-
 describe("compileRuntimePlan", () => {
   it("compiles bindings into a deterministic runtime plan", () => {
     const registry = new IntegrationRegistry();
@@ -454,7 +431,6 @@ describe("compileRuntimePlan", () => {
         endpointKey: "app-server",
       },
     ]);
-    expect(runtimePlan.artifactRemovals).toEqual([]);
   });
 
   it("supports github release binary install refs in artifact lifecycle hooks", () => {
@@ -940,86 +916,6 @@ describe("compileRuntimePlan", () => {
         expect(error.code).toBe(CompilerErrorCodes.TARGET_DISABLED);
       }
     }
-  });
-
-  it("includes artifact removals for artifact keys present only in previous bindings", () => {
-    const registry = new IntegrationRegistry();
-    registry.register(createOpenAiDefinition());
-    registry.register(createOpenAiNoArtifactDefinition());
-
-    const runtimePlan = compileRuntimePlan({
-      organizationId: "org_123",
-      sandboxProfileId: "sbp_123",
-      version: 3,
-      image: {
-        source: "snapshot",
-        imageRef: "127.0.0.1:5001/mistle/sandbox-snapshots@sha256:test",
-        instanceId: "sbi_123",
-      },
-      registry,
-      bindings: [
-        {
-          targetKey: "openai-no-artifacts",
-          target: {
-            familyId: "openai",
-            variantId: "openai-no-artifacts",
-            enabled: true,
-            config: {
-              apiBaseUrl: "https://api.openai.com",
-            },
-            secrets: {},
-          },
-          connection: {
-            id: "conn_openai_org_123",
-            status: "active",
-            config: {},
-          },
-          binding: {
-            id: "bind_openai_agent_new",
-            kind: "agent",
-            connectionId: "conn_openai_org_123",
-            config: {
-              defaultModel: "gpt-5.3-codex",
-            },
-          },
-        },
-      ],
-      previousBindings: [
-        {
-          targetKey: "openai-default",
-          target: {
-            familyId: "openai",
-            variantId: "openai-default",
-            enabled: true,
-            config: {
-              apiBaseUrl: "https://api.openai.com",
-            },
-            secrets: {},
-          },
-          connection: {
-            id: "conn_openai_org_123",
-            status: "active",
-            config: {},
-          },
-          binding: {
-            id: "bind_openai_agent_old",
-            kind: "agent",
-            connectionId: "conn_openai_org_123",
-            config: {
-              defaultModel: "gpt-5.3-codex",
-            },
-          },
-        },
-      ],
-    });
-
-    expect(runtimePlan.artifacts).toEqual([]);
-    expect(runtimePlan.artifactRemovals).toEqual([
-      {
-        artifactKey: "codex-cli",
-        commands: [{ args: ["rm", "-f", "/var/lib/mistle/bin/codex"] }],
-      },
-    ]);
   });
 
   it("fails when resolved connection does not match binding connectionId", () => {

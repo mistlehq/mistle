@@ -17,7 +17,7 @@ func buildRuntimePlanForResolverTests() startup.RuntimePlan {
 		EgressRoutes: []startup.EgressCredentialRoute{
 			{
 				EgressRuleID: "egress_rule_openai",
-				BindingID: "ibd_openai",
+				BindingID:    "ibd_openai",
 				Match: startup.EgressRouteMatch{
 					Hosts:        []string{"api.openai.com"},
 					PathPrefixes: []string{"/v1"},
@@ -79,7 +79,7 @@ func TestResolverResolveMatchingRoute(t *testing.T) {
 		runtimePlan := buildRuntimePlanForResolverTests()
 		runtimePlan.EgressRoutes = append(runtimePlan.EgressRoutes, startup.EgressCredentialRoute{
 			EgressRuleID: "egress_rule_openai_secondary",
-			BindingID: "ibd_openai_secondary",
+			BindingID:    "ibd_openai_secondary",
 			Match: startup.EgressRouteMatch{
 				Hosts:        []string{"api.openai.com"},
 				PathPrefixes: []string{"/v1"},

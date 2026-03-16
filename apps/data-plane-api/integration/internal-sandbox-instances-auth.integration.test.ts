@@ -22,7 +22,6 @@ function createRuntimePlan(input: {
     },
     egressRoutes: [],
     artifacts: [],
-    artifactRemovals: [],
     runtimeClients: [],
     workspaceSources: [],
     agentRuntimes: [],
@@ -51,7 +50,6 @@ function createStartSandboxInput(input: {
     source: "dashboard",
     image: {
       imageId: input.imageId,
-      kind: "base",
       createdAt: "2026-02-27T00:00:00.000Z",
     },
   };
@@ -169,7 +167,6 @@ describe("internal sandbox instances auth integration", () => {
           source: "dashboard",
           image: {
             imageId: "im_dp_api_integration_invalid_body",
-            kind: "base",
             createdAt: "2026-02-27T00:00:00.000Z",
           },
         }),

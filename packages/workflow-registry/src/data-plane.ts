@@ -10,7 +10,7 @@ export const StopSandboxInstanceWorkflowVersion = "1";
 
 export type StartSandboxInstanceWorkflowImageInput = Pick<
   SandboxImageHandle,
-  "imageId" | "kind" | "createdAt"
+  "imageId" | "createdAt"
 >;
 
 export type StartSandboxInstanceWorkflowInput = {

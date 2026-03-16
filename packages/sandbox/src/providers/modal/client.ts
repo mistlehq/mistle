@@ -8,13 +8,11 @@ import {
 } from "./client-errors.js";
 import {
   ModalCloseSandboxStdinRequestSchema,
-  ModalSnapshotSandboxRequestSchema,
   ModalStartSandboxRequestSchema,
   ModalStopSandboxRequestSchema,
   ModalWriteSandboxStdinRequestSchema,
   type ModalCloseSandboxStdinRequest,
   type ModalSandboxConfig,
-  type ModalSnapshotSandboxRequest,
   type ModalStartSandboxRequest,
   type ModalStopSandboxRequest,
   type ModalWriteSandboxStdinRequest,
@@ -24,16 +22,10 @@ export type ModalStartSandboxResponse = {
   sandboxId: string;
 };
 
-export type ModalSnapshotSandboxResponse = {
-  imageId: string;
-  createdAt: string;
-};
-
 export interface ModalClient {
   startSandbox(request: ModalStartSandboxRequest): Promise<ModalStartSandboxResponse>;
   writeSandboxStdin(request: ModalWriteSandboxStdinRequest): Promise<void>;
   closeSandboxStdin(request: ModalCloseSandboxStdinRequest): Promise<void>;
-  snapshotSandbox(request: ModalSnapshotSandboxRequest): Promise<ModalSnapshotSandboxResponse>;
   stopSandbox(request: ModalStopSandboxRequest): Promise<void>;
 }
 
@@ -66,27 +58,6 @@ export class ModalApiClient implements ModalClient {
 
     return {
       sandboxId: sandbox.sandboxId,
-    };
-  }
-
-  async snapshotSandbox(
-    request: ModalSnapshotSandboxRequest,
-  ): Promise<ModalSnapshotSandboxResponse> {
-    const parsedRequest = ModalSnapshotSandboxRequestSchema.parse(request);
-
-    const sandbox = await this.#runModalClientOperation(
-      ModalClientOperationIds.RESOLVE_SANDBOX,
-      () => this.#modalClient.sandboxes.fromId(parsedRequest.sandboxId),
-    );
-    const image = await this.#runModalClientOperation(
-      ModalClientOperationIds.SNAPSHOT_SANDBOX,
-      () => sandbox.snapshotFilesystem(),
-    );
-
-    return {
-      imageId: image.imageId,
-      // Modal does not return a snapshot creation timestamp from this SDK call.
-      createdAt: new Date().toISOString(),
     };
   }
 

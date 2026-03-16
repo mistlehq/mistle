@@ -43,13 +43,13 @@ describe("mapDockerClientError", () => {
   });
 
   it("maps 401 unauthenticated status", () => {
-    const mapped = mapDockerClientError(DockerClientOperationIds.PUSH_IMAGE, {
+    const mapped = mapDockerClientError(DockerClientOperationIds.PULL_IMAGE, {
       statusCode: 401,
       reason: "authentication required",
     });
 
     expect(mapped.code).toBe(DockerClientErrorCodes.UNAUTHENTICATED);
-    expect(mapped.operation).toBe(DockerClientOperationIds.PUSH_IMAGE);
+    expect(mapped.operation).toBe(DockerClientOperationIds.PULL_IMAGE);
     expect(mapped.retryable).toBe(false);
   });
 

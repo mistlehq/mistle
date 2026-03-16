@@ -3,13 +3,13 @@ import { randomUUID } from "node:crypto";
 import type { Sandbox as ModalSandbox } from "modal";
 import { describe, expect } from "vitest";
 
-import { SandboxImageKind, SandboxProvider } from "../../src/index.js";
+import { SandboxProvider } from "../../src/index.js";
 import { it, modalAdapterIntegrationEnabled } from "./test-context.js";
 
 const describeModalAdapterIntegration = modalAdapterIntegrationEnabled ? describe : describe.skip;
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
-const SNAPSHOT_MARKER_FILE_PATH = "/tmp/mistle-snapshot-marker.txt";
+const START_MARKER_FILE_PATH = "/tmp/mistle-start-marker.txt";
 const STDIN_MARKER_FILE_PATH = "/tmp/mistle-stdin-marker.txt";
 const INJECTED_ENV_KEY = "MISTLE_SANDBOX_INJECTED_ENV";
 
@@ -18,22 +18,6 @@ type SandboxCommandResult = {
   stdout: string;
   stderr: string;
 };
-
-function formatUnknownError(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  if (typeof error === "string") {
-    return error;
-  }
-
-  try {
-    return JSON.stringify(error);
-  } catch {
-    return "unknown error";
-  }
-}
 
 async function writeSandboxFile(
   sandbox: ModalSandbox,
@@ -80,86 +64,24 @@ async function runSandboxCommand(input: {
 }
 
 describeModalAdapterIntegration("modal adapter integration", () => {
-  it("supports full lifecycle from base and snapshot images", async ({ fixture }) => {
-    const snapshotMarker = `mistle-modal-snapshot-${randomUUID()}`;
-    let baseSandboxId: string | undefined;
-    let snapshotSandboxId: string | undefined;
-    let lifecycleError: unknown;
-    let cleanupFailureMessage: string | undefined;
+  it("starts a sandbox from a base image and exposes its filesystem", async ({ fixture }) => {
+    const startMarker = `mistle-modal-start-${randomUUID()}`;
+    let sandboxId: string | undefined;
 
     try {
-      const baseSandbox = await fixture.adapter.start({ image: fixture.baseImage });
-      baseSandboxId = baseSandbox.sandboxId;
-      expect(baseSandbox.provider).toBe(SandboxProvider.MODAL);
-      expect(baseSandbox.sandboxId).not.toBe("");
+      const sandbox = await fixture.adapter.start({ image: fixture.baseImage });
+      sandboxId = sandbox.sandboxId;
+      expect(sandbox.provider).toBe(SandboxProvider.MODAL);
+      expect(sandbox.sandboxId).not.toBe("");
 
-      const baseSandboxForMutation = await fixture.modalClient.sandboxes.fromId(
-        baseSandbox.sandboxId,
-      );
-      await writeSandboxFile(baseSandboxForMutation, SNAPSHOT_MARKER_FILE_PATH, snapshotMarker);
-      const baseSandboxReadback = await readSandboxFile(
-        baseSandboxForMutation,
-        SNAPSHOT_MARKER_FILE_PATH,
-      );
-      expect(baseSandboxReadback).toBe(snapshotMarker);
-
-      const snapshot = await fixture.adapter.snapshot({ sandboxId: baseSandbox.sandboxId });
-      expect(snapshot.provider).toBe(SandboxProvider.MODAL);
-      expect(snapshot.kind).toBe(SandboxImageKind.SNAPSHOT);
-      expect(snapshot.imageId).not.toBe("");
-      expect(Number.isNaN(Date.parse(snapshot.createdAt))).toBe(false);
-
-      await fixture.adapter.stop({ sandboxId: baseSandbox.sandboxId });
-      baseSandboxId = undefined;
-
-      const snapshotSandbox = await fixture.adapter.start({ image: snapshot });
-      snapshotSandboxId = snapshotSandbox.sandboxId;
-      expect(snapshotSandbox.provider).toBe(SandboxProvider.MODAL);
-      expect(snapshotSandbox.sandboxId).not.toBe("");
-
-      const restoredSandbox = await fixture.modalClient.sandboxes.fromId(snapshotSandbox.sandboxId);
-      const restoredSnapshotMarker = await readSandboxFile(
-        restoredSandbox,
-        SNAPSHOT_MARKER_FILE_PATH,
-      );
-      expect(restoredSnapshotMarker).toBe(snapshotMarker);
-    } catch (error) {
-      lifecycleError = error;
+      const startedSandbox = await fixture.modalClient.sandboxes.fromId(sandbox.sandboxId);
+      await writeSandboxFile(startedSandbox, START_MARKER_FILE_PATH, startMarker);
+      const readback = await readSandboxFile(startedSandbox, START_MARKER_FILE_PATH);
+      expect(readback).toBe(startMarker);
     } finally {
-      const sandboxIdsToStop = [baseSandboxId, snapshotSandboxId].filter(
-        (sandboxId): sandboxId is string => sandboxId !== undefined,
-      );
-
-      const stopResults = await Promise.allSettled(
-        sandboxIdsToStop.map((sandboxId) => fixture.adapter.stop({ sandboxId })),
-      );
-      const stopFailures = stopResults
-        .map((result, index) => {
-          if (result.status === "rejected") {
-            return `${sandboxIdsToStop[index]}: ${formatUnknownError(result.reason)}`;
-          }
-
-          return undefined;
-        })
-        .filter((failureMessage): failureMessage is string => failureMessage !== undefined);
-
-      if (stopFailures.length > 0) {
-        cleanupFailureMessage = `Failed to stop one or more Modal sandboxes during test teardown: ${stopFailures.join("; ")}`;
+      if (sandboxId !== undefined) {
+        await fixture.adapter.stop({ sandboxId });
       }
-    }
-
-    if (lifecycleError !== undefined) {
-      if (cleanupFailureMessage !== undefined) {
-        throw new Error(
-          `${cleanupFailureMessage}. Original lifecycle failure: ${formatUnknownError(lifecycleError)}`,
-        );
-      }
-
-      throw lifecycleError;
-    }
-
-    if (cleanupFailureMessage !== undefined) {
-      throw new Error(cleanupFailureMessage);
     }
   }, 300_000);
 

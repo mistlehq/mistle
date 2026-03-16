@@ -118,7 +118,6 @@ export interface paths {
             image: {
               createdAt: string;
               imageId: string;
-              kind: "base" | "snapshot";
             };
             organizationId: string;
             runtimePlan: {

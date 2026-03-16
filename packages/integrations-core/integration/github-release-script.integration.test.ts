@@ -125,8 +125,6 @@ describe("renderInstallLatestGithubReleaseBinaryScript integration", () => {
     if (typeof script !== "string") {
       throw new Error("Expected generated github release install script.");
     }
-    expect(runtimePlan.artifactRemovals).toEqual([]);
-
     let container: StartedTestContainer | undefined;
 
     try {

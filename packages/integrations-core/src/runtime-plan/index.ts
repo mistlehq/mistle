@@ -4,7 +4,6 @@ import type {
   CompiledAgentRuntime,
   CompiledBindingResult,
   CompiledRuntimeArtifactSpec,
-  CompiledRuntimeArtifactRemovalSpec,
   CompiledRuntimeClient,
   CompiledRuntimePlan,
   CompiledWorkspaceSource,
@@ -22,7 +21,6 @@ type AssembleCompiledRuntimePlanInput = {
   version: number;
   image: CompiledRuntimePlan["image"];
   compiledBindingResults: ReadonlyArray<CompiledBindingResult>;
-  previousCompiledBindingResults?: ReadonlyArray<CompiledBindingResult>;
 };
 
 function flattenArtifacts(
@@ -416,33 +414,6 @@ function sortArtifacts(
     .sort((left, right) => left.artifactKey.localeCompare(right.artifactKey));
 }
 
-function computeArtifactRemovals(input: {
-  artifacts: ReadonlyArray<CompiledRuntimeArtifactSpec>;
-  previousCompiledBindingResults: ReadonlyArray<CompiledBindingResult> | undefined;
-}): ReadonlyArray<CompiledRuntimeArtifactRemovalSpec> {
-  const previousCompiledBindingResults = input.previousCompiledBindingResults;
-  if (previousCompiledBindingResults === undefined || previousCompiledBindingResults.length === 0) {
-    return [];
-  }
-
-  const currentArtifactKeys = new Set(input.artifacts.map((artifact) => artifact.artifactKey));
-  const previousArtifacts = sortArtifacts(flattenArtifacts(previousCompiledBindingResults));
-  const removals: CompiledRuntimeArtifactRemovalSpec[] = [];
-
-  for (const artifact of previousArtifacts) {
-    if (currentArtifactKeys.has(artifact.artifactKey)) {
-      continue;
-    }
-
-    removals.push({
-      artifactKey: artifact.artifactKey,
-      commands: artifact.lifecycle.remove,
-    });
-  }
-
-  return removals;
-}
-
 export function assembleCompiledRuntimePlan(
   input: AssembleCompiledRuntimePlanInput,
 ): CompiledRuntimePlan {
@@ -452,10 +423,6 @@ export function assembleCompiledRuntimePlan(
     ),
   );
   const artifacts = sortArtifacts(flattenArtifacts(input.compiledBindingResults));
-  const artifactRemovals = computeArtifactRemovals({
-    artifacts,
-    previousCompiledBindingResults: input.previousCompiledBindingResults,
-  });
   const runtimeClients = mergeRuntimeClients(
     resolveRuntimeClients({
       runtimeClients: flattenRuntimeClients(input.compiledBindingResults),
@@ -479,7 +446,6 @@ export function assembleCompiledRuntimePlan(
     image: input.image,
     egressRoutes: routes,
     artifacts,
-    artifactRemovals,
     workspaceSources,
     runtimeClients,
     agentRuntimes,

@@ -78,7 +78,7 @@ export const StartSandboxProfileInstanceWorkflowVersion = "1";
 
 export type StartSandboxProfileInstanceWorkflowImageInput = Pick<
   SandboxImageHandle,
-  "imageId" | "kind" | "createdAt"
+  "imageId" | "createdAt"
 >;
 
 export type StartSandboxProfileInstanceWorkflowInput = {

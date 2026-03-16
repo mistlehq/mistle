@@ -651,23 +651,10 @@ export function compileRuntimePlan(input: CompileRuntimePlanInput): CompiledRunt
     compiledBindingResults,
   });
 
-  const previousCompiledBindingResults =
-    input.previousBindings === undefined
-      ? []
-      : compileBindings({
-          organizationId: input.organizationId,
-          sandboxProfileId: input.sandboxProfileId,
-          version: input.version - 1,
-          registry: input.registry,
-          bindings: input.previousBindings,
-          enforceRuntimeEligibility: false,
-        });
-
   return assembleCompiledRuntimePlan({
     sandboxProfileId: input.sandboxProfileId,
     version: input.version,
     image: input.image,
     compiledBindingResults,
-    previousCompiledBindingResults,
   });
 }
