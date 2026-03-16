@@ -12,7 +12,7 @@ func TestRunWithInput(t *testing.T) {
 	t.Run("fails when runtime listen addr env is missing", func(t *testing.T) {
 		err := runWithInput(runtime.RunInput{
 			Stdin: bytes.NewBufferString(
-				`{"bootstrapToken":"test-token","tunnelGatewayWsUrl":"ws://127.0.0.1:5003/tunnel/sandbox","runtimePlan":{"sandboxProfileId":"sbp_test","version":1,"image":{"source":"base","imageRef":"mistle/sandbox-base:dev"},"egressRoutes":[],"artifacts":[],"artifactRemovals":[],"runtimeClients":[],"workspaceSources":[],"agentRuntimes":[]}}`,
+				`{"bootstrapToken":"test-token","tunnelGatewayWsUrl":"ws://127.0.0.1:5003/tunnel/sandbox","runtimePlan":{"sandboxProfileId":"sbp_test","version":1,"image":{"source":"base","imageRef":"mistle/sandbox-base:dev"},"egressRoutes":[],"artifacts":[],"runtimeClients":[],"workspaceSources":[],"agentRuntimes":[]}}`,
 			),
 			LookupEnv: func(string) (string, bool) {
 				return "", false

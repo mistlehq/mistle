@@ -54,7 +54,6 @@ export function createInternalSandboxRuntimeApp(): AppRoutes<
           source: body.source,
           image: {
             imageId: ctx.get("sandboxConfig").defaultBaseImage,
-            kind: "base",
             createdAt: new Date().toISOString(),
           },
         });

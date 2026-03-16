@@ -43,7 +43,6 @@ function createRuntimePlan(input: {
     },
     egressRoutes: [],
     artifacts: [],
-    artifactRemovals: [],
     runtimeClients: [],
     workspaceSources: [],
     agentRuntimes: [],
@@ -100,7 +99,6 @@ describe("sandboxInstances.start integration", () => {
       source: "dashboard",
       image: {
         imageId: "im_dp_api_integration_001",
-        kind: "base",
         createdAt: "2026-02-27T00:00:00.000Z",
       },
     };
@@ -168,7 +166,6 @@ describe("sandboxInstances.start integration", () => {
       source: "dashboard",
       image: {
         imageId: "im_dp_api_integration_idempotent",
-        kind: "base",
         createdAt: "2026-02-27T00:00:00.000Z",
       },
     };
@@ -223,7 +220,6 @@ describe("sandboxInstances.start integration", () => {
       source: "dashboard",
       image: {
         imageId: "im_dp_api_sync_insert",
-        kind: "base",
         createdAt: "2026-02-27T00:00:00.000Z",
       },
     };

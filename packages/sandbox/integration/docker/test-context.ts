@@ -6,7 +6,6 @@ import { it as vitestIt } from "vitest";
 import { z } from "zod";
 
 import {
-  SandboxImageKind,
   SandboxProvider,
   createSandboxAdapter,
   type SandboxAdapter,
@@ -19,7 +18,6 @@ const REGISTRY_IMAGE_REFERENCE = "registry:3";
 const REGISTRY_INTERNAL_PORT = 5000;
 const BASE_IMAGE_SOURCE_REFERENCE = "registry:3";
 const BASE_IMAGE_REPOSITORY_PATH = "mistle/base";
-const SNAPSHOT_REPOSITORY_PATH = "mistle/snapshots";
 const STARTUP_STDIN_PROBE_IMAGE_SOURCE_REFERENCE = "alpine:3.22";
 const STARTUP_STDIN_PROBE_REPOSITORY_PATH = "mistle/startup-stdin-probe";
 
@@ -38,7 +36,6 @@ type DockerProgressMessage = z.output<typeof DockerProgressMessageSchema>;
 
 type RegistryFixture = {
   container: StartedTestContainer;
-  snapshotRepository: string;
   registryAuthority: string;
 };
 
@@ -47,7 +44,6 @@ export type DockerAdapterIntegrationFixture = {
   baseImage: SandboxImageHandle;
   startupStdinProbeImage: SandboxImageHandle;
   dockerClient: Docker;
-  snapshotRepository: string;
 };
 
 export const sandboxIntegrationSettings = resolveSandboxIntegrationSettings(process.env);
@@ -79,7 +75,6 @@ export const it = vitestIt.extend<{ fixture: DockerAdapterIntegrationFixture }>(
         provider: SandboxProvider.DOCKER,
         docker: {
           socketPath: settings.socketPath,
-          snapshotRepository: registry.snapshotRepository,
         },
       });
 
@@ -98,7 +93,6 @@ export const it = vitestIt.extend<{ fixture: DockerAdapterIntegrationFixture }>(
           baseImage,
           startupStdinProbeImage,
           dockerClient,
-          snapshotRepository: registry.snapshotRepository,
         });
       } finally {
         await registry.container.stop();
@@ -114,7 +108,6 @@ export function createBaseImageHandle(baseImageId: string): SandboxImageHandle {
   return {
     provider: SandboxProvider.DOCKER,
     imageId: baseImageId,
-    kind: SandboxImageKind.BASE,
     // This timestamp is metadata for the handle and not sent to Docker start calls.
     createdAt: new Date().toISOString(),
   };
@@ -175,7 +168,6 @@ async function startRegistry(): Promise<RegistryFixture> {
 
   return {
     container,
-    snapshotRepository: `${registryAuthority}/${SNAPSHOT_REPOSITORY_PATH}`,
     registryAuthority,
   };
 }

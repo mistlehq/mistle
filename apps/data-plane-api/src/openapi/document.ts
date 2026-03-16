@@ -43,7 +43,6 @@ const StartSandboxInstanceRequestSchema = z
     image: z
       .object({
         imageId: z.string().min(1),
-        kind: z.union([z.literal("base"), z.literal("snapshot")]),
         createdAt: z.string().min(1),
       })
       .strict(),

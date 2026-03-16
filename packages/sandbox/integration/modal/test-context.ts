@@ -5,7 +5,6 @@ import { ModalClient as ModalSdkClient } from "modal";
 import { it as vitestIt } from "vitest";
 
 import {
-  SandboxImageKind,
   SandboxProvider,
   createSandboxAdapter,
   type SandboxAdapter,
@@ -103,7 +102,6 @@ export function createBaseImageHandle(baseImageId: string): SandboxImageHandle {
   return {
     provider: SandboxProvider.MODAL,
     imageId: baseImageId,
-    kind: SandboxImageKind.BASE,
     // This timestamp is metadata for the handle and not sent to Modal start calls.
     createdAt: new Date().toISOString(),
   };

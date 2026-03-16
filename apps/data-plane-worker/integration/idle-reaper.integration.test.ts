@@ -65,7 +65,6 @@ const TestRuntimeConfig: DataPlaneWorkerRuntimeConfig = {
       tokenizerProxyEgressBaseUrl: "http://tokenizer-proxy-relay/tokenizer-proxy/egress",
       docker: {
         socketPath: "/var/run/docker.sock",
-        snapshotRepository: "localhost:5001/mistle/snapshots",
       },
     },
   },

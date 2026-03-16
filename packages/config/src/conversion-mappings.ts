@@ -386,11 +386,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH",
   },
   {
-    configPath: ["apps", "data_plane_worker", "sandbox", "docker", "snapshotRepository"],
-    tomlPath: ["apps", "data_plane_worker", "sandbox", "docker", "snapshot_repository"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY",
-  },
-  {
     configPath: ["apps", "data_plane_worker", "sandbox", "docker", "networkName"],
     tomlPath: ["apps", "data_plane_worker", "sandbox", "docker", "network_name"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME",

@@ -82,24 +82,12 @@
                         "type": "string",
                         "minLength": 1
                       },
-                      "kind": {
-                        "anyOf": [
-                          {
-                            "type": "string",
-                            "enum": ["base"]
-                          },
-                          {
-                            "type": "string",
-                            "enum": ["snapshot"]
-                          }
-                        ]
-                      },
                       "createdAt": {
                         "type": "string",
                         "minLength": 1
                       }
                     },
-                    "required": ["imageId", "kind", "createdAt"],
+                    "required": ["imageId", "createdAt"],
                     "additionalProperties": false
                   }
                 },

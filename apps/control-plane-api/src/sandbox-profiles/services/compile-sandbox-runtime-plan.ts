@@ -291,26 +291,6 @@ export async function compileSandboxRuntimePlan(
     profileVersion: input.profileVersion,
   });
 
-  const previousSandboxProfileVersion = await input.db.query.sandboxProfileVersions.findFirst({
-    columns: {
-      version: true,
-    },
-    where: (table, { and, eq, lt }) =>
-      and(eq(table.sandboxProfileId, input.profileId), lt(table.version, input.profileVersion)),
-    orderBy: (table, { desc }) => [desc(table.version)],
-  });
-
-  const previousCompileBindings =
-    previousSandboxProfileVersion === undefined
-      ? []
-      : await resolveCompileBindingsForVersion({
-          db: input.db,
-          resolveTargetSecrets: input.resolveTargetSecrets,
-          organizationId: input.organizationId,
-          profileId: input.profileId,
-          profileVersion: previousSandboxProfileVersion.version,
-        });
-
   try {
     return compileRuntimePlan({
       organizationId: input.organizationId,
@@ -318,11 +298,6 @@ export async function compileSandboxRuntimePlan(
       version: input.profileVersion,
       image: input.image,
       bindings: compileBindings,
-      ...(previousCompileBindings.length === 0
-        ? {}
-        : {
-            previousBindings: previousCompileBindings,
-          }),
       registry: input.integrationRegistry,
     });
   } catch (error) {

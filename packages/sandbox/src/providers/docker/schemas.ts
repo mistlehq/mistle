@@ -5,9 +5,6 @@ export const DockerSandboxConfigSchema = z
     socketPath: z.string().trim().min(1, {
       message: "Docker config field `socketPath` is required.",
     }),
-    snapshotRepository: z.string().trim().min(1, {
-      message: "Docker config field `snapshotRepository` is required.",
-    }),
     networkName: z.string().trim().min(1).optional(),
   })
   .strict();
@@ -51,15 +48,6 @@ export const DockerCloseSandboxStdinRequestSchema = z
   })
   .strict();
 export type DockerCloseSandboxStdinRequest = z.output<typeof DockerCloseSandboxStdinRequestSchema>;
-
-export const DockerSnapshotSandboxRequestSchema = z
-  .object({
-    sandboxId: z.string().trim().min(1, {
-      message: "Docker request field `sandboxId` is required.",
-    }),
-  })
-  .strict();
-export type DockerSnapshotSandboxRequest = z.output<typeof DockerSnapshotSandboxRequestSchema>;
 
 export const DockerStopSandboxRequestSchema = z
   .object({

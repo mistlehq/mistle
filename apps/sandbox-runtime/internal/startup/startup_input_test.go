@@ -15,7 +15,6 @@ const validRuntimePlanJSON = `{
 	},
 	"egressRoutes": [],
 	"artifacts": [],
-	"artifactRemovals": [],
 	"runtimeClients": [],
 	"workspaceSources": [],
 	"agentRuntimes": []
@@ -100,7 +99,6 @@ func TestReadStartupInput(t *testing.T) {
 							}]
 						}
 					}],
-					"artifactRemovals": [],
 					"runtimeClients": [],
 					"workspaceSources": [],
 					"agentRuntimes": []
@@ -281,7 +279,6 @@ func TestReadStartupInput(t *testing.T) {
 					},
 					"egressRoutes": [],
 					"artifacts": [],
-					"artifactRemovals": [],
 					"runtimeClients": [],
 					"workspaceSources": [],
 					"agentRuntimes": [],
@@ -338,7 +335,6 @@ func TestReadStartupInput(t *testing.T) {
 					},
 					"egressRoutes": [],
 					"artifacts": [],
-					"artifactRemovals": [],
 					"runtimeClients": [],
 					"workspaceSources": [],
 					"agentRuntimes": [
@@ -358,6 +354,37 @@ func TestReadStartupInput(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "agentRuntimes[0].clientId") {
 			t.Fatalf("expected agent runtime clientId validation error, got %v", err)
+		}
+	})
+
+	t.Run("fails when runtime plan image has unknown field", func(t *testing.T) {
+		_, err := ReadStartupInput(ReadStartupInputInput{
+			Reader: bytes.NewBufferString(`{
+				"bootstrapToken": "test-token",
+				"tunnelExchangeToken": "test-exchange-token",
+				"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+				"runtimePlan": {
+					"sandboxProfileId": "sbp_123",
+					"version": 1,
+					"image": {
+						"source": "base",
+						"imageRef": "mistle/sandbox-base:dev",
+						"instanceId": "sbi_123"
+					},
+					"egressRoutes": [],
+					"artifacts": [],
+					"runtimeClients": [],
+					"workspaceSources": [],
+					"agentRuntimes": []
+				}
+			}`),
+			MaxBytes: 4096,
+		})
+		if err == nil {
+			t.Fatal("expected error when runtime plan image has unknown field")
+		}
+		if !strings.Contains(err.Error(), "instanceId") {
+			t.Fatalf("expected unknown image field error, got %v", err)
 		}
 	})
 }

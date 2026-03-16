@@ -75,7 +75,6 @@ export type SandboxProfilesService = {
     source: SandboxInstanceSource;
     image: {
       imageId: string;
-      kind: "base" | "snapshot";
       createdAt: string;
     };
   }) => Promise<{

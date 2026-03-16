@@ -5,7 +5,6 @@ Provider-agnostic sandbox lifecycle package used by Mistle services.
 Current scope:
 
 - start a sandbox from an image handle
-- snapshot a running sandbox to a new image handle
 - stop a running sandbox
 
 Currently implemented providers:
@@ -43,11 +42,9 @@ Unknown provider names fail fast during integration config parsing.
 The package root exports:
 
 - `SandboxProvider`
-- `SandboxImageKind`
 - `SandboxImageHandle`
 - `SandboxHandle`
 - `SandboxStartRequest`
-- `SandboxSnapshotRequest`
 - `SandboxStopRequest`
 - `SandboxAdapter`
 - `SandboxError`
@@ -58,7 +55,7 @@ The package root exports:
 `createSandboxAdapter` is the main entrypoint.
 
 ```ts
-import { createSandboxAdapter, SandboxImageKind, type SandboxImageHandle } from "@mistle/sandbox";
+import { createSandboxAdapter, type SandboxImageHandle } from "@mistle/sandbox";
 
 // See provider README for provider-specific configuration shape.
 const providerConfig = { provider: "..." };
@@ -67,7 +64,6 @@ const adapter = createSandboxAdapter(providerConfig);
 const baseImage: SandboxImageHandle = {
   provider: providerConfig.provider,
   imageId: "im-abc123",
-  kind: SandboxImageKind.BASE,
   createdAt: new Date().toISOString(),
 };
 
@@ -77,15 +73,12 @@ await sandbox.writeStdin({
 });
 await sandbox.closeStdin();
 
-const snapshot = await adapter.snapshot({ sandboxId: sandbox.sandboxId });
-
 await adapter.stop({ sandboxId: sandbox.sandboxId });
 ```
 
 ## Usage Notes
 
-- Start and restore use the same semantic path: both are `start({ image })`.
-- `image.kind` can be `base` or `snapshot`; provider implementations decide how they interpret it.
+- Sandbox image handles describe the provider image passed to `start({ image })`.
 - `SandboxHandle.writeStdin({ payload })` writes bytes to running sandbox stdin.
 - `SandboxHandle.closeStdin()` closes stdin to signal EOF.
 - Operations may throw `SandboxError` subclasses. Configuration failures throw `SandboxConfigurationError`.
@@ -95,7 +88,6 @@ await adapter.stop({ sandboxId: sandbox.sandboxId });
 `@mistle/sandbox` is responsible only for sandbox lifecycle operations exposed by the adapter interface:
 
 - start a sandbox from an image handle
-- snapshot a running sandbox
 - stop a sandbox
 
 It is not responsible for provisioning or managing provider infrastructure/resources. For current and future adapters (for example Modal, Docker, Kubernetes), platform concerns such as autoscaling, cluster/node lifecycle, scheduling policy, capacity management, and other underlying resource orchestration are out of scope for this package.
@@ -114,7 +106,7 @@ Use the current Modal provider as the reference implementation.
 8. Wire the provider into `createSandboxAdapter` in `src/factory.ts`.
 9. Add unit tests next to each provider module (config, errors, factory wiring, and adapter behavior).
 10. Add provider integration tests in `integration/<provider>/` (for example `integration/modal/modal-adapter.integration.test.ts`).
-11. Integration tests must cover the full lifecycle surface: `start` from a base image, mutate filesystem state, `snapshot`, `stop`, `start` from the snapshot image, verify restored filesystem state, and `stop` again.
+11. Integration tests must cover the provider lifecycle surface: `start` from a base image, validate sandbox interaction such as stdin/filesystem/env behavior, and `stop`.
 
 Design expectations:
 

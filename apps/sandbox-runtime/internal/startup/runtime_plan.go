@@ -7,7 +7,6 @@ import (
 )
 
 const (
-	resolvedSandboxImageSourceSnapshot    = "snapshot"
 	resolvedSandboxImageSourceProfileBase = "profile-base"
 	resolvedSandboxImageSourceBase        = "base"
 	runtimeFileWriteModeOverwrite         = "overwrite"
@@ -22,21 +21,19 @@ var allowedAuthInjectionTypes = map[string]struct{}{
 }
 
 type RuntimePlan struct {
-	SandboxProfileID string                       `json:"sandboxProfileId"`
-	Version          int                          `json:"version"`
-	Image            ResolvedSandboxImage         `json:"image"`
-	EgressRoutes     []EgressCredentialRoute      `json:"egressRoutes"`
-	Artifacts        []RuntimeArtifactSpec        `json:"artifacts"`
-	ArtifactRemovals []RuntimeArtifactRemovalSpec `json:"artifactRemovals"`
-	WorkspaceSources []WorkspaceSource            `json:"workspaceSources"`
-	RuntimeClients   []RuntimeClient              `json:"runtimeClients"`
-	AgentRuntimes    []AgentRuntime               `json:"agentRuntimes"`
+	SandboxProfileID string                  `json:"sandboxProfileId"`
+	Version          int                     `json:"version"`
+	Image            ResolvedSandboxImage    `json:"image"`
+	EgressRoutes     []EgressCredentialRoute `json:"egressRoutes"`
+	Artifacts        []RuntimeArtifactSpec   `json:"artifacts"`
+	WorkspaceSources []WorkspaceSource       `json:"workspaceSources"`
+	RuntimeClients   []RuntimeClient         `json:"runtimeClients"`
+	AgentRuntimes    []AgentRuntime          `json:"agentRuntimes"`
 }
 
 type ResolvedSandboxImage struct {
 	Source           string `json:"source"`
 	ImageRef         string `json:"imageRef"`
-	InstanceID       string `json:"instanceId"`
 	SandboxProfileID string `json:"sandboxProfileId"`
 	Version          int    `json:"version"`
 }
@@ -88,11 +85,6 @@ type RuntimeArtifactLifecycle struct {
 	Install []RuntimeArtifactCommand `json:"install"`
 	Update  []RuntimeArtifactCommand `json:"update"`
 	Remove  []RuntimeArtifactCommand `json:"remove"`
-}
-
-type RuntimeArtifactRemovalSpec struct {
-	ArtifactKey string                   `json:"artifactKey"`
-	Commands    []RuntimeArtifactCommand `json:"commands"`
 }
 
 type RuntimeArtifactCommand struct {
@@ -184,9 +176,6 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 	if runtimePlan.Artifacts == nil {
 		return fmt.Errorf("runtime plan artifacts is required")
 	}
-	if runtimePlan.ArtifactRemovals == nil {
-		return fmt.Errorf("runtime plan artifactRemovals is required")
-	}
 	if runtimePlan.WorkspaceSources == nil {
 		return fmt.Errorf("runtime plan workspaceSources is required")
 	}
@@ -215,11 +204,6 @@ func ValidateRuntimePlan(runtimePlan RuntimePlan) error {
 
 	for artifactIndex, artifact := range runtimePlan.Artifacts {
 		if err := validateArtifact(artifact, artifactIndex); err != nil {
-			return err
-		}
-	}
-	for removalIndex, removal := range runtimePlan.ArtifactRemovals {
-		if err := validateArtifactRemoval(removal, removalIndex); err != nil {
 			return err
 		}
 	}
@@ -269,10 +253,6 @@ func validateResolvedSandboxImage(image ResolvedSandboxImage) error {
 	}
 
 	switch image.Source {
-	case resolvedSandboxImageSourceSnapshot:
-		if strings.TrimSpace(image.InstanceID) == "" {
-			return fmt.Errorf("runtime plan image instanceId is required for source '%s'", image.Source)
-		}
 	case resolvedSandboxImageSourceProfileBase:
 		if strings.TrimSpace(image.SandboxProfileID) == "" {
 			return fmt.Errorf("runtime plan image sandboxProfileId is required for source '%s'", image.Source)
@@ -416,29 +396,6 @@ func validateArtifact(artifact RuntimeArtifactSpec, artifactIndex int) error {
 
 	return nil
 }
-
-func validateArtifactRemoval(removal RuntimeArtifactRemovalSpec, removalIndex int) error {
-	if strings.TrimSpace(removal.ArtifactKey) == "" {
-		return fmt.Errorf("runtime plan artifactRemovals[%d] artifactKey is required", removalIndex)
-	}
-	if removal.Commands == nil {
-		return fmt.Errorf("runtime plan artifactRemovals[%d] commands is required", removalIndex)
-	}
-	if len(removal.Commands) == 0 {
-		return fmt.Errorf("runtime plan artifactRemovals[%d] commands must not be empty", removalIndex)
-	}
-	for commandIndex, command := range removal.Commands {
-		if err := validateArtifactCommand(
-			command,
-			fmt.Sprintf("runtime plan artifactRemovals[%d] commands[%d]", removalIndex, commandIndex),
-		); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 func validateArtifactCommand(command RuntimeArtifactCommand, location string) error {
 	if command.Args == nil {
 		return fmt.Errorf("%s args is required", location)

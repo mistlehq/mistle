@@ -39,7 +39,6 @@ const adapter = createSandboxAdapter({
 
 - `start({ image })` resolves Modal app and image, then creates a sandbox.
 - returned `SandboxHandle` supports `writeStdin({ payload })` and `closeStdin()` via Modal sandbox stdin stream APIs.
-- `snapshot({ sandboxId })` snapshots sandbox filesystem to a new image handle.
 - `stop({ sandboxId })` resolves sandbox and terminates it.
 
 ## Error Surface
@@ -55,8 +54,8 @@ See implementation details in `client-errors.ts`.
 ## Integration Tests
 
 Modal adapter integration tests call the real Modal API and are opt-in.
-They cover the full adapter lifecycle surface: `start`, mutate filesystem state, `snapshot`, `stop`,
-`start` from a snapshot image, and verify restored filesystem state.
+They cover the adapter lifecycle surface for `start`, `stop`, stdin writes, env injection, and
+filesystem access inside a started sandbox.
 
 Required environment variables when enabled:
 
@@ -82,5 +81,3 @@ Run:
 ```bash
 pnpm --filter @mistle/sandbox test:integration
 ```
-
-Note: snapshot integration creates a new Modal image and currently does not delete it.

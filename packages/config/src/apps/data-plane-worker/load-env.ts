@@ -114,10 +114,6 @@ const loadSandboxDockerEnv = createEnvLoader<typeof DataPlaneWorkerSandboxDocker
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH",
   },
   {
-    key: "snapshotRepository",
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY",
-  },
-  {
     key: "networkName",
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME",
   },

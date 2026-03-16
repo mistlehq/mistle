@@ -331,7 +331,6 @@ const dataPlaneWorkerDockerFixtureConfig = {
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
     docker: {
       socketPath: "/var/run/docker.sock",
-      snapshotRepository: "localhost:5001/mistle/snapshots",
       networkName: "mistle-sandbox-dev",
       tracesEndpoint: "http://otel-lgtm:4318/v1/traces",
     },
@@ -669,8 +668,6 @@ describe("loadConfig integrations", () => {
         NODE_ENV: "production",
         MISTLE_GLOBAL_SANDBOX_PROVIDER: "docker",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH: "/var/run/docker.sock",
-        MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SNAPSHOT_REPOSITORY:
-          "localhost:5001/mistle/snapshots",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME: "mistle-sandbox-dev",
         MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT:
           "http://otel-lgtm:4318/v1/traces",

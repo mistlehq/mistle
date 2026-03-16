@@ -61,15 +61,6 @@ export const ModalCloseSandboxStdinRequestSchema = z
   .strict();
 export type ModalCloseSandboxStdinRequest = z.output<typeof ModalCloseSandboxStdinRequestSchema>;
 
-export const ModalSnapshotSandboxRequestSchema = z
-  .object({
-    sandboxId: z.string().trim().min(1, {
-      message: "Modal request field `sandboxId` is required.",
-    }),
-  })
-  .strict();
-export type ModalSnapshotSandboxRequest = z.output<typeof ModalSnapshotSandboxRequestSchema>;
-
 export const ModalStopSandboxRequestSchema = z
   .object({
     sandboxId: z.string().trim().min(1, {

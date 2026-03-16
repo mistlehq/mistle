@@ -34,12 +34,6 @@ export const ModalClientOperationIds = {
    */
   RESOLVE_SANDBOX: "resolve_sandbox",
   /**
-   * `sandbox.snapshotFilesystem(...)`
-   * Source:
-   * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L1126-L1140
-   */
-  SNAPSHOT_SANDBOX: "snapshot_sandbox",
-  /**
    * `sandbox.terminate(...)`
    * Source:
    * https://github.com/modal-labs/libmodal/blob/12a48ff63c32dcffa7267cbfbc3b8901db243cc9/modal-js/src/sandbox.ts#L1033-L1045

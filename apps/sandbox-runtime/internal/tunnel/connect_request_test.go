@@ -101,8 +101,8 @@ func TestParsePTYConnectRequest(t *testing.T) {
 
 	t.Run("rejects invalid session mode", func(t *testing.T) {
 		payload, err := json.Marshal(map[string]any{
-			"type":      sessionprotocol.MessageTypeStreamOpen,
-			"streamId":  22,
+			"type":     sessionprotocol.MessageTypeStreamOpen,
+			"streamId": 22,
 			"channel": map[string]any{
 				"kind":    sessionprotocol.ChannelKindPTY,
 				"session": "resume",
@@ -123,8 +123,8 @@ func TestParsePTYConnectRequest(t *testing.T) {
 
 	t.Run("rejects cols and rows mismatch", func(t *testing.T) {
 		payload, err := json.Marshal(map[string]any{
-			"type":      sessionprotocol.MessageTypeStreamOpen,
-			"streamId":  33,
+			"type":     sessionprotocol.MessageTypeStreamOpen,
+			"streamId": 33,
 			"channel": map[string]any{
 				"kind":    sessionprotocol.ChannelKindPTY,
 				"session": sessionprotocol.PTYSessionModeCreate,

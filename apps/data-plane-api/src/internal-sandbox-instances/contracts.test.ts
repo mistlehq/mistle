@@ -86,7 +86,6 @@ describe("StartSandboxInstanceInputValidationSchema", () => {
       source: "dashboard",
       image: {
         imageId: "img_123",
-        kind: "base",
         createdAt: "2026-03-10T00:00:00.000Z",
       },
     };
@@ -107,7 +106,6 @@ describe("StartSandboxInstanceInputValidationSchema", () => {
       source: "dashboard",
       image: {
         imageId: "img_123",
-        kind: "base",
         createdAt: "2026-03-10T00:00:00.000Z",
       },
     };
@@ -131,7 +129,6 @@ describe("StartSandboxInstanceInputValidationSchema", () => {
       source: "dashboard",
       image: {
         imageId: "img_123",
-        kind: "base",
         createdAt: "2026-03-10T00:00:00.000Z",
       },
     });

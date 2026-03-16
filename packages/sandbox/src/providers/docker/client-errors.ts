@@ -37,24 +37,6 @@ export const DockerClientOperationIds = {
    */
   RESOLVE_CONTAINER: "resolve_container",
   /**
-   * `container.commit(...)`.
-   * Source:
-   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L544-L576
-   */
-  COMMIT_CONTAINER: "commit_container",
-  /**
-   * `image.push(...)`.
-   * Source:
-   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/image.js#L163-L200
-   */
-  PUSH_IMAGE: "push_image",
-  /**
-   * `image.inspect(...)`.
-   * Source:
-   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/image.js#L21-L51
-   */
-  INSPECT_IMAGE: "inspect_image",
-  /**
    * `container.remove(...)`.
    * Source:
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L815-L847

@@ -25,15 +25,6 @@ export type {
   InsertSandboxInstanceRuntimePlan,
   SandboxInstanceRuntimePlan,
 } from "./sandbox-instance-runtime-plans.js";
-export {
-  sandboxInstanceSnapshots,
-  SandboxSnapshotArtifactKinds,
-} from "./sandbox-instance-snapshots.js";
-export type {
-  InsertSandboxInstanceSnapshot,
-  SandboxSnapshotArtifactKind,
-  SandboxInstanceSnapshot,
-} from "./sandbox-instance-snapshots.js";
 export { sandboxTunnelTokenRedemptions } from "./sandbox-tunnel-token-redemptions.js";
 export type {
   InsertSandboxTunnelTokenRedemption,

@@ -17,7 +17,7 @@ func TestValidateRuntimePlan(t *testing.T) {
 			EgressRoutes: []EgressCredentialRoute{
 				{
 					EgressRuleID: "egress_rule_github_git",
-					BindingID: "bind_github",
+					BindingID:    "bind_github",
 					Match: EgressRouteMatch{
 						Hosts:        []string{"github.com"},
 						PathPrefixes: []string{"/mistlehq/mistle.git"},
@@ -38,8 +38,7 @@ func TestValidateRuntimePlan(t *testing.T) {
 					},
 				},
 			},
-			Artifacts:        []RuntimeArtifactSpec{},
-			ArtifactRemovals: []RuntimeArtifactRemovalSpec{},
+			Artifacts: []RuntimeArtifactSpec{},
 			WorkspaceSources: []WorkspaceSource{
 				{
 					SourceKind:   "git-clone",
@@ -67,7 +66,7 @@ func TestValidateRuntimePlan(t *testing.T) {
 			EgressRoutes: []EgressCredentialRoute{
 				{
 					EgressRuleID: "egress_rule_github_api",
-					BindingID: "bind_github",
+					BindingID:    "bind_github",
 					Match: EgressRouteMatch{
 						Hosts: []string{"api.github.com"},
 					},
@@ -86,7 +85,6 @@ func TestValidateRuntimePlan(t *testing.T) {
 				},
 			},
 			Artifacts:        []RuntimeArtifactSpec{},
-			ArtifactRemovals: []RuntimeArtifactRemovalSpec{},
 			WorkspaceSources: []WorkspaceSource{},
 			RuntimeClients:   []RuntimeClient{},
 			AgentRuntimes:    []AgentRuntime{},
@@ -121,7 +119,6 @@ func TestValidateRuntimePlan(t *testing.T) {
 					},
 				},
 			},
-			ArtifactRemovals: []RuntimeArtifactRemovalSpec{},
 			WorkspaceSources: []WorkspaceSource{},
 			RuntimeClients:   []RuntimeClient{},
 			AgentRuntimes:    []AgentRuntime{},
@@ -153,7 +150,6 @@ func TestValidateRuntimePlan(t *testing.T) {
 					},
 				},
 			},
-			ArtifactRemovals: []RuntimeArtifactRemovalSpec{},
 			WorkspaceSources: []WorkspaceSource{},
 			RuntimeClients:   []RuntimeClient{},
 			AgentRuntimes:    []AgentRuntime{},
@@ -163,6 +159,28 @@ func TestValidateRuntimePlan(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "env contains an empty key") {
 			t.Fatalf("expected empty env key validation error, got %v", err)
+		}
+	})
+
+	t.Run("rejects snapshot image sources", func(t *testing.T) {
+		err := ValidateRuntimePlan(RuntimePlan{
+			SandboxProfileID: "sbp_123",
+			Version:          1,
+			Image: ResolvedSandboxImage{
+				Source:   "snapshot",
+				ImageRef: "mistle/sandbox-snapshot@sha256:test",
+			},
+			EgressRoutes:     []EgressCredentialRoute{},
+			Artifacts:        []RuntimeArtifactSpec{},
+			WorkspaceSources: []WorkspaceSource{},
+			RuntimeClients:   []RuntimeClient{},
+			AgentRuntimes:    []AgentRuntime{},
+		})
+		if err == nil {
+			t.Fatal("expected snapshot image source to fail validation")
+		}
+		if !strings.Contains(err.Error(), "is not supported") {
+			t.Fatalf("expected unsupported image source validation error, got %v", err)
 		}
 	})
 }

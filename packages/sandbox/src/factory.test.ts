@@ -16,7 +16,6 @@ describe("createSandboxAdapter", () => {
     });
 
     expect(typeof adapter.start).toBe("function");
-    expect(typeof adapter.snapshot).toBe("function");
     expect(typeof adapter.stop).toBe("function");
   });
 
@@ -33,12 +32,10 @@ describe("createSandboxAdapter", () => {
       provider: SandboxProvider.DOCKER,
       docker: {
         socketPath: "/var/run/docker.sock",
-        snapshotRepository: "localhost:5001/mistle/snapshots",
       },
     });
 
     expect(typeof adapter.start).toBe("function");
-    expect(typeof adapter.snapshot).toBe("function");
     expect(typeof adapter.stop).toBe("function");
   });
 

@@ -7,13 +7,11 @@ describe("validateDockerSandboxConfig", () => {
   it("returns config when all required fields are non-empty", () => {
     const config = validateDockerSandboxConfig({
       socketPath: "/var/run/docker.sock",
-      snapshotRepository: "localhost:5001/mistle/snapshots",
       networkName: "mistle-sandbox-dev",
     });
 
     expect(config).toEqual({
       socketPath: "/var/run/docker.sock",
-      snapshotRepository: "localhost:5001/mistle/snapshots",
       networkName: "mistle-sandbox-dev",
     });
   });
@@ -22,17 +20,6 @@ describe("validateDockerSandboxConfig", () => {
     expect(() =>
       validateDockerSandboxConfig({
         socketPath: "",
-        snapshotRepository: "localhost:5001/mistle/snapshots",
-        networkName: "mistle-sandbox-dev",
-      }),
-    ).toThrowError(ZodError);
-  });
-
-  it("throws when snapshot repository is empty", () => {
-    expect(() =>
-      validateDockerSandboxConfig({
-        socketPath: "/var/run/docker.sock",
-        snapshotRepository: "  ",
         networkName: "mistle-sandbox-dev",
       }),
     ).toThrowError(ZodError);
@@ -42,7 +29,6 @@ describe("validateDockerSandboxConfig", () => {
     expect(() =>
       validateDockerSandboxConfig({
         socketPath: "/var/run/docker.sock",
-        snapshotRepository: "localhost:5001/mistle/snapshots",
         networkName: "  ",
       }),
     ).toThrowError(ZodError);

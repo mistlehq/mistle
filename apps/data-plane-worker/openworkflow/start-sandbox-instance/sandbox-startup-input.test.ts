@@ -14,11 +14,6 @@ const RuntimePlanSchema = z.object({
   version: z.number().int(),
   image: z.discriminatedUnion("source", [
     z.object({
-      source: z.literal("snapshot"),
-      imageRef: z.string().min(1),
-      instanceId: z.string().min(1),
-    }),
-    z.object({
       source: z.literal("profile-base"),
       imageRef: z.string().min(1),
       sandboxProfileId: z.string().min(1),
@@ -85,19 +80,6 @@ const RuntimePlanSchema = z.object({
           }),
         ),
       }),
-    }),
-  ),
-  artifactRemovals: z.array(
-    z.object({
-      artifactKey: z.string().min(1),
-      commands: z.array(
-        z.object({
-          args: z.array(z.string()),
-          env: z.record(z.string(), z.string()).optional(),
-          cwd: z.string().optional(),
-          timeoutMs: z.number().int().optional(),
-        }),
-      ),
     }),
   ),
   workspaceSources: z.array(
@@ -232,7 +214,6 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
       },
     ],
     artifacts: [],
-    artifactRemovals: [],
     workspaceSources: [],
     runtimeClients: [],
     agentRuntimes: [],

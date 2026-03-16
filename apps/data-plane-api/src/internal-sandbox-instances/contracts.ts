@@ -1,6 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
-import { SandboxImageKind } from "@mistle/sandbox";
 
 const DataPlaneSandboxInstanceStarterKinds = {
   USER: "user",
@@ -22,7 +21,6 @@ export const DataPlaneSandboxInstanceStatuses = {
 const StartSandboxInstanceImageSchema = z
   .object({
     imageId: z.string().min(1),
-    kind: z.enum(SandboxImageKind),
     createdAt: z.string().min(1),
   })
   .strict();

@@ -4,12 +4,9 @@ import {
   SandboxResourceNotFoundError,
 } from "../../errors.js";
 import {
-  SandboxImageKind,
   SandboxProvider,
   type SandboxAdapter,
   type SandboxHandle,
-  type SandboxImageHandle,
-  type SandboxSnapshotRequest,
   type SandboxStartRequest,
   type SandboxStopRequest,
 } from "../../types.js";
@@ -48,17 +45,6 @@ export class DockerSandboxAdapter implements SandboxAdapter {
           sandboxId,
         });
       },
-    };
-  }
-
-  async snapshot(request: SandboxSnapshotRequest): Promise<SandboxImageHandle> {
-    const response = await this.#client.snapshotSandbox({ sandboxId: request.sandboxId });
-
-    return {
-      provider: SandboxProvider.DOCKER,
-      imageId: response.imageId,
-      kind: SandboxImageKind.SNAPSHOT,
-      createdAt: response.createdAt,
     };
   }
 

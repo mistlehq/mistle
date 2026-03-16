@@ -1,24 +1,20 @@
-import { randomUUID } from "node:crypto";
 import http from "node:http";
 
 import Docker from "dockerode";
 import { z } from "zod";
 
 import {
-  DockerClientError,
   DockerClientOperationIds,
   mapDockerClientError,
   type DockerClientOperation,
 } from "./client-errors.js";
 import {
   DockerCloseSandboxStdinRequestSchema,
-  DockerSnapshotSandboxRequestSchema,
   DockerStartSandboxRequestSchema,
   DockerStopSandboxRequestSchema,
   DockerWriteSandboxStdinRequestSchema,
   type DockerCloseSandboxStdinRequest,
   type DockerSandboxConfig,
-  type DockerSnapshotSandboxRequest,
   type DockerStartSandboxRequest,
   type DockerStopSandboxRequest,
   type DockerWriteSandboxStdinRequest,
@@ -28,24 +24,12 @@ export type DockerStartSandboxResponse = {
   sandboxId: string;
 };
 
-export type DockerSnapshotSandboxResponse = {
-  imageId: string;
-  createdAt: string;
-};
-
 export interface DockerClient {
   startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse>;
   writeSandboxStdin(request: DockerWriteSandboxStdinRequest): Promise<void>;
   closeSandboxStdin(request: DockerCloseSandboxStdinRequest): Promise<void>;
-  snapshotSandbox(request: DockerSnapshotSandboxRequest): Promise<DockerSnapshotSandboxResponse>;
   stopSandbox(request: DockerStopSandboxRequest): Promise<void>;
 }
-
-const DockerProgressAuxSchema = z
-  .object({
-    Digest: z.string().optional(),
-  })
-  .strip();
 
 const DockerProgressMessageSchema = z
   .object({
@@ -57,7 +41,6 @@ const DockerProgressMessageSchema = z
       })
       .strip()
       .optional(),
-    aux: DockerProgressAuxSchema.optional(),
   })
   .strip();
 type DockerProgressMessage = z.output<typeof DockerProgressMessageSchema>;
@@ -106,25 +89,6 @@ function splitCompleteLines(buffer: string): {
       .filter((line) => line.length > 0),
     rest,
   };
-}
-
-function toImageReference(repository: string, digest: string): string {
-  if (digest.includes("@")) {
-    return digest;
-  }
-
-  return `${repository}@${digest}`;
-}
-
-function resolveRepositoryDigest(
-  repoDigests: readonly string[] | undefined,
-  repository: string,
-): string | undefined {
-  if (repoDigests === undefined) {
-    return undefined;
-  }
-
-  return repoDigests.find((repoDigest) => repoDigest.startsWith(`${repository}@`));
 }
 
 function toDockerEnv(env: Record<string, string> | undefined): string[] | undefined {
@@ -215,58 +179,6 @@ export class DockerApiClient implements DockerClient {
     });
   }
 
-  async snapshotSandbox(
-    request: DockerSnapshotSandboxRequest,
-  ): Promise<DockerSnapshotSandboxResponse> {
-    const parsedRequest = DockerSnapshotSandboxRequestSchema.parse(request);
-    const container = await this.#resolveContainer(parsedRequest.sandboxId);
-    const snapshotTag = `snapshot-${randomUUID().replaceAll("-", "")}`;
-
-    await this.#runDockerClientOperation(DockerClientOperationIds.COMMIT_CONTAINER, () =>
-      container.commit({
-        repo: this.#config.snapshotRepository,
-        tag: snapshotTag,
-      }),
-    );
-
-    const pushedImageTag = `${this.#config.snapshotRepository}:${snapshotTag}`;
-    const pushedImage = this.#docker.getImage(pushedImageTag);
-    const pushMessages = await this.#pushImage(pushedImage);
-
-    const digestFromPush = pushMessages
-      .map((message) => message.aux?.Digest)
-      .find((digest): digest is string => digest !== undefined);
-
-    let imageId: string | undefined =
-      digestFromPush === undefined
-        ? undefined
-        : toImageReference(this.#config.snapshotRepository, digestFromPush);
-
-    if (imageId === undefined) {
-      const imageInspect = await this.#runDockerClientOperation(
-        DockerClientOperationIds.INSPECT_IMAGE,
-        () => pushedImage.inspect(),
-      );
-      imageId = resolveRepositoryDigest(imageInspect.RepoDigests, this.#config.snapshotRepository);
-    }
-
-    if (imageId === undefined) {
-      throw new DockerClientError({
-        code: "unknown",
-        operation: DockerClientOperationIds.INSPECT_IMAGE,
-        retryable: false,
-        message:
-          "Docker operation `inspect_image` failed: Unable to resolve pushed image digest for snapshot repository.",
-        cause: new Error("No digest was returned by docker push or image inspect."),
-      });
-    }
-
-    return {
-      imageId,
-      createdAt: new Date().toISOString(),
-    };
-  }
-
   async stopSandbox(request: DockerStopSandboxRequest): Promise<void> {
     const parsedRequest = DockerStopSandboxRequestSchema.parse(request);
     this.#releaseTrackedStdinStream(parsedRequest.sandboxId);
@@ -296,15 +208,6 @@ export class DockerApiClient implements DockerClient {
     );
 
     await this.#consumeProgressStream(DockerClientOperationIds.PULL_IMAGE, pullStream);
-  }
-
-  async #pushImage(image: Docker.Image): Promise<ReadonlyArray<DockerProgressMessage>> {
-    const pushStream = await this.#runDockerClientOperation(
-      DockerClientOperationIds.PUSH_IMAGE,
-      () => image.push({}),
-    );
-
-    return this.#consumeProgressStream(DockerClientOperationIds.PUSH_IMAGE, pushStream);
   }
 
   async #getOrCreateAttachedStdinStream(sandboxId: string): Promise<NodeJS.ReadWriteStream> {

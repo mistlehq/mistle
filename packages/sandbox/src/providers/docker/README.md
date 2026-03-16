@@ -7,7 +7,6 @@ Docker implementation for `@mistle/sandbox`.
 `createSandboxAdapter({ provider: SandboxProvider.DOCKER, docker: ... })` expects:
 
 - `socketPath`: Docker daemon socket path (for example `/var/run/docker.sock`)
-- `snapshotRepository`: OCI repository used for snapshot push/pull by digest
 - `networkName` (optional): Docker network name that started sandbox containers should join
 
 All config fields are validated with Zod and fail fast when invalid.
@@ -21,7 +20,6 @@ const adapter = createSandboxAdapter({
   provider: SandboxProvider.DOCKER,
   docker: {
     socketPath: "/var/run/docker.sock",
-    snapshotRepository: "localhost:5001/mistle/snapshots",
     networkName: "mistle-sandbox-dev",
   },
 });
@@ -31,7 +29,6 @@ const adapter = createSandboxAdapter({
 
 - `start({ image })` pulls image reference and starts a Docker container.
 - returned `SandboxHandle` supports `writeStdin({ payload })` and `closeStdin()` for container stdin lifecycle.
-- `snapshot({ sandboxId })` commits container filesystem, pushes to `snapshotRepository`, and returns immutable digest reference.
 - `stop({ sandboxId })` force-removes the Docker container.
 
 ## Error Surface
