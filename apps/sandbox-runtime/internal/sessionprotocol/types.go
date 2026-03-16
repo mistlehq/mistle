@@ -9,6 +9,8 @@ const (
 	MessageTypeStreamClose     = "stream.close"
 	MessageTypeStreamReset     = "stream.reset"
 	MessageTypeStreamWindow    = "stream.window"
+	MessageTypeLeaseCreate     = "lease.create"
+	MessageTypeLeaseRenew      = "lease.renew"
 	MessageTypeDisconnect      = "disconnect"
 	MessageTypePTYResize       = "pty.resize"
 	MessageTypePTYExit         = "pty.exit"
@@ -99,6 +101,27 @@ type StreamWindow struct {
 	Type     string `json:"type" jsonschema:"enum=stream.window"`
 	StreamID int    `json:"streamId"`
 	Bytes    int    `json:"bytes"`
+}
+
+// ExecutionLease describes one renewable execution-scoped keepalive signal.
+type ExecutionLease struct {
+	ID                  string         `json:"id"`
+	Kind                string         `json:"kind"`
+	Source              string         `json:"source"`
+	ExternalExecutionID string         `json:"externalExecutionId,omitempty"`
+	Metadata            map[string]any `json:"metadata,omitempty"`
+}
+
+// LeaseCreate reports that the sandbox has started tracking one execution lease.
+type LeaseCreate struct {
+	Type  string         `json:"type" jsonschema:"enum=lease.create"`
+	Lease ExecutionLease `json:"lease"`
+}
+
+// LeaseRenew reports that the sandbox has re-observed a tracked execution lease.
+type LeaseRenew struct {
+	Type    string `json:"type" jsonschema:"enum=lease.renew"`
+	LeaseID string `json:"leaseId"`
 }
 
 // Disconnect reports that the opposite tunnel peer disconnected and the current

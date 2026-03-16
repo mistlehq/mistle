@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { parseStreamControlMessage } from "./stream-protocol.js";
+import {
+  parseBootstrapControlMessage,
+  parseLeaseControlMessage,
+  parseStreamControlMessage,
+} from "./stream-protocol.js";
 
 describe("stream control message parser", () => {
   it("parses pty stream opens into the shared control shape", () => {
@@ -84,5 +88,80 @@ describe("stream control message parser", () => {
       code: "target_closed",
       message: "target closed stream",
     });
+  });
+
+  it("parses execution lease control messages", () => {
+    expect(
+      parseLeaseControlMessage(
+        JSON.stringify({
+          type: "lease.create",
+          lease: {
+            id: "sxl_123",
+            kind: "agent_execution",
+            source: "codex",
+            externalExecutionId: "turn_123",
+            metadata: {
+              threadId: "thr_123",
+            },
+          },
+        }),
+      ),
+    ).toEqual({
+      type: "lease.create",
+      lease: {
+        id: "sxl_123",
+        kind: "agent_execution",
+        source: "codex",
+        externalExecutionId: "turn_123",
+        metadata: {
+          threadId: "thr_123",
+        },
+      },
+    });
+
+    expect(
+      parseLeaseControlMessage(
+        JSON.stringify({
+          type: "lease.renew",
+          leaseId: "sxl_123",
+        }),
+      ),
+    ).toEqual({
+      type: "lease.renew",
+      leaseId: "sxl_123",
+    });
+  });
+
+  it("keeps stream and bootstrap control parsers scoped correctly", () => {
+    const leaseCreatePayload = JSON.stringify({
+      type: "lease.create",
+      lease: {
+        id: "sxl_123",
+        kind: "agent_execution",
+        source: "codex",
+      },
+    });
+
+    expect(parseStreamControlMessage(leaseCreatePayload)).toBeUndefined();
+    expect(parseBootstrapControlMessage(leaseCreatePayload)).toEqual({
+      type: "lease.create",
+      lease: {
+        id: "sxl_123",
+        kind: "agent_execution",
+        source: "codex",
+      },
+    });
+
+    expect(
+      parseBootstrapControlMessage(
+        JSON.stringify({
+          type: "stream.open",
+          streamId: 17,
+          channel: {
+            kind: "agent",
+          },
+        }),
+      ),
+    ).toBeUndefined();
   });
 });
