@@ -8,7 +8,7 @@ import { Client } from "pg";
 import { it as vitestIt } from "vitest";
 import { z } from "zod";
 
-import type { ControlPlaneWorkerConfig } from "../src/types.js";
+import type { ControlPlaneWorkerConfig } from "../openworkflow/core/config.js";
 
 const RUNTIME_DATABASE_NAME_PREFIX = "mistle_control_plane_worker_it_runtime";
 const TestContextId = "control-plane-worker.integration";

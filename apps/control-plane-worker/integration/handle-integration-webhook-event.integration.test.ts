@@ -44,11 +44,9 @@ import { HandleIntegrationWebhookEventWorkflow } from "../openworkflow/handle-in
 import {
   markAutomationRunCompleted,
   markAutomationRunFailed,
-} from "../openworkflow/shared/automation-run.js";
-import {
   prepareAutomationRun,
   resolveAutomationRunFailure,
-} from "../src/runtime/workflows/automation-run.js";
+} from "../openworkflow/shared/automation-run.js";
 import { withOpenWorkflowRuntime } from "./openworkflow-test-support.js";
 import { it } from "./test-context.js";
 

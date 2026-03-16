@@ -2,14 +2,14 @@ import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-
 import { systemSleeper } from "@mistle/time";
 
 import type {
-  AcquiredAutomationConnection,
   EnsuredAutomationSandbox,
   PreparedAutomationRun,
-} from "../../src/runtime/workflow-types.js";
+} from "../shared/automation-run-types.js";
 import {
   AutomationRunFailureCodes,
   createAutomationRunExecutionError,
-} from "../../src/runtime/workflows/automation-run.js";
+} from "../shared/automation-run.js";
+import type { AcquiredAutomationConnection } from "./types.js";
 
 const SandboxStartTimeoutMs = 5 * 60 * 1000;
 const SandboxStartPollIntervalMs = 1_000;

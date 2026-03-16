@@ -3,25 +3,27 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 
-import { executeConversationProviderDelivery } from "../../src/runtime/automation-workflows/provider/execute-conversation-provider-delivery.js";
-import type {
-  AcquiredAutomationConnection,
-  EnsuredAutomationSandbox,
-  PreparedAutomationRun,
-  ResolvedAutomationConversationDeliveryRoute,
-} from "../../src/runtime/workflow-types.js";
-import {
-  AutomationConversationRouteBindingActions,
-  resolveAutomationConversationRouteBindingAction,
-} from "../../src/runtime/workflows/conversation-delivery-planning.js";
-import { activateAutomationConversationRoute } from "../../src/runtime/workflows/persistence/activate-conversation-route.js";
-import { createAutomationConversationRoute } from "../../src/runtime/workflows/persistence/create-conversation-route.js";
+import { activateAutomationConversationRoute } from "../shared/activate-conversation-route.js";
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
-} from "../../src/runtime/workflows/persistence/errors.js";
-import { markAutomationConversationDeliveryTaskDelivering } from "../../src/runtime/workflows/persistence/mark-conversation-delivery-task-delivering.js";
-import { updateAutomationConversationExecution } from "../../src/runtime/workflows/persistence/update-conversation-execution.js";
+} from "../shared/automation-conversation-persistence-error.js";
+import type {
+  EnsuredAutomationSandbox,
+  PreparedAutomationRun,
+} from "../shared/automation-run-types.js";
+import { createAutomationConversationRoute } from "../shared/create-conversation-route.js";
+import { markAutomationConversationDeliveryTaskDelivering } from "../shared/mark-conversation-delivery-task-delivering.js";
+import { updateAutomationConversationExecution } from "../shared/update-conversation-execution.js";
+import {
+  AutomationConversationRouteBindingActions,
+  resolveAutomationConversationRouteBindingAction,
+} from "./conversation-delivery-planning.js";
+import { executeConversationProviderDelivery } from "./execute-conversation-provider-delivery.js";
+import type {
+  AcquiredAutomationConnection,
+  ResolvedAutomationConversationDeliveryRoute,
+} from "./types.js";
 
 export async function deliverConversationAutomationPayload(
   ctx: {

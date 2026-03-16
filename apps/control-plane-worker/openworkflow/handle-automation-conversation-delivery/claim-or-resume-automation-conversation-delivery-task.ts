@@ -2,17 +2,15 @@ import {
   AutomationConversationDeliveryTaskStatuses,
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
+import type { HandleAutomationConversationDeliveryWorkflowInput } from "@mistle/workflow-registry/control-plane";
 
-import type {
-  ActiveAutomationConversationDeliveryTask,
-  HandleAutomationConversationDeliveryWorkflowInput,
-} from "../../src/runtime/workflow-types.js";
-import { claimNextAutomationConversationDeliveryTask } from "../../src/runtime/workflows/persistence/claim-next-conversation-delivery-task.js";
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
-} from "../../src/runtime/workflows/persistence/errors.js";
-import { findActiveAutomationConversationDeliveryTask } from "../../src/runtime/workflows/persistence/find-active-conversation-delivery-task.js";
+} from "../shared/automation-conversation-persistence-error.js";
+import { claimNextAutomationConversationDeliveryTask } from "../shared/claim-next-conversation-delivery-task.js";
+import { findActiveAutomationConversationDeliveryTask } from "../shared/find-active-conversation-delivery-task.js";
+import type { ActiveAutomationConversationDeliveryTask } from "./types.js";
 
 export async function claimOrResumeAutomationConversationDeliveryTask(
   ctx: {

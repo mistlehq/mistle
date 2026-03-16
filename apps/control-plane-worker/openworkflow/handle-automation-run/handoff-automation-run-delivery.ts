@@ -1,10 +1,8 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 
-import type { HandoffAutomationRunDeliveryInput } from "../../src/runtime/workflow-types.js";
-import {
-  enqueueAutomationConversationDeliveryTask,
-  ensureAutomationConversationDeliveryProcessor,
-} from "../../src/runtime/workflows/persistence/index.js";
+import type { HandoffAutomationRunDeliveryInput } from "../shared/automation-run-types.js";
+import { enqueueAutomationConversationDeliveryTask } from "../shared/enqueue-conversation-delivery-task.js";
+import { ensureAutomationConversationDeliveryProcessor } from "../shared/ensure-conversation-delivery-processor.js";
 
 export type HandoffAutomationRunDeliveryOutput = {
   conversationId: string;
