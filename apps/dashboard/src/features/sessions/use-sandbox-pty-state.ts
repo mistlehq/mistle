@@ -160,18 +160,32 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
       clearConnectedSandboxInstanceId();
 
       if (canReuseConnection) {
-        await existingClient.open({
-          cols: input.cols,
-          rows: input.rows,
-          ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
-        });
+        bindClient(existingClient, generation);
 
-        if (isCurrentGeneration(generation)) {
-          connectedSandboxInstanceIdRef.current = input.sandboxInstanceId;
-          setConnectedSandboxInstanceId(input.sandboxInstanceId);
+        try {
+          await existingClient.open({
+            cols: input.cols,
+            rows: input.rows,
+            ...(input.cwd === undefined ? {} : { cwd: input.cwd }),
+          });
+
+          if (isCurrentGeneration(generation)) {
+            connectedSandboxInstanceIdRef.current = input.sandboxInstanceId;
+            setConnectedSandboxInstanceId(input.sandboxInstanceId);
+          }
+
+          return;
+        } catch (error) {
+          const resolvedError =
+            error instanceof Error ? error : new Error("Could not open sandbox PTY session.");
+
+          if (isCurrentGeneration(generation)) {
+            clearConnectedSandboxInstanceId();
+            setErrorMessage(resolvedError.message);
+          }
+
+          throw resolvedError;
         }
-
-        return;
       }
 
       if (existingClient !== null) {
