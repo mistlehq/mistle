@@ -117,6 +117,16 @@ function isPositiveInteger(value: number): boolean {
   return Number.isInteger(value) && Number.isFinite(value) && value > 0;
 }
 
+function assertValidPtyDimensions(
+  input: { cols: number; rows: number },
+  operation: "open" | "resize",
+): void {
+  if (!isPositiveInteger(input.cols) || !isPositiveInteger(input.rows)) {
+    const operationLabel = operation === "open" ? "open size" : "resize";
+    throw new Error(`Sandbox PTY ${operationLabel} must use positive integer rows and columns.`);
+  }
+}
+
 export class SandboxPtyClient {
   readonly #connectionUrl: string;
   readonly #runtime: SandboxSessionRuntime;
@@ -271,9 +281,7 @@ export class SandboxPtyClient {
   }
 
   async open(options: SandboxPtyOpenOptions): Promise<void> {
-    if (!isPositiveInteger(options.cols) || !isPositiveInteger(options.rows)) {
-      throw new Error("Sandbox PTY open size must use positive integer rows and columns.");
-    }
+    assertValidPtyDimensions(options, "open");
     if (this.#state !== SandboxPtyStates.CONNECTED) {
       throw new Error("Sandbox PTY stream can only open from the connected state.");
     }
@@ -304,8 +312,7 @@ export class SandboxPtyClient {
 
       const fail = (error: Error): void => {
         this.#pendingOpen = null;
-        this.#streamId = null;
-        this.#availableSendWindowBytes = 0;
+        this.#clearActiveStreamState();
         this.#error = error;
         if (
           this.#socket !== null &&
@@ -377,9 +384,7 @@ export class SandboxPtyClient {
   }
 
   async resize(input: { cols: number; rows: number }): Promise<void> {
-    if (!isPositiveInteger(input.cols) || !isPositiveInteger(input.rows)) {
-      throw new Error("Sandbox PTY resize must use positive integer rows and columns.");
-    }
+    assertValidPtyDimensions(input, "resize");
     if (this.#state !== SandboxPtyStates.OPEN) {
       throw new Error("Sandbox PTY stream is not open.");
     }
@@ -427,16 +432,14 @@ export class SandboxPtyClient {
 
       const succeed = (): void => {
         this.#pendingClose = null;
-        this.#streamId = null;
-        this.#availableSendWindowBytes = 0;
+        this.#clearActiveStreamState();
         this.#setState(SandboxPtyStates.CONNECTED);
         resolve();
       };
 
       const fail = (error: Error): void => {
         this.#pendingClose = null;
-        this.#streamId = null;
-        this.#availableSendWindowBytes = 0;
+        this.#clearActiveStreamState();
         this.#setErrorState(error);
         reject(error);
       };
@@ -501,8 +504,7 @@ export class SandboxPtyClient {
 
   readonly #handleSocketClose = (): void => {
     this.#socket = null;
-    this.#availableSendWindowBytes = 0;
-    this.#streamId = null;
+    this.#clearActiveStreamState();
     this.#rejectPendingOpen(new Error("Sandbox PTY websocket closed before the stream was ready."));
 
     const pendingClose = this.#pendingClose;
@@ -645,8 +647,7 @@ export class SandboxPtyClient {
 
   #handleExit(exitInfo: SandboxPtyExitInfo): void {
     this.#exitInfo = exitInfo;
-    this.#streamId = null;
-    this.#availableSendWindowBytes = 0;
+    this.#clearActiveStreamState();
     for (const listener of this.#exitListeners) {
       listener(exitInfo);
     }
@@ -663,8 +664,7 @@ export class SandboxPtyClient {
 
   #handleReset(resetInfo: SandboxPtyResetInfo): void {
     this.#resetInfo = resetInfo;
-    this.#streamId = null;
-    this.#availableSendWindowBytes = 0;
+    this.#clearActiveStreamState();
     for (const listener of this.#resetListeners) {
       listener(resetInfo);
     }
@@ -734,8 +734,7 @@ export class SandboxPtyClient {
   #closeConnectedSocketWithError(error: Error): void {
     const socket = this.#socket;
     this.#socket = null;
-    this.#streamId = null;
-    this.#availableSendWindowBytes = 0;
+    this.#clearActiveStreamState();
 
     this.#rejectPendingOpen(error);
     this.#rejectPendingClose(error);
@@ -770,6 +769,11 @@ export class SandboxPtyClient {
     for (const listener of this.#errorListeners) {
       listener(error);
     }
+  }
+
+  #clearActiveStreamState(): void {
+    this.#streamId = null;
+    this.#availableSendWindowBytes = 0;
   }
 
   #resolveDisconnectWaiters(): void {
