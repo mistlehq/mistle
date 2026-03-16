@@ -10,11 +10,8 @@ export async function verifySandboxProfileVersionExists(input: {
     columns: {
       id: true,
     },
-    where: (table, { and: whereAnd, eq: whereEq }) =>
-      whereAnd(
-        whereEq(table.id, input.sandboxProfileId),
-        whereEq(table.organizationId, input.organizationId),
-      ),
+    where: (table, { and, eq }) =>
+      and(eq(table.id, input.sandboxProfileId), eq(table.organizationId, input.organizationId)),
   });
 
   if (sandboxProfile === undefined) {
@@ -25,10 +22,10 @@ export async function verifySandboxProfileVersionExists(input: {
     columns: {
       sandboxProfileId: true,
     },
-    where: (table, { and: whereAnd, eq: whereEq }) =>
-      whereAnd(
-        whereEq(table.sandboxProfileId, input.sandboxProfileId),
-        whereEq(table.version, input.sandboxProfileVersion),
+    where: (table, { and, eq }) =>
+      and(
+        eq(table.sandboxProfileId, input.sandboxProfileId),
+        eq(table.version, input.sandboxProfileVersion),
       ),
   });
 

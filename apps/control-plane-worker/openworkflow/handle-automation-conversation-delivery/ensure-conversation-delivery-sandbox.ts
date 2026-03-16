@@ -50,8 +50,7 @@ export async function ensureConversationDeliverySandbox(
   return ensureAutomationSandbox(
     {
       db: ctx.db,
-      startSandboxProfileInstance: (startInput) =>
-        ctx.controlPlaneInternalClient.startSandboxProfileInstance(startInput),
+      controlPlaneInternalClient: ctx.controlPlaneInternalClient,
     },
     {
       preparedAutomationRun: input.preparedAutomationRun,

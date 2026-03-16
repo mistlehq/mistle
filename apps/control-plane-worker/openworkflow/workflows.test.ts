@@ -16,7 +16,7 @@ import { HandleIntegrationWebhookEventWorkflow } from "./handle-integration-webh
 import { RequestDeleteSandboxProfileWorkflow } from "./request-delete-sandbox-profile.js";
 import { SendOrganizationInvitationWorkflow } from "./send-organization-invitation.js";
 import { SendVerificationOTPWorkflow } from "./send-verification-otp.js";
-import { StartSandboxProfileInstanceWorkflow } from "./start-sandbox-profile-instance.js";
+import { StartSandboxProfileInstanceWorkflow } from "./start-sandbox-profile-instance/workflow.js";
 import { SyncIntegrationConnectionResourcesWorkflow } from "./sync-integration-connection-resources/workflow.js";
 
 describe("control-plane worker openworkflow entrypoints", () => {

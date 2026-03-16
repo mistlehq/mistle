@@ -1,3 +1,4 @@
+import type { ControlPlaneInternalClient } from "@mistle/control-plane-internal-client";
 import {
   automationRuns,
   AutomationRunStatuses,
@@ -31,19 +32,7 @@ export type HandoffAutomationRunDeliveryOutput = {
 
 export type EnsureAutomationSandboxDependencies = {
   db: ControlPlaneDatabase;
-  startSandboxProfileInstance: (input: {
-    organizationId: string;
-    profileId: string;
-    profileVersion: number;
-    startedBy: {
-      kind: "user" | "system";
-      id: string;
-    };
-    source: "dashboard" | "webhook";
-  }) => Promise<{
-    workflowRunId: string;
-    sandboxInstanceId: string;
-  }>;
+  controlPlaneInternalClient: Pick<ControlPlaneInternalClient, "startSandboxProfileInstance">;
 };
 
 export type TransitionAutomationRunToRunningOutput = {
@@ -654,7 +643,7 @@ export async function ensureAutomationSandbox(
     });
   }
 
-  const startedSandbox = await ctx.startSandboxProfileInstance({
+  const startedSandbox = await ctx.controlPlaneInternalClient.startSandboxProfileInstance({
     organizationId: input.preparedAutomationRun.organizationId,
     profileId: input.preparedAutomationRun.sandboxProfileId,
     profileVersion: input.preparedAutomationRun.sandboxProfileVersion,
