@@ -1,5 +1,7 @@
 import type { z } from "zod";
 
+import type { AgentIntegrationHooks } from "../agent/index.js";
+
 export type IntegrationKind = "agent" | "git" | "connector";
 
 export const IntegrationKinds: {
@@ -801,6 +803,7 @@ export type IntegrationDefinition<
   familyId: string;
   variantId: string;
   kind: IntegrationKind;
+  agent?: AgentIntegrationHooks;
   displayName: string;
   description?: string;
   logoKey: string;
