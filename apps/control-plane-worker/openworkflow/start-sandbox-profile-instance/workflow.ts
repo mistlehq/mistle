@@ -1,7 +1,7 @@
 import { StartSandboxProfileInstanceWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { defineWorkflow } from "openworkflow";
 
-import { getWorkflowContext } from "../../src/openworkflow/context.js";
+import { getWorkflowContext } from "../core/context.js";
 import { startSandboxProfileInstance } from "./start-sandbox-profile-instance.js";
 
 export const StartSandboxProfileInstanceWorkflow = defineWorkflow(

@@ -1,6 +1,6 @@
 import { AppIds, loadConfig } from "@mistle/config";
 
-import type { ControlPlaneWorkerConfig, ControlPlaneWorkerGlobalConfig } from "../types.js";
+import type { ControlPlaneWorkerConfig, ControlPlaneWorkerGlobalConfig } from "../../src/types.js";
 import { createControlPlaneBackend } from "./client.js";
 
 export type OpenWorkflowRuntime = {

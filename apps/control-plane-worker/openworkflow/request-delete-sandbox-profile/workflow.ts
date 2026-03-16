@@ -1,7 +1,7 @@
 import { RequestDeleteSandboxProfileWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { defineWorkflow } from "openworkflow";
 
-import { getWorkflowContext } from "../../src/openworkflow/context.js";
+import { getWorkflowContext } from "../core/context.js";
 import { deleteSandboxProfile } from "./delete-sandbox-profile.js";
 
 export const RequestDeleteSandboxProfileWorkflow = defineWorkflow(

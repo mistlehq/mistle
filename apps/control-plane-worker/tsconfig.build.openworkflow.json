@@ -8,5 +8,5 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["openworkflow.config.ts", "openworkflow/**/*.ts"]
+  "include": ["instrument.ts", "logger.ts", "openworkflow.config.ts", "openworkflow/**/*.ts"]
 }

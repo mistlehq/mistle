@@ -1,7 +1,7 @@
 import { defineConfig } from "@openworkflow/cli";
 
-import { registerWorkflowContextShutdownHandlers } from "./src/openworkflow/context.js";
-import { getOpenWorkflowRuntime } from "./src/openworkflow/runtime.js";
+import { registerWorkflowContextShutdownHandlers } from "./openworkflow/core/context.js";
+import { getOpenWorkflowRuntime } from "./openworkflow/core/runtime.js";
 
 registerWorkflowContextShutdownHandlers();
 const openWorkflowRuntime = await getOpenWorkflowRuntime();

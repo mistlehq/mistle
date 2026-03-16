@@ -4,7 +4,7 @@ import {
 } from "@mistle/workflow-registry/control-plane";
 import { defineWorkflow } from "openworkflow";
 
-import { getWorkflowContext } from "../../src/openworkflow/context.js";
+import { getWorkflowContext } from "../core/context.js";
 import { markIntegrationWebhookEventFailed } from "./mark-integration-webhook-event-failed.js";
 import { markIntegrationWebhookEventProcessed } from "./mark-integration-webhook-event-processed.js";
 import { prepareIntegrationWebhookEvent } from "./prepare-integration-webhook-event.js";

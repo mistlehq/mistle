@@ -1,7 +1,7 @@
 import { describe, expect } from "vitest";
 
-import { closeWorkflowContext, getWorkflowContext } from "../src/openworkflow/context.js";
-import { closeOpenWorkflowRuntime, getOpenWorkflowRuntime } from "../src/openworkflow/runtime.js";
+import { closeWorkflowContext, getWorkflowContext } from "../openworkflow/core/context.js";
+import { closeOpenWorkflowRuntime, getOpenWorkflowRuntime } from "../openworkflow/core/runtime.js";
 import type { ControlPlaneWorkerIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
 
