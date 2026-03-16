@@ -59,7 +59,6 @@ const InvitationErrorSchema = z
   })
   .catchall(z.unknown());
 
-type InvitationRecord = z.infer<typeof InvitationRecordSchema>;
 type InvitationDetailsEnvelope = z.infer<typeof InvitationDetailsEnvelopeSchema>;
 type OrganizationRecord = z.infer<typeof OrganizationRecordSchema>;
 type InviterRecord = z.infer<typeof InviterRecordSchema>;
