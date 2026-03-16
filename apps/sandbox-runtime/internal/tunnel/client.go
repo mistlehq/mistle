@@ -267,6 +267,7 @@ func handleSandboxTunnelConnection(
 						requestContext,
 						conn,
 						connectRequest,
+						executionLeases,
 						agentRuntimes,
 						runtimeClients,
 						relayResultCh,
