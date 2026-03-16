@@ -23,12 +23,8 @@ function mergeCommandEnvironment(
   };
 }
 
-function trimCommandOutput(output: string): string {
-  return output.trim();
-}
-
 function combineCommandOutput(result: CommandResult): string {
-  const outputParts = [trimCommandOutput(result.stdout), trimCommandOutput(result.stderr)].filter(
+  const outputParts = [result.stdout.trim(), result.stderr.trim()].filter(
     (value) => value.length > 0,
   );
 
