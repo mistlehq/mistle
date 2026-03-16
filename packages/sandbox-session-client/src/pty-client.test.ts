@@ -473,7 +473,7 @@ describe("SandboxPtyClient", () => {
     });
   });
 
-  it("waits for terminal exit when closing an open PTY stream", async () => {
+  it("returns to the connected state after closing an open PTY stream", async () => {
     const server = await startPtyTestServer();
     startedServers.push(server);
     const client = new SandboxPtyClient({
@@ -501,17 +501,57 @@ describe("SandboxPtyClient", () => {
         streamId: 1,
       },
     });
-
-    server.sendPtyExit({
-      exitCode: 0,
-      streamId: 1,
-    });
     await closePromise;
 
-    expect(client.state).toBe(SandboxPtyStates.CLOSED);
-    expect(client.exitInfo).toEqual({
-      exitCode: 0,
+    expect(client.state).toBe(SandboxPtyStates.CONNECTED);
+    expect(client.streamId).toBeNull();
+    expect(client.exitInfo).toBeNull();
+  });
+
+  it("can reopen a PTY on the same websocket after stream.close", async () => {
+    const server = await startPtyTestServer();
+    startedServers.push(server);
+    const client = new SandboxPtyClient({
+      connectionUrl: server.url,
+      runtime: createNodeSandboxSessionRuntime(),
     });
+
+    await client.connect();
+    const firstOpenPromise = client.open({
+      cols: 80,
+      rows: 24,
+    });
+    await server.waitForNextMessage();
+    server.sendOpenOk(1);
+    await firstOpenPromise;
+
+    const firstClosePromise = client.close();
+    await server.waitForNextMessage();
+    await firstClosePromise;
+
+    const secondOpenPromise = client.open({
+      cols: 132,
+      rows: 48,
+    });
+    const secondOpenRequest = await server.waitForNextMessage();
+    expect(secondOpenRequest).toEqual({
+      kind: "control",
+      message: {
+        type: "stream.open",
+        streamId: 2,
+        channel: {
+          kind: "pty",
+          session: "create",
+          cols: 132,
+          rows: 48,
+        },
+      },
+    });
+    server.sendOpenOk(2);
+    await secondOpenPromise;
+
+    expect(client.state).toBe(SandboxPtyStates.OPEN);
+    expect(client.streamId).toBe(2);
   });
 
   it("surfaces stream.reset as an error and preserves reset details", async () => {

@@ -37,13 +37,6 @@ type PendingOpen = {
   reject: (error: Error) => void;
 };
 
-type PendingClose = {
-  streamId: number;
-  timeoutTask: SandboxScheduledTask;
-  resolve: () => void;
-  reject: (error: Error) => void;
-};
-
 function readTextPayload(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
@@ -116,7 +109,6 @@ export class SandboxPtyClient {
   readonly #connectionUrl: string;
   readonly #runtime: SandboxSessionRuntime;
   readonly #connectTimeoutMs: number;
-  readonly #closeTimeoutMs: number;
   readonly #stateListeners = new Set<(state: SandboxPtyState) => void>();
   readonly #dataListeners = new Set<(chunk: Uint8Array) => void>();
   readonly #exitListeners = new Set<(info: SandboxPtyExitInfo) => void>();
@@ -131,7 +123,6 @@ export class SandboxPtyClient {
   #resetInfo: SandboxPtyResetInfo | null = null;
   #availableSendWindowBytes = 0;
   #pendingOpen: PendingOpen | null = null;
-  #pendingClose: PendingClose | null = null;
   #disconnectPromise: Promise<void> | null = null;
   #disconnectResolve: (() => void) | null = null;
 
@@ -139,7 +130,6 @@ export class SandboxPtyClient {
     this.#connectionUrl = input.connectionUrl;
     this.#runtime = input.runtime;
     this.#connectTimeoutMs = input.connectTimeoutMs ?? DefaultConnectTimeoutMs;
-    this.#closeTimeoutMs = input.closeTimeoutMs ?? this.#connectTimeoutMs;
   }
 
   get state(): SandboxPtyState {
@@ -275,6 +265,9 @@ export class SandboxPtyClient {
 
     const streamId = this.#runtime.createStreamId();
     this.#setState(SandboxPtyStates.OPENING);
+    this.#error = null;
+    this.#exitInfo = null;
+    this.#resetInfo = null;
 
     const openPromise = new Promise<void>((resolve, reject) => {
       const timeoutTask = this.#runtime.scheduleTimeout(() => {
@@ -385,41 +378,18 @@ export class SandboxPtyClient {
 
     this.#setState(SandboxPtyStates.CLOSING);
 
-    const closePromise = new Promise<void>((resolve, reject) => {
-      const timeoutTask = this.#runtime.scheduleTimeout(() => {
-        fail(new Error("Timed out while closing the sandbox PTY stream."));
-      }, this.#closeTimeoutMs);
-
-      const fail = (error: Error): void => {
-        this.#pendingClose = null;
-        this.#setErrorState(error);
-        reject(error);
-      };
-
-      const succeed = (): void => {
-        this.#pendingClose = null;
-        this.#setState(SandboxPtyStates.CLOSED);
-        resolve();
-      };
-
-      this.#pendingClose = {
-        streamId,
-        timeoutTask,
-        resolve: succeed,
-        reject: fail,
-      };
-    });
-
     try {
       await socket.send(JSON.stringify(createStreamCloseMessage(streamId)));
     } catch (error) {
       const resolvedError =
         error instanceof Error ? error : new Error("Failed to send sandbox PTY stream.close.");
-      this.#rejectPendingClose(resolvedError);
+      this.#setErrorState(resolvedError);
       throw resolvedError;
     }
 
-    await closePromise;
+    this.#streamId = null;
+    this.#availableSendWindowBytes = 0;
+    this.#setState(SandboxPtyStates.CONNECTED);
   }
 
   async disconnect(): Promise<void> {
@@ -466,13 +436,6 @@ export class SandboxPtyClient {
     this.#streamId = null;
     this.#rejectPendingOpen(new Error("Sandbox PTY websocket closed before the stream was ready."));
 
-    const pendingClose = this.#pendingClose;
-    this.#pendingClose = null;
-    if (pendingClose !== null) {
-      pendingClose.timeoutTask.cancel();
-      pendingClose.resolve();
-    }
-
     if (this.#state !== SandboxPtyStates.ERROR && this.#state !== SandboxPtyStates.CLOSED) {
       this.#setState(SandboxPtyStates.CLOSED);
     }
@@ -492,7 +455,7 @@ export class SandboxPtyClient {
   #handleControlPayload(payload: string): void {
     const controlMessage = parseStreamControlMessage(payload);
     if (controlMessage === undefined) {
-      if (this.#streamId !== null || this.#pendingOpen !== null || this.#pendingClose !== null) {
+      if (this.#streamId !== null || this.#pendingOpen !== null) {
         this.#closeConnectedSocketWithError(
           new Error("Received malformed sandbox PTY control payload."),
         );
@@ -596,13 +559,6 @@ export class SandboxPtyClient {
       listener(exitInfo);
     }
 
-    const pendingClose = this.#pendingClose;
-    if (pendingClose !== null) {
-      pendingClose.timeoutTask.cancel();
-      pendingClose.resolve();
-      return;
-    }
-
     this.#setState(SandboxPtyStates.EXITED);
   }
 
@@ -615,7 +571,6 @@ export class SandboxPtyClient {
     }
 
     const resetError = createStreamResetError(resetInfo);
-    this.#rejectPendingClose(resetError);
     this.#setErrorState(resetError);
   }
 
@@ -656,16 +611,6 @@ export class SandboxPtyClient {
     pendingOpen.reject(error);
   }
 
-  #rejectPendingClose(error: Error): void {
-    const pendingClose = this.#pendingClose;
-    if (pendingClose === null) {
-      return;
-    }
-
-    pendingClose.timeoutTask.cancel();
-    pendingClose.reject(error);
-  }
-
   #closeConnectedSocketWithError(error: Error): void {
     const socket = this.#socket;
     this.#socket = null;
@@ -673,7 +618,6 @@ export class SandboxPtyClient {
     this.#availableSendWindowBytes = 0;
 
     this.#rejectPendingOpen(error);
-    this.#rejectPendingClose(error);
 
     if (socket !== null) {
       socket.removeEventListener("message", this.#handleSocketMessage);
