@@ -4,57 +4,22 @@ import {
   sandboxInstances,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
-import type { SandboxProvider } from "@mistle/sandbox";
+import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 import { and, eq, sql } from "drizzle-orm";
 
-import type {
-  EnsureSandboxInstanceInput,
-  EnsureSandboxInstanceOutput,
-  PersistSandboxInstanceProvisioningInput,
-} from "./types.js";
-
-export async function ensureSandboxInstance(
-  deps: {
-    db: DataPlaneDatabase;
-    provider: SandboxProvider;
-  },
-  input: EnsureSandboxInstanceInput,
-): Promise<EnsureSandboxInstanceOutput> {
-  const insertedRows = await deps.db
-    .insert(sandboxInstances)
-    .values({
-      id: input.sandboxInstanceId,
-      organizationId: input.organizationId,
-      sandboxProfileId: input.sandboxProfileId,
-      sandboxProfileVersion: input.sandboxProfileVersion,
-      provider: deps.provider,
-      providerSandboxId: null,
-      status: SandboxInstanceStatuses.STARTING,
-      startedByKind: input.startedBy.kind,
-      startedById: input.startedBy.id,
-      source: input.source,
-    })
-    .onConflictDoNothing({
-      target: [sandboxInstances.id],
-    })
-    .returning({
-      id: sandboxInstances.id,
-    });
-
-  const ensuredSandboxInstanceId = insertedRows[0]?.id ?? input.sandboxInstanceId;
-
-  return {
-    sandboxInstanceId: ensuredSandboxInstanceId,
-  };
-}
-
 export async function persistSandboxInstanceProvisioning(
-  deps: {
+  ctx: {
     db: DataPlaneDatabase;
   },
-  input: PersistSandboxInstanceProvisioningInput,
+  input: {
+    sandboxInstanceId: string;
+    runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+    sandboxProfileId: string;
+    sandboxProfileVersion: number;
+    providerSandboxId: string;
+  },
 ): Promise<void> {
-  await deps.db.transaction(async (tx) => {
+  await ctx.db.transaction(async (tx) => {
     const updatedRows = await tx
       .update(sandboxInstances)
       .set({

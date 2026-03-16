@@ -1,7 +1,10 @@
-import type { SandboxAdapter } from "@mistle/sandbox";
+import type { SandboxAdapter, SandboxProvider } from "@mistle/sandbox";
+import type {
+  StartSandboxInstanceWorkflowImageInput,
+  StartSandboxInstanceWorkflowInput,
+} from "@mistle/workflow-registry/data-plane";
 
-import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
-import type { StartSandboxInput, StartSandboxOutput } from "./types.js";
+import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { writeSandboxStartupInput } from "./write-sandbox-startup-input.js";
 
 const SandboxRuntimeTokenizerProxyEgressBaseURLEnv =
@@ -10,25 +13,33 @@ const SandboxRuntimeTelemetryTracesEndpointEnv = "SANDBOX_RUNTIME_TELEMETRY_TRAC
 const SandboxRuntimeSandboxInstanceIDEnv = "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID";
 
 export async function startSandbox(
-  deps: {
+  ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     sandboxAdapter: SandboxAdapter;
   },
-  input: StartSandboxInput,
-): Promise<StartSandboxOutput> {
+  input: {
+    sandboxInstanceId: string;
+    image: StartSandboxInstanceWorkflowImageInput;
+    runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+  },
+): Promise<{
+  sandboxInstanceId: string;
+  provider: SandboxProvider;
+  providerSandboxId: string;
+}> {
   const sandboxRuntimeTracesEndpoint =
-    deps.config.telemetry.enabled && deps.config.sandbox.provider === "docker"
-      ? deps.config.app.sandbox.docker?.tracesEndpoint
+    ctx.config.telemetry.enabled && ctx.config.sandbox.provider === "docker"
+      ? ctx.config.app.sandbox.docker?.tracesEndpoint
       : undefined;
 
-  const startedSandbox = await deps.sandboxAdapter.start({
+  const startedSandbox = await ctx.sandboxAdapter.start({
     image: {
       ...input.image,
-      provider: deps.config.sandbox.provider,
+      provider: ctx.config.sandbox.provider,
     },
     env: {
       [SandboxRuntimeTokenizerProxyEgressBaseURLEnv]:
-        deps.config.app.sandbox.tokenizerProxyEgressBaseUrl,
+        ctx.config.app.sandbox.tokenizerProxyEgressBaseUrl,
       [SandboxRuntimeSandboxInstanceIDEnv]: input.sandboxInstanceId,
       ...(sandboxRuntimeTracesEndpoint === undefined
         ? {}
@@ -38,13 +49,13 @@ export async function startSandbox(
     },
   });
 
-  if (startedSandbox.provider !== deps.config.sandbox.provider) {
+  if (startedSandbox.provider !== ctx.config.sandbox.provider) {
     throw new Error("Sandbox adapter returned sandbox handle with unexpected provider.");
   }
 
   await writeSandboxStartupInput({
-    config: deps.config,
-    sandboxAdapter: deps.sandboxAdapter,
+    config: ctx.config,
+    sandboxAdapter: ctx.sandboxAdapter,
     sandboxInstanceId: input.sandboxInstanceId,
     runtimePlan: input.runtimePlan,
     sandbox: startedSandbox,

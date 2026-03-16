@@ -4,19 +4,25 @@ import {
 } from "@mistle/workflow-registry/data-plane";
 import { defineWorkflow } from "openworkflow";
 
-import { getWorkflowContext } from "../src/openworkflow/context.js";
+import { getWorkflowContext } from "../core/context.js";
+import { stopSandboxInstance } from "./stop-sandbox-instance.js";
 
 export const StopSandboxInstanceWorkflow = defineWorkflow(
   StopSandboxInstanceWorkflowSpec,
   async ({ input, step }): Promise<StopSandboxInstanceWorkflowOutput> => {
-    const {
-      services: { stopSandboxInstance },
-    } = await getWorkflowContext();
+    const ctx = await getWorkflowContext();
 
     await step.run({ name: "stop-sandbox-instance" }, async () => {
-      await stopSandboxInstance.stopSandboxInstance({
-        sandboxInstanceId: input.sandboxInstanceId,
-      });
+      await stopSandboxInstance(
+        {
+          config: ctx.config,
+          db: ctx.db,
+          sandboxAdapter: ctx.sandboxAdapter,
+        },
+        {
+          sandboxInstanceId: input.sandboxInstanceId,
+        },
+      );
     });
 
     return {

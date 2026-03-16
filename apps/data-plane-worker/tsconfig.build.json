@@ -3,10 +3,10 @@
   "compilerOptions": {
     "noEmit": false,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"]
+  "include": ["instrument.ts", "logger.ts", "reaper/**/*.ts", "openworkflow/core/**/*.ts"]
 }

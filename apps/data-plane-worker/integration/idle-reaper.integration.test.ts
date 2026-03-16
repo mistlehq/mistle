@@ -17,14 +17,17 @@ import { Pool } from "pg";
 import { typeid } from "typeid-js";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { createDataPlaneBackend, createDataPlaneOpenWorkflow } from "../src/openworkflow/client.js";
+import {
+  createDataPlaneBackend,
+  createDataPlaneOpenWorkflow,
+} from "../openworkflow/core/client.js";
+import type { DataPlaneWorkerRuntimeConfig } from "../openworkflow/core/config.js";
+import { markSandboxInstanceStopped } from "../openworkflow/stop-sandbox-instance/mark-sandbox-instance-stopped.js";
 import {
   createWebhookIdlePolicy,
   findWebhookSandboxesEligibleForStop,
   runIdleReaperSweep,
-} from "../src/reaper/runtime.js";
-import { markSandboxInstanceStopped } from "../src/runtime/services/update-sandbox-instance-status.js";
-import type { DataPlaneWorkerRuntimeConfig } from "../src/types.js";
+} from "../reaper/runtime.js";
 
 const IntegrationTestTimeoutMs = 60_000;
 

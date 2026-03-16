@@ -1,8 +1,11 @@
 {
   "extends": "../../tsconfig.base.json",
   "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
+    "instrument.ts",
+    "logger.ts",
+    "reaper/**/*.ts",
+    "openworkflow.config.ts",
+    "openworkflow/**/*.ts",
     "integration/**/*.ts",
     "integration/**/*.tsx",
     "vitest.config.ts",
