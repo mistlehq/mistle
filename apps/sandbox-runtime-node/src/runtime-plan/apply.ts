@@ -1,4 +1,4 @@
-import type { CompiledRuntimePlan } from "@mistle/integrations-core";
+import type { CompiledRuntimePlan, ResolvedSandboxImage } from "@mistle/integrations-core";
 
 import { runRuntimeArtifactCommand } from "./artifact-command.js";
 import { errorMessage } from "./error-message.js";
@@ -11,14 +11,21 @@ type ApplyRuntimePlanInput = {
 
 type ArtifactLifecycleCommandSet = "install" | "update";
 
-function resolveArtifactLifecycleCommandSet(source: string): ArtifactLifecycleCommandSet {
+function unsupportedImageSource(source: string): never {
+  throw new Error(`runtime plan image source '${source}' is not supported`);
+}
+
+function resolveArtifactLifecycleCommandSet(
+  source: ResolvedSandboxImage["source"],
+): ArtifactLifecycleCommandSet {
   switch (source) {
     case "base":
     case "profile-base":
       return "install";
-    default:
-      throw new Error(`runtime plan image source '${source}' is not supported`);
   }
+
+  const unsupportedSource: never = source;
+  return unsupportedImageSource(unsupportedSource);
 }
 
 export async function applyRuntimePlan(input: ApplyRuntimePlanInput): Promise<void> {
