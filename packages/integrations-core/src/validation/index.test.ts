@@ -816,6 +816,7 @@ describe("validateCompiledBindingResults", () => {
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
+          adapterKey: "openai-codex",
         },
       ],
     });
@@ -840,6 +841,7 @@ describe("validateCompiledBindingResults", () => {
           runtimeKey: "codex-app-server",
           clientId: "missing-client",
           endpointKey: "app-server",
+          adapterKey: "openai-codex",
         },
       ],
     });
@@ -890,6 +892,7 @@ describe("validateCompiledBindingResults", () => {
           runtimeKey: "codex-app-server",
           clientId: "codex-cli",
           endpointKey: "app-server",
+          adapterKey: "openai-codex",
         },
       ],
     });
@@ -910,5 +913,45 @@ describe("validateCompiledBindingResults", () => {
         expect(error.code).toBe(CompilerErrorCodes.AGENT_RUNTIME_CONFLICT);
       }
     }
+  });
+
+  it("fails when an agent runtime omits adapterKey", () => {
+    const result = createCompiledBindingResult({
+      route: createRoute({
+        egressRuleId: "egress_rule_a",
+        bindingId: "bind_a",
+        hosts: ["api.openai.com"],
+      }),
+      artifactKey: "codex-cli",
+      runtimeClientSetup: {
+        clientId: "codex-cli",
+        env: {},
+        files: [],
+      },
+      runtimeClientEndpoints: [
+        {
+          endpointKey: "app-server",
+          transport: {
+            type: "ws",
+            url: "ws://127.0.0.1:4747",
+          },
+          connectionMode: "dedicated",
+        },
+      ],
+      agentRuntimes: [
+        {
+          runtimeKey: "codex-app-server",
+          clientId: "codex-cli",
+          endpointKey: "app-server",
+          adapterKey: "",
+        },
+      ],
+    });
+
+    expect(() =>
+      validateCompiledBindingResults({
+        compiledBindingResults: [result],
+      }),
+    ).toThrowError(IntegrationCompilerError);
   });
 });

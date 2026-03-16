@@ -221,6 +221,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         runtimeKey: "codex-app-server",
         clientId: "codex-cli",
         endpointKey: "app-server",
+        adapterKey: "openai-codex",
       },
     ]);
   });

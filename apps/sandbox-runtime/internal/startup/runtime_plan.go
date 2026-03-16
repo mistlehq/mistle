@@ -154,6 +154,7 @@ type AgentRuntime struct {
 	RuntimeKey  string `json:"runtimeKey"`
 	ClientID    string `json:"clientId"`
 	EndpointKey string `json:"endpointKey"`
+	AdapterKey  string `json:"adapterKey"`
 }
 
 type WorkspaceSource struct {
@@ -665,6 +666,9 @@ func validateAgentRuntime(
 	}
 	if strings.TrimSpace(agentRuntime.EndpointKey) == "" {
 		return fmt.Errorf("%s.endpointKey is required", location)
+	}
+	if strings.TrimSpace(agentRuntime.AdapterKey) == "" {
+		return fmt.Errorf("%s.adapterKey is required", location)
 	}
 	endpoint, exists := endpointsByKey[agentRuntime.EndpointKey]
 	if !exists {

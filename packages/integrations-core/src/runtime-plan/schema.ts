@@ -187,6 +187,7 @@ const CompiledAgentRuntimeSchema = z
     runtimeKey: z.string().min(1),
     clientId: z.string().min(1),
     endpointKey: z.string().min(1),
+    adapterKey: z.string().min(1),
   })
   .strict();
 
@@ -382,6 +383,7 @@ function normalizeAgentRuntime(
     runtimeKey: agentRuntime.runtimeKey,
     clientId: agentRuntime.clientId,
     endpointKey: agentRuntime.endpointKey,
+    adapterKey: agentRuntime.adapterKey,
   };
 }
 

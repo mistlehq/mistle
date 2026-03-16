@@ -342,7 +342,8 @@ func TestReadStartupInput(t *testing.T) {
 							"bindingId": "bind_openai",
 							"runtimeKey": "codex-app-server",
 							"clientId": "client_codex",
-							"endpointKey": "app-server"
+							"endpointKey": "app-server",
+							"adapterKey": "openai-codex"
 						}
 					]
 				}
@@ -354,6 +355,62 @@ func TestReadStartupInput(t *testing.T) {
 		}
 		if !strings.Contains(err.Error(), "agentRuntimes[0].clientId") {
 			t.Fatalf("expected agent runtime clientId validation error, got %v", err)
+		}
+	})
+
+	t.Run("fails when agent runtime omits adapter key", func(t *testing.T) {
+		_, err := ReadStartupInput(ReadStartupInputInput{
+			Reader: bytes.NewBufferString(`{
+				"bootstrapToken": "test-token",
+				"tunnelExchangeToken": "test-exchange-token",
+				"tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+				"runtimePlan": {
+					"sandboxProfileId": "sbp_123",
+					"version": 1,
+					"image": {
+						"source": "base",
+						"imageRef": "mistle/sandbox-base:dev"
+					},
+					"egressRoutes": [],
+					"artifacts": [],
+					"runtimeClients": [
+						{
+							"clientId": "client_codex",
+							"setup": {
+								"env": {},
+								"files": []
+							},
+							"processes": [],
+							"endpoints": [
+								{
+									"endpointKey": "app-server",
+									"transport": {
+										"type": "ws",
+										"url": "ws://127.0.0.1:4500"
+									},
+									"connectionMode": "dedicated"
+								}
+							]
+						}
+					],
+					"workspaceSources": [],
+					"agentRuntimes": [
+						{
+							"bindingId": "bind_openai",
+							"runtimeKey": "codex-app-server",
+							"clientId": "client_codex",
+							"endpointKey": "app-server"
+						}
+					]
+				}
+			}`),
+			MaxBytes: 4096,
+		})
+		if err == nil {
+			t.Fatal("expected error when agent runtime omits adapter key")
+		}
+		if !strings.Contains(err.Error(), "agentRuntimes[0].adapterKey") {
+			t.Fatalf("expected agent runtime adapterKey validation error, got %v", err)
 		}
 	})
 
