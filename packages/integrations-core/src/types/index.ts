@@ -187,12 +187,9 @@ export type BindingWriteValidationResult =
       issues: readonly BindingWriteValidationIssue[];
     };
 
-export type IntegrationFormJsonSchema = Record<string, unknown>;
-export type IntegrationFormUiSchema = Record<string, unknown>;
-
 export type ResolvedIntegrationForm = {
-  schema?: IntegrationFormJsonSchema;
-  uiSchema?: IntegrationFormUiSchema;
+  schema?: Record<string, unknown>;
+  uiSchema?: Record<string, unknown>;
 };
 
 export type IntegrationFormContext<

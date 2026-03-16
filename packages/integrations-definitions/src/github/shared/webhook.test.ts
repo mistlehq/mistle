@@ -24,10 +24,6 @@ type WebhookDefinitionShape = {
   examples: ReadonlyArray<unknown>;
 };
 
-type WebhookPayloadObject = {
-  [key: string]: unknown;
-};
-
 const IssueCommentEventName: WebhookEventName = "issue_comment";
 const PullRequestReviewCommentEventName: WebhookEventName = "pull_request_review_comment";
 const PullRequestEventName: WebhookEventName = "pull_request";
@@ -36,12 +32,8 @@ function encodePayload(input: unknown): Uint8Array {
   return encoder.encode(JSON.stringify(input));
 }
 
-function isWebhookPayloadObject(input: unknown): input is WebhookPayloadObject {
-  return typeof input === "object" && input !== null && !Array.isArray(input);
-}
-
-function toPayloadRecord(input: unknown): WebhookPayloadObject {
-  if (!isWebhookPayloadObject(input)) {
+function toPayloadRecord(input: unknown) {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
     throw new Error("Expected webhook payload to be a JSON object.");
   }
 

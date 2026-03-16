@@ -128,16 +128,22 @@ export type CodexChatAction =
       notification: CodexJsonRpcNotification;
     };
 
-type CodexChatItemObject = {
-  [key: string]: unknown;
-};
-
-function isCodexChatItemObject(value: unknown): value is CodexChatItemObject {
+function isCodexChatItemValue(value: unknown): value is object {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function readOptionalString(record: CodexChatItemObject, key: string): string | null {
-  const value = record[key];
+function readObjectValue(record: object, key: string): unknown {
+  for (const [entryKey, entryValue] of Object.entries(record)) {
+    if (entryKey === key) {
+      return entryValue;
+    }
+  }
+
+  return undefined;
+}
+
+function readOptionalString(record: object, key: string): string | null {
+  const value = readObjectValue(record, key);
   return typeof value === "string" ? value : null;
 }
 
@@ -719,7 +725,7 @@ function buildUserEntry(turnId: string, text: string, id?: string): ChatUserEntr
 }
 
 function mergeRawItem(existing: unknown, incoming: unknown): unknown {
-  if (!isCodexChatItemObject(existing) || !isCodexChatItemObject(incoming)) {
+  if (!isCodexChatItemValue(existing) || !isCodexChatItemValue(incoming)) {
     return incoming;
   }
 
@@ -742,16 +748,21 @@ function updateRawItemTextField(
   const ensured = ensureTurn(state.turnsById, state.turnOrder, input.turnId);
   const turn = ensured.turnsById[input.turnId] ?? createTurnState(input.turnId);
   const existingRawItem = turn.rawItemsById[input.itemId];
-  const nextRawItem = isCodexChatItemObject(existingRawItem)
+  const currentStatus = isCodexChatItemValue(existingRawItem)
+    ? readObjectValue(existingRawItem, "status")
+    : undefined;
+  const currentFieldValue = isCodexChatItemValue(existingRawItem)
+    ? readObjectValue(existingRawItem, input.field)
+    : undefined;
+  const nextRawItem = isCodexChatItemValue(existingRawItem)
     ? {
         ...existingRawItem,
         type: input.itemType,
         id: input.itemId,
-        status:
-          typeof existingRawItem["status"] === "string" ? existingRawItem["status"] : "inProgress",
+        status: typeof currentStatus === "string" ? currentStatus : "inProgress",
         [input.field]:
-          typeof existingRawItem[input.field] === "string"
-            ? `${existingRawItem[input.field]}${input.delta}`
+          typeof currentFieldValue === "string"
+            ? `${currentFieldValue}${input.delta}`
             : input.delta,
       }
     : {
@@ -790,7 +801,7 @@ function upsertLifecycleItem(
     method: "item/started" | "item/completed";
   },
 ): CodexChatState {
-  if (!isCodexChatItemObject(input.item)) {
+  if (!isCodexChatItemValue(input.item)) {
     throw new Error(`Lifecycle item must be an object. Payload: ${JSON.stringify(input.item)}`);
   }
 
@@ -806,12 +817,13 @@ function upsertLifecycleItem(
     return state;
   }
 
-  const lifecycleItem = !("status" in input.item)
-    ? {
-        ...input.item,
-        status: input.method === "item/started" ? "inProgress" : "completed",
-      }
-    : input.item;
+  const lifecycleItem =
+    readObjectValue(input.item, "status") === undefined
+      ? {
+          ...input.item,
+          status: input.method === "item/started" ? "inProgress" : "completed",
+        }
+      : input.item;
 
   return buildState({
     pendingTurnId: state.pendingTurnId,
@@ -851,7 +863,7 @@ function hydrateTurns(turns: readonly CodexThreadReadTurn[]): CodexChatState {
         continue;
       }
 
-      if (!isCodexChatItemObject(item)) {
+      if (!isCodexChatItemValue(item)) {
         continue;
       }
 

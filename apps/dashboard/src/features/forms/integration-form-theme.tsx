@@ -24,11 +24,10 @@ import type {
 import type { IntegrationFormContext } from "./integration-form-context.js";
 import { IntegrationResourceStringArrayWidget } from "./integration-resource-string-array-widget.js";
 
-type JsonObject = Record<string, unknown>;
 type IntegrationFieldLayout = "horizontal" | "vertical";
 
 function resolveSelectWidgetOptions(input: {
-  options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"];
+  options: WidgetProps<Record<string, unknown>, RJSFSchema, IntegrationFormContext>["options"];
   formContext: IntegrationFormContext | undefined;
 }): {
   fitContent: boolean;
@@ -53,7 +52,7 @@ export const IntegrationSelectContentClassName =
   "w-max min-w-(--anchor-width) max-w-[min(32rem,calc(100vw-2rem))]";
 
 function resolveCommaSeparatedOptions(
-  options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"],
+  options: WidgetProps<Record<string, unknown>, RJSFSchema, IntegrationFormContext>["options"],
 ): {
   delimiter: string;
   placeholder: string | undefined;
@@ -68,7 +67,7 @@ function resolveCommaSeparatedOptions(
 }
 
 function CommaSeparatedStringArrayWidget(
-  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+  props: WidgetProps<Record<string, unknown>, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
   const { delimiter, placeholder } = resolveCommaSeparatedOptions(props.options);
   const value = Array.isArray(props.value)
@@ -100,7 +99,7 @@ function CommaSeparatedStringArrayWidget(
   );
 }
 
-function SelectWidget(props: WidgetProps<JsonObject, RJSFSchema>): React.JSX.Element {
+function SelectWidget(props: WidgetProps<Record<string, unknown>, RJSFSchema>): React.JSX.Element {
   const enumOptions = props.options.enumOptions ?? [];
   const selectedValue = typeof props.value === "string" ? props.value : undefined;
   const { fitContent } = resolveSelectWidgetOptions({
@@ -150,7 +149,7 @@ function SelectWidget(props: WidgetProps<JsonObject, RJSFSchema>): React.JSX.Ele
 }
 
 function resolveTextareaWidgetOptions(
-  options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"],
+  options: WidgetProps<Record<string, unknown>, RJSFSchema, IntegrationFormContext>["options"],
 ): {
   placeholder: string | undefined;
   rows: number | undefined;
@@ -165,7 +164,7 @@ function resolveTextareaWidgetOptions(
 }
 
 function TextareaWidget(
-  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+  props: WidgetProps<Record<string, unknown>, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
   const { placeholder, rows } = resolveTextareaWidgetOptions(props.options);
   const value = typeof props.value === "string" ? props.value : "";
@@ -199,7 +198,7 @@ function resolveFormLayout(input: IntegrationFormContext | undefined): "vertical
 }
 
 function resolveFieldLayout(
-  props: FieldTemplateProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+  props: FieldTemplateProps<Record<string, unknown>, RJSFSchema, IntegrationFormContext>,
 ): IntegrationFieldLayout {
   const formLayout = resolveFormLayout(props.registry.formContext);
   if (formLayout === "vertical") {
@@ -219,7 +218,7 @@ function resolveFieldLayout(
 }
 
 function IntegrationFieldTemplate(
-  props: FieldTemplateProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+  props: FieldTemplateProps<Record<string, unknown>, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
   if (props.hidden) {
     return props.children;
@@ -261,7 +260,7 @@ function IntegrationFieldTemplate(
 }
 
 function IntegrationObjectFieldTemplate(
-  props: ObjectFieldTemplateProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+  props: ObjectFieldTemplateProps<Record<string, unknown>, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
   const layout = resolveFormLayout(props.registry.formContext);
   const visibleProperties = props.properties.filter((property) => !property.hidden);

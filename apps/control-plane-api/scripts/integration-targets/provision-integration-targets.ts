@@ -77,7 +77,7 @@ function normalizeEscapedNewlinesInUnknownValue(value: unknown): unknown {
   return value;
 }
 
-function normalizeEscapedNewlinesInUnknownObject(value: object): Record<string, unknown> {
+function normalizeEscapedNewlinesInUnknownObject(value: object) {
   const normalizedValue: Record<string, unknown> = {};
 
   for (const [key, entryValue] of Object.entries(value)) {

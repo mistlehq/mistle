@@ -25,7 +25,7 @@ const InstallationId = "123456";
 const ControlPlaneWorkflowNamespaceId = "integration";
 const HandleIntegrationWebhookEventWorkflowName = "control-plane.integration-webhooks.handle-event";
 
-function createGitHubWebhookPayload(): Record<string, unknown> {
+function createGitHubWebhookPayload() {
   return {
     action: "created",
     installation: {

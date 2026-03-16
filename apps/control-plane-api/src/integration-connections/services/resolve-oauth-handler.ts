@@ -16,40 +16,8 @@ import {
 } from "./errors.js";
 
 const registry = createIntegrationRegistry();
-
-type OauthHandlerObject = {
-  [key: string]: unknown;
-};
-
-function parseOauthHandlerObject(value: unknown): OauthHandlerObject | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return null;
-  }
-
-  const record: OauthHandlerObject = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
-}
-
-function parseOauthSecretRecord(value: unknown): Record<string, string> | null {
-  const record = parseOauthHandlerObject(value);
-  if (record === null) {
-    return null;
-  }
-
-  const stringRecord: Record<string, string> = {};
-  for (const [key, entryValue] of Object.entries(record)) {
-    if (typeof entryValue !== "string") {
-      return null;
-    }
-    stringRecord[key] = entryValue;
-  }
-
-  return stringRecord;
-}
+const OAuthHandlerConfigSchema = z.record(z.string(), z.unknown());
+const OAuthHandlerSecretSchema = z.record(z.string(), z.string());
 
 export type ResolvedOauthHandlerTarget = {
   target: {
@@ -130,11 +98,7 @@ export async function resolveOauthHandlerTargetOrThrow(
   let parsedConfig: Record<string, unknown>;
   try {
     const parsedConfigCandidate = definition.targetConfigSchema.parse(target.config);
-    const targetConfigRecord = parseOauthHandlerObject(parsedConfigCandidate);
-    if (targetConfigRecord === null) {
-      throw new Error("Target config must be an object.");
-    }
-    parsedConfig = targetConfigRecord;
+    parsedConfig = OAuthHandlerConfigSchema.parse(parsedConfigCandidate);
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new IntegrationConnectionsBadRequestError(
@@ -149,11 +113,7 @@ export async function resolveOauthHandlerTargetOrThrow(
   let parsedSecrets: Record<string, string>;
   try {
     const parsedSecretsCandidate = definition.targetSecretSchema.parse(targetSecrets);
-    const targetSecretsRecord = parseOauthSecretRecord(parsedSecretsCandidate);
-    if (targetSecretsRecord === null) {
-      throw new Error("Target secrets must be a string record.");
-    }
-    parsedSecrets = targetSecretsRecord;
+    parsedSecrets = OAuthHandlerSecretSchema.parse(parsedSecretsCandidate);
   } catch (error) {
     if (error instanceof z.ZodError) {
       throw new IntegrationConnectionsBadRequestError(

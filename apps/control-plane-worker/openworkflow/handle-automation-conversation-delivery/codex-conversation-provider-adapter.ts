@@ -43,12 +43,18 @@ const CodexInitializeClientInfo = {
   version: "0.1.0",
 } as const;
 
-type CodexPayloadObject = {
-  [key: string]: unknown;
-};
-
-function isCodexPayloadObject(value: unknown): value is CodexPayloadObject {
+function isCodexPayloadValue(value: unknown): value is object {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readObjectValue(record: object, key: string): unknown {
+  for (const [entryKey, entryValue] of Object.entries(record)) {
+    if (entryKey === key) {
+      return entryValue;
+    }
+  }
+
+  return undefined;
 }
 
 function readNestedString(value: unknown, path: readonly string[]): string | null {
@@ -59,24 +65,36 @@ function readNestedString(value: unknown, path: readonly string[]): string | nul
 function readNestedValue(value: unknown, path: readonly string[]): unknown {
   let currentValue: unknown = value;
   for (const segment of path) {
-    if (!isCodexPayloadObject(currentValue) || !(segment in currentValue)) {
+    if (!isCodexPayloadValue(currentValue)) {
       return null;
     }
-    currentValue = currentValue[segment];
+
+    currentValue = readObjectValue(currentValue, segment);
+    if (currentValue === undefined) {
+      return null;
+    }
   }
 
   return currentValue;
 }
 
 function normalizeThreadStatus(statusValue: unknown): ProviderInspectConversationOutput["status"] {
-  if (!isCodexPayloadObject(statusValue) || typeof statusValue.type !== "string") {
+  if (!isCodexPayloadValue(statusValue)) {
     throw new ConversationProviderError({
       code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
       message: "Codex inspect did not return thread.status.type.",
     });
   }
 
-  switch (statusValue.type) {
+  const statusType = readObjectValue(statusValue, "type");
+  if (typeof statusType !== "string") {
+    throw new ConversationProviderError({
+      code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
+      message: "Codex inspect did not return thread.status.type.",
+    });
+  }
+
+  switch (statusType) {
     case "active":
       return "active";
     case "systemError":
@@ -87,7 +105,7 @@ function normalizeThreadStatus(statusValue: unknown): ProviderInspectConversatio
     default:
       throw new ConversationProviderError({
         code: ConversationProviderErrorCodes.PROVIDER_INSPECT_FAILED,
-        message: `Codex inspect returned unsupported thread status type '${statusValue.type}'.`,
+        message: `Codex inspect returned unsupported thread status type '${statusType}'.`,
       });
   }
 }
@@ -136,13 +154,13 @@ function readCodexRequestFailureCause(error: unknown): CodexRequestFailureCause 
     return null;
   }
 
-  if (!isCodexPayloadObject(error.cause)) {
+  if (!isCodexPayloadValue(error.cause)) {
     return null;
   }
 
-  const methodValue = error.cause.method;
-  const errorMessageValue = error.cause.errorMessage;
-  const errorCodeValue = error.cause.errorCode;
+  const methodValue = readObjectValue(error.cause, "method");
+  const errorMessageValue = readObjectValue(error.cause, "errorMessage");
+  const errorCodeValue = readObjectValue(error.cause, "errorCode");
   if (typeof methodValue !== "string") {
     return null;
   }
@@ -158,8 +176,9 @@ function readCodexRequestFailureCause(error: unknown): CodexRequestFailureCause 
     errorCode: errorCodeValue,
     errorMessage: errorMessageValue,
   };
-  if ("errorData" in error.cause) {
-    cause.errorData = error.cause.errorData;
+  const errorDataValue = readObjectValue(error.cause, "errorData");
+  if (errorDataValue !== undefined) {
+    cause.errorData = errorDataValue;
   }
 
   return cause;
@@ -286,7 +305,15 @@ async function initializeCodexSession(rpcClient: CodexJsonRpcClient): Promise<vo
     },
   );
   await rpcClient.notify("initialized", {});
-  if (!isCodexPayloadObject(initializeResult) || typeof initializeResult.userAgent !== "string") {
+  if (!isCodexPayloadValue(initializeResult)) {
+    throw new ConversationProviderError({
+      code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
+      message: "Codex initialize response did not include userAgent.",
+    });
+  }
+
+  const userAgent = readObjectValue(initializeResult, "userAgent");
+  if (typeof userAgent !== "string") {
     throw new ConversationProviderError({
       code: ConversationProviderErrorCodes.PROVIDER_REQUEST_FAILED,
       message: "Codex initialize response did not include userAgent.",

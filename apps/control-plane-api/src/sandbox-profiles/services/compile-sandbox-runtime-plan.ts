@@ -108,9 +108,7 @@ function mapCompilerErrorCodeToSandboxRuntimePlanCompilerErrorCode(
   throw new Error(`Unhandled compiler error code '${code}'.`);
 }
 
-function normalizeConnectionConfig(
-  connectionConfig: Record<string, unknown> | null,
-): Record<string, unknown> {
+function normalizeConnectionConfig(connectionConfig: Record<string, unknown> | null) {
   if (connectionConfig === null) {
     return {};
   }

@@ -21,7 +21,7 @@ export type DashboardBuildConfig = {
   controlPlaneApiOrigin: string;
 };
 
-function parseTomlFile(path: string): Record<string, unknown> {
+function parseTomlFile(path: string) {
   if (!existsSync(path)) {
     throw new Error(`Missing required dashboard config file: ${path}`);
   }

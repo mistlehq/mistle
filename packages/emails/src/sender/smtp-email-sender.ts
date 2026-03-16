@@ -42,20 +42,26 @@ const RETRYABLE_SMTP_ERROR_CODES = new Set<string>([
   "ETIMEDOUT",
 ]);
 
-type SmtpTransportObject = {
-  [key: string]: unknown;
-};
-
-function isSmtpTransportObject(value: unknown): value is SmtpTransportObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function toSmtpAddress(address: { email: string; name?: string }): string {
   if (address.name === undefined) {
     return address.email;
   }
 
   return `${address.name} <${address.email}>`;
+}
+
+function readSmtpRecipientAddress(value: unknown): string | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return null;
+  }
+
+  for (const [key, entryValue] of Object.entries(value)) {
+    if (key === "address" && typeof entryValue === "string") {
+      return entryValue;
+    }
+  }
+
+  return null;
 }
 
 function normalizeRecipientList(value: unknown): string[] {
@@ -71,8 +77,9 @@ function normalizeRecipientList(value: unknown): string[] {
       continue;
     }
 
-    if (isSmtpTransportObject(recipient) && typeof recipient.address === "string") {
-      normalized.push(recipient.address);
+    const recipientAddress = readSmtpRecipientAddress(recipient);
+    if (recipientAddress !== null) {
+      normalized.push(recipientAddress);
     }
   }
 
@@ -103,24 +110,35 @@ function parseSMTPTransportResult(result: SMTPTransportSendResult): ParsedSMTPTr
   };
 }
 
+function readSmtpErrorDetail(value: unknown, key: "code" | "message"): string | undefined {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return undefined;
+  }
+
+  for (const [entryKey, entryValue] of Object.entries(value)) {
+    if (entryKey === key && typeof entryValue === "string") {
+      return entryValue;
+    }
+  }
+
+  return undefined;
+}
+
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
   }
 
-  if (isSmtpTransportObject(error) && typeof error.message === "string") {
-    return error.message;
+  const errorMessage = readSmtpErrorDetail(error, "message");
+  if (errorMessage !== undefined) {
+    return errorMessage;
   }
 
   return "Failed to send email via SMTP.";
 }
 
 function getErrorCode(error: unknown): string | undefined {
-  if (isSmtpTransportObject(error) && typeof error.code === "string") {
-    return error.code;
-  }
-
-  return undefined;
+  return readSmtpErrorDetail(error, "code");
 }
 
 function isRetryableSmtpCode(code: string | undefined): boolean {

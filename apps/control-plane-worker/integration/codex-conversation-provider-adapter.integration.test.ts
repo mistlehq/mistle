@@ -166,6 +166,7 @@ function parseJsonRpcResponsePayload(data: RawData): JsonRpcResponsePayload | nu
     if (!isCodexTestPayloadObject(parsedPayload.error)) {
       return null;
     }
+
     if (
       typeof parsedPayload.error.code !== "number" ||
       typeof parsedPayload.error.message !== "string"
@@ -178,7 +179,7 @@ function parseJsonRpcResponsePayload(data: RawData): JsonRpcResponsePayload | nu
       error: {
         code: parsedPayload.error.code,
         message: parsedPayload.error.message,
-        data: "data" in parsedPayload.error ? parsedPayload.error.data : undefined,
+        data: parsedPayload.error.data,
       },
     };
   }

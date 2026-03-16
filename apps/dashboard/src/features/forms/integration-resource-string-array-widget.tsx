@@ -14,7 +14,6 @@ import type { IntegrationFormContext } from "./integration-form-context.js";
 import { buildIntegrationResourceWidgetViewModel } from "./integration-resource-string-array-widget-view-model.js";
 import { IntegrationResourceStringArrayWidgetView } from "./integration-resource-string-array-widget-view.js";
 
-type JsonObject = Record<string, unknown>;
 const IntegrationResourceSummaryOptionSchema = z
   .object({
     kind: z.string().min(1),
@@ -35,14 +34,14 @@ const IntegrationResourceStringArrayWidgetOptionsSchema = z
     refreshLabel: z.string().min(1).optional(),
     resourceSummary: IntegrationResourceSummaryOptionSchema.optional(),
   })
-  .passthrough();
+  .loose();
 
 type IntegrationResourceStringArrayWidgetOptions = z.infer<
   typeof IntegrationResourceStringArrayWidgetOptionsSchema
 >;
 
 function resolveWidgetOptions(
-  options: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>["options"],
+  options: WidgetProps<Record<string, unknown>, RJSFSchema, IntegrationFormContext>["options"],
 ): IntegrationResourceStringArrayWidgetOptions {
   const parsedOptions = IntegrationResourceStringArrayWidgetOptionsSchema.safeParse(options);
   if (!parsedOptions.success) {
@@ -92,7 +91,7 @@ function resolveResourceOverride(input: {
 }
 
 export function IntegrationResourceStringArrayWidget(
-  props: WidgetProps<JsonObject, RJSFSchema, IntegrationFormContext>,
+  props: WidgetProps<Record<string, unknown>, RJSFSchema, IntegrationFormContext>,
 ): React.JSX.Element {
   const options = resolveWidgetOptions(props.options);
   const queryClient = useQueryClient();

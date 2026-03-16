@@ -5,22 +5,26 @@ import type {
   CodexTurnPlanSnapshot,
 } from "./codex-session-types.js";
 
-type CodexNotificationParams = {
-  [key: string]: unknown;
-};
-
-function isCodexNotificationParams(value: unknown): value is CodexNotificationParams {
+function isCodexNotificationParams(value: unknown): value is object {
   return typeof value === "object" && value !== null;
 }
 
-function resolveStringProperty(record: CodexNotificationParams, key: string): string | null {
-  const value = record[key];
+function readNotificationValue(record: object, key: string): unknown {
+  for (const [entryKey, entryValue] of Object.entries(record)) {
+    if (entryKey === key) {
+      return entryValue;
+    }
+  }
+
+  return undefined;
+}
+
+function resolveStringProperty(record: object, key: string): string | null {
+  const value = readNotificationValue(record, key);
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-function resolveNotificationParams(notification: {
-  params?: unknown;
-}): CodexNotificationParams | null {
+function resolveNotificationParams(notification: { params?: unknown }): object | null {
   return isCodexNotificationParams(notification.params) ? notification.params : null;
 }
 
@@ -47,7 +51,7 @@ export function parseThreadLifecycleEvent(notification: {
     return null;
   }
 
-  const statusValue = params.status;
+  const statusValue = readNotificationValue(params, "status");
   return {
     method: notification.method,
     threadId,
@@ -95,7 +99,7 @@ export function parseTurnPlanSnapshot(notification: {
   }
 
   const turnId = resolveStringProperty(params, "turnId");
-  const planValue = params.plan;
+  const planValue = readNotificationValue(params, "plan");
   if (turnId === null || !Array.isArray(planValue)) {
     return null;
   }

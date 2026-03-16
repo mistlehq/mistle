@@ -10,32 +10,38 @@ export type SandboxProfileBindingSummaryItem = {
   value: string;
 };
 
-type BindingSummaryObject = {
-  [key: string]: unknown;
-};
-
-function isBindingSummaryObject(value: unknown): value is BindingSummaryObject {
+function isBindingSummaryValue(value: unknown): value is object {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function readBindingSummaryValue(record: object, key: string): unknown {
+  for (const [entryKey, entryValue] of Object.entries(record)) {
+    if (entryKey === key) {
+      return entryValue;
+    }
+  }
+
+  return undefined;
+}
+
 function resolvePropertyTitle(input: {
-  schema: Record<string, unknown>;
-  uiSchema: Record<string, unknown>;
+  schema: object;
+  uiSchema: object;
   propertyKey: string;
 }): string {
-  const propertyUiSchema = input.uiSchema[input.propertyKey];
-  if (isBindingSummaryObject(propertyUiSchema)) {
-    const uiTitle = propertyUiSchema["ui:title"];
+  const propertyUiSchema = readBindingSummaryValue(input.uiSchema, input.propertyKey);
+  if (isBindingSummaryValue(propertyUiSchema)) {
+    const uiTitle = readBindingSummaryValue(propertyUiSchema, "ui:title");
     if (typeof uiTitle === "string" && uiTitle.length > 0) {
       return uiTitle;
     }
   }
 
-  const properties = input.schema.properties;
-  if (isBindingSummaryObject(properties)) {
-    const propertySchema = properties[input.propertyKey];
-    if (isBindingSummaryObject(propertySchema)) {
-      const title = propertySchema.title;
+  const properties = readBindingSummaryValue(input.schema, "properties");
+  if (isBindingSummaryValue(properties)) {
+    const propertySchema = readBindingSummaryValue(properties, input.propertyKey);
+    if (isBindingSummaryValue(propertySchema)) {
+      const title = readBindingSummaryValue(propertySchema, "title");
       if (typeof title === "string" && title.length > 0) {
         return title;
       }
@@ -46,27 +52,34 @@ function resolvePropertyTitle(input: {
 }
 
 function resolveScalarSummaryValue(input: {
-  schema: Record<string, unknown>;
+  schema: object;
   propertyKey: string;
   value: string | number | boolean;
 }): string {
-  const properties = input.schema.properties;
-  if (!isBindingSummaryObject(properties)) {
+  const properties = readBindingSummaryValue(input.schema, "properties");
+  if (!isBindingSummaryValue(properties)) {
     return String(input.value);
   }
 
-  const propertySchema = properties[input.propertyKey];
-  if (!isBindingSummaryObject(propertySchema) || !Array.isArray(propertySchema.oneOf)) {
+  const propertySchema = readBindingSummaryValue(properties, input.propertyKey);
+  if (!isBindingSummaryValue(propertySchema)) {
     return String(input.value);
   }
 
-  for (const option of propertySchema.oneOf) {
-    if (!isBindingSummaryObject(option)) {
+  const oneOfOptions = readBindingSummaryValue(propertySchema, "oneOf");
+  if (!Array.isArray(oneOfOptions)) {
+    return String(input.value);
+  }
+
+  for (const option of oneOfOptions) {
+    if (!isBindingSummaryValue(option)) {
       continue;
     }
 
-    if (option.const === input.value && typeof option.title === "string") {
-      return option.title;
+    const optionConst = readBindingSummaryValue(option, "const");
+    const optionTitle = readBindingSummaryValue(option, "title");
+    if (optionConst === input.value && typeof optionTitle === "string") {
+      return optionTitle;
     }
   }
 

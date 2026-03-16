@@ -16,7 +16,7 @@ type CapturedRequest = {
   body: unknown;
 };
 
-function createConnectionResponse(): Record<string, unknown> {
+function createConnectionResponse() {
   return {
     id: "icn_123",
     targetKey: "openai-default",

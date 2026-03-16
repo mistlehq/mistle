@@ -97,20 +97,22 @@ export type SharedInfraCoordinatorLease = {
 
 const TESTCONTAINERS_HOST_GATEWAY = "host.docker.internal";
 
-type SharedInfraStateObject = {
-  [key: string]: unknown;
-};
-
-function isSharedInfraStateObject(value: unknown): value is SharedInfraStateObject {
-  return typeof value === "object" && value !== null;
+function isSharedInfraStateObject(value: unknown): value is object {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function readRecordString(
-  record: SharedInfraStateObject,
-  key: string,
-  label: string,
-): string | undefined {
-  const value = record[key];
+function readRecordValue(record: object, key: string): unknown {
+  for (const [entryKey, entryValue] of Object.entries(record)) {
+    if (entryKey === key) {
+      return entryValue;
+    }
+  }
+
+  return undefined;
+}
+
+function readRecordString(record: object, key: string, label: string): string | undefined {
+  const value = readRecordValue(record, key);
   if (value === undefined) {
     return undefined;
   }
@@ -120,12 +122,8 @@ function readRecordString(
   return value;
 }
 
-function readRecordNumber(
-  record: SharedInfraStateObject,
-  key: string,
-  label: string,
-): number | undefined {
-  const value = record[key];
+function readRecordNumber(record: object, key: string, label: string): number | undefined {
+  const value = readRecordValue(record, key);
   if (value === undefined) {
     return undefined;
   }
@@ -143,7 +141,7 @@ function isProcessAlive(processId: number): boolean {
     if (!isSharedInfraStateObject(error)) {
       return false;
     }
-    const code = error["code"];
+    const code = readRecordValue(error, "code");
     if (code === "ESRCH") {
       return false;
     }
@@ -182,7 +180,7 @@ function parsePersistedState(raw: string): PersistedSharedInfraState {
     );
   }
 
-  const entriesValue = parsed["entries"];
+  const entriesValue = readRecordValue(parsed, "entries");
   if (!isSharedInfraStateObject(entriesValue)) {
     throw new Error("Shared infra state entries must be an object.");
   }
@@ -193,7 +191,7 @@ function parsePersistedState(raw: string): PersistedSharedInfraState {
       throw new Error(`Shared infra state entry ${key} must be an object.`);
     }
 
-    const leasesValue = value["leases"];
+    const leasesValue = readRecordValue(value, "leases");
     if (!isSharedInfraStateObject(leasesValue)) {
       throw new Error(`Shared infra state entry ${key} leases must be an object.`);
     }
@@ -222,8 +220,8 @@ function parsePersistedState(raw: string): PersistedSharedInfraState {
       };
     }
 
-    const postgresValue = value["postgres"];
-    const mailpitValue = value["mailpit"];
+    const postgresValue = readRecordValue(value, "postgres");
+    const mailpitValue = readRecordValue(value, "mailpit");
 
     const postgres =
       postgresValue === undefined
@@ -247,9 +245,9 @@ function parsePersistedState(raw: string): PersistedSharedInfraState {
               "pooledUrl",
               `shared infra postgres pooledUrl for key ${key}`,
             );
-            const postgresData = postgresValue["postgres"];
-            const pgbouncerData = postgresValue["pgbouncer"];
-            const runtimeMetadata = postgresValue["runtimeMetadata"];
+            const postgresData = readRecordValue(postgresValue, "postgres");
+            const pgbouncerData = readRecordValue(postgresValue, "pgbouncer");
+            const runtimeMetadata = readRecordValue(postgresValue, "runtimeMetadata");
             if (
               configFingerprint === undefined ||
               directUrl === undefined ||
@@ -323,7 +321,7 @@ function parsePersistedState(raw: string): PersistedSharedInfraState {
               "pgbouncerContainerId",
               `shared infra postgres runtime metadata pgbouncerContainerId for key ${key}`,
             );
-            const networkIdValue = runtimeMetadata["networkId"];
+            const networkIdValue = readRecordValue(runtimeMetadata, "networkId");
             if (
               postgresHost === undefined ||
               postgresPort === undefined ||
@@ -406,7 +404,7 @@ function parsePersistedState(raw: string): PersistedSharedInfraState {
               "httpBaseUrl",
               `shared infra mailpit httpBaseUrl for key ${key}`,
             );
-            const runtimeMetadata = mailpitValue["runtimeMetadata"];
+            const runtimeMetadata = readRecordValue(mailpitValue, "runtimeMetadata");
             if (
               smtpHost === undefined ||
               smtpPort === undefined ||
@@ -454,7 +452,7 @@ async function readPersistedState(): Promise<PersistedSharedInfraState> {
     const raw = await readFile(SharedInfraStateFilePath, "utf8");
     return parsePersistedState(raw);
   } catch (error) {
-    if (isSharedInfraStateObject(error) && error["code"] === "ENOENT") {
+    if (isSharedInfraStateObject(error) && readRecordValue(error, "code") === "ENOENT") {
       return createEmptyState();
     }
     throw error;
@@ -481,7 +479,7 @@ async function readLockOwnerPid(): Promise<number | undefined> {
     const pid = readRecordNumber(parsed, "pid", "shared infra lock owner pid");
     return pid;
   } catch (error) {
-    if (isSharedInfraStateObject(error) && error["code"] === "ENOENT") {
+    if (isSharedInfraStateObject(error) && readRecordValue(error, "code") === "ENOENT") {
       return undefined;
     }
     throw error;
@@ -518,7 +516,7 @@ async function acquireStateFileLock(): Promise<() => Promise<void>> {
         await rm(SharedInfraLockDirectoryPath, { recursive: true, force: true });
       };
     } catch (error) {
-      if (!(isSharedInfraStateObject(error) && error["code"] === "EEXIST")) {
+      if (!(isSharedInfraStateObject(error) && readRecordValue(error, "code") === "EEXIST")) {
         throw error;
       }
       const ownerPid = await readLockOwnerPid();
@@ -586,11 +584,11 @@ function isNotFoundError(error: unknown): boolean {
   if (!isSharedInfraStateObject(error)) {
     return false;
   }
-  const statusCode = error["statusCode"];
+  const statusCode = readRecordValue(error, "statusCode");
   if (typeof statusCode === "number" && statusCode === 404) {
     return true;
   }
-  const message = error["message"];
+  const message = readRecordValue(error, "message");
   return typeof message === "string" && message.includes("No such");
 }
 
@@ -598,11 +596,11 @@ function isAlreadyStoppedContainerError(error: unknown): boolean {
   if (!isSharedInfraStateObject(error)) {
     return false;
   }
-  const statusCode = error["statusCode"];
+  const statusCode = readRecordValue(error, "statusCode");
   if (typeof statusCode === "number" && statusCode === 304) {
     return true;
   }
-  const message = error["message"];
+  const message = readRecordValue(error, "message");
   return typeof message === "string" && message.includes("is not running");
 }
 

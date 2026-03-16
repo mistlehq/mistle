@@ -211,7 +211,7 @@ function hasListConnectionResources(
   );
 }
 
-function parseUnknownRecord(input: { label: string; value: unknown }): Record<string, unknown> {
+function parseUnknownRecord(input: { label: string; value: unknown }) {
   const parsed = UnknownRecordSchema.safeParse(input.value);
   if (!parsed.success) {
     throw new Error(`Expected ${input.label} to be a record.`);
@@ -220,7 +220,7 @@ function parseUnknownRecord(input: { label: string; value: unknown }): Record<st
   return parsed.data;
 }
 
-function parseStringRecord(input: { label: string; value: unknown }): Record<string, string> {
+function parseStringRecord(input: { label: string; value: unknown }) {
   const parsed = StringRecordSchema.safeParse(input.value);
   if (!parsed.success) {
     throw new Error(`Expected ${input.label} to be a string record.`);

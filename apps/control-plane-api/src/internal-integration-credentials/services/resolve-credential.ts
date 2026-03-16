@@ -67,10 +67,7 @@ type ResolverContextBinding = {
 const UnknownRecordSchema = z.record(z.string(), z.unknown());
 const StringRecordSchema = z.record(z.string(), z.string());
 
-function resolveConnectionConfigOrThrow(input: {
-  connectionId: string;
-  config: unknown;
-}): Record<string, unknown> {
+function resolveConnectionConfigOrThrow(input: { connectionId: string; config: unknown }) {
   const parsedConfig = UnknownRecordSchema.safeParse(input.config);
   if (!parsedConfig.success) {
     throw new Error(`Integration connection '${input.connectionId}' has invalid config.`);

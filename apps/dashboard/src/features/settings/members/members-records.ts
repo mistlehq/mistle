@@ -3,27 +3,20 @@ import { z } from "zod";
 const ObjectValueSchema = z.custom<object>(
   (value): value is object => typeof value === "object" && value !== null,
 );
+const MembersRecordSchema = z.record(z.string(), z.unknown());
 const UnknownArraySchema = z.array(z.unknown());
 const StringSchema = z.string();
 const NumberSchema = z.number();
 const BooleanSchema = z.boolean();
 
-export type MembersRecordValue = {
-  [key: string]: unknown;
-};
+export type MembersRecordValue = z.infer<typeof MembersRecordSchema>;
 
 export function parseMembersRecord(value: unknown): MembersRecordValue | null {
   const parsed = ObjectValueSchema.safeParse(value);
   if (!parsed.success) {
     return null;
   }
-
-  const record: MembersRecordValue = {};
-  for (const [key, entryValue] of Object.entries(parsed.data)) {
-    record[key] = entryValue;
-  }
-
-  return record;
+  return MembersRecordSchema.parse(Object.fromEntries(Object.entries(parsed.data)));
 }
 
 export function readMembersString(record: MembersRecordValue, key: string): string | null {

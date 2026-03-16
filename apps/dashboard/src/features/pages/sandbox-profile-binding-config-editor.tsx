@@ -15,10 +15,6 @@ import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-
 
 const IntegrationRegistry = createIntegrationFormRegistry();
 
-type JsonObject = Record<string, unknown>;
-type BindingSchemaObject = {
-  [key: string]: unknown;
-};
 type IntegrationDefinition = NonNullable<ReturnType<typeof IntegrationRegistry.getDefinition>>;
 
 export type SandboxProfileBindingEditorRow = {
@@ -60,7 +56,7 @@ type BindingConfigUiModel =
   | {
       mode: "form";
       schema: RJSFSchema;
-      uiSchema: UiSchema<JsonObject, RJSFSchema>;
+      uiSchema: UiSchema<Record<string, unknown>, RJSFSchema>;
       value: Record<string, unknown>;
       visiblePropertyKeys: readonly string[];
     }
@@ -78,20 +74,22 @@ type ResolvedBindingEditorContext = {
   parsedConnectionConfig: Record<string, unknown>;
 };
 
-function isBindingSchemaObject(value: unknown): value is BindingSchemaObject {
+function isBindingSchemaObject(value: unknown): value is object {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function coerceBindingSchemaObject(value: unknown): BindingSchemaObject {
-  if (!isBindingSchemaObject(value)) {
-    return {};
+function readBindingSchemaValue(schema: object, key: string): unknown {
+  for (const [entryKey, entryValue] of Object.entries(schema)) {
+    if (entryKey === key) {
+      return entryValue;
+    }
   }
 
-  return value;
+  return undefined;
 }
 
 function readUiWidget(
-  uiSchema: UiSchema<JsonObject, RJSFSchema>,
+  uiSchema: UiSchema<Record<string, unknown>, RJSFSchema>,
   propertyKey: string,
 ): string | undefined {
   const propertyUiSchema = uiSchema[propertyKey];
@@ -99,26 +97,24 @@ function readUiWidget(
     return undefined;
   }
 
-  const widget = propertyUiSchema["ui:widget"];
+  const widget = readBindingSchemaValue(propertyUiSchema, "ui:widget");
   return typeof widget === "string" ? widget : undefined;
 }
 
-function resolveSchemaProperties(schema: RJSFSchema): Record<string, unknown> {
+function resolveSchemaPropertyKeys(schema: RJSFSchema): readonly string[] {
   const properties = schema.properties;
-  return isBindingSchemaObject(properties) ? properties : {};
+  return isBindingSchemaObject(properties) ? Object.keys(properties) : [];
 }
 
-function normalizeRjsfSchema(schema: RJSFSchema): RJSFSchema {
-  const schemaRecord = coerceBindingSchemaObject(schema);
-  const { $schema: _ignoredSchema, ...normalizedSchema } = schemaRecord;
-  return normalizedSchema;
+function normalizeRjsfSchema(schema: RJSFSchema) {
+  return Object.fromEntries(Object.entries(schema).filter(([key]) => key !== "$schema"));
 }
 
 function resolveVisiblePropertyKeys(input: {
   schema: RJSFSchema;
-  uiSchema: UiSchema<JsonObject, RJSFSchema>;
+  uiSchema: UiSchema<Record<string, unknown>, RJSFSchema>;
 }): readonly string[] {
-  return Object.keys(resolveSchemaProperties(input.schema)).filter(
+  return resolveSchemaPropertyKeys(input.schema).filter(
     (propertyKey) => readUiWidget(input.uiSchema, propertyKey) !== "hidden",
   );
 }
@@ -127,14 +123,14 @@ function hasUnsupportedConfigKeys(input: {
   schema: RJSFSchema;
   formData: Record<string, unknown>;
 }): boolean {
-  const supportedKeys = new Set<string>(Object.keys(resolveSchemaProperties(input.schema)));
+  const supportedKeys = new Set<string>(resolveSchemaPropertyKeys(input.schema));
 
   return Object.keys(input.formData).some((key) => !supportedKeys.has(key));
 }
 
-function createDefaultConfigFromSchema(schema: RJSFSchema): Record<string, unknown> {
+function createDefaultConfigFromSchema(schema: RJSFSchema) {
   return applySchemaDefaultsToFormData({
-    schema: coerceBindingSchemaObject(schema),
+    schema: Object.fromEntries(Object.entries(schema)),
     formData: {},
   });
 }
@@ -273,11 +269,11 @@ function resolveFormModelFromContext(input: {
     });
 
     const schema = normalizeRjsfSchema(resolvedForm.schema ?? {});
-    const uiSchema: UiSchema<JsonObject, RJSFSchema> = resolvedForm.uiSchema ?? {};
+    const uiSchema: UiSchema<Record<string, unknown>, RJSFSchema> = resolvedForm.uiSchema ?? {};
     const defaultConfig = createDefaultConfigFromSchema(schema);
     const normalizedValue = applySchemaDefaultsToFormData({
-      schema: coerceBindingSchemaObject(schema),
-      formData: coerceBindingSchemaObject(input.row.config),
+      schema: Object.fromEntries(Object.entries(schema)),
+      formData: input.row.config,
     });
 
     if (hasUnsupportedConfigKeys({ schema, formData: input.row.config })) {
@@ -318,7 +314,7 @@ function resolveNextConfigFromChange(input: {
   nextFormData: Record<string, unknown>;
   connections: readonly IntegrationConnectionSummary[];
   targets: readonly IntegrationTargetSummary[];
-}): Record<string, unknown> {
+}) {
   const contextResult = resolveBindingDefinitionContext({
     row: {
       ...input.row,
@@ -365,7 +361,7 @@ export function resolveBindingKindFromTarget(
 export function createDefaultBindingConfig(input: {
   connection?: IntegrationConnectionSummary;
   target?: IntegrationTargetSummary;
-}): Record<string, unknown> {
+}) {
   if (input.target === undefined || input.connection === undefined) {
     return {};
   }
@@ -480,7 +476,7 @@ export function SandboxProfileBindingConfigEditor(input: {
   }
 
   return (
-    <Form<JsonObject, RJSFSchema, IntegrationFormContext>
+    <Form<Record<string, unknown>, RJSFSchema, IntegrationFormContext>
       children={<></>}
       formData={configUiModel.value}
       formContext={{
@@ -488,8 +484,10 @@ export function SandboxProfileBindingConfigEditor(input: {
         layout: input.layout ?? "vertical",
       }}
       noHtml5Validate
-      onChange={(event: IChangeEvent<JsonObject, RJSFSchema>) => {
-        const nextFormData = coerceBindingSchemaObject(event.formData);
+      onChange={(event: IChangeEvent<Record<string, unknown>, RJSFSchema>) => {
+        const nextFormData = isBindingSchemaObject(event.formData)
+          ? Object.fromEntries(Object.entries(event.formData))
+          : {};
         const nextConfig = resolveNextConfigFromChange({
           row: input.row,
           nextFormData,

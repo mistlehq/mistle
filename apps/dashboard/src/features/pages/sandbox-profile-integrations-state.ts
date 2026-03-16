@@ -95,18 +95,6 @@ function mapBindingsToEditorRows(
   }));
 }
 
-type IntegrationConfigObject = {
-  [key: string]: unknown;
-};
-
-function isIntegrationConfigObject(value: unknown): value is IntegrationConfigObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function coerceIntegrationConfigObject(value: unknown): IntegrationConfigObject {
-  return isIntegrationConfigObject(value) ? value : {};
-}
-
 function resolveLatestVersion(versions: readonly SandboxProfileVersion[]): number | null {
   if (versions.length === 0) {
     return null;
@@ -335,13 +323,21 @@ export function useSandboxProfileIntegrationsState(
       ...(connection.config === undefined
         ? {}
         : {
-            config: coerceIntegrationConfigObject(connection.config),
+            config:
+              typeof connection.config === "object" &&
+              connection.config !== null &&
+              !Array.isArray(connection.config)
+                ? { ...connection.config }
+                : {},
           }),
     })) ?? [];
   const availableTargets: readonly IntegrationTargetSummary[] =
     integrationDirectoryQuery.data?.targets.map((target) => ({
       ...target,
-      config: coerceIntegrationConfigObject(target.config),
+      config:
+        typeof target.config === "object" && target.config !== null && !Array.isArray(target.config)
+          ? { ...target.config }
+          : {},
     })) ?? [];
 
   function setNeutralSaveState(): void {

@@ -4,22 +4,38 @@ import type {
   NormalizedFileChange,
 } from "./types.js";
 
-type ThreadItemObject = {
-  [key: string]: unknown;
-};
-
-function isThreadItemObject(value: unknown): value is ThreadItemObject {
+function isThreadItemValue(value: unknown): value is object {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function readOptionalString(record: ThreadItemObject, key: string): string | null {
-  const value = record[key];
-  return typeof value === "string" ? value : null;
+function readOptionalString(record: object, key: string): string | null {
+  for (const [entryKey, entryValue] of Object.entries(record)) {
+    if (entryKey === key && typeof entryValue === "string") {
+      return entryValue;
+    }
+  }
+
+  return null;
 }
 
-function readOptionalNumber(record: ThreadItemObject, key: string): number | null {
-  const value = record[key];
-  return typeof value === "number" && Number.isFinite(value) ? value : null;
+function readOptionalNumber(record: object, key: string): number | null {
+  for (const [entryKey, entryValue] of Object.entries(record)) {
+    if (entryKey === key && typeof entryValue === "number" && Number.isFinite(entryValue)) {
+      return entryValue;
+    }
+  }
+
+  return null;
+}
+
+function readObjectValue(record: object, key: string): unknown {
+  for (const [entryKey, entryValue] of Object.entries(record)) {
+    if (entryKey === key) {
+      return entryValue;
+    }
+  }
+
+  return undefined;
 }
 
 function serializeUnknown(value: unknown): string | null {
@@ -47,7 +63,7 @@ function collectTextFragments(value: unknown, depth: number): string[] {
     return value.flatMap((entry) => collectTextFragments(entry, depth + 1));
   }
 
-  if (!isThreadItemObject(value)) {
+  if (!isThreadItemValue(value)) {
     return [];
   }
 
@@ -57,7 +73,7 @@ function collectTextFragments(value: unknown, depth: number): string[] {
   }
 
   return ["content", "parts", "summary", "summaryParts", "value"].flatMap((key) =>
-    collectTextFragments(value[key], depth + 1),
+    collectTextFragments(readObjectValue(value, key), depth + 1),
   );
 }
 
@@ -85,7 +101,7 @@ function parseFileChanges(value: unknown): readonly NormalizedFileChange[] {
 
   const changes: NormalizedFileChange[] = [];
   for (const entry of value) {
-    if (!isThreadItemObject(entry)) {
+    if (!isThreadItemValue(entry)) {
       continue;
     }
 
@@ -117,7 +133,7 @@ function normalizeCommandActions(value: unknown): readonly NormalizedCommandActi
 
   const actions: NormalizedCommandAction[] = [];
   for (const entry of value) {
-    if (!isThreadItemObject(entry)) {
+    if (!isThreadItemValue(entry)) {
       continue;
     }
 
@@ -178,7 +194,7 @@ function mapTransportStatus(value: string): "streaming" | "completed" {
 }
 
 function normalizeToolCall(input: {
-  item: ThreadItemObject;
+  item: object;
   turnId: string;
   toolType: "dynamic" | "mcp" | "collab";
   title: string | null;
@@ -203,7 +219,7 @@ function normalizeToolCall(input: {
   ];
 }
 
-function readRequiredId(item: ThreadItemObject): string {
+function readRequiredId(item: object): string {
   const id = readOptionalString(item, "id");
   if (id === null || id.length === 0) {
     throw new Error(`Thread item is missing a valid id. Payload: ${JSON.stringify(item)}`);
@@ -212,7 +228,7 @@ function readRequiredId(item: ThreadItemObject): string {
   return id;
 }
 
-function readRequiredType(item: ThreadItemObject): string {
+function readRequiredType(item: object): string {
   const type = readOptionalString(item, "type");
   if (type === null || type.length === 0) {
     throw new Error(`Thread item is missing a valid type. Payload: ${JSON.stringify(item)}`);
@@ -225,7 +241,7 @@ export function normalizeCodexThreadItem(input: {
   turnId: string;
   item: unknown;
 }): readonly NormalizedCodexThreadItem[] {
-  if (!isThreadItemObject(input.item)) {
+  if (!isThreadItemValue(input.item)) {
     throw new Error(`Thread item must be an object. Payload: ${JSON.stringify(input.item)}`);
   }
 
@@ -239,7 +255,7 @@ export function normalizeCodexThreadItem(input: {
         kind: "user-message",
         id: itemId,
         turnId: input.turnId,
-        text: collectText(item["content"]),
+        text: collectText(readObjectValue(item, "content")),
       },
     ];
   }
@@ -250,7 +266,7 @@ export function normalizeCodexThreadItem(input: {
         kind: "assistant-message",
         id: itemId,
         turnId: input.turnId,
-        text: readOptionalString(item, "text") ?? collectText(item["content"]),
+        text: readOptionalString(item, "text") ?? collectText(readObjectValue(item, "content")),
         phase: readOptionalString(item, "phase"),
         status: readOptionalString(item, "status") === "inProgress" ? "streaming" : "completed",
       },
@@ -263,7 +279,7 @@ export function normalizeCodexThreadItem(input: {
         kind: "plan",
         id: itemId,
         turnId: input.turnId,
-        text: readOptionalString(item, "text") ?? collectText(item["content"]),
+        text: readOptionalString(item, "text") ?? collectText(readObjectValue(item, "content")),
         status: readOptionalString(item, "status") === "inProgress" ? "streaming" : "completed",
       },
     ];
@@ -271,7 +287,7 @@ export function normalizeCodexThreadItem(input: {
 
   if (itemType === "reasoning") {
     const normalizedItems: NormalizedCodexThreadItem[] = [];
-    const summaryText = normalizeReasoningText(item["summary"]);
+    const summaryText = normalizeReasoningText(readObjectValue(item, "summary"));
     if (summaryText.length > 0) {
       normalizedItems.push({
         kind: "reasoning",
@@ -283,7 +299,7 @@ export function normalizeCodexThreadItem(input: {
       });
     }
 
-    const contentText = normalizeReasoningText(item["content"]);
+    const contentText = normalizeReasoningText(readObjectValue(item, "content"));
     if (contentText.length > 0) {
       normalizedItems.push({
         kind: "reasoning",
@@ -315,7 +331,7 @@ export function normalizeCodexThreadItem(input: {
         exitCode: readOptionalNumber(item, "exitCode"),
         output: readOptionalString(item, "aggregatedOutput") ?? readOptionalString(item, "output"),
         durationMs: readOptionalNumber(item, "durationMs"),
-        commandActions: normalizeCommandActions(item["commandActions"]),
+        commandActions: normalizeCommandActions(readObjectValue(item, "commandActions")),
         reason: readOptionalString(item, "reason"),
         status: mapTransportStatus(status),
       },
@@ -334,7 +350,7 @@ export function normalizeCodexThreadItem(input: {
         id: itemId,
         turnId: input.turnId,
         fileChangeStatus: status,
-        changes: parseFileChanges(item["changes"]),
+        changes: parseFileChanges(readObjectValue(item, "changes")),
         output: readOptionalString(item, "aggregatedOutput") ?? readOptionalString(item, "output"),
         status: mapTransportStatus(status),
       },
@@ -375,7 +391,7 @@ export function normalizeCodexThreadItem(input: {
   }
 
   if (itemType === "webSearch") {
-    const action = item["action"];
+    const action = readObjectValue(item, "action");
     return [
       {
         kind: "web-search",
