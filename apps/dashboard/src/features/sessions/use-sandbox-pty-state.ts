@@ -118,8 +118,7 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
     [detachClientListeners, isCurrentGeneration],
   );
 
-  const disconnectPty = useCallback(async (): Promise<void> => {
-    openGenerationRef.current += 1;
+  const disconnectCurrentClient = useCallback(async (): Promise<void> => {
     const client = clientRef.current;
     if (client === null) {
       setPtyState(SandboxPtyStates.CLOSED);
@@ -136,6 +135,11 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
       setPtyState(SandboxPtyStates.CLOSED);
     }
   }, [clearConnectedSandboxInstanceId, detachClientListeners]);
+
+  const disconnectPty = useCallback(async (): Promise<void> => {
+    openGenerationRef.current += 1;
+    await disconnectCurrentClient();
+  }, [disconnectCurrentClient]);
 
   const openPty = useCallback(
     async (input: { sandboxInstanceId: string } & SandboxPtyOpenOptions): Promise<void> => {
@@ -189,7 +193,7 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
       }
 
       if (existingClient !== null) {
-        await disconnectPty();
+        await disconnectCurrentClient();
         if (!isCurrentGeneration(generation)) {
           throw new Error("Sandbox PTY connection attempt was superseded.");
         }
@@ -251,7 +255,7 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
         throw resolvedError;
       }
     },
-    [bindClient, clearConnectedSandboxInstanceId, disconnectPty, isCurrentGeneration],
+    [bindClient, clearConnectedSandboxInstanceId, disconnectCurrentClient, isCurrentGeneration],
   );
 
   const writeInput = useCallback(async (data: string | Uint8Array): Promise<void> => {
