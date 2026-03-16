@@ -913,15 +913,22 @@ export type TriggerRule = {
   enabled: boolean;
 };
 
+export const SandboxImageSources = {
+  BASE: "base",
+  PROFILE_BASE: "profile-base",
+} as const;
+
+export type SandboxImageSource = (typeof SandboxImageSources)[keyof typeof SandboxImageSources];
+
 export type ResolvedSandboxImage =
   | {
-      source: "profile-base";
+      source: typeof SandboxImageSources.PROFILE_BASE;
       imageRef: string;
       sandboxProfileId: string;
       version: number;
     }
   | {
-      source: "base";
+      source: typeof SandboxImageSources.BASE;
       imageRef: string;
     };
 
