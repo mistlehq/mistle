@@ -1,4 +1,10 @@
-export * from "./automation-run.js";
+export {
+  AutomationRunFailureCodes,
+  createAutomationRunExecutionError,
+  ensureAutomationSandbox,
+  prepareAutomationRun,
+  resolveAutomationRunFailure,
+} from "./automation-run.js";
 export {
   AutomationConversationDeliverySandboxActions,
   AutomationConversationRouteBindingActions,
