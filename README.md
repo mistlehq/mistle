@@ -6,11 +6,18 @@ User-facing documentation will be added here.
 
 Local development is Nix-first.
 
+Repo runtime expectation:
+
+- Node v25
+- pnpm 10.30.2
+
 ### Prerequisites
 
 - Nix with flakes enabled
 - Docker (Desktop or Engine) with `docker compose`
 - Optional: `direnv` + `nix-direnv` for automatic shell activation
+
+If you are not using the Nix shell, install Node v25 and pnpm 10.30.2 locally.
 
 ### Install Nix
 
