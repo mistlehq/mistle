@@ -1,0 +1,15 @@
+[package]
+name = "sandbox-rs-napi"
+version = "0.0.0"
+edition = "2024"
+build = "build.rs"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+napi = { version = "3.8.3", features = ["napi10"] }
+napi-derive = "3.5.2"
+
+[build-dependencies]
+napi-build = "2.3.1"

@@ -1,0 +1,18 @@
+{
+  "name": "@mistle/sandbox-runtime-node",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "start": "node dist/main.js",
+    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
+    "typecheck": "tsgo --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@mistle/sandbox-rs-napi": "workspace:*"
+  }
+}

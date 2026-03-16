@@ -1,0 +1,27 @@
+{
+  "name": "@mistle/sandbox-rs-napi",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "node": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && napi build --platform --release --output-dir dist --esm",
+    "lint": "cargo clippy --locked --all-targets -- -D warnings",
+    "typecheck": "cargo check --locked --all-targets",
+    "test": "cargo test --locked",
+    "format": "cargo fmt",
+    "format:check": "cargo fmt --check"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.5.1"
+  }
+}
