@@ -21,10 +21,6 @@ type StartupInputPayload = {
   runtimePlan?: unknown;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
 function requireStringField(
   payload: StartupInputPayload,
   fieldName: keyof StartupInputPayload,
@@ -81,7 +77,7 @@ export async function readStartupInput(input: ReadStartupInputInput): Promise<St
     );
   }
 
-  if (!isRecord(payload)) {
+  if (payload === null || Array.isArray(payload) || typeof payload !== "object") {
     throw new Error("startup input from stdin must be valid json: expected object");
   }
 
