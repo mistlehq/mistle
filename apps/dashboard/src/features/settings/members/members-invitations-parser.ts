@@ -4,20 +4,25 @@ import type {
   SettingsInvitation,
 } from "./members-api-types.js";
 import { parseOrganizationRoleValue, parseTimestampToIsoString } from "./members-parsing.js";
-import { compactMap, readArray, readString, toRecord } from "./members-records.js";
+import {
+  compactMap,
+  parseMembersRecord,
+  readMembersArray,
+  readMembersString,
+} from "./members-records.js";
 
 export function parseInvitation(value: unknown): SettingsInvitation | null {
-  const record = toRecord(value);
+  const record = parseMembersRecord(value);
   if (record === null) {
     return null;
   }
 
-  const id = readString(record, "id");
-  const organizationId = readString(record, "organizationId");
-  const email = readString(record, "email");
+  const id = readMembersString(record, "id");
+  const organizationId = readMembersString(record, "organizationId");
+  const email = readMembersString(record, "email");
   const role = parseOrganizationRoleValue(record["role"]);
-  const inviterId = readString(record, "inviterId");
-  const status = readString(record, "status");
+  const inviterId = readMembersString(record, "inviterId");
+  const status = readMembersString(record, "status");
   const expiresAt = parseTimestampToIsoString(record["expiresAt"]);
   const createdAt = parseTimestampToIsoString(record["createdAt"]);
 
@@ -61,7 +66,7 @@ export function parseInvitation(value: unknown): SettingsInvitation | null {
 }
 
 export function parseInvitationsResponse(value: unknown): SettingsInvitation[] {
-  const entries = readArray(value);
+  const entries = readMembersArray(value);
   if (entries === null) {
     throw new Error("Invitations response did not include an array.");
   }
@@ -70,7 +75,7 @@ export function parseInvitationsResponse(value: unknown): SettingsInvitation[] {
 }
 
 export function parseInviteMemberResponse(value: unknown): InviteMemberResponse {
-  const record = toRecord(value);
+  const record = parseMembersRecord(value);
   if (record === null) {
     return {
       status: null,
@@ -80,14 +85,14 @@ export function parseInviteMemberResponse(value: unknown): InviteMemberResponse 
     };
   }
 
-  const nestedError = toRecord(record["error"]);
-  const nestedCode = nestedError === null ? null : readString(nestedError, "code");
-  const nestedMessage = nestedError === null ? null : readString(nestedError, "message");
+  const nestedError = parseMembersRecord(record["error"]);
+  const nestedCode = nestedError === null ? null : readMembersString(nestedError, "code");
+  const nestedMessage = nestedError === null ? null : readMembersString(nestedError, "message");
 
   return {
-    status: readString(record, "status"),
-    message: readString(record, "message") ?? nestedMessage,
-    code: readString(record, "code") ?? nestedCode,
+    status: readMembersString(record, "status"),
+    message: readMembersString(record, "message") ?? nestedMessage,
+    code: readMembersString(record, "code") ?? nestedCode,
     raw: value,
   };
 }

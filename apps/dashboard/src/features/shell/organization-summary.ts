@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import { authClient } from "../../lib/auth/client.js";
 import {
   parseOrganizationSummary,
@@ -15,60 +17,36 @@ export function organizationSummaryQueryKey(
   return [...ORGANIZATION_SUMMARY_QUERY_KEY_PREFIX, organizationId];
 }
 
-type UnknownRecord = Record<string, unknown>;
+const OrganizationSummaryErrorSchema = z
+  .object({
+    status: z.number().optional(),
+    message: z.string().optional(),
+    error: z
+      .object({
+        message: z.string().optional(),
+      })
+      .optional(),
+  })
+  .catchall(z.unknown());
 
-function toRecord(value: unknown): UnknownRecord | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-
-  const record: UnknownRecord = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
-}
-
-function readString(record: UnknownRecord, key: string): string | null {
-  const value = record[key];
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  return value;
-}
-
-function readNumber(record: UnknownRecord, key: string): number | null {
-  const value = record[key];
-  if (typeof value !== "number") {
-    return null;
-  }
-
-  return value;
-}
+type OrganizationSummaryErrorPayload = z.infer<typeof OrganizationSummaryErrorSchema>;
 
 function readErrorMessage(value: unknown): string | null {
   if (typeof value === "string" && value.length > 0) {
     return value;
   }
 
-  const record = toRecord(value);
-  if (record === null) {
+  const parsedError = OrganizationSummaryErrorSchema.safeParse(value);
+  if (!parsedError.success) {
     return null;
   }
 
-  const direct = readString(record, "message");
-  if (direct !== null) {
+  const direct = parsedError.data.message;
+  if (direct !== undefined) {
     return direct;
   }
 
-  const nestedError = toRecord(record["error"]);
-  if (nestedError === null) {
-    return null;
-  }
-
-  return readString(nestedError, "message");
+  return parsedError.data.error?.message ?? null;
 }
 
 export class OrganizationSummaryError extends Error {
@@ -85,13 +63,14 @@ export class OrganizationSummaryError extends Error {
 }
 
 function toOrganizationSummaryError(operation: string, error: unknown): OrganizationSummaryError {
-  const record = toRecord(error);
-  if (record !== null) {
+  const parsedError = OrganizationSummaryErrorSchema.safeParse(error);
+  if (parsedError.success) {
+    const errorPayload: OrganizationSummaryErrorPayload = parsedError.data;
     return new OrganizationSummaryError({
       operation,
-      status: readNumber(record, "status") ?? 500,
+      status: errorPayload.status ?? 500,
       body: error,
-      message: readErrorMessage(record) ?? `${operation} failed.`,
+      message: readErrorMessage(errorPayload) ?? `${operation} failed.`,
     });
   }
 

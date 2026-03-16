@@ -1,9 +1,14 @@
 import type { MembershipCapabilities, OrganizationRole } from "./members-api-types.js";
 import { parseOrganizationRoleValue } from "./members-parsing.js";
-import { readArray, readBoolean, readString, toRecord } from "./members-records.js";
+import {
+  parseMembersRecord,
+  readMembersArray,
+  readMembersBoolean,
+  readMembersString,
+} from "./members-records.js";
 
 function parseRoleArrayStrict(value: unknown): OrganizationRole[] | null {
-  const entries = readArray(value);
+  const entries = readMembersArray(value);
   if (entries === null) {
     return null;
   }
@@ -21,15 +26,15 @@ function parseRoleArrayStrict(value: unknown): OrganizationRole[] | null {
 }
 
 export function parseMembershipCapabilities(value: unknown): MembershipCapabilities | null {
-  const record = toRecord(value);
+  const record = parseMembersRecord(value);
   if (record === null) {
     return null;
   }
 
-  const organizationId = readString(record, "organizationId");
+  const organizationId = readMembersString(record, "organizationId");
   const actorRole = parseOrganizationRoleValue(record["actorRole"]);
-  const invite = toRecord(record["invite"]);
-  const memberRoleUpdate = toRecord(record["memberRoleUpdate"]);
+  const invite = parseMembersRecord(record["invite"]);
+  const memberRoleUpdate = parseMembersRecord(record["memberRoleUpdate"]);
   if (
     organizationId === null ||
     actorRole === null ||
@@ -39,11 +44,11 @@ export function parseMembershipCapabilities(value: unknown): MembershipCapabilit
     return null;
   }
 
-  const inviteCanExecute = readBoolean(invite, "canExecute");
+  const inviteCanExecute = readMembersBoolean(invite, "canExecute");
   const assignableRoles = parseRoleArrayStrict(invite["assignableRoles"]);
 
-  const roleTransitionMatrix = toRecord(memberRoleUpdate["roleTransitionMatrix"]);
-  const memberRoleUpdateCanExecute = readBoolean(memberRoleUpdate, "canExecute");
+  const roleTransitionMatrix = parseMembersRecord(memberRoleUpdate["roleTransitionMatrix"]);
+  const memberRoleUpdateCanExecute = readMembersBoolean(memberRoleUpdate, "canExecute");
   if (
     inviteCanExecute === null ||
     assignableRoles === null ||

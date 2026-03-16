@@ -8,15 +8,17 @@ const StringSchema = z.string();
 const NumberSchema = z.number();
 const BooleanSchema = z.boolean();
 
-export type UnknownRecord = Record<string, unknown>;
+export type MembersRecordValue = {
+  [key: string]: unknown;
+};
 
-export function toRecord(value: unknown): UnknownRecord | null {
+export function parseMembersRecord(value: unknown): MembersRecordValue | null {
   const parsed = ObjectValueSchema.safeParse(value);
   if (!parsed.success) {
     return null;
   }
 
-  const record: UnknownRecord = {};
+  const record: MembersRecordValue = {};
   for (const [key, entryValue] of Object.entries(parsed.data)) {
     record[key] = entryValue;
   }
@@ -24,7 +26,7 @@ export function toRecord(value: unknown): UnknownRecord | null {
   return record;
 }
 
-export function readString(record: UnknownRecord, key: string): string | null {
+export function readMembersString(record: MembersRecordValue, key: string): string | null {
   const parsed = StringSchema.safeParse(record[key]);
   if (!parsed.success) {
     return null;
@@ -33,7 +35,7 @@ export function readString(record: UnknownRecord, key: string): string | null {
   return parsed.data;
 }
 
-export function readNumber(record: UnknownRecord, key: string): number | null {
+export function readMembersNumber(record: MembersRecordValue, key: string): number | null {
   const parsed = NumberSchema.safeParse(record[key]);
   if (!parsed.success) {
     return null;
@@ -42,7 +44,7 @@ export function readNumber(record: UnknownRecord, key: string): number | null {
   return parsed.data;
 }
 
-export function readBoolean(record: UnknownRecord, key: string): boolean | null {
+export function readMembersBoolean(record: MembersRecordValue, key: string): boolean | null {
   const parsed = BooleanSchema.safeParse(record[key]);
   if (!parsed.success) {
     return null;
@@ -51,7 +53,7 @@ export function readBoolean(record: UnknownRecord, key: string): boolean | null 
   return parsed.data;
 }
 
-export function readArray(value: unknown): unknown[] | null {
+export function readMembersArray(value: unknown): unknown[] | null {
   const parsed = UnknownArraySchema.safeParse(value);
   if (!parsed.success) {
     return null;

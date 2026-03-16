@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 import type { ChatSemanticGroupEntry, ChatSemanticGroupKind } from "../chat-types.js";
 import { getCodeFenceLanguage, isMarkdownPath } from "../code-fence-language.js";
 import { ChatDiffView } from "./chat-diff-view.js";
@@ -14,6 +16,16 @@ type WebSearchResult = {
   snippet: string | null;
 };
 
+const WebSearchResultsSchema = z.object({
+  results: z.array(
+    z.object({
+      title: z.string(),
+      url: z.string(),
+      snippet: z.string().nullable().optional(),
+    }),
+  ),
+});
+
 function getReadRenderMarkdown(input: { path: string; output: string }): string | null {
   if (isMarkdownPath(input.path)) {
     return input.output;
@@ -27,10 +39,6 @@ function getReadRenderMarkdown(input: { path: string; output: string }): string 
   return ["```" + codeFenceLanguage, input.output, "```"].join("\n");
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
 function parseWebSearchResults(output: string): readonly WebSearchResult[] | null {
   let parsed: unknown;
   try {
@@ -39,35 +47,16 @@ function parseWebSearchResults(output: string): readonly WebSearchResult[] | nul
     return null;
   }
 
-  if (!isRecord(parsed)) {
+  const parsedResults = WebSearchResultsSchema.safeParse(parsed);
+  if (!parsedResults.success) {
     return null;
   }
 
-  const results = parsed["results"];
-  if (!Array.isArray(results)) {
-    return null;
-  }
-
-  return results.flatMap((result): readonly WebSearchResult[] => {
-    if (!isRecord(result)) {
-      return [];
-    }
-
-    const title = result["title"];
-    const url = result["url"];
-    const snippet = result["snippet"];
-    if (typeof title !== "string" || typeof url !== "string") {
-      return [];
-    }
-
-    return [
-      {
-        title,
-        url,
-        snippet: typeof snippet === "string" ? snippet : null,
-      },
-    ];
-  });
+  return parsedResults.data.results.map((result) => ({
+    title: result.title,
+    url: result.url,
+    snippet: result.snippet ?? null,
+  }));
 }
 
 export function ChatSemanticGroupItemOutput({

@@ -1,4 +1,3 @@
-import { isRecord } from "../shared/is-record.js";
 import {
   resolveBindingConfigUiModel,
   type IntegrationConnectionSummary,
@@ -11,13 +10,21 @@ export type SandboxProfileBindingSummaryItem = {
   value: string;
 };
 
+type BindingSummaryObject = {
+  [key: string]: unknown;
+};
+
+function isBindingSummaryObject(value: unknown): value is BindingSummaryObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function resolvePropertyTitle(input: {
   schema: Record<string, unknown>;
   uiSchema: Record<string, unknown>;
   propertyKey: string;
 }): string {
   const propertyUiSchema = input.uiSchema[input.propertyKey];
-  if (isRecord(propertyUiSchema)) {
+  if (isBindingSummaryObject(propertyUiSchema)) {
     const uiTitle = propertyUiSchema["ui:title"];
     if (typeof uiTitle === "string" && uiTitle.length > 0) {
       return uiTitle;
@@ -25,9 +32,9 @@ function resolvePropertyTitle(input: {
   }
 
   const properties = input.schema.properties;
-  if (isRecord(properties)) {
+  if (isBindingSummaryObject(properties)) {
     const propertySchema = properties[input.propertyKey];
-    if (isRecord(propertySchema)) {
+    if (isBindingSummaryObject(propertySchema)) {
       const title = propertySchema.title;
       if (typeof title === "string" && title.length > 0) {
         return title;
@@ -44,17 +51,17 @@ function resolveScalarSummaryValue(input: {
   value: string | number | boolean;
 }): string {
   const properties = input.schema.properties;
-  if (!isRecord(properties)) {
+  if (!isBindingSummaryObject(properties)) {
     return String(input.value);
   }
 
   const propertySchema = properties[input.propertyKey];
-  if (!isRecord(propertySchema) || !Array.isArray(propertySchema.oneOf)) {
+  if (!isBindingSummaryObject(propertySchema) || !Array.isArray(propertySchema.oneOf)) {
     return String(input.value);
   }
 
   for (const option of propertySchema.oneOf) {
-    if (!isRecord(option)) {
+    if (!isBindingSummaryObject(option)) {
       continue;
     }
 

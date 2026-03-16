@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 
 import { useCodexSessionState } from "../codex-client/use-codex-session-state.js";
 import { shouldAutoConnectSession } from "../sessions/session-connect-policy.js";
@@ -15,9 +16,10 @@ type ComposerConfigSnapshot = {
   modelReasoningEffort: string | null;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+const ComposerConfigSnapshotSchema = z.object({
+  model: z.string().optional(),
+  model_reasoning_effort: z.string().optional(),
+});
 
 function readComposerConfigSnapshot(configJson: string | null): ComposerConfigSnapshot {
   if (configJson === null) {
@@ -37,19 +39,17 @@ function readComposerConfigSnapshot(configJson: string | null): ComposerConfigSn
     };
   }
 
-  if (!isRecord(parsedJson)) {
+  const parsedConfig = ComposerConfigSnapshotSchema.safeParse(parsedJson);
+  if (!parsedConfig.success) {
     return {
       model: null,
       modelReasoningEffort: null,
     };
   }
 
-  const model = parsedJson["model"];
-  const modelReasoningEffort = parsedJson["model_reasoning_effort"];
-
   return {
-    model: typeof model === "string" ? model : null,
-    modelReasoningEffort: typeof modelReasoningEffort === "string" ? modelReasoningEffort : null,
+    model: parsedConfig.data.model ?? null,
+    modelReasoningEffort: parsedConfig.data.model_reasoning_effort ?? null,
   };
 }
 

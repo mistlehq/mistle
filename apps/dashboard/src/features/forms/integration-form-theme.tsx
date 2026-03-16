@@ -21,7 +21,6 @@ import type {
   WidgetProps,
 } from "@rjsf/utils";
 
-import { isRecord } from "../shared/is-record.js";
 import type { IntegrationFormContext } from "./integration-form-context.js";
 import { IntegrationResourceStringArrayWidget } from "./integration-resource-string-array-widget.js";
 
@@ -207,12 +206,12 @@ function resolveFieldLayout(
     return "vertical";
   }
 
-  if (!isRecord(props.uiSchema)) {
+  if (typeof props.uiSchema !== "object" || props.uiSchema === null) {
     return "horizontal";
   }
 
   const options = props.uiSchema["ui:options"];
-  if (!isRecord(options)) {
+  if (typeof options !== "object" || options === null) {
     return "horizontal";
   }
 

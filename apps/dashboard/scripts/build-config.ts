@@ -7,8 +7,6 @@ import { z } from "zod";
 
 type DashboardBuildEnvironment = "development" | "production";
 
-type UnknownRecord = Record<string, unknown>;
-
 const DashboardBuildConfigSchema = z.object({
   apps: z.object({
     dashboard: z.object({
@@ -17,26 +15,25 @@ const DashboardBuildConfigSchema = z.object({
   }),
 });
 
+const TomlRootSchema = z.record(z.string(), z.unknown());
+
 export type DashboardBuildConfig = {
   controlPlaneApiOrigin: string;
 };
 
-function isRecord(value: unknown): value is UnknownRecord {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseTomlFile(path: string): UnknownRecord {
+function parseTomlFile(path: string): Record<string, unknown> {
   if (!existsSync(path)) {
     throw new Error(`Missing required dashboard config file: ${path}`);
   }
 
   const content = readFileSync(path, "utf8");
   const parsed = parse(content);
-  if (!isRecord(parsed)) {
+  const parsedRoot = TomlRootSchema.safeParse(parsed);
+  if (!parsedRoot.success) {
     throw new Error(`Expected TOML object in ${path}.`);
   }
 
-  return parsed;
+  return parsedRoot.data;
 }
 
 function resolveWorkspaceRoot(): string {

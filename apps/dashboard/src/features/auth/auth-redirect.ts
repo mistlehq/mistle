@@ -1,18 +1,21 @@
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+function readLocationProperty(
+  value: object,
+  key: "from" | "pathname" | "search" | "hash",
+): unknown {
+  return Object.getOwnPropertyDescriptor(value, key)?.value;
 }
 
 export function resolvePostLoginPath(state: unknown): string {
-  if (!isObjectRecord(state)) {
+  if (typeof state !== "object" || state === null) {
     return "/";
   }
 
-  const from = state.from;
-  if (!isObjectRecord(from)) {
+  const from = readLocationProperty(state, "from");
+  if (typeof from !== "object" || from === null) {
     return "/";
   }
 
-  const pathname = from.pathname;
+  const pathname = readLocationProperty(from, "pathname");
   if (typeof pathname !== "string" || pathname.length === 0) {
     return "/";
   }
@@ -27,8 +30,10 @@ export function resolvePostLoginPath(state: unknown): string {
     return "/";
   }
 
-  const search = typeof from.search === "string" ? from.search : "";
-  const hash = typeof from.hash === "string" ? from.hash : "";
+  const searchValue = readLocationProperty(from, "search");
+  const hashValue = readLocationProperty(from, "hash");
+  const search = typeof searchValue === "string" ? searchValue : "";
+  const hash = typeof hashValue === "string" ? hashValue : "";
 
   return `${pathname}${search}${hash}`;
 }

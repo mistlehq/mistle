@@ -5,19 +5,23 @@ import type {
   CodexTurnPlanSnapshot,
 } from "./codex-session-types.js";
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+type CodexNotificationParams = {
+  [key: string]: unknown;
+};
+
+function isCodexNotificationParams(value: unknown): value is CodexNotificationParams {
   return typeof value === "object" && value !== null;
 }
 
-function resolveStringProperty(record: Record<string, unknown>, key: string): string | null {
+function resolveStringProperty(record: CodexNotificationParams, key: string): string | null {
   const value = record[key];
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
 function resolveNotificationParams(notification: {
   params?: unknown;
-}): Record<string, unknown> | null {
-  return isRecord(notification.params) ? notification.params : null;
+}): CodexNotificationParams | null {
+  return isCodexNotificationParams(notification.params) ? notification.params : null;
 }
 
 export function parseThreadLifecycleEvent(notification: {
@@ -97,7 +101,7 @@ export function parseTurnPlanSnapshot(notification: {
   }
 
   const steps = planValue.flatMap((entry) => {
-    if (!isRecord(entry)) {
+    if (!isCodexNotificationParams(entry)) {
       return [];
     }
 

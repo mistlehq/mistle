@@ -1,6 +1,11 @@
 import type { SettingsMember } from "./members-api-types.js";
 import { parseOrganizationRoleValue, parseTimestampToIsoString } from "./members-parsing.js";
-import { compactMap, readNumber, readString, toRecord } from "./members-records.js";
+import {
+  compactMap,
+  parseMembersRecord,
+  readMembersNumber,
+  readMembersString,
+} from "./members-records.js";
 
 export type ParsedMembersPage = {
   members: SettingsMember[];
@@ -9,15 +14,15 @@ export type ParsedMembersPage = {
 };
 
 function parseMember(value: unknown): SettingsMember | null {
-  const record = toRecord(value);
+  const record = parseMembersRecord(value);
   if (record === null) {
     return null;
   }
 
-  const user = toRecord(record["user"]);
+  const user = parseMembersRecord(record["user"]);
   const role = parseOrganizationRoleValue(record["role"]);
-  const id = readString(record, "id");
-  const userId = readString(record, "userId");
+  const id = readMembersString(record, "id");
+  const userId = readMembersString(record, "userId");
   const joinedAt = parseTimestampToIsoString(record["createdAt"]);
   if (role === null || id === null || userId === null || joinedAt === null) {
     return null;
@@ -27,8 +32,8 @@ function parseMember(value: unknown): SettingsMember | null {
     return null;
   }
 
-  const email = readString(user, "email");
-  const name = readString(user, "name");
+  const email = readMembersString(user, "email");
+  const name = readMembersString(user, "name");
   if (email === null) {
     return null;
   }
@@ -44,7 +49,7 @@ function parseMember(value: unknown): SettingsMember | null {
 }
 
 export function parseMembersPageResponse(value: unknown): ParsedMembersPage {
-  const record = toRecord(value);
+  const record = parseMembersRecord(value);
   if (record === null) {
     throw new Error("Members response was invalid.");
   }
@@ -54,7 +59,7 @@ export function parseMembersPageResponse(value: unknown): ParsedMembersPage {
     throw new Error("Members response did not include a members array.");
   }
 
-  const total = readNumber(record, "total");
+  const total = readMembersNumber(record, "total");
   if (total === null) {
     throw new Error("Members response did not include a numeric total.");
   }

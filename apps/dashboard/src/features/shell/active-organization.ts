@@ -1,43 +1,22 @@
-type UnknownRecord = Record<string, unknown>;
-
 export const MISSING_ACTIVE_ORGANIZATION_ERROR_MESSAGE =
   "No active organization is available in the current session.";
 
-function toRecord(value: unknown): UnknownRecord | null {
-  if (typeof value !== "object" || value === null) {
-    return null;
-  }
-
-  const record: UnknownRecord = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
-
-  return record;
-}
-
-function readString(record: UnknownRecord, key: string): string | null {
-  const value = record[key];
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  return value;
-}
-
 export function resolveActiveOrganizationIdFromSession(session: unknown): string | null {
-  const sessionRecord = toRecord(session);
-  if (sessionRecord === null) {
+  if (typeof session !== "object" || session === null || !("session" in session)) {
     return null;
   }
 
-  const nestedSession = toRecord(sessionRecord["session"]);
-  if (nestedSession === null) {
+  const nestedSession = session.session;
+  if (
+    typeof nestedSession !== "object" ||
+    nestedSession === null ||
+    !("activeOrganizationId" in nestedSession)
+  ) {
     return null;
   }
 
-  const activeOrganizationId = readString(nestedSession, "activeOrganizationId");
-  if (activeOrganizationId === null || activeOrganizationId.length === 0) {
+  const activeOrganizationId = nestedSession.activeOrganizationId;
+  if (typeof activeOrganizationId !== "string" || activeOrganizationId.length === 0) {
     return null;
   }
 

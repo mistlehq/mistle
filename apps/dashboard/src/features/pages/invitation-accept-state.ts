@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export type InvitationDetails = {
   id: string;
   email: string;
@@ -10,100 +12,122 @@ export type InvitationDetails = {
   inviterEmail: string | null;
 };
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
+const OrganizationRecordSchema = z
+  .object({
+    name: z.string().optional(),
+  })
+  .catchall(z.unknown());
 
-function readRecord(value: Record<string, unknown>, key: string): Record<string, unknown> | null {
-  const candidate = value[key];
-  return isRecord(candidate) ? candidate : null;
-}
+const InviterRecordSchema = z
+  .object({
+    email: z.string().optional(),
+    user: z
+      .object({
+        email: z.string().optional(),
+      })
+      .optional(),
+  })
+  .catchall(z.unknown());
 
-function readString(value: Record<string, unknown>, key: string): string | null {
-  const candidate = value[key];
-  return typeof candidate === "string" ? candidate : null;
-}
+const InvitationRecordSchema = z
+  .object({
+    id: z.string().optional(),
+    email: z.string().optional(),
+    role: z.string().optional(),
+    organizationId: z.string().optional(),
+    inviterId: z.string().optional(),
+    status: z.string().optional(),
+    expiresAt: z.string().optional(),
+    organizationName: z.string().optional(),
+    inviterEmail: z.string().optional(),
+    organization: OrganizationRecordSchema.optional(),
+    inviter: InviterRecordSchema.optional(),
+  })
+  .catchall(z.unknown());
 
-function readNumber(value: Record<string, unknown>, key: string): number | null {
-  const candidate = value[key];
-  return typeof candidate === "number" ? candidate : null;
-}
+const InvitationDetailsEnvelopeSchema = InvitationRecordSchema.extend({
+  invitation: InvitationRecordSchema.optional(),
+  organization: OrganizationRecordSchema.optional(),
+  inviter: InviterRecordSchema.optional(),
+});
 
-function readNestedString(
-  value: Record<string, unknown>,
-  keys: readonly [string, ...string[]],
-): string | null {
-  let currentValue: unknown = value;
+const InvitationErrorSchema = z
+  .object({
+    status: z.number().optional(),
+    statusCode: z.number().optional(),
+    message: z.string().optional(),
+  })
+  .catchall(z.unknown());
 
-  for (let index = 0; index < keys.length; index += 1) {
-    if (!isRecord(currentValue)) {
-      return null;
-    }
-
-    const key = keys[index];
-    if (key === undefined) {
-      return null;
-    }
-    const candidate = currentValue[key];
-    if (index === keys.length - 1) {
-      return typeof candidate === "string" ? candidate : null;
-    }
-
-    currentValue = candidate;
-  }
-
-  return null;
-}
+type InvitationRecord = z.infer<typeof InvitationRecordSchema>;
+type InvitationDetailsEnvelope = z.infer<typeof InvitationDetailsEnvelopeSchema>;
+type OrganizationRecord = z.infer<typeof OrganizationRecordSchema>;
+type InviterRecord = z.infer<typeof InviterRecordSchema>;
 
 function readHttpStatus(error: unknown): number | null {
-  if (!isRecord(error)) {
+  const parsedError = InvitationErrorSchema.safeParse(error);
+  if (!parsedError.success) {
     return null;
   }
 
-  const status = readNumber(error, "status");
-  if (status !== null) {
-    return status;
+  if (parsedError.data.status !== undefined) {
+    return parsedError.data.status;
   }
 
-  return readNumber(error, "statusCode");
+  return parsedError.data.statusCode ?? null;
+}
+
+function resolveOrganizationRecord(envelope: InvitationDetailsEnvelope): OrganizationRecord | null {
+  if (envelope.organization !== undefined) {
+    return envelope.organization;
+  }
+
+  return envelope.invitation?.organization ?? null;
+}
+
+function resolveInviterRecord(envelope: InvitationDetailsEnvelope): InviterRecord | null {
+  if (envelope.inviter !== undefined) {
+    return envelope.inviter;
+  }
+
+  return envelope.invitation?.inviter ?? null;
 }
 
 export function parseInvitationDetails(value: unknown): InvitationDetails | null {
-  if (!isRecord(value)) {
+  const parsedEnvelope = InvitationDetailsEnvelopeSchema.safeParse(value);
+  if (!parsedEnvelope.success) {
     return null;
   }
 
-  const invitation = readRecord(value, "invitation") ?? value;
-  const organization = readRecord(value, "organization") ?? readRecord(invitation, "organization");
-  const inviter = readRecord(value, "inviter") ?? readRecord(invitation, "inviter");
+  const envelope = parsedEnvelope.data;
+  const invitation = envelope.invitation ?? envelope;
+  const organization = resolveOrganizationRecord(envelope);
+  const inviter = resolveInviterRecord(envelope);
 
-  const id = readString(invitation, "id") ?? readString(value, "id");
-  const email = readString(invitation, "email") ?? readString(value, "email");
-  const role = readString(invitation, "role") ?? readString(value, "role");
-  const organizationId =
-    readString(invitation, "organizationId") ?? readString(value, "organizationId");
-  const inviterId = readString(invitation, "inviterId") ?? readString(value, "inviterId");
-  const status = readString(invitation, "status") ?? readString(value, "status");
-  const expiresAt = readString(invitation, "expiresAt") ?? readString(value, "expiresAt");
-  const organizationName =
-    readString(invitation, "organizationName") ??
-    readString(value, "organizationName") ??
-    (organization === null ? null : readString(organization, "name"));
-  const inviterEmail =
-    readString(invitation, "inviterEmail") ??
-    readString(value, "inviterEmail") ??
-    (inviter === null
-      ? null
-      : (readString(inviter, "email") ?? readNestedString(inviter, ["user", "email"])));
+  const id = invitation.id ?? envelope.id;
+  const email = invitation.email ?? envelope.email;
+  const role = invitation.role ?? envelope.role;
+  const organizationId = invitation.organizationId ?? envelope.organizationId;
+  const inviterId = invitation.inviterId ?? envelope.inviterId;
+  const status = invitation.status ?? envelope.status;
+  const expiresAt = invitation.expiresAt ?? envelope.expiresAt;
+  const organizationName: string | null =
+    invitation.organizationName ?? envelope.organizationName ?? organization?.name ?? null;
+  const inviterEmail: string | null =
+    invitation.inviterEmail ??
+    envelope.inviterEmail ??
+    inviter?.email ??
+    inviter?.user?.email ??
+    null;
 
   if (
-    id === null ||
-    email === null ||
-    role === null ||
-    organizationId === null ||
-    inviterId === null ||
-    status === null ||
-    expiresAt === null
+    id === undefined ||
+    email === undefined ||
+    role === undefined ||
+    organizationId === undefined ||
+    inviterId === undefined ||
+    status === undefined ||
+    expiresAt === undefined
   ) {
     return null;
   }
@@ -122,10 +146,12 @@ export function parseInvitationDetails(value: unknown): InvitationDetails | null
 }
 
 function readErrorMessage(error: unknown): string | null {
-  if (!isRecord(error)) {
+  const parsedError = InvitationErrorSchema.safeParse(error);
+  if (!parsedError.success) {
     return null;
   }
-  return readString(error, "message");
+
+  return parsedError.data.message ?? null;
 }
 
 export function toInvitationFetchErrorMessage(error: unknown): string {

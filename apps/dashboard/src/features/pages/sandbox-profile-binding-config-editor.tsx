@@ -12,11 +12,13 @@ import {
 } from "../forms/integration-form-theme.js";
 import type { IntegrationConnectionResourceSummary } from "../integrations/integrations-service.js";
 import type { SandboxIntegrationBindingKind } from "../sandbox-profiles/sandbox-profiles-types.js";
-import { isRecord } from "../shared/is-record.js";
 
 const IntegrationRegistry = createIntegrationFormRegistry();
 
 type JsonObject = Record<string, unknown>;
+type BindingSchemaObject = {
+  [key: string]: unknown;
+};
 type IntegrationDefinition = NonNullable<ReturnType<typeof IntegrationRegistry.getDefinition>>;
 
 export type SandboxProfileBindingEditorRow = {
@@ -76,8 +78,12 @@ type ResolvedBindingEditorContext = {
   parsedConnectionConfig: Record<string, unknown>;
 };
 
-function resolveRecord(value: unknown): Record<string, unknown> {
-  if (!isRecord(value)) {
+function isBindingSchemaObject(value: unknown): value is BindingSchemaObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function coerceBindingSchemaObject(value: unknown): BindingSchemaObject {
+  if (!isBindingSchemaObject(value)) {
     return {};
   }
 
@@ -89,7 +95,7 @@ function readUiWidget(
   propertyKey: string,
 ): string | undefined {
   const propertyUiSchema = uiSchema[propertyKey];
-  if (!isRecord(propertyUiSchema)) {
+  if (!isBindingSchemaObject(propertyUiSchema)) {
     return undefined;
   }
 
@@ -99,11 +105,11 @@ function readUiWidget(
 
 function resolveSchemaProperties(schema: RJSFSchema): Record<string, unknown> {
   const properties = schema.properties;
-  return isRecord(properties) ? properties : {};
+  return isBindingSchemaObject(properties) ? properties : {};
 }
 
 function normalizeRjsfSchema(schema: RJSFSchema): RJSFSchema {
-  const schemaRecord = resolveRecord(schema);
+  const schemaRecord = coerceBindingSchemaObject(schema);
   const { $schema: _ignoredSchema, ...normalizedSchema } = schemaRecord;
   return normalizedSchema;
 }
@@ -128,7 +134,7 @@ function hasUnsupportedConfigKeys(input: {
 
 function createDefaultConfigFromSchema(schema: RJSFSchema): Record<string, unknown> {
   return applySchemaDefaultsToFormData({
-    schema: resolveRecord(schema),
+    schema: coerceBindingSchemaObject(schema),
     formData: {},
   });
 }
@@ -270,8 +276,8 @@ function resolveFormModelFromContext(input: {
     const uiSchema: UiSchema<JsonObject, RJSFSchema> = resolvedForm.uiSchema ?? {};
     const defaultConfig = createDefaultConfigFromSchema(schema);
     const normalizedValue = applySchemaDefaultsToFormData({
-      schema: resolveRecord(schema),
-      formData: resolveRecord(input.row.config),
+      schema: coerceBindingSchemaObject(schema),
+      formData: coerceBindingSchemaObject(input.row.config),
     });
 
     if (hasUnsupportedConfigKeys({ schema, formData: input.row.config })) {
@@ -483,7 +489,7 @@ export function SandboxProfileBindingConfigEditor(input: {
       }}
       noHtml5Validate
       onChange={(event: IChangeEvent<JsonObject, RJSFSchema>) => {
-        const nextFormData = resolveRecord(event.formData);
+        const nextFormData = coerceBindingSchemaObject(event.formData);
         const nextConfig = resolveNextConfigFromChange({
           row: input.row,
           nextFormData,

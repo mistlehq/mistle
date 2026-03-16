@@ -37,12 +37,22 @@ type MatchLike = {
   data?: unknown;
 };
 
-function isObjectRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+function readRouteHandleProperty(
+  value: object,
+  key:
+    | "breadcrumb"
+    | "breadcrumbTo"
+    | "breadcrumbClickable"
+    | "title"
+    | "description"
+    | "headerIcon"
+    | "hideBreadcrumb",
+): unknown {
+  return Object.getOwnPropertyDescriptor(value, key)?.value;
 }
 
 function isMatchLike(value: unknown): value is MatchLike {
-  if (!isObjectRecord(value)) {
+  if (typeof value !== "object" || value === null) {
     return false;
   }
 
@@ -64,7 +74,7 @@ function isRouteHeaderIconValue(
 }
 
 function normalizeParams(params: unknown): Readonly<Record<string, string | undefined>> {
-  if (!isObjectRecord(params)) {
+  if (typeof params !== "object" || params === null) {
     return {};
   }
 
@@ -84,18 +94,18 @@ function normalizeParams(params: unknown): Readonly<Record<string, string | unde
 }
 
 function parseAppRouteHandle(handle: unknown): AppRouteHandle | null {
-  if (!isObjectRecord(handle)) {
+  if (typeof handle !== "object" || handle === null) {
     return null;
   }
 
   const parsedHandle: AppRouteHandle = {};
-  const breadcrumb = handle["breadcrumb"];
-  const breadcrumbTo = handle["breadcrumbTo"];
-  const breadcrumbClickable = handle["breadcrumbClickable"];
-  const title = handle["title"];
-  const description = handle["description"];
-  const headerIcon = handle["headerIcon"];
-  const hideBreadcrumb = handle["hideBreadcrumb"];
+  const breadcrumb = readRouteHandleProperty(handle, "breadcrumb");
+  const breadcrumbTo = readRouteHandleProperty(handle, "breadcrumbTo");
+  const breadcrumbClickable = readRouteHandleProperty(handle, "breadcrumbClickable");
+  const title = readRouteHandleProperty(handle, "title");
+  const description = readRouteHandleProperty(handle, "description");
+  const headerIcon = readRouteHandleProperty(handle, "headerIcon");
+  const hideBreadcrumb = readRouteHandleProperty(handle, "hideBreadcrumb");
 
   if (isRouteTextValue(breadcrumb)) {
     parsedHandle.breadcrumb = breadcrumb;

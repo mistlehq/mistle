@@ -1,28 +1,29 @@
 import { resolveErrorMessage } from "../auth/messages.js";
 import type { SessionData } from "../auth/types.js";
 
-type UnknownRecord = Record<string, unknown>;
-
-function toRecord(value: unknown): UnknownRecord | null {
-  if (typeof value !== "object" || value === null) {
+function readAuthClientError(error: unknown): { message?: string; status?: number } | null {
+  if (typeof error !== "object" || error === null) {
     return null;
   }
 
-  const record: UnknownRecord = {};
-  for (const [key, entryValue] of Object.entries(value)) {
-    record[key] = entryValue;
-  }
+  const messageValue = Object.getOwnPropertyDescriptor(error, "message")?.value;
+  const statusValue = Object.getOwnPropertyDescriptor(error, "status")?.value;
+  const parsedMessage = typeof messageValue === "string" ? messageValue : undefined;
+  const parsedStatus = typeof statusValue === "number" ? statusValue : undefined;
 
-  return record;
-}
-
-function readNumber(record: UnknownRecord, key: string): number | null {
-  const value = record[key];
-  if (typeof value !== "number") {
+  if (parsedMessage === undefined && parsedStatus === undefined) {
     return null;
   }
 
-  return value;
+  const authClientError: { message?: string; status?: number } = {};
+  if (parsedMessage !== undefined) {
+    authClientError.message = parsedMessage;
+  }
+  if (parsedStatus !== undefined) {
+    authClientError.status = parsedStatus;
+  }
+
+  return authClientError;
 }
 
 export function resolveSessionFromAuthPayload(input: {
@@ -33,12 +34,12 @@ export function resolveSessionFromAuthPayload(input: {
     return input.data;
   }
 
-  const errorRecord = toRecord(input.error);
-  const status = errorRecord === null ? null : readNumber(errorRecord, "status");
+  const authClientError = readAuthClientError(input.error);
+  const status = authClientError?.status ?? null;
 
   if (status === 401) {
     return null;
   }
 
-  throw new Error(resolveErrorMessage(errorRecord, "Unable to load session."));
+  throw new Error(resolveErrorMessage(authClientError, "Unable to load session."));
 }

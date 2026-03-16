@@ -3,7 +3,9 @@ import type { PluginModule, RuleContext, RuleListener, RuleModule } from "./type
 const UI_PACKAGE_NAME = "@mistle/ui";
 const SELECT_IMPORT_NAME = "Select";
 
-type UnknownRecord = Record<string, unknown>;
+type AstNodeObject = {
+  [key: string]: unknown;
+};
 
 interface IdentifierNode {
   type: "Identifier";
@@ -75,21 +77,26 @@ interface LiteralNode {
   value: unknown;
 }
 
-function isRecord(value: unknown): value is UnknownRecord {
+function isAstNodeObject(value: unknown): value is AstNodeObject {
   return typeof value === "object" && value !== null;
 }
 
 function isIdentifierNode(node: unknown): node is IdentifierNode {
-  return isRecord(node) && node.type === "Identifier" && typeof node.name === "string";
+  return isAstNodeObject(node) && node.type === "Identifier" && typeof node.name === "string";
 }
 
 function isImportSpecifierNode(node: unknown): node is ImportSpecifierNode {
-  return isRecord(node) && node.type === "ImportSpecifier" && "imported" in node && "local" in node;
+  return (
+    isAstNodeObject(node) &&
+    node.type === "ImportSpecifier" &&
+    "imported" in node &&
+    "local" in node
+  );
 }
 
 function isImportDeclarationNode(node: unknown): node is ImportDeclarationNode {
   return (
-    isRecord(node) &&
+    isAstNodeObject(node) &&
     node.type === "ImportDeclaration" &&
     "source" in node &&
     Array.isArray(node.specifiers)
@@ -97,40 +104,40 @@ function isImportDeclarationNode(node: unknown): node is ImportDeclarationNode {
 }
 
 function isProgramNode(node: unknown): node is ProgramNode {
-  return isRecord(node) && Array.isArray(node.body);
+  return isAstNodeObject(node) && Array.isArray(node.body);
 }
 
 function isParenthesizedExpressionNode(node: unknown): node is ParenthesizedExpressionNode {
-  return isRecord(node) && node.type === "ParenthesizedExpression" && "expression" in node;
+  return isAstNodeObject(node) && node.type === "ParenthesizedExpression" && "expression" in node;
 }
 
 function isJSXIdentifierNode(node: unknown): node is JSXIdentifierNode {
-  return isRecord(node) && node.type === "JSXIdentifier" && typeof node.name === "string";
+  return isAstNodeObject(node) && node.type === "JSXIdentifier" && typeof node.name === "string";
 }
 
 function isJSXAttributeNode(node: unknown): node is JSXAttributeNode {
-  return isRecord(node) && node.type === "JSXAttribute" && "name" in node;
+  return isAstNodeObject(node) && node.type === "JSXAttribute" && "name" in node;
 }
 
 function isJSXExpressionContainerNode(node: unknown): node is JSXExpressionContainerNode {
-  return isRecord(node) && node.type === "JSXExpressionContainer" && "expression" in node;
+  return isAstNodeObject(node) && node.type === "JSXExpressionContainer" && "expression" in node;
 }
 
 function isJSXOpeningElementNode(node: unknown): node is JSXOpeningElementNode {
-  return isRecord(node) && "name" in node && Array.isArray(node.attributes);
+  return isAstNodeObject(node) && "name" in node && Array.isArray(node.attributes);
 }
 
 function isLiteralStringNode(node: unknown): node is LiteralNode & { value: string } {
-  return isRecord(node) && node.type === "Literal" && typeof node.value === "string";
+  return isAstNodeObject(node) && node.type === "Literal" && typeof node.value === "string";
 }
 
 function isLiteralZeroNode(node: unknown): node is LiteralNode {
-  return isRecord(node) && node.type === "Literal" && "value" in node && node.value === 0;
+  return isAstNodeObject(node) && node.type === "Literal" && "value" in node && node.value === 0;
 }
 
 function isUnaryVoidExpressionNode(node: unknown): node is UnaryExpressionNode {
   return (
-    isRecord(node) &&
+    isAstNodeObject(node) &&
     node.type === "UnaryExpression" &&
     node.operator === "void" &&
     "argument" in node
@@ -139,7 +146,7 @@ function isUnaryVoidExpressionNode(node: unknown): node is UnaryExpressionNode {
 
 function isConditionalExpressionNode(node: unknown): node is ConditionalExpressionNode {
   return (
-    isRecord(node) &&
+    isAstNodeObject(node) &&
     node.type === "ConditionalExpression" &&
     "consequent" in node &&
     "alternate" in node
@@ -148,12 +155,15 @@ function isConditionalExpressionNode(node: unknown): node is ConditionalExpressi
 
 function isLogicalExpressionNode(node: unknown): node is LogicalExpressionNode {
   return (
-    isRecord(node) && node.type === "LogicalExpression" && "operator" in node && "right" in node
+    isAstNodeObject(node) &&
+    node.type === "LogicalExpression" &&
+    "operator" in node &&
+    "right" in node
   );
 }
 
 function isJSXEmptyExpressionNode(node: unknown): boolean {
-  return isRecord(node) && node.type === "JSXEmptyExpression";
+  return isAstNodeObject(node) && node.type === "JSXEmptyExpression";
 }
 
 function isIdentifierWithName(node: unknown, name: string): boolean {
