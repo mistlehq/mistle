@@ -10,7 +10,7 @@ import { and, eq, sql } from "drizzle-orm";
 import {
   AutomationRunFailureCodes,
   createAutomationRunExecutionError,
-} from "../../src/runtime/workflows/automation-run.js";
+} from "../shared/automation-run.js";
 
 export type TransitionAutomationRunToRunningOutput = {
   shouldProcess: boolean;

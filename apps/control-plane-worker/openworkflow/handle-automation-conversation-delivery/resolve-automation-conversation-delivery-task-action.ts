@@ -8,7 +8,7 @@ import {
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
-} from "../../src/runtime/workflows/persistence/errors.js";
+} from "../shared/automation-conversation-persistence-error.js";
 export const AutomationConversationDeliveryTaskActions = {
   DELIVER: "deliver",
   IGNORE: "ignore",

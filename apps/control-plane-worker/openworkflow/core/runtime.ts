@@ -1,7 +1,7 @@
 import { AppIds, loadConfig } from "@mistle/config";
 
-import type { ControlPlaneWorkerConfig, ControlPlaneWorkerGlobalConfig } from "../../src/types.js";
 import { createControlPlaneBackend } from "./client.js";
+import type { ControlPlaneWorkerConfig, ControlPlaneWorkerGlobalConfig } from "./config.js";
 
 export type OpenWorkflowRuntime = {
   backend: Awaited<ReturnType<typeof createControlPlaneBackend>>;

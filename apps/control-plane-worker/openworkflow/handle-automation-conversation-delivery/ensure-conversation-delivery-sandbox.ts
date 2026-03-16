@@ -4,13 +4,13 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type {
   EnsuredAutomationSandbox,
   PreparedAutomationRun,
-  ResolvedAutomationConversationDeliveryRoute,
-} from "../../src/runtime/workflow-types.js";
-import { ensureAutomationSandbox } from "../../src/runtime/workflows/automation-run.js";
+} from "../shared/automation-run-types.js";
+import { ensureAutomationSandbox } from "../shared/automation-run.js";
 import {
   AutomationConversationDeliverySandboxActions,
   resolveAutomationConversationDeliverySandboxAction,
-} from "../../src/runtime/workflows/conversation-delivery-planning.js";
+} from "./conversation-delivery-planning.js";
+import type { ResolvedAutomationConversationDeliveryRoute } from "./types.js";
 
 export async function ensureConversationDeliverySandbox(
   ctx: {

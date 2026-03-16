@@ -10,12 +10,12 @@ import { systemScheduler, systemSleeper, type TimerHandle } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 import WebSocket, { type RawData } from "ws";
 
-import type { ProviderConnection } from "../src/runtime/automation-workflows/provider/provider-adapter.js";
+import { createCodexConversationProviderAdapter } from "../openworkflow/handle-automation-conversation-delivery/codex-conversation-provider-adapter.js";
+import type { ProviderConnection } from "../openworkflow/handle-automation-conversation-delivery/provider-adapter.js";
 import {
   ConversationProviderError,
   ConversationProviderErrorCodes,
-} from "../src/runtime/automation-workflows/provider/provider-errors.js";
-import { createCodexConversationProviderAdapter } from "../src/runtime/automation-workflows/provider/providers/codex-conversation-provider-adapter.js";
+} from "../openworkflow/handle-automation-conversation-delivery/provider-errors.js";
 
 const OPENAI_API_KEY_ENV = "MISTLE_TEST_OPENAI_API_KEY";
 const PREFERRED_INTEGRATION_MODELS = ["gpt-5-codex-mini", "gpt-5.1-codex-mini"] as const;

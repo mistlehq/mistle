@@ -1,10 +1,10 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 
-import type { ResolvedAutomationConversationDeliveryRoute } from "../../src/runtime/workflow-types.js";
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
-} from "../../src/runtime/workflows/persistence/errors.js";
+} from "../shared/automation-conversation-persistence-error.js";
+import type { ResolvedAutomationConversationDeliveryRoute } from "./types.js";
 
 export async function resolveAutomationConversationDeliveryRoute(
   ctx: {

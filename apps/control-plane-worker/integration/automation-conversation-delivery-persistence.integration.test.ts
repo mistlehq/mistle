@@ -33,15 +33,13 @@ import { describe, expect } from "vitest";
 import { finalizeAutomationConversationDeliveryTask } from "../openworkflow/handle-automation-conversation-delivery/finalize-automation-conversation-delivery-task.js";
 import { idleAutomationConversationDeliveryProcessorIfEmpty } from "../openworkflow/handle-automation-conversation-delivery/idle-automation-conversation-delivery-processor-if-empty.js";
 import { resolveAutomationConversationDeliveryTaskAction } from "../openworkflow/handle-automation-conversation-delivery/resolve-automation-conversation-delivery-task-action.js";
-import {
-  AutomationConversationPersistenceErrorCodes,
-  claimAutomationConversation,
-  claimNextAutomationConversationDeliveryTask,
-  ensureAutomationConversationDeliveryProcessor,
-  enqueueAutomationConversationDeliveryTask,
-  findActiveAutomationConversationDeliveryTask,
-  markAutomationConversationDeliveryTaskDelivering,
-} from "../src/runtime/workflows/index.js";
+import { AutomationConversationPersistenceErrorCodes } from "../openworkflow/shared/automation-conversation-persistence-error.js";
+import { claimAutomationConversation } from "../openworkflow/shared/claim-conversation.js";
+import { claimNextAutomationConversationDeliveryTask } from "../openworkflow/shared/claim-next-conversation-delivery-task.js";
+import { enqueueAutomationConversationDeliveryTask } from "../openworkflow/shared/enqueue-conversation-delivery-task.js";
+import { ensureAutomationConversationDeliveryProcessor } from "../openworkflow/shared/ensure-conversation-delivery-processor.js";
+import { findActiveAutomationConversationDeliveryTask } from "../openworkflow/shared/find-active-conversation-delivery-task.js";
+import { markAutomationConversationDeliveryTaskDelivering } from "../openworkflow/shared/mark-conversation-delivery-task-delivering.js";
 import { it } from "./test-context.js";
 
 async function createTestDatabase(input: { databaseUrl: string }) {

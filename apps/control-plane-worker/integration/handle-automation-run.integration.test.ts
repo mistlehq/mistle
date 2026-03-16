@@ -56,11 +56,9 @@ import { HandleAutomationRunWorkflow } from "../openworkflow/handle-automation-r
 import {
   markAutomationRunFailed,
   markAutomationRunIgnored,
-} from "../openworkflow/shared/automation-run.js";
-import {
   prepareAutomationRun,
   resolveAutomationRunFailure,
-} from "../src/runtime/workflows/automation-run.js";
+} from "../openworkflow/shared/automation-run.js";
 import { withOpenWorkflowRuntime } from "./openworkflow-test-support.js";
 import { it } from "./test-context.js";
 

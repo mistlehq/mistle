@@ -11,7 +11,7 @@ import { and, eq, or, sql } from "drizzle-orm";
 import {
   AutomationConversationPersistenceError,
   AutomationConversationPersistenceErrorCodes,
-} from "../../src/runtime/workflows/persistence/errors.js";
+} from "../shared/automation-conversation-persistence-error.js";
 const FinalAutomationConversationDeliveryTaskStatuses =
   new Set<AutomationConversationDeliveryTaskStatus>([
     AutomationConversationDeliveryTaskStatuses.COMPLETED,

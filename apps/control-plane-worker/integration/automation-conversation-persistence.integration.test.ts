@@ -19,15 +19,13 @@ import {
 import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
-import {
-  activateAutomationConversationRoute,
-  AutomationConversationPersistenceErrorCodes,
-  claimAutomationConversation,
-  createAutomationConversationRoute,
-  rebindAutomationConversationSandbox,
-  replaceAutomationConversationBinding,
-  updateAutomationConversationExecution,
-} from "../src/runtime/workflows/index.js";
+import { activateAutomationConversationRoute } from "../openworkflow/shared/activate-conversation-route.js";
+import { AutomationConversationPersistenceErrorCodes } from "../openworkflow/shared/automation-conversation-persistence-error.js";
+import { claimAutomationConversation } from "../openworkflow/shared/claim-conversation.js";
+import { createAutomationConversationRoute } from "../openworkflow/shared/create-conversation-route.js";
+import { rebindAutomationConversationSandbox } from "../openworkflow/shared/rebind-conversation-sandbox.js";
+import { replaceAutomationConversationBinding } from "../openworkflow/shared/replace-conversation-binding.js";
+import { updateAutomationConversationExecution } from "../openworkflow/shared/update-conversation-execution.js";
 import { it } from "./test-context.js";
 
 async function createTestDatabase(input: { databaseUrl: string }) {

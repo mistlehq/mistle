@@ -4,7 +4,7 @@ import {
   type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
 
-import { setAutomationConversationDeliveryProcessorIdle } from "../../src/runtime/workflows/persistence/set-conversation-delivery-processor-idle.js";
+import { setAutomationConversationDeliveryProcessorIdle } from "../shared/set-conversation-delivery-processor-idle.js";
 
 export type IdleAutomationConversationDeliveryProcessorIfEmptyInput = {
   conversationId: string;

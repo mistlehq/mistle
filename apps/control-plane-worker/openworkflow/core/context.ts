@@ -6,9 +6,8 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { Pool } from "pg";
 
-import { createEmailSender } from "../../src/runtime/services/create-email-sender.js";
-import type { ControlPlaneWorkerEmailDelivery } from "../../src/runtime/workflow-types.js";
 import { createControlPlaneOpenWorkflow } from "./client.js";
+import { createEmailSender, type ControlPlaneWorkerEmailDelivery } from "./email.js";
 import { getOpenWorkflowRuntime } from "./runtime.js";
 
 export type WorkflowContext = {
