@@ -1,8 +1,4 @@
-import {
-  sandboxExecutionLeases,
-  type DataPlaneDatabase,
-  type SandboxExecutionLeaseMetadata,
-} from "@mistle/db/data-plane";
+import { sandboxExecutionLeases, type DataPlaneDatabase } from "@mistle/db/data-plane";
 import type { ExecutionLease } from "@mistle/sandbox-session-protocol";
 import { and, eq, sql } from "drizzle-orm";
 
@@ -13,12 +9,6 @@ export class SandboxExecutionLeaseNotFoundError extends Error {
     );
     this.name = "SandboxExecutionLeaseNotFoundError";
   }
-}
-
-function toLeaseMetadata(
-  metadata: ExecutionLease["metadata"] | undefined,
-): SandboxExecutionLeaseMetadata | null {
-  return metadata ?? null;
 }
 
 export async function createSandboxExecutionLease(input: {
@@ -34,7 +24,7 @@ export async function createSandboxExecutionLease(input: {
       kind: input.lease.kind,
       source: input.lease.source,
       externalExecutionId: input.lease.externalExecutionId ?? null,
-      metadata: toLeaseMetadata(input.lease.metadata),
+      metadata: input.lease.metadata ?? null,
     })
     .onConflictDoUpdate({
       target: sandboxExecutionLeases.id,
