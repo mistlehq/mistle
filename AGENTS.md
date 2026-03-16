@@ -103,9 +103,7 @@
 
 ## Database Migrations
 
-- We use Drizzle; generate migrations only with `drizzle-kit`.
-- Never handwrite migrations.
-- Use the migration generation and application scripts in `apps/control-plane-api/package.json`.
+- Use the `db-migrations` skill for database migration work in this repository.
 
 ## Database Conventions
 

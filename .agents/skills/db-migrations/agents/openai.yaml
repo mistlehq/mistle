@@ -1,0 +1,4 @@
+interface:
+  display_name: "DB Migrations"
+  short_description: "Handle Drizzle database migrations"
+  default_prompt: "Use $db-migrations to generate or apply database migrations in this repository."
