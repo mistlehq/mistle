@@ -134,6 +134,12 @@ describe("parseConfigRecord", () => {
             bootstrapTokenTtlSeconds: 120,
             exchangeTokenTtlSeconds: 3600,
           },
+          reaper: {
+            pollIntervalSeconds: 30,
+            webhookIdleTimeoutSeconds: 300,
+            executionLeaseFreshnessSeconds: 30,
+            tunnelDisconnectGraceSeconds: 60,
+          },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
             modal: {
@@ -299,6 +305,12 @@ describe("parseConfigRecord", () => {
             bootstrapTokenTtlSeconds: 120,
             exchangeTokenTtlSeconds: 3600,
           },
+          reaper: {
+            pollIntervalSeconds: 30,
+            webhookIdleTimeoutSeconds: 300,
+            executionLeaseFreshnessSeconds: 30,
+            tunnelDisconnectGraceSeconds: 60,
+          },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
             docker: {
@@ -463,6 +475,12 @@ describe("parseConfigRecord", () => {
           tunnel: {
             bootstrapTokenTtlSeconds: 120,
             exchangeTokenTtlSeconds: 3600,
+          },
+          reaper: {
+            pollIntervalSeconds: 30,
+            webhookIdleTimeoutSeconds: 300,
+            executionLeaseFreshnessSeconds: 30,
+            tunnelDisconnectGraceSeconds: 60,
           },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",

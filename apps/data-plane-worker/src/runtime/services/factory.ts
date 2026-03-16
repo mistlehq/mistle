@@ -4,6 +4,7 @@ import {
   persistSandboxInstanceProvisioning,
 } from "./insert-sandbox-instance.js";
 import { startSandbox } from "./start-sandbox.js";
+import { stopSandboxInstance } from "./stop-sandbox-instance.js";
 import { stopSandbox } from "./stop-sandbox.js";
 import type {
   CreateDataPlaneWorkerServicesInput,
@@ -109,6 +110,18 @@ export function createDataPlaneWorkerServices(
             workflowInput,
           );
         },
+      },
+    },
+    stopSandboxInstance: {
+      stopSandboxInstance: async (workflowInput) => {
+        await stopSandboxInstance(
+          {
+            config: input.config,
+            db: input.db,
+            sandboxAdapter: input.sandboxAdapter,
+          },
+          workflowInput,
+        );
       },
     },
   } satisfies DataPlaneWorkerServices;
