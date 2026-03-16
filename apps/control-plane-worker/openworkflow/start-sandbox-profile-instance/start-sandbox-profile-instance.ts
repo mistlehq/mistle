@@ -8,18 +8,18 @@ import type {
 import { verifySandboxProfileVersionExists } from "./verify-sandbox-profile-version-exists.js";
 
 export async function startSandboxProfileInstance(
-  deps: {
+  ctx: {
     db: ControlPlaneDatabase;
     dataPlaneClient: Pick<DataPlaneSandboxInstancesClient, "startSandboxInstance">;
   },
   input: StartSandboxProfileInstanceWorkflowInput,
 ): Promise<StartSandboxProfileInstanceWorkflowOutput> {
   await verifySandboxProfileVersionExists({
-    db: deps.db,
+    db: ctx.db,
     organizationId: input.organizationId,
     sandboxProfileId: input.sandboxProfileId,
     sandboxProfileVersion: input.sandboxProfileVersion,
   });
 
-  return deps.dataPlaneClient.startSandboxInstance(input);
+  return ctx.dataPlaneClient.startSandboxInstance(input);
 }
