@@ -425,6 +425,10 @@ describe("SandboxPtyClient", () => {
       connectionUrl: server.url,
       runtime: createNodeSandboxSessionRuntime(),
     });
+    const resets: Array<{ code: string; message: string }> = [];
+    client.onReset((resetInfo) => {
+      resets.push(resetInfo);
+    });
 
     await client.connect();
     const openPromise = client.open({
@@ -446,6 +450,12 @@ describe("SandboxPtyClient", () => {
       code: "invalid_stream_data",
       message: "stream setup invalidated before open completed",
     });
+    expect(resets).toEqual([
+      {
+        code: "invalid_stream_data",
+        message: "stream setup invalidated before open completed",
+      },
+    ]);
   });
 
   it("rejects resize before the PTY stream is open", async () => {

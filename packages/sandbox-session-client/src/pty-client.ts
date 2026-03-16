@@ -600,11 +600,15 @@ export class SandboxPtyClient {
 
     if (controlMessage.type === "stream.reset") {
       pendingOpen.timeoutTask.cancel();
-      this.#resetInfo = {
+      const resetInfo = {
         code: controlMessage.code,
         message: controlMessage.message,
       };
-      pendingOpen.reject(createStreamResetError(this.#resetInfo));
+      this.#resetInfo = resetInfo;
+      for (const listener of this.#resetListeners) {
+        listener(resetInfo);
+      }
+      pendingOpen.reject(createStreamResetError(resetInfo));
       return true;
     }
 
