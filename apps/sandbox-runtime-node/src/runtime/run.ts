@@ -1,14 +1,14 @@
 import { once } from "node:events";
 import { createServer, type Server } from "node:http";
 
+import { applyRuntimePlan } from "../runtime-plan/index.js";
+import { loadRuntimeConfig, type RuntimeConfig } from "./config.js";
 import {
   startRuntimeClientProcessManager,
   type RuntimeClientProcessExit,
   type RuntimeClientProcessManager,
-} from "../processes/runtime-client-process-manager.js";
-import { flattenRuntimeClientProcesses } from "../processes/runtime-client-processes.js";
-import { applyRuntimePlan } from "../runtime-plan/index.js";
-import { loadRuntimeConfig, type RuntimeConfig } from "./config.js";
+} from "./processes/runtime-client-process-manager.js";
+import { flattenRuntimeClientProcesses } from "./processes/runtime-client-processes.js";
 import {
   readStartupInput,
   DefaultStartupInputMaxBytes,

@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 import type { CompiledRuntimeClient, RuntimeClientProcessSpec } from "@mistle/integrations-core";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { startRuntimeClientProcessManager } from "../src/processes/runtime-client-process-manager.js";
-import { flattenRuntimeClientProcesses } from "../src/processes/runtime-client-processes.js";
+import { startRuntimeClientProcessManager } from "../src/runtime/processes/runtime-client-process-manager.js";
+import { flattenRuntimeClientProcesses } from "../src/runtime/processes/runtime-client-processes.js";
 
 const RuntimeClientProcessHelperPath = fileURLToPath(
   new URL("./helpers/runtime-client-process-helper.mjs", import.meta.url),
