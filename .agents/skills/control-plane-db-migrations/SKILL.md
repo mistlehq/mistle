@@ -41,8 +41,15 @@ pnpm --filter @mistle/control-plane-api db:migrate
 Run the smallest relevant checks for the migration change:
 
 ```bash
-pnpm lint:sql
 pnpm --filter @mistle/control-plane-api typecheck
 ```
+
+If the change adds or modifies migration SQL files, also run the existing Squawk-backed SQL lint command:
+
+```bash
+pnpm lint:sql
+```
+
+`pnpm lint:sql` is the repo alias for `pnpm --filter @mistle/db lint:sql`.
 
 Run broader repo checks when the task changes more than migration artifacts or when the user asks for full verification.
