@@ -1,6 +1,6 @@
 import { createSandboxAdapter, SandboxProvider, type SandboxAdapter } from "@mistle/sandbox";
 
-import type { DataPlaneWorkerRuntimeConfig } from "../types.js";
+import type { DataPlaneWorkerRuntimeConfig } from "./config.js";
 
 function assertUnreachable(_value: never): never {
   throw new Error("Unsupported sandbox provider.");

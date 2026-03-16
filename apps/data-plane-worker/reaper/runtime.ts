@@ -1,4 +1,3 @@
-import { AppIds, loadConfig } from "@mistle/config";
 import {
   createDataPlaneDatabase,
   SandboxInstanceSources,
@@ -10,8 +9,16 @@ import { StopSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-
 import { Client, Pool } from "pg";
 
 import { logger } from "../logger.js";
-import { createDataPlaneBackend, createDataPlaneOpenWorkflow } from "../openworkflow/client.js";
-import type { DataPlaneWorkerRuntimeConfig } from "../types.js";
+import {
+  createDataPlaneBackend,
+  createDataPlaneOpenWorkflow,
+} from "../openworkflow/core/client.js";
+import {
+  createDataPlaneWorkerRuntimeConfig,
+  loadDataPlaneWorkerConfig,
+  requireDataPlaneWorkerGlobalConfig,
+  type DataPlaneWorkerRuntimeConfig,
+} from "../openworkflow/core/config.js";
 import {
   evaluateWebhookSandboxStopReason,
   type WebhookSandboxIdlePolicy,
@@ -36,16 +43,6 @@ export type EligibleWebhookSandboxStop = {
 export type IdleReaperSweepResult = {
   enqueuedStopWorkflowCount: number;
 };
-
-function requireLoadedGlobalConfig(
-  runtimeConfig: ReturnType<typeof loadConfig<typeof AppIds.DATA_PLANE_WORKER>>,
-): asserts runtimeConfig is ReturnType<typeof loadConfig<typeof AppIds.DATA_PLANE_WORKER>> & {
-  global: NonNullable<ReturnType<typeof loadConfig<typeof AppIds.DATA_PLANE_WORKER>>["global"]>;
-} {
-  if (runtimeConfig.global === undefined) {
-    throw new Error("Expected global config to be loaded for data-plane-worker reaper.");
-  }
-}
 
 export function createWebhookIdlePolicy(
   config: DataPlaneWorkerRuntimeConfig,
@@ -213,17 +210,12 @@ async function tryRunSweepWithAdvisoryLock(input: {
 }
 
 export async function runIdleReaper(): Promise<void> {
-  const loadedConfig = loadConfig({
-    app: AppIds.DATA_PLANE_WORKER,
-    env: process.env,
-  });
-  requireLoadedGlobalConfig(loadedConfig);
-
-  const runtimeConfig: DataPlaneWorkerRuntimeConfig = {
+  const loadedConfig = loadDataPlaneWorkerConfig(process.env);
+  requireDataPlaneWorkerGlobalConfig(loadedConfig, "data-plane-worker reaper");
+  const runtimeConfig: DataPlaneWorkerRuntimeConfig = createDataPlaneWorkerRuntimeConfig({
     app: loadedConfig.app,
-    sandbox: loadedConfig.global.sandbox,
-    telemetry: loadedConfig.global.telemetry,
-  };
+    global: loadedConfig.global,
+  });
 
   const dbPool = new Pool({
     connectionString: loadedConfig.app.database.url,

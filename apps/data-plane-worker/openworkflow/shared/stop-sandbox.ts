@@ -1,22 +1,24 @@
-import type { SandboxAdapter } from "@mistle/sandbox";
+import type { SandboxAdapter, SandboxProvider } from "@mistle/sandbox";
 
-import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
-import type { StopSandboxInput } from "./types.js";
+import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 
 export async function stopSandbox(
-  deps: {
+  ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     sandboxAdapter: SandboxAdapter;
   },
-  input: StopSandboxInput,
+  input: {
+    provider: SandboxProvider;
+    providerSandboxId: string;
+  },
 ): Promise<void> {
-  if (input.provider !== deps.config.sandbox.provider) {
+  if (input.provider !== ctx.config.sandbox.provider) {
     throw new Error(
       "Attempted to stop sandbox using provider different from configured runtime sandbox provider.",
     );
   }
 
-  await deps.sandboxAdapter.stop({
+  await ctx.sandboxAdapter.stop({
     sandboxId: input.providerSandboxId,
   });
 }

@@ -4,7 +4,7 @@ import { mintBootstrapToken, mintTunnelExchangeToken } from "@mistle/gateway-tun
 import type { SandboxAdapter, SandboxHandle } from "@mistle/sandbox";
 import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registry/data-plane";
 
-import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
+import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import {
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxStartupInput,

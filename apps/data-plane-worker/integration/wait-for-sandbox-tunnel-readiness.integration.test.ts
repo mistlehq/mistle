@@ -11,7 +11,7 @@ import { Pool } from "pg";
 import { typeid } from "typeid-js";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { waitForSandboxTunnelReadiness } from "../src/runtime/services/wait-for-sandbox-tunnel-readiness.js";
+import { waitForSandboxTunnelReadiness } from "../openworkflow/start-sandbox-instance/wait-for-sandbox-tunnel-readiness.js";
 
 const IntegrationTestTimeoutMs = 60_000;
 type DatabaseStack = {

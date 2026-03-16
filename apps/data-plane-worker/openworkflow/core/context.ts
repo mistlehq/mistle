@@ -1,47 +1,47 @@
 import { createDataPlaneDatabase, type DataPlaneDatabase } from "@mistle/db/data-plane";
-import { systemClock, systemSleeper } from "@mistle/time";
+import type { SandboxAdapter } from "@mistle/sandbox";
+import { systemClock, systemSleeper, type Clock, type Sleeper } from "@mistle/time";
 import { Pool } from "pg";
 
-import { createSandboxRuntimeAdapter } from "../runtime/resources.js";
-import {
-  createDataPlaneWorkerServices,
-  createDefaultTunnelReadinessPolicy,
-} from "../runtime/services/index.js";
-import type { DataPlaneWorkerServices } from "../runtime/workflow-types.js";
+import type { DataPlaneWorkerRuntimeConfig } from "./config.js";
 import { getOpenWorkflowRuntime } from "./runtime.js";
-
-type RequiredWorkflowServices = {
-  startSandboxInstance: DataPlaneWorkerServices["startSandboxInstance"];
-  stopSandboxInstance: DataPlaneWorkerServices["stopSandboxInstance"];
-};
+import { createSandboxRuntimeAdapter } from "./sandbox-runtime-adapter.js";
 
 export type WorkflowContext = {
+  config: DataPlaneWorkerRuntimeConfig;
   db: DataPlaneDatabase;
   dbPool: Pool;
-  services: RequiredWorkflowServices;
+  sandboxAdapter: SandboxAdapter;
+  tunnelReadinessPolicy: {
+    timeoutMs: number;
+    pollIntervalMs: number;
+  };
+  clock: Clock;
+  sleeper: Sleeper;
 };
 
 let workflowContextPromise: Promise<WorkflowContext> | undefined;
 let closeWorkflowContextPromise: Promise<void> | undefined;
 let shutdownHandlersRegistered = false;
 
-function requireWorkflowServices(services: DataPlaneWorkerServices): RequiredWorkflowServices {
-  if (services.startSandboxInstance === undefined) {
-    throw new Error("Expected start sandbox instance workflow services.");
-  }
-  if (services.stopSandboxInstance === undefined) {
-    throw new Error("Expected stop sandbox instance workflow services.");
+function createDefaultTunnelReadinessPolicy(config: DataPlaneWorkerRuntimeConfig): {
+  timeoutMs: number;
+  pollIntervalMs: number;
+} {
+  const bootstrapTokenTtlSeconds = config.app.tunnel.bootstrapTokenTtlSeconds;
+  if (!Number.isFinite(bootstrapTokenTtlSeconds) || bootstrapTokenTtlSeconds <= 0) {
+    throw new Error("Expected tunnel bootstrap token TTL seconds to be a positive number.");
   }
 
   return {
-    startSandboxInstance: services.startSandboxInstance,
-    stopSandboxInstance: services.stopSandboxInstance,
+    timeoutMs: bootstrapTokenTtlSeconds * 1000,
+    pollIntervalMs: 250,
   };
 }
 
 async function createWorkflowContext(): Promise<WorkflowContext> {
   const { globalConfig, workerConfig } = await getOpenWorkflowRuntime();
-  const runtimeConfig = {
+  const config: DataPlaneWorkerRuntimeConfig = {
     app: workerConfig,
     sandbox: globalConfig.sandbox,
     telemetry: globalConfig.telemetry,
@@ -51,20 +51,14 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
   });
 
   try {
-    const db = createDataPlaneDatabase(dbPool);
-    const services = createDataPlaneWorkerServices({
-      config: runtimeConfig,
-      db,
-      sandboxAdapter: createSandboxRuntimeAdapter(runtimeConfig),
-      tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(runtimeConfig),
+    return {
+      config,
+      db: createDataPlaneDatabase(dbPool),
+      dbPool,
+      sandboxAdapter: createSandboxRuntimeAdapter(config),
+      tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(config),
       clock: systemClock,
       sleeper: systemSleeper,
-    });
-
-    return {
-      db,
-      dbPool,
-      services: requireWorkflowServices(services),
     };
   } catch (error) {
     await dbPool.end();

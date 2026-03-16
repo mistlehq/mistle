@@ -6,10 +6,9 @@ import {
 import type { SandboxAdapter } from "@mistle/sandbox";
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
 
-import type { DataPlaneWorkerRuntimeConfig } from "../../types.js";
-import { stopSandbox } from "./stop-sandbox.js";
-import type { StopSandboxInstanceInput } from "./types.js";
-import { markSandboxInstanceStopped } from "./update-sandbox-instance-status.js";
+import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
+import { stopSandbox } from "../shared/stop-sandbox.js";
+import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 
 type RunningSandboxInstanceStopState = {
   provider: SandboxInstanceProvider;
@@ -56,15 +55,17 @@ async function resolveRunningSandboxInstanceStopState(input: {
 }
 
 export async function stopSandboxInstance(
-  deps: {
+  ctx: {
     config: DataPlaneWorkerRuntimeConfig;
     db: DataPlaneDatabase;
     sandboxAdapter: SandboxAdapter;
   },
-  input: StopSandboxInstanceInput,
+  input: {
+    sandboxInstanceId: string;
+  },
 ): Promise<void> {
   const sandboxInstanceState = await resolveRunningSandboxInstanceStopState({
-    db: deps.db,
+    db: ctx.db,
     sandboxInstanceId: input.sandboxInstanceId,
   });
   if (sandboxInstanceState === null) {
@@ -74,8 +75,8 @@ export async function stopSandboxInstance(
   try {
     await stopSandbox(
       {
-        config: deps.config,
-        sandboxAdapter: deps.sandboxAdapter,
+        config: ctx.config,
+        sandboxAdapter: ctx.sandboxAdapter,
       },
       {
         provider: sandboxInstanceState.provider,
@@ -89,7 +90,7 @@ export async function stopSandboxInstance(
   }
 
   await markSandboxInstanceStopped({
-    db: deps.db,
+    db: ctx.db,
     sandboxInstanceId: input.sandboxInstanceId,
   });
 }

@@ -1,7 +1,10 @@
-import { AppIds, loadConfig } from "@mistle/config";
-
-import type { DataPlaneWorkerConfig, DataPlaneWorkerGlobalConfig } from "../types.js";
 import { createDataPlaneBackend } from "./client.js";
+import {
+  loadDataPlaneWorkerConfig,
+  requireDataPlaneWorkerGlobalConfig,
+  type DataPlaneWorkerConfig,
+  type DataPlaneWorkerGlobalConfig,
+} from "./config.js";
 
 export type OpenWorkflowRuntime = {
   backend: Awaited<ReturnType<typeof createDataPlaneBackend>>;
@@ -19,14 +22,8 @@ export function getOpenWorkflowRuntime(): Promise<OpenWorkflowRuntime> {
 
   openWorkflowRuntimePromise = Promise.resolve()
     .then(async () => {
-      const loadedConfig = loadConfig({
-        app: AppIds.DATA_PLANE_WORKER,
-        env: process.env,
-      });
-
-      if (loadedConfig.global === undefined) {
-        throw new Error("Expected global config to be loaded for data-plane-worker workflows.");
-      }
+      const loadedConfig = loadDataPlaneWorkerConfig(process.env);
+      requireDataPlaneWorkerGlobalConfig(loadedConfig, "data-plane-worker workflows");
 
       return {
         workerConfig: loadedConfig.app,
