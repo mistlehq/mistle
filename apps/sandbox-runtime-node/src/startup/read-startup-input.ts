@@ -14,23 +14,54 @@ type ReadStartupInputInput = {
   maxBytes: number;
 };
 
-type StartupInputPayload = {
-  bootstrapToken?: unknown;
-  tunnelExchangeToken?: unknown;
-  tunnelGatewayWsUrl?: unknown;
-  runtimePlan?: unknown;
-};
+function normalizeRequiredString(value: string, fieldLabel: string): string {
+  const trimmedValue = value.trim();
+  if (trimmedValue.length === 0) {
+    throw new Error(`startup input ${fieldLabel} is required`);
+  }
 
-function requireStringField(
-  payload: StartupInputPayload,
-  fieldName: keyof StartupInputPayload,
-): string {
-  const rawValue = payload[fieldName];
-  if (typeof rawValue !== "string" || rawValue.trim().length === 0) {
+  return trimmedValue;
+}
+
+function readRequiredStringField(payload: object, fieldName: string): string {
+  const fieldValue = Object.getOwnPropertyDescriptor(payload, fieldName)?.value;
+  if (typeof fieldValue !== "string") {
     throw new Error(`startup input ${fieldName} is required`);
   }
 
-  return rawValue.trim();
+  return fieldValue;
+}
+
+function readRequiredRuntimePlanField(payload: object): CompiledRuntimePlan {
+  const runtimePlan = Object.getOwnPropertyDescriptor(payload, "runtimePlan")?.value;
+  if (runtimePlan === undefined) {
+    throw new Error("startup input runtime plan is required");
+  }
+
+  const parsedRuntimePlan = CompiledRuntimePlanSchema.safeParse(runtimePlan);
+  if (!parsedRuntimePlan.success) {
+    const firstIssue = parsedRuntimePlan.error.issues[0];
+    throw new Error(
+      `startup input runtime plan is invalid: ${firstIssue?.message ?? "invalid runtime plan"}`,
+    );
+  }
+
+  return parsedRuntimePlan.data;
+}
+
+function validateExpectedFields(payload: object): void {
+  const allowedFields = new Set([
+    "bootstrapToken",
+    "tunnelExchangeToken",
+    "tunnelGatewayWsUrl",
+    "runtimePlan",
+  ]);
+
+  for (const fieldName of Object.keys(payload)) {
+    if (!allowedFields.has(fieldName)) {
+      throw new Error(`startup input from stdin must be valid json: unexpected field ${fieldName}`);
+    }
+  }
 }
 
 async function readStreamToString(
@@ -77,43 +108,25 @@ export async function readStartupInput(input: ReadStartupInputInput): Promise<St
     );
   }
 
-  if (payload === null || Array.isArray(payload) || typeof payload !== "object") {
+  if (typeof payload !== "object" || payload === null || Array.isArray(payload)) {
     throw new Error("startup input from stdin must be valid json: expected object");
   }
 
-  const payloadKeys = new Set(Object.keys(payload));
-  const expectedKeys = [
-    "bootstrapToken",
-    "tunnelExchangeToken",
-    "tunnelGatewayWsUrl",
-    "runtimePlan",
-  ];
-  for (const expectedKey of expectedKeys) {
-    payloadKeys.delete(expectedKey);
-  }
-  if (payloadKeys.size > 0) {
-    const [unexpectedKey] = payloadKeys;
-    throw new Error(
-      `startup input from stdin must be valid json: unexpected field ${unexpectedKey}`,
-    );
-  }
-
-  if (payload.runtimePlan === undefined) {
-    throw new Error("startup input runtime plan is required");
-  }
-
-  const parsedRuntimePlan = CompiledRuntimePlanSchema.safeParse(payload.runtimePlan);
-  if (!parsedRuntimePlan.success) {
-    const firstIssue = parsedRuntimePlan.error.issues[0];
-    throw new Error(
-      `startup input runtime plan is invalid: ${firstIssue?.message ?? "invalid runtime plan"}`,
-    );
-  }
+  validateExpectedFields(payload);
 
   return {
-    bootstrapToken: requireStringField(payload, "bootstrapToken"),
-    tunnelExchangeToken: requireStringField(payload, "tunnelExchangeToken"),
-    tunnelGatewayWsUrl: requireStringField(payload, "tunnelGatewayWsUrl"),
-    runtimePlan: parsedRuntimePlan.data,
+    bootstrapToken: normalizeRequiredString(
+      readRequiredStringField(payload, "bootstrapToken"),
+      "bootstrap token",
+    ),
+    tunnelExchangeToken: normalizeRequiredString(
+      readRequiredStringField(payload, "tunnelExchangeToken"),
+      "tunnel exchange token",
+    ),
+    tunnelGatewayWsUrl: normalizeRequiredString(
+      readRequiredStringField(payload, "tunnelGatewayWsUrl"),
+      "tunnel gateway ws url",
+    ),
+    runtimePlan: readRequiredRuntimePlanField(payload),
   };
 }
