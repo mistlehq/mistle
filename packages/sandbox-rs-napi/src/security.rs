@@ -250,6 +250,7 @@ mod tests {
             std::env::current_exe().expect("expected current test executable path");
         let mut command = std::process::Command::new(current_executable);
         command
+            .arg("--nocapture")
             .arg("--exact")
             .arg("security::tests::dumpability_helper_process")
             .env(DUMPABILITY_HELPER_MODE_ENV, helper_mode)
