@@ -5,6 +5,10 @@ import { createIntegrationRegistry, listIntegrationDefinitions } from "./index.j
 describe("integrations-definitions index", () => {
   it("registers built-in integration definitions in a registry", () => {
     const registry = createIntegrationRegistry();
+    const atlassianDefinition = registry.getDefinition({
+      familyId: "atlassian",
+      variantId: "atlassian-default",
+    });
     const openAiDefinition = registry.getDefinition({
       familyId: "openai",
       variantId: "openai-default",
@@ -21,11 +25,15 @@ describe("integrations-definitions index", () => {
       familyId: "linear",
       variantId: "linear-default",
     });
-    const jiraDefinition = registry.getDefinition({
-      familyId: "jira",
-      variantId: "jira-default",
-    });
 
+    expect(atlassianDefinition).toMatchObject({
+      familyId: "atlassian",
+      variantId: "atlassian-default",
+      kind: "connector",
+      displayName: "Atlassian",
+      supportedAuthSchemes: ["api-key"],
+    });
+    expect(atlassianDefinition?.mcp).toBeDefined();
     expect(openAiDefinition?.displayName).toBe("OpenAI");
     expect(openAiDefinition?.kind).toBe("agent");
     expect(githubCloudDefinition).toMatchObject({
@@ -58,14 +66,6 @@ describe("integrations-definitions index", () => {
       supportedAuthSchemes: ["api-key"],
     });
     expect(linearDefinition?.mcp).toBeDefined();
-    expect(jiraDefinition).toMatchObject({
-      familyId: "jira",
-      variantId: "jira-default",
-      kind: "connector",
-      displayName: "Jira",
-      supportedAuthSchemes: ["api-key"],
-    });
-    expect(jiraDefinition?.mcp).toBeDefined();
   });
 
   it("lists registered definitions", () => {
@@ -75,9 +75,9 @@ describe("integrations-definitions index", () => {
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
+      "atlassian::atlassian-default",
       "github::github-cloud",
       "github::github-enterprise-server",
-      "jira::jira-default",
       "linear::linear-default",
       "openai::openai-default",
     ]);

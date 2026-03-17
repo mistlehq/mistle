@@ -1,6 +1,6 @@
 import type { ResolvedIntegrationForm } from "@mistle/integrations-core";
 
-export const JiraConnectionConfigForm: ResolvedIntegrationForm = {
+export const AtlassianConnectionConfigForm: ResolvedIntegrationForm = {
   schema: {
     properties: {
       auth_scheme: {

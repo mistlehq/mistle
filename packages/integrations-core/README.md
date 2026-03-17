@@ -183,9 +183,9 @@ flowchart TD
 Current registry includes:
 
 - `openai::openai-default` (`kind: agent`)
+- `atlassian::atlassian-default` (`kind: connector`)
 - `github::github-cloud` (`kind: git`)
 - `github::github-enterprise-server` (`kind: git`)
-- `jira::jira-default` (`kind: connector`)
 - `linear::linear-default` (`kind: connector`)
 
 ## Creating A New Integration

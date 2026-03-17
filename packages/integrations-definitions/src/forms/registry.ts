@@ -4,15 +4,15 @@ import type {
   IntegrationKind,
 } from "@mistle/integrations-core";
 
+import { AtlassianConnectionConfigSchema } from "../atlassian/variants/atlassian-default/auth.js";
+import { AtlassianBindingConfigSchema } from "../atlassian/variants/atlassian-default/binding-config-schema.js";
+import { AtlassianConnectionConfigForm } from "../atlassian/variants/atlassian-default/connection-config-form.js";
+import { AtlassianTargetConfigSchema } from "../atlassian/variants/atlassian-default/target-config-schema.js";
 import { resolveGitHubBindingConfigForm } from "../github/shared/binding-config-form.js";
 import { GitHubCloudBindingConfigSchema } from "../github/variants/github-cloud/binding-config-schema.js";
 import { GitHubCloudTargetConfigSchema } from "../github/variants/github-cloud/target-config-schema.js";
 import { GitHubEnterpriseServerBindingConfigSchema } from "../github/variants/github-enterprise-server/binding-config-schema.js";
 import { GitHubEnterpriseServerTargetConfigSchema } from "../github/variants/github-enterprise-server/target-config-schema.js";
-import { JiraConnectionConfigSchema } from "../jira/variants/jira-default/auth.js";
-import { JiraBindingConfigSchema } from "../jira/variants/jira-default/binding-config-schema.js";
-import { JiraConnectionConfigForm } from "../jira/variants/jira-default/connection-config-form.js";
-import { JiraTargetConfigSchema } from "../jira/variants/jira-default/target-config-schema.js";
 import { LinearConnectionConfigSchema } from "../linear/variants/linear-default/auth.js";
 import { LinearBindingConfigSchema } from "../linear/variants/linear-default/binding-config-schema.js";
 import { LinearConnectionConfigForm } from "../linear/variants/linear-default/connection-config-form.js";
@@ -74,13 +74,13 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
     connectionConfigForm: OpenAiConnectionConfigForm,
   },
   {
-    familyId: "jira",
-    variantId: "jira-default",
+    familyId: "atlassian",
+    variantId: "atlassian-default",
     kind: "connector",
-    targetConfigSchema: JiraTargetConfigSchema,
-    bindingConfigSchema: JiraBindingConfigSchema,
-    connectionConfigSchema: JiraConnectionConfigSchema,
-    connectionConfigForm: JiraConnectionConfigForm,
+    targetConfigSchema: AtlassianTargetConfigSchema,
+    bindingConfigSchema: AtlassianBindingConfigSchema,
+    connectionConfigSchema: AtlassianConnectionConfigSchema,
+    connectionConfigForm: AtlassianConnectionConfigForm,
   },
   {
     familyId: "linear",

@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { compileJiraBinding } from "./compile-binding.js";
+import { compileAtlassianBinding } from "./compile-binding.js";
 
-describe("compileJiraBinding", () => {
-  it("builds the expected Jira MCP egress route", () => {
-    const compiled = compileJiraBinding({
+describe("compileAtlassianBinding", () => {
+  it("builds the expected Atlassian MCP egress route", () => {
+    const compiled = compileAtlassianBinding({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
       version: 1,
-      targetKey: "jira-default",
+      targetKey: "atlassian-default",
       target: {
-        familyId: "jira",
-        variantId: "jira-default",
+        familyId: "atlassian",
+        variantId: "atlassian-default",
         enabled: true,
         config: {},
         secrets: {},
