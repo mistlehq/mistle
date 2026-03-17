@@ -68,8 +68,9 @@ jobs:
         with:
           method: oidc
           identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
-          project-slug: mistle-integration-tests
+          project-slug: mistle-oss
           env-slug: ci
+          secret-path: /integration-tests
 
       - name: Run daily integration suite in Nix shell
         env:
@@ -100,8 +101,9 @@ jobs:
         with:
           method: oidc
           identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
-          project-slug: mistle-integration-tests
+          project-slug: mistle-oss
           env-slug: ci
+          secret-path: /integration-tests
 
       - name: Post Slack notification
         run: |
