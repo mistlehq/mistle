@@ -4,6 +4,9 @@ import { writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { createServer as createNetServer } from "node:net";
 
+// Keep this helper as plain .mjs because the integration suite spawns it as a
+// real child Node process. Using .ts here would require an extra loader or
+// build step and would change the process boundary under test.
 const mode = process.env.SANDBOX_RUNTIME_PROCESS_HELPER_MODE;
 const port = Number.parseInt(process.env.SANDBOX_RUNTIME_PROCESS_HELPER_PORT ?? "", 10);
 const delayMs = Number.parseInt(process.env.SANDBOX_RUNTIME_PROCESS_HELPER_DELAY_MS ?? "0", 10);
