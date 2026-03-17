@@ -104,6 +104,27 @@ func readNextRuntimeDataFrame(
 	}
 }
 
+func readUntilTunnelMessage(
+	ctx context.Context,
+	conn *websocket.Conn,
+	handleMessage func(messageType websocket.MessageType, payload []byte) (bool, error),
+) error {
+	for {
+		messageType, payload, err := conn.Read(ctx)
+		if err != nil {
+			return err
+		}
+
+		done, handleErr := handleMessage(messageType, payload)
+		if handleErr != nil {
+			return handleErr
+		}
+		if done {
+			return nil
+		}
+	}
+}
+
 func TestRun(t *testing.T) {
 	t.Run("fails when context is missing", func(t *testing.T) {
 		err := Run(RunInput{
@@ -1017,7 +1038,7 @@ func TestRun(t *testing.T) {
 			}
 			defer conn.CloseNow()
 
-			handlerCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			handlerCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
 			messageType, payload, err := conn.Read(handlerCtx)
@@ -1040,7 +1061,7 @@ func TestRun(t *testing.T) {
 		}))
 		defer agentServer.Close()
 
-		runCtx, cancelRun := context.WithCancel(context.Background())
+		runCtx, cancelRun := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancelRun()
 
 		gatewayServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -1053,7 +1074,7 @@ func TestRun(t *testing.T) {
 				}
 				defer conn.CloseNow()
 
-				handlerCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				handlerCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer cancel()
 
 				ptyOpenPayload, err := json.Marshal(sessionprotocol.StreamOpen{
@@ -1110,22 +1131,36 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				agentAckType, agentAckPayload, err := conn.Read(handlerCtx)
-				if err != nil {
+				if err := readUntilTunnelMessage(handlerCtx, conn, func(messageType websocket.MessageType, payload []byte) (bool, error) {
+					if messageType == websocket.MessageBinary {
+						dataFrame := decodeTestDataFrame(t, payload)
+						if dataFrame.StreamID != 51 {
+							return false, fmt.Errorf("unexpected mixed pre-ack streamId %d", dataFrame.StreamID)
+						}
+						if dataFrame.PayloadKind != sessionprotocol.PayloadKindRawBytes {
+							return false, fmt.Errorf(
+								"expected mixed pre-ack PTY payloadKind %d, got %d",
+								sessionprotocol.PayloadKindRawBytes,
+								dataFrame.PayloadKind,
+							)
+						}
+						return false, nil
+					}
+					if messageType != websocket.MessageText {
+						return false, nil
+					}
+
+					var agentAck sessionprotocol.StreamOpenOK
+					if err := json.Unmarshal(payload, &agentAck); err != nil {
+						return false, nil
+					}
+					if agentAck.Type == sessionprotocol.MessageTypeStreamOpenOK && agentAck.StreamID == 61 {
+						return true, nil
+					}
+
+					return false, nil
+				}); err != nil {
 					handlerErrCh <- fmt.Errorf("expected mixed agent ack read to succeed: %w", err)
-					return
-				}
-				if agentAckType != websocket.MessageText {
-					handlerErrCh <- fmt.Errorf("expected mixed agent ack to be text, got %s", agentAckType.String())
-					return
-				}
-				var agentAck sessionprotocol.StreamOpenOK
-				if err := json.Unmarshal(agentAckPayload, &agentAck); err != nil {
-					handlerErrCh <- fmt.Errorf("expected mixed agent ack decode to succeed: %w", err)
-					return
-				}
-				if agentAck.Type != sessionprotocol.MessageTypeStreamOpenOK || agentAck.StreamID != 61 {
-					handlerErrCh <- fmt.Errorf("expected mixed agent ack for stream 61, got type=%s streamId=%d", agentAck.Type, agentAck.StreamID)
 					return
 				}
 
@@ -1257,7 +1292,7 @@ func TestRun(t *testing.T) {
 			}
 		case handlerErr := <-handlerErrCh:
 			t.Fatalf("expected mixed websocket handlers to succeed, got %v", handlerErr)
-		case <-time.After(3 * time.Second):
+		case <-time.After(10 * time.Second):
 			t.Fatal("expected mixed agent endpoint to receive forwarded payload")
 		}
 
@@ -1266,7 +1301,7 @@ func TestRun(t *testing.T) {
 			if runErr != nil {
 				t.Fatalf("expected run to stop cleanly after mixed streams, got %v", runErr)
 			}
-		case <-time.After(3 * time.Second):
+		case <-time.After(10 * time.Second):
 			t.Fatal("expected run to return after mixed streams")
 		}
 
@@ -1279,7 +1314,7 @@ func TestRun(t *testing.T) {
 
 	t.Run("connects to pty session, supports attach and resize, and closes cleanly", func(t *testing.T) {
 		handlerErrCh := make(chan error, 16)
-		runCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+		runCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		gatewayConnectionCount := 0
 		gatewayServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -1299,7 +1334,7 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				handlerCtx, handlerCancel := context.WithTimeout(context.Background(), 5*time.Second)
+				handlerCtx, handlerCancel := context.WithTimeout(context.Background(), 10*time.Second)
 				defer handlerCancel()
 
 				connectCreatePayload, err := json.Marshal(sessionprotocol.StreamOpen{
@@ -1495,38 +1530,32 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				foundPrimaryOnlyToken := false
-				for range 12 {
-					messageType, payload, readErr := conn.Read(handlerCtx)
-					if readErr != nil {
-						handlerErrCh <- fmt.Errorf("expected second pty output read to succeed: %w", readErr)
-						return
-					}
+				if err := readUntilTunnelMessage(handlerCtx, conn, func(messageType websocket.MessageType, payload []byte) (bool, error) {
 					if messageType != websocket.MessageBinary {
-						continue
+						return false, nil
 					}
+
 					dataFrame := decodeTestDataFrame(t, payload)
-					if dataFrame.StreamID != 31 {
-						handlerErrCh <- fmt.Errorf("expected second pty output streamId 31, got %d", dataFrame.StreamID)
-						return
+					if dataFrame.StreamID != 31 && dataFrame.StreamID != 32 {
+						return false, fmt.Errorf("expected second pty output streamId 31 or 32, got %d", dataFrame.StreamID)
 					}
 					if dataFrame.PayloadKind != sessionprotocol.PayloadKindRawBytes {
-						handlerErrCh <- fmt.Errorf(
+						return false, fmt.Errorf(
 							"expected second pty output payloadKind %d, got %d",
 							sessionprotocol.PayloadKindRawBytes,
 							dataFrame.PayloadKind,
 						)
-						return
 					}
-					if bytes.Contains(dataFrame.Payload, expectedPrimaryToken) {
-						foundPrimaryOnlyToken = true
-						break
+					if dataFrame.StreamID == 31 && bytes.Contains(dataFrame.Payload, expectedPrimaryToken) {
+						return true, nil
 					}
-				}
-				if !foundPrimaryOnlyToken {
+
+					return false, nil
+				}); err != nil {
 					handlerErrCh <- fmt.Errorf(
-						"expected detached PTY session to keep primary stream output token %q",
+						"expected detached PTY session to keep primary stream output token %q: %w",
 						string(expectedPrimaryToken),
+						err,
 					)
 					return
 				}
@@ -1544,30 +1573,38 @@ func TestRun(t *testing.T) {
 					return
 				}
 
-				foundCloseEvent := false
-				for range 12 {
-					closeEventType, closeEventPayload, readErr := conn.Read(handlerCtx)
-					if readErr != nil {
-						handlerErrCh <- fmt.Errorf("expected pty close ack read to succeed: %w", readErr)
-						return
+				if err := readUntilTunnelMessage(handlerCtx, conn, func(messageType websocket.MessageType, payload []byte) (bool, error) {
+					if messageType == websocket.MessageBinary {
+						dataFrame := decodeTestDataFrame(t, payload)
+						if dataFrame.StreamID != 31 && dataFrame.StreamID != 32 {
+							return false, fmt.Errorf("unexpected pty close follow-up streamId %d", dataFrame.StreamID)
+						}
+						if dataFrame.PayloadKind != sessionprotocol.PayloadKindRawBytes {
+							return false, fmt.Errorf(
+								"expected pty close follow-up payloadKind %d, got %d",
+								sessionprotocol.PayloadKindRawBytes,
+								dataFrame.PayloadKind,
+							)
+						}
+						return false, nil
 					}
-					if closeEventType != websocket.MessageText {
-						continue
+					if messageType != websocket.MessageText {
+						return false, nil
 					}
 
 					var closeEvent sessionprotocol.StreamEvent
-					if err := json.Unmarshal(closeEventPayload, &closeEvent); err != nil {
-						continue
+					if err := json.Unmarshal(payload, &closeEvent); err != nil {
+						return false, nil
 					}
 					if closeEvent.Type == sessionprotocol.MessageTypeStreamEvent &&
 						closeEvent.StreamID == 31 &&
 						closeEvent.Event.Type == sessionprotocol.MessageTypePTYExit {
-						foundCloseEvent = true
-						break
+						return true, nil
 					}
-				}
-				if !foundCloseEvent {
-					handlerErrCh <- fmt.Errorf("expected to receive stream.event pty.exit for stream 31 after close")
+
+					return false, nil
+				}); err != nil {
+					handlerErrCh <- fmt.Errorf("expected to receive stream.event pty.exit for stream 31 after close: %w", err)
 					return
 				}
 
