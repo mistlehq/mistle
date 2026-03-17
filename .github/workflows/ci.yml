@@ -261,7 +261,7 @@ jobs:
           emoji_by_result = {
               "success": ":white_check_mark:",
               "failure": ":x:",
-              "cancelled": ":warning:",
+              "cancelled": ":white_circle:",
           }
           color = color_by_result.get(workflow_result, "#808080")
           emoji = emoji_by_result.get(workflow_result, ":grey_question:")
@@ -288,7 +288,6 @@ jobs:
           if pull_requests:
               pull_request = pull_requests[0]
               pr_field = {
-                  "title": "PR",
                   "value": f"<{pull_request['html_url']}|#{pull_request['number']} {pull_request['title']}>",
                   "short": False,
               }
