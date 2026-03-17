@@ -32,6 +32,14 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function isProcessExited(process: ReturnType<typeof startNativeManagedProcess>): boolean {
+  try {
+    return process.hasExited();
+  } catch {
+    return false;
+  }
+}
+
 function exitErrorFromProcessResult(
   exitCode: number | undefined,
   signal: string | undefined,
@@ -86,7 +94,7 @@ async function startRuntimeClientProcess(
       spec: processSpec,
       process: startedProcess,
       exited: exitedPromise,
-      hasExited: () => exited,
+      hasExited: () => exited || isProcessExited(startedProcess),
       exitError: () => exitErr,
     };
   } catch (error: unknown) {
@@ -105,6 +113,11 @@ function waitForRuntimeClientProcessExit(
   }
 
   return new Promise<void>((resolve, reject) => {
+    if (process.hasExited()) {
+      resolve();
+      return;
+    }
+
     const timer = setTimeout(() => {
       reject(new Error("process exit wait timed out"));
     }, waitDurationMs);

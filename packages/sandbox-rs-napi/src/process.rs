@@ -150,14 +150,6 @@ fn wait_for_exit_state(
     })
 }
 
-fn signal_name(signal: nix::sys::signal::Signal) -> &'static str {
-    match signal {
-        nix::sys::signal::Signal::SIGTERM => "SIGTERM",
-        nix::sys::signal::Signal::SIGKILL => "SIGKILL",
-        _ => "UNKNOWN",
-    }
-}
-
 fn signal_from_input(signal: &str) -> Result<nix::sys::signal::Signal> {
     match signal {
         "sigterm" => Ok(nix::sys::signal::Signal::SIGTERM),
@@ -272,7 +264,7 @@ fn spawn_managed_process_impl(
                     .signal()
                     .map(nix::sys::signal::Signal::try_from)
                     .and_then(|result| result.ok())
-                    .map(|signal| signal_name(signal).to_string()),
+                    .map(|signal| format!("{signal:?}")),
             },
             Err(error) => ProcessExitResult {
                 exit_code: Some(1),

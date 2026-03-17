@@ -85,6 +85,9 @@ switch (mode) {
   case "exit-immediately":
     process.exit(17);
     break;
+  case "abort-immediately":
+    process.abort();
+    break;
   case "exit-after-delay":
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs);
     process.exit(17);

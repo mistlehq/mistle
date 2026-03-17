@@ -251,6 +251,19 @@ describe("startRuntimeClientProcessManager", () => {
     expect(processExit.err).toBeInstanceOf(Error);
   });
 
+  it("preserves unexpected non-TERM/KILL signal names", async () => {
+    const manager = await startRuntimeClientProcessManager([
+      {
+        ...helperProcessSpec("process_abort", "abort-immediately", {}),
+      },
+    ]);
+    StartedManagers.add(manager);
+
+    const processExit = await manager.unexpectedExit;
+    expect(processExit.processKey).toBe("process_abort");
+    expect(processExit.err?.message).toContain("SIGABRT");
+  });
+
   it("escalates sigterm to sigkill after grace period when process ignores sigterm", async () => {
     const manager = await startRuntimeClientProcessManager([
       {
