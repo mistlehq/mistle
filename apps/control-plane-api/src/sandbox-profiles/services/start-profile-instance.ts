@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { SandboxInstanceSource, SandboxInstanceStarterKind } from "@mistle/db/data-plane";
 
 import { compileProfileVersionRuntimePlan } from "./compile-profile-version-runtime-plan.js";
+import { SandboxProfilesCompileError, SandboxProfilesCompileErrorCodes } from "./errors.js";
 import type { CreateSandboxProfilesServiceInput } from "./types.js";
 
 type StartProfileInstanceInput = {
@@ -51,6 +52,12 @@ export async function startProfileInstance(
       },
     },
   );
+  if (runtimePlan.agentRuntimes.length === 0) {
+    throw new SandboxProfilesCompileError(
+      SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_REQUIRED,
+      `Sandbox profile '${serviceInput.profileId}' version ${String(serviceInput.profileVersion)} does not declare an agent runtime. Add an agent integration binding before starting a session.`,
+    );
+  }
 
   const startedSandbox = await dataPlaneClient.startSandboxInstance({
     organizationId: serviceInput.organizationId,

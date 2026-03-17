@@ -7,59 +7,29 @@
       "config": {
         "api_base_url": "https://api.openai.com/v1",
         "binding_capabilities": {
-          "by_auth_scheme": {
-            "api-key": {
-              "models": [
-                "gpt-5.3-codex",
-                "gpt-5.3-codex-spark",
-                "gpt-5.2-codex",
-                "gpt-5.1-codex-max",
-                "gpt-5.2",
-                "gpt-5.1-codex-mini"
-              ],
-              "allowed_reasoning_by_model": {
-                "gpt-5.3-codex": ["low", "medium", "high", "xhigh"],
-                "gpt-5.3-codex-spark": ["low", "medium", "high", "xhigh"],
-                "gpt-5.2-codex": ["low", "medium", "high", "xhigh"],
-                "gpt-5.1-codex-max": ["low", "medium", "high", "xhigh"],
-                "gpt-5.2": ["low", "medium", "high", "xhigh"],
-                "gpt-5.1-codex-mini": ["medium", "high"]
-              },
-              "default_reasoning_by_model": {
-                "gpt-5.3-codex": "medium",
-                "gpt-5.3-codex-spark": "high",
-                "gpt-5.2-codex": "medium",
-                "gpt-5.1-codex-max": "medium",
-                "gpt-5.2": "medium",
-                "gpt-5.1-codex-mini": "medium"
-              }
-            },
-            "oauth": {
-              "models": [
-                "gpt-5.3-codex",
-                "gpt-5.3-codex-spark",
-                "gpt-5.2-codex",
-                "gpt-5.1-codex-max",
-                "gpt-5.2",
-                "gpt-5.1-codex-mini"
-              ],
-              "allowed_reasoning_by_model": {
-                "gpt-5.3-codex": ["low", "medium", "high", "xhigh"],
-                "gpt-5.3-codex-spark": ["low", "medium", "high", "xhigh"],
-                "gpt-5.2-codex": ["low", "medium", "high", "xhigh"],
-                "gpt-5.1-codex-max": ["low", "medium", "high", "xhigh"],
-                "gpt-5.2": ["low", "medium", "high", "xhigh"],
-                "gpt-5.1-codex-mini": ["medium", "high"]
-              },
-              "default_reasoning_by_model": {
-                "gpt-5.3-codex": "medium",
-                "gpt-5.3-codex-spark": "high",
-                "gpt-5.2-codex": "medium",
-                "gpt-5.1-codex-max": "medium",
-                "gpt-5.2": "medium",
-                "gpt-5.1-codex-mini": "medium"
-              }
-            }
+          "models": [
+            "gpt-5.3-codex",
+            "gpt-5.3-codex-spark",
+            "gpt-5.2-codex",
+            "gpt-5.1-codex-max",
+            "gpt-5.2",
+            "gpt-5.1-codex-mini"
+          ],
+          "allowed_reasoning_by_model": {
+            "gpt-5.3-codex": ["low", "medium", "high", "xhigh"],
+            "gpt-5.3-codex-spark": ["low", "medium", "high", "xhigh"],
+            "gpt-5.2-codex": ["low", "medium", "high", "xhigh"],
+            "gpt-5.1-codex-max": ["low", "medium", "high", "xhigh"],
+            "gpt-5.2": ["low", "medium", "high", "xhigh"],
+            "gpt-5.1-codex-mini": ["medium", "high"]
+          },
+          "default_reasoning_by_model": {
+            "gpt-5.3-codex": "medium",
+            "gpt-5.3-codex-spark": "high",
+            "gpt-5.2-codex": "medium",
+            "gpt-5.1-codex-max": "medium",
+            "gpt-5.2": "medium",
+            "gpt-5.1-codex-mini": "medium"
           }
         }
       },

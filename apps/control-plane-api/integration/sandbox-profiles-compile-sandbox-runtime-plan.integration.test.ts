@@ -7,7 +7,7 @@ import {
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
-import { IntegrationSupportedAuthSchemes } from "@mistle/integrations-core";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import {
   createIntegrationRegistry,
   createOpenAiRawBindingCapabilities,
@@ -60,7 +60,7 @@ describe("sandbox profile internal runtime plan compiler integration", () => {
       displayName: "Missing Secrets Entry Connection",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
-        auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
+        connection_method: IntegrationConnectionMethodIds.API_KEY,
       },
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({

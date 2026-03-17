@@ -1,14 +1,12 @@
-import type { IntegrationFormContext, ResolvedIntegrationForm } from "@mistle/integrations-core";
+import {
+  IntegrationConnectionMethodIds,
+  type IntegrationFormContext,
+  type ResolvedIntegrationForm,
+} from "@mistle/integrations-core";
 
 import { createStackedFieldUiOptions } from "../../../forms/ui-options.js";
-import { OpenAiConnectionConfigSchema } from "./auth.js";
 import { OpenAiRuntimes } from "./binding-config-schema.js";
-import { OpenAiConnectionAuthSchemes } from "./model-capabilities.js";
-import {
-  OpenAiReasoningEffortLabelByValue,
-  type OpenAiConnectionAuthScheme,
-  type OpenAiModelId,
-} from "./model-capabilities.js";
+import { OpenAiReasoningEffortLabelByValue, type OpenAiModelId } from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 
 type OpenAiBindingFormContext = IntegrationFormContext;
@@ -21,24 +19,6 @@ function createChoiceList(
     const: value,
     title: labelByValue?.[value] ?? value,
   }));
-}
-
-function resolveAuthScheme(input: OpenAiBindingFormContext): OpenAiConnectionAuthScheme {
-  const connection = input.connection;
-  if (connection === undefined) {
-    throw new Error("OpenAI binding form requires connection config context.");
-  }
-
-  const parsedConnectionConfig = OpenAiConnectionConfigSchema.parse(connection.rawConfig);
-  const authScheme = parsedConnectionConfig.auth_scheme;
-  if (
-    authScheme !== OpenAiConnectionAuthSchemes.API_KEY &&
-    authScheme !== OpenAiConnectionAuthSchemes.OAUTH
-  ) {
-    throw new Error("OpenAI binding form requires a valid connection auth_scheme.");
-  }
-
-  return authScheme;
 }
 
 function resolveSelectedModel(input: {
@@ -70,8 +50,7 @@ export function resolveOpenAiBindingConfigForm(
   }
 
   const parsedTargetConfig = OpenAiApiKeyTargetConfigSchema.parse(target.rawConfig);
-  const authScheme = resolveAuthScheme(input);
-  const capabilitySet = parsedTargetConfig.bindingCapabilities.byAuthScheme[authScheme];
+  const capabilitySet = parsedTargetConfig.bindingCapabilities;
   const selectedModel = resolveSelectedModel({
     models: capabilitySet.models,
     currentValue: input.currentValue,
@@ -138,19 +117,14 @@ export function resolveOpenAiBindingConfigForm(
 export const OpenAiConnectionConfigForm: ResolvedIntegrationForm = {
   schema: {
     properties: {
-      auth_scheme: {
-        title: "Authentication method",
-        oneOf: createChoiceList([
-          OpenAiConnectionAuthSchemes.API_KEY,
-          OpenAiConnectionAuthSchemes.OAUTH,
-        ]),
-        default: OpenAiConnectionAuthSchemes.API_KEY,
+      connection_method: {
+        default: IntegrationConnectionMethodIds.API_KEY,
       },
     },
   },
   uiSchema: {
-    auth_scheme: {
-      "ui:widget": "SelectWidget",
+    connection_method: {
+      "ui:widget": "hidden",
     },
   },
 };

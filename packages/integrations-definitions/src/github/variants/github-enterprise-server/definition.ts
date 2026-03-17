@@ -1,6 +1,15 @@
-import { IntegrationKinds, type IntegrationDefinition } from "@mistle/integrations-core";
+import {
+  IntegrationConnectionMethodIds,
+  IntegrationConnectionMethodKinds,
+  IntegrationKinds,
+  type IntegrationDefinition,
+} from "@mistle/integrations-core";
 
-import { GitHubConnectionConfigSchema } from "../../shared/auth.js";
+import {
+  type GitHubConnectionConfig,
+  GitHubApiKeyConnectionConfigSchema,
+  GitHubAppInstallationConnectionConfigSchema,
+} from "../../shared/auth.js";
 import { resolveGitHubBindingConfigForm } from "../../shared/binding-config-form.js";
 import { GitHubFamilyId } from "../../shared/constants.js";
 import {
@@ -14,7 +23,6 @@ import {
   GitHubResourceSyncTriggers,
 } from "../../shared/resource-definitions.js";
 import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
-import { GitHubEnterpriseServerSupportedAuthSchemes } from "./auth.js";
 import { GitHubEnterpriseServerBindingConfigSchema } from "./binding-config-schema.js";
 import { compileGitHubEnterpriseServerBinding } from "./compile-binding.js";
 import { GitHubEnterpriseServerTargetConfigSchema } from "./target-config-schema.js";
@@ -24,7 +32,7 @@ type GitHubEnterpriseServerIntegrationDefinition = IntegrationDefinition<
   typeof GitHubEnterpriseServerTargetConfigSchema,
   typeof GitHubTargetSecretSchema,
   typeof GitHubEnterpriseServerBindingConfigSchema,
-  typeof GitHubConnectionConfigSchema
+  GitHubConnectionConfig
 >;
 
 export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegrationDefinition = {
@@ -38,8 +46,20 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
   targetSecretSchema: GitHubTargetSecretSchema,
   bindingConfigSchema: GitHubEnterpriseServerBindingConfigSchema,
   bindingConfigForm: resolveGitHubBindingConfigForm,
-  connectionConfigSchema: GitHubConnectionConfigSchema,
-  supportedAuthSchemes: GitHubEnterpriseServerSupportedAuthSchemes,
+  connectionMethods: [
+    {
+      id: IntegrationConnectionMethodIds.API_KEY,
+      label: "API key",
+      kind: IntegrationConnectionMethodKinds.API_KEY,
+      configSchema: GitHubApiKeyConnectionConfigSchema,
+    },
+    {
+      id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      label: "GitHub App installation",
+      kind: IntegrationConnectionMethodKinds.REDIRECT,
+      configSchema: GitHubAppInstallationConnectionConfigSchema,
+    },
+  ],
   credentialResolvers: {
     custom: {
       [GitHubCredentialResolverKeys.GITHUB_APP_INSTALLATION_TOKEN]:

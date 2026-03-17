@@ -19,8 +19,16 @@ export const IntegrationTargetSchema = z
     displayName: z.string().min(1),
     description: z.string().min(1),
     logoKey: z.string().min(1).optional(),
-    supportedAuthSchemes: z
-      .array(z.enum(["oauth", "api-key"]))
+    connectionMethods: z
+      .array(
+        z
+          .object({
+            id: z.enum(["api-key", "oauth2", "github-app-installation"]),
+            label: z.string().min(1),
+            kind: z.enum(["api-key", "oauth2", "redirect"]),
+          })
+          .strict(),
+      )
       .min(1)
       .optional(),
     displayNameOverride: z.string().min(1).optional(),
@@ -140,6 +148,9 @@ export const StartedOAuthConnectionSchema = z
   .strict();
 
 export type IntegrationTarget = z.infer<typeof IntegrationTargetSchema>;
+export type IntegrationConnectionMethod = NonNullable<
+  IntegrationTarget["connectionMethods"]
+>[number];
 export type IntegrationConnection = z.infer<typeof IntegrationConnectionSchema>;
 export type IntegrationConnectionResourceSummary = NonNullable<
   IntegrationConnection["resources"]

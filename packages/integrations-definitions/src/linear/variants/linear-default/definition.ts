@@ -1,11 +1,13 @@
 import {
+  IntegrationConnectionMethodIds,
+  IntegrationConnectionMethodKinds,
   IntegrationKinds,
   IntegrationMcpTransports,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
-import { LinearConnectionConfigSchema, LinearSupportedAuthSchemes } from "./auth.js";
+import { type LinearConnectionConfig, LinearConnectionConfigSchema } from "./auth.js";
 import { LinearBindingConfigSchema } from "./binding-config-schema.js";
 import { compileLinearBinding } from "./compile-binding.js";
 import { LinearConnectionConfigForm } from "./connection-config-form.js";
@@ -15,7 +17,7 @@ type LinearIntegrationDefinition = IntegrationDefinition<
   typeof LinearTargetConfigSchema,
   typeof LinearTargetSecretSchema,
   typeof LinearBindingConfigSchema,
-  typeof LinearConnectionConfigSchema
+  LinearConnectionConfig
 >;
 
 const LinearTargetSecretSchema = z.object({}).strict();
@@ -30,9 +32,15 @@ export const LinearDefinition: LinearIntegrationDefinition = {
   targetConfigSchema: LinearTargetConfigSchema,
   targetSecretSchema: LinearTargetSecretSchema,
   bindingConfigSchema: LinearBindingConfigSchema,
-  connectionConfigSchema: LinearConnectionConfigSchema,
-  connectionConfigForm: LinearConnectionConfigForm,
-  supportedAuthSchemes: LinearSupportedAuthSchemes,
+  connectionMethods: [
+    {
+      id: IntegrationConnectionMethodIds.API_KEY,
+      label: "API key",
+      kind: IntegrationConnectionMethodKinds.API_KEY,
+      configSchema: LinearConnectionConfigSchema,
+      configForm: LinearConnectionConfigForm,
+    },
+  ],
   mcp: () => ({
     serverId: "linear-default",
     serverName: "linear",

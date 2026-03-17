@@ -24,6 +24,18 @@ import { validateDiscoveredResources } from "./validate-discovered-resources.js"
 const UnknownRecordSchema = z.record(z.string(), z.unknown());
 const StringRecordSchema = z.record(z.string(), z.string());
 
+function resolveConnectionMethodDefinition(
+  definition: AnyIntegrationDefinition,
+  rawConnectionConfig: Record<string, unknown>,
+) {
+  const connectionMethodId = rawConnectionConfig["connection_method"];
+  if (typeof connectionMethodId !== "string") {
+    return null;
+  }
+
+  return definition.connectionMethods.find((method) => method.id === connectionMethodId) ?? null;
+}
+
 export async function syncIntegrationConnectionResources(
   deps: {
     db: ControlPlaneDatabase;
@@ -121,12 +133,16 @@ export async function syncIntegrationConnectionResources(
       label: `target secrets '${target.targetKey}'`,
       value: definition.targetSecretSchema.parse(resolvedTargetSecrets.secrets),
     });
+    const connectionMethodDefinition = resolveConnectionMethodDefinition(
+      definition,
+      connection.config ?? {},
+    );
     const parsedConnectionConfig = parseUnknownRecord({
       label: `connection config '${connection.id}'`,
       value:
-        definition.connectionConfigSchema === undefined
+        connectionMethodDefinition?.configSchema === undefined
           ? (connection.config ?? {})
-          : definition.connectionConfigSchema.parse(connection.config ?? {}),
+          : connectionMethodDefinition.configSchema.parse(connection.config ?? {}),
     });
     const resolvedCredential = await resolveResourceCredential({
       connection: {

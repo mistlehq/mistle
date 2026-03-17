@@ -74,7 +74,13 @@ function createCard(input: {
       config: {},
       displayName: "GitHub",
       description: "GitHub",
-      supportedAuthSchemes: ["oauth"],
+      connectionMethods: [
+        {
+          id: "github-app-installation",
+          label: "GitHub App installation",
+          kind: "redirect",
+        },
+      ],
       targetHealth: {
         configStatus: "valid",
       },

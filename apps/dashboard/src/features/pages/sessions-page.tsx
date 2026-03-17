@@ -16,10 +16,12 @@ import { useNavigate } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
+  sandboxProfileVersionIntegrationBindingsQueryKey,
   sandboxProfilesListQueryKey,
   sandboxProfileVersionsQueryKey,
 } from "../sandbox-profiles/sandbox-profiles-query-keys.js";
 import {
+  getSandboxProfileVersionIntegrationBindings,
   listSandboxProfiles,
   listSandboxProfileVersions,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
@@ -129,6 +131,34 @@ export function SessionsPage(): React.JSX.Element {
     () => resolveLatestVersion(versionsQuery.data?.versions ?? []),
     [versionsQuery.data?.versions],
   );
+  const integrationBindingsQuery = useQuery({
+    queryKey:
+      selectedProfileId === null || selectedProfileVersion === null
+        ? sandboxProfileVersionIntegrationBindingsQueryKey({
+            profileId: "none",
+            version: 0,
+          })
+        : sandboxProfileVersionIntegrationBindingsQueryKey({
+            profileId: selectedProfileId,
+            version: selectedProfileVersion,
+          }),
+    queryFn: async ({ signal }) => {
+      if (selectedProfileId === null || selectedProfileVersion === null) {
+        return { bindings: [] };
+      }
+
+      return getSandboxProfileVersionIntegrationBindings({
+        profileId: selectedProfileId,
+        version: selectedProfileVersion,
+        signal,
+      });
+    },
+    enabled: selectedProfileId !== null && selectedProfileVersion !== null,
+    retry: false,
+  });
+  const hasAgentBinding = (integrationBindingsQuery.data?.bindings ?? []).some(
+    (binding) => binding.kind === "agent",
+  );
 
   const selectedProfileDisplayText =
     selectedProfileId === null
@@ -142,6 +172,9 @@ export function SessionsPage(): React.JSX.Element {
     selectedProfileVersion !== null &&
     !profilesQuery.isPending &&
     !versionsQuery.isPending &&
+    !integrationBindingsQuery.isPending &&
+    !integrationBindingsQuery.isError &&
+    hasAgentBinding &&
     !isStartingSession;
   const sortedSessions = [...launchedSessions].sort((left, right) => {
     const statusRank: Record<SandboxSessionStatus, number> = {
@@ -231,6 +264,30 @@ export function SessionsPage(): React.JSX.Element {
                 error: versionsQuery.error,
                 fallbackMessage: "Could not load sandbox profile versions.",
               })}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {integrationBindingsQuery.isError ? (
+          <Alert variant="destructive">
+            <AlertTitle>Could not load integration bindings</AlertTitle>
+            <AlertDescription>
+              {resolveApiErrorMessage({
+                error: integrationBindingsQuery.error,
+                fallbackMessage: "Could not load sandbox profile integration bindings.",
+              })}
+            </AlertDescription>
+          </Alert>
+        ) : null}
+        {selectedProfileId !== null &&
+        selectedProfileVersion !== null &&
+        !integrationBindingsQuery.isPending &&
+        !integrationBindingsQuery.isError &&
+        !hasAgentBinding ? (
+          <Alert variant="destructive">
+            <AlertTitle>Agent Binding Required</AlertTitle>
+            <AlertDescription>
+              Add an agent integration binding to this sandbox profile version before starting a
+              session.
             </AlertDescription>
           </Alert>
         ) : null}

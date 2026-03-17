@@ -143,7 +143,14 @@ describe("integration targets discovery integration", () => {
       displayName: "GitHub Cloud",
       description: "GitHub Cloud target",
       logoKey: "github",
-      supportedAuthSchemes: ["api-key", "oauth"],
+      connectionMethods: [
+        { id: "api-key", label: "API key", kind: "api-key" },
+        {
+          id: "github-app-installation",
+          label: "GitHub App installation",
+          kind: "redirect",
+        },
+      ],
       displayNameOverride: "GitHub Cloud",
       descriptionOverride: "GitHub Cloud target",
       targetHealth: {
@@ -180,10 +187,9 @@ describe("integration targets discovery integration", () => {
       variantId: "openai-default",
       enabled: true,
       displayName: "OpenAI",
-      description:
-        "Enable OpenAI model access with API key or ChatGPT subscription authentication.",
+      description: "Enable OpenAI model access with API key authentication.",
       logoKey: "openai",
-      supportedAuthSchemes: ["api-key", "oauth"],
+      connectionMethods: [{ id: "api-key", label: "API key", kind: "api-key" }],
       targetHealth: {
         configStatus: "valid",
       },
@@ -279,7 +285,9 @@ describe("integration targets discovery integration", () => {
     const openAiTarget = page.items.find((item) => item.targetKey === "openai-default");
     expect(openAiTarget).toBeDefined();
     expect(openAiTarget?.targetHealth.configStatus).toBe("valid");
-    expect(openAiTarget?.supportedAuthSchemes).toEqual(["api-key", "oauth"]);
+    expect(openAiTarget?.connectionMethods).toEqual([
+      { id: "api-key", label: "API key", kind: "api-key" },
+    ]);
     expect("resolvedBindingEditorUi" in (openAiTarget ?? {})).toBe(false);
   }, 60_000);
 });

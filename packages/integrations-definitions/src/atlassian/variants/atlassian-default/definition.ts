@@ -1,11 +1,13 @@
 import {
+  IntegrationConnectionMethodIds,
+  IntegrationConnectionMethodKinds,
   IntegrationKinds,
   IntegrationMcpTransports,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
-import { AtlassianConnectionConfigSchema, AtlassianSupportedAuthSchemes } from "./auth.js";
+import { type AtlassianConnectionConfig, AtlassianConnectionConfigSchema } from "./auth.js";
 import { AtlassianBindingConfigSchema } from "./binding-config-schema.js";
 import { compileAtlassianBinding } from "./compile-binding.js";
 import { AtlassianConnectionConfigForm } from "./connection-config-form.js";
@@ -15,7 +17,7 @@ type AtlassianIntegrationDefinition = IntegrationDefinition<
   typeof AtlassianTargetConfigSchema,
   typeof AtlassianTargetSecretSchema,
   typeof AtlassianBindingConfigSchema,
-  typeof AtlassianConnectionConfigSchema
+  AtlassianConnectionConfig
 >;
 
 const AtlassianTargetSecretSchema = z.object({}).strict();
@@ -30,9 +32,15 @@ export const AtlassianDefinition: AtlassianIntegrationDefinition = {
   targetConfigSchema: AtlassianTargetConfigSchema,
   targetSecretSchema: AtlassianTargetSecretSchema,
   bindingConfigSchema: AtlassianBindingConfigSchema,
-  connectionConfigSchema: AtlassianConnectionConfigSchema,
-  connectionConfigForm: AtlassianConnectionConfigForm,
-  supportedAuthSchemes: AtlassianSupportedAuthSchemes,
+  connectionMethods: [
+    {
+      id: IntegrationConnectionMethodIds.API_KEY,
+      label: "API key",
+      kind: IntegrationConnectionMethodKinds.API_KEY,
+      configSchema: AtlassianConnectionConfigSchema,
+      configForm: AtlassianConnectionConfigForm,
+    },
+  ],
   mcp: () => ({
     serverId: "atlassian-default",
     serverName: "atlassian",

@@ -6,10 +6,32 @@ import {
   IntegrationDefinitionRegistryError,
 } from "../errors/index.js";
 import type { IntegrationDefinition } from "../types/index.js";
+import {
+  IntegrationConnectionMethodIds,
+  IntegrationConnectionMethodKinds,
+} from "../types/index.js";
 import { IntegrationRegistry } from "./index.js";
 
 const ConfigSchema = z.record(z.string(), z.unknown());
 const EmptySecretsSchema = z.object({});
+const ApiKeyConnectionMethods = [
+  {
+    id: IntegrationConnectionMethodIds.API_KEY,
+    label: "API key",
+    kind: IntegrationConnectionMethodKinds.API_KEY,
+  },
+] as const;
+const GitHubAppInstallationConnectionMethods = [
+  {
+    id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+    label: "GitHub App installation",
+    kind: IntegrationConnectionMethodKinds.REDIRECT,
+  },
+] as const;
+const GitHubConnectionMethods = [
+  ...ApiKeyConnectionMethods,
+  ...GitHubAppInstallationConnectionMethods,
+] as const;
 
 describe("integration registry", () => {
   it("registers and resolves definitions by family + variant", () => {
@@ -24,7 +46,7 @@ describe("integration registry", () => {
       targetConfigSchema: ConfigSchema,
       targetSecretSchema: EmptySecretsSchema,
       bindingConfigSchema: ConfigSchema,
-      supportedAuthSchemes: ["api-key"],
+      connectionMethods: ApiKeyConnectionMethods,
       compileBinding: () => ({
         egressRoutes: [],
         artifacts: [],
@@ -51,7 +73,7 @@ describe("integration registry", () => {
       targetConfigSchema: ConfigSchema,
       targetSecretSchema: EmptySecretsSchema,
       bindingConfigSchema: ConfigSchema,
-      supportedAuthSchemes: ["api-key"],
+      connectionMethods: ApiKeyConnectionMethods,
       compileBinding: () => ({
         egressRoutes: [],
         artifacts: [],
@@ -86,7 +108,7 @@ describe("integration registry", () => {
         targetConfigSchema: ConfigSchema,
         targetSecretSchema: EmptySecretsSchema,
         bindingConfigSchema: ConfigSchema,
-        supportedAuthSchemes: ["oauth"],
+        connectionMethods: GitHubAppInstallationConnectionMethods,
         compileBinding: () => ({
           egressRoutes: [],
           artifacts: [],
@@ -102,7 +124,7 @@ describe("integration registry", () => {
         targetConfigSchema: ConfigSchema,
         targetSecretSchema: EmptySecretsSchema,
         bindingConfigSchema: ConfigSchema,
-        supportedAuthSchemes: ["api-key"],
+        connectionMethods: ApiKeyConnectionMethods,
         compileBinding: () => ({
           egressRoutes: [],
           artifacts: [],
@@ -131,7 +153,7 @@ describe("integration registry", () => {
       targetConfigSchema: ConfigSchema,
       targetSecretSchema: EmptySecretsSchema,
       bindingConfigSchema: ConfigSchema,
-      supportedAuthSchemes: ["oauth", "api-key"],
+      connectionMethods: GitHubConnectionMethods,
       credentialResolvers: {
         custom: {
           github_installation_token: {

@@ -14,14 +14,28 @@ export const IntegrationKinds: {
   CONNECTOR: "connector",
 };
 
-export type IntegrationSupportedAuthScheme = "oauth" | "api-key";
+export type IntegrationConnectionMethodId = "api-key" | "oauth2" | "github-app-installation";
 
-export const IntegrationSupportedAuthSchemes: {
-  OAUTH: IntegrationSupportedAuthScheme;
-  API_KEY: IntegrationSupportedAuthScheme;
+export const IntegrationConnectionMethodIds: {
+  API_KEY: IntegrationConnectionMethodId;
+  OAUTH2: IntegrationConnectionMethodId;
+  GITHUB_APP_INSTALLATION: IntegrationConnectionMethodId;
 } = {
-  OAUTH: "oauth",
   API_KEY: "api-key",
+  OAUTH2: "oauth2",
+  GITHUB_APP_INSTALLATION: "github-app-installation",
+};
+
+export type IntegrationConnectionMethodKind = "api-key" | "oauth2" | "redirect";
+
+export const IntegrationConnectionMethodKinds: {
+  API_KEY: IntegrationConnectionMethodKind;
+  OAUTH2: IntegrationConnectionMethodKind;
+  REDIRECT: IntegrationConnectionMethodKind;
+} = {
+  API_KEY: "api-key",
+  OAUTH2: "oauth2",
+  REDIRECT: "redirect",
 };
 
 export type IntegrationTarget = {
@@ -151,9 +165,6 @@ export type IntegrationConfigSchema<TOutput> = z.ZodType<TOutput>;
 type ParsedSchemaOutput<TSchema extends IntegrationConfigSchema<unknown>> =
   TSchema extends IntegrationConfigSchema<infer TOutput> ? TOutput : never;
 
-type ParsedOptionalSchemaOutput<TSchema extends IntegrationConfigSchema<unknown> | undefined> =
-  TSchema extends IntegrationConfigSchema<infer TOutput> ? TOutput : Record<string, unknown>;
-
 export type BindingWriteValidationContext<
   TTargetConfig = Record<string, unknown>,
   TBindingConfig = Record<string, unknown>,
@@ -248,6 +259,24 @@ export type IntegrationResolvedTarget<
 > = Omit<IntegrationTarget, "config" | "secrets"> & {
   config: TTargetConfig;
   secrets: TTargetSecrets;
+};
+
+export type IntegrationConnectionMethodDefinition<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TBindingConfig = Record<string, unknown>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  id: IntegrationConnectionMethodId;
+  label: string;
+  kind: IntegrationConnectionMethodKind;
+  configSchema?: IntegrationConfigSchema<TConnectionConfig>;
+  configForm?: IntegrationFormDefinition<
+    TTargetConfig,
+    TTargetSecrets,
+    TBindingConfig,
+    TConnectionConfig
+  >;
 };
 
 type MaybePromise<TValue> = TValue | Promise<TValue>;
@@ -824,8 +853,7 @@ export type IntegrationDefinition<
   TBindingConfigSchema extends IntegrationConfigSchema<unknown> = IntegrationConfigSchema<
     Record<string, unknown>
   >,
-  TConnectionConfigSchema extends IntegrationConfigSchema<Record<string, unknown>> | undefined =
-    undefined,
+  TConnectionConfig = Record<string, unknown>,
 > = {
   familyId: string;
   variantId: string;
@@ -839,30 +867,30 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,
     ParsedSchemaOutput<TBindingConfigSchema>,
-    ParsedOptionalSchemaOutput<TConnectionConfigSchema>
+    TConnectionConfig
   >;
   targetSecretSchema: TTargetSecretsSchema;
   targetSecretForm?: IntegrationFormDefinition<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,
     ParsedSchemaOutput<TBindingConfigSchema>,
-    ParsedOptionalSchemaOutput<TConnectionConfigSchema>
+    TConnectionConfig
   >;
   bindingConfigSchema: TBindingConfigSchema;
   bindingConfigForm?: IntegrationFormDefinition<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,
     ParsedSchemaOutput<TBindingConfigSchema>,
-    ParsedOptionalSchemaOutput<TConnectionConfigSchema>
+    TConnectionConfig
   >;
-  connectionConfigSchema?: TConnectionConfigSchema;
-  connectionConfigForm?: IntegrationFormDefinition<
-    ParsedSchemaOutput<TTargetConfigSchema>,
-    ParsedSchemaOutput<TTargetSecretsSchema>,
-    ParsedSchemaOutput<TBindingConfigSchema>,
-    ParsedOptionalSchemaOutput<TConnectionConfigSchema>
+  connectionMethods: ReadonlyArray<
+    IntegrationConnectionMethodDefinition<
+      ParsedSchemaOutput<TTargetConfigSchema>,
+      ParsedSchemaOutput<TTargetSecretsSchema>,
+      ParsedSchemaOutput<TBindingConfigSchema>,
+      TConnectionConfig
+    >
   >;
-  supportedAuthSchemes: ReadonlyArray<IntegrationSupportedAuthScheme>;
   credentialResolvers?: IntegrationCredentialResolvers;
   authHandlers?: {
     oauth?: IntegrationOAuthHandler<
@@ -881,7 +909,7 @@ export type IntegrationDefinition<
     input: ListConnectionResourcesInput<
       ParsedSchemaOutput<TTargetConfigSchema>,
       ParsedSchemaOutput<TTargetSecretsSchema>,
-      ParsedOptionalSchemaOutput<TConnectionConfigSchema>
+      TConnectionConfig
     >,
   ): MaybePromise<ListConnectionResourcesResult>;
   mcp?: IntegrationMcpDefinition<
@@ -894,7 +922,7 @@ export type IntegrationDefinition<
     input: BindingWriteValidationContext<
       ParsedSchemaOutput<TTargetConfigSchema>,
       ParsedSchemaOutput<TBindingConfigSchema>,
-      ParsedOptionalSchemaOutput<TConnectionConfigSchema>
+      TConnectionConfig
     >,
   ): BindingWriteValidationResult;
   compileBinding(
@@ -910,8 +938,25 @@ export type AnyIntegrationDefinition = IntegrationDefinition<
   IntegrationConfigSchema<unknown>,
   IntegrationConfigSchema<unknown>,
   IntegrationConfigSchema<unknown>,
-  IntegrationConfigSchema<Record<string, unknown>> | undefined
+  Record<string, unknown>
 >;
+
+export type IntegrationFormConnectionMethodDefinition<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TBindingConfig = Record<string, unknown>,
+  TConnectionConfig = Record<string, unknown>,
+> = Omit<
+  IntegrationConnectionMethodDefinition<
+    TTargetConfig,
+    TTargetSecrets,
+    TBindingConfig,
+    TConnectionConfig
+  >,
+  "configSchema"
+> & {
+  configSchema?: IntegrationConfigSchema<Record<string, unknown>>;
+};
 
 export type TriggerFilter =
   | { op: "all"; filters: ReadonlyArray<TriggerFilter> }

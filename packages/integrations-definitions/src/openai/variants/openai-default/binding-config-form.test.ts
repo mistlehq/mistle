@@ -12,13 +12,13 @@ import { createOpenAiRawBindingCapabilities } from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 
 describe("openai binding config forms", () => {
-  it("resolves binding config choices from target capabilities and connection auth scheme", () => {
+  it("resolves binding config choices from target capabilities", () => {
     const targetConfig = OpenAiApiKeyTargetConfigSchema.parse({
       api_base_url: "https://api.openai.com",
       binding_capabilities: createOpenAiRawBindingCapabilities(),
     });
     const connectionConfig = OpenAiConnectionConfigSchema.parse({
-      auth_scheme: "api-key",
+      connection_method: "api-key",
     });
 
     const resolvedForm = resolveIntegrationForm({
@@ -37,7 +37,7 @@ describe("openai binding config forms", () => {
         },
         connection: {
           rawConfig: {
-            auth_scheme: "api-key",
+            connection_method: "api-key",
           },
           config: connectionConfig,
         },
@@ -99,7 +99,7 @@ describe("openai binding config forms", () => {
     });
   });
 
-  it("declares the OpenAI connection auth scheme form", () => {
+  it("declares the OpenAI connection method form", () => {
     const resolvedForm = resolveIntegrationForm({
       schema: OpenAiConnectionConfigSchema,
       form: OpenAiConnectionConfigForm,
@@ -112,20 +112,14 @@ describe("openai binding config forms", () => {
 
     expect(resolvedForm.schema).toMatchObject({
       properties: {
-        auth_scheme: {
-          title: "Authentication method",
+        connection_method: {
           default: "api-key",
-          oneOf: [
-            {
-              const: "api-key",
-              title: "api-key",
-            },
-            {
-              const: "oauth",
-              title: "oauth",
-            },
-          ],
         },
+      },
+    });
+    expect(resolvedForm.uiSchema).toEqual({
+      connection_method: {
+        "ui:widget": "hidden",
       },
     });
   });

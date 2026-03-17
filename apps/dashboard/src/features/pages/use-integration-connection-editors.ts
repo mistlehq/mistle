@@ -2,7 +2,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { updateIntegrationConnection } from "../integrations/integrations-service.js";
+import {
+  updateApiKeyIntegrationConnection,
+  updateIntegrationConnection,
+} from "../integrations/integrations-service.js";
 import type { IntegrationConnection } from "../integrations/integrations-service.js";
 
 export function useIntegrationConnectionEditors(input: {
@@ -30,7 +33,7 @@ export function useIntegrationConnectionEditors(input: {
 
   const updateConnectionApiKeyMutation = useMutation({
     mutationFn: async (payload: { connectionId: string; apiKey: string; displayName: string }) =>
-      updateIntegrationConnection(payload),
+      updateApiKeyIntegrationConnection(payload),
     onMutate: () => {
       setApiKeyError(undefined);
     },

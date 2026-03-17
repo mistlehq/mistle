@@ -1,8 +1,11 @@
-import type { IntegrationConnectionMethodId } from "../integrations/integration-connection-dialog.js";
+import type {
+  IntegrationConnectionMethod,
+  IntegrationConnectionMethodId,
+} from "../integrations/integration-connection-dialog.js";
 
 export type OpenIntegrationConnectionDialogInput =
   | {
-      methods: readonly IntegrationConnectionMethodId[];
+      methods: readonly IntegrationConnectionMethod[];
       mode: "create";
       targetDisplayName: string;
       targetKey: string;

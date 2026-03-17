@@ -45,7 +45,7 @@ describe("sandbox profile version put integration bindings integration", () => {
           targetKey: "openai-default-put-bindings-route",
           displayName: "Route Connection A",
           config: {
-            auth_scheme: "api-key",
+            connection_method: "api-key",
           },
         },
         {
@@ -54,7 +54,7 @@ describe("sandbox profile version put integration bindings integration", () => {
           targetKey: "openai-default-put-bindings-route",
           displayName: "Route Connection B",
           config: {
-            auth_scheme: "api-key",
+            connection_method: "api-key",
           },
         },
       ])
@@ -293,7 +293,7 @@ describe("sandbox profile version put integration bindings integration", () => {
         targetKey: "github-cloud-put-bindings-route-duplicate-family-a",
         displayName: "GitHub Route Family A",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       },
       {
@@ -302,7 +302,7 @@ describe("sandbox profile version put integration bindings integration", () => {
         targetKey: "github-cloud-put-bindings-route-duplicate-family-b",
         displayName: "GitHub Route Family B",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       },
     ]);
@@ -405,7 +405,7 @@ describe("sandbox profile version put integration bindings integration", () => {
         targetKey: "openai-default-put-bindings-route-invalid-binding-id",
         displayName: "Invalid Binding Connection",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       })
       .returning();
@@ -526,7 +526,7 @@ describe("sandbox profile version put integration bindings integration", () => {
         targetKey: "openai-default-put-bindings-invalid-reasoning",
         displayName: "Invalid Reasoning Connection",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       })
       .returning();

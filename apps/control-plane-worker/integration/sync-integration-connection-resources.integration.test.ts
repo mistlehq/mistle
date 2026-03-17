@@ -80,7 +80,7 @@ describe("syncIntegrationConnectionResources integration", () => {
         status: IntegrationConnectionStatuses.ACTIVE,
         externalSubjectId: "123456",
         config: {
-          auth_scheme: "oauth",
+          connection_method: "github-app-installation",
           installation_id: "123456",
         },
       });

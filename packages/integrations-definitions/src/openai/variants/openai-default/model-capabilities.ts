@@ -28,24 +28,18 @@ export const OpenAiModelIds = [
 
 export type OpenAiModelId = (typeof OpenAiModelIds)[number];
 
-export const OpenAiConnectionAuthSchemes = {
+export const OpenAiConnectionMethodIds = {
   API_KEY: "api-key",
-  OAUTH: "oauth",
 } as const;
 
-export type OpenAiConnectionAuthScheme =
-  (typeof OpenAiConnectionAuthSchemes)[keyof typeof OpenAiConnectionAuthSchemes];
+export type OpenAiConnectionMethodId =
+  (typeof OpenAiConnectionMethodIds)[keyof typeof OpenAiConnectionMethodIds];
 
-type OpenAiCapabilitySet = {
+export type OpenAiCapabilitySet = {
   models: readonly OpenAiModelId[];
   allowedReasoningByModel: Record<OpenAiModelId, readonly OpenAiReasoningEffort[]>;
   defaultReasoningByModel: Record<OpenAiModelId, OpenAiReasoningEffort>;
 };
-
-export type OpenAiCapabilitiesByAuthScheme = Record<
-  OpenAiConnectionAuthScheme,
-  OpenAiCapabilitySet
->;
 
 const OpenAiDefaultCapabilitySet: OpenAiCapabilitySet = {
   models: OpenAiModelIds,
@@ -67,10 +61,7 @@ const OpenAiDefaultCapabilitySet: OpenAiCapabilitySet = {
   },
 };
 
-export const OpenAiCapabilitiesByAuthScheme: OpenAiCapabilitiesByAuthScheme = {
-  "api-key": OpenAiDefaultCapabilitySet,
-  oauth: OpenAiDefaultCapabilitySet,
-};
+export const OpenAiCapabilities: OpenAiCapabilitySet = OpenAiDefaultCapabilitySet;
 
 const OpenAiReasoningEffortSchema = z.enum(["low", "medium", "high", "xhigh"]);
 const OpenAiModelIdSchema = z.enum(OpenAiModelIds);
@@ -115,14 +106,9 @@ const OpenAiCapabilitySetSchema = z
     }
   });
 
-export const OpenAiCapabilitiesByAuthSchemeSchema = z
-  .object({
-    "api-key": OpenAiCapabilitySetSchema,
-    oauth: OpenAiCapabilitySetSchema,
-  })
-  .strict();
+export const OpenAiCapabilitiesSchema = OpenAiCapabilitySetSchema;
 
-OpenAiCapabilitiesByAuthSchemeSchema.parse(OpenAiCapabilitiesByAuthScheme);
+OpenAiCapabilitiesSchema.parse(OpenAiCapabilities);
 
 export type OpenAiRawCapabilitySet = {
   models: readonly OpenAiModelId[];
@@ -130,55 +116,36 @@ export type OpenAiRawCapabilitySet = {
   default_reasoning_by_model: Record<OpenAiModelId, OpenAiReasoningEffort>;
 };
 
-export type OpenAiRawBindingCapabilities = {
-  by_auth_scheme: Record<OpenAiConnectionAuthScheme, OpenAiRawCapabilitySet>;
-};
+export type OpenAiRawBindingCapabilities = OpenAiRawCapabilitySet;
 
 export function createOpenAiRawBindingCapabilities(): OpenAiRawBindingCapabilities {
-  const byAuthScheme: Record<OpenAiConnectionAuthScheme, OpenAiRawCapabilitySet> = {
-    "api-key": {
-      models: OpenAiCapabilitiesByAuthScheme["api-key"].models,
-      allowed_reasoning_by_model: OpenAiCapabilitiesByAuthScheme["api-key"].allowedReasoningByModel,
-      default_reasoning_by_model: OpenAiCapabilitiesByAuthScheme["api-key"].defaultReasoningByModel,
-    },
-    oauth: {
-      models: OpenAiCapabilitiesByAuthScheme.oauth.models,
-      allowed_reasoning_by_model: OpenAiCapabilitiesByAuthScheme.oauth.allowedReasoningByModel,
-      default_reasoning_by_model: OpenAiCapabilitiesByAuthScheme.oauth.defaultReasoningByModel,
-    },
-  };
-
   return {
-    by_auth_scheme: byAuthScheme,
+    models: OpenAiCapabilities.models,
+    allowed_reasoning_by_model: OpenAiCapabilities.allowedReasoningByModel,
+    default_reasoning_by_model: OpenAiCapabilities.defaultReasoningByModel,
   };
 }
 
 export function isOpenAiModelSupported(input: {
-  authScheme: OpenAiConnectionAuthScheme;
   model: string;
-}): input is { authScheme: OpenAiConnectionAuthScheme; model: OpenAiModelId } {
-  return OpenAiCapabilitiesByAuthScheme[input.authScheme].models.includes(
-    input.model as OpenAiModelId,
-  );
+}): input is { model: OpenAiModelId } {
+  return OpenAiCapabilities.models.includes(input.model as OpenAiModelId);
 }
 
 export function isOpenAiReasoningEffortSupported(input: {
-  authScheme: OpenAiConnectionAuthScheme;
   model: OpenAiModelId;
   reasoningEffort: string;
 }): input is {
-  authScheme: OpenAiConnectionAuthScheme;
   model: OpenAiModelId;
   reasoningEffort: OpenAiReasoningEffort;
 } {
-  return OpenAiCapabilitiesByAuthScheme[input.authScheme].allowedReasoningByModel[
-    input.model
-  ].includes(input.reasoningEffort as OpenAiReasoningEffort);
+  return OpenAiCapabilities.allowedReasoningByModel[input.model].includes(
+    input.reasoningEffort as OpenAiReasoningEffort,
+  );
 }
 
 export function resolveOpenAiDefaultReasoningEffort(input: {
-  authScheme: OpenAiConnectionAuthScheme;
   model: OpenAiModelId;
 }): OpenAiReasoningEffort {
-  return OpenAiCapabilitiesByAuthScheme[input.authScheme].defaultReasoningByModel[input.model];
+  return OpenAiCapabilities.defaultReasoningByModel[input.model];
 }

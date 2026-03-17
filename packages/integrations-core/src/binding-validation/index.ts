@@ -1,10 +1,9 @@
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import type {
+  AnyIntegrationDefinition,
   BindingWriteValidationIssue,
   BindingWriteValidationResult,
   IntegrationConnection,
-  IntegrationConfigSchema,
-  IntegrationDefinition,
   IntegrationTarget,
 } from "../types/index.js";
 
@@ -27,13 +26,25 @@ function sanitizeSchemaFailureMessage(input: {
   return `Binding '${input.bindingIdOrDraftIndex}' has invalid config reference: Binding config is invalid for integration '${input.familyId}/${input.variantId}'.`;
 }
 
+function readConnectionMethodId(value: Record<string, unknown>): string | undefined {
+  const connectionMethodId = value["connection_method"];
+  return typeof connectionMethodId === "string" ? connectionMethodId : undefined;
+}
+
+function resolveConnectionMethodDefinition(input: {
+  connectionMethods: AnyIntegrationDefinition["connectionMethods"];
+  rawConnectionConfig: Record<string, unknown>;
+}): AnyIntegrationDefinition["connectionMethods"][number] | null {
+  const connectionMethodId = readConnectionMethodId(input.rawConnectionConfig);
+  if (connectionMethodId === undefined) {
+    return null;
+  }
+
+  return input.connectionMethods.find((method) => method.id === connectionMethodId) ?? null;
+}
+
 export function runDefinitionBindingWriteValidation(input: {
-  definition: IntegrationDefinition<
-    IntegrationConfigSchema<unknown>,
-    IntegrationConfigSchema<unknown>,
-    IntegrationConfigSchema<unknown>,
-    IntegrationConfigSchema<Record<string, unknown>> | undefined
-  >;
+  definition: AnyIntegrationDefinition;
   targetKey: string;
   target: Pick<IntegrationTarget, "familyId" | "variantId" | "config">;
   connection: Pick<IntegrationConnection, "id" | "config">;
@@ -107,9 +118,14 @@ export function runDefinitionBindingWriteValidation(input: {
 
   let parsedConnectionConfig: Record<string, unknown>;
   try {
-    const connectionConfigCandidate = input.definition.connectionConfigSchema
-      ? input.definition.connectionConfigSchema.parse(input.connection.config)
-      : input.connection.config;
+    const connectionMethodDefinition = resolveConnectionMethodDefinition({
+      connectionMethods: input.definition.connectionMethods,
+      rawConnectionConfig: input.connection.config,
+    });
+    const connectionConfigCandidate =
+      connectionMethodDefinition?.configSchema === undefined
+        ? input.connection.config
+        : connectionMethodDefinition.configSchema.parse(input.connection.config);
     const connectionConfigRecord = toUnknownRecord(connectionConfigCandidate);
     if (connectionConfigRecord === null) {
       throw new Error("Connection config must be an object.");

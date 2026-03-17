@@ -1,12 +1,12 @@
 import {
-  formatConnectionAuthMethodLabel,
-  resolveConnectionAuthScheme,
+  formatConnectionMethodLabel,
+  resolveConnectionMethodId,
 } from "../integrations/connection-auth.js";
 import type { IntegrationCardViewModel } from "../integrations/directory-model.js";
 import { formatConnectionCount } from "../integrations/format-connection-count.js";
 import type { IntegrationConnectionDetailItem } from "../integrations/integration-connection-detail-view.js";
 import {
-  IntegrationConnectionMethodIds,
+  type IntegrationConnectionMethod,
   type IntegrationConnectionMethodId,
 } from "../integrations/integration-connection-dialog.js";
 import type {
@@ -17,17 +17,13 @@ import type { OpenIntegrationConnectionDialogInput } from "./integration-connect
 import type { OrganizationIntegrationsSettingsPageCard } from "./organization-integrations-settings-page-view.js";
 
 export function toConnectionMethods(
-  supportedAuthSchemes: readonly ("oauth" | "api-key")[] | undefined,
-): readonly IntegrationConnectionMethodId[] {
-  if (supportedAuthSchemes === undefined) {
+  connectionMethods: readonly IntegrationConnectionMethod[] | undefined,
+): readonly IntegrationConnectionMethod[] {
+  if (connectionMethods === undefined) {
     return [];
   }
 
-  return supportedAuthSchemes.map((scheme) =>
-    scheme === "api-key"
-      ? IntegrationConnectionMethodIds.API_KEY
-      : IntegrationConnectionMethodIds.OAUTH,
-  );
+  return connectionMethods;
 }
 
 export function buildConnectedIntegrationViewCards(input: {
@@ -52,7 +48,7 @@ export function buildAvailableIntegrationViewCards(input: {
   onOpenCreateDialog: (input: OpenIntegrationConnectionDialogInput) => void;
 }): readonly OrganizationIntegrationsSettingsPageCard[] {
   return input.cards.map((card) => {
-    const methods = toConnectionMethods(card.target.supportedAuthSchemes);
+    const methods = toConnectionMethods(card.target.connectionMethods);
 
     return {
       targetKey: card.target.targetKey,
@@ -77,14 +73,14 @@ export function buildAvailableIntegrationViewCards(input: {
 export function resolveEditableConnectionMethodId(
   connection: Pick<IntegrationConnection, "config" | "id" | "targetKey">,
 ): IntegrationConnectionMethodId {
-  const authScheme = resolveConnectionAuthScheme(connection.config ?? null);
-  if (authScheme === null) {
+  const connectionMethodId = resolveConnectionMethodId(connection.config ?? null);
+  if (connectionMethodId === null) {
     throw new Error(
-      `Unsupported auth scheme for integration connection '${connection.id}' on target '${connection.targetKey}'.`,
+      `Unsupported connection method for integration connection '${connection.id}' on target '${connection.targetKey}'.`,
     );
   }
 
-  return authScheme;
+  return connectionMethodId;
 }
 
 export function buildIntegrationConnectionDetailItems(input: {
@@ -92,16 +88,18 @@ export function buildIntegrationConnectionDetailItems(input: {
   refreshingResourceKeys: ReadonlySet<string>;
 }): readonly IntegrationConnectionDetailItem[] {
   return input.connections.map((connection) => {
-    const authScheme = resolveConnectionAuthScheme(connection.config ?? null);
+    const connectionMethodId = resolveConnectionMethodId(connection.config ?? null);
 
     return {
       id: connection.id,
       displayName: connection.displayName,
       status: connection.status,
-      ...(authScheme === null ? { authMethodId: null } : { authMethodId: authScheme }),
-      ...(authScheme === null
+      ...(connectionMethodId === null
+        ? { authMethodId: null }
+        : { authMethodId: connectionMethodId }),
+      ...(connectionMethodId === null
         ? {}
-        : { authMethodLabel: formatConnectionAuthMethodLabel(authScheme) }),
+        : { authMethodLabel: formatConnectionMethodLabel(connectionMethodId) }),
       resources: (connection.resources ?? []).map((resource) => ({
         kind: resource.kind,
         count: resource.count,

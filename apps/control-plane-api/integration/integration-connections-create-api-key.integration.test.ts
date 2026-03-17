@@ -5,7 +5,7 @@ import {
   IntegrationCredentialSecretKinds,
   integrationTargets,
 } from "@mistle/db/control-plane";
-import { IntegrationSupportedAuthSchemes } from "@mistle/integrations-core";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
@@ -74,7 +74,7 @@ describe("integration connections create api key integration", () => {
     expect(responseBody.displayName).toBe("Primary OpenAI key");
     expect(responseBody.status).toBe("active");
     expect(responseBody.config).toEqual({
-      auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
+      connection_method: IntegrationConnectionMethodIds.API_KEY,
     });
     expect(responseBody.targetSnapshotConfig).toEqual({
       api_base_url: "https://api.openai.com",
@@ -93,7 +93,7 @@ describe("integration connections create api key integration", () => {
       throw new Error("Expected created integration connection.");
     }
     expect(createdConnection.config).toEqual({
-      auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
+      connection_method: IntegrationConnectionMethodIds.API_KEY,
     });
     expect(createdConnection.displayName).toBe("Primary OpenAI key");
 

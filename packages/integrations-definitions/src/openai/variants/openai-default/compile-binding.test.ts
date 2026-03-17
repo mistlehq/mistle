@@ -1,5 +1,4 @@
 import type {
-  IntegrationSupportedAuthScheme,
   RuntimeArtifactCommand,
   RuntimeArtifactLifecycleBuilder,
   RuntimeArtifactRefs,
@@ -10,7 +9,7 @@ import { compileOpenAiApiKeyBinding } from "./compile-binding.js";
 import { createOpenAiRawBindingCapabilities } from "./model-capabilities.js";
 import { OpenAiApiKeyTargetConfigSchema } from "./target-config-schema.js";
 
-const OpenAiApiKeyAuthScheme: IntegrationSupportedAuthScheme = "api-key";
+const OpenAiApiKeyConnectionMethod = "api-key" as const;
 const RuntimeArtifactBinDirectory = "/var/lib/mistle/bin";
 const SandboxPaths = {
   userHomeDir: "/home/sandbox",
@@ -101,7 +100,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         id: "icn_123",
         status: "active",
         config: {
-          auth_scheme: OpenAiApiKeyAuthScheme,
+          connection_method: OpenAiApiKeyConnectionMethod,
         },
       },
       binding: {
@@ -243,7 +242,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         id: "icn_123",
         status: "active",
         config: {
-          auth_scheme: OpenAiApiKeyAuthScheme,
+          connection_method: OpenAiApiKeyConnectionMethod,
         },
       },
       binding: {
@@ -285,7 +284,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         id: "icn_123",
         status: "active",
         config: {
-          auth_scheme: OpenAiApiKeyAuthScheme,
+          connection_method: OpenAiApiKeyConnectionMethod,
         },
       },
       binding: {
@@ -329,7 +328,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         id: "icn_123",
         status: "active",
         config: {
-          auth_scheme: OpenAiApiKeyAuthScheme,
+          connection_method: OpenAiApiKeyConnectionMethod,
         },
       },
       binding: {
@@ -350,7 +349,7 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(compiled.egressRoutes[0]?.match.pathPrefixes).toEqual(["/"]);
   });
 
-  it("fails fast when connection auth_scheme is missing", () => {
+  it("fails fast when connection connection_method is missing", () => {
     expect(() =>
       compileOpenAiApiKeyBinding({
         organizationId: "org_123",

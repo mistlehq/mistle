@@ -10,19 +10,27 @@ import {
   RadioGroupItem,
 } from "@mistle/ui";
 
-export type IntegrationConnectionMethodId = "api-key" | "oauth";
+export type IntegrationConnectionMethodId = "api-key" | "oauth2" | "github-app-installation";
 export const IntegrationConnectionMethodIds: {
   API_KEY: IntegrationConnectionMethodId;
-  OAUTH: IntegrationConnectionMethodId;
+  OAUTH2: IntegrationConnectionMethodId;
+  GITHUB_APP_INSTALLATION: IntegrationConnectionMethodId;
 } = {
   API_KEY: "api-key",
-  OAUTH: "oauth",
+  OAUTH2: "oauth2",
+  GITHUB_APP_INSTALLATION: "github-app-installation",
+};
+
+export type IntegrationConnectionMethod = {
+  id: IntegrationConnectionMethodId;
+  label: string;
+  kind: "api-key" | "oauth2" | "redirect";
 };
 
 type CreateIntegrationConnectionDialogState = {
   displayName: string;
   targetKey: string;
-  methods: readonly IntegrationConnectionMethodId[];
+  methods: readonly IntegrationConnectionMethod[];
   mode: "create";
 };
 
@@ -57,11 +65,8 @@ type IntegrationConnectionDialogProps = {
   onSubmit: () => void;
 };
 
-function formatIntegrationConnectionMethodLabel(methodId: IntegrationConnectionMethodId): string {
-  if (methodId === IntegrationConnectionMethodIds.API_KEY) {
-    return "API key";
-  }
-  return "OAuth";
+function formatIntegrationConnectionMethodLabel(method: IntegrationConnectionMethod): string {
+  return method.label;
 }
 
 export function IntegrationConnectionDialog(props: IntegrationConnectionDialogProps) {
@@ -110,25 +115,26 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
                 onValueChange={(nextValue) => {
                   if (
                     nextValue === IntegrationConnectionMethodIds.API_KEY ||
-                    nextValue === IntegrationConnectionMethodIds.OAUTH
+                    nextValue === IntegrationConnectionMethodIds.OAUTH2 ||
+                    nextValue === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
                   ) {
                     props.onMethodChange(nextValue);
                   }
                 }}
                 value={props.connectMethodId}
               >
-                {dialog.methods.map((methodId) => (
+                {dialog.methods.map((method) => (
                   <label
                     className="inline-flex items-center gap-2 text-sm"
-                    htmlFor={`connect-auth-method-${dialog.targetKey}-${methodId}`}
-                    key={methodId}
+                    htmlFor={`connect-auth-method-${dialog.targetKey}-${method.id}`}
+                    key={method.id}
                   >
                     <RadioGroupItem
-                      aria-label={formatIntegrationConnectionMethodLabel(methodId)}
-                      id={`connect-auth-method-${dialog.targetKey}-${methodId}`}
-                      value={methodId}
+                      aria-label={formatIntegrationConnectionMethodLabel(method)}
+                      id={`connect-auth-method-${dialog.targetKey}-${method.id}`}
+                      value={method.id}
                     />
-                    <span>{formatIntegrationConnectionMethodLabel(methodId)}</span>
+                    <span>{formatIntegrationConnectionMethodLabel(method)}</span>
                   </label>
                 ))}
               </RadioGroup>
@@ -160,7 +166,7 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
             <p className="text-muted-foreground text-sm">
               {isUpdateMode
                 ? "Save to update this connection name."
-                : "Continue to generate an OAuth authorization URL and redirect."}
+                : "Continue to start the connection flow."}
             </p>
           )}
 
@@ -181,7 +187,7 @@ export function IntegrationConnectionDialog(props: IntegrationConnectionDialogPr
                 ? "Save"
                 : props.connectMethodId === IntegrationConnectionMethodIds.API_KEY
                   ? "Create connection"
-                  : "Continue with OAuth"}
+                  : "Continue"}
             </Button>
           </DialogFooter>
         </DialogContent>
