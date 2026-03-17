@@ -265,11 +265,7 @@ mod tests {
         let stdout = child.stdout.take().expect("expected helper stdout");
         let stdin = child.stdin.take().expect("expected helper stdin");
         let mut reader = std::io::BufReader::new(stdout);
-        let mut readiness_line = String::new();
-        std::io::BufRead::read_line(&mut reader, &mut readiness_line)
-            .expect("expected helper readiness line");
-
-        let dumpable = parse_helper_dumpable(readiness_line.trim());
+        let dumpable = read_helper_dumpable(&mut reader).expect("expected helper readiness line");
 
         DumpabilityHelper {
             command: child,
@@ -279,16 +275,39 @@ mod tests {
     }
 
     #[cfg(target_os = "linux")]
-    fn parse_helper_dumpable(readiness_line: &str) -> bool {
+    fn read_helper_dumpable(
+        reader: &mut impl std::io::BufRead,
+    ) -> Result<bool, String> {
+        let mut line = String::new();
+
+        loop {
+            line.clear();
+            let bytes_read =
+                std::io::BufRead::read_line(reader, &mut line).map_err(|error| {
+                    format!("failed to read helper readiness line: {error}")
+                })?;
+            if bytes_read == 0 {
+                return Err("helper exited before reporting dumpable state".to_string());
+            }
+
+            if let Some(dumpable) = parse_helper_dumpable(line.trim()) {
+                return Ok(dumpable);
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    fn parse_helper_dumpable(readiness_line: &str) -> Option<bool> {
         const PREFIX: &str = "ready dumpable=";
 
-        assert!(
-            readiness_line.starts_with(PREFIX),
-            "unexpected helper readiness line: {readiness_line}"
-        );
+        if !readiness_line.starts_with(PREFIX) {
+            return None;
+        }
 
-        readiness_line[PREFIX.len()..]
+        Some(
+            readiness_line[PREFIX.len()..]
             .parse::<bool>()
-            .expect("expected helper dumpable flag")
+            .expect("expected helper dumpable flag"),
+        )
     }
 }
