@@ -2,6 +2,11 @@ import { once } from "node:events";
 import { type Server } from "node:http";
 
 import { applyRuntimePlan } from "../runtime-plan/index.js";
+import {
+  startTunnelClient,
+  type StartedTunnelClient,
+  type TunnelCompletion,
+} from "../tunnel/client.js";
 import { loadRuntimeConfig, type RuntimeConfig } from "./config.js";
 import { createRuntimeHttpServer } from "./http-server.js";
 import { parseListenAddress } from "./parse-listen-address.js";
@@ -36,6 +41,7 @@ export type StartedRuntime = {
   server: Server;
   baseUrl: string;
   unexpectedProcessExit: Promise<RuntimeClientProcessExit>;
+  tunnelCompletion: Promise<TunnelCompletion>;
   close: () => Promise<void>;
   closed: Promise<void>;
 };
@@ -51,6 +57,10 @@ function getBaseUrl(server: Server): string {
 }
 
 async function closeServer(server: Server): Promise<void> {
+  if (!server.listening) {
+    return;
+  }
+
   await new Promise<void>((resolve, reject) => {
     server.close((error) => {
       if (error !== undefined) {
@@ -113,6 +123,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
   );
 
   let processManager: RuntimeClientProcessManager | undefined;
+  let tunnelClient: StartedTunnelClient | undefined;
   try {
     await applyRuntimePlan({
       runtimePlan: startupInput.runtimePlan,
@@ -120,15 +131,37 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     processManager = await startRuntimeClientProcessManager(
       flattenRuntimeClientProcesses(startupInput.runtimePlan.runtimeClients),
     );
+    try {
+      tunnelClient = startTunnelClient({
+        signal: new AbortController().signal,
+        gatewayWsUrl: startupInput.tunnelGatewayWsUrl,
+        bootstrapToken: startupInput.bootstrapToken,
+        tunnelExchangeToken: startupInput.tunnelExchangeToken,
+        agentRuntimes: startupInput.runtimePlan.agentRuntimes,
+        runtimeClients: startupInput.runtimePlan.runtimeClients,
+      });
+    } catch (error) {
+      throw new Error(
+        `failed to start sandbox tunnel: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
     state.startupReady = true;
   } catch (error) {
+    if (tunnelClient !== undefined) {
+      await tunnelClient.close().catch(() => undefined);
+    }
+    if (processManager !== undefined) {
+      await processManager.stop().catch(() => undefined);
+    }
     restoreProxyEnvironment();
     await closeServer(server);
 
     throw new Error(
       error instanceof Error && error.message.startsWith("runtime client process[")
         ? `failed to start runtime client processes: ${error.message}`
-        : `failed to apply runtime plan: ${error instanceof Error ? error.message : String(error)}`,
+        : error instanceof Error && error.message.startsWith("failed to start sandbox tunnel:")
+          ? error.message
+          : `failed to apply runtime plan: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
@@ -138,6 +171,9 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     new Promise<RuntimeClientProcessExit>(() => {
       // Intentionally pending when there are no runtime client processes.
     });
+  if (tunnelClient === undefined) {
+    throw new Error("sandbox tunnel client is required");
+  }
 
   return {
     config,
@@ -145,7 +181,9 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     server,
     baseUrl: getBaseUrl(server),
     unexpectedProcessExit,
+    tunnelCompletion: tunnelClient.completion,
     close: async () => {
+      await tunnelClient.close();
       await closeServer(server);
       await proxyServer.close();
 
@@ -169,22 +207,40 @@ export async function runRuntime(input: RunRuntimeInput): Promise<never> {
       type: "process-exit" as const,
       processExit,
     })),
+    runtime.tunnelCompletion.then((completion) => ({
+      type: "tunnel-completion" as const,
+      completion,
+    })),
   ]);
-
-  if (result.type === "closed") {
-    throw new Error("sandbox runtime server closed unexpectedly");
-  }
 
   try {
     await runtime.close();
   } catch {
     // Preserve the primary unexpected-exit error.
   }
-  if (result.processExit.err !== undefined) {
+
+  if (result.type === "process-exit") {
+    if (result.processExit.err !== undefined) {
+      throw new Error(
+        `runtime client process '${result.processExit.processKey}' exited unexpectedly: ${result.processExit.err.message}`,
+      );
+    }
+
     throw new Error(
-      `runtime client process '${result.processExit.processKey}' exited unexpectedly: ${result.processExit.err.message}`,
+      `runtime client process '${result.processExit.processKey}' exited unexpectedly`,
     );
   }
 
-  throw new Error(`runtime client process '${result.processExit.processKey}' exited unexpectedly`);
+  if (result.type === "closed") {
+    throw new Error("sandbox runtime server closed unexpectedly");
+  }
+
+  switch (result.completion.kind) {
+    case "aborted":
+      throw new Error("sandbox tunnel aborted unexpectedly");
+    case "closed":
+      throw new Error("sandbox tunnel closed unexpectedly");
+    case "error":
+      throw new Error(`sandbox tunnel failed: ${result.completion.error.message}`);
+  }
 }

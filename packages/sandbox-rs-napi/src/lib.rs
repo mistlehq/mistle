@@ -1,10 +1,12 @@
 mod proxy_ca;
+mod pty;
 
 use napi_derive::napi;
 use proxy_ca::{
-    generate_proxy_ca_impl, issue_proxy_leaf_certificate_impl, GeneratedProxyCa,
-    IssuedProxyLeafCertificate,
+    GeneratedProxyCa, IssuedProxyLeafCertificate, generate_proxy_ca_impl,
+    issue_proxy_leaf_certificate_impl,
 };
+pub use pty::{NativePtySession, PtyEnvironmentEntry, SpawnPtyInput, spawn_pty};
 
 #[napi(object)]
 pub struct GeneratedProxyCaResult {

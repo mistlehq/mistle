@@ -541,9 +541,19 @@ importers:
       '@mistle/sandbox-rs-napi':
         specifier: workspace:*
         version: link:../../packages/sandbox-rs-napi
+      '@mistle/sandbox-session-protocol':
+        specifier: workspace:*
+        version: link:../../packages/sandbox-session-protocol
       undici:
         specifier: 7.24.4
         version: 7.24.4
+      ws:
+        specifier: ^8.19.0
+        version: 8.19.0
+    devDependencies:
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
 
   apps/tokenizer-proxy:
     dependencies:
