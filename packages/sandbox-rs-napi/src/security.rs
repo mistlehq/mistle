@@ -173,6 +173,9 @@ mod tests {
     const DUMPABILITY_HELPER_MODE_ENV: &str = "MISTLE_SECURITY_DUMPABILITY_HELPER_MODE";
 
     #[cfg(target_os = "linux")]
+    const DUMPABILITY_HELPER_READY_PATH_ENV: &str = "MISTLE_SECURITY_DUMPABILITY_HELPER_READY_PATH";
+
+    #[cfg(target_os = "linux")]
     #[test]
     fn reports_non_dumpable_state_in_helper_process() {
         let helper = start_dumpability_helper("non-dumpable");
@@ -184,12 +187,13 @@ mod tests {
     #[test]
     fn dumpability_helper_process() {
         use std::io::Read as _;
-        use std::io::Write as _;
 
         let helper_mode = match std::env::var(DUMPABILITY_HELPER_MODE_ENV) {
             Ok(value) => value,
             Err(_) => return,
         };
+        let ready_path = std::env::var(DUMPABILITY_HELPER_READY_PATH_ENV)
+            .expect("expected helper ready path");
 
         match helper_mode.as_str() {
             "non-dumpable" => {
@@ -200,10 +204,8 @@ mod tests {
         }
 
         let dumpable = current_process_dumpable().expect("expected helper dumpable query");
-        println!("ready dumpable={dumpable}");
-        std::io::stdout()
-            .flush()
-            .expect("expected helper stdout flush to succeed");
+        std::fs::write(&ready_path, dumpable.to_string())
+            .expect("expected helper readiness file write to succeed");
 
         let mut line = [0_u8; 1];
         std::io::stdin()
@@ -225,7 +227,7 @@ mod tests {
     struct DumpabilityHelper {
         command: std::process::Child,
         stdin: std::process::ChildStdin,
-        stdout: std::io::BufReader<std::process::ChildStdout>,
+        ready_path: std::path::PathBuf,
         dumpable: bool,
     }
 
@@ -237,26 +239,27 @@ mod tests {
             self.stdin
                 .write_all(b"\n")
                 .expect("expected helper stdin write to succeed");
-            drop(self.stdout);
             let status = self
                 .command
                 .wait()
                 .expect("expected helper process wait to succeed");
+            let _ = std::fs::remove_file(&self.ready_path);
             assert!(status.success(), "expected helper process to exit successfully");
         }
     }
 
     #[cfg(target_os = "linux")]
     fn start_dumpability_helper(helper_mode: &str) -> DumpabilityHelper {
+        let ready_path = helper_ready_path();
         let current_executable =
             std::env::current_exe().expect("expected current test executable path");
         let mut command = std::process::Command::new(current_executable);
         command
-            .arg("--nocapture")
             .arg("--exact")
             .arg("security::tests::dumpability_helper_process")
             .env(DUMPABILITY_HELPER_MODE_ENV, helper_mode)
-            .stdout(std::process::Stdio::piped())
+            .env(DUMPABILITY_HELPER_READY_PATH_ENV, &ready_path)
+            .stdout(std::process::Stdio::inherit())
             .stdin(std::process::Stdio::piped())
             .stderr(std::process::Stdio::inherit());
 
@@ -264,54 +267,49 @@ mod tests {
             .spawn()
             .expect("expected helper process spawn to succeed");
 
-        let stdout = child.stdout.take().expect("expected helper stdout");
         let stdin = child.stdin.take().expect("expected helper stdin");
-        let mut stdout_reader = std::io::BufReader::new(stdout);
-        let dumpable =
-            read_helper_dumpable(&mut stdout_reader).expect("expected helper readiness line");
+        let dumpable = read_helper_dumpable(&ready_path).expect("expected helper readiness file");
 
         DumpabilityHelper {
             command: child,
             stdin,
-            stdout: stdout_reader,
+            ready_path,
             dumpable,
         }
     }
 
     #[cfg(target_os = "linux")]
-    fn read_helper_dumpable(
-        reader: &mut impl std::io::BufRead,
-    ) -> Result<bool, String> {
-        let mut line = String::new();
-
-        loop {
-            line.clear();
-            let bytes_read =
-                std::io::BufRead::read_line(reader, &mut line).map_err(|error| {
-                    format!("failed to read helper readiness line: {error}")
-                })?;
-            if bytes_read == 0 {
-                return Err("helper exited before reporting dumpable state".to_string());
-            }
-
-            if let Some(dumpable) = parse_helper_dumpable(line.trim()) {
-                return Ok(dumpable);
+    fn read_helper_dumpable(ready_path: &std::path::Path) -> Result<bool, String> {
+        for _ in 0..200 {
+            match std::fs::read_to_string(ready_path) {
+                Ok(value) => {
+                    return value
+                        .trim()
+                        .parse::<bool>()
+                        .map_err(|error| format!("failed to parse helper dumpable state: {error}"));
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                Err(error) => {
+                    return Err(format!("failed to read helper readiness file: {error}"));
+                }
             }
         }
+
+        Err("helper exited before reporting dumpable state".to_string())
     }
 
     #[cfg(target_os = "linux")]
-    fn parse_helper_dumpable(readiness_line: &str) -> Option<bool> {
-        const PREFIX: &str = "ready dumpable=";
+    fn helper_ready_path() -> std::path::PathBuf {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("expected system time after unix epoch")
+            .as_nanos();
 
-        if !readiness_line.starts_with(PREFIX) {
-            return None;
-        }
-
-        Some(
-            readiness_line[PREFIX.len()..]
-            .parse::<bool>()
-            .expect("expected helper dumpable flag"),
-        )
+        std::env::temp_dir().join(format!(
+            "mistle-security-dumpability-{}-{timestamp}",
+            std::process::id(),
+        ))
     }
 }
