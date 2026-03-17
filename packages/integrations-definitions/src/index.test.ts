@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createIntegrationRegistry, listIntegrationDefinitions } from "./index.js";
 
 describe("integrations-definitions index", () => {
-  it("registers openai and github definitions in a registry", () => {
+  it("registers built-in integration definitions in a registry", () => {
     const registry = createIntegrationRegistry();
     const openAiDefinition = registry.getDefinition({
       familyId: "openai",
@@ -20,6 +20,10 @@ describe("integrations-definitions index", () => {
     const linearDefinition = registry.getDefinition({
       familyId: "linear",
       variantId: "linear-default",
+    });
+    const jiraDefinition = registry.getDefinition({
+      familyId: "jira",
+      variantId: "jira-default",
     });
 
     expect(openAiDefinition?.displayName).toBe("OpenAI");
@@ -54,17 +58,26 @@ describe("integrations-definitions index", () => {
       supportedAuthSchemes: ["api-key"],
     });
     expect(linearDefinition?.mcp).toBeDefined();
+    expect(jiraDefinition).toMatchObject({
+      familyId: "jira",
+      variantId: "jira-default",
+      kind: "connector",
+      displayName: "Jira",
+      supportedAuthSchemes: ["api-key"],
+    });
+    expect(jiraDefinition?.mcp).toBeDefined();
   });
 
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(4);
+    expect(definitions).toHaveLength(5);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
       "github::github-cloud",
       "github::github-enterprise-server",
+      "jira::jira-default",
       "linear::linear-default",
       "openai::openai-default",
     ]);

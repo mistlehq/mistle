@@ -66,6 +66,12 @@
       "secrets": {}
     },
     {
+      "targetKey": "jira-default",
+      "enabled": false,
+      "config": {},
+      "secrets": {}
+    },
+    {
       "targetKey": "github-cloud",
       "enabled": true,
       "config": {

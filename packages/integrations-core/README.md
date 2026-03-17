@@ -185,6 +185,7 @@ Current registry includes:
 - `openai::openai-default` (`kind: agent`)
 - `github::github-cloud` (`kind: git`)
 - `github::github-enterprise-server` (`kind: git`)
+- `jira::jira-default` (`kind: connector`)
 - `linear::linear-default` (`kind: connector`)
 
 ## Creating A New Integration
