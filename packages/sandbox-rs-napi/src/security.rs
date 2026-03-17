@@ -61,8 +61,7 @@ pub fn exec_runtime_as_user_impl(input: ExecRuntimeAsUserInput) -> Result<(), St
 
 fn set_supplementary_groups(gid: u32) -> Result<(), String> {
     let groups = [gid as nix::libc::gid_t];
-    let group_count = i32::try_from(groups.len())
-        .map_err(|_| "supplementary group count overflow".to_string())?;
+    let group_count = setgroups_count(groups.len())?;
     let result = unsafe { nix::libc::setgroups(group_count, groups.as_ptr()) };
     if result != 0 {
         return Err(format!(
@@ -72,6 +71,18 @@ fn set_supplementary_groups(gid: u32) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn setgroups_count(group_count: usize) -> Result<nix::libc::size_t, String> {
+    nix::libc::size_t::try_from(group_count)
+        .map_err(|_| "supplementary group count overflow".to_string())
+}
+
+#[cfg(not(target_os = "linux"))]
+fn setgroups_count(group_count: usize) -> Result<nix::libc::c_int, String> {
+    nix::libc::c_int::try_from(group_count)
+        .map_err(|_| "supplementary group count overflow".to_string())
 }
 
 fn build_exec_argv(
@@ -131,6 +142,9 @@ mod tests {
     use super::{
         ExecRuntimeAsUserInput, ProcessEnvironmentEntry, build_exec_environment,
     };
+
+    #[cfg(target_os = "linux")]
+    use super::set_current_process_non_dumpable_impl;
 
     #[test]
     fn rejects_invalid_environment_entry_name() {
