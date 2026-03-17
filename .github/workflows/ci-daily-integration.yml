@@ -103,7 +103,7 @@ jobs:
           identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
           project-slug: mistle-oss
           env-slug: ci
-          secret-path: /integration-tests
+          secret-path: /ci-shared
 
       - name: Post Slack notification
         run: |
