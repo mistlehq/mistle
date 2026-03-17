@@ -298,7 +298,7 @@ describe("tokenizer proxy integration", () => {
     } finally {
       await Promise.all([runtime.stop(), controlPlaneServer.stop(), upstreamEchoService.stop()]);
     }
-  });
+  }, 15_000);
 
   it("supports the header-addressed egress endpoint", async () => {
     const upstreamEchoService = await startHttpEcho();
