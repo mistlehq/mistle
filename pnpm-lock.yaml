@@ -538,12 +538,18 @@ importers:
       '@mistle/integrations-core':
         specifier: workspace:*
         version: link:../../packages/integrations-core
+      '@mistle/integrations-definitions':
+        specifier: workspace:*
+        version: link:../../packages/integrations-definitions
       '@mistle/sandbox-rs-napi':
         specifier: workspace:*
         version: link:../../packages/sandbox-rs-napi
       '@mistle/sandbox-session-protocol':
         specifier: workspace:*
         version: link:../../packages/sandbox-session-protocol
+      '@mistle/time':
+        specifier: workspace:*
+        version: link:../../packages/time
       undici:
         specifier: 7.24.4
         version: 7.24.4
@@ -762,6 +768,9 @@ importers:
       smol-toml:
         specifier: ^1.6.0
         version: 1.6.0
+      ws:
+        specifier: ^8.19.0
+        version: 8.19.0
       zod:
         specifier: ^4.3.6
         version: 4.3.6
@@ -778,9 +787,6 @@ importers:
       '@types/ws':
         specifier: ^8.18.1
         version: 8.18.1
-      ws:
-        specifier: ^8.18.3
-        version: 8.19.0
 
   packages/logging:
     dependencies:

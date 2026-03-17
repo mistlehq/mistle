@@ -1,6 +1,7 @@
 import { type CompileBindingInput, type CompileBindingResult } from "@mistle/integrations-core";
 import { stringify as stringifyToml } from "smol-toml";
 
+import { OpenAiAgentAdapterKeys } from "./adapter-keys.js";
 import { resolveOpenAiCredentialSecretType } from "./auth.js";
 import type { OpenAiApiKeyBindingConfig } from "./binding-config-schema.js";
 import type { OpenAiApiKeyTargetConfig } from "./target-config-schema.js";
@@ -13,7 +14,6 @@ export type OpenAiApiKeyCompileBindingInput = CompileBindingInput<
 const CodexCliArtifactKey = "codex-cli";
 const CodexAppServerProcessKey = "codex-app-server";
 const CodexAppServerEndpointKey = "app-server";
-const OpenAiCodexAdapterKey = "openai-codex";
 const CodexAppServerListenUrl = "ws://127.0.0.1:4500";
 const CodexGitHubRepository = "openai/codex";
 const CodexGitHubAssets = {
@@ -172,7 +172,7 @@ export function compileOpenAiApiKeyBinding(
         runtimeKey: CodexAppServerProcessKey,
         clientId: input.binding.config.runtime,
         endpointKey: CodexAppServerEndpointKey,
-        adapterKey: OpenAiCodexAdapterKey,
+        adapterKey: OpenAiAgentAdapterKeys.OPENAI_CODEX,
       },
     ],
   };

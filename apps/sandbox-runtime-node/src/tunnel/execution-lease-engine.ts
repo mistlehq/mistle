@@ -3,7 +3,7 @@ import type WebSocket from "ws";
 
 import { writeLeaseCreate, writeLeaseRenew } from "./messages.js";
 
-class ExecutionLeaseAlreadyTrackedError extends Error {
+export class ExecutionLeaseAlreadyTrackedError extends Error {
   constructor(leaseId: string) {
     super(`execution lease "${leaseId}" is already tracked`);
   }

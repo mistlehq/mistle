@@ -221,6 +221,7 @@ async function handleTunnelConnection(input: {
             streamId: connectRequest.streamId,
             agentRuntimes: input.agentRuntimes,
             runtimeClients: input.runtimeClients,
+            executionLeases: input.executionLeases,
             relayResultQueue,
           });
           if (relay !== undefined) {

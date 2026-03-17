@@ -51,6 +51,7 @@ describe("resolveAgentEndpoint", () => {
       runtimeKey: "codex-app-server",
       clientId: "client_openai",
       endpointKey: "app-server",
+      adapterKey: "openai-codex",
       connectionMode: "dedicated",
       transportUrl: "ws://127.0.0.1:4020/app-server",
     });
