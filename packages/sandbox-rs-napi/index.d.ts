@@ -4,6 +4,11 @@ export declare class NativePtySession {
   terminate(): Promise<number>;
 }
 
+export declare class NativeManagedProcess {
+  signal(signal: "sigterm" | "sigkill"): void;
+  hasExited(): boolean;
+}
+
 export interface GeneratedProxyCaResult {
   certificatePem: string;
   privateKeyPem: string;
@@ -47,6 +52,18 @@ export interface ExecRuntimeAsUserInput {
   env: ProcessEnvironmentEntry[];
 }
 
+export interface SpawnManagedProcessInput {
+  command: string;
+  args: string[];
+  cwd?: string;
+  env?: ProcessEnvironmentEntry[];
+}
+
+export interface ProcessExitResult {
+  exitCode?: number;
+  signal?: string;
+}
+
 export interface PtyEventResult {
   kind: string;
   data?: Uint8Array;
@@ -60,6 +77,10 @@ export declare function issueProxyLeafCertificate(
 ): IssuedProxyLeafCertificateResult;
 export declare function execRuntimeAsUser(input: ExecRuntimeAsUserInput): void;
 export declare function setCurrentProcessNonDumpable(): void;
+export declare function spawnManagedProcess(
+  input: SpawnManagedProcessInput,
+  onExit: (result: ProcessExitResult) => void,
+): NativeManagedProcess;
 export declare function spawnPty(
   input: SpawnPtyInput,
   onEvent: (event: PtyEventResult) => void,
