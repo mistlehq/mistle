@@ -225,6 +225,7 @@ mod tests {
     struct DumpabilityHelper {
         command: std::process::Child,
         stdin: std::process::ChildStdin,
+        stdout: std::io::BufReader<std::process::ChildStdout>,
         dumpable: bool,
     }
 
@@ -236,6 +237,7 @@ mod tests {
             self.stdin
                 .write_all(b"\n")
                 .expect("expected helper stdin write to succeed");
+            drop(self.stdout);
             let status = self
                 .command
                 .wait()
@@ -264,12 +266,14 @@ mod tests {
 
         let stdout = child.stdout.take().expect("expected helper stdout");
         let stdin = child.stdin.take().expect("expected helper stdin");
-        let mut reader = std::io::BufReader::new(stdout);
-        let dumpable = read_helper_dumpable(&mut reader).expect("expected helper readiness line");
+        let mut stdout_reader = std::io::BufReader::new(stdout);
+        let dumpable =
+            read_helper_dumpable(&mut stdout_reader).expect("expected helper readiness line");
 
         DumpabilityHelper {
             command: child,
             stdin,
+            stdout: stdout_reader,
             dumpable,
         }
     }
