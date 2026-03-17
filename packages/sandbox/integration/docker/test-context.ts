@@ -39,6 +39,12 @@ type RegistryFixture = {
   registryAuthority: string;
 };
 
+type DockerRegistryAuthConfig = {
+  password: string;
+  serveraddress: string;
+  username: string;
+};
+
 export type DockerAdapterIntegrationFixture = {
   adapter: SandboxAdapter;
   baseImage: SandboxImageHandle;
@@ -129,7 +135,9 @@ async function publishBaseImage(input: {
   });
 
   const taggedImage = input.dockerClient.getImage(taggedBaseImageReference);
-  const pushStream = await taggedImage.push({});
+  const pushStream = await taggedImage.push({
+    authconfig: createRegistryAuthConfig(input.registryAuthority),
+  });
   await consumeProgressStream(pushStream);
 
   return createBaseImageHandle(taggedBaseImageReference);
@@ -151,7 +159,9 @@ async function publishStartupStdinProbeImage(input: {
   });
 
   const taggedImage = input.dockerClient.getImage(taggedImageReference);
-  const pushStream = await taggedImage.push({});
+  const pushStream = await taggedImage.push({
+    authconfig: createRegistryAuthConfig(input.registryAuthority),
+  });
   await consumeProgressStream(pushStream);
 
   return createBaseImageHandle(taggedImageReference);
@@ -175,6 +185,15 @@ async function startRegistry(): Promise<RegistryFixture> {
 async function pullImage(dockerClient: Docker, imageReference: string): Promise<void> {
   const pullStream = await dockerClient.pull(imageReference, {});
   await consumeProgressStream(pullStream);
+}
+
+function createRegistryAuthConfig(registryAuthority: string): DockerRegistryAuthConfig {
+  // GitHub-hosted runners reject registry pushes that omit a valid auth header.
+  return {
+    username: "mistle",
+    password: "mistle",
+    serveraddress: registryAuthority,
+  };
 }
 
 function chunkToUtf8String(chunk: unknown): string {
