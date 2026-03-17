@@ -54,13 +54,13 @@
     "@octokit/webhooks-methods": "^6.0.0",
     "octokit": "^5.0.5",
     "smol-toml": "^1.6.0",
+    "ws": "^8.19.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@octokit/webhooks-examples": "^7.6.1",
     "@octokit/webhooks-types": "^7.6.1",
-    "@types/ws": "^8.18.1",
-    "ws": "^8.18.3"
+    "@types/ws": "^8.18.1"
   }
 }

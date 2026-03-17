@@ -124,8 +124,8 @@ export function sendWebSocketMessage(
     socket.send(
       message.payload,
       { binary: message.kind === "binary" },
-      (error: Error | undefined) => {
-        if (error === undefined) {
+      (error: Error | null | undefined) => {
+        if (error == null) {
           resolve();
           return;
         }
