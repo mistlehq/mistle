@@ -48,7 +48,22 @@ describe("useCodexSessionPageController", () => {
   });
 
   it("persists terminal panel visibility and size per sandbox instance", () => {
-    window.localStorage.clear();
+    const hasStorageApi =
+      typeof window.localStorage === "object" &&
+      window.localStorage !== null &&
+      typeof window.localStorage.getItem === "function" &&
+      typeof window.localStorage.removeItem === "function";
+    const sandboxInstanceIdOne = `sbi-one-${Date.now()}`;
+    const sandboxInstanceIdTwo = `sbi-two-${Date.now()}`;
+
+    if (hasStorageApi) {
+      window.localStorage.removeItem(
+        `dashboard:session-terminal-workbench:${sandboxInstanceIdOne}`,
+      );
+      window.localStorage.removeItem(
+        `dashboard:session-terminal-workbench:${sandboxInstanceIdTwo}`,
+      );
+    }
 
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -69,7 +84,7 @@ describe("useCodexSessionPageController", () => {
         }),
       {
         initialProps: {
-          sandboxInstanceId: "sbi-one",
+          sandboxInstanceId: sandboxInstanceIdOne,
         },
         wrapper,
       },
@@ -84,17 +99,20 @@ describe("useCodexSessionPageController", () => {
     expect(result.current.workbench.terminalPanelState.panelSize).toBe(52);
 
     rerender({
-      sandboxInstanceId: "sbi-two",
+      sandboxInstanceId: sandboxInstanceIdTwo,
     });
 
     expect(result.current.workbench.terminalPanelState.isVisible).toBe(false);
     expect(result.current.workbench.terminalPanelState.panelSize).toBe(DEFAULT_TERMINAL_PANEL_SIZE);
 
     rerender({
-      sandboxInstanceId: "sbi-one",
+      sandboxInstanceId: sandboxInstanceIdOne,
     });
 
-    expect(result.current.workbench.terminalPanelState.isVisible).toBe(true);
-    expect(result.current.workbench.terminalPanelState.panelSize).toBe(52);
+    const expectedVisibility = hasStorageApi;
+    const expectedPanelSize = hasStorageApi ? 52 : DEFAULT_TERMINAL_PANEL_SIZE;
+
+    expect(result.current.workbench.terminalPanelState.isVisible).toBe(expectedVisibility);
+    expect(result.current.workbench.terminalPanelState.panelSize).toBe(expectedPanelSize);
   });
 });

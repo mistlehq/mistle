@@ -38,19 +38,44 @@ function normalizePanelSize(size: number): number {
   return Math.min(75, Math.max(20, size));
 }
 
+function getBrowserStorage(): Pick<Storage, "getItem" | "removeItem" | "setItem"> | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const storage = window.localStorage;
+  if (
+    typeof storage !== "object" ||
+    storage === null ||
+    typeof storage.getItem !== "function" ||
+    typeof storage.setItem !== "function" ||
+    typeof storage.removeItem !== "function"
+  ) {
+    return null;
+  }
+
+  return storage;
+}
+
 function readPersistedTerminalWorkbenchState(
   sandboxInstanceId: string | null,
 ): PersistedTerminalWorkbenchState {
-  if (sandboxInstanceId === null || typeof window === "undefined") {
+  if (sandboxInstanceId === null) {
     return {
       isVisible: false,
       panelSize: DEFAULT_TERMINAL_PANEL_SIZE,
     };
   }
 
-  const storedValue = window.localStorage.getItem(
-    getTerminalWorkbenchStorageKey(sandboxInstanceId),
-  );
+  const storage = getBrowserStorage();
+  if (storage === null) {
+    return {
+      isVisible: false,
+      panelSize: DEFAULT_TERMINAL_PANEL_SIZE,
+    };
+  }
+
+  const storedValue = storage.getItem(getTerminalWorkbenchStorageKey(sandboxInstanceId));
   if (storedValue === null) {
     return {
       isVisible: false,
@@ -93,14 +118,16 @@ export function useSessionTerminalWorkbenchState(input: {
   }, [input.sandboxInstanceId]);
 
   useEffect(() => {
-    if (input.sandboxInstanceId === null || typeof window === "undefined") {
+    if (input.sandboxInstanceId === null) {
       return;
     }
 
-    window.localStorage.setItem(
-      getTerminalWorkbenchStorageKey(input.sandboxInstanceId),
-      JSON.stringify(state),
-    );
+    const storage = getBrowserStorage();
+    if (storage === null) {
+      return;
+    }
+
+    storage.setItem(getTerminalWorkbenchStorageKey(input.sandboxInstanceId), JSON.stringify(state));
   }, [input.sandboxInstanceId, state]);
 
   const openPanel = useCallback((): void => {

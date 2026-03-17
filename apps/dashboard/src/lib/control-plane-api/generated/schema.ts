@@ -1635,6 +1635,19 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
+        /** @description Immediate integration-defined webhook response. Status code, headers, content type, and body are integration-specific and may include empty responses. */
+        "2XX": {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "*/*":
+              | string
+              | {
+                  [key: string]: unknown;
+                };
+          };
+        };
         /** @description Webhook event accepted for processing. */
         202: {
           headers: {
@@ -1646,6 +1659,13 @@ export interface paths {
               status: "received" | "duplicate";
             };
           };
+        };
+        /** @description Immediate integration-defined webhook response with no body. */
+        204: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
         };
         /** @description Invalid webhook request. */
         400: {
