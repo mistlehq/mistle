@@ -1,9 +1,10 @@
 import { readFile } from "node:fs/promises";
+import { extname } from "node:path";
 
 import { generateProxyCa } from "@mistle/sandbox-rs-napi";
 
-import { runRuntime } from "../runtime/run.js";
 import { loadBootstrapConfig } from "./config.js";
+import { buildRuntimeExecInput, execRuntime } from "./exec-runtime.js";
 import { installProxyCaCertificate, prepareProxyCaRuntimeEnv } from "./proxy-ca.js";
 
 type PasswdUserRecord = {
@@ -17,12 +18,9 @@ type LookupEnv = (key: string) => string | undefined;
 
 type RunBootstrapInput = {
   lookupEnv: LookupEnv;
-  stdin: NodeJS.ReadableStream;
+  processArgv: readonly string[];
+  bootstrapEntrypointPath: string;
 };
-
-const HomeEnv = "HOME";
-const LognameEnv = "LOGNAME";
-const UserEnv = "USER";
 
 function parsePasswdUserRecord(line: string): PasswdUserRecord | undefined {
   const parts = line.split(":");
@@ -67,32 +65,16 @@ async function resolveSandboxUser(username: string): Promise<PasswdUserRecord> {
   throw new Error(`failed to resolve sandbox user "${username}"`);
 }
 
-function applyRuntimeEnvironment(userRecord: PasswdUserRecord): void {
-  delete process.env[HomeEnv];
-  delete process.env[LognameEnv];
-  delete process.env[UserEnv];
-
-  process.env[HomeEnv] = userRecord.homeDir;
-  process.env[LognameEnv] = userRecord.username;
-  process.env[UserEnv] = userRecord.username;
-}
-
-function dropPrivileges(userRecord: PasswdUserRecord): void {
-  if (
-    typeof process.setgroups !== "function" ||
-    typeof process.setgid !== "function" ||
-    typeof process.setuid !== "function"
-  ) {
-    throw new Error("sandbox bootstrap requires posix privilege controls");
+function resolveRuntimeEntrypointPath(bootstrapEntrypointPath: string): string {
+  const extension = extname(bootstrapEntrypointPath);
+  const bootstrapSuffix = `/bootstrap/main${extension}`;
+  if (!bootstrapEntrypointPath.endsWith(bootstrapSuffix)) {
+    throw new Error(
+      `unexpected bootstrap entrypoint path "${bootstrapEntrypointPath}": expected suffix "${bootstrapSuffix}"`,
+    );
   }
 
-  process.setgroups([userRecord.gid]);
-  process.setgid(userRecord.gid);
-  process.setuid(userRecord.uid);
-}
-
-function lookupProcessEnv(key: string): string | undefined {
-  return process.env[key];
+  return `${bootstrapEntrypointPath.slice(0, -bootstrapSuffix.length)}/main${extension}`;
 }
 
 export async function runBootstrap(input: RunBootstrapInput): Promise<void> {
@@ -110,17 +92,16 @@ export async function runBootstrap(input: RunBootstrapInput): Promise<void> {
       throw new Error(`sandbox user "${sandboxUser.username}" must not resolve to uid 0`);
     }
 
-    for (const [envName, envValue] of Object.entries(proxyCaRuntimeEnv.env)) {
-      process.env[envName] = envValue;
-    }
-
-    applyRuntimeEnvironment(sandboxUser);
-    dropPrivileges(sandboxUser);
-
-    await runRuntime({
-      lookupEnv: lookupProcessEnv,
-      stdin: input.stdin,
+    const runtimeExecInput = buildRuntimeExecInput({
+      processEnv: process.env,
+      processArgv: input.processArgv,
+      bootstrapEntrypointPath: input.bootstrapEntrypointPath,
+      runtimeEntrypointPath: resolveRuntimeEntrypointPath(input.bootstrapEntrypointPath),
+      userRecord: sandboxUser,
+      additionalEnv: proxyCaRuntimeEnv.env,
     });
+
+    execRuntime(runtimeExecInput);
   } finally {
     proxyCaRuntimeEnv.cleanup();
   }
