@@ -11,7 +11,7 @@
     "start:bootstrap": "pnpm run build:native && node dist/bootstrap/main.js",
     "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
     "typecheck": "tsgo --noEmit",
-    "test": "vitest run -c vitest.config.ts --passWithNoTests",
+    "test": "pnpm run build:native && vitest run -c vitest.config.ts --passWithNoTests",
     "test:integration": "pnpm run build:native && vitest run -c vitest.integration.config.ts --passWithNoTests",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
@@ -20,7 +20,6 @@
     "@mistle/integrations-core": "workspace:*",
     "@mistle/sandbox-rs-napi": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
-    "node-pty": "^1.1.0",
     "undici": "7.24.4",
     "ws": "^8.19.0"
   },

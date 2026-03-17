@@ -33,7 +33,7 @@ import {
   writeStreamReset,
   writeStreamWindow,
 } from "./messages.js";
-import { PtySession, startPtySession } from "./pty-session.js";
+import { PtySession, PtySessionOutputClosedError, startPtySession } from "./pty-session.js";
 import { StreamSendWindow } from "./stream-window.js";
 
 async function handlePtyControlMessage(input: {
@@ -141,20 +141,35 @@ async function relayPtySession(input: {
     [input.primaryStreamId, new StreamSendWindow()],
   ]);
   const exitPromise = input.session.waitForExit();
+  let pendingExitCode: number | undefined;
 
   while (!input.signal.aborted) {
     const nextMessage = input.messages.next(input.signal).then((message) => ({
       source: "message" as const,
       message,
     }));
-    const nextOutput = input.session.nextOutput(input.signal).then((output) => ({
-      source: "output" as const,
-      output,
-    }));
-    const nextExit = exitPromise.then((exitCode) => ({
-      source: "exit" as const,
-      exitCode,
-    }));
+    const nextOutput = input.session
+      .nextOutput(input.signal)
+      .then((output) => ({
+        source: "output" as const,
+        output,
+      }))
+      .catch((error: unknown) => {
+        if (error instanceof PtySessionOutputClosedError) {
+          return {
+            source: "output-closed" as const,
+          };
+        }
+
+        throw error;
+      });
+    const nextExit =
+      pendingExitCode === undefined
+        ? exitPromise.then((exitCode) => ({
+            source: "exit" as const,
+            exitCode,
+          }))
+        : new Promise<never>(() => undefined);
 
     const event = await Promise.race([nextMessage, nextOutput, nextExit]);
 
@@ -189,14 +204,20 @@ async function relayPtySession(input: {
       continue;
     }
 
-    if (event.source === "exit") {
+    if (event.source === "output-closed") {
+      const exitCode = pendingExitCode ?? (await exitPromise);
       for (const attachedStreamId of attachedStreamIds) {
         await writeStreamEvent(
           input.tunnelSocket,
-          createPtyExitEventMessage(attachedStreamId, event.exitCode),
+          createPtyExitEventMessage(attachedStreamId, exitCode),
         );
       }
       return undefined;
+    }
+
+    if (event.source === "exit") {
+      pendingExitCode = event.exitCode;
+      continue;
     }
 
     const message = event.message;

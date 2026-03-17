@@ -6,5 +6,4 @@ packages:
 onlyBuiltDependencies:
   - esbuild
   - lefthook
-  - node-pty
   - squawk-cli
