@@ -85,27 +85,27 @@ Kinds are used on bindings and definitions to enforce compatibility (`binding.ki
 
 Key fields and what they drive:
 
-| Field                                   | Purpose                                          | Where it is used                          |
-| --------------------------------------- | ------------------------------------------------ | ----------------------------------------- |
-| `familyId`, `variantId`                 | Global identity of a provider variant            | Registry lookup, target records           |
-| `kind`                                  | Integration kind (`agent` / `git` / `connector`) | Binding validation during compile         |
-| `displayName`, `description`, `logoKey` | UI metadata                                      | Target discovery responses                |
-| `targetConfigSchema`                    | Parse/validate target config                     | target list/use, OAuth, compile, webhooks |
-| `targetConfigForm` (optional)           | Rendering metadata for target config             | Operator-facing target config forms       |
-| `targetSecretSchema`                    | Parse/validate decrypted target secrets          | OAuth, compile, webhooks                  |
-| `targetSecretForm` (optional)           | Rendering metadata for target secrets            | Operator-facing target secret forms       |
-| `bindingConfigSchema`                   | Parse/validate per-binding config                | Runtime plan compile                      |
-| `bindingConfigForm` (optional)          | Rendering metadata for per-binding config        | Dashboard binding editor                  |
-| `connectionConfigSchema`                | Parse/validate per-connection config             | Binding write validation, compile         |
-| `connectionConfigForm` (optional)       | Rendering metadata for per-connection config     | Connection-related forms                  |
-| `supportedAuthSchemes`                  | Declares allowed auth methods                    | Connection creation and OAuth gating      |
-| `credentialResolvers` (optional)        | Dynamic credential generation/lookup             | Internal credential resolution endpoint   |
-| `authHandlers.oauth` (optional)         | OAuth start/complete behavior                    | OAuth connection flows                    |
-| `webhookHandler` (optional)             | Verify + parse inbound webhooks                  | Webhook ingest                            |
-| `mcp` (optional)                        | Declare one or more MCP servers for this binding | MCP collection during compile             |
-| `mcpConfig` (optional)                  | Declarative MCP config target for an agent       | Post-compile MCP file update              |
-| `validateBindingWriteContext(...)`      | Contextual target/connection/binding validation  | Binding write and compile parity checks   |
-| `compileBinding(...)`                   | Generate egress/artifacts/runtime clients        | Runtime plan compiler                     |
+| Field                                   | Purpose                                                           | Where it is used                          |
+| --------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------- |
+| `familyId`, `variantId`                 | Global identity of a provider variant                             | Registry lookup, target records           |
+| `kind`                                  | Integration kind (`agent` / `git` / `connector`)                  | Binding validation during compile         |
+| `displayName`, `description`, `logoKey` | UI metadata                                                       | Target discovery responses                |
+| `targetConfigSchema`                    | Parse/validate target config                                      | target list/use, OAuth, compile, webhooks |
+| `targetConfigForm` (optional)           | Rendering metadata for target config                              | Operator-facing target config forms       |
+| `targetSecretSchema`                    | Parse/validate decrypted target secrets                           | OAuth, compile, webhooks                  |
+| `targetSecretForm` (optional)           | Rendering metadata for target secrets                             | Operator-facing target secret forms       |
+| `bindingConfigSchema`                   | Parse/validate per-binding config                                 | Runtime plan compile                      |
+| `bindingConfigForm` (optional)          | Rendering metadata for per-binding config                         | Dashboard binding editor                  |
+| `connectionConfigSchema`                | Parse/validate per-connection config                              | Binding write validation, compile         |
+| `connectionConfigForm` (optional)       | Rendering metadata for per-connection config                      | Connection-related forms                  |
+| `supportedAuthSchemes`                  | Declares allowed auth methods                                     | Connection creation and OAuth gating      |
+| `credentialResolvers` (optional)        | Dynamic credential generation/lookup                              | Internal credential resolution endpoint   |
+| `authHandlers.oauth` (optional)         | OAuth start/complete behavior                                     | OAuth connection flows                    |
+| `webhookHandler` (optional)             | Resolve inbound webhook requests to events or immediate responses | Webhook ingest                            |
+| `mcp` (optional)                        | Declare one or more MCP servers for this binding                  | MCP collection during compile             |
+| `mcpConfig` (optional)                  | Declarative MCP config target for an agent                        | Post-compile MCP file update              |
+| `validateBindingWriteContext(...)`      | Contextual target/connection/binding validation                   | Binding write and compile parity checks   |
+| `compileBinding(...)`                   | Generate egress/artifacts/runtime clients                         | Runtime plan compiler                     |
 
 ## Lifecycle End-To-End
 
@@ -175,8 +175,9 @@ flowchart TD
 ### 6) Webhooks
 
 - Webhook ingest resolves definition webhook handler.
-- Handler parses event + verifies signature (with target and connection secrets).
-- Normalized event is persisted and handed to workflow processing.
+- Handler first resolves the inbound request into either an immediate HTTP response or a normalized event.
+- Immediate HTTP response: returned directly and bypasses connection resolution, persistence, and workflow processing.
+- Normalized event: continues through connection resolution and verification (with target and connection secrets), then is persisted and handed to workflow processing.
 
 ## Built-In Integrations
 
@@ -241,8 +242,11 @@ This is the recommended workflow.
 
 8. Add webhook support if provider emits events.
 
-- Implement `webhookHandler.parse`, `webhookHandler.resolveConnection`, and `webhookHandler.verify`.
-- Keep connection resolution explicit and deterministic from parsed event payload + candidate connections.
+- Implement `webhookHandler.resolveWebhookRequest`, `webhookHandler.resolveConnection`, and `webhookHandler.verify`.
+- `resolveWebhookRequest` should return either an immediate response or a normalized event.
+- `{ kind: "response", response }`: for protocol-level requests that must be answered immediately.
+- `{ kind: "event", event }`: for requests that should continue through the durable ingest path.
+- Keep connection resolution explicit and deterministic from the normalized event payload + candidate connections.
 
 9. Register the definition.
 

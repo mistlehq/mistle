@@ -195,6 +195,32 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
   GitHubTargetSecrets,
   Record<string, string>
 > = {
+  resolveWebhookRequest(input) {
+    const payload = parseJsonPayload(input.rawBody);
+    const providerEventType = resolveProviderEventType(input.headers);
+    const action = resolveAction(payload);
+    const deliveryId = resolveDeliveryId(input.headers);
+    resolveInstallationId(payload);
+    const ordering = resolveCommentOrdering(payload);
+
+    return {
+      kind: "event",
+      event: {
+        externalEventId: deliveryId,
+        externalDeliveryId: deliveryId,
+        providerEventType,
+        eventType: resolveEventType({
+          providerEventType,
+          action,
+        }),
+        payload,
+        ...(ordering.occurredAt === undefined ? {} : { occurredAt: ordering.occurredAt }),
+        ...(ordering.sourceOrderKey === undefined
+          ? {}
+          : { sourceOrderKey: ordering.sourceOrderKey }),
+      },
+    };
+  },
   resolveConnection(input): IntegrationWebhookResolveConnectionResult {
     const installationId = resolveInstallationId(input.event.payload);
     const matchingCandidates = input.candidates.filter(
@@ -266,26 +292,5 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
         message: "GitHub webhook signature verification failed.",
       };
     }
-  },
-  parse(input) {
-    const payload = parseJsonPayload(input.rawBody);
-    const providerEventType = resolveProviderEventType(input.headers);
-    const action = resolveAction(payload);
-    const deliveryId = resolveDeliveryId(input.headers);
-    resolveInstallationId(payload);
-    const ordering = resolveCommentOrdering(payload);
-
-    return {
-      externalEventId: deliveryId,
-      externalDeliveryId: deliveryId,
-      providerEventType,
-      eventType: resolveEventType({
-        providerEventType,
-        action,
-      }),
-      payload,
-      ...(ordering.occurredAt === undefined ? {} : { occurredAt: ordering.occurredAt }),
-      ...(ordering.sourceOrderKey === undefined ? {} : { sourceOrderKey: ordering.sourceOrderKey }),
-    };
   },
 };

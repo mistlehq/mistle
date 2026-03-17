@@ -3165,6 +3165,9 @@
               }
             }
           },
+          "204": {
+            "description": "Immediate integration-defined webhook response with no body."
+          },
           "400": {
             "description": "Invalid webhook request.",
             "content": {
@@ -3216,6 +3219,24 @@
                 "schema": {
                   "type": "string",
                   "minLength": 1
+                }
+              }
+            }
+          },
+          "2XX": {
+            "description": "Immediate integration-defined webhook response. Status code, headers, content type, and body are integration-specific and may include empty responses.",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  ]
                 }
               }
             }

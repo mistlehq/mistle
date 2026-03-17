@@ -479,7 +479,14 @@ export type IntegrationWebhookResolvedEvent = {
   connectionId: string;
 };
 
-export type IntegrationWebhookParseInput<
+export type IntegrationWebhookImmediateResponse = {
+  status: number;
+  headers?: Readonly<Record<string, string>>;
+  contentType?: string;
+  body?: string | Record<string, unknown>;
+};
+
+export type IntegrationWebhookRequestInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
 > = {
@@ -499,20 +506,39 @@ export type IntegrationWebhookEvent = {
   sourceOrderKey?: string;
 };
 
+export type IntegrationWebhookRequestResolution =
+  | {
+      kind: "event";
+      event: IntegrationWebhookEvent;
+    }
+  | {
+      kind: "response";
+      response: IntegrationWebhookImmediateResponse;
+    };
+
+export type IntegrationWebhookResolvedRequest =
+  | ({
+      kind: "event";
+    } & IntegrationWebhookResolvedEvent)
+  | {
+      kind: "response";
+      response: IntegrationWebhookImmediateResponse;
+    };
+
 export type IntegrationWebhookHandler<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TConnectionSecrets = Record<string, string>,
 > = {
+  resolveWebhookRequest(
+    input: IntegrationWebhookRequestInput<TTargetConfig, TTargetSecrets>,
+  ): MaybePromise<IntegrationWebhookRequestResolution>;
   resolveConnection(
     input: IntegrationWebhookResolveConnectionInput<TTargetConfig, TTargetSecrets>,
   ): MaybePromise<IntegrationWebhookResolveConnectionResult>;
   verify(
     input: IntegrationWebhookVerifyInput<TTargetConfig, TTargetSecrets, TConnectionSecrets>,
   ): MaybePromise<IntegrationWebhookVerifyResult>;
-  parse(
-    input: IntegrationWebhookParseInput<TTargetConfig, TTargetSecrets>,
-  ): MaybePromise<IntegrationWebhookEvent>;
 };
 
 export type EgressCredentialResolverRef = {

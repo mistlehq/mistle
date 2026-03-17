@@ -10,7 +10,7 @@ import type {
   IntegrationWebhookHandler,
   IntegrationWebhookHeaders,
   IntegrationWebhookResolveConnectionFailureCode,
-  IntegrationWebhookResolvedEvent,
+  IntegrationWebhookResolvedRequest,
 } from "../types/index.js";
 
 export type NormalizeWebhookHeadersInput = Readonly<Record<string, string | string[] | undefined>>;
@@ -100,7 +100,7 @@ function getWebhookConnectionResolutionErrorCode(
   return WebhookErrorCodes.WEBHOOK_CONNECTION_RESOLUTION_FAILED;
 }
 
-export type VerifyAndParseWebhookInput<
+export type VerifyAndResolveWebhookRequestInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TConnectionSecrets = Record<string, string>,
@@ -119,21 +119,27 @@ export type VerifyAndParseWebhookInput<
   rawBody: Uint8Array;
 };
 
-export async function verifyAndParseWebhookOrThrow<
+export async function verifyAndResolveWebhookRequestOrThrow<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
   TConnectionSecrets = Record<string, string>,
 >(
-  input: VerifyAndParseWebhookInput<TTargetConfig, TTargetSecrets, TConnectionSecrets>,
-): Promise<IntegrationWebhookResolvedEvent> {
+  input: VerifyAndResolveWebhookRequestInput<TTargetConfig, TTargetSecrets, TConnectionSecrets>,
+): Promise<IntegrationWebhookResolvedRequest> {
   const webhookHandler = getWebhookHandlerOrThrow(input.definition);
 
-  const webhookEvent = await webhookHandler.parse({
+  const webhookRequest = await webhookHandler.resolveWebhookRequest({
     targetKey: input.targetKey,
     target: input.target,
     headers: input.headers,
     rawBody: input.rawBody,
   });
+
+  if (webhookRequest.kind === "response") {
+    return webhookRequest;
+  }
+
+  const webhookEvent = webhookRequest.event;
 
   const resolvedConnection = await webhookHandler.resolveConnection({
     targetKey: input.targetKey,
@@ -184,6 +190,7 @@ export async function verifyAndParseWebhookOrThrow<
   }
 
   return {
+    kind: "event",
     event: webhookEvent,
     connectionId: connection.id,
   };

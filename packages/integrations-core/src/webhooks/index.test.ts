@@ -5,7 +5,7 @@ import type { IntegrationConnection, IntegrationWebhookHandler } from "../types/
 import {
   getWebhookHandlerOrThrow,
   normalizeWebhookHeaders,
-  verifyAndParseWebhookOrThrow,
+  verifyAndResolveWebhookRequestOrThrow,
 } from "./index.js";
 
 const CandidateConnection: IntegrationConnection = {
@@ -21,23 +21,46 @@ function createWebhookHandler(input?: {
     | { ok: false; code: "connection-not-found" | "connection-ambiguous"; message: string };
   verifyResult?: { ok: true } | { ok: false; code: "invalid-signature"; message: string };
   eventType?: string;
+  resolveWebhookRequestResult?:
+    | {
+        kind: "event";
+        event: {
+          externalEventId: string;
+          externalDeliveryId: string;
+          providerEventType: string;
+          eventType: string;
+          payload: Record<string, unknown>;
+        };
+      }
+    | {
+        kind: "response";
+        response: {
+          status: number;
+          contentType?: string;
+          body?: string | Record<string, unknown>;
+        };
+      };
 }): IntegrationWebhookHandler {
   return {
+    resolveWebhookRequest: () =>
+      input?.resolveWebhookRequestResult ?? {
+        kind: "event",
+        event: {
+          externalEventId: "evt_123",
+          externalDeliveryId: "delivery_123",
+          providerEventType: "issue_comment",
+          eventType: input?.eventType ?? "github.issue_comment.created",
+          payload: {
+            hello: "world",
+          },
+        },
+      },
     resolveConnection: () =>
       input?.resolveConnectionResult ?? {
         ok: true,
         connectionId: CandidateConnection.id,
       },
     verify: () => input?.verifyResult ?? { ok: true },
-    parse: () => ({
-      externalEventId: "evt_123",
-      externalDeliveryId: "delivery_123",
-      providerEventType: "issue_comment",
-      eventType: input?.eventType ?? "github.issue_comment.created",
-      payload: {
-        hello: "world",
-      },
-    }),
   };
 }
 
@@ -89,8 +112,8 @@ describe("webhook helpers", () => {
     }
   });
 
-  it("parses, resolves connection, and verifies webhook events", async () => {
-    const resolvedWebhook = await verifyAndParseWebhookOrThrow({
+  it("resolves, verifies, and returns webhook events", async () => {
+    const resolvedWebhook = await verifyAndResolveWebhookRequestOrThrow({
       definition: {
         familyId: "github",
         variantId: "github-cloud",
@@ -112,13 +135,18 @@ describe("webhook helpers", () => {
       rawBody: new TextEncoder().encode('{"ok":true}'),
     });
 
-    expect(resolvedWebhook.event.eventType).toBe("github.issue_comment.created");
-    expect(resolvedWebhook.connectionId).toBe(CandidateConnection.id);
+    expect(resolvedWebhook).toMatchObject({
+      kind: "event",
+      event: {
+        eventType: "github.issue_comment.created",
+      },
+      connectionId: CandidateConnection.id,
+    });
   });
 
   it("throws when webhook verification fails", async () => {
     await expect(
-      verifyAndParseWebhookOrThrow({
+      verifyAndResolveWebhookRequestOrThrow({
         definition: {
           familyId: "github",
           variantId: "github-cloud",
@@ -148,7 +176,7 @@ describe("webhook helpers", () => {
 
   it("maps missing connection resolution to webhook connection-not-found error", async () => {
     await expect(
-      verifyAndParseWebhookOrThrow({
+      verifyAndResolveWebhookRequestOrThrow({
         definition: {
           familyId: "github",
           variantId: "github-cloud",
@@ -180,7 +208,7 @@ describe("webhook helpers", () => {
 
   it("maps ambiguous connection resolution to webhook connection-ambiguous error", async () => {
     await expect(
-      verifyAndParseWebhookOrThrow({
+      verifyAndResolveWebhookRequestOrThrow({
         definition: {
           familyId: "github",
           variantId: "github-cloud",
@@ -212,7 +240,7 @@ describe("webhook helpers", () => {
 
   it("fails when resolver returns a connection id that is not in candidates", async () => {
     await expect(
-      verifyAndParseWebhookOrThrow({
+      verifyAndResolveWebhookRequestOrThrow({
         definition: {
           familyId: "github",
           variantId: "github-cloud",
@@ -247,11 +275,21 @@ describe("webhook helpers", () => {
     let verifyEventType: string | undefined;
     let verifyConnectionSecrets: Record<string, string> | undefined;
 
-    await verifyAndParseWebhookOrThrow({
+    await verifyAndResolveWebhookRequestOrThrow({
       definition: {
         familyId: "github",
         variantId: "github-cloud",
         webhookHandler: {
+          resolveWebhookRequest: () => ({
+            kind: "event",
+            event: {
+              externalEventId: "evt_123",
+              externalDeliveryId: "delivery_123",
+              providerEventType: "issue_comment",
+              eventType: "github.issue_comment.created",
+              payload: {},
+            },
+          }),
           resolveConnection: () => ({
             ok: true,
             connectionId: CandidateConnection.id,
@@ -262,13 +300,6 @@ describe("webhook helpers", () => {
             verifyConnectionSecrets = input.connectionSecrets;
             return { ok: true };
           },
-          parse: () => ({
-            externalEventId: "evt_123",
-            externalDeliveryId: "delivery_123",
-            providerEventType: "issue_comment",
-            eventType: "github.issue_comment.created",
-            payload: {},
-          }),
         },
       },
       targetKey: "github_cloud",
@@ -295,6 +326,48 @@ describe("webhook helpers", () => {
     expect(verifyEventType).toBe("github.issue_comment.created");
     expect(verifyConnectionSecrets).toEqual({
       webhook_secret: "whsec_123",
+    });
+  });
+
+  it("short-circuits with an immediate response", async () => {
+    const resolvedWebhook = await verifyAndResolveWebhookRequestOrThrow({
+      definition: {
+        familyId: "slack",
+        variantId: "slack-default",
+        webhookHandler: createWebhookHandler({
+          resolveWebhookRequestResult: {
+            kind: "response",
+            response: {
+              status: 200,
+              contentType: "text/plain",
+              body: "challenge-value",
+            },
+          },
+        }),
+      },
+      targetKey: "slack_default",
+      target: {
+        familyId: "slack",
+        variantId: "slack-default",
+        enabled: true,
+        config: {},
+        secrets: {},
+      },
+      connections: [CandidateConnection],
+      resolveConnectionSecrets: () => {
+        throw new Error("resolveConnectionSecrets should not be called for immediate responses");
+      },
+      headers: {},
+      rawBody: new Uint8Array(),
+    });
+
+    expect(resolvedWebhook).toEqual({
+      kind: "response",
+      response: {
+        status: 200,
+        contentType: "text/plain",
+        body: "challenge-value",
+      },
     });
   });
 });
