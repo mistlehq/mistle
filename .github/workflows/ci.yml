@@ -146,7 +146,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      pull-requests: read
     env:
+      GITHUB_TOKEN: ${{ github.token }}
       STATIC_RESULT: ${{ needs.static.result }}
       TEST_RESULT: ${{ needs.test.result }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -167,6 +169,7 @@ jobs:
           python3 <<'PY'
           import json
           import os
+          import urllib.error
           import urllib.request
 
           static_result = os.environ["STATIC_RESULT"]
@@ -190,13 +193,40 @@ jobs:
           }
           color = color_by_result.get(workflow_result, "#808080")
           emoji = emoji_by_result.get(workflow_result, ":grey_question:")
+          pr_field = None
+          pr_text = f"`{os.environ['GITHUB_SHA'][:7]}`"
+          api_request = urllib.request.Request(
+              f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/commits/{os.environ['GITHUB_SHA']}/pulls",
+              headers={
+                  "Accept": "application/vnd.github+json",
+                  "Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}",
+                  "X-GitHub-Api-Version": "2022-11-28",
+              },
+              method="GET",
+          )
+          try:
+              with urllib.request.urlopen(api_request) as response:
+                  pull_requests = json.load(response)
+          except urllib.error.HTTPError:
+              pull_requests = []
+
+          if pull_requests:
+              pull_request = pull_requests[0]
+              pr_text = f"<{pull_request['html_url']}|#{pull_request['number']} {pull_request['title']}>"
+              pr_field = {
+                  "title": "PR",
+                  "value": pr_text,
+                  "short": False,
+              }
+
           payload = {
               "attachments": [
                   {
                       "color": color,
                       "title": os.environ["WORKFLOW_NAME"],
                       "title_link": os.environ["RUN_URL"],
-                      "text": f"{emoji} CI run finished with result: {workflow_result}.",
+                      "text": f"{emoji} CI run finished with result: {workflow_result} for {pr_text}.",
+                      "mrkdwn_in": ["text", "fields"],
                       "fields": [
                           {
                               "title": "Repository",
@@ -222,6 +252,8 @@ jobs:
                   }
               ]
           }
+          if pr_field is not None:
+              payload["attachments"][0]["fields"].insert(0, pr_field)
           request = urllib.request.Request(
               os.environ["SLACK_WEBHOOK_URL"],
               data=json.dumps(payload).encode("utf-8"),
