@@ -101,7 +101,7 @@ Key fields and what they drive:
 | `supportedAuthSchemes`                  | Declares allowed auth methods                    | Connection creation and OAuth gating      |
 | `credentialResolvers` (optional)        | Dynamic credential generation/lookup             | Internal credential resolution endpoint   |
 | `authHandlers.oauth` (optional)         | OAuth start/complete behavior                    | OAuth connection flows                    |
-| `webhookHandler` (optional)             | Verify + parse inbound webhooks                  | Webhook ingest                            |
+| `webhookHandler` (optional)             | Resolve inbound webhook requests into events or immediate responses | Webhook ingest                |
 | `mcp` (optional)                        | Declare one or more MCP servers for this binding | MCP collection during compile             |
 | `mcpConfig` (optional)                  | Declarative MCP config target for an agent       | Post-compile MCP file update              |
 | `validateBindingWriteContext(...)`      | Contextual target/connection/binding validation  | Binding write and compile parity checks   |
@@ -175,8 +175,11 @@ flowchart TD
 ### 6) Webhooks
 
 - Webhook ingest resolves definition webhook handler.
-- Handler parses event + verifies signature (with target and connection secrets).
-- Normalized event is persisted and handed to workflow processing.
+- Handler first resolves the inbound request into either:
+- an immediate HTTP response
+- or a normalized event
+- Immediate responses are returned directly and bypass connection resolution, persistence, and workflow processing.
+- Event requests continue through connection resolution and verification (with target and connection secrets), then the normalized event is persisted and handed to workflow processing.
 
 ## Built-In Integrations
 
@@ -241,8 +244,11 @@ This is the recommended workflow.
 
 8. Add webhook support if provider emits events.
 
-- Implement `webhookHandler.parse`, `webhookHandler.resolveConnection`, and `webhookHandler.verify`.
-- Keep connection resolution explicit and deterministic from parsed event payload + candidate connections.
+- Implement `webhookHandler.resolveWebhookRequest`, `webhookHandler.resolveConnection`, and `webhookHandler.verify`.
+- `resolveWebhookRequest` should return either:
+- `{ kind: "response", response }` for protocol-level requests that must be answered immediately
+- `{ kind: "event", event }` for requests that should continue through the durable ingest path
+- Keep connection resolution explicit and deterministic from the normalized event payload + candidate connections.
 
 9. Register the definition.
 
