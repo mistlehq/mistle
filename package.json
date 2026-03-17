@@ -53,7 +53,7 @@
     "jscpd": "^4.0.8",
     "knip": "^5.87.0",
     "lefthook": "^2.1.4",
-    "lint-staged": "^16.3.2",
+    "lint-staged": "^16.4.0",
     "oxfmt": "^0.36.0",
     "oxlint": "^1.52.0",
     "oxlint-tsgolint": "^0.16.0",
