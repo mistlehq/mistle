@@ -27,6 +27,7 @@ import {
   DefaultStartupInputMaxBytes,
   type StartupInput,
 } from "./read-startup-input.js";
+import { applyCurrentProcessSecurity } from "./security.js";
 
 type LookupEnv = (key: string) => string | undefined;
 
@@ -74,6 +75,8 @@ async function closeServer(server: Server): Promise<void> {
 }
 
 export async function startRuntime(input: RunRuntimeInput): Promise<StartedRuntime> {
+  applyCurrentProcessSecurity();
+
   if (input.lookupEnv === undefined) {
     throw new Error("lookup env function is required");
   }

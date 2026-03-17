@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { runBootstrap } from "./run.js";
 
 function lookupEnv(key: string): string | undefined {
@@ -7,7 +9,8 @@ function lookupEnv(key: string): string | undefined {
 async function main(): Promise<void> {
   await runBootstrap({
     lookupEnv,
-    stdin: process.stdin,
+    processArgv: process.argv,
+    bootstrapEntrypointPath: fileURLToPath(import.meta.url),
   });
 }
 

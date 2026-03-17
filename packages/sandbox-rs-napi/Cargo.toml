@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 [dependencies]
 napi = { version = "3.8.3", features = ["napi10"] }
 napi-derive = "3.5.2"
-nix = { version = "0.31.2", features = ["process", "signal"] }
+nix = { version = "0.31.2", features = ["process", "signal", "user"] }
 portable-pty = "0.9.0"
 rcgen = "0.13.2"
 
