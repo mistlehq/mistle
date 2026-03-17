@@ -1,6 +1,7 @@
 import {
   integrationConnectionCredentials,
   integrationConnections,
+  IntegrationConnectionCredentialPurposes,
   integrationCredentials,
   IntegrationCredentialSecretKinds,
 } from "@mistle/db/control-plane";
@@ -22,7 +23,6 @@ import {
   IntegrationConnectionsNotFoundError,
 } from "./errors.js";
 
-const API_KEY_CREDENTIAL_PURPOSE = "api_key";
 const registry = createIntegrationRegistry();
 
 type UpdatedConnection = {
@@ -168,7 +168,7 @@ export async function updateApiKeyConnection(
         .values({
           connectionId: existingConnection.id,
           credentialId: createdCredential.id,
-          purpose: API_KEY_CREDENTIAL_PURPOSE,
+          purpose: IntegrationConnectionCredentialPurposes.API_KEY,
         })
         .onConflictDoUpdate({
           target: [

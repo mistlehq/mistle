@@ -5,9 +5,11 @@ import { describe, expect, it } from "vitest";
 import {
   decryptCredentialUtf8,
   decryptIntegrationConnectionSecrets,
+  decryptRedirectSessionSecretUtf8,
   decryptIntegrationTargetSecrets,
   encryptCredentialUtf8,
   encryptIntegrationConnectionSecrets,
+  encryptRedirectSessionSecretUtf8,
   encryptIntegrationTargetSecrets,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
@@ -185,5 +187,22 @@ describe("integration credential crypto", () => {
         masterEncryptionKeyMaterial: "wrong-master-key",
       }),
     ).toThrow("Failed to decrypt integration connection secrets.");
+  });
+
+  it("encrypts and decrypts redirect session secrets with master key material", () => {
+    const ciphertext = encryptRedirectSessionSecretUtf8({
+      plaintext: "pkce-verifier-value",
+      masterKeyVersion: 5,
+      masterEncryptionKeyMaterial: "master-key-version-5",
+    });
+
+    const decrypted = decryptRedirectSessionSecretUtf8({
+      ciphertext,
+      masterEncryptionKeys: {
+        "5": "master-key-version-5",
+      },
+    });
+
+    expect(decrypted).toBe("pkce-verifier-value");
   });
 });

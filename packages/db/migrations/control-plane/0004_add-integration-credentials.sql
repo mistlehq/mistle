@@ -7,6 +7,7 @@ CREATE TABLE "control_plane"."integration_credentials" (
 	"organization_credential_key_version" bigint NOT NULL,
 	"intended_family_id" text,
 	"metadata" jsonb,
+	"expires_at" timestamp with time zone,
 	"revoked_at" timestamp with time zone,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL

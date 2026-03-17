@@ -5,6 +5,7 @@ import { buildDashboardUrl } from "../dashboard-url.js";
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 import { INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH } from "./constants.js";
 import {
+  completeOAuth2ConnectionRoute,
   completeGitHubAppInstallationConnectionRoute,
   createApiKeyConnectionRoute,
   IntegrationConnectionsBadRequestResponseSchema,
@@ -13,11 +14,13 @@ import {
   listIntegrationConnectionResourcesRoute,
   listIntegrationConnectionsRoute,
   refreshIntegrationConnectionResourcesRoute,
+  startOAuth2ConnectionRoute,
   startGitHubAppInstallationConnectionRoute,
   updateApiKeyConnectionRoute,
   updateIntegrationConnectionRoute,
 } from "./contracts.js";
 import { completeGitHubAppInstallationConnection } from "./services/complete-github-app-installation-connection.js";
+import { completeOAuth2Connection } from "./services/complete-oauth2-connection.js";
 import { createApiKeyConnection } from "./services/create-api-key-connection.js";
 import {
   IntegrationConnectionsBadRequestError,
@@ -27,6 +30,7 @@ import {
 import { listIntegrationConnectionResources } from "./services/list-connection-resources.js";
 import { listIntegrationConnections } from "./services/list-connections.js";
 import { startGitHubAppInstallationConnection } from "./services/start-github-app-installation-connection.js";
+import { startOAuth2Connection } from "./services/start-oauth2-connection.js";
 import { updateApiKeyConnection } from "./services/update-api-key-connection.js";
 import { updateIntegrationConnection } from "./services/update-connection.js";
 
@@ -203,6 +207,32 @@ export function createIntegrationConnectionsApp(): AppRoutes<
     }
   });
 
+  routes.openapi(startOAuth2ConnectionRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const body = ctx.req.valid("json");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+
+      const startedOAuth2Connection = await startOAuth2Connection(
+        ctx.get("db"),
+        ctx.get("config").integrations,
+        {
+          organizationId: session.session.activeOrganizationId,
+          targetKey: params.targetKey,
+          ...(body.displayName === undefined ? {} : { displayName: body.displayName }),
+          controlPlaneBaseUrl: ctx.get("config").auth.baseUrl,
+        },
+      );
+
+      return ctx.json(startedOAuth2Connection, 200);
+    } catch (error) {
+      return handleIntegrationConnectionMutationError(ctx, error);
+    }
+  });
+
   routes.openapi(completeGitHubAppInstallationConnectionRoute, async (ctx) => {
     try {
       const params = ctx.req.valid("param");
@@ -211,6 +241,23 @@ export function createIntegrationConnectionsApp(): AppRoutes<
       await completeGitHubAppInstallationConnection(ctx.get("db"), ctx.get("config").integrations, {
         targetKey: params.targetKey,
         query,
+      });
+
+      return ctx.redirect(buildDashboardIntegrationsUrl(ctx.get("config").dashboard.baseUrl), 302);
+    } catch (error) {
+      return handleIntegrationConnectionMutationError(ctx, error);
+    }
+  });
+
+  routes.openapi(completeOAuth2ConnectionRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const query = ctx.req.valid("query");
+
+      await completeOAuth2Connection(ctx.get("db"), ctx.get("config").integrations, {
+        targetKey: params.targetKey,
+        query,
+        controlPlaneBaseUrl: ctx.get("config").auth.baseUrl,
       });
 
       return ctx.redirect(buildDashboardIntegrationsUrl(ctx.get("config").dashboard.baseUrl), 302);

@@ -1,5 +1,6 @@
 import {
   integrationConnectionCredentials,
+  IntegrationConnectionCredentialPurposes,
   integrationConnections,
   IntegrationConnectionStatuses,
   integrationCredentials,
@@ -18,6 +19,7 @@ import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsBadRequestError,
 } from "./errors.js";
+import { createRedirectQueryParams, resolveRedirectDisplayName } from "./redirect-flow.js";
 import { resolveGitHubAppInstallationHandlerTargetOrThrow } from "./resolve-github-app-installation-handler.js";
 
 type CompleteGitHubAppInstallationConnectionInput = {
@@ -37,16 +39,6 @@ type CompletedConnection = {
   updatedAt: string;
 };
 
-function createRedirectQueryParams(query: Record<string, string>): URLSearchParams {
-  const params = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(query)) {
-    params.set(key, value);
-  }
-
-  return params;
-}
-
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   const state = params.get("state");
   if (state === null || state.length === 0) {
@@ -59,27 +51,28 @@ function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   return state;
 }
 
-function resolveRedirectDisplayName(state: string): string | undefined {
-  const separatorIndex = state.indexOf(".");
-  if (separatorIndex < 0 || separatorIndex === state.length - 1) {
-    return undefined;
-  }
-
-  const encodedDisplayName = state.slice(separatorIndex + 1);
-  const displayName = Buffer.from(encodedDisplayName, "base64url").toString("utf8").trim();
-  if (displayName.length === 0) {
-    return undefined;
-  }
-
-  return displayName;
-}
-
 function resolveCredentialSecretKind(secretType: string) {
   if (secretType === IntegrationCredentialSecretKinds.API_KEY) {
     return IntegrationCredentialSecretKinds.API_KEY;
   }
 
   throw new Error(`Unsupported GitHub App installation credential secret type '${secretType}'.`);
+}
+
+function resolveCredentialPurpose(purpose: string) {
+  if (purpose === IntegrationConnectionCredentialPurposes.API_KEY) {
+    return IntegrationConnectionCredentialPurposes.API_KEY;
+  }
+
+  if (purpose === IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN) {
+    return IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN;
+  }
+
+  if (purpose === IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN) {
+    return IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN;
+  }
+
+  throw new Error(`Unsupported GitHub App installation credential purpose '${purpose}'.`);
 }
 
 export async function completeGitHubAppInstallationConnection(
@@ -235,7 +228,7 @@ export async function completeGitHubAppInstallationConnection(
           await tx.insert(integrationConnectionCredentials).values({
             connectionId: createdConnection.id,
             credentialId: createdCredential.id,
-            purpose: material.purpose,
+            purpose: resolveCredentialPurpose(material.purpose),
           });
         }
       } finally {

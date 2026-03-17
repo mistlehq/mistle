@@ -4,6 +4,7 @@ const WRAPPED_ORGANIZATION_KEY_FORMAT_VERSION = "v1";
 const ENCRYPTED_CREDENTIAL_FORMAT_VERSION = "v1";
 const ENCRYPTED_INTEGRATION_TARGET_SECRETS_FORMAT_VERSION = "v1";
 const ENCRYPTED_INTEGRATION_CONNECTION_SECRETS_FORMAT_VERSION = "v1";
+const ENCRYPTED_REDIRECT_SESSION_SECRET_FORMAT_VERSION = "v1";
 const AES_GCM_NONCE_BYTE_LENGTH = 12;
 
 export function resolveMasterEncryptionKeyMaterial(input: {
@@ -383,5 +384,97 @@ export function decryptIntegrationConnectionSecrets(input: {
     ciphertext.fill(0);
     authTag.fill(0);
     plaintext?.fill(0);
+  }
+}
+
+function deriveRedirectSessionSecretEncryptionKey(masterEncryptionKeyMaterial: string): Buffer {
+  return createHash("sha256")
+    .update("integration-redirect-session-secret", "utf8")
+    .update("\0", "utf8")
+    .update(masterEncryptionKeyMaterial, "utf8")
+    .digest();
+}
+
+export function encryptRedirectSessionSecretUtf8(input: {
+  plaintext: string;
+  masterKeyVersion: number;
+  masterEncryptionKeyMaterial: string;
+}): string {
+  const encryptionKey = deriveRedirectSessionSecretEncryptionKey(input.masterEncryptionKeyMaterial);
+  const nonce = randomBytes(AES_GCM_NONCE_BYTE_LENGTH);
+  const plaintext = Buffer.from(input.plaintext, "utf8");
+  const cipher = createCipheriv("aes-256-gcm", encryptionKey, nonce);
+
+  try {
+    const ciphertext = Buffer.concat([cipher.update(plaintext), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+
+    try {
+      return [
+        ENCRYPTED_REDIRECT_SESSION_SECRET_FORMAT_VERSION,
+        String(input.masterKeyVersion),
+        nonce.toString("base64url"),
+        ciphertext.toString("base64url"),
+        authTag.toString("base64url"),
+      ].join(".");
+    } finally {
+      ciphertext.fill(0);
+      authTag.fill(0);
+    }
+  } finally {
+    encryptionKey.fill(0);
+    nonce.fill(0);
+    plaintext.fill(0);
+  }
+}
+
+export function decryptRedirectSessionSecretUtf8(input: {
+  ciphertext: string;
+  masterEncryptionKeys: Record<string, string>;
+}): string {
+  const [formatVersion, encodedMasterKeyVersion, encodedNonce, encodedCiphertext, encodedAuthTag] =
+    input.ciphertext.split(".");
+
+  if (
+    formatVersion !== ENCRYPTED_REDIRECT_SESSION_SECRET_FORMAT_VERSION ||
+    encodedMasterKeyVersion === undefined ||
+    encodedNonce === undefined ||
+    encodedCiphertext === undefined ||
+    encodedAuthTag === undefined
+  ) {
+    throw new Error("Encrypted redirect session secret format is invalid.");
+  }
+
+  const masterKeyVersion = Number(encodedMasterKeyVersion);
+  if (!Number.isInteger(masterKeyVersion) || masterKeyVersion < 1) {
+    throw new Error("Encrypted redirect session secret contains an invalid master key version.");
+  }
+
+  const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+    masterKeyVersion,
+    masterEncryptionKeys: input.masterEncryptionKeys,
+  });
+  const encryptionKey = deriveRedirectSessionSecretEncryptionKey(masterEncryptionKeyMaterial);
+  const nonce = Buffer.from(encodedNonce, "base64url");
+  const ciphertext = Buffer.from(encodedCiphertext, "base64url");
+  const authTag = Buffer.from(encodedAuthTag, "base64url");
+  const decipher = createDecipheriv("aes-256-gcm", encryptionKey, nonce);
+  decipher.setAuthTag(authTag);
+
+  try {
+    const plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+
+    try {
+      return plaintext.toString("utf8");
+    } finally {
+      plaintext.fill(0);
+    }
+  } catch (error) {
+    throw new Error("Failed to decrypt redirect session secret.", { cause: error });
+  } finally {
+    encryptionKey.fill(0);
+    nonce.fill(0);
+    ciphertext.fill(0);
+    authTag.fill(0);
   }
 }

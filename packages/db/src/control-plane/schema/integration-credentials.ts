@@ -7,7 +7,8 @@ import { organizations } from "./organizations.js";
 
 export const IntegrationCredentialSecretKinds = {
   API_KEY: "api_key",
-  OAUTH_ACCESS_TOKEN: "oauth_access_token",
+  OAUTH2_ACCESS_TOKEN: "oauth2_access_token",
+  OAUTH2_REFRESH_TOKEN: "oauth2_refresh_token",
 } as const;
 
 export type IntegrationCredentialSecretKind =
@@ -30,6 +31,7 @@ export const integrationCredentials = controlPlaneSchema.table(
     }).notNull(),
     intendedFamilyId: text("intended_family_id"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    expiresAt: timestamp("expires_at", { withTimezone: true, mode: "string" }),
     revokedAt: timestamp("revoked_at", { withTimezone: true, mode: "string" }),
     createdAt: timestamp("created_at", { withTimezone: true, mode: "string" })
       .notNull()
