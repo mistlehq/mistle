@@ -17,7 +17,9 @@ const textEncoder = new TextEncoder();
 type TerminalStoryScenario = {
   initialErrorMessage?: string | null;
   initialOutput?: string;
+  initialPanelSize?: number;
   initialState?: UseSandboxPtyStateResult["lifecycle"]["state"];
+  initialTerminalVisible?: boolean;
 };
 
 function createPtyChunks(text: string): readonly Uint8Array[] {
@@ -29,6 +31,8 @@ function createPtyChunks(text: string): readonly Uint8Array[] {
 }
 
 function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element {
+  const [isTerminalVisible, setIsTerminalVisible] = useState(input.initialTerminalVisible ?? true);
+  const [panelSize, setPanelSize] = useState(input.initialPanelSize ?? 38);
   const [lifecycleState, setLifecycleState] = useState<
     UseSandboxPtyStateResult["lifecycle"]["state"]
   >(input.initialState ?? "closed");
@@ -114,7 +118,7 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
                   },
                 ]
           }
-          isSecondaryPanelVisible
+          isSecondaryPanelVisible={isTerminalVisible}
           mainContent={
             <CodexSessionPaneMainContent
               chatEntries={CodexStorySessionEntriesWithExploringGroup}
@@ -124,7 +128,7 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
               serverRequestPanelEntries={CodexStorySessionServerRequests}
             />
           }
-          onSecondaryPanelResize={function onSecondaryPanelResize() {}}
+          onSecondaryPanelResize={setPanelSize}
           primaryBottomPanel={
             <CodexSessionPaneBottomPanel
               chatEntries={CodexStorySessionEntriesWithExploringGroup}
@@ -136,13 +140,15 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
           }
           secondaryPanel={
             <SessionTerminalPanel
-              isVisible
-              onClose={function onClose() {}}
+              isVisible={isTerminalVisible}
+              onClose={() => {
+                setIsTerminalVisible(false);
+              }}
               ptyState={ptyState}
               sandboxInstanceId="sbi_storybook"
             />
           }
-          secondaryPanelSize={38}
+          secondaryPanelSize={panelSize}
           sandboxInstanceId="sbi_storybook"
         />
       </div>
@@ -160,7 +166,9 @@ const meta = {
   args: {
     initialErrorMessage: null,
     initialOutput: "",
+    initialPanelSize: 38,
     initialState: "closed",
+    initialTerminalVisible: true,
   },
 } satisfies Meta<typeof StoryTerminalWorkbench>;
 
@@ -168,35 +176,37 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-export const ClosedReady: Story = {
-  render: function RenderClosedReady(): React.JSX.Element {
-    return <StoryTerminalWorkbench initialState="closed" />;
+export const TerminalClosed: Story = {
+  args: {
+    initialTerminalVisible: false,
+  },
+};
+
+export const OpenEmpty: Story = {
+  args: {
+    initialOutput: "",
+    initialState: "closed",
+    initialTerminalVisible: true,
   },
 };
 
 export const OpenWithOutput: Story = {
-  render: function RenderOpenWithOutput(): React.JSX.Element {
-    return (
-      <StoryTerminalWorkbench
-        initialOutput={[
-          "mistle@sandbox:~/workspace$ git status --short",
-          " M apps/dashboard/src/features/pages/session-terminal-panel.tsx",
-          " M apps/dashboard/src/features/pages/codex-session-page.tsx",
-          "",
-        ].join("\n")}
-        initialState="open"
-      />
-    );
+  args: {
+    initialOutput: [
+      "mistle@sandbox:~/workspace$ git status --short",
+      " M apps/dashboard/src/features/pages/session-terminal-panel.tsx",
+      " M apps/dashboard/src/features/pages/codex-session-page.tsx",
+      "",
+    ].join("\n"),
+    initialState: "open",
+    initialTerminalVisible: true,
   },
 };
 
 export const ErrorState: Story = {
-  render: function RenderErrorState(): React.JSX.Element {
-    return (
-      <StoryTerminalWorkbench
-        initialErrorMessage="Could not open sandbox PTY session."
-        initialState="error"
-      />
-    );
+  args: {
+    initialErrorMessage: "Could not open sandbox PTY session.",
+    initialState: "error",
+    initialTerminalVisible: true,
   },
 };

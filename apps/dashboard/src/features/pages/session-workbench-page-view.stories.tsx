@@ -1,6 +1,12 @@
 import { Badge } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
+import {
+  CodexStorySessionComposerProps,
+  CodexStorySessionEntriesWithExploringGroup,
+  CodexStorySessionServerRequests,
+} from "../codex-client/codex-story-fixtures.js";
+import { CodexSessionPaneBottomPanel, CodexSessionPaneMainContent } from "./codex-session-pane.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 const meta = {
@@ -15,20 +21,24 @@ const meta = {
     alerts: [],
     isSecondaryPanelVisible: false,
     mainContent: (
-      <div className="space-y-3 py-6">
-        <div className="bg-card rounded-lg border p-4">Conversation content region</div>
-        <div className="bg-card rounded-lg border p-4">Additional content block</div>
-      </div>
+      <CodexSessionPaneMainContent
+        chatEntries={CodexStorySessionEntriesWithExploringGroup}
+        composerProps={CodexStorySessionComposerProps}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={function onRespondToServerRequest() {}}
+        serverRequestPanelEntries={CodexStorySessionServerRequests}
+      />
     ),
     primaryBottomPanel: (
-      <div className="space-y-3">
-        <div className="bg-card rounded-lg border p-4">Bottom panel surface</div>
-        <div className="bg-card rounded-lg border p-4">Composer or auxiliary controls</div>
-      </div>
+      <CodexSessionPaneBottomPanel
+        chatEntries={CodexStorySessionEntriesWithExploringGroup}
+        composerProps={CodexStorySessionComposerProps}
+        isRespondingToServerRequest={false}
+        onRespondToServerRequest={function onRespondToServerRequest() {}}
+        serverRequestPanelEntries={CodexStorySessionServerRequests}
+      />
     ),
-    secondaryPanel: (
-      <div className="bg-card h-full rounded-lg border p-4">Secondary pane surface</div>
-    ),
+    secondaryPanel: <div className="h-full w-full border-t bg-white" />,
     secondaryPanelSize: 38,
     onSecondaryPanelResize: function onSecondaryPanelResize() {},
   },
