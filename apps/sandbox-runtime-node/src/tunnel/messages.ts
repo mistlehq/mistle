@@ -35,8 +35,8 @@ function sendWebSocketPayload(
   isBinary: boolean,
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    socket.send(payload, { binary: isBinary }, (error: Error | undefined) => {
-      if (error === undefined) {
+    socket.send(payload, { binary: isBinary }, (error?: Error | null) => {
+      if (error == null) {
         resolve();
         return;
       }
