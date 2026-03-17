@@ -1,7 +1,10 @@
 import { readFile } from "node:fs/promises";
 
+import { generateProxyCa } from "@mistle/sandbox-rs-napi";
+
 import { runRuntime } from "../runtime/run.js";
 import { loadBootstrapConfig } from "./config.js";
+import { installProxyCaCertificate, prepareProxyCaRuntimeEnv } from "./proxy-ca.js";
 
 type PasswdUserRecord = {
   username: string;
@@ -98,16 +101,27 @@ export async function runBootstrap(input: RunBootstrapInput): Promise<void> {
   }
 
   const config = loadBootstrapConfig(input.lookupEnv);
-  const sandboxUser = await resolveSandboxUser(config.sandboxUser);
-  if (sandboxUser.uid === 0) {
-    throw new Error(`sandbox user "${sandboxUser.username}" must not resolve to uid 0`);
+  const proxyCa = generateProxyCa();
+  await installProxyCaCertificate(proxyCa.certificatePem);
+  const proxyCaRuntimeEnv = prepareProxyCaRuntimeEnv(proxyCa);
+  try {
+    const sandboxUser = await resolveSandboxUser(config.sandboxUser);
+    if (sandboxUser.uid === 0) {
+      throw new Error(`sandbox user "${sandboxUser.username}" must not resolve to uid 0`);
+    }
+
+    for (const [envName, envValue] of Object.entries(proxyCaRuntimeEnv.env)) {
+      process.env[envName] = envValue;
+    }
+
+    applyRuntimeEnvironment(sandboxUser);
+    dropPrivileges(sandboxUser);
+
+    await runRuntime({
+      lookupEnv: lookupProcessEnv,
+      stdin: input.stdin,
+    });
+  } finally {
+    proxyCaRuntimeEnv.cleanup();
   }
-
-  applyRuntimeEnvironment(sandboxUser);
-  dropPrivileges(sandboxUser);
-
-  await runRuntime({
-    lookupEnv: lookupProcessEnv,
-    stdin: input.stdin,
-  });
 }
