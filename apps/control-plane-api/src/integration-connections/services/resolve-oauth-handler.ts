@@ -1,6 +1,6 @@
 import type { IntegrationTarget } from "@mistle/db/control-plane";
 import {
-  IntegrationSupportedAuthSchemes,
+  IntegrationConnectionMethodIds,
   type IntegrationOAuthHandler,
 } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
@@ -100,7 +100,13 @@ export async function resolveOauthHandlerTargetOrThrow(
     );
   }
 
-  if (!definition.supportedAuthSchemes.includes(IntegrationSupportedAuthSchemes.OAUTH)) {
+  if (
+    !definition.connectionMethods.some(
+      (method) =>
+        method.id === IntegrationConnectionMethodIds.OAUTH2 ||
+        method.id === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+    )
+  ) {
     throw new IntegrationConnectionsBadRequestError(
       IntegrationConnectionsBadRequestCodes.OAUTH_NOT_SUPPORTED,
       `Integration target '${input.targetKey}' does not support OAuth.`,

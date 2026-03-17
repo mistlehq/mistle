@@ -1,17 +1,21 @@
-import { IntegrationSupportedAuthSchemes } from "@mistle/integrations-core";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { assertApiKeyAuthSchemeSupportedOrThrow } from "./create-api-key-connection.js";
+import { assertApiKeyConnectionMethodSupportedOrThrow } from "./create-api-key-connection.js";
 import { IntegrationConnectionsBadRequestError } from "./errors.js";
 
-describe("assertApiKeyAuthSchemeSupportedOrThrow", () => {
+describe("assertApiKeyConnectionMethodSupportedOrThrow", () => {
   it("allows targets that include api-key auth", () => {
     expect(() =>
-      assertApiKeyAuthSchemeSupportedOrThrow({
+      assertApiKeyConnectionMethodSupportedOrThrow({
         targetKey: "github-cloud",
-        supportedAuthSchemes: [
-          IntegrationSupportedAuthSchemes.API_KEY,
-          IntegrationSupportedAuthSchemes.OAUTH,
+        connectionMethods: [
+          {
+            id: IntegrationConnectionMethodIds.API_KEY,
+          },
+          {
+            id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          },
         ],
       }),
     ).not.toThrow();
@@ -21,9 +25,13 @@ describe("assertApiKeyAuthSchemeSupportedOrThrow", () => {
     let thrownError: unknown = null;
 
     try {
-      assertApiKeyAuthSchemeSupportedOrThrow({
+      assertApiKeyConnectionMethodSupportedOrThrow({
         targetKey: "oauth-only-target",
-        supportedAuthSchemes: [IntegrationSupportedAuthSchemes.OAUTH],
+        connectionMethods: [
+          {
+            id: IntegrationConnectionMethodIds.OAUTH2,
+          },
+        ],
       });
     } catch (error) {
       thrownError = error;

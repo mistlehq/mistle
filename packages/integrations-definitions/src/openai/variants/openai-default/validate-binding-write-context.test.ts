@@ -17,7 +17,7 @@ function createTargetConfig(
 }
 
 describe("validateOpenAiBindingWriteContext", () => {
-  it("returns issue when auth scheme is missing", () => {
+  it("returns issue when connection method is missing", () => {
     const result = validateOpenAiBindingWriteContext({
       targetKey: "openai-default",
       bindingIdOrDraftIndex: "draft:0",
@@ -44,7 +44,7 @@ describe("validateOpenAiBindingWriteContext", () => {
     if (result.ok) {
       throw new Error("Expected validation result to fail.");
     }
-    expect(result.issues[0]?.code).toBe("openai.missing_auth_scheme");
+    expect(result.issues[0]?.code).toBe("openai.missing_connection_method");
   });
 
   it("returns issue for unsupported model/reasoning combinations", () => {
@@ -59,7 +59,7 @@ describe("validateOpenAiBindingWriteContext", () => {
       connection: {
         id: "icn_1",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       },
       binding: {
@@ -84,7 +84,7 @@ describe("validateOpenAiBindingWriteContext", () => {
       connection: {
         id: "icn_1",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       },
       binding: {
@@ -106,19 +106,14 @@ describe("validateOpenAiBindingWriteContext", () => {
   it("uses target binding capabilities when validating model/reasoning", () => {
     const defaultCapabilities = createOpenAiRawBindingCapabilities();
     const targetConfig = createTargetConfig({
-      by_auth_scheme: {
-        "api-key": {
-          ...defaultCapabilities.by_auth_scheme["api-key"],
-          allowed_reasoning_by_model: {
-            ...defaultCapabilities.by_auth_scheme["api-key"].allowed_reasoning_by_model,
-            "gpt-5.3-codex": ["low"],
-          },
-          default_reasoning_by_model: {
-            ...defaultCapabilities.by_auth_scheme["api-key"].default_reasoning_by_model,
-            "gpt-5.3-codex": "low",
-          },
-        },
-        oauth: defaultCapabilities.by_auth_scheme.oauth,
+      ...defaultCapabilities,
+      allowed_reasoning_by_model: {
+        ...defaultCapabilities.allowed_reasoning_by_model,
+        "gpt-5.3-codex": ["low"],
+      },
+      default_reasoning_by_model: {
+        ...defaultCapabilities.default_reasoning_by_model,
+        "gpt-5.3-codex": "low",
       },
     });
 
@@ -133,7 +128,7 @@ describe("validateOpenAiBindingWriteContext", () => {
       connection: {
         id: "icn_1",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       },
       binding: {

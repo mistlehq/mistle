@@ -6,6 +6,14 @@ import {
 
 import { IntegrationTargetsBadRequestCodes } from "./services/errors.js";
 
+const IntegrationConnectionMethodSchema = z
+  .object({
+    id: z.enum(["api-key", "oauth2", "github-app-installation"]),
+    label: z.string().min(1),
+    kind: z.enum(["api-key", "oauth2", "redirect"]),
+  })
+  .strict();
+
 export const IntegrationTargetSchema = z
   .object({
     targetKey: z.string().min(1),
@@ -16,10 +24,7 @@ export const IntegrationTargetSchema = z
     displayName: z.string().min(1),
     description: z.string().min(1),
     logoKey: z.string().min(1).optional(),
-    supportedAuthSchemes: z
-      .array(z.enum(["oauth", "api-key"]))
-      .min(1)
-      .optional(),
+    connectionMethods: z.array(IntegrationConnectionMethodSchema).min(1).optional(),
     displayNameOverride: z.string().min(1).optional(),
     descriptionOverride: z.string().min(1).optional(),
     targetHealth: z

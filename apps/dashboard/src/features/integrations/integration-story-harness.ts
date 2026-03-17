@@ -11,7 +11,7 @@ export const DemoIntegrationConnections: readonly IntegrationConnection[] = [
     targetKey: "github",
     displayName: "Engineering GitHub",
     status: "active",
-    config: { auth_scheme: "oauth" },
+    config: { connection_method: "github-app-installation", installation_id: 12345 },
     externalSubjectId: "mistle-labs",
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-11T04:30:00.000Z",
@@ -37,7 +37,7 @@ export const DemoIntegrationConnections: readonly IntegrationConnection[] = [
     targetKey: "github",
     displayName: "Archive Mirror",
     status: "error",
-    config: { auth_scheme: "api-key" },
+    config: { connection_method: "api-key" },
     createdAt: "2026-02-14T00:00:00.000Z",
     updatedAt: "2026-03-10T10:15:00.000Z",
     resources: [

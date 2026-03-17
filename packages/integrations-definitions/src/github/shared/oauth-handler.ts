@@ -1,5 +1,5 @@
 import {
-  IntegrationSupportedAuthSchemes,
+  IntegrationConnectionMethodIds,
   type IntegrationOAuthHandler,
 } from "@mistle/integrations-core";
 
@@ -56,7 +56,7 @@ export const GitHubAppOAuthHandler: IntegrationOAuthHandler<
     return {
       externalSubjectId: installationId,
       connectionConfig: {
-        auth_scheme: IntegrationSupportedAuthSchemes.OAUTH,
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         installation_id: installationId,
         ...(setupAction === null ? {} : { setup_action: setupAction }),
       },

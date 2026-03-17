@@ -703,13 +703,168 @@ export interface paths {
       requestBody: {
         content: {
           "application/json": {
-            apiKey?: string;
             displayName: string;
           };
         };
       };
       responses: {
         /** @description Update an existing integration connection. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              config?: {
+                [key: string]: unknown;
+              };
+              createdAt: string;
+              displayName: string;
+              externalSubjectId?: string;
+              id: string;
+              resources?: {
+                count: number;
+                kind: string;
+                lastSyncedAt?: string;
+                /** @enum {string} */
+                selectionMode: "single" | "multi";
+                /** @enum {string} */
+                syncState: "never-synced" | "syncing" | "ready" | "error";
+              }[];
+              /** @enum {string} */
+              status: "active" | "error" | "revoked";
+              targetKey: string;
+              targetSnapshotConfig?: {
+                [key: string]: unknown;
+              };
+              updatedAt: string;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code:
+                    | "INVALID_LIST_CONNECTIONS_INPUT"
+                    | "INVALID_PAGINATION_CURSOR"
+                    | "INVALID_LIST_CONNECTION_RESOURCES_INPUT"
+                    | "INVALID_RESOURCE_PAGINATION_CURSOR"
+                    | "RESOURCE_KIND_NOT_SUPPORTED"
+                    | "INVALID_CREATE_CONNECTION_INPUT"
+                    | "INVALID_UPDATE_CONNECTION_INPUT"
+                    | "API_KEY_NOT_SUPPORTED"
+                    | "API_KEY_CONNECTION_REQUIRED"
+                    | "INVALID_OAUTH_START_INPUT"
+                    | "INVALID_OAUTH_COMPLETE_INPUT"
+                    | "OAUTH_NOT_SUPPORTED"
+                    | "OAUTH_HANDLER_NOT_CONFIGURED"
+                    | "OAUTH_STATE_INVALID"
+                    | "OAUTH_STATE_EXPIRED"
+                    | "OAUTH_STATE_ALREADY_USED";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Integration target or connection was not found. */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "TARGET_NOT_FOUND" | "CONNECTION_NOT_FOUND";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/integration/connections/:connectionId/api-key": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          connectionId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            apiKey: string;
+            displayName: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Rotate the API key for an existing integration connection. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -1519,6 +1674,13 @@ export interface paths {
                 config: {
                   [key: string]: unknown;
                 };
+                connectionMethods?: {
+                  /** @enum {string} */
+                  id: "api-key" | "oauth2" | "github-app-installation";
+                  /** @enum {string} */
+                  kind: "api-key" | "oauth2" | "redirect";
+                  label: string;
+                }[];
                 description: string;
                 descriptionOverride?: string;
                 displayName: string;
@@ -1526,7 +1688,6 @@ export interface paths {
                 enabled: boolean;
                 familyId: string;
                 logoKey?: string;
-                supportedAuthSchemes?: ("oauth" | "api-key")[];
                 targetHealth: {
                   /** @enum {string} */
                   configStatus: "valid" | "invalid";

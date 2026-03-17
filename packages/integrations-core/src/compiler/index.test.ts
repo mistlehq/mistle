@@ -3,7 +3,11 @@ import { z } from "zod";
 
 import { CompilerErrorCodes, IntegrationCompilerError } from "../errors/index.js";
 import { IntegrationRegistry } from "../registry/index.js";
-import type { IntegrationDefinition } from "../types/index.js";
+import {
+  IntegrationConnectionMethodIds,
+  IntegrationConnectionMethodKinds,
+  type IntegrationDefinition,
+} from "../types/index.js";
 import { compileRuntimePlan } from "./index.js";
 
 const OpenAiTargetConfigSchema = z.object({
@@ -15,6 +19,14 @@ const EmptyTargetSecretsSchema = z.object({});
 const OpenAiBindingConfigSchema = z.object({
   defaultModel: z.string().min(1),
 });
+
+const ApiKeyConnectionMethods = [
+  {
+    id: IntegrationConnectionMethodIds.API_KEY,
+    label: "API key",
+    kind: IntegrationConnectionMethodKinds.API_KEY,
+  },
+] as const;
 
 function createOpenAiDefinition(): IntegrationDefinition<
   typeof OpenAiTargetConfigSchema,
@@ -30,7 +42,7 @@ function createOpenAiDefinition(): IntegrationDefinition<
     targetConfigSchema: OpenAiTargetConfigSchema,
     targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
-    supportedAuthSchemes: ["api-key"],
+    connectionMethods: ApiKeyConnectionMethods,
     agent: {
       createConversationProvider: () => ({
         connect: async () => ({
@@ -195,7 +207,7 @@ function createJsonAgentDefinition(): IntegrationDefinition<
     targetConfigSchema: OpenAiTargetConfigSchema,
     targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
-    supportedAuthSchemes: ["api-key"],
+    connectionMethods: ApiKeyConnectionMethods,
     mcpConfig: {
       clientId: "claude-code",
       fileId: "claude_config",
@@ -244,7 +256,7 @@ function createLinearMcpDefinition(): IntegrationDefinition<
     targetConfigSchema: OpenAiTargetConfigSchema,
     targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
-    supportedAuthSchemes: ["api-key"],
+    connectionMethods: ApiKeyConnectionMethods,
     mcp: () => ({
       serverId: "linear-default",
       serverName: "linear",
@@ -292,7 +304,7 @@ function createLinearDuplicateNameMcpDefinition(): IntegrationDefinition<
     targetConfigSchema: OpenAiTargetConfigSchema,
     targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
-    supportedAuthSchemes: ["api-key"],
+    connectionMethods: ApiKeyConnectionMethods,
     mcp: {
       serverId: "linear-duplicate-name",
       serverName: "linear",
@@ -321,7 +333,7 @@ function createGithubReleaseArtifactDefinition(): IntegrationDefinition<
     targetConfigSchema: OpenAiTargetConfigSchema,
     targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: OpenAiBindingConfigSchema,
-    supportedAuthSchemes: ["api-key"],
+    connectionMethods: ApiKeyConnectionMethods,
     compileBinding: () => ({
       egressRoutes: [],
       artifacts: [
@@ -1130,7 +1142,7 @@ describe("compileRuntimePlan", () => {
       targetConfigSchema: OpenAiTargetConfigSchema,
       targetSecretSchema,
       bindingConfigSchema: OpenAiBindingConfigSchema,
-      supportedAuthSchemes: ["api-key"],
+      connectionMethods: ApiKeyConnectionMethods,
       compileBinding: () => ({
         egressRoutes: [],
         artifacts: [],
@@ -1346,7 +1358,7 @@ describe("compileRuntimePlan", () => {
       targetConfigSchema,
       targetSecretSchema: EmptyTargetSecretsSchema,
       bindingConfigSchema,
-      supportedAuthSchemes: ["api-key"],
+      connectionMethods: ApiKeyConnectionMethods,
       compileBinding: (input) => ({
         egressRoutes: [],
         artifacts: [],

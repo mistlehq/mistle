@@ -1,5 +1,5 @@
 import {
-  IntegrationSupportedAuthSchemes,
+  IntegrationConnectionMethodIds,
   type IntegrationCredentialResolverInput,
 } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
@@ -34,7 +34,7 @@ function createResolverInput(
       id: "icn_test",
       status: "active",
       config: {
-        auth_scheme: IntegrationSupportedAuthSchemes.OAUTH,
+        connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         installation_id: "12345",
       },
     },

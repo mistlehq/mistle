@@ -3,7 +3,7 @@ import {
   IntegrationCredentialSecretKinds,
   integrationTargets,
 } from "@mistle/db/control-plane";
-import { IntegrationSupportedAuthSchemes } from "@mistle/integrations-core";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
@@ -12,7 +12,7 @@ import {
   IntegrationConnectionSchema,
   IntegrationConnectionsBadRequestResponseSchema,
   IntegrationConnectionsNotFoundResponseSchema,
-  UpdateIntegrationConnectionBodySchema,
+  UpdateApiKeyConnectionBodySchema,
   ValidationErrorResponseSchema,
 } from "../src/integration-connections/contracts.js";
 import {
@@ -83,13 +83,13 @@ describe("integration connections update api key integration", () => {
       throw new Error("Expected an existing API-key credential link.");
     }
 
-    const updateBody = UpdateIntegrationConnectionBodySchema.parse({
+    const updateBody = UpdateApiKeyConnectionBodySchema.parse({
       displayName: "OpenAI rotated",
       apiKey: "sk-test-rotated-api-key",
     });
 
     const updateResponse = await fixture.request(
-      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}`,
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/api-key`,
       {
         method: "PUT",
         headers: {
@@ -164,16 +164,18 @@ describe("integration connections update api key integration", () => {
       email: "integration-connections-update-api-key-missing@example.com",
     });
 
-    const response = await fixture.request("/v1/integration/connections/icn_missing", {
+    const response = await fixture.request("/v1/integration/connections/icn_missing/api-key", {
       method: "PUT",
       headers: {
         "content-type": "application/json",
         cookie: authenticatedSession.cookie,
       },
-      body: JSON.stringify({
-        displayName: "Missing connection",
-        apiKey: "sk-test-rotated-api-key",
-      }),
+      body: JSON.stringify(
+        UpdateApiKeyConnectionBodySchema.parse({
+          displayName: "Missing connection",
+          apiKey: "sk-test-rotated-api-key",
+        }),
+      ),
     });
 
     expect(response.status).toBe(404);
@@ -220,7 +222,7 @@ describe("integration connections update api key integration", () => {
         displayName: "OAuth-only connection",
         status: "active",
         config: {
-          auth_scheme: IntegrationSupportedAuthSchemes.OAUTH,
+          connection_method: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
         },
         targetSnapshotConfig: {
           api_base_url: "https://api.openai.com",
@@ -235,7 +237,7 @@ describe("integration connections update api key integration", () => {
     }
 
     const response = await fixture.request(
-      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}`,
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/api-key`,
       {
         method: "PUT",
         headers: {
@@ -408,17 +410,19 @@ describe("integration connections update api key integration", () => {
     }
 
     const updateResponse = await fixture.request(
-      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}`,
+      `/v1/integration/connections/${encodeURIComponent(createdConnection.id)}/api-key`,
       {
         method: "PUT",
         headers: {
           "content-type": "application/json",
           cookie: authenticatedSession.cookie,
         },
-        body: JSON.stringify({
-          displayName: "OpenAI renamed",
-          apiKey: "   ",
-        }),
+        body: JSON.stringify(
+          UpdateApiKeyConnectionBodySchema.parse({
+            displayName: "OpenAI renamed",
+            apiKey: "   ",
+          }),
+        ),
       },
     );
 

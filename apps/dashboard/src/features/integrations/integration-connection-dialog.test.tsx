@@ -11,7 +11,18 @@ import {
 
 const dialog: IntegrationConnectionDialogState = {
   displayName: "OpenAI",
-  methods: [IntegrationConnectionMethodIds.API_KEY, IntegrationConnectionMethodIds.OAUTH],
+  methods: [
+    {
+      id: IntegrationConnectionMethodIds.API_KEY,
+      label: "API key",
+      kind: "api-key",
+    },
+    {
+      id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      label: "GitHub App installation",
+      kind: "redirect",
+    },
+  ],
   mode: "create",
   targetKey: "openai",
 };
@@ -79,19 +90,19 @@ describe("IntegrationConnectionDialog", () => {
     expect(screen.queryByRole("radio")).toBeNull();
   });
 
-  it("renders Save for OAuth connections in update mode", () => {
+  it("renders Save for redirect connections in update mode", () => {
     render(
       <IntegrationConnectionDialog
         apiKeyValue=""
         connectionDisplayNamePlaceholder="OpenAI connection"
-        connectionDisplayNameValue="Existing OAuth connection"
+        connectionDisplayNameValue="Existing GitHub App installation connection"
         connectError={null}
-        connectMethodId={IntegrationConnectionMethodIds.OAUTH}
+        connectMethodId={IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION}
         dialog={{
           connectionId: "icn_456",
-          currentMethodId: IntegrationConnectionMethodIds.OAUTH,
+          currentMethodId: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
           displayName: "OpenAI",
-          initialConnectionDisplayName: "Existing OAuth connection",
+          initialConnectionDisplayName: "Existing GitHub App installation connection",
           mode: "update",
           targetKey: "openai",
         }}
@@ -108,10 +119,8 @@ describe("IntegrationConnectionDialog", () => {
     );
 
     expect(screen.getByRole("button", { name: "Save" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Continue with OAuth" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Continue" })).toBeNull();
     expect(screen.getByText("Save to update this connection name.")).toBeTruthy();
-    expect(
-      screen.queryByText("Continue to generate an OAuth authorization URL and redirect."),
-    ).toBeNull();
+    expect(screen.queryByText("Continue to start the connection flow.")).toBeNull();
   });
 });

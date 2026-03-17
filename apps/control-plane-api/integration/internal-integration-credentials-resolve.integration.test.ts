@@ -69,7 +69,7 @@ async function insertGitHubBindingFixture(input: {
     displayName: "GitHub binding-aware connection",
     status: IntegrationConnectionStatuses.ACTIVE,
     config: {
-      auth_scheme: "oauth",
+      connection_method: "github-app-installation",
       installation_id: "12345",
     },
   });
@@ -292,7 +292,7 @@ describe("internal integration credentials resolve", () => {
       displayName: "Other GitHub connection",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
-        auth_scheme: "oauth",
+        connection_method: "github-app-installation",
         installation_id: "67890",
       },
     });

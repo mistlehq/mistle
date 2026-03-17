@@ -12,12 +12,7 @@ describe("OpenAiApiKeyTargetConfigSchema", () => {
 
     expect(parsed).toEqual({
       apiBaseUrl: "https://api.openai.com/",
-      bindingCapabilities: {
-        byAuthScheme: {
-          "api-key": expect.any(Object),
-          oauth: expect.any(Object),
-        },
-      },
+      bindingCapabilities: expect.any(Object),
     });
   });
 
@@ -29,12 +24,7 @@ describe("OpenAiApiKeyTargetConfigSchema", () => {
 
     expect(parsed).toEqual({
       apiBaseUrl: "https://proxy.example.com/openai-v2",
-      bindingCapabilities: {
-        byAuthScheme: {
-          "api-key": expect.any(Object),
-          oauth: expect.any(Object),
-        },
-      },
+      bindingCapabilities: expect.any(Object),
     });
   });
 

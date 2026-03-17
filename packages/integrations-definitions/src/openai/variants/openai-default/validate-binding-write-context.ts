@@ -1,7 +1,7 @@
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import type { BindingWriteValidationResult } from "@mistle/integrations-core";
 
 import type { OpenAiApiKeyBindingConfig } from "./binding-config-schema.js";
-import { OpenAiConnectionAuthSchemes } from "./model-capabilities.js";
 import type { OpenAiApiKeyTargetConfig } from "./target-config-schema.js";
 
 type OpenAiBindingWriteValidationInput = {
@@ -22,68 +22,61 @@ type OpenAiBindingWriteValidationInput = {
   };
 };
 
-function readAuthScheme(value: Record<string, unknown>): string | undefined {
-  const authScheme = value["auth_scheme"];
-  if (typeof authScheme !== "string") {
+function readConnectionMethod(value: Record<string, unknown>): string | undefined {
+  const connectionMethod = value["connection_method"];
+  if (typeof connectionMethod !== "string") {
     return undefined;
   }
 
-  return authScheme;
+  return connectionMethod;
 }
 
 export function validateOpenAiBindingWriteContext(
   input: OpenAiBindingWriteValidationInput,
 ): BindingWriteValidationResult {
-  const authScheme = readAuthScheme(input.connection.config);
-  if (authScheme === undefined) {
+  const connectionMethod = readConnectionMethod(input.connection.config);
+  if (connectionMethod === undefined) {
     return {
       ok: false,
       issues: [
         {
-          code: "openai.missing_auth_scheme",
-          field: "connection.config.auth_scheme",
+          code: "openai.missing_connection_method",
+          field: "connection.config.connection_method",
           safeMessage:
-            "OpenAI connection is missing auth scheme. Reconnect this integration connection.",
+            "OpenAI connection is missing connection method. Reconnect this integration connection.",
         },
       ],
     };
   }
 
-  if (
-    authScheme !== OpenAiConnectionAuthSchemes.API_KEY &&
-    authScheme !== OpenAiConnectionAuthSchemes.OAUTH
-  ) {
+  if (connectionMethod !== IntegrationConnectionMethodIds.API_KEY) {
     return {
       ok: false,
       issues: [
         {
-          code: "openai.unsupported_auth_scheme",
-          field: "connection.config.auth_scheme",
-          safeMessage: `OpenAI connection auth scheme '${authScheme}' is not supported.`,
+          code: "openai.unsupported_connection_method",
+          field: "connection.config.connection_method",
+          safeMessage: `OpenAI connection method '${connectionMethod}' is not supported.`,
         },
       ],
     };
   }
 
-  if (
-    !input.target.config.bindingCapabilities.byAuthScheme[authScheme].models.includes(
-      input.binding.config.defaultModel,
-    )
-  ) {
+  if (!input.target.config.bindingCapabilities.models.includes(input.binding.config.defaultModel)) {
     return {
       ok: false,
       issues: [
         {
-          code: "openai.unsupported_model_for_auth_scheme",
+          code: "openai.unsupported_model_for_connection_method",
           field: "config.defaultModel",
-          safeMessage: `Model '${input.binding.config.defaultModel}' is not supported for OpenAI auth scheme '${authScheme}'.`,
+          safeMessage: `Model '${input.binding.config.defaultModel}' is not supported for OpenAI connection method '${connectionMethod}'.`,
         },
       ],
     };
   }
 
   if (
-    !input.target.config.bindingCapabilities.byAuthScheme[authScheme].allowedReasoningByModel[
+    !input.target.config.bindingCapabilities.allowedReasoningByModel[
       input.binding.config.defaultModel
     ].includes(input.binding.config.reasoningEffort)
   ) {
@@ -93,7 +86,7 @@ export function validateOpenAiBindingWriteContext(
         {
           code: "openai.unsupported_reasoning_for_model",
           field: "config.reasoningEffort",
-          safeMessage: `Reasoning effort '${input.binding.config.reasoningEffort}' is not supported for model '${input.binding.config.defaultModel}' under auth scheme '${authScheme}'.`,
+          safeMessage: `Reasoning effort '${input.binding.config.reasoningEffort}' is not supported for model '${input.binding.config.defaultModel}' under connection method '${connectionMethod}'.`,
         },
       ],
     };

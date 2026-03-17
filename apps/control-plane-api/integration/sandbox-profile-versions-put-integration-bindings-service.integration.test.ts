@@ -49,7 +49,7 @@ describe("sandbox profile version put integration bindings service integration",
           targetKey: "openai-default-put-bindings-service",
           displayName: "Service Connection A",
           config: {
-            auth_scheme: "api-key",
+            connection_method: "api-key",
           },
         },
         {
@@ -58,7 +58,7 @@ describe("sandbox profile version put integration bindings service integration",
           targetKey: "openai-default-put-bindings-service",
           displayName: "Service Connection B",
           config: {
-            auth_scheme: "api-key",
+            connection_method: "api-key",
           },
         },
       ])
@@ -274,7 +274,7 @@ describe("sandbox profile version put integration bindings service integration",
         targetKey: "openai-default-connection-reference",
         displayName: "Other Org Connection",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       })
       .returning();
@@ -347,7 +347,7 @@ describe("sandbox profile version put integration bindings service integration",
         targetKey: "openai-default-binding-reference",
         displayName: "Valid Reference Connection",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       })
       .returning();
@@ -699,7 +699,7 @@ async function insertGitHubBindingValidationFixture(input: {
     targetKey: input.targetKey,
     displayName: "GitHub Connection",
     config: {
-      auth_scheme: "api-key",
+      connection_method: "api-key",
     },
   });
 }

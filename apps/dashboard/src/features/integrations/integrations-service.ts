@@ -4,7 +4,8 @@ export {
 } from "./integration-connection-resources-service.js";
 export {
   createApiKeyIntegrationConnection,
-  startOAuthIntegrationConnection,
+  startRedirectIntegrationConnection,
+  updateApiKeyIntegrationConnection,
   updateIntegrationConnection,
 } from "./integration-connection-mutations-service.js";
 export { listIntegrationDirectory } from "./integrations-directory-service.js";

@@ -31,7 +31,7 @@ describe("integrations-definitions index", () => {
       variantId: "atlassian-default",
       kind: "connector",
       displayName: "Atlassian",
-      supportedAuthSchemes: ["api-key"],
+      connectionMethods: [{ id: "api-key", label: "API key", kind: "api-key" }],
     });
     expect(atlassianDefinition?.mcp).toBeDefined();
     expect(openAiDefinition?.displayName).toBe("OpenAI");
@@ -41,7 +41,14 @@ describe("integrations-definitions index", () => {
       variantId: "github-cloud",
       kind: "git",
       displayName: "GitHub",
-      supportedAuthSchemes: ["api-key", "oauth"],
+      connectionMethods: [
+        { id: "api-key", label: "API key", kind: "api-key" },
+        {
+          id: "github-app-installation",
+          label: "GitHub App installation",
+          kind: "redirect",
+        },
+      ],
     });
     expect(githubCloudDefinition?.authHandlers?.oauth).toBeDefined();
     expect(
@@ -52,7 +59,14 @@ describe("integrations-definitions index", () => {
       variantId: "github-enterprise-server",
       kind: "git",
       displayName: "GitHub Enterprise Server",
-      supportedAuthSchemes: ["api-key", "oauth"],
+      connectionMethods: [
+        { id: "api-key", label: "API key", kind: "api-key" },
+        {
+          id: "github-app-installation",
+          label: "GitHub App installation",
+          kind: "redirect",
+        },
+      ],
     });
     expect(githubEnterpriseServerDefinition?.authHandlers?.oauth).toBeDefined();
     expect(
@@ -63,7 +77,7 @@ describe("integrations-definitions index", () => {
       variantId: "linear-default",
       kind: "connector",
       displayName: "Linear",
-      supportedAuthSchemes: ["api-key"],
+      connectionMethods: [{ id: "api-key", label: "API key", kind: "api-key" }],
     });
     expect(linearDefinition?.mcp).toBeDefined();
   });

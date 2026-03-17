@@ -93,7 +93,7 @@ describe("GitHubAppOAuthHandler", () => {
     expect(completed).toEqual({
       externalSubjectId: "98765",
       connectionConfig: {
-        auth_scheme: "oauth",
+        connection_method: "github-app-installation",
         installation_id: "98765",
         setup_action: "install",
       },

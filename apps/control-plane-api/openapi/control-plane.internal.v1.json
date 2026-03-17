@@ -11,7 +11,9 @@
   "paths": {
     "/internal/integration-connections/refresh-resource": {
       "post": {
-        "tags": ["Internal"],
+        "tags": [
+          "Internal"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -32,7 +34,11 @@
                     "minLength": 1
                   }
                 },
-                "required": ["organizationId", "connectionId", "kind"],
+                "required": [
+                  "organizationId",
+                  "connectionId",
+                  "kind"
+                ],
                 "additionalProperties": false
               }
             }
@@ -60,10 +66,17 @@
                     },
                     "syncState": {
                       "type": "string",
-                      "enum": ["syncing"]
+                      "enum": [
+                        "syncing"
+                      ]
                     }
                   },
-                  "required": ["connectionId", "familyId", "kind", "syncState"],
+                  "required": [
+                    "connectionId",
+                    "familyId",
+                    "kind",
+                    "syncState"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -104,7 +117,10 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"],
+                      "required": [
+                        "code",
+                        "message"
+                      ],
                       "additionalProperties": false
                     },
                     {
@@ -112,7 +128,9 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -126,11 +144,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -154,7 +178,10 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -169,14 +196,20 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": [
+                        "TARGET_NOT_FOUND",
+                        "CONNECTION_NOT_FOUND"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -198,7 +231,9 @@
     },
     "/internal/integration-credentials/resolve": {
       "post": {
-        "tags": ["Internal"],
+        "tags": [
+          "Internal"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -227,7 +262,10 @@
                     "minLength": 1
                   }
                 },
-                "required": ["connectionId", "secretType"],
+                "required": [
+                  "connectionId",
+                  "secretType"
+                ],
                 "additionalProperties": false
               }
             }
@@ -250,7 +288,9 @@
                       "format": "date-time"
                     }
                   },
-                  "required": ["value"],
+                  "required": [
+                    "value"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -272,7 +312,10 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -287,14 +330,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -316,7 +364,10 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -338,7 +389,9 @@
     },
     "/internal/integration-credentials/resolve-target-secrets": {
       "post": {
-        "tags": ["Internal"],
+        "tags": [
+          "Internal"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -356,7 +409,10 @@
                           "minLength": 1
                         },
                         "encryptedSecrets": {
-                          "type": ["object", "null"],
+                          "type": [
+                            "object",
+                            "null"
+                          ],
                           "properties": {
                             "ciphertext": {
                               "type": "string",
@@ -371,17 +427,26 @@
                               "minimum": 1
                             }
                           },
-                          "required": ["ciphertext", "nonce", "masterKeyVersion"],
+                          "required": [
+                            "ciphertext",
+                            "nonce",
+                            "masterKeyVersion"
+                          ],
                           "additionalProperties": false
                         }
                       },
-                      "required": ["targetKey", "encryptedSecrets"],
+                      "required": [
+                        "targetKey",
+                        "encryptedSecrets"
+                      ],
                       "additionalProperties": false
                     },
                     "minItems": 1
                   }
                 },
-                "required": ["targets"],
+                "required": [
+                  "targets"
+                ],
                 "additionalProperties": false
               }
             }
@@ -411,12 +476,17 @@
                             }
                           }
                         },
-                        "required": ["targetKey", "secrets"],
+                        "required": [
+                          "targetKey",
+                          "secrets"
+                        ],
                         "additionalProperties": false
                       }
                     }
                   },
-                  "required": ["targets"],
+                  "required": [
+                    "targets"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -438,7 +508,10 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -453,14 +526,19 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["UNAUTHORIZED"]
+                      "enum": [
+                        "UNAUTHORIZED"
+                      ]
                     },
                     "message": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"],
+                  "required": [
+                    "code",
+                    "message"
+                  ],
                   "additionalProperties": false
                 }
               }
@@ -482,7 +560,9 @@
     },
     "/internal/sandbox-runtime/start-profile-instance": {
       "post": {
-        "tags": ["Internal"],
+        "tags": [
+          "Internal"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -509,11 +589,15 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "enum": ["user"]
+                            "enum": [
+                              "user"
+                            ]
                           },
                           {
                             "type": "string",
-                            "enum": ["system"]
+                            "enum": [
+                              "system"
+                            ]
                           }
                         ]
                       },
@@ -522,22 +606,35 @@
                         "minLength": 1
                       }
                     },
-                    "required": ["kind", "id"]
+                    "required": [
+                      "kind",
+                      "id"
+                    ]
                   },
                   "source": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "enum": ["dashboard"]
+                        "enum": [
+                          "dashboard"
+                        ]
                       },
                       {
                         "type": "string",
-                        "enum": ["webhook"]
+                        "enum": [
+                          "webhook"
+                        ]
                       }
                     ]
                   }
                 },
-                "required": ["organizationId", "profileId", "profileVersion", "startedBy", "source"]
+                "required": [
+                  "organizationId",
+                  "profileId",
+                  "profileVersion",
+                  "startedBy",
+                  "source"
+                ]
               }
             }
           }
@@ -552,7 +649,9 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": ["accepted"]
+                      "enum": [
+                        "accepted"
+                      ]
                     },
                     "workflowRunId": {
                       "type": "string",
@@ -563,7 +662,11 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["status", "workflowRunId", "sandboxInstanceId"]
+                  "required": [
+                    "status",
+                    "workflowRunId",
+                    "sandboxInstanceId"
+                  ]
                 }
               }
             }
@@ -586,14 +689,19 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"]
+                      "required": [
+                        "code",
+                        "message"
+                      ]
                     },
                     {
                       "type": "object",
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -607,11 +715,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -635,7 +749,10 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": [
+                    "code",
+                    "message"
+                  ]
                 }
               }
             }
@@ -656,7 +773,10 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": [
+                    "code",
+                    "message"
+                  ]
                 }
               }
             }
@@ -677,7 +797,9 @@
     },
     "/internal/sandbox-runtime/get-sandbox-instance": {
       "post": {
-        "tags": ["Internal"],
+        "tags": [
+          "Internal"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -694,7 +816,10 @@
                     "minLength": 1
                   }
                 },
-                "required": ["organizationId", "instanceId"]
+                "required": [
+                  "organizationId",
+                  "instanceId"
+                ]
               }
             }
           }
@@ -713,18 +838,34 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["starting", "running", "stopped", "failed"]
+                      "enum": [
+                        "starting",
+                        "running",
+                        "stopped",
+                        "failed"
+                      ]
                     },
                     "failureCode": {
-                      "type": ["string", "null"],
+                      "type": [
+                        "string",
+                        "null"
+                      ],
                       "minLength": 1
                     },
                     "failureMessage": {
-                      "type": ["string", "null"],
+                      "type": [
+                        "string",
+                        "null"
+                      ],
                       "minLength": 1
                     }
                   },
-                  "required": ["id", "status", "failureCode", "failureMessage"]
+                  "required": [
+                    "id",
+                    "status",
+                    "failureCode",
+                    "failureMessage"
+                  ]
                 }
               }
             }
@@ -747,14 +888,19 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"]
+                      "required": [
+                        "code",
+                        "message"
+                      ]
                     },
                     {
                       "type": "object",
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -768,11 +914,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -796,7 +948,10 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": [
+                    "code",
+                    "message"
+                  ]
                 }
               }
             }
@@ -817,7 +972,10 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": [
+                    "code",
+                    "message"
+                  ]
                 }
               }
             }
@@ -838,7 +996,9 @@
     },
     "/internal/sandbox-runtime/mint-connection-token": {
       "post": {
-        "tags": ["Internal"],
+        "tags": [
+          "Internal"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -855,7 +1015,10 @@
                     "minLength": 1
                   }
                 },
-                "required": ["organizationId", "instanceId"]
+                "required": [
+                  "organizationId",
+                  "instanceId"
+                ]
               }
             }
           }
@@ -885,7 +1048,12 @@
                       "format": "date-time"
                     }
                   },
-                  "required": ["instanceId", "url", "token", "expiresAt"]
+                  "required": [
+                    "instanceId",
+                    "url",
+                    "token",
+                    "expiresAt"
+                  ]
                 }
               }
             }
@@ -908,14 +1076,19 @@
                           "minLength": 1
                         }
                       },
-                      "required": ["code", "message"]
+                      "required": [
+                        "code",
+                        "message"
+                      ]
                     },
                     {
                       "type": "object",
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [false]
+                          "enum": [
+                            false
+                          ]
                         },
                         "error": {
                           "type": "object",
@@ -929,11 +1102,17 @@
                               "minLength": 1
                             }
                           },
-                          "required": ["name", "message"],
+                          "required": [
+                            "name",
+                            "message"
+                          ],
                           "additionalProperties": {}
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": [
+                        "success",
+                        "error"
+                      ],
                       "additionalProperties": false
                     }
                   ]
@@ -957,7 +1136,10 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": [
+                    "code",
+                    "message"
+                  ]
                 }
               }
             }
@@ -978,7 +1160,10 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": [
+                    "code",
+                    "message"
+                  ]
                 }
               }
             }
@@ -999,7 +1184,10 @@
                       "minLength": 1
                     }
                   },
-                  "required": ["code", "message"]
+                  "required": [
+                    "code",
+                    "message"
+                  ]
                 }
               }
             }

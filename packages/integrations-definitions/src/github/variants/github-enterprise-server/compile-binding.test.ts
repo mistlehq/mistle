@@ -94,7 +94,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         id: "icn_123",
         status: "active",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       },
       binding: {
@@ -218,7 +218,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         id: "icn_123",
         status: "active",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       },
       binding: {
@@ -261,7 +261,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
         id: "icn_123",
         status: "active",
         config: {
-          auth_scheme: "oauth",
+          connection_method: "github-app-installation",
           installation_id: "12345",
         },
       },
@@ -309,7 +309,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
           id: "icn_123",
           status: "active",
           config: {
-            auth_scheme: "oauth",
+            connection_method: "github-app-installation",
           },
         },
         binding: {
