@@ -40,7 +40,7 @@
     "prepare": "node -e \"const cp = require('child_process'); if (!(process.env.CI || process.env.LEFTHOOK === '0')) { try { cp.execSync('git rev-parse --is-inside-work-tree', { stdio: 'ignore' }); cp.execSync('lefthook install', { stdio: 'inherit' }); } catch {} }\""
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.4.3",
+    "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.4.3",
     "@fast-check/vitest": "^0.3.0",
     "@playwright/test": "^1.58.1",
