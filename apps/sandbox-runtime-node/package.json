@@ -13,6 +13,7 @@
     "typecheck": "tsgo --noEmit",
     "test": "node ./scripts/ensure-native-built.mjs && vitest run -c vitest.config.ts --passWithNoTests",
     "test:integration": "node ./scripts/ensure-native-built.mjs && vitest run -c vitest.integration.config.ts --passWithNoTests",
+    "test:property": "vitest run -c vitest.property.config.ts --passWithNoTests",
     "format": "oxfmt .",
     "format:check": "oxfmt --check ."
   },

@@ -4,8 +4,9 @@ import { extname } from "node:path";
 import { generateProxyCa } from "@mistle/sandbox-rs-napi";
 
 import { loadBootstrapConfig } from "./config.js";
-import { buildRuntimeExecInput, execRuntime } from "./exec-runtime.js";
+import { execRuntime } from "./exec-runtime.js";
 import { installProxyCaCertificate, prepareProxyCaRuntimeEnv } from "./proxy-ca.js";
+import { buildRuntimeExecInput } from "./runtime-exec-input.js";
 
 type PasswdUserRecord = {
   username: string;

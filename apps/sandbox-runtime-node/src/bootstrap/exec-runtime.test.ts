@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildRuntimeExecArgs, buildRuntimeExecInput } from "./exec-runtime.js";
+import { buildRuntimeExecArgs, buildRuntimeExecInput } from "./runtime-exec-input.js";
 
 describe("buildRuntimeExecArgs", () => {
   it("replaces the bootstrap entrypoint for a built node invocation", () => {
