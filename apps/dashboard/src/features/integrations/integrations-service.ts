@@ -18,5 +18,5 @@ export {
   type IntegrationConnectionResourceSummary,
   type IntegrationTarget,
   type RefreshedIntegrationConnectionResources,
-  type StartedOAuthConnection,
+  type StartedRedirectConnection,
 } from "./integrations-service-shared.js";

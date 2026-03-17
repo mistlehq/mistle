@@ -77,13 +77,13 @@ const BadRequestCodeSchema = z.enum([
   IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
   IntegrationConnectionsBadRequestCodes.API_KEY_NOT_SUPPORTED,
   IntegrationConnectionsBadRequestCodes.API_KEY_CONNECTION_REQUIRED,
-  IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_START_INPUT,
-  IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_COMPLETE_INPUT,
-  IntegrationConnectionsBadRequestCodes.OAUTH_NOT_SUPPORTED,
-  IntegrationConnectionsBadRequestCodes.OAUTH_HANDLER_NOT_CONFIGURED,
-  IntegrationConnectionsBadRequestCodes.OAUTH_STATE_INVALID,
-  IntegrationConnectionsBadRequestCodes.OAUTH_STATE_EXPIRED,
-  IntegrationConnectionsBadRequestCodes.OAUTH_STATE_ALREADY_USED,
+  IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT,
+  IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
+  IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
+  IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED,
+  IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
+  IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
+  IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
 ]);
 
 export const IntegrationConnectionsBadRequestResponseSchema = z
@@ -260,13 +260,13 @@ export const CreateApiKeyConnectionBodySchema = z
   })
   .strict();
 
-export const StartOAuthConnectionParamsSchema = z
+export const StartGitHubAppInstallationConnectionParamsSchema = z
   .object({
     targetKey: z.string().min(1),
   })
   .strict();
 
-export const StartOAuthConnectionBodySchema = z
+export const StartGitHubAppInstallationConnectionBodySchema = z
   .object({
     displayName: z.string().min(1).optional(),
   })
@@ -294,19 +294,19 @@ export const UpdateApiKeyConnectionBodySchema = z
   })
   .strict();
 
-export const StartOAuthConnectionResponseSchema = z
+export const StartGitHubAppInstallationConnectionResponseSchema = z
   .object({
     authorizationUrl: z.url(),
   })
   .strict();
 
-export const CompleteOAuthConnectionParamsSchema = z
+export const CompleteGitHubAppInstallationConnectionParamsSchema = z
   .object({
     targetKey: z.string().min(1),
   })
   .strict();
 
-export const CompleteOAuthConnectionQuerySchema = z
+export const CompleteGitHubAppInstallationConnectionQuerySchema = z
   .object({
     state: z.string().min(1).optional(),
     code: z.string().min(1).optional(),
@@ -675,28 +675,28 @@ export const updateApiKeyConnectionRoute = createRoute({
   },
 });
 
-export const startOAuthConnectionRoute = createRoute({
+export const startGitHubAppInstallationConnectionRoute = createRoute({
   method: "post",
-  path: "/:targetKey/oauth/start",
+  path: "/:targetKey/github-app-installation/start",
   tags: ["Integrations"],
   middleware: ProtectedIntegrationConnectionsRouteMiddleware,
   request: {
-    params: StartOAuthConnectionParamsSchema,
+    params: StartGitHubAppInstallationConnectionParamsSchema,
     body: {
       required: false,
       content: {
         "application/json": {
-          schema: StartOAuthConnectionBodySchema,
+          schema: StartGitHubAppInstallationConnectionBodySchema,
         },
       },
     },
   },
   responses: {
     200: {
-      description: "Create an OAuth authorization URL for an integration target.",
+      description: "Create a GitHub App installation authorization URL for an integration target.",
       content: {
         "application/json": {
-          schema: StartOAuthConnectionResponseSchema,
+          schema: StartGitHubAppInstallationConnectionResponseSchema,
         },
       },
     },
@@ -743,17 +743,18 @@ export const startOAuthConnectionRoute = createRoute({
   },
 });
 
-export const completeOAuthConnectionRoute = createRoute({
+export const completeGitHubAppInstallationConnectionRoute = createRoute({
   method: "get",
-  path: "/:targetKey/oauth/complete",
+  path: "/:targetKey/github-app-installation/complete",
   tags: ["Integrations"],
   request: {
-    params: CompleteOAuthConnectionParamsSchema,
-    query: CompleteOAuthConnectionQuerySchema,
+    params: CompleteGitHubAppInstallationConnectionParamsSchema,
+    query: CompleteGitHubAppInstallationConnectionQuerySchema,
   },
   responses: {
     302: {
-      description: "Complete OAuth connection creation and redirect to dashboard integrations.",
+      description:
+        "Complete GitHub App installation connection creation and redirect to dashboard integrations.",
       headers: RedirectLocationHeaderSchema,
     },
     400: {

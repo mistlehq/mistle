@@ -4,7 +4,7 @@ import {
   IntegrationConnectionStatuses,
   integrationCredentials,
   IntegrationCredentialSecretKinds,
-  integrationOauthSessions,
+  integrationConnectionRedirectSessions,
 } from "@mistle/db/control-plane";
 import { and, eq, isNull } from "drizzle-orm";
 
@@ -18,9 +18,9 @@ import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsBadRequestError,
 } from "./errors.js";
-import { resolveOauthHandlerTargetOrThrow } from "./resolve-oauth-handler.js";
+import { resolveGitHubAppInstallationHandlerTargetOrThrow } from "./resolve-github-app-installation-handler.js";
 
-type CompleteOAuthConnectionInput = {
+type CompleteGitHubAppInstallationConnectionInput = {
   targetKey: string;
   query: Record<string, string>;
 };
@@ -37,7 +37,7 @@ type CompletedConnection = {
   updatedAt: string;
 };
 
-function createOAuthQueryParams(query: Record<string, string>): URLSearchParams {
+function createRedirectQueryParams(query: Record<string, string>): URLSearchParams {
   const params = new URLSearchParams();
 
   for (const [key, value] of Object.entries(query)) {
@@ -47,19 +47,19 @@ function createOAuthQueryParams(query: Record<string, string>): URLSearchParams 
   return params;
 }
 
-function resolveOAuthStateOrThrow(params: URLSearchParams): string {
+function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   const state = params.get("state");
   if (state === null || state.length === 0) {
     throw new IntegrationConnectionsBadRequestError(
-      IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_COMPLETE_INPUT,
-      "OAuth callback query must include `state`.",
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
+      "GitHub App installation callback query must include `state`.",
     );
   }
 
   return state;
 }
 
-function resolveOAuthDisplayName(state: string): string | undefined {
+function resolveRedirectDisplayName(state: string): string | undefined {
   const separatorIndex = state.indexOf(".");
   if (separatorIndex < 0 || separatorIndex === state.length - 1) {
     return undefined;
@@ -79,62 +79,59 @@ function resolveCredentialSecretKind(secretType: string) {
     return IntegrationCredentialSecretKinds.API_KEY;
   }
 
-  if (secretType === IntegrationCredentialSecretKinds.OAUTH_ACCESS_TOKEN) {
-    return IntegrationCredentialSecretKinds.OAUTH_ACCESS_TOKEN;
-  }
-
-  throw new Error(`Unsupported OAuth credential secret type '${secretType}'.`);
+  throw new Error(`Unsupported GitHub App installation credential secret type '${secretType}'.`);
 }
 
-export async function completeOAuthConnection(
+export async function completeGitHubAppInstallationConnection(
   db: AppContext["var"]["db"],
   integrationsConfig: AppContext["var"]["config"]["integrations"],
-  input: CompleteOAuthConnectionInput,
+  input: CompleteGitHubAppInstallationConnectionInput,
 ): Promise<CompletedConnection> {
-  const resolved = await resolveOauthHandlerTargetOrThrow(db, integrationsConfig, {
+  const resolved = await resolveGitHubAppInstallationHandlerTargetOrThrow(db, integrationsConfig, {
     targetKey: input.targetKey,
-    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_COMPLETE_INPUT,
+    invalidInputCode:
+      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
   });
 
-  const queryParams = createOAuthQueryParams(input.query);
-  const state = resolveOAuthStateOrThrow(queryParams);
+  const queryParams = createRedirectQueryParams(input.query);
+  const state = resolveRedirectStateOrThrow(queryParams);
 
-  const oauthSession = await db.query.integrationOauthSessions.findFirst({
+  const redirectSession = await db.query.integrationConnectionRedirectSessions.findFirst({
     where: (table, { and, eq }) =>
       and(eq(table.targetKey, input.targetKey), eq(table.state, state)),
   });
 
-  if (oauthSession === undefined) {
+  if (redirectSession === undefined) {
     throw new IntegrationConnectionsBadRequestError(
-      IntegrationConnectionsBadRequestCodes.OAUTH_STATE_INVALID,
-      "OAuth state is invalid.",
+      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
+      "Redirect state is invalid.",
     );
   }
 
-  const requestedDisplayName = resolveOAuthDisplayName(oauthSession.state);
+  const requestedDisplayName = resolveRedirectDisplayName(redirectSession.state);
 
-  if (oauthSession.usedAt !== null) {
+  if (redirectSession.usedAt !== null) {
     throw new IntegrationConnectionsBadRequestError(
-      IntegrationConnectionsBadRequestCodes.OAUTH_STATE_ALREADY_USED,
-      "OAuth state has already been used.",
+      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
+      "Redirect state has already been used.",
     );
   }
 
   const now = Date.now();
-  const expiresAt = Date.parse(oauthSession.expiresAt);
+  const expiresAt = Date.parse(redirectSession.expiresAt);
   if (Number.isNaN(expiresAt)) {
-    throw new Error(`OAuth session '${oauthSession.id}' has an invalid expiry timestamp.`);
+    throw new Error(`Redirect session '${redirectSession.id}' has an invalid expiry timestamp.`);
   }
 
   if (expiresAt <= now) {
     throw new IntegrationConnectionsBadRequestError(
-      IntegrationConnectionsBadRequestCodes.OAUTH_STATE_EXPIRED,
-      "OAuth state has expired.",
+      IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
+      "Redirect state has expired.",
     );
   }
 
-  const completedOAuthConnection = await resolved.oauthHandler.complete({
-    organizationId: oauthSession.organizationId,
+  const completedGitHubAppInstallationConnection = await resolved.redirectHandler.complete({
+    organizationId: redirectSession.organizationId,
     targetKey: input.targetKey,
     target: resolved.target,
     query: queryParams,
@@ -143,56 +140,60 @@ export async function completeOAuthConnection(
   return db.transaction(async (tx) => {
     const usedAtTimestamp = new Date().toISOString();
     const consumedSessionRows = await tx
-      .update(integrationOauthSessions)
+      .update(integrationConnectionRedirectSessions)
       .set({
         usedAt: usedAtTimestamp,
       })
       .where(
         and(
-          eq(integrationOauthSessions.id, oauthSession.id),
-          isNull(integrationOauthSessions.usedAt),
+          eq(integrationConnectionRedirectSessions.id, redirectSession.id),
+          isNull(integrationConnectionRedirectSessions.usedAt),
         ),
       )
       .returning({
-        id: integrationOauthSessions.id,
+        id: integrationConnectionRedirectSessions.id,
       });
 
     if (consumedSessionRows.length !== 1) {
       throw new IntegrationConnectionsBadRequestError(
-        IntegrationConnectionsBadRequestCodes.OAUTH_STATE_ALREADY_USED,
-        "OAuth state has already been used.",
+        IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
+        "Redirect state has already been used.",
       );
     }
 
     const [createdConnection] = await tx
       .insert(integrationConnections)
       .values({
-        organizationId: oauthSession.organizationId,
+        organizationId: redirectSession.organizationId,
         targetKey: input.targetKey,
         displayName:
-          requestedDisplayName ?? completedOAuthConnection.externalSubjectId ?? input.targetKey,
+          requestedDisplayName ??
+          completedGitHubAppInstallationConnection.externalSubjectId ??
+          input.targetKey,
         status: IntegrationConnectionStatuses.ACTIVE,
-        ...(completedOAuthConnection.externalSubjectId === undefined
+        ...(completedGitHubAppInstallationConnection.externalSubjectId === undefined
           ? {}
-          : { externalSubjectId: completedOAuthConnection.externalSubjectId }),
-        config: completedOAuthConnection.connectionConfig,
+          : { externalSubjectId: completedGitHubAppInstallationConnection.externalSubjectId }),
+        config: completedGitHubAppInstallationConnection.connectionConfig,
         targetSnapshotConfig: resolved.target.config,
       })
       .returning();
 
     if (createdConnection === undefined) {
-      throw new Error("Failed to create integration connection from OAuth callback.");
+      throw new Error(
+        "Failed to create integration connection from GitHub App installation callback.",
+      );
     }
 
-    if (completedOAuthConnection.credentialMaterials.length > 0) {
+    if (completedGitHubAppInstallationConnection.credentialMaterials.length > 0) {
       const organizationCredentialKey = await tx.query.organizationCredentialKeys.findFirst({
-        where: (table, { eq }) => eq(table.organizationId, oauthSession.organizationId),
+        where: (table, { eq }) => eq(table.organizationId, redirectSession.organizationId),
         orderBy: (table, { desc }) => [desc(table.version)],
       });
 
       if (organizationCredentialKey === undefined) {
         throw new Error(
-          `Organization credential key is missing for '${oauthSession.organizationId}'.`,
+          `Organization credential key is missing for '${redirectSession.organizationId}'.`,
         );
       }
 
@@ -206,7 +207,7 @@ export async function completeOAuthConnection(
       });
 
       try {
-        for (const material of completedOAuthConnection.credentialMaterials) {
+        for (const material of completedGitHubAppInstallationConnection.credentialMaterials) {
           const encryptedCredential = encryptCredentialUtf8({
             plaintext: material.plaintext,
             organizationCredentialKey: unwrappedOrganizationCredentialKey,
@@ -215,7 +216,7 @@ export async function completeOAuthConnection(
           const [createdCredential] = await tx
             .insert(integrationCredentials)
             .values({
-              organizationId: oauthSession.organizationId,
+              organizationId: redirectSession.organizationId,
               secretKind: resolveCredentialSecretKind(material.secretType),
               ciphertext: encryptedCredential.ciphertext,
               nonce: encryptedCredential.nonce,

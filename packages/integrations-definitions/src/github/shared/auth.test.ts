@@ -11,13 +11,13 @@ describe("github shared auth", () => {
     expect(secretType).toBe("api_key");
   });
 
-  it("resolves oauth connections to oauth_access_token secret type", () => {
+  it("resolves GitHub App installation connections to github_app_installation_token", () => {
     const secretType = resolveGitHubCredentialSecretType({
       connection_method: "github-app-installation",
       installation_id: 12345,
     });
 
-    expect(secretType).toBe("oauth_access_token");
+    expect(secretType).toBe("github_app_installation_token");
   });
 
   it("fails when connection_method is missing", () => {

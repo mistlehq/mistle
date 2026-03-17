@@ -5,13 +5,13 @@ export type {
   IntegrationConnectionsService,
 } from "./services/factory.js";
 export {
-  completeOAuthConnectionRoute,
-  CompleteOAuthConnectionQuerySchema,
+  completeGitHubAppInstallationConnectionRoute,
+  CompleteGitHubAppInstallationConnectionQuerySchema,
   IntegrationConnectionSchema,
   createApiKeyConnectionRoute,
   listIntegrationConnectionsRoute,
   ListIntegrationConnectionsResponseSchema,
-  startOAuthConnectionRoute,
-  StartOAuthConnectionResponseSchema,
+  startGitHubAppInstallationConnectionRoute,
+  StartGitHubAppInstallationConnectionResponseSchema,
 } from "./contracts.js";
 export { createIntegrationConnectionsService } from "./services/factory.js";

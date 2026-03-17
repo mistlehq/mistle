@@ -112,7 +112,7 @@ const ThreadReadResultSchema = z.looseObject({
   }),
 });
 
-const StartOAuthConnectionResponseSchema = z
+const StartRedirectConnectionResponseSchema = z
   .object({
     authorizationUrl: z.url(),
   })
@@ -268,12 +268,12 @@ function parseGitHubRepository(input: string): GitHubRepository {
   };
 }
 
-function createOAuthCompletePath(input: {
+function createGitHubAppInstallationCompletePath(input: {
   targetKey: string;
   query: Record<string, string>;
 }): string {
   const searchParams = new URLSearchParams(input.query);
-  return `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth/complete?${searchParams.toString()}`;
+  return `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/github-app-installation/complete?${searchParams.toString()}`;
 }
 
 async function expectStatusJson(input: {
@@ -1748,9 +1748,9 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
           action: async () => {
             const startResponse = await requestWithTimeout({
               request: fixture.request,
-              path: `/v1/integration/connections/${encodeURIComponent(GITHUB_TARGET_KEY)}/oauth/start`,
+              path: `/v1/integration/connections/${encodeURIComponent(GITHUB_TARGET_KEY)}/github-app-installation/start`,
               timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
-              description: "GitHub OAuth connection start",
+              description: "GitHub App installation start",
               init: {
                 method: "POST",
                 headers: {
@@ -1765,12 +1765,13 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
             const startPayload = await expectStatusJson({
               response: startResponse,
               status: 200,
-              description: "GitHub OAuth connection start",
+              description: "GitHub App installation start",
             });
-            const parsedStartPayload = StartOAuthConnectionResponseSchema.safeParse(startPayload);
+            const parsedStartPayload =
+              StartRedirectConnectionResponseSchema.safeParse(startPayload);
             if (!parsedStartPayload.success) {
               throw new Error(
-                `GitHub OAuth start response did not match schema: ${formatJsonForError(startPayload)}`,
+                `GitHub App installation start response did not match schema: ${formatJsonForError(startPayload)}`,
               );
             }
 
@@ -1778,12 +1779,14 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
               parsedStartPayload.data.authorizationUrl,
             ).searchParams.get("state");
             if (githubOauthState === null || githubOauthState.length === 0) {
-              throw new Error("Expected GitHub OAuth start response to include a non-empty state.");
+              throw new Error(
+                "Expected GitHub App installation start response to include a non-empty state.",
+              );
             }
 
             const completeResponse = await requestWithTimeout({
               request: fixture.request,
-              path: createOAuthCompletePath({
+              path: createGitHubAppInstallationCompletePath({
                 targetKey: GITHUB_TARGET_KEY,
                 query: {
                   state: githubOauthState,
@@ -1792,7 +1795,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
                 },
               }),
               timeoutMs: CREATE_CONNECTION_TIMEOUT_MS,
-              description: "GitHub OAuth connection completion",
+              description: "GitHub App installation completion",
               init: {
                 method: "GET",
                 headers: {
@@ -1804,7 +1807,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
             if (completeResponse.status !== 302) {
               const responseBody = await completeResponse.text().catch(() => "");
               throw new Error(
-                `GitHub OAuth connection completion expected status 302, got ${String(completeResponse.status)}. Response body: ${responseBody}`,
+                `GitHub App installation completion expected status 302, got ${String(completeResponse.status)}. Response body: ${responseBody}`,
               );
             }
 

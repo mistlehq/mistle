@@ -96,10 +96,10 @@ export {
   type IntegrationTarget,
 } from "./integration-targets.js";
 export {
-  integrationOauthSessions,
-  type InsertIntegrationOauthSession,
-  type IntegrationOauthSession,
-} from "./integration-oauth-sessions.js";
+  integrationConnectionRedirectSessions,
+  type InsertIntegrationConnectionRedirectSession,
+  type IntegrationConnectionRedirectSession,
+} from "./integration-connection-redirect-sessions.js";
 export {
   scheduleAutomations,
   type InsertScheduleAutomation,

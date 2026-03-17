@@ -33,7 +33,7 @@ func TestValidateRuntimePlan(t *testing.T) {
 					},
 					CredentialResolver: EgressCredentialResolver{
 						ConnectionID: "icn_123",
-						SecretType:   "oauth_access_token",
+						SecretType:   "github_app_installation_token",
 						ResolverKey:  "github_app_installation_token",
 					},
 				},
@@ -80,7 +80,7 @@ func TestValidateRuntimePlan(t *testing.T) {
 					},
 					CredentialResolver: EgressCredentialResolver{
 						ConnectionID: "icn_123",
-						SecretType:   "oauth_access_token",
+						SecretType:   "github_app_installation_token",
 					},
 				},
 			},

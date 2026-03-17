@@ -16,8 +16,8 @@ import {
   GitHubAppInstallationCredentialResolver,
   GitHubCredentialResolverKeys,
 } from "../../shared/credential-resolver.js";
+import { GitHubAppInstallationRedirectHandler } from "../../shared/github-app-installation-handler.js";
 import { listGitHubConnectionResources } from "../../shared/list-connection-resources.js";
-import { GitHubAppOAuthHandler } from "../../shared/oauth-handler.js";
 import {
   GitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
@@ -67,7 +67,7 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
     },
   },
   authHandlers: {
-    oauth: GitHubAppOAuthHandler,
+    oauth: GitHubAppInstallationRedirectHandler,
   },
   webhookHandler: GitHubCloudWebhookHandler,
   resourceDefinitions: GitHubResourceDefinitions,

@@ -5,8 +5,8 @@ import { integrationTargets } from "./integration-targets.js";
 import { controlPlaneSchema } from "./namespace.js";
 import { organizations } from "./organizations.js";
 
-export const integrationOauthSessions = controlPlaneSchema.table(
-  "integration_oauth_sessions",
+export const integrationConnectionRedirectSessions = controlPlaneSchema.table(
+  "integration_connection_redirect_sessions",
   {
     id: text("id")
       .primaryKey()
@@ -26,15 +26,17 @@ export const integrationOauthSessions = controlPlaneSchema.table(
       .defaultNow(),
   },
   (table) => [
-    index("integration_oauth_sessions_organization_id_idx").on(table.organizationId),
-    index("integration_oauth_sessions_organization_id_target_key_idx").on(
+    index("integration_connection_redirect_sessions_organization_id_idx").on(table.organizationId),
+    index("integration_connection_redirect_sessions_organization_id_target_key_idx").on(
       table.organizationId,
       table.targetKey,
     ),
-    uniqueIndex("integration_oauth_sessions_state_uidx").on(table.state),
-    index("integration_oauth_sessions_expires_at_idx").on(table.expiresAt),
+    uniqueIndex("integration_connection_redirect_sessions_state_uidx").on(table.state),
+    index("integration_connection_redirect_sessions_expires_at_idx").on(table.expiresAt),
   ],
 );
 
-export type IntegrationOauthSession = typeof integrationOauthSessions.$inferSelect;
-export type InsertIntegrationOauthSession = typeof integrationOauthSessions.$inferInsert;
+export type IntegrationConnectionRedirectSession =
+  typeof integrationConnectionRedirectSessions.$inferSelect;
+export type InsertIntegrationConnectionRedirectSession =
+  typeof integrationConnectionRedirectSessions.$inferInsert;

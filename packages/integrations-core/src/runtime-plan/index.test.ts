@@ -94,7 +94,7 @@ describe("assembleCompiledRuntimePlan", () => {
               },
               credentialResolver: {
                 connectionId: "conn_b",
-                secretType: "oauth_access_token",
+                secretType: "github_app_installation_token",
               },
             },
           ],

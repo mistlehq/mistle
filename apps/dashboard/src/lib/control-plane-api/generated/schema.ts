@@ -617,13 +617,13 @@ export interface paths {
                     | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
                     | "API_KEY_CONNECTION_REQUIRED"
-                    | "INVALID_OAUTH_START_INPUT"
-                    | "INVALID_OAUTH_COMPLETE_INPUT"
-                    | "OAUTH_NOT_SUPPORTED"
-                    | "OAUTH_HANDLER_NOT_CONFIGURED"
-                    | "OAUTH_STATE_INVALID"
-                    | "OAUTH_STATE_EXPIRED"
-                    | "OAUTH_STATE_ALREADY_USED";
+                    | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
+                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
+                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
+                    | "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED"
+                    | "REDIRECT_STATE_INVALID"
+                    | "REDIRECT_STATE_EXPIRED"
+                    | "REDIRECT_STATE_ALREADY_USED";
                   message: string;
                 }
               | {
@@ -760,13 +760,13 @@ export interface paths {
                     | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
                     | "API_KEY_CONNECTION_REQUIRED"
-                    | "INVALID_OAUTH_START_INPUT"
-                    | "INVALID_OAUTH_COMPLETE_INPUT"
-                    | "OAUTH_NOT_SUPPORTED"
-                    | "OAUTH_HANDLER_NOT_CONFIGURED"
-                    | "OAUTH_STATE_INVALID"
-                    | "OAUTH_STATE_EXPIRED"
-                    | "OAUTH_STATE_ALREADY_USED";
+                    | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
+                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
+                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
+                    | "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED"
+                    | "REDIRECT_STATE_INVALID"
+                    | "REDIRECT_STATE_EXPIRED"
+                    | "REDIRECT_STATE_ALREADY_USED";
                   message: string;
                 }
               | {
@@ -916,13 +916,13 @@ export interface paths {
                     | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
                     | "API_KEY_CONNECTION_REQUIRED"
-                    | "INVALID_OAUTH_START_INPUT"
-                    | "INVALID_OAUTH_COMPLETE_INPUT"
-                    | "OAUTH_NOT_SUPPORTED"
-                    | "OAUTH_HANDLER_NOT_CONFIGURED"
-                    | "OAUTH_STATE_INVALID"
-                    | "OAUTH_STATE_EXPIRED"
-                    | "OAUTH_STATE_ALREADY_USED";
+                    | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
+                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
+                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
+                    | "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED"
+                    | "REDIRECT_STATE_INVALID"
+                    | "REDIRECT_STATE_EXPIRED"
+                    | "REDIRECT_STATE_ALREADY_USED";
                   message: string;
                 }
               | {
@@ -1073,13 +1073,13 @@ export interface paths {
                     | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
                     | "API_KEY_CONNECTION_REQUIRED"
-                    | "INVALID_OAUTH_START_INPUT"
-                    | "INVALID_OAUTH_COMPLETE_INPUT"
-                    | "OAUTH_NOT_SUPPORTED"
-                    | "OAUTH_HANDLER_NOT_CONFIGURED"
-                    | "OAUTH_STATE_INVALID"
-                    | "OAUTH_STATE_EXPIRED"
-                    | "OAUTH_STATE_ALREADY_USED";
+                    | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
+                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
+                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
+                    | "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED"
+                    | "REDIRECT_STATE_INVALID"
+                    | "REDIRECT_STATE_EXPIRED"
+                    | "REDIRECT_STATE_ALREADY_USED";
                   message: string;
                 }
               | {
@@ -1196,13 +1196,13 @@ export interface paths {
                     | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
                     | "API_KEY_CONNECTION_REQUIRED"
-                    | "INVALID_OAUTH_START_INPUT"
-                    | "INVALID_OAUTH_COMPLETE_INPUT"
-                    | "OAUTH_NOT_SUPPORTED"
-                    | "OAUTH_HANDLER_NOT_CONFIGURED"
-                    | "OAUTH_STATE_INVALID"
-                    | "OAUTH_STATE_EXPIRED"
-                    | "OAUTH_STATE_ALREADY_USED";
+                    | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
+                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
+                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
+                    | "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED"
+                    | "REDIRECT_STATE_INVALID"
+                    | "REDIRECT_STATE_EXPIRED"
+                    | "REDIRECT_STATE_ALREADY_USED";
                   message: string;
                 }
               | {
@@ -1352,13 +1352,13 @@ export interface paths {
                     | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
                     | "API_KEY_CONNECTION_REQUIRED"
-                    | "INVALID_OAUTH_START_INPUT"
-                    | "INVALID_OAUTH_COMPLETE_INPUT"
-                    | "OAUTH_NOT_SUPPORTED"
-                    | "OAUTH_HANDLER_NOT_CONFIGURED"
-                    | "OAUTH_STATE_INVALID"
-                    | "OAUTH_STATE_EXPIRED"
-                    | "OAUTH_STATE_ALREADY_USED";
+                    | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
+                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
+                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
+                    | "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED"
+                    | "REDIRECT_STATE_INVALID"
+                    | "REDIRECT_STATE_EXPIRED"
+                    | "REDIRECT_STATE_ALREADY_USED";
                   message: string;
                 }
               | {
@@ -1403,7 +1403,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/integration/connections/:targetKey/oauth/complete": {
+  "/v1/integration/connections/:targetKey/github-app-installation/complete": {
     parameters: {
       query?: never;
       header?: never;
@@ -1429,7 +1429,7 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Complete OAuth connection creation and redirect to dashboard integrations. */
+        /** @description Complete GitHub App installation connection creation and redirect to dashboard integrations. */
         302: {
           headers: {
             Location: string;
@@ -1456,13 +1456,13 @@ export interface paths {
                     | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
                     | "API_KEY_CONNECTION_REQUIRED"
-                    | "INVALID_OAUTH_START_INPUT"
-                    | "INVALID_OAUTH_COMPLETE_INPUT"
-                    | "OAUTH_NOT_SUPPORTED"
-                    | "OAUTH_HANDLER_NOT_CONFIGURED"
-                    | "OAUTH_STATE_INVALID"
-                    | "OAUTH_STATE_EXPIRED"
-                    | "OAUTH_STATE_ALREADY_USED";
+                    | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
+                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
+                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
+                    | "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED"
+                    | "REDIRECT_STATE_INVALID"
+                    | "REDIRECT_STATE_EXPIRED"
+                    | "REDIRECT_STATE_ALREADY_USED";
                   message: string;
                 }
               | {
@@ -1509,7 +1509,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/integration/connections/:targetKey/oauth/start": {
+  "/v1/integration/connections/:targetKey/github-app-installation/start": {
     parameters: {
       query?: never;
       header?: never;
@@ -1535,7 +1535,7 @@ export interface paths {
         };
       };
       responses: {
-        /** @description Create an OAuth authorization URL for an integration target. */
+        /** @description Create a GitHub App installation authorization URL for an integration target. */
         200: {
           headers: {
             [name: string]: unknown;
@@ -1566,13 +1566,13 @@ export interface paths {
                     | "INVALID_UPDATE_CONNECTION_INPUT"
                     | "API_KEY_NOT_SUPPORTED"
                     | "API_KEY_CONNECTION_REQUIRED"
-                    | "INVALID_OAUTH_START_INPUT"
-                    | "INVALID_OAUTH_COMPLETE_INPUT"
-                    | "OAUTH_NOT_SUPPORTED"
-                    | "OAUTH_HANDLER_NOT_CONFIGURED"
-                    | "OAUTH_STATE_INVALID"
-                    | "OAUTH_STATE_EXPIRED"
-                    | "OAUTH_STATE_ALREADY_USED";
+                    | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
+                    | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
+                    | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
+                    | "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED"
+                    | "REDIRECT_STATE_INVALID"
+                    | "REDIRECT_STATE_EXPIRED"
+                    | "REDIRECT_STATE_ALREADY_USED";
                   message: string;
                 }
               | {

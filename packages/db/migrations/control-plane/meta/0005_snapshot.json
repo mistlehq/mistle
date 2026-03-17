@@ -1703,8 +1703,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "control_plane.integration_oauth_sessions": {
-      "name": "integration_oauth_sessions",
+    "control_plane.integration_connection_redirect_sessions": {
+      "name": "integration_connection_redirect_sessions",
       "schema": "control_plane",
       "columns": {
         "id": {
@@ -1758,8 +1758,8 @@
         }
       },
       "indexes": {
-        "integration_oauth_sessions_organization_id_idx": {
-          "name": "integration_oauth_sessions_organization_id_idx",
+        "integration_connection_redirect_sessions_organization_id_idx": {
+          "name": "integration_connection_redirect_sessions_organization_id_idx",
           "columns": [
             {
               "expression": "organization_id",
@@ -1773,8 +1773,8 @@
           "method": "btree",
           "with": {}
         },
-        "integration_oauth_sessions_organization_id_target_key_idx": {
-          "name": "integration_oauth_sessions_organization_id_target_key_idx",
+        "integration_connection_redirect_sessions_organization_id_target_key_idx": {
+          "name": "integration_connection_redirect_sessions_organization_id_target_key_idx",
           "columns": [
             {
               "expression": "organization_id",
@@ -1794,8 +1794,8 @@
           "method": "btree",
           "with": {}
         },
-        "integration_oauth_sessions_state_uidx": {
-          "name": "integration_oauth_sessions_state_uidx",
+        "integration_connection_redirect_sessions_state_uidx": {
+          "name": "integration_connection_redirect_sessions_state_uidx",
           "columns": [
             {
               "expression": "state",
@@ -1809,8 +1809,8 @@
           "method": "btree",
           "with": {}
         },
-        "integration_oauth_sessions_expires_at_idx": {
-          "name": "integration_oauth_sessions_expires_at_idx",
+        "integration_connection_redirect_sessions_expires_at_idx": {
+          "name": "integration_connection_redirect_sessions_expires_at_idx",
           "columns": [
             {
               "expression": "expires_at",
@@ -1826,9 +1826,9 @@
         }
       },
       "foreignKeys": {
-        "integration_oauth_sessions_organization_id_organizations_id_fk": {
-          "name": "integration_oauth_sessions_organization_id_organizations_id_fk",
-          "tableFrom": "integration_oauth_sessions",
+        "integration_connection_redirect_sessions_organization_id_organizations_id_fk": {
+          "name": "integration_connection_redirect_sessions_organization_id_organizations_id_fk",
+          "tableFrom": "integration_connection_redirect_sessions",
           "tableTo": "organizations",
           "schemaTo": "control_plane",
           "columnsFrom": ["organization_id"],
@@ -1836,9 +1836,9 @@
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
-        "integration_oauth_sessions_target_key_integration_targets_target_key_fk": {
-          "name": "integration_oauth_sessions_target_key_integration_targets_target_key_fk",
-          "tableFrom": "integration_oauth_sessions",
+        "integration_connection_redirect_sessions_target_key_integration_targets_target_key_fk": {
+          "name": "integration_connection_redirect_sessions_target_key_integration_targets_target_key_fk",
+          "tableFrom": "integration_connection_redirect_sessions",
           "tableTo": "integration_targets",
           "schemaTo": "control_plane",
           "columnsFrom": ["target_key"],

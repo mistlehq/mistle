@@ -68,11 +68,11 @@ Configure these values:
 
 <CodeGroup>
 ```txt GitHub Cloud target
-https://<control-plane-base-url>/v1/integration/connections/github-cloud/oauth/complete
+https://<control-plane-base-url>/v1/integration/connections/github-cloud/github-app-installation/complete
 ```
 
 ```txt GHES target
-https://<control-plane-base-url>/v1/integration/connections/github-enterprise-server/oauth/complete
+https://<control-plane-base-url>/v1/integration/connections/github-enterprise-server/github-app-installation/complete
 ```
 
 </CodeGroup>
@@ -104,7 +104,7 @@ https://<control-plane-base-url>/v1/integration/webhooks/github-enterprise-serve
 9. Generate and download a PEM private key.
 10. Copy the App ID, app slug, and optional client ID into your Mistle provision manifest.
 
-Mistle's current GitHub flow is GitHub App installation based, not a traditional OAuth authorization-code exchange. The backend starts the flow by generating an installation URL at `/apps/<app-slug>/installations/new?state=...`. GitHub then redirects directly to Mistle's control-plane completion endpoint at `/v1/integration/connections/<target-key>/oauth/complete`, which processes callback query parameters such as `state`, `installation_id`, and `setup_action`, creates the integration connection, and redirects the browser to the dashboard integrations page.
+Mistle's current GitHub flow is GitHub App installation based, not a traditional OAuth authorization-code exchange. The backend starts the flow by generating an installation URL at `/apps/<app-slug>/installations/new?state=...`. GitHub then redirects directly to Mistle's control-plane completion endpoint at `/v1/integration/connections/<target-key>/github-app-installation/complete`, which processes callback query parameters such as `state`, `installation_id`, and `setup_action`, creates the integration connection, and redirects the browser to the dashboard integrations page.
 
 ## Configure Mistle
 

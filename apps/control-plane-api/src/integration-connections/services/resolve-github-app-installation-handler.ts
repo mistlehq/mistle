@@ -47,7 +47,7 @@ function toStringRecord(value: unknown): Record<string, string> | null {
   return stringRecord;
 }
 
-export type ResolvedOauthHandlerTarget = {
+export type ResolvedGitHubAppInstallationHandlerTarget = {
   target: {
     targetKey: string;
     familyId: string;
@@ -56,7 +56,7 @@ export type ResolvedOauthHandlerTarget = {
     config: Record<string, unknown>;
     secrets: Record<string, string>;
   };
-  oauthHandler: IntegrationOAuthHandler<Record<string, unknown>, Record<string, string>>;
+  redirectHandler: IntegrationOAuthHandler<Record<string, unknown>, Record<string, string>>;
 };
 
 async function resolveEnabledTargetOrThrow(
@@ -77,16 +77,16 @@ async function resolveEnabledTargetOrThrow(
   return target;
 }
 
-export async function resolveOauthHandlerTargetOrThrow(
+export async function resolveGitHubAppInstallationHandlerTargetOrThrow(
   db: AppContext["var"]["db"],
   integrationsConfig: AppContext["var"]["config"]["integrations"],
   input: {
     targetKey: string;
     invalidInputCode:
-      | typeof IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_START_INPUT
-      | typeof IntegrationConnectionsBadRequestCodes.INVALID_OAUTH_COMPLETE_INPUT;
+      | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT
+      | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT;
   },
-): Promise<ResolvedOauthHandlerTarget> {
+): Promise<ResolvedGitHubAppInstallationHandlerTarget> {
   const target = await resolveEnabledTargetOrThrow(db, input.targetKey);
   const definition = registry.getDefinition({
     familyId: target.familyId,
@@ -102,22 +102,20 @@ export async function resolveOauthHandlerTargetOrThrow(
 
   if (
     !definition.connectionMethods.some(
-      (method) =>
-        method.id === IntegrationConnectionMethodIds.OAUTH2 ||
-        method.id === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+      (method) => method.id === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
     )
   ) {
     throw new IntegrationConnectionsBadRequestError(
-      IntegrationConnectionsBadRequestCodes.OAUTH_NOT_SUPPORTED,
-      `Integration target '${input.targetKey}' does not support OAuth.`,
+      IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
+      `Integration target '${input.targetKey}' does not support GitHub App installation.`,
     );
   }
 
-  const oauthHandler = definition.authHandlers?.oauth;
-  if (oauthHandler === undefined) {
+  const redirectHandler = definition.authHandlers?.oauth;
+  if (redirectHandler === undefined) {
     throw new IntegrationConnectionsBadRequestError(
-      IntegrationConnectionsBadRequestCodes.OAUTH_HANDLER_NOT_CONFIGURED,
-      `Integration target '${input.targetKey}' does not define an OAuth handler.`,
+      IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED,
+      `Integration target '${input.targetKey}' does not define a GitHub App installation handler.`,
     );
   }
 
@@ -176,6 +174,6 @@ export async function resolveOauthHandlerTargetOrThrow(
       config: parsedConfig,
       secrets: parsedSecrets,
     },
-    oauthHandler,
+    redirectHandler,
   };
 }

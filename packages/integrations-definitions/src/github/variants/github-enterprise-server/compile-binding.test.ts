@@ -278,11 +278,15 @@ describe("compileGitHubEnterpriseServerBinding", () => {
       },
     });
 
-    expect(compiled.egressRoutes[0]?.credentialResolver.secretType).toBe("oauth_access_token");
+    expect(compiled.egressRoutes[0]?.credentialResolver.secretType).toBe(
+      "github_app_installation_token",
+    );
     expect(compiled.egressRoutes[0]?.credentialResolver.resolverKey).toBe(
       "github_app_installation_token",
     );
-    expect(compiled.egressRoutes[1]?.credentialResolver.secretType).toBe("oauth_access_token");
+    expect(compiled.egressRoutes[1]?.credentialResolver.secretType).toBe(
+      "github_app_installation_token",
+    );
     expect(compiled.egressRoutes[1]?.credentialResolver.resolverKey).toBe(
       "github_app_installation_token",
     );
