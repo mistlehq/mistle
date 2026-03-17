@@ -4,6 +4,10 @@ import type {
   IntegrationKind,
 } from "@mistle/integrations-core";
 
+import { AtlassianConnectionConfigSchema } from "../atlassian/variants/atlassian-default/auth.js";
+import { AtlassianBindingConfigSchema } from "../atlassian/variants/atlassian-default/binding-config-schema.js";
+import { AtlassianConnectionConfigForm } from "../atlassian/variants/atlassian-default/connection-config-form.js";
+import { AtlassianTargetConfigSchema } from "../atlassian/variants/atlassian-default/target-config-schema.js";
 import { resolveGitHubBindingConfigForm } from "../github/shared/binding-config-form.js";
 import { GitHubCloudBindingConfigSchema } from "../github/variants/github-cloud/binding-config-schema.js";
 import { GitHubCloudTargetConfigSchema } from "../github/variants/github-cloud/target-config-schema.js";
@@ -68,6 +72,15 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
     bindingConfigForm: resolveOpenAiBindingConfigForm,
     connectionConfigSchema: OpenAiConnectionConfigSchema,
     connectionConfigForm: OpenAiConnectionConfigForm,
+  },
+  {
+    familyId: "atlassian",
+    variantId: "atlassian-default",
+    kind: "connector",
+    targetConfigSchema: AtlassianTargetConfigSchema,
+    bindingConfigSchema: AtlassianBindingConfigSchema,
+    connectionConfigSchema: AtlassianConnectionConfigSchema,
+    connectionConfigForm: AtlassianConnectionConfigForm,
   },
   {
     familyId: "linear",

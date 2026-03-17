@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import { createIntegrationRegistry, listIntegrationDefinitions } from "./index.js";
 
 describe("integrations-definitions index", () => {
-  it("registers openai and github definitions in a registry", () => {
+  it("registers built-in integration definitions in a registry", () => {
     const registry = createIntegrationRegistry();
+    const atlassianDefinition = registry.getDefinition({
+      familyId: "atlassian",
+      variantId: "atlassian-default",
+    });
     const openAiDefinition = registry.getDefinition({
       familyId: "openai",
       variantId: "openai-default",
@@ -22,6 +26,14 @@ describe("integrations-definitions index", () => {
       variantId: "linear-default",
     });
 
+    expect(atlassianDefinition).toMatchObject({
+      familyId: "atlassian",
+      variantId: "atlassian-default",
+      kind: "connector",
+      displayName: "Atlassian",
+      supportedAuthSchemes: ["api-key"],
+    });
+    expect(atlassianDefinition?.mcp).toBeDefined();
     expect(openAiDefinition?.displayName).toBe("OpenAI");
     expect(openAiDefinition?.kind).toBe("agent");
     expect(githubCloudDefinition).toMatchObject({
@@ -59,10 +71,11 @@ describe("integrations-definitions index", () => {
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(4);
+    expect(definitions).toHaveLength(5);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
+      "atlassian::atlassian-default",
       "github::github-cloud",
       "github::github-enterprise-server",
       "linear::linear-default",
