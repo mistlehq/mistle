@@ -1,5 +1,6 @@
 import { Badge, Button } from "@mistle/ui";
 import { TerminalIcon } from "@phosphor-icons/react";
+import { useCallback } from "react";
 import { useParams } from "react-router";
 
 import { SessionMoreActions } from "../sessions/session-more-actions.js";
@@ -22,6 +23,10 @@ export function CodexSessionPage(): React.JSX.Element {
   const { codexPane, workbench } = useCodexSessionPageController({
     sandboxInstanceId,
   });
+  const handleCloseTerminalPanel = useCallback(async (): Promise<void> => {
+    await workbench.ptyState.actions.disconnectPty();
+    workbench.terminalPanelState.closePanel();
+  }, [workbench.ptyState.actions, workbench.terminalPanelState]);
   const headerActions = (
     <div className="flex items-center gap-2">
       <Badge
@@ -41,7 +46,14 @@ export function CodexSessionPage(): React.JSX.Element {
         sandboxInstanceId={sandboxInstanceId}
       />
       <Button
-        onClick={workbench.terminalPanelState.togglePanel}
+        onClick={() => {
+          if (workbench.terminalPanelState.isVisible) {
+            void handleCloseTerminalPanel();
+            return;
+          }
+
+          workbench.terminalPanelState.openPanel();
+        }}
         size="sm"
         type="button"
         variant={workbench.terminalPanelState.isVisible ? "secondary" : "outline"}
@@ -164,7 +176,7 @@ export function CodexSessionPage(): React.JSX.Element {
       secondaryPanel={
         <SessionTerminalPanel
           isVisible={workbench.terminalPanelState.isVisible}
-          onClose={workbench.terminalPanelState.closePanel}
+          onClose={handleCloseTerminalPanel}
           ptyState={workbench.ptyState}
           sandboxInstanceId={sandboxInstanceId}
         />

@@ -9,7 +9,7 @@ const TERMINAL_BORDER_COLOR = "#D6D3D1";
 
 type SessionTerminalPanelProps = {
   isVisible: boolean;
-  onClose: () => void;
+  onClose: () => Promise<void> | void;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   sandboxInstanceId: string;
 };
@@ -21,14 +21,10 @@ export function SessionTerminalPanel({
   sandboxInstanceId,
 }: SessionTerminalPanelProps): React.JSX.Element | null {
   const { lifecycle, output, actions } = ptyState;
-  const { closePty, disconnectPty, openPty, resizePty, writeInput } = actions;
+  const { openPty, resizePty, writeInput } = actions;
 
   if (!isVisible) {
     return null;
-  }
-
-  async function handleDisconnectTerminal(): Promise<void> {
-    await disconnectPty();
   }
 
   useEffect(() => {
@@ -54,12 +50,12 @@ export function SessionTerminalPanel({
   }, [isVisible, lifecycle.state, openPty, sandboxInstanceId]);
 
   async function handleHideTerminal(): Promise<void> {
-    await handleDisconnectTerminal();
-    onClose();
+    await onClose();
   }
 
   async function handleCloseTerminal(): Promise<void> {
-    await closePty();
+    output.clearOutput();
+    await onClose();
   }
 
   return (
