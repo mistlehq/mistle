@@ -204,8 +204,12 @@ mod tests {
         }
 
         let dumpable = current_process_dumpable().expect("expected helper dumpable query");
-        std::fs::write(&ready_path, dumpable.to_string())
-            .expect("expected helper readiness file write to succeed");
+        let ready_path_ref = std::path::Path::new(&ready_path);
+        let staging_path = ready_path_ref.with_extension("tmp");
+        std::fs::write(&staging_path, dumpable.to_string())
+            .expect("expected helper readiness staging file write to succeed");
+        std::fs::rename(&staging_path, ready_path_ref)
+            .expect("expected helper readiness file rename to succeed");
 
         let mut line = [0_u8; 1];
         std::io::stdin()
@@ -268,7 +272,13 @@ mod tests {
             .expect("expected helper process spawn to succeed");
 
         let stdin = child.stdin.take().expect("expected helper stdin");
-        let dumpable = read_helper_dumpable(&ready_path).expect("expected helper readiness file");
+        let dumpable = match read_helper_dumpable(&ready_path) {
+            Ok(value) => value,
+            Err(error) => {
+                cleanup_failed_helper(&mut child, &ready_path);
+                panic!("expected helper readiness file: {error}");
+            }
+        };
 
         DumpabilityHelper {
             command: child,
@@ -283,10 +293,25 @@ mod tests {
         for _ in 0..200 {
             match std::fs::read_to_string(ready_path) {
                 Ok(value) => {
-                    return value
-                        .trim()
-                        .parse::<bool>()
-                        .map_err(|error| format!("failed to parse helper dumpable state: {error}"));
+                    let trimmed = value.trim();
+                    if trimmed.is_empty() {
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                        continue;
+                    }
+
+                    match trimmed.parse::<bool>() {
+                        Ok(parsed) => return Ok(parsed),
+                        Err(error) => {
+                            std::thread::sleep(std::time::Duration::from_millis(10));
+                            if ready_path.exists() {
+                                continue;
+                            }
+
+                            return Err(format!(
+                                "failed to parse helper dumpable state: {error}"
+                            ));
+                        }
+                    }
                 }
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
                     std::thread::sleep(std::time::Duration::from_millis(10));
@@ -311,5 +336,15 @@ mod tests {
             "mistle-security-dumpability-{}-{timestamp}",
             std::process::id(),
         ))
+    }
+
+    #[cfg(target_os = "linux")]
+    fn cleanup_failed_helper(
+        child: &mut std::process::Child,
+        ready_path: &std::path::Path,
+    ) {
+        let _ = child.kill();
+        let _ = child.wait();
+        let _ = std::fs::remove_file(ready_path);
     }
 }
