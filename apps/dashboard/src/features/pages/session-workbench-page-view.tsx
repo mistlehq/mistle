@@ -1,4 +1,11 @@
-import { Alert, AlertDescription, AlertTitle } from "@mistle/ui";
+import {
+  Alert,
+  AlertDescription,
+  AlertTitle,
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@mistle/ui";
 
 type SessionWorkbenchAlert = {
   title: string;
@@ -9,7 +16,11 @@ type SessionWorkbenchPageViewProps = {
   sandboxInstanceId: string | null;
   alerts: readonly SessionWorkbenchAlert[];
   mainContent: React.ReactNode;
-  bottomPanel: React.ReactNode;
+  primaryBottomPanel: React.ReactNode;
+  secondaryPanel: React.ReactNode;
+  secondaryPanelSize: number;
+  onSecondaryPanelResize: (size: number) => void;
+  isSecondaryPanelVisible: boolean;
 };
 
 export type { SessionWorkbenchAlert, SessionWorkbenchPageViewProps };
@@ -18,7 +29,11 @@ export function SessionWorkbenchPageView({
   sandboxInstanceId,
   alerts,
   mainContent,
-  bottomPanel,
+  primaryBottomPanel,
+  secondaryPanel,
+  secondaryPanelSize,
+  onSecondaryPanelResize,
+  isSecondaryPanelVisible,
 }: SessionWorkbenchPageViewProps): React.JSX.Element {
   if (sandboxInstanceId === null) {
     return (
@@ -42,18 +57,53 @@ export function SessionWorkbenchPageView({
         </div>
       )}
 
-      <div
-        aria-label="Conversation chat"
-        className="min-h-0 flex-1 overflow-y-auto"
-        role="region"
-        style={{ scrollbarGutter: "stable both-edges" }}
-      >
-        <div className="mx-auto w-full max-w-3xl px-4 pb-4">{mainContent}</div>
-      </div>
+      {isSecondaryPanelVisible ? (
+        <ResizablePanelGroup className="min-h-0 flex-1" orientation="vertical">
+          <ResizablePanel defaultSize={100 - secondaryPanelSize} minSize={25}>
+            <div className="flex h-full min-h-0 flex-col overflow-hidden">
+              <div
+                aria-label="Conversation chat"
+                className="min-h-0 flex-1 overflow-y-auto"
+                role="region"
+                style={{ scrollbarGutter: "stable both-edges" }}
+              >
+                <div className="mx-auto w-full max-w-3xl px-4 pb-4">{mainContent}</div>
+              </div>
 
-      <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
-        <div className="mx-auto w-full max-w-3xl px-4">{bottomPanel}</div>
-      </div>
+              <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
+                <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
+              </div>
+            </div>
+          </ResizablePanel>
+          <ResizableHandle />
+          <ResizablePanel
+            defaultSize={secondaryPanelSize}
+            minSize={20}
+            onResize={(panelSize) => {
+              onSecondaryPanelResize(panelSize.asPercentage);
+            }}
+          >
+            <div className="bg-background/98 h-full min-h-0 overflow-hidden backdrop-blur-sm">
+              <div className="h-full w-full">{secondaryPanel}</div>
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      ) : (
+        <>
+          <div
+            aria-label="Conversation chat"
+            className="min-h-0 flex-1 overflow-y-auto"
+            role="region"
+            style={{ scrollbarGutter: "stable both-edges" }}
+          >
+            <div className="mx-auto w-full max-w-3xl px-4 pb-4">{mainContent}</div>
+          </div>
+
+          <div className="bg-background/95 flex-none pt-3 pb-4 backdrop-blur-sm">
+            <div className="mx-auto w-full max-w-3xl px-4">{primaryBottomPanel}</div>
+          </div>
+        </>
+      )}
     </div>
   );
 }

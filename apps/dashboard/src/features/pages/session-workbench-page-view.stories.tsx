@@ -13,18 +13,24 @@ const meta = {
   args: {
     sandboxInstanceId: "sbi_storybook",
     alerts: [],
+    isSecondaryPanelVisible: false,
     mainContent: (
       <div className="space-y-3 py-6">
         <div className="bg-card rounded-lg border p-4">Conversation content region</div>
         <div className="bg-card rounded-lg border p-4">Additional content block</div>
       </div>
     ),
-    bottomPanel: (
+    primaryBottomPanel: (
       <div className="space-y-3">
         <div className="bg-card rounded-lg border p-4">Bottom panel surface</div>
         <div className="bg-card rounded-lg border p-4">Composer or auxiliary controls</div>
       </div>
     ),
+    secondaryPanel: (
+      <div className="bg-card h-full rounded-lg border p-4">Secondary pane surface</div>
+    ),
+    secondaryPanelSize: 38,
+    onSecondaryPanelResize: function onSecondaryPanelResize() {},
   },
   decorators: [
     function StoryDecorator(Story): React.JSX.Element {
@@ -65,6 +71,12 @@ export const WithAlerts: Story = {
         description: "The underlying sandbox exited before the session fully connected.",
       },
     ],
+  },
+};
+
+export const WithSecondaryPane: Story = {
+  args: {
+    isSecondaryPanelVisible: true,
   },
 };
 

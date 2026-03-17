@@ -1,4 +1,5 @@
-import { Badge } from "@mistle/ui";
+import { Badge, Button } from "@mistle/ui";
+import { TerminalIcon } from "@phosphor-icons/react";
 import { useParams } from "react-router";
 
 import { SessionMoreActions } from "../sessions/session-more-actions.js";
@@ -8,6 +9,7 @@ import {
   CodexSessionPaneMainContent,
   type CodexSessionPaneComposerProps,
 } from "./codex-session-pane.js";
+import { SessionTerminalPanel } from "./session-terminal-panel.js";
 import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
@@ -38,6 +40,15 @@ export function CodexSessionPage(): React.JSX.Element {
         onLoadConfigSetup={workbench.moreActionsState.loadConfigSetup}
         sandboxInstanceId={sandboxInstanceId}
       />
+      <Button
+        onClick={workbench.terminalPanelState.togglePanel}
+        size="sm"
+        type="button"
+        variant={workbench.terminalPanelState.isVisible ? "secondary" : "outline"}
+      >
+        <TerminalIcon className="size-4" />
+        Terminal
+      </Button>
     </div>
   );
   useAppShellHeaderActions(headerActions);
@@ -87,12 +98,20 @@ export function CodexSessionPage(): React.JSX.Element {
       description: workbench.sandboxFailureMessage,
     });
   }
+  if (workbench.ptyState.lifecycle.errorMessage !== null) {
+    alerts.push({
+      title: "Terminal connection error",
+      description: workbench.ptyState.lifecycle.errorMessage,
+    });
+  }
 
   if (sandboxInstanceId === null) {
     return (
       <SessionWorkbenchPageView
         alerts={[]}
-        bottomPanel={
+        isSecondaryPanelVisible={false}
+        onSecondaryPanelResize={function onSecondaryPanelResize() {}}
+        primaryBottomPanel={
           <CodexSessionPaneBottomPanel
             chatEntries={[]}
             composerProps={createEmptyComposerProps()}
@@ -101,6 +120,8 @@ export function CodexSessionPage(): React.JSX.Element {
             serverRequestPanelEntries={[]}
           />
         }
+        secondaryPanel={<></>}
+        secondaryPanelSize={38}
         mainContent={
           <CodexSessionPaneMainContent
             chatEntries={[]}
@@ -117,16 +138,10 @@ export function CodexSessionPage(): React.JSX.Element {
 
   return (
     <SessionWorkbenchPageView
-      alerts={workbench.hasTopAlert ? alerts : []}
-      bottomPanel={
-        <CodexSessionPaneBottomPanel
-          chatEntries={codexPane.chatState.entries}
-          composerProps={codexPane.composerProps}
-          isRespondingToServerRequest={codexPane.serverRequestsState.isRespondingToServerRequest}
-          onRespondToServerRequest={codexPane.serverRequestsState.respondToServerRequest}
-          serverRequestPanelEntries={unmatchedServerRequests}
-        />
+      alerts={
+        workbench.hasTopAlert || workbench.ptyState.lifecycle.errorMessage !== null ? alerts : []
       }
+      isSecondaryPanelVisible={workbench.terminalPanelState.isVisible}
       mainContent={
         <CodexSessionPaneMainContent
           chatEntries={codexPane.chatState.entries}
@@ -136,6 +151,25 @@ export function CodexSessionPage(): React.JSX.Element {
           serverRequestPanelEntries={unmatchedServerRequests}
         />
       }
+      onSecondaryPanelResize={workbench.terminalPanelState.setPanelSize}
+      primaryBottomPanel={
+        <CodexSessionPaneBottomPanel
+          chatEntries={codexPane.chatState.entries}
+          composerProps={codexPane.composerProps}
+          isRespondingToServerRequest={codexPane.serverRequestsState.isRespondingToServerRequest}
+          onRespondToServerRequest={codexPane.serverRequestsState.respondToServerRequest}
+          serverRequestPanelEntries={unmatchedServerRequests}
+        />
+      }
+      secondaryPanel={
+        <SessionTerminalPanel
+          isVisible={workbench.terminalPanelState.isVisible}
+          onClose={workbench.terminalPanelState.closePanel}
+          ptyState={workbench.ptyState}
+          sandboxInstanceId={sandboxInstanceId}
+        />
+      }
+      secondaryPanelSize={workbench.terminalPanelState.panelSize}
       sandboxInstanceId={sandboxInstanceId}
     />
   );

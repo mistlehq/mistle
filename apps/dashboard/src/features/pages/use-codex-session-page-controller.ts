@@ -4,11 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useCodexSessionState } from "../codex-client/use-codex-session-state.js";
 import { shouldAutoConnectSession } from "../sessions/session-connect-policy.js";
 import { getSandboxInstanceStatus } from "../sessions/sessions-service.js";
+import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
   hasSessionTopAlert,
   resolveChatComposerAction,
   resolveSessionHeaderStatusUi,
 } from "./codex-session-page-view-model.js";
+import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 
 type ComposerConfigSnapshot = {
   model: string | null;
@@ -55,12 +57,21 @@ function readComposerConfigSnapshot(configJson: string | null): ComposerConfigSn
 
 type CodexSessionWorkbenchState = {
   hasTopAlert: boolean;
+  ptyState: ReturnType<typeof useSandboxPtyState>;
   sandboxFailureMessage: string | null;
   sandboxStatusQuery: ReturnType<
     typeof useQuery<Awaited<ReturnType<typeof getSandboxInstanceStatus>>, Error>
   >;
   sessionHeaderStatusUi: ReturnType<typeof resolveSessionHeaderStatusUi>;
   startErrorMessage: string | null;
+  terminalPanelState: {
+    closePanel: () => void;
+    isVisible: boolean;
+    openPanel: () => void;
+    panelSize: number;
+    setPanelSize: (size: number) => void;
+    togglePanel: () => void;
+  };
   moreActionsState: {
     agentConnectionState: ReturnType<
       typeof useCodexSessionState
@@ -127,6 +138,11 @@ export function useCodexSessionPageController(input: {
     string | null
   >(null);
   const sessionState = useCodexSessionState();
+  const ptyState = useSandboxPtyState();
+  const terminalPanelState = useSessionTerminalWorkbenchState({
+    sandboxInstanceId: input.sandboxInstanceId,
+  });
+  const { disconnectPty } = ptyState.actions;
   const lifecycle = sessionState.lifecycle;
   const chat = sessionState.chat;
   const admin = sessionState.admin;
@@ -169,7 +185,8 @@ export function useCodexSessionPageController(input: {
     setHasAttemptedAutoConnect(false);
     clearStartErrorMessage();
     disconnectSession();
-  }, [clearStartErrorMessage, disconnectSession, input.sandboxInstanceId]);
+    void disconnectPty();
+  }, [clearStartErrorMessage, disconnectPty, disconnectSession, input.sandboxInstanceId]);
 
   useEffect(() => {
     if (input.sandboxInstanceId === null) {
@@ -308,10 +325,12 @@ export function useCodexSessionPageController(input: {
   return {
     workbench: {
       hasTopAlert,
+      ptyState,
       sandboxFailureMessage,
       sandboxStatusQuery,
       sessionHeaderStatusUi,
       startErrorMessage,
+      terminalPanelState,
       moreActionsState: {
         agentConnectionState: lifecycle.agentConnectionState,
         configJson: admin.configJson,
