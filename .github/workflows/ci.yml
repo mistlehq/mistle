@@ -193,8 +193,11 @@ jobs:
           }
           color = color_by_result.get(workflow_result, "#808080")
           emoji = emoji_by_result.get(workflow_result, ":grey_question:")
-          pr_field = None
-          pr_text = f"`{os.environ['GITHUB_SHA'][:7]}`"
+          pr_field = {
+              "title": "Commit",
+              "value": f"`{os.environ['GITHUB_SHA'][:7]}`",
+              "short": False,
+          }
           api_request = urllib.request.Request(
               f"https://api.github.com/repos/{os.environ['GITHUB_REPOSITORY']}/commits/{os.environ['GITHUB_SHA']}/pulls",
               headers={
@@ -212,10 +215,9 @@ jobs:
 
           if pull_requests:
               pull_request = pull_requests[0]
-              pr_text = f"<{pull_request['html_url']}|#{pull_request['number']} {pull_request['title']}>"
               pr_field = {
                   "title": "PR",
-                  "value": pr_text,
+                  "value": f"<{pull_request['html_url']}|#{pull_request['number']} {pull_request['title']}>",
                   "short": False,
               }
 
@@ -223,37 +225,21 @@ jobs:
               "attachments": [
                   {
                       "color": color,
-                      "title": os.environ["WORKFLOW_NAME"],
+                      "title": "PR merged to main",
                       "title_link": os.environ["RUN_URL"],
-                      "text": f"{emoji} CI run finished with result: {workflow_result} for {pr_text}.",
+                      "text": f"{emoji} CI run finished with result: {workflow_result}.",
                       "mrkdwn_in": ["text", "fields"],
                       "fields": [
+                          pr_field,
                           {
                               "title": "Repository",
                               "value": os.environ["GITHUB_REPOSITORY"],
-                              "short": True,
-                          },
-                          {
-                              "title": "Branch",
-                              "value": os.environ["GITHUB_REF_NAME"],
-                              "short": True,
-                          },
-                          {
-                              "title": "Static",
-                              "value": static_result,
-                              "short": True,
-                          },
-                          {
-                              "title": "Test",
-                              "value": test_result,
                               "short": True,
                           },
                       ],
                   }
               ]
           }
-          if pr_field is not None:
-              payload["attachments"][0]["fields"].insert(0, pr_field)
           request = urllib.request.Request(
               os.environ["SLACK_WEBHOOK_URL"],
               data=json.dumps(payload).encode("utf-8"),
