@@ -7,9 +7,12 @@ import {
   IntegrationWebhookError,
   WebhookErrorCodes,
   normalizeWebhookHeaders,
-  verifyAndParseWebhookOrThrow,
+  verifyAndResolveWebhookRequestOrThrow,
 } from "@mistle/integrations-core";
-import type { IntegrationConnection } from "@mistle/integrations-core";
+import type {
+  IntegrationConnection,
+  IntegrationWebhookImmediateResponse,
+} from "@mistle/integrations-core";
 
 import {
   decryptIntegrationConnectionSecrets,
@@ -31,10 +34,16 @@ export type ReceiveIntegrationWebhookInput = {
   rawBody: Uint8Array;
 };
 
-export type ReceivedIntegrationWebhook = {
-  duplicate: boolean;
-  webhookEventId?: string;
-};
+export type ReceivedIntegrationWebhook =
+  | {
+      kind: "accepted";
+      duplicate: boolean;
+      webhookEventId?: string;
+    }
+  | {
+      kind: "response";
+      response: IntegrationWebhookImmediateResponse;
+    };
 
 type ActiveWebhookConnection = {
   id: string;
@@ -162,10 +171,12 @@ export async function receiveIntegrationWebhook(
       }),
   );
 
-  let webhookEvent: Awaited<ReturnType<typeof verifyAndParseWebhookOrThrow>> | undefined;
+  let resolvedWebhookRequest:
+    | Awaited<ReturnType<typeof verifyAndResolveWebhookRequestOrThrow>>
+    | undefined;
 
   try {
-    webhookEvent = await verifyAndParseWebhookOrThrow({
+    resolvedWebhookRequest = await verifyAndResolveWebhookRequestOrThrow({
       definition,
       targetKey: input.targetKey,
       target: {
@@ -203,13 +214,18 @@ export async function receiveIntegrationWebhook(
     throw error;
   }
 
-  if (webhookEvent === undefined) {
-    throw new Error("Expected webhook event to be parsed.");
+  if (resolvedWebhookRequest === undefined) {
+    throw new Error("Expected webhook request to be resolved.");
   }
-  const resolvedConnection = activeConnectionsById.get(webhookEvent.connectionId);
+
+  if (resolvedWebhookRequest.kind === "response") {
+    return resolvedWebhookRequest;
+  }
+
+  const resolvedConnection = activeConnectionsById.get(resolvedWebhookRequest.connectionId);
   if (resolvedConnection === undefined) {
     throw new Error(
-      `Expected resolved webhook connection '${webhookEvent.connectionId}' to exist in active connection candidates.`,
+      `Expected resolved webhook connection '${resolvedWebhookRequest.connectionId}' to exist in active connection candidates.`,
     );
   }
 
@@ -219,13 +235,13 @@ export async function receiveIntegrationWebhook(
       organizationId: resolvedConnection.organizationId,
       integrationConnectionId: resolvedConnection.id,
       targetKey: input.targetKey,
-      externalEventId: webhookEvent.event.externalEventId,
-      externalDeliveryId: webhookEvent.event.externalDeliveryId,
-      eventType: webhookEvent.event.eventType,
-      providerEventType: webhookEvent.event.providerEventType,
-      payload: webhookEvent.event.payload,
-      sourceOccurredAt: webhookEvent.event.occurredAt,
-      sourceOrderKey: webhookEvent.event.sourceOrderKey,
+      externalEventId: resolvedWebhookRequest.event.externalEventId,
+      externalDeliveryId: resolvedWebhookRequest.event.externalDeliveryId,
+      eventType: resolvedWebhookRequest.event.eventType,
+      providerEventType: resolvedWebhookRequest.event.providerEventType,
+      payload: resolvedWebhookRequest.event.payload,
+      sourceOccurredAt: resolvedWebhookRequest.event.occurredAt,
+      sourceOrderKey: resolvedWebhookRequest.event.sourceOrderKey,
       status: IntegrationWebhookEventStatuses.RECEIVED,
     })
     .onConflictDoNothing({
@@ -236,6 +252,7 @@ export async function receiveIntegrationWebhook(
     });
 
   return {
+    kind: "accepted",
     duplicate: insertedRows.length === 0,
     ...(insertedRows[0] === undefined ? {} : { webhookEventId: insertedRows[0].id }),
   };

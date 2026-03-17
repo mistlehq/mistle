@@ -17,6 +17,11 @@ export const IngestIntegrationWebhookResponseSchema = z
   })
   .strict();
 
+const ImmediateIntegrationWebhookBodySchema = z.union([
+  z.string(),
+  z.record(z.string(), z.unknown()),
+]);
+
 const BadRequestCodeSchema = z.enum([IntegrationWebhooksBadRequestCodes.INVALID_WEBHOOK_REQUEST]);
 
 export const IntegrationWebhooksBadRequestResponseSchema = z
@@ -46,6 +51,18 @@ export const ingestIntegrationWebhookRoute = createRoute({
     params: IngestIntegrationWebhookParamsSchema,
   },
   responses: {
+    "2XX": {
+      description:
+        "Immediate integration-defined webhook response. Status code, headers, content type, and body are integration-specific and may include empty responses.",
+      content: {
+        "*/*": {
+          schema: ImmediateIntegrationWebhookBodySchema,
+        },
+      },
+    },
+    204: {
+      description: "Immediate integration-defined webhook response with no body.",
+    },
     202: {
       description: "Webhook event accepted for processing.",
       content: {

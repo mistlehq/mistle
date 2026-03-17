@@ -257,8 +257,8 @@ describe("GitHubWebhookHandler", () => {
     });
   });
 
-  it("parses issue_comment created events", async () => {
-    const parsed = await GitHubWebhookHandler.parse({
+  it("resolves issue_comment created events into webhook events", async () => {
+    const resolved = await GitHubWebhookHandler.resolveWebhookRequest({
       targetKey: "github_cloud",
       target: createGitHubCloudTargetConfig(),
       headers: {
@@ -268,15 +268,21 @@ describe("GitHubWebhookHandler", () => {
       rawBody: encodePayload(IssueCommentCreatedPayload),
     });
 
-    expect(parsed).toMatchObject({
-      externalEventId: "delivery_123",
-      externalDeliveryId: "delivery_123",
-      providerEventType: "issue_comment",
-      eventType: "github.issue_comment.created",
-      occurredAt: IssueCommentCreatedPayload.comment.created_at,
-      sourceOrderKey: `${IssueCommentCreatedPayload.comment.created_at}#${IssueCommentCreatedPayload.comment.id.toString().padStart(20, "0")}`,
+    expect(resolved).toMatchObject({
+      kind: "event",
+      event: {
+        externalEventId: "delivery_123",
+        externalDeliveryId: "delivery_123",
+        providerEventType: "issue_comment",
+        eventType: "github.issue_comment.created",
+        occurredAt: IssueCommentCreatedPayload.comment.created_at,
+        sourceOrderKey: `${IssueCommentCreatedPayload.comment.created_at}#${IssueCommentCreatedPayload.comment.id.toString().padStart(20, "0")}`,
+      },
     });
-    expect(parsed.payload).toEqual(IssueCommentCreatedPayload);
+    if (resolved.kind !== "event") {
+      throw new Error("Expected GitHub webhook request resolution to produce an event.");
+    }
+    expect(resolved.event.payload).toEqual(IssueCommentCreatedPayload);
   });
 
   it("resolves matching connection by installation id", async () => {
@@ -345,7 +351,7 @@ describe("GitHubWebhookHandler", () => {
   });
 
   it("uses canonical provider event type for pull_request_review_comment", async () => {
-    const parsed = await GitHubWebhookHandler.parse({
+    const resolved = await GitHubWebhookHandler.resolveWebhookRequest({
       targetKey: "github_cloud",
       target: createGitHubCloudTargetConfig(),
       headers: {
@@ -355,11 +361,16 @@ describe("GitHubWebhookHandler", () => {
       rawBody: encodePayload(PullRequestReviewCommentCreatedPayload),
     });
 
-    expect(parsed.eventType).toBe("github.pull_request_review_comment.created");
+    expect(resolved).toMatchObject({
+      kind: "event",
+      event: {
+        eventType: "github.pull_request_review_comment.created",
+      },
+    });
   });
 
   it("returns derived event type for unsupported official GitHub events", async () => {
-    const parsed = await GitHubWebhookHandler.parse({
+    const resolved = await GitHubWebhookHandler.resolveWebhookRequest({
       targetKey: "github_cloud",
       target: createGitHubCloudTargetConfig(),
       headers: {
@@ -369,12 +380,17 @@ describe("GitHubWebhookHandler", () => {
       rawBody: encodePayload(PullRequestOpenedPayload),
     });
 
-    expect(parsed.eventType).toBe("github.pull_request.opened");
+    expect(resolved).toMatchObject({
+      kind: "event",
+      event: {
+        eventType: "github.pull_request.opened",
+      },
+    });
   });
 
   it("fails when x-github-delivery header is missing", () => {
     expect(() =>
-      GitHubWebhookHandler.parse({
+      GitHubWebhookHandler.resolveWebhookRequest({
         targetKey: "github_cloud",
         target: createGitHubCloudTargetConfig(),
         headers: {
@@ -389,7 +405,7 @@ describe("GitHubWebhookHandler", () => {
     const payloadWithoutInstallation = withoutInstallation(IssueCommentCreatedPayload);
 
     expect(() =>
-      GitHubWebhookHandler.parse({
+      GitHubWebhookHandler.resolveWebhookRequest({
         targetKey: "github_cloud",
         target: createGitHubCloudTargetConfig(),
         headers: {
