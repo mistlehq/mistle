@@ -494,6 +494,32 @@ export type IntegrationOAuth2RefreshAccessTokenResult = {
   credentialMetadata?: Record<string, unknown>;
 };
 
+export type IntegrationOAuth2RefreshAccessTokenErrorClassification = "temporary" | "permanent";
+
+export const IntegrationOAuth2RefreshAccessTokenErrorClassifications: {
+  TEMPORARY: IntegrationOAuth2RefreshAccessTokenErrorClassification;
+  PERMANENT: IntegrationOAuth2RefreshAccessTokenErrorClassification;
+} = {
+  TEMPORARY: "temporary",
+  PERMANENT: "permanent",
+};
+
+export class IntegrationOAuth2RefreshAccessTokenError extends Error {
+  readonly classification: IntegrationOAuth2RefreshAccessTokenErrorClassification;
+  readonly code: string | undefined;
+
+  constructor(input: {
+    message: string;
+    classification: IntegrationOAuth2RefreshAccessTokenErrorClassification;
+    code?: string;
+  }) {
+    super(input.message);
+    this.name = "IntegrationOAuth2RefreshAccessTokenError";
+    this.classification = input.classification;
+    this.code = input.code;
+  }
+}
+
 export type IntegrationOAuth2Capability<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
