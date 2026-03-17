@@ -1,4 +1,6 @@
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { createServer as createNetServer } from "node:net";
 
@@ -91,6 +93,24 @@ switch (mode) {
     process.on("SIGTERM", () => {});
     process.stdin.resume();
     break;
+  case "ignore-sigterm-with-child": {
+    const childPidPath = process.env.SANDBOX_RUNTIME_PROCESS_HELPER_CHILD_PID_PATH;
+    if (typeof childPidPath !== "string" || childPidPath.length === 0) {
+      throw new Error("helper child pid path is required");
+    }
+
+    const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      stdio: "ignore",
+    });
+    if (child.pid === undefined) {
+      throw new Error("helper child pid is required");
+    }
+
+    writeFileSync(childPidPath, String(child.pid));
+    process.on("SIGTERM", () => {});
+    process.stdin.resume();
+    break;
+  }
   default:
     throw new Error(`unsupported helper mode ${String(mode)}`);
 }
