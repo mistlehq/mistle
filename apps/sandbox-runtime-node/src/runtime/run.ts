@@ -4,6 +4,7 @@ import { type Server } from "node:http";
 import { applyRuntimePlan } from "../runtime-plan/index.js";
 import { loadRuntimeConfig, type RuntimeConfig } from "./config.js";
 import { createRuntimeHttpServer } from "./http-server.js";
+import { parseListenAddress } from "./parse-listen-address.js";
 import {
   startRuntimeClientProcessManager,
   type RuntimeClientProcessExit,
@@ -38,35 +39,6 @@ export type StartedRuntime = {
   close: () => Promise<void>;
   closed: Promise<void>;
 };
-
-function parseListenAddress(listenAddr: string): { host?: string; port: number } {
-  if (listenAddr.startsWith(":")) {
-    const port = Number.parseInt(listenAddr.slice(1), 10);
-    if (!Number.isInteger(port) || port < 0 || port > 65_535) {
-      throw new Error(`invalid listen addr ${listenAddr}`);
-    }
-
-    return {
-      port,
-    };
-  }
-
-  const separatorIndex = listenAddr.lastIndexOf(":");
-  if (separatorIndex < 1 || separatorIndex === listenAddr.length - 1) {
-    throw new Error(`invalid listen addr ${listenAddr}`);
-  }
-
-  const host = listenAddr.slice(0, separatorIndex);
-  const port = Number.parseInt(listenAddr.slice(separatorIndex + 1), 10);
-  if (!Number.isInteger(port) || port < 0 || port > 65_535) {
-    throw new Error(`invalid listen addr ${listenAddr}`);
-  }
-
-  return {
-    host,
-    port,
-  };
-}
 
 function getBaseUrl(server: Server): string {
   const address = server.address();

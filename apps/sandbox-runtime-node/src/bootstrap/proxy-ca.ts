@@ -10,10 +10,7 @@ import { ProxyCaCertInstallPath } from "./config.js";
 
 export const UpdateCaCertificatesPath = "/usr/sbin/update-ca-certificates";
 
-export type GeneratedProxyCa = {
-  certificatePem: string;
-  privateKeyPem: string;
-};
+export type GeneratedProxyCa = ReturnType<typeof generateProxyCa>;
 
 function closeFd(fd: number): void {
   try {
@@ -55,10 +52,6 @@ function runUpdateCaCertificates(): Promise<void> {
       );
     });
   });
-}
-
-export function generateProxyCaMaterial(): GeneratedProxyCa {
-  return generateProxyCa();
 }
 
 export async function installProxyCaCertificate(certificatePem: string): Promise<void> {

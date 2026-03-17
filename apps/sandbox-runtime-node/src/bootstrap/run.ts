@@ -1,12 +1,10 @@
 import { readFile } from "node:fs/promises";
 
+import { generateProxyCa } from "@mistle/sandbox-rs-napi";
+
 import { runRuntime } from "../runtime/run.js";
 import { loadBootstrapConfig } from "./config.js";
-import {
-  generateProxyCaMaterial,
-  installProxyCaCertificate,
-  prepareProxyCaRuntimeEnv,
-} from "./proxy-ca.js";
+import { installProxyCaCertificate, prepareProxyCaRuntimeEnv } from "./proxy-ca.js";
 
 type PasswdUserRecord = {
   username: string;
@@ -103,7 +101,7 @@ export async function runBootstrap(input: RunBootstrapInput): Promise<void> {
   }
 
   const config = loadBootstrapConfig(input.lookupEnv);
-  const proxyCa = generateProxyCaMaterial();
+  const proxyCa = generateProxyCa();
   await installProxyCaCertificate(proxyCa.certificatePem);
   const proxyCaRuntimeEnv = prepareProxyCaRuntimeEnv(proxyCa);
   try {

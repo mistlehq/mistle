@@ -9,18 +9,18 @@ import {
   type HeaderBag,
 } from "./headers.js";
 
-export const HeaderEgressRuleId = "x-mistle-egress-rule-id";
-export const HeaderEgressBindingId = "x-mistle-egress-binding-id";
-export const HeaderEgressUpstreamBaseUrl = "x-mistle-egress-upstream-base-url";
-export const HeaderEgressAuthInjectionType = "x-mistle-egress-auth-injection-type";
-export const HeaderEgressAuthInjectionTarget = "x-mistle-egress-auth-injection-target";
-export const HeaderEgressAuthInjectionUsername = "x-mistle-egress-auth-injection-username";
-export const HeaderEgressConnectionId = "x-mistle-egress-connection-id";
-export const HeaderEgressCredentialSecretType = "x-mistle-egress-credential-secret-type";
-export const HeaderEgressCredentialPurpose = "x-mistle-egress-credential-purpose";
-export const HeaderEgressCredentialResolverKey = "x-mistle-egress-credential-resolver-key";
-export const HeaderSandboxProfileId = "x-mistle-sandbox-profile-id";
-export const HeaderSandboxProfileVersion = "x-mistle-sandbox-profile-version";
+export const HEADER_EGRESS_RULE_ID = "x-mistle-egress-rule-id";
+export const HEADER_EGRESS_BINDING_ID = "x-mistle-egress-binding-id";
+export const HEADER_EGRESS_UPSTREAM_BASE_URL = "x-mistle-egress-upstream-base-url";
+export const HEADER_EGRESS_AUTH_INJECTION_TYPE = "x-mistle-egress-auth-injection-type";
+export const HEADER_EGRESS_AUTH_INJECTION_TARGET = "x-mistle-egress-auth-injection-target";
+export const HEADER_EGRESS_AUTH_INJECTION_USERNAME = "x-mistle-egress-auth-injection-username";
+export const HEADER_EGRESS_CONNECTION_ID = "x-mistle-egress-connection-id";
+export const HEADER_EGRESS_CREDENTIAL_SECRET_TYPE = "x-mistle-egress-credential-secret-type";
+export const HEADER_EGRESS_CREDENTIAL_PURPOSE = "x-mistle-egress-credential-purpose";
+export const HEADER_EGRESS_CREDENTIAL_RESOLVER_KEY = "x-mistle-egress-credential-resolver-key";
+export const HEADER_SANDBOX_PROFILE_ID = "x-mistle-sandbox-profile-id";
+export const HEADER_SANDBOX_PROFILE_VERSION = "x-mistle-sandbox-profile-version";
 
 function joinPath(basePath: string, suffixPath: string): string {
   const normalizedBasePath = basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
@@ -77,18 +77,26 @@ export function buildTokenizerProxyRequest(
   tokenizerProxyUrl.hash = "";
 
   const headers = copyHeadersWithoutHopByHop(headerBagFromIncomingHeaders(input.headers), true);
-  setHeader(headers, HeaderEgressRuleId, input.route.egressRuleId);
-  setHeader(headers, HeaderEgressBindingId, input.route.bindingId);
-  setHeader(headers, HeaderEgressUpstreamBaseUrl, input.route.upstream.baseUrl);
-  setHeader(headers, HeaderEgressAuthInjectionType, input.route.authInjection.type);
-  setHeader(headers, HeaderEgressAuthInjectionTarget, input.route.authInjection.target);
-  setHeader(headers, HeaderEgressAuthInjectionUsername, input.route.authInjection.username);
-  setHeader(headers, HeaderEgressConnectionId, input.route.credentialResolver.connectionId);
-  setHeader(headers, HeaderEgressCredentialSecretType, input.route.credentialResolver.secretType);
-  setHeader(headers, HeaderEgressCredentialPurpose, input.route.credentialResolver.purpose);
-  setHeader(headers, HeaderEgressCredentialResolverKey, input.route.credentialResolver.resolverKey);
-  setHeader(headers, HeaderSandboxProfileId, input.runtimePlan.sandboxProfileId);
-  setHeader(headers, HeaderSandboxProfileVersion, String(input.runtimePlan.version));
+  setHeader(headers, HEADER_EGRESS_RULE_ID, input.route.egressRuleId);
+  setHeader(headers, HEADER_EGRESS_BINDING_ID, input.route.bindingId);
+  setHeader(headers, HEADER_EGRESS_UPSTREAM_BASE_URL, input.route.upstream.baseUrl);
+  setHeader(headers, HEADER_EGRESS_AUTH_INJECTION_TYPE, input.route.authInjection.type);
+  setHeader(headers, HEADER_EGRESS_AUTH_INJECTION_TARGET, input.route.authInjection.target);
+  setHeader(headers, HEADER_EGRESS_AUTH_INJECTION_USERNAME, input.route.authInjection.username);
+  setHeader(headers, HEADER_EGRESS_CONNECTION_ID, input.route.credentialResolver.connectionId);
+  setHeader(
+    headers,
+    HEADER_EGRESS_CREDENTIAL_SECRET_TYPE,
+    input.route.credentialResolver.secretType,
+  );
+  setHeader(headers, HEADER_EGRESS_CREDENTIAL_PURPOSE, input.route.credentialResolver.purpose);
+  setHeader(
+    headers,
+    HEADER_EGRESS_CREDENTIAL_RESOLVER_KEY,
+    input.route.credentialResolver.resolverKey,
+  );
+  setHeader(headers, HEADER_SANDBOX_PROFILE_ID, input.runtimePlan.sandboxProfileId);
+  setHeader(headers, HEADER_SANDBOX_PROFILE_VERSION, String(input.runtimePlan.version));
 
   return {
     url: tokenizerProxyUrl,

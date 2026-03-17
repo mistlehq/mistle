@@ -6,11 +6,6 @@ use proxy_ca::{
     IssuedProxyLeafCertificate,
 };
 
-#[napi]
-pub fn scaffold_marker() -> &'static str {
-    "sandbox-rs-napi"
-}
-
 #[napi(object)]
 pub struct GeneratedProxyCaResult {
     pub certificate_pem: String,

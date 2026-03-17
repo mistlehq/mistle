@@ -1,7 +1,7 @@
 import type { EgressCredentialRoute } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { buildTokenizerProxyRequest, HeaderEgressRuleId } from "./forwarder.js";
+import { buildTokenizerProxyRequest, HEADER_EGRESS_RULE_ID } from "./forwarder.js";
 
 const OpenAiRoute: EgressCredentialRoute = {
   egressRuleId: "egress_rule_openai",
@@ -46,6 +46,6 @@ describe("buildTokenizerProxyRequest", () => {
 
     expect(request.url.pathname).toBe("/tokenizer-proxy/egress/v1/responses");
     expect(request.url.search).toBe("?stream=true");
-    expect(request.headers[HeaderEgressRuleId]).toBe("egress_rule_openai");
+    expect(request.headers[HEADER_EGRESS_RULE_ID]).toBe("egress_rule_openai");
   });
 });

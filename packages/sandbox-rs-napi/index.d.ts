@@ -1,4 +1,3 @@
-export declare function scaffoldMarker(): string;
 export declare function generateProxyCa(): {
   certificatePem: string;
   privateKeyPem: string;
