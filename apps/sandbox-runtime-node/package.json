@@ -19,6 +19,12 @@
   "dependencies": {
     "@mistle/integrations-core": "workspace:*",
     "@mistle/sandbox-rs-napi": "workspace:*",
-    "undici": "7.24.4"
+    "@mistle/sandbox-session-protocol": "workspace:*",
+    "node-pty": "^1.1.0",
+    "undici": "7.24.4",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1"
   }
 }
