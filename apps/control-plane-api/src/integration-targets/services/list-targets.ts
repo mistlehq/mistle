@@ -10,6 +10,10 @@ import {
   paginateKeyset,
   parseKeysetPageSize,
 } from "@mistle/http/pagination";
+import type {
+  IntegrationWebhookEventDefinition,
+  IntegrationWebhookEventParameterDefinition,
+} from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -41,6 +45,43 @@ type IntegrationTargetListItem = z.infer<typeof IntegrationTargetSchema>;
 type IntegrationTargetsCursor = z.infer<typeof CursorSchema>;
 
 const IntegrationRegistry = createIntegrationRegistry();
+
+type IntegrationTargetWebhookEvent = NonNullable<
+  IntegrationTargetListItem["supportedWebhookEvents"]
+>[number];
+
+type IntegrationTargetWebhookEventParameter = NonNullable<
+  IntegrationTargetWebhookEvent["parameters"]
+>[number];
+
+function cloneWebhookEventParameters(
+  parameters: readonly IntegrationWebhookEventParameterDefinition[],
+): IntegrationTargetWebhookEventParameter[] {
+  return parameters.map((parameter) => ({
+    id: parameter.id,
+    label: parameter.label,
+    kind: parameter.kind,
+    resourceKind: parameter.resourceKind,
+    payloadPath: [...parameter.payloadPath],
+    ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+  }));
+}
+
+function cloneWebhookEvents(
+  events: readonly IntegrationWebhookEventDefinition[],
+): IntegrationTargetWebhookEvent[] {
+  return events.map((eventDefinition) => ({
+    eventType: eventDefinition.eventType,
+    providerEventType: eventDefinition.providerEventType,
+    displayName: eventDefinition.displayName,
+    ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
+    ...(eventDefinition.parameters === undefined
+      ? {}
+      : {
+          parameters: cloneWebhookEventParameters(eventDefinition.parameters),
+        }),
+  }));
+}
 
 function resolveTargetMetadata(input: {
   familyId: string;
@@ -90,9 +131,7 @@ function resolveTargetMetadata(input: {
         ...(definition.supportedWebhookEvents === undefined
           ? {}
           : {
-              supportedWebhookEvents: definition.supportedWebhookEvents.map((eventDefinition) => ({
-                ...eventDefinition,
-              })),
+              supportedWebhookEvents: cloneWebhookEvents(definition.supportedWebhookEvents),
             }),
       };
     }
@@ -114,9 +153,7 @@ function resolveTargetMetadata(input: {
     ...(definition.supportedWebhookEvents === undefined
       ? {}
       : {
-          supportedWebhookEvents: definition.supportedWebhookEvents.map((eventDefinition) => ({
-            ...eventDefinition,
-          })),
+          supportedWebhookEvents: cloneWebhookEvents(definition.supportedWebhookEvents),
         }),
   };
 }

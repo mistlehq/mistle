@@ -39,6 +39,20 @@ export const IntegrationTargetSchema = z
             providerEventType: z.string().min(1),
             displayName: z.string().min(1),
             category: z.string().min(1).optional(),
+            parameters: z
+              .array(
+                z
+                  .object({
+                    id: z.string().min(1),
+                    label: z.string().min(1),
+                    kind: z.literal("resource-select"),
+                    resourceKind: z.string().min(1),
+                    payloadPath: z.array(z.string().min(1)).min(1),
+                    prefix: z.string().min(1).optional(),
+                  })
+                  .strict(),
+              )
+              .optional(),
           })
           .strict(),
       )

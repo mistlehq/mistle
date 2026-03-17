@@ -6,7 +6,25 @@ import {
   toWebhookAutomationFormValues,
   validateWebhookAutomationFormValues,
 } from "./webhook-automation-form-helpers.js";
+import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 import type { WebhookAutomation } from "./webhook-automations-types.js";
+
+const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
+  {
+    value: "github.pull_request.opened",
+    label: "Pull request opened",
+    parameters: [
+      {
+        id: "repository",
+        label: "repository",
+        kind: "resource-select",
+        resourceKind: "repository",
+        payloadPath: ["repository", "full_name"],
+        prefix: "in",
+      },
+    ],
+  },
+];
 
 const SampleAutomation: WebhookAutomation = {
   id: "aut_123",
@@ -43,6 +61,7 @@ describe("toWebhookAutomationFormValues", () => {
       conversationKeyTemplate: "",
       idempotencyKeyTemplate: "",
       eventTypes: [],
+      triggerParameterValues: {},
       payloadFilterEditorMode: "builder",
       payloadFilterBuilderMode: "all",
       payloadFilterConditions: [],
@@ -60,6 +79,7 @@ describe("toWebhookAutomationFormValues", () => {
       conversationKeyTemplate: "{{event.repository.id}}",
       idempotencyKeyTemplate: "",
       eventTypes: ["push", "pull_request"],
+      triggerParameterValues: {},
       payloadFilterEditorMode: "builder",
       payloadFilterBuilderMode: "all",
       payloadFilterConditions: [
@@ -97,6 +117,7 @@ describe("validateWebhookAutomationFormValues", () => {
         conversationKeyTemplate: "",
         idempotencyKeyTemplate: "",
         eventTypes: [],
+        triggerParameterValues: {},
         payloadFilterEditorMode: "builder",
         payloadFilterBuilderMode: "all",
         payloadFilterConditions: [
@@ -135,6 +156,7 @@ describe("automation payload transforms", () => {
         conversationKeyTemplate: "{{event.repository.id}}",
         idempotencyKeyTemplate: " ",
         eventTypes: ["push", "pull_request"],
+        triggerParameterValues: {},
         payloadFilterEditorMode: "builder",
         payloadFilterBuilderMode: "all",
         payloadFilterConditions: [
@@ -179,6 +201,7 @@ describe("automation payload transforms", () => {
         conversationKeyTemplate: "{{event.id}}",
         idempotencyKeyTemplate: "",
         eventTypes: [],
+        triggerParameterValues: {},
         payloadFilterEditorMode: "builder",
         payloadFilterBuilderMode: "all",
         payloadFilterConditions: [],
@@ -210,6 +233,7 @@ describe("automation payload transforms", () => {
         conversationKeyTemplate: "{{event.id}}",
         idempotencyKeyTemplate: "",
         eventTypes: ["push"],
+        triggerParameterValues: {},
         payloadFilterEditorMode: "json",
         payloadFilterBuilderMode: "all",
         payloadFilterConditions: [],
@@ -228,6 +252,49 @@ describe("automation payload transforms", () => {
         op: "contains",
         path: ["repository", "full_name"],
         value: "mistle",
+      },
+      target: {
+        sandboxProfileId: "sbp_repo",
+      },
+    });
+  });
+
+  it("builds trigger parameter filters into the payload filter", () => {
+    expect(
+      toCreateWebhookAutomationPayload(
+        {
+          name: "Pull request routing",
+          integrationConnectionId: "conn_github",
+          sandboxProfileId: "sbp_repo",
+          enabled: true,
+          inputTemplate: "{}",
+          conversationKeyTemplate: "{{event.id}}",
+          idempotencyKeyTemplate: "",
+          eventTypes: ["github.pull_request.opened"],
+          triggerParameterValues: {
+            "github.pull_request.opened": {
+              repository: "mistlehq/mistle",
+            },
+          },
+          payloadFilterEditorMode: "builder",
+          payloadFilterBuilderMode: "all",
+          payloadFilterConditions: [],
+          payloadFilterText: "",
+        },
+        GitHubEventOptions,
+      ),
+    ).toEqual({
+      name: "Pull request routing",
+      enabled: true,
+      integrationConnectionId: "conn_github",
+      inputTemplate: "{}",
+      conversationKeyTemplate: "{{event.id}}",
+      idempotencyKeyTemplate: null,
+      eventTypes: ["github.pull_request.opened"],
+      payloadFilter: {
+        op: "eq",
+        path: ["repository", "full_name"],
+        value: "mistlehq/mistle",
       },
       target: {
         sandboxProfileId: "sbp_repo",

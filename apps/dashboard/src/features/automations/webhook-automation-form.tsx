@@ -27,10 +27,11 @@ import {
 import { CaretDownIcon, TrashIcon } from "@phosphor-icons/react";
 
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
-import {
-  WebhookAutomationTriggerPicker,
-  type WebhookAutomationEventOption,
-} from "./webhook-automation-trigger-picker.js";
+import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
+import type {
+  WebhookAutomationEventOption,
+  WebhookAutomationTriggerParameterValueMap,
+} from "./webhook-automation-trigger-types.js";
 import {
   buildPayloadFilterFromConditions,
   createEmptyPayloadFilterConditionDraft,
@@ -47,7 +48,7 @@ export type {
   PayloadFilterBuilderValueType,
   PayloadFilterConditionDraft,
 } from "./webhook-payload-filter-builder.js";
-export type { WebhookAutomationEventOption } from "./webhook-automation-trigger-picker.js";
+export type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 
 export type WebhookAutomationFormOption = {
   value: string;
@@ -64,6 +65,7 @@ export type WebhookAutomationFormValues = {
   conversationKeyTemplate: string;
   idempotencyKeyTemplate: string;
   eventTypes: string[];
+  triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
   payloadFilterEditorMode: "builder" | "json";
   payloadFilterBuilderMode: PayloadFilterBuilderMode;
   payloadFilterConditions: PayloadFilterConditionDraft[];
@@ -84,7 +86,12 @@ type WebhookAutomationFormProps = {
   isDeleting: boolean;
   onValueChange: (
     key: WebhookAutomationFormValueKey,
-    value: string | boolean | string[] | PayloadFilterConditionDraft[],
+    value:
+      | string
+      | boolean
+      | string[]
+      | PayloadFilterConditionDraft[]
+      | WebhookAutomationTriggerParameterValueMap,
   ) => void;
   onSubmit: () => void;
   onDelete: (() => void) | null;
@@ -712,18 +719,29 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             error={input.fieldErrors.eventTypes}
             eventOptions={input.webhookEventOptions}
             hasConnectedIntegrations={input.connectionOptions.length > 0}
+            onTriggerParameterValueChange={({ eventType, parameterId, value }) => {
+              input.onValueChange("triggerParameterValues", {
+                ...input.values.triggerParameterValues,
+                [eventType]: {
+                  ...(input.values.triggerParameterValues[eventType] ?? {}),
+                  [parameterId]: value,
+                },
+              });
+            }}
             onValueChange={(value) => {
               input.onValueChange("eventTypes", value);
             }}
+            selectedConnectionId={input.values.integrationConnectionId}
             selectedEventTypes={input.values.eventTypes}
+            triggerParameterValues={input.values.triggerParameterValues}
           />
           <FieldError message={input.fieldErrors.eventTypes} />
 
           <div className="space-y-3">
             <div className="space-y-1">
-              <h3 className="text-sm font-medium">Conditions</h3>
+              <h3 className="text-sm font-medium">Advanced conditions</h3>
               <p className="text-muted-foreground text-sm">
-                Only run when the event payload matches these conditions.
+                Optionally add extra payload filters beyond the trigger parameters above.
               </p>
             </div>
 

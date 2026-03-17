@@ -62,6 +62,36 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
         "Integration definition supportedWebhookEvents[*].displayName must be non-empty.",
       );
     }
+
+    for (const parameter of supportedWebhookEvent.parameters ?? []) {
+      if (parameter.id.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameters[*].id must be non-empty.",
+        );
+      }
+
+      if (parameter.label.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameters[*].label must be non-empty.",
+        );
+      }
+
+      if (parameter.resourceKind.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameters[*].resourceKind must be non-empty.",
+        );
+      }
+
+      if (parameter.payloadPath.length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameters[*].payloadPath must be non-empty.",
+        );
+      }
+    }
   }
 }
 

@@ -2,6 +2,11 @@ import type {
   WebhookAutomationFormValueKey,
   WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
+import {
+  extractWebhookAutomationTriggerParameterValues,
+  mergeWebhookAutomationPayloadFilter,
+} from "./webhook-automation-trigger-parameters.js";
+import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 import type {
   CreateWebhookAutomationInput,
   UpdateWebhookAutomationPatch,
@@ -16,6 +21,7 @@ import {
 
 export function toWebhookAutomationFormValues(
   automation: WebhookAutomation | null,
+  eventOptions: readonly WebhookAutomationEventOption[] = [],
 ): WebhookAutomationFormValues {
   if (automation === null) {
     return {
@@ -27,6 +33,7 @@ export function toWebhookAutomationFormValues(
       conversationKeyTemplate: "",
       idempotencyKeyTemplate: "",
       eventTypes: [],
+      triggerParameterValues: {},
       payloadFilterEditorMode: "builder",
       payloadFilterBuilderMode: "all",
       payloadFilterConditions: [],
@@ -34,8 +41,13 @@ export function toWebhookAutomationFormValues(
     };
   }
 
-  const parsedBuilder = parsePayloadFilterBuilder({
+  const extractedTriggerParameterValues = extractWebhookAutomationTriggerParameterValues({
+    eventOptions,
+    selectedEventTypes: automation.eventTypes ?? [],
     payloadFilter: automation.payloadFilter,
+  });
+  const parsedBuilder = parsePayloadFilterBuilder({
+    payloadFilter: extractedTriggerParameterValues.remainingPayloadFilter,
   });
 
   return {
@@ -47,10 +59,13 @@ export function toWebhookAutomationFormValues(
     conversationKeyTemplate: automation.conversationKeyTemplate,
     idempotencyKeyTemplate: automation.idempotencyKeyTemplate ?? "",
     eventTypes: automation.eventTypes ?? [],
+    triggerParameterValues: extractedTriggerParameterValues.triggerParameterValues,
     payloadFilterEditorMode: parsedBuilder.supported ? "builder" : "json",
     payloadFilterBuilderMode: parsedBuilder.supported ? parsedBuilder.mode : "all",
     payloadFilterConditions: parsedBuilder.supported ? parsedBuilder.conditions : [],
-    payloadFilterText: formatPayloadFilterText(automation.payloadFilter),
+    payloadFilterText: formatPayloadFilterText(
+      extractedTriggerParameterValues.remainingPayloadFilter,
+    ),
   };
 }
 
@@ -119,29 +134,42 @@ export function validateWebhookAutomationFormValues(
   return errors;
 }
 
-function toPayloadFilterValue(values: WebhookAutomationFormValues): Record<string, unknown> | null {
-  if (values.payloadFilterEditorMode === "builder") {
+function toPayloadFilterValue(input: {
+  values: WebhookAutomationFormValues;
+  eventOptions: readonly WebhookAutomationEventOption[];
+}): Record<string, unknown> | null {
+  let advancedPayloadFilter: Record<string, unknown> | null;
+
+  if (input.values.payloadFilterEditorMode === "builder") {
     const builtFilter = buildPayloadFilterFromConditions({
-      mode: values.payloadFilterBuilderMode,
-      conditions: values.payloadFilterConditions,
+      mode: input.values.payloadFilterBuilderMode,
+      conditions: input.values.payloadFilterConditions,
     });
     if (!builtFilter.success) {
       throw new Error("Expected payload filter builder state to be valid.");
     }
 
-    return builtFilter.value;
+    advancedPayloadFilter = builtFilter.value;
+  } else {
+    const parsedPayloadFilter = parseOptionalJsonObject(input.values.payloadFilterText);
+    if (!parsedPayloadFilter.success) {
+      throw new Error("Expected payload filter text to be a valid JSON object.");
+    }
+
+    advancedPayloadFilter = parsedPayloadFilter.value;
   }
 
-  const parsedPayloadFilter = parseOptionalJsonObject(values.payloadFilterText);
-  if (!parsedPayloadFilter.success) {
-    throw new Error("Expected payload filter text to be a valid JSON object.");
-  }
-
-  return parsedPayloadFilter.value;
+  return mergeWebhookAutomationPayloadFilter({
+    eventOptions: input.eventOptions,
+    selectedEventTypes: input.values.eventTypes,
+    triggerParameterValues: input.values.triggerParameterValues,
+    advancedPayloadFilter,
+  });
 }
 
 export function toCreateWebhookAutomationPayload(
   values: WebhookAutomationFormValues,
+  eventOptions: readonly WebhookAutomationEventOption[] = [],
 ): CreateWebhookAutomationInput {
   return {
     name: values.name.trim(),
@@ -153,7 +181,7 @@ export function toCreateWebhookAutomationPayload(
       ? { idempotencyKeyTemplate: null }
       : { idempotencyKeyTemplate: values.idempotencyKeyTemplate }),
     eventTypes: parseOptionalEventTypes(values.eventTypes),
-    payloadFilter: toPayloadFilterValue(values),
+    payloadFilter: toPayloadFilterValue({ values, eventOptions }),
     target: {
       sandboxProfileId: values.sandboxProfileId,
     },
@@ -162,6 +190,7 @@ export function toCreateWebhookAutomationPayload(
 
 export function toUpdateWebhookAutomationPayload(
   values: WebhookAutomationFormValues,
+  eventOptions: readonly WebhookAutomationEventOption[] = [],
 ): UpdateWebhookAutomationPatch {
   return {
     name: values.name.trim(),
@@ -172,7 +201,7 @@ export function toUpdateWebhookAutomationPayload(
     idempotencyKeyTemplate:
       values.idempotencyKeyTemplate.trim().length === 0 ? null : values.idempotencyKeyTemplate,
     eventTypes: parseOptionalEventTypes(values.eventTypes),
-    payloadFilter: toPayloadFilterValue(values),
+    payloadFilter: toPayloadFilterValue({ values, eventOptions }),
     target: {
       sandboxProfileId: values.sandboxProfileId,
     },

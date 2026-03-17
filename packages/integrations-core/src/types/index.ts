@@ -952,11 +952,21 @@ export type IntegrationMcpConfig = {
   path: ReadonlyArray<string>;
 };
 
+export type IntegrationWebhookEventParameterDefinition = {
+  id: string;
+  label: string;
+  kind: "resource-select";
+  resourceKind: string;
+  payloadPath: ReadonlyArray<string>;
+  prefix?: string | undefined;
+};
+
 export type IntegrationWebhookEventDefinition = {
   eventType: string;
   providerEventType: string;
   displayName: string;
   category?: string | undefined;
+  parameters?: ReadonlyArray<IntegrationWebhookEventParameterDefinition> | undefined;
 };
 
 export type IntegrationDefinition<

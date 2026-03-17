@@ -58,6 +58,14 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
     label: string;
     description?: string;
     category?: string;
+    parameters?: readonly {
+      id: string;
+      label: string;
+      kind: "resource-select";
+      resourceKind: string;
+      payloadPath: string[];
+      prefix?: string;
+    }[];
     unavailable?: boolean;
   }[];
   values: WebhookAutomationFormValues;
@@ -75,7 +83,12 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
   onSubmit: () => void;
   onValueChange: (
     key: keyof WebhookAutomationFormValues,
-    value: string | boolean | string[] | PayloadFilterConditionDraft[],
+    value:
+      | string
+      | boolean
+      | string[]
+      | PayloadFilterConditionDraft[]
+      | WebhookAutomationFormValues["triggerParameterValues"],
   ) => void;
 } {
   const queryClient = useQueryClient();
@@ -134,7 +147,7 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
   const createMutation = useMutation({
     mutationFn: async (values: WebhookAutomationFormValues) =>
       createWebhookAutomation({
-        payload: toCreateWebhookAutomationPayload(values),
+        payload: toCreateWebhookAutomationPayload(values, webhookEventOptions),
       }),
     onSuccess: async (automation) => {
       setFormError(null);
@@ -162,13 +175,13 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
       return updateWebhookAutomation({
         payload: {
           automationId: input.automationId,
-          payload: toUpdateWebhookAutomationPayload(values),
+          payload: toUpdateWebhookAutomationPayload(values, webhookEventOptions),
         },
       });
     },
     onSuccess: async (automation) => {
       setFormError(null);
-      setFormValues(toWebhookAutomationFormValues(automation));
+      setFormValues(toWebhookAutomationFormValues(automation, webhookEventOptions));
       await queryClient.invalidateQueries({
         queryKey: AUTOMATIONS_QUERY_KEY_PREFIX,
       });
@@ -211,15 +224,20 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
 
   useEffect(() => {
     if (input.mode === "edit" && automationQuery.data !== undefined) {
-      setFormValues(toWebhookAutomationFormValues(automationQuery.data));
+      setFormValues(toWebhookAutomationFormValues(automationQuery.data, webhookEventOptions));
       setFieldErrors({});
       setFormError(null);
     }
-  }, [automationQuery.data, input.mode]);
+  }, [automationQuery.data, input.mode, webhookEventOptions]);
 
   function onValueChange(
     key: keyof WebhookAutomationFormValues,
-    value: string | boolean | string[] | PayloadFilterConditionDraft[],
+    value:
+      | string
+      | boolean
+      | string[]
+      | PayloadFilterConditionDraft[]
+      | WebhookAutomationFormValues["triggerParameterValues"],
   ): void {
     setFormValues((currentValues) => ({
       ...currentValues,

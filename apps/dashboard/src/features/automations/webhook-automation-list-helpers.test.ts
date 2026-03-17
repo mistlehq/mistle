@@ -39,12 +39,32 @@ describe("buildWebhookAutomationEventOptions", () => {
                 providerEventType: "issue_comment",
                 displayName: "Issue comment created",
                 category: "Issues",
+                parameters: [
+                  {
+                    id: "repository",
+                    label: "repository",
+                    kind: "resource-select",
+                    resourceKind: "repository",
+                    payloadPath: ["repository", "full_name"],
+                    prefix: "in",
+                  },
+                ],
               },
               {
                 eventType: "github.pull_request.opened",
                 providerEventType: "pull_request",
                 displayName: "Pull request opened",
                 category: "Pull requests",
+                parameters: [
+                  {
+                    id: "repository",
+                    label: "repository",
+                    kind: "resource-select",
+                    resourceKind: "repository",
+                    payloadPath: ["repository", "full_name"],
+                    prefix: "in",
+                  },
+                ],
               },
             ],
             targetHealth: {
@@ -80,11 +100,31 @@ describe("buildWebhookAutomationEventOptions", () => {
         value: "github.pull_request.opened",
         label: "Pull request opened",
         category: "Pull requests",
+        parameters: [
+          {
+            id: "repository",
+            label: "repository",
+            kind: "resource-select",
+            resourceKind: "repository",
+            payloadPath: ["repository", "full_name"],
+            prefix: "in",
+          },
+        ],
       },
       {
         value: "github.issue_comment.created",
         label: "Issue comment created",
         category: "Issues",
+        parameters: [
+          {
+            id: "repository",
+            label: "repository",
+            kind: "resource-select",
+            resourceKind: "repository",
+            payloadPath: ["repository", "full_name"],
+            prefix: "in",
+          },
+        ],
       },
       {
         value: "linear.issue.created",

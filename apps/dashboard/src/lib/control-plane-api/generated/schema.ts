@@ -1970,6 +1970,15 @@ export interface paths {
                   category?: string;
                   displayName: string;
                   eventType: string;
+                  parameters?: {
+                    id: string;
+                    /** @enum {string} */
+                    kind: "resource-select";
+                    label: string;
+                    payloadPath: string[];
+                    prefix?: string;
+                    resourceKind: string;
+                  }[];
                   providerEventType: string;
                 }[];
                 targetHealth: {

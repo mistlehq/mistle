@@ -136,6 +136,18 @@ export function buildWebhookAutomationEventOptions(input: {
         label: eventDefinition.displayName,
         ...(target.logoKey === undefined ? {} : { logoKey: target.logoKey }),
         ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
+        ...(eventDefinition.parameters === undefined
+          ? {}
+          : {
+              parameters: eventDefinition.parameters.map((parameter) => ({
+                id: parameter.id,
+                label: parameter.label,
+                kind: parameter.kind,
+                resourceKind: parameter.resourceKind,
+                payloadPath: [...parameter.payloadPath],
+                ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+              })),
+            }),
       });
     }
   }

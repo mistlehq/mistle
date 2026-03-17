@@ -4,10 +4,8 @@ import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
-import {
-  WebhookAutomationTriggerPicker,
-  type WebhookAutomationEventOption,
-} from "./webhook-automation-trigger-picker.js";
+import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
+import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 
 const WebhookEventOptions: readonly WebhookAutomationEventOption[] = [
   {
@@ -31,8 +29,11 @@ describe("WebhookAutomationTriggerPicker", () => {
         error={undefined}
         eventOptions={WebhookEventOptions}
         hasConnectedIntegrations
+        onTriggerParameterValueChange={() => {}}
         onValueChange={() => {}}
+        selectedConnectionId="icn_01kkk1g84mfetvga8a4b853k27"
         selectedEventTypes={["github.issue_comment.created"]}
+        triggerParameterValues={{}}
       />,
     );
 
@@ -51,8 +52,11 @@ describe("WebhookAutomationTriggerPicker", () => {
         error={undefined}
         eventOptions={WebhookEventOptions}
         hasConnectedIntegrations
+        onTriggerParameterValueChange={() => {}}
         onValueChange={() => {}}
+        selectedConnectionId="icn_01kkk1g84mfetvga8a4b853k27"
         selectedEventTypes={["github.push.deleted"]}
+        triggerParameterValues={{}}
       />,
     );
 
@@ -66,8 +70,11 @@ describe("WebhookAutomationTriggerPicker", () => {
         error={undefined}
         eventOptions={[]}
         hasConnectedIntegrations={false}
+        onTriggerParameterValueChange={() => {}}
         onValueChange={() => {}}
+        selectedConnectionId=""
         selectedEventTypes={[]}
+        triggerParameterValues={{}}
       />,
     );
 
@@ -88,8 +95,11 @@ describe("WebhookAutomationTriggerPicker", () => {
         error={undefined}
         eventOptions={[]}
         hasConnectedIntegrations
+        onTriggerParameterValueChange={() => {}}
         onValueChange={() => {}}
+        selectedConnectionId="icn_01kkk1g84mfetvga8a4b853k27"
         selectedEventTypes={[]}
+        triggerParameterValues={{}}
       />,
     );
 
