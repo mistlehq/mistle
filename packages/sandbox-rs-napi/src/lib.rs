@@ -5,8 +5,9 @@ mod security;
 
 use napi_derive::napi;
 use proxy_ca::{
-    GeneratedProxyCa, IssuedProxyLeafCertificate, generate_proxy_ca_impl,
-    issue_proxy_leaf_certificate_impl,
+    GeneratedProxyCa, IssuedProxyLeafCertificate, NativePreparedProxyCaRuntimeEnv,
+    PrepareProxyCaRuntimeEnvInput, generate_proxy_ca_impl, issue_proxy_leaf_certificate_impl,
+    prepare_proxy_ca_runtime_env,
 };
 pub use pty::{NativePtySession, PtyEnvironmentEntry, SpawnPtyInput, spawn_pty};
 pub use process::{
@@ -67,4 +68,11 @@ pub fn issue_proxy_leaf_certificate(
         certificate_chain_pem,
         private_key_pem,
     })
+}
+
+#[napi]
+pub fn prepare_proxy_ca_runtime(
+    input: PrepareProxyCaRuntimeEnvInput,
+) -> napi::Result<NativePreparedProxyCaRuntimeEnv> {
+    prepare_proxy_ca_runtime_env(input)
 }

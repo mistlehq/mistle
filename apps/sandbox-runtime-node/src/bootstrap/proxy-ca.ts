@@ -1,34 +1,15 @@
 import { spawn } from "node:child_process";
-import { closeSync, mkdtempSync, openSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { writeFileSync } from "node:fs";
 
 import { generateProxyCa } from "@mistle/sandbox-rs-napi";
 
+import { prepareNativeProxyCaRuntimeEnv } from "../native/proxy-ca-host.js";
 import { ProxyCaCertFdEnv, ProxyCaKeyFdEnv } from "../runtime/config.js";
 import { ProxyCaCertInstallPath } from "./config.js";
 
 export const UpdateCaCertificatesPath = "/usr/sbin/update-ca-certificates";
 
 export type GeneratedProxyCa = ReturnType<typeof generateProxyCa>;
-
-function closeFd(fd: number): void {
-  try {
-    closeSync(fd);
-  } catch {
-    // ignore close errors during cleanup
-  }
-}
-
-function writeTempFd(payload: string, fileName: string): number {
-  const tempDirectory = mkdtempSync(join(tmpdir(), "mistle-proxy-ca-"));
-  const filePath = join(tempDirectory, fileName);
-  writeFileSync(filePath, payload, { mode: 0o600 });
-  const fd = openSync(filePath, "r");
-  unlinkSync(filePath);
-  rmSync(tempDirectory, { recursive: true, force: true });
-  return fd;
-}
 
 function runUpdateCaCertificates(): Promise<void> {
   return new Promise<void>((resolve, reject) => {
@@ -72,17 +53,13 @@ export function prepareProxyCaRuntimeEnv(proxyCa: GeneratedProxyCa): {
   env: Record<string, string>;
   cleanup: () => void;
 } {
-  const certFd = writeTempFd(proxyCa.certificatePem, "proxy-ca-cert.pem");
-  const keyFd = writeTempFd(proxyCa.privateKeyPem, "proxy-ca-key.pem");
+  const preparedRuntimeEnv = prepareNativeProxyCaRuntimeEnv(proxyCa);
 
   return {
     env: {
-      [ProxyCaCertFdEnv]: String(certFd),
-      [ProxyCaKeyFdEnv]: String(keyFd),
+      [ProxyCaCertFdEnv]: String(preparedRuntimeEnv.certFd),
+      [ProxyCaKeyFdEnv]: String(preparedRuntimeEnv.keyFd),
     },
-    cleanup: () => {
-      closeFd(certFd);
-      closeFd(keyFd);
-    },
+    cleanup: preparedRuntimeEnv.cleanup,
   };
 }

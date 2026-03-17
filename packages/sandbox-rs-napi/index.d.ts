@@ -9,7 +9,18 @@ export declare class NativeManagedProcess {
   hasExited(): boolean;
 }
 
+export declare class NativePreparedProxyCaRuntimeEnv {
+  readonly certificateFd: number;
+  readonly privateKeyFd: number;
+  cleanup(): void;
+}
+
 export interface GeneratedProxyCaResult {
+  certificatePem: string;
+  privateKeyPem: string;
+}
+
+export interface PrepareProxyCaRuntimeEnvInput {
   certificatePem: string;
   privateKeyPem: string;
 }
@@ -72,6 +83,9 @@ export interface PtyEventResult {
 }
 
 export declare function generateProxyCa(): GeneratedProxyCaResult;
+export declare function prepareProxyCaRuntime(
+  input: PrepareProxyCaRuntimeEnvInput,
+): NativePreparedProxyCaRuntimeEnv;
 export declare function issueProxyLeafCertificate(
   input: IssueProxyLeafCertificateInput,
 ): IssuedProxyLeafCertificateResult;
