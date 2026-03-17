@@ -66,9 +66,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
         GitHubAppInstallationCredentialResolver,
     },
   },
-  authHandlers: {
-    oauth: GitHubAppInstallationRedirectHandler,
-  },
+  redirectHandler: GitHubAppInstallationRedirectHandler,
   webhookHandler: GitHubEnterpriseServerWebhookHandler,
   resourceDefinitions: GitHubResourceDefinitions,
   resourceSyncTriggers: GitHubResourceSyncTriggers,

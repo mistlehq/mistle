@@ -1,7 +1,7 @@
 import type { IntegrationTarget } from "@mistle/db/control-plane";
 import {
   IntegrationConnectionMethodIds,
-  type IntegrationOAuthHandler,
+  type IntegrationRedirectHandler,
 } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { z } from "zod";
@@ -56,7 +56,7 @@ export type ResolvedGitHubAppInstallationHandlerTarget = {
     config: Record<string, unknown>;
     secrets: Record<string, string>;
   };
-  redirectHandler: IntegrationOAuthHandler<Record<string, unknown>, Record<string, string>>;
+  redirectHandler: IntegrationRedirectHandler<Record<string, unknown>, Record<string, string>>;
 };
 
 async function resolveEnabledTargetOrThrow(
@@ -111,7 +111,7 @@ export async function resolveGitHubAppInstallationHandlerTargetOrThrow(
     );
   }
 
-  const redirectHandler = definition.authHandlers?.oauth;
+  const redirectHandler = definition.redirectHandler;
   if (redirectHandler === undefined) {
     throw new IntegrationConnectionsBadRequestError(
       IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED,
