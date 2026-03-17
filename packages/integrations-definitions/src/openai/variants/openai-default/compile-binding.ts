@@ -35,6 +35,7 @@ const OpenAiAllowedPathPrefix = "/";
 function renderCodexConfig(input: {
   model: string;
   reasoningEffort: string;
+  openAiBaseUrl: string;
   additionalInstructions?: string;
 }): string {
   return stringifyToml({
@@ -42,6 +43,7 @@ function renderCodexConfig(input: {
     model_reasoning_effort: input.reasoningEffort,
     approval_policy: "never",
     sandbox_mode: "danger-full-access",
+    openai_base_url: input.openAiBaseUrl,
     ...(input.additionalInstructions === undefined
       ? {}
       : { developer_instructions: input.additionalInstructions }),
@@ -115,7 +117,6 @@ export function compileOpenAiApiKeyBinding(
         clientId: input.binding.config.runtime,
         setup: {
           env: {
-            OPENAI_BASE_URL: input.target.config.apiBaseUrl,
             OPENAI_MODEL: input.binding.config.defaultModel,
             OPENAI_REASONING_EFFORT: input.binding.config.reasoningEffort,
           },
@@ -127,6 +128,7 @@ export function compileOpenAiApiKeyBinding(
               content: renderCodexConfig({
                 model: input.binding.config.defaultModel,
                 reasoningEffort: input.binding.config.reasoningEffort,
+                openAiBaseUrl: input.target.config.apiBaseUrl,
                 ...(input.binding.config.additionalInstructions === undefined
                   ? {}
                   : {
