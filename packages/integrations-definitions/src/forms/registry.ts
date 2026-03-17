@@ -22,6 +22,10 @@ import { LinearConnectionConfigSchema } from "../linear/variants/linear-default/
 import { LinearBindingConfigSchema } from "../linear/variants/linear-default/binding-config-schema.js";
 import { LinearConnectionConfigForm } from "../linear/variants/linear-default/connection-config-form.js";
 import { LinearTargetConfigSchema } from "../linear/variants/linear-default/target-config-schema.js";
+import { NotionConnectionConfigSchema } from "../notion/variants/notion-default/auth.js";
+import { NotionBindingConfigSchema } from "../notion/variants/notion-default/binding-config-schema.js";
+import { NotionConnectionConfigForm } from "../notion/variants/notion-default/connection-config-form.js";
+import { NotionTargetConfigSchema } from "../notion/variants/notion-default/target-config-schema.js";
 import { OpenAiConnectionConfigSchema } from "../openai/variants/openai-default/auth.js";
 import {
   OpenAiConnectionConfigForm,
@@ -109,6 +113,22 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
         kind: "api-key",
         configSchema: OpenAiConnectionConfigSchema,
         configForm: OpenAiConnectionConfigForm,
+      },
+    ],
+  },
+  {
+    familyId: "notion",
+    variantId: "notion-default",
+    kind: "connector",
+    targetConfigSchema: NotionTargetConfigSchema,
+    bindingConfigSchema: NotionBindingConfigSchema,
+    connectionMethods: [
+      {
+        id: "oauth2",
+        label: "OAuth2",
+        kind: "oauth2",
+        configSchema: NotionConnectionConfigSchema,
+        configForm: NotionConnectionConfigForm,
       },
     ],
   },

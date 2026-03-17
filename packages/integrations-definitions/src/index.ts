@@ -3,11 +3,13 @@ import { IntegrationRegistry, type AnyIntegrationDefinition } from "@mistle/inte
 import { AtlassianDefinition } from "./atlassian/index.js";
 import { GitHubCloudDefinition, GitHubEnterpriseServerDefinition } from "./github/index.js";
 import { LinearDefinition } from "./linear/index.js";
+import { NotionDefinition } from "./notion/index.js";
 import { OpenAiApiKeyDefinition } from "./openai/index.js";
 
 export * from "./atlassian/index.js";
 export * from "./github/index.js";
 export * from "./linear/index.js";
+export * from "./notion/index.js";
 export * from "./openai/index.js";
 export * from "./forms/index.js";
 
@@ -16,6 +18,7 @@ const RegisteredIntegrationDefinitions: ReadonlyArray<AnyIntegrationDefinition> 
   GitHubCloudDefinition,
   GitHubEnterpriseServerDefinition,
   LinearDefinition,
+  NotionDefinition,
   OpenAiApiKeyDefinition,
 ];
 

@@ -1,0 +1,75 @@
+---
+title: Notion Integration Setup
+description: Operator guide for configuring a bearer-capable Notion MCP target with OAuth2
+---
+
+## Overview
+
+This guide is for operators running self-hosted Mistle with a bearer-capable Notion MCP deployment.
+
+Mistle's Notion integration uses:
+
+1. A target-scoped MCP base URL for the upstream server that accepts bearer authentication
+2. Notion's official OAuth2 authorization endpoint at `https://api.notion.com/v1/oauth/authorize`
+3. Notion's official OAuth2 token endpoint at `https://api.notion.com/v1/oauth/token`
+4. Control-plane managed access-token refresh using the stored `oauth2_refresh_token`
+
+## Prerequisites
+
+Before configuring Mistle, prepare:
+
+1. A bearer-capable Notion MCP deployment URL such as `https://notion-mcp.example.com/mcp`
+2. A Notion OAuth client ID
+3. A Notion OAuth client secret
+4. The control-plane public base URL that Notion will redirect back to
+
+## Sync And Provision Targets
+
+Run the built-in integration target sync after database setup:
+
+```bash
+pnpm --filter @mistle/control-plane-api db:seed:integration-targets
+```
+
+Then provision a target from `integration-targets.provision.json`. Start from [`integration-targets.provision.example.json`](https://github.com/mistledev/mistle/blob/main/integration-targets.provision.example.json) and keep only the targets you want to manage.
+
+Example:
+
+```json
+{
+  "version": 1,
+  "targets": [
+    {
+      "targetKey": "notion-default",
+      "enabled": true,
+      "config": {
+        "mcp_base_url": "https://notion-mcp.example.com/mcp",
+        "authorization_endpoint": "https://api.notion.com/v1/oauth/authorize",
+        "token_endpoint": "https://api.notion.com/v1/oauth/token",
+        "notion_version": "2026-03-11"
+      },
+      "secrets": {
+        "client_id": "your-notion-client-id",
+        "client_secret": "your-notion-client-secret"
+      }
+    }
+  ]
+}
+```
+
+## Runtime Behavior
+
+The connection flow redirects the user through Notion OAuth2, stores the resulting `oauth2_access_token` and `oauth2_refresh_token`, and injects the access token as a bearer credential on outbound MCP requests to `mcp_base_url`.
+
+When the access token is no longer usable, the control plane refreshes it during internal credential resolution. Permanent refresh failures are surfaced explicitly by marking the connection unusable. Mistle does not silently fall back to another credential path.
+
+## Current Testing Note
+
+Automated coverage in this repository currently exercises:
+
+1. Notion target provisioning and schema wiring
+2. OAuth2 authorization-start flow generation
+3. Notion compile output using `oauth2_access_token`
+4. Unit-level OAuth2 parsing and error classification behavior
+
+Provider-backed OAuth2 completion-success and refresh-success coverage remain deferred until the repo test environment includes a real bearer-capable Notion MCP deployment with usable test credentials. This guide is explicit about those gaps so the implementation does not rely on simulated provider behavior.

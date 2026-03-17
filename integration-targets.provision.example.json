@@ -42,6 +42,20 @@
       "secrets": {}
     },
     {
+      "targetKey": "notion-default",
+      "enabled": false,
+      "config": {
+        "mcp_base_url": "https://notion-mcp.example.com/mcp",
+        "authorization_endpoint": "https://api.notion.com/v1/oauth/authorize",
+        "token_endpoint": "https://api.notion.com/v1/oauth/token",
+        "notion_version": "2026-03-11"
+      },
+      "secrets": {
+        "client_id": "<replace-with-notion-client-id>",
+        "client_secret": "<replace-with-notion-client-secret>"
+      }
+    },
+    {
       "targetKey": "github-cloud",
       "enabled": true,
       "config": {

@@ -38,6 +38,13 @@ describe("sync-integration-targets", () => {
         config: {},
       },
       {
+        targetKey: "notion-default",
+        familyId: "notion",
+        variantId: "notion-default",
+        enabled: false,
+        config: {},
+      },
+      {
         targetKey: "openai-default",
         familyId: "openai",
         variantId: "openai-default",

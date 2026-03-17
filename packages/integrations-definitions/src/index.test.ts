@@ -25,6 +25,10 @@ describe("integrations-definitions index", () => {
       familyId: "linear",
       variantId: "linear-default",
     });
+    const notionDefinition = registry.getDefinition({
+      familyId: "notion",
+      variantId: "notion-default",
+    });
 
     expect(atlassianDefinition).toMatchObject({
       familyId: "atlassian",
@@ -80,12 +84,21 @@ describe("integrations-definitions index", () => {
       connectionMethods: [{ id: "api-key", label: "API key", kind: "api-key" }],
     });
     expect(linearDefinition?.mcp).toBeDefined();
+    expect(notionDefinition).toMatchObject({
+      familyId: "notion",
+      variantId: "notion-default",
+      kind: "connector",
+      displayName: "Notion",
+      connectionMethods: [{ id: "oauth2", label: "OAuth2", kind: "oauth2" }],
+    });
+    expect(notionDefinition?.oauth2).toBeDefined();
+    expect(notionDefinition?.mcp).toBeDefined();
   });
 
   it("lists registered definitions", () => {
     const definitions = listIntegrationDefinitions();
 
-    expect(definitions).toHaveLength(5);
+    expect(definitions).toHaveLength(6);
     expect(
       definitions.map((definition) => `${definition.familyId}::${definition.variantId}`),
     ).toEqual([
@@ -93,6 +106,7 @@ describe("integrations-definitions index", () => {
       "github::github-cloud",
       "github::github-enterprise-server",
       "linear::linear-default",
+      "notion::notion-default",
       "openai::openai-default",
     ]);
   });
