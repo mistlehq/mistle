@@ -360,10 +360,7 @@ impl napi::Task for TerminateTask {
 
         Err(Error::new(
             Status::GenericFailure,
-            format!(
-                "pty process did not exit after {}ms",
-                PTY_TERMINATE_TIMEOUT_MS
-            ),
+            format!("pty process did not exit after {PTY_TERMINATE_TIMEOUT_MS}ms"),
         ))
     }
 
