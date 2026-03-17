@@ -2907,6 +2907,7 @@ export interface paths {
               | {
                   /** @enum {string} */
                   code:
+                    | "AGENT_RUNTIME_REQUIRED"
                     | "INVALID_BINDING_CONNECTION_REFERENCE"
                     | "INVALID_CONNECTION_TARGET_REFERENCE"
                     | "CONNECTION_MISMATCH"
