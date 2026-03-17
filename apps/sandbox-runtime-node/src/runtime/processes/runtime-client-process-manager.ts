@@ -1,4 +1,3 @@
-import { spawn, type ChildProcess } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
@@ -9,9 +8,11 @@ import type {
   RuntimeClientProcessSpec,
 } from "@mistle/integrations-core";
 
+import { startNativeManagedProcess, type NativeProcessSignal } from "../../native/process-host.js";
+
 type RunningRuntimeClientProcess = {
   spec: RuntimeClientProcessSpec;
-  child: ChildProcess;
+  process: ReturnType<typeof startNativeManagedProcess>;
   exited: Promise<void>;
   hasExited: () => boolean;
   exitError: () => Error | undefined;
@@ -31,38 +32,31 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function exitErrorFromChild(code: number | null, signal: NodeJS.Signals | null): Error | undefined {
-  if (signal !== null) {
+function isProcessExited(process: ReturnType<typeof startNativeManagedProcess>): boolean {
+  try {
+    return process.hasExited();
+  } catch {
+    return false;
+  }
+}
+
+function exitErrorFromProcessResult(
+  exitCode: number | undefined,
+  signal: string | undefined,
+): Error | undefined {
+  if (signal !== undefined) {
     return new Error(`process exited with signal ${signal}`);
   }
 
-  if (code === null || code === 0) {
+  if (exitCode === undefined || exitCode === 0) {
     return undefined;
   }
 
-  return new Error(`process exited with code ${code}`);
+  return new Error(`process exited with code ${exitCode}`);
 }
 
-function stopSignal(signal: "sigterm" | "sigkill"): NodeJS.Signals {
-  switch (signal) {
-    case "sigterm":
-      return "SIGTERM";
-    case "sigkill":
-      return "SIGKILL";
-  }
-}
-
-function mergeProcessEnvironment(
-  overrides: Record<string, string> | undefined,
-): NodeJS.ProcessEnv | undefined {
-  if (overrides === undefined) {
-    return undefined;
-  }
-
-  return {
-    ...process.env,
-    ...overrides,
-  };
+function stopSignal(signal: "sigterm" | "sigkill"): NativeProcessSignal {
+  return signal;
 }
 
 async function startRuntimeClientProcess(
@@ -77,50 +71,35 @@ async function startRuntimeClientProcess(
     throw new Error("process command args must not be empty");
   }
 
-  const child = spawn(command, args, {
-    cwd:
-      processSpec.command.cwd !== undefined && processSpec.command.cwd.trim().length > 0
-        ? processSpec.command.cwd
-        : undefined,
-    env: mergeProcessEnvironment(processSpec.command.env),
-    stdio: "inherit",
-  });
-
   let exited = false;
   let exitErr: Error | undefined;
-
-  const exitedPromise = new Promise<void>((resolve) => {
-    child.once("exit", (code, signal) => {
-      exited = true;
-      exitErr = exitErrorFromChild(code, signal);
-      resolve();
+  try {
+    let resolveExited!: () => void;
+    const exitedPromise = new Promise<void>((resolve) => {
+      resolveExited = resolve;
     });
-  });
+    const startedProcess = startNativeManagedProcess({
+      command,
+      args,
+      ...(processSpec.command.cwd === undefined ? {} : { cwd: processSpec.command.cwd }),
+      ...(processSpec.command.env === undefined ? {} : { env: processSpec.command.env }),
+      onExit(result) {
+        exited = true;
+        exitErr = exitErrorFromProcessResult(result.exitCode, result.signal);
+        resolveExited();
+      },
+    });
 
-  await new Promise<void>((resolve, reject) => {
-    const handleSpawn = (): void => {
-      child.off("error", handleError);
-      resolve();
+    return {
+      spec: processSpec,
+      process: startedProcess,
+      exited: exitedPromise,
+      hasExited: () => exited || isProcessExited(startedProcess),
+      exitError: () => exitErr,
     };
-
-    const handleError = (error: Error): void => {
-      child.off("spawn", handleSpawn);
-      reject(error);
-    };
-
-    child.once("spawn", handleSpawn);
-    child.once("error", handleError);
-  }).catch((error: unknown) => {
+  } catch (error: unknown) {
     throw new Error(`failed to start process command: ${errorMessage(error)}`);
-  });
-
-  return {
-    spec: processSpec,
-    child,
-    exited: exitedPromise,
-    hasExited: () => exited,
-    exitError: () => exitErr,
-  };
+  }
 }
 
 function waitForRuntimeClientProcessExit(
@@ -134,6 +113,11 @@ function waitForRuntimeClientProcessExit(
   }
 
   return new Promise<void>((resolve, reject) => {
+    if (process.hasExited()) {
+      resolve();
+      return;
+    }
+
     const timer = setTimeout(() => {
       reject(new Error("process exit wait timed out"));
     }, waitDurationMs);
@@ -147,21 +131,14 @@ function waitForRuntimeClientProcessExit(
 
 async function signalRuntimeClientProcess(
   process: RunningRuntimeClientProcess,
-  signal: NodeJS.Signals,
+  signal: NativeProcessSignal,
 ): Promise<void> {
   if (process.hasExited()) {
     return;
   }
 
-  if (process.child.pid === undefined) {
-    throw new Error("runtime client process has no running OS process");
-  }
-
   try {
-    const signaled = process.child.kill(signal);
-    if (!signaled && !process.hasExited()) {
-      throw new Error("failed to signal process");
-    }
+    process.process.signal(signal);
   } catch (error) {
     if (process.hasExited()) {
       return;
@@ -184,7 +161,7 @@ async function stopRuntimeClientProcess(process: RunningRuntimeClientProcess): P
       await waitForRuntimeClientProcessExit(process, process.spec.stop.gracePeriodMs ?? 0);
       return;
     } catch {
-      await signalRuntimeClientProcess(process, "SIGKILL");
+      await signalRuntimeClientProcess(process, "sigkill");
     }
   }
 

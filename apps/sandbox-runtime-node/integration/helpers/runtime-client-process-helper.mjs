@@ -1,7 +1,12 @@
+import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { createServer as createNetServer } from "node:net";
 
+// Keep this helper as plain .mjs because the integration suite spawns it as a
+// real child Node process. Using .ts here would require an extra loader or
+// build step and would change the process boundary under test.
 const mode = process.env.SANDBOX_RUNTIME_PROCESS_HELPER_MODE;
 const port = Number.parseInt(process.env.SANDBOX_RUNTIME_PROCESS_HELPER_PORT ?? "", 10);
 const delayMs = Number.parseInt(process.env.SANDBOX_RUNTIME_PROCESS_HELPER_DELAY_MS ?? "0", 10);
@@ -83,6 +88,9 @@ switch (mode) {
   case "exit-immediately":
     process.exit(17);
     break;
+  case "abort-immediately":
+    process.abort();
+    break;
   case "exit-after-delay":
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs);
     process.exit(17);
@@ -91,6 +99,24 @@ switch (mode) {
     process.on("SIGTERM", () => {});
     process.stdin.resume();
     break;
+  case "ignore-sigterm-with-child": {
+    const childPidPath = process.env.SANDBOX_RUNTIME_PROCESS_HELPER_CHILD_PID_PATH;
+    if (typeof childPidPath !== "string" || childPidPath.length === 0) {
+      throw new Error("helper child pid path is required");
+    }
+
+    const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], {
+      stdio: "ignore",
+    });
+    if (child.pid === undefined) {
+      throw new Error("helper child pid is required");
+    }
+
+    writeFileSync(childPidPath, String(child.pid));
+    process.on("SIGTERM", () => {});
+    process.stdin.resume();
+    break;
+  }
   default:
     throw new Error(`unsupported helper mode ${String(mode)}`);
 }

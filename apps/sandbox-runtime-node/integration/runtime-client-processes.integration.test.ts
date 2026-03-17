@@ -1,5 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { once } from "node:events";
+import { readFile, rm } from "node:fs/promises";
 import { createServer } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import type { CompiledRuntimeClient, RuntimeClientProcessSpec } from "@mistle/integrations-core";
@@ -28,6 +32,56 @@ async function reserveTCPPort(): Promise<number> {
   server.close();
   await once(server, "close");
   return port;
+}
+
+function helperChildPidPath(): string {
+  return join(tmpdir(), `mistle-runtime-client-child-${process.pid}-${randomUUID()}`);
+}
+
+function sleepForPollInterval(delayMs: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delayMs);
+}
+
+async function waitForChildPid(path: string): Promise<number> {
+  const deadlineAt = Date.now() + 2_000;
+
+  while (Date.now() < deadlineAt) {
+    try {
+      const value = await readFile(path, "utf8");
+      const pid = Number.parseInt(value.trim(), 10);
+      if (Number.isInteger(pid) && pid > 0) {
+        return pid;
+      }
+    } catch (error) {
+      if (!(error instanceof Error) || !("code" in error) || error.code !== "ENOENT") {
+        throw error;
+      }
+    }
+
+    sleepForPollInterval(10);
+  }
+
+  throw new Error("expected helper child pid to be written");
+}
+
+async function expectProcessAbsent(pid: number): Promise<void> {
+  const deadlineAt = Date.now() + 2_000;
+
+  while (Date.now() < deadlineAt) {
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ESRCH") {
+        return;
+      }
+
+      throw error;
+    }
+
+    sleepForPollInterval(10);
+  }
+
+  throw new Error(`expected process ${pid} to be absent`);
 }
 
 function helperProcessSpec(
@@ -197,6 +251,19 @@ describe("startRuntimeClientProcessManager", () => {
     expect(processExit.err).toBeInstanceOf(Error);
   });
 
+  it("preserves unexpected non-TERM/KILL signal names", async () => {
+    const manager = await startRuntimeClientProcessManager([
+      {
+        ...helperProcessSpec("process_abort", "abort-immediately", {}),
+      },
+    ]);
+    StartedManagers.add(manager);
+
+    const processExit = await manager.unexpectedExit;
+    expect(processExit.processKey).toBe("process_abort");
+    expect(processExit.err?.message).toContain("SIGABRT");
+  });
+
   it("escalates sigterm to sigkill after grace period when process ignores sigterm", async () => {
     const manager = await startRuntimeClientProcessManager([
       {
@@ -210,6 +277,32 @@ describe("startRuntimeClientProcessManager", () => {
     ]);
 
     await expect(manager.stop()).resolves.toBeUndefined();
+  });
+
+  it("kills the full process tree when stop escalates to sigkill", async () => {
+    const childPidPath = helperChildPidPath();
+    const manager = await startRuntimeClientProcessManager([
+      {
+        ...helperProcessSpec("process_ignore_sigterm_tree", "ignore-sigterm-with-child", {
+          SANDBOX_RUNTIME_PROCESS_HELPER_CHILD_PID_PATH: childPidPath,
+        }),
+        stop: {
+          signal: "sigterm",
+          timeoutMs: 1_500,
+          gracePeriodMs: 100,
+        },
+      },
+    ]);
+    StartedManagers.add(manager);
+
+    try {
+      const childPid = await waitForChildPid(childPidPath);
+      await expect(manager.stop()).resolves.toBeUndefined();
+      StartedManagers.delete(manager);
+      await expectProcessAbsent(childPid);
+    } finally {
+      await rm(childPidPath, { force: true });
+    }
   });
 
   it("starts processes with merged runtime client setup env", async () => {

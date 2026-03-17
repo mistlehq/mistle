@@ -1,4 +1,5 @@
 mod proxy_ca;
+mod process;
 mod pty;
 mod security;
 
@@ -8,6 +9,9 @@ use proxy_ca::{
     issue_proxy_leaf_certificate_impl,
 };
 pub use pty::{NativePtySession, PtyEnvironmentEntry, SpawnPtyInput, spawn_pty};
+pub use process::{
+    NativeManagedProcess, ProcessExitResult, SpawnManagedProcessInput, spawn_managed_process,
+};
 pub use security::{
     ExecRuntimeAsUserInput, ProcessEnvironmentEntry, exec_runtime_as_user,
     set_current_process_non_dumpable,
