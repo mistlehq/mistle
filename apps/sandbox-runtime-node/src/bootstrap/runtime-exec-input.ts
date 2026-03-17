@@ -13,6 +13,7 @@ type SandboxUserRecord = {
 
 export const HomeEnv = "HOME";
 export const LognameEnv = "LOGNAME";
+export const PackagedRuntimeBinaryName = "sandboxd-node";
 export const UserEnv = "USER";
 
 function normalizePathArgument(argument: string): string {
@@ -105,6 +106,46 @@ export function buildRuntimeExecInput(input: {
       input.bootstrapEntrypointPath,
       input.runtimeEntrypointPath,
     ),
+    env,
+  };
+}
+
+export function buildPackagedRuntimeExecInput(input: {
+  processEnv: NodeJS.ProcessEnv;
+  processArgv: readonly string[];
+  runtimeExecutablePath: string;
+  userRecord: SandboxUserRecord;
+  additionalEnv: Record<string, string>;
+}): ExecRuntimeAsUserInput {
+  const env = buildProcessEnvironmentEntries(input.processEnv);
+  env.push(
+    {
+      name: HomeEnv,
+      value: input.userRecord.homeDir,
+    },
+    {
+      name: LognameEnv,
+      value: input.userRecord.username,
+    },
+    {
+      name: UserEnv,
+      value: input.userRecord.username,
+    },
+  );
+
+  for (const [name, value] of Object.entries(input.additionalEnv)) {
+    env.push({
+      name,
+      value,
+    });
+  }
+
+  return {
+    uid: input.userRecord.uid,
+    gid: input.userRecord.gid,
+    command: input.runtimeExecutablePath,
+    // In SEA entrypoints, user-provided arguments start at process.argv[2].
+    args: input.processArgv.slice(2),
     env,
   };
 }

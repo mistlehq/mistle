@@ -1,6 +1,4 @@
-import { fileURLToPath } from "node:url";
-
-import { runBootstrap } from "./run.js";
+import { resolvePackagedRuntimeExecutablePath, runBootstrap } from "../bootstrap/run.js";
 
 function lookupEnv(key: string): string | undefined {
   return process.env[key];
@@ -11,8 +9,8 @@ async function main(): Promise<void> {
     lookupEnv,
     processArgv: process.argv,
     runtimeExecTarget: {
-      kind: "node-script",
-      bootstrapEntrypointPath: fileURLToPath(import.meta.url),
+      kind: "packaged-binary",
+      runtimeExecutablePath: resolvePackagedRuntimeExecutablePath(process.execPath),
     },
   });
 }

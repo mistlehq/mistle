@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { extname } from "node:path";
 
 import { generateProxyCa } from "@mistle/sandbox-rs-napi";
@@ -6,7 +7,11 @@ import { generateProxyCa } from "@mistle/sandbox-rs-napi";
 import { loadBootstrapConfig } from "./config.js";
 import { execRuntime } from "./exec-runtime.js";
 import { installProxyCaCertificate, prepareProxyCaRuntimeEnv } from "./proxy-ca.js";
-import { buildRuntimeExecInput } from "./runtime-exec-input.js";
+import {
+  buildPackagedRuntimeExecInput,
+  buildRuntimeExecInput,
+  PackagedRuntimeBinaryName,
+} from "./runtime-exec-input.js";
 
 type PasswdUserRecord = {
   username: string;
@@ -20,7 +25,15 @@ type LookupEnv = (key: string) => string | undefined;
 type RunBootstrapInput = {
   lookupEnv: LookupEnv;
   processArgv: readonly string[];
-  bootstrapEntrypointPath: string;
+  runtimeExecTarget:
+    | {
+        kind: "node-script";
+        bootstrapEntrypointPath: string;
+      }
+    | {
+        kind: "packaged-binary";
+        runtimeExecutablePath: string;
+      };
 };
 
 function parsePasswdUserRecord(line: string): PasswdUserRecord | undefined {
@@ -93,17 +106,32 @@ export async function runBootstrap(input: RunBootstrapInput): Promise<void> {
       throw new Error(`sandbox user "${sandboxUser.username}" must not resolve to uid 0`);
     }
 
-    const runtimeExecInput = buildRuntimeExecInput({
-      processEnv: process.env,
-      processArgv: input.processArgv,
-      bootstrapEntrypointPath: input.bootstrapEntrypointPath,
-      runtimeEntrypointPath: resolveRuntimeEntrypointPath(input.bootstrapEntrypointPath),
-      userRecord: sandboxUser,
-      additionalEnv: proxyCaRuntimeEnv.env,
-    });
+    const runtimeExecInput =
+      input.runtimeExecTarget.kind === "node-script"
+        ? buildRuntimeExecInput({
+            processEnv: process.env,
+            processArgv: input.processArgv,
+            bootstrapEntrypointPath: input.runtimeExecTarget.bootstrapEntrypointPath,
+            runtimeEntrypointPath: resolveRuntimeEntrypointPath(
+              input.runtimeExecTarget.bootstrapEntrypointPath,
+            ),
+            userRecord: sandboxUser,
+            additionalEnv: proxyCaRuntimeEnv.env,
+          })
+        : buildPackagedRuntimeExecInput({
+            processEnv: process.env,
+            processArgv: input.processArgv,
+            runtimeExecutablePath: input.runtimeExecTarget.runtimeExecutablePath,
+            userRecord: sandboxUser,
+            additionalEnv: proxyCaRuntimeEnv.env,
+          });
 
     execRuntime(runtimeExecInput);
   } finally {
     proxyCaRuntimeEnv.cleanup();
   }
+}
+
+export function resolvePackagedRuntimeExecutablePath(bootstrapExecutablePath: string): string {
+  return join(dirname(bootstrapExecutablePath), PackagedRuntimeBinaryName);
 }
