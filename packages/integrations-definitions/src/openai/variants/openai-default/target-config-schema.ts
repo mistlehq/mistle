@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { OpenAiCapabilitiesByAuthSchemeSchema, OpenAiModelIds } from "./model-capabilities.js";
+import { OpenAiCapabilitiesSchema, OpenAiModelIds } from "./model-capabilities.js";
 
 const OpenAiApiBaseUrlSchema = z.url().transform((input) => {
   const parsedUrl = new URL(input);
@@ -30,30 +30,13 @@ const OpenAiRawCapabilitySetSchema = z
   })
   .strict();
 
-const OpenAiRawBindingCapabilitiesSchema = z
-  .object({
-    by_auth_scheme: z
-      .object({
-        "api-key": OpenAiRawCapabilitySetSchema,
-        oauth: OpenAiRawCapabilitySetSchema,
-      })
-      .strict(),
-  })
-  .strict()
-  .transform((input) => ({
-    byAuthScheme: OpenAiCapabilitiesByAuthSchemeSchema.parse({
-      "api-key": {
-        models: input.by_auth_scheme["api-key"].models,
-        allowedReasoningByModel: input.by_auth_scheme["api-key"].allowed_reasoning_by_model,
-        defaultReasoningByModel: input.by_auth_scheme["api-key"].default_reasoning_by_model,
-      },
-      oauth: {
-        models: input.by_auth_scheme.oauth.models,
-        allowedReasoningByModel: input.by_auth_scheme.oauth.allowed_reasoning_by_model,
-        defaultReasoningByModel: input.by_auth_scheme.oauth.default_reasoning_by_model,
-      },
-    }),
-  }));
+const OpenAiRawBindingCapabilitiesSchema = OpenAiRawCapabilitySetSchema.transform((input) =>
+  OpenAiCapabilitiesSchema.parse({
+    models: input.models,
+    allowedReasoningByModel: input.allowed_reasoning_by_model,
+    defaultReasoningByModel: input.default_reasoning_by_model,
+  }),
+);
 
 export const OpenAiApiKeyTargetConfigSchema = z
   .object({

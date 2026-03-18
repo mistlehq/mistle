@@ -4,10 +4,7 @@ import {
   integrationCredentials,
   IntegrationCredentialSecretKinds,
 } from "@mistle/db/control-plane";
-import {
-  type IntegrationSupportedAuthScheme,
-  IntegrationSupportedAuthSchemes,
-} from "@mistle/integrations-core";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { eq, sql } from "drizzle-orm";
 
@@ -17,7 +14,7 @@ import {
   unwrapOrganizationCredentialKey,
 } from "../../integration-credentials/crypto.js";
 import type { AppContext } from "../../types.js";
-import { assertApiKeyAuthSchemeSupportedOrThrow } from "./create-api-key-connection.js";
+import { assertApiKeyConnectionMethodSupportedOrThrow } from "./create-api-key-connection.js";
 import {
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsBadRequestError,
@@ -44,25 +41,23 @@ export type UpdateApiKeyConnectionInput = {
   organizationId: string;
   connectionId: string;
   displayName: string;
-  apiKey?: string;
+  apiKey: string;
 };
 
-function resolveConnectionAuthScheme(
-  config: Record<string, unknown> | null,
-): IntegrationSupportedAuthScheme | null {
+function resolveConnectionMethodId(config: Record<string, unknown> | null): string | null {
   if (config === null) {
     return null;
   }
 
-  const authScheme = config["auth_scheme"];
-  if (authScheme !== IntegrationSupportedAuthSchemes.API_KEY) {
+  const connectionMethodId = config["connection_method"];
+  if (connectionMethodId !== IntegrationConnectionMethodIds.API_KEY) {
     return null;
   }
 
-  return IntegrationSupportedAuthSchemes.API_KEY;
+  return IntegrationConnectionMethodIds.API_KEY;
 }
 
-export async function updateIntegrationConnection(
+export async function updateApiKeyConnection(
   db: AppContext["var"]["db"],
   integrationsConfig: AppContext["var"]["config"]["integrations"],
   input: UpdateApiKeyConnectionInput,
@@ -79,47 +74,14 @@ export async function updateIntegrationConnection(
     );
   }
 
-  const existingAuthScheme = resolveConnectionAuthScheme(existingConnection.config);
-  const normalizedApiKey = input.apiKey?.trim() ?? "";
-  const isApiKeyProvided = input.apiKey !== undefined;
-  const shouldRotateApiKey = isApiKeyProvided && normalizedApiKey.length > 0;
+  const existingConnectionMethodId = resolveConnectionMethodId(existingConnection.config);
+  const normalizedApiKey = input.apiKey.trim();
 
-  if (isApiKeyProvided && normalizedApiKey.length === 0) {
+  if (normalizedApiKey.length === 0) {
     throw new IntegrationConnectionsBadRequestError(
       IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
       "`apiKey` must contain at least one non-whitespace character when provided.",
     );
-  }
-
-  if (!shouldRotateApiKey) {
-    const [updatedConnection] = await db
-      .update(integrationConnections)
-      .set({
-        displayName: input.displayName,
-        updatedAt: sql`now()`,
-      })
-      .where(eq(integrationConnections.id, existingConnection.id))
-      .returning();
-
-    if (updatedConnection === undefined) {
-      throw new Error("Failed to update integration connection.");
-    }
-
-    return {
-      id: updatedConnection.id,
-      targetKey: updatedConnection.targetKey,
-      displayName: updatedConnection.displayName,
-      status: updatedConnection.status,
-      ...(updatedConnection.externalSubjectId === null
-        ? {}
-        : { externalSubjectId: updatedConnection.externalSubjectId }),
-      ...(updatedConnection.config === null ? {} : { config: updatedConnection.config }),
-      ...(updatedConnection.targetSnapshotConfig === null
-        ? {}
-        : { targetSnapshotConfig: updatedConnection.targetSnapshotConfig }),
-      createdAt: updatedConnection.createdAt,
-      updatedAt: updatedConnection.updatedAt,
-    };
   }
 
   const target = await db.query.integrationTargets.findFirst({
@@ -145,16 +107,16 @@ export async function updateIntegrationConnection(
     );
   }
 
-  if (existingAuthScheme !== IntegrationSupportedAuthSchemes.API_KEY) {
+  if (existingConnectionMethodId !== IntegrationConnectionMethodIds.API_KEY) {
     throw new IntegrationConnectionsBadRequestError(
       IntegrationConnectionsBadRequestCodes.API_KEY_CONNECTION_REQUIRED,
       `Integration connection '${input.connectionId}' is not an API-key connection.`,
     );
   }
 
-  assertApiKeyAuthSchemeSupportedOrThrow({
+  assertApiKeyConnectionMethodSupportedOrThrow({
     targetKey: existingConnection.targetKey,
-    supportedAuthSchemes: definition.supportedAuthSchemes,
+    connectionMethods: definition.connectionMethods,
   });
 
   const organizationCredentialKey = await db.query.organizationCredentialKeys.findFirst({

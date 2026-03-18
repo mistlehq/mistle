@@ -131,6 +131,7 @@ const SandboxProfileVersionNotFoundCodeSchema = z.enum([
   SandboxProfilesNotFoundCodes.PROFILE_VERSION_NOT_FOUND,
 ]);
 const StartSandboxProfileInstanceBadRequestCodeSchema = z.enum([
+  SandboxProfilesCompileErrorCodes.AGENT_RUNTIME_REQUIRED,
   SandboxProfilesCompileErrorCodes.INVALID_BINDING_CONNECTION_REFERENCE,
   SandboxProfilesCompileErrorCodes.INVALID_CONNECTION_TARGET_REFERENCE,
   SandboxProfilesCompileErrorCodes.CONNECTION_MISMATCH,

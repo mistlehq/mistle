@@ -51,7 +51,11 @@ function resolveTargetMetadata(input: {
   displayName: string;
   description: string;
   logoKey?: string;
-  supportedAuthSchemes?: ("oauth" | "api-key")[];
+  connectionMethods?: {
+    id: "api-key" | "oauth2" | "github-app-installation";
+    label: string;
+    kind: "api-key" | "oauth2" | "redirect";
+  }[];
 } {
   const definition = IntegrationRegistry.getDefinition({
     familyId: input.familyId,
@@ -77,7 +81,11 @@ function resolveTargetMetadata(input: {
         displayName: input.displayNameOverride ?? definition.displayName,
         description: input.descriptionOverride,
         logoKey: definition.logoKey,
-        supportedAuthSchemes: [...definition.supportedAuthSchemes],
+        connectionMethods: definition.connectionMethods.map((method) => ({
+          id: method.id,
+          label: method.label,
+          kind: method.kind,
+        })),
       };
     }
 
@@ -90,7 +98,11 @@ function resolveTargetMetadata(input: {
     displayName: input.displayNameOverride ?? definition.displayName,
     description: input.descriptionOverride ?? definition.description,
     logoKey: definition.logoKey,
-    supportedAuthSchemes: [...definition.supportedAuthSchemes],
+    connectionMethods: definition.connectionMethods.map((method) => ({
+      id: method.id,
+      label: method.label,
+      kind: method.kind,
+    })),
   };
 }
 
@@ -199,9 +211,9 @@ export async function listIntegrationTargets(
           displayName: resolvedMetadata.displayName,
           description: resolvedMetadata.description,
           ...(resolvedMetadata.logoKey === undefined ? {} : { logoKey: resolvedMetadata.logoKey }),
-          ...(resolvedMetadata.supportedAuthSchemes === undefined
+          ...(resolvedMetadata.connectionMethods === undefined
             ? {}
-            : { supportedAuthSchemes: resolvedMetadata.supportedAuthSchemes }),
+            : { connectionMethods: resolvedMetadata.connectionMethods }),
           targetHealth: projectedTargetUi.targetHealth,
           ...(target.displayNameOverride === null
             ? {}

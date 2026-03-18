@@ -1,7 +1,7 @@
 import {
+  IntegrationConnectionMethodIds,
   joinRoutePathPrefixes,
   resolveRoutePathPrefixFromBaseUrl,
-  IntegrationSupportedAuthSchemes,
   type RuntimeArtifactCommand,
   type CompileBindingInput,
   type CompileBindingResult,
@@ -172,7 +172,8 @@ export function compileGitHubBinding(input: GitHubCompileBindingInput): CompileB
   const credentialResolver = {
     connectionId: input.connection.id,
     secretType: credentialSecretType,
-    ...(parsedConnectionConfig.auth_scheme === IntegrationSupportedAuthSchemes.OAUTH
+    ...(parsedConnectionConfig.connection_method ===
+    IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
       ? {
           resolverKey: GitHubCredentialResolverKeys.GITHUB_APP_INSTALLATION_TOKEN,
         }

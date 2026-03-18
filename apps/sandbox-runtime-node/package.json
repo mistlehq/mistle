@@ -7,6 +7,9 @@
     "dev": "tsx watch src/main.ts",
     "dev:bootstrap": "pnpm run build:native && tsx watch src/bootstrap/main.ts",
     "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "build:sea:bundle": "node ./scripts/build-sea-bundles.mjs",
+    "build:sea": "node ./scripts/build-sea.mjs",
+    "test:sea": "pnpm run build:sea && node ./scripts/smoke-sea.mjs",
     "start": "node dist/main.js",
     "start:bootstrap": "pnpm run build:native && node dist/bootstrap/main.js",
     "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
@@ -27,6 +30,8 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
-    "@types/ws": "^8.18.1"
+    "@types/ws": "^8.18.1",
+    "esbuild": "0.27.4",
+    "postject": "1.0.0-alpha.6"
   }
 }

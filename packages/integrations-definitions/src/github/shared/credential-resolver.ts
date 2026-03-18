@@ -1,5 +1,5 @@
 import {
-  IntegrationSupportedAuthSchemes,
+  IntegrationConnectionMethodIds,
   type IntegrationCredentialResolver,
   type IntegrationCredentialResolverInput,
 } from "@mistle/integrations-core";
@@ -84,8 +84,13 @@ function resolveGitHubAppCredentialContext(
   }
 
   const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(input.connection.config);
-  if (parsedConnectionConfig.auth_scheme !== IntegrationSupportedAuthSchemes.OAUTH) {
-    throw new Error("GitHub app installation resolver requires an OAuth connection config.");
+  if (
+    parsedConnectionConfig.connection_method !==
+    IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+  ) {
+    throw new Error(
+      "GitHub app installation resolver requires a GitHub App installation connection config.",
+    );
   }
 
   const numericInstallationId = Number(parsedConnectionConfig.installation_id);

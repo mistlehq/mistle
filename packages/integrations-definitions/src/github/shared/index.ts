@@ -1,10 +1,11 @@
 export { GitHubApiMethods, GitHubFamilyId } from "./constants.js";
 export {
+  GitHubApiKeyConnectionConfigSchema,
+  GitHubAppInstallationConnectionConfigSchema,
   GitHubConnectionConfigSchema,
   GitHubCredentialSecretTypes,
   type GitHubConnectionConfig,
   type GitHubCredentialSecretType,
-  GitHubSupportedAuthSchemes,
   resolveGitHubCredentialSecretType,
 } from "./auth.js";
 export { GitHubWebhookHandler } from "./webhook.js";

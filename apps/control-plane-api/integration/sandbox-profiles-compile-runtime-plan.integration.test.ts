@@ -7,7 +7,7 @@ import {
   sandboxProfileVersionIntegrationBindings,
   sandboxProfileVersions,
 } from "@mistle/db/control-plane";
-import { IntegrationSupportedAuthSchemes } from "@mistle/integrations-core";
+import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { createOpenAiRawBindingCapabilities } from "@mistle/integrations-definitions";
 import { describe, expect } from "vitest";
 
@@ -59,7 +59,7 @@ describe("sandbox profile compile runtime plan integration", () => {
       displayName: "Compile Success Connection",
       status: IntegrationConnectionStatuses.ACTIVE,
       config: {
-        auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
+        connection_method: IntegrationConnectionMethodIds.API_KEY,
       },
     });
     await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({

@@ -8,5 +8,5 @@ export {
   type GitHubCloudBindingConfig,
 } from "./binding-config-schema.js";
 export { compileGitHubCloudBinding } from "./compile-binding.js";
-export { GitHubCloudCredentialSecretTypes, GitHubCloudSupportedAuthSchemes } from "./auth.js";
+export { GitHubCloudCredentialSecretTypes } from "./auth.js";
 export { GitHubCloudWebhookHandler } from "./webhook.js";

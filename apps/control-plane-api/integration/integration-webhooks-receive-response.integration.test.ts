@@ -1,8 +1,9 @@
 import { integrationTargets } from "@mistle/db/control-plane";
 import {
+  IntegrationConnectionMethodIds,
+  IntegrationConnectionMethodKinds,
   IntegrationKinds,
   IntegrationRegistry,
-  IntegrationSupportedAuthSchemes,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 import { describe, expect } from "vitest";
@@ -28,7 +29,13 @@ const ImmediateResponseWebhookDefinition: IntegrationDefinition<
   targetConfigSchema: ResponseTargetConfigSchema,
   targetSecretSchema: ResponseTargetSecretSchema,
   bindingConfigSchema: ResponseBindingConfigSchema,
-  supportedAuthSchemes: [IntegrationSupportedAuthSchemes.API_KEY],
+  connectionMethods: [
+    {
+      id: IntegrationConnectionMethodIds.API_KEY,
+      label: "API key",
+      kind: IntegrationConnectionMethodKinds.API_KEY,
+    },
+  ],
   webhookHandler: {
     resolveWebhookRequest(input) {
       return {

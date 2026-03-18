@@ -4,7 +4,11 @@ import { z } from "zod";
 
 import { compileRuntimePlan } from "../src/compiler/index.js";
 import { IntegrationRegistry } from "../src/registry/index.js";
-import type { IntegrationDefinition } from "../src/types/index.js";
+import {
+  IntegrationConnectionMethodIds,
+  IntegrationConnectionMethodKinds,
+  type IntegrationDefinition,
+} from "../src/types/index.js";
 
 const EmptyTargetConfigSchema = z.object({});
 const EmptyTargetSecretsSchema = z.object({});
@@ -12,6 +16,13 @@ const EmptyBindingConfigSchema = z.object({});
 
 const TestContainerImage = "alpine:3.22";
 const InstallPath = "/tmp/jq";
+const ApiKeyConnectionMethods = [
+  {
+    id: IntegrationConnectionMethodIds.API_KEY,
+    label: "API key",
+    kind: IntegrationConnectionMethodKinds.API_KEY,
+  },
+] as const;
 
 function createGithubBinaryInstallDefinition(): IntegrationDefinition<
   typeof EmptyTargetConfigSchema,
@@ -27,7 +38,7 @@ function createGithubBinaryInstallDefinition(): IntegrationDefinition<
     targetConfigSchema: EmptyTargetConfigSchema,
     targetSecretSchema: EmptyTargetSecretsSchema,
     bindingConfigSchema: EmptyBindingConfigSchema,
-    supportedAuthSchemes: ["api-key"],
+    connectionMethods: ApiKeyConnectionMethods,
     compileBinding: () => ({
       egressRoutes: [],
       artifacts: [

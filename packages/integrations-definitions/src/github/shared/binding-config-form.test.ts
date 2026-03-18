@@ -13,7 +13,7 @@ describe("github binding config forms", () => {
       web_base_url: "https://github.com",
     });
     const connectionConfig = GitHubConnectionConfigSchema.parse({
-      auth_scheme: "api-key",
+      connection_method: "api-key",
     });
 
     const resolvedForm = resolveIntegrationForm({
@@ -33,7 +33,7 @@ describe("github binding config forms", () => {
         connection: {
           id: "icn_github_form_test_001",
           rawConfig: {
-            auth_scheme: "api-key",
+            connection_method: "api-key",
           },
           config: connectionConfig,
           resources: [

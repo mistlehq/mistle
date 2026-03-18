@@ -55,7 +55,13 @@ describe("IntegrationsPage resource refresh concurrency", () => {
                 config: {},
                 displayName: "GitHub",
                 description: "Bring GitHub into Mistle.",
-                supportedAuthSchemes: ["oauth"],
+                connectionMethods: [
+                  {
+                    id: "github-app-installation",
+                    label: "GitHub App installation",
+                    kind: "redirect",
+                  },
+                ],
                 targetHealth: {
                   configStatus: "valid",
                 },
@@ -80,7 +86,7 @@ describe("IntegrationsPage resource refresh concurrency", () => {
                 displayName: "Engineering GitHub",
                 status: "active",
                 config: {
-                  auth_scheme: "oauth",
+                  connection_method: "github-app-installation",
                 },
                 resources: [
                   {

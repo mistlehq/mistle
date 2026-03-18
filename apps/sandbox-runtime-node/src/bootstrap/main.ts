@@ -10,7 +10,10 @@ async function main(): Promise<void> {
   await runBootstrap({
     lookupEnv,
     processArgv: process.argv,
-    bootstrapEntrypointPath: fileURLToPath(import.meta.url),
+    runtimeExecTarget: {
+      kind: "node-script",
+      bootstrapEntrypointPath: fileURLToPath(import.meta.url),
+    },
   });
 }
 

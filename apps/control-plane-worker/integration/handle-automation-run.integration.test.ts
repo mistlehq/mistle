@@ -116,7 +116,7 @@ async function seedOpenAiAgentBinding(input: {
     status: IntegrationConnectionStatuses.ACTIVE,
     externalSubjectId: "openai-agent-subject",
     config: {
-      auth_scheme: "api-key",
+      connection_method: "api-key",
     },
   });
   await input.db.insert(sandboxProfileVersions).values({

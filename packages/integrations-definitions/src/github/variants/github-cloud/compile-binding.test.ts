@@ -94,7 +94,7 @@ describe("compileGitHubCloudBinding", () => {
         id: "icn_123",
         status: "active",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       },
       binding: {
@@ -242,7 +242,7 @@ describe("compileGitHubCloudBinding", () => {
         id: "icn_123",
         status: "active",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       },
       binding: {
@@ -295,7 +295,7 @@ describe("compileGitHubCloudBinding", () => {
         id: "icn_123",
         status: "active",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       },
       binding: {
@@ -335,7 +335,7 @@ describe("compileGitHubCloudBinding", () => {
         id: "icn_123",
         status: "active",
         config: {
-          auth_scheme: "oauth",
+          connection_method: "github-app-installation",
           installation_id: "12345",
         },
       },
@@ -366,7 +366,7 @@ describe("compileGitHubCloudBinding", () => {
     );
   });
 
-  it("fails fast when connection auth_scheme is missing", () => {
+  it("fails fast when connection connection_method is missing", () => {
     expect(() =>
       compileGitHubCloudBinding({
         organizationId: "org_123",

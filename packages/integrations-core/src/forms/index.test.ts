@@ -69,7 +69,10 @@ describe("integration forms helpers", () => {
         schema: {
           properties: {
             model: {
-              default: connection?.config.auth_scheme === "oauth" ? "gpt-5" : "gpt-5-mini",
+              default:
+                connection?.config.connection_method === "github-app-installation"
+                  ? "gpt-5"
+                  : "gpt-5-mini",
             },
           },
         },
@@ -80,10 +83,10 @@ describe("integration forms helpers", () => {
         kind: "agent",
         connection: {
           rawConfig: {
-            auth_scheme: "oauth",
+            connection_method: "github-app-installation",
           },
           config: {
-            auth_scheme: "oauth",
+            connection_method: "github-app-installation",
           },
         },
       },

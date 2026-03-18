@@ -38,7 +38,7 @@ export const StoryOpenAiConnection: IntegrationConnectionSummary = {
   targetKey: StoryOpenAiTarget.targetKey,
   status: "active",
   config: {
-    auth_scheme: "api-key",
+    connection_method: "api-key",
   },
 };
 
@@ -71,7 +71,8 @@ export const StoryGithubConnection: IntegrationConnectionSummary = {
     },
   ],
   config: {
-    auth_scheme: "oauth",
+    connection_method: "github-app-installation",
+    installation_id: 12345,
   },
 };
 

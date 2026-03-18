@@ -4,30 +4,28 @@ import {
   createOpenAiRawBindingCapabilities,
   isOpenAiModelSupported,
   isOpenAiReasoningEffortSupported,
-  OpenAiCapabilitiesByAuthScheme,
-  OpenAiCapabilitiesByAuthSchemeSchema,
+  OpenAiCapabilities,
+  OpenAiCapabilitiesSchema,
   resolveOpenAiDefaultReasoningEffort,
 } from "./model-capabilities.js";
 
 describe("OpenAI model capabilities", () => {
-  it("parses canonical capability payload for all auth schemes", () => {
-    const parsed = OpenAiCapabilitiesByAuthSchemeSchema.parse(OpenAiCapabilitiesByAuthScheme);
-    expect(parsed["api-key"].models).toContain("gpt-5.3-codex");
-    expect(parsed.oauth.models).toContain("gpt-5.1-codex-mini");
+  it("parses the canonical capability payload", () => {
+    const parsed = OpenAiCapabilitiesSchema.parse(OpenAiCapabilities);
+    expect(parsed.models).toContain("gpt-5.3-codex");
+    expect(parsed.models).toContain("gpt-5.1-codex-mini");
   });
 
-  it("supports model and reasoning checks by auth scheme", () => {
-    expect(isOpenAiModelSupported({ authScheme: "api-key", model: "gpt-5.3-codex" })).toBe(true);
+  it("supports model and reasoning checks", () => {
+    expect(isOpenAiModelSupported({ model: "gpt-5.3-codex" })).toBe(true);
     expect(
       isOpenAiReasoningEffortSupported({
-        authScheme: "api-key",
         model: "gpt-5.3-codex",
         reasoningEffort: "xhigh",
       }),
     ).toBe(true);
     expect(
       isOpenAiReasoningEffortSupported({
-        authScheme: "oauth",
         model: "gpt-5.1-codex-mini",
         reasoningEffort: "low",
       }),
@@ -37,7 +35,6 @@ describe("OpenAI model capabilities", () => {
   it("resolves default reasoning effort per model", () => {
     expect(
       resolveOpenAiDefaultReasoningEffort({
-        authScheme: "api-key",
         model: "gpt-5.3-codex-spark",
       }),
     ).toBe("high");
@@ -45,8 +42,6 @@ describe("OpenAI model capabilities", () => {
 
   it("builds raw target-config payload shape for seeding", () => {
     const raw = createOpenAiRawBindingCapabilities();
-    expect(raw.by_auth_scheme["api-key"].default_reasoning_by_model["gpt-5.3-codex"]).toBe(
-      "medium",
-    );
+    expect(raw.default_reasoning_by_model["gpt-5.3-codex"]).toBe("medium");
   });
 });

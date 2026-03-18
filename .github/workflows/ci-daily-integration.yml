@@ -84,14 +84,33 @@ jobs:
           path: .turbo/cache
           key: ${{ runner.os }}-turbo-${{ github.workflow }}-${{ github.sha }}
 
+  sandbox-runtime-sea-linux:
+    name: Sandbox Runtime SEA (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 25
+
+      - name: Run Linux SEA packaging check
+        run: node ./scripts/test/run-sandbox-runtime-sea-linux.mjs
+
   notify:
     name: Notify Slack
     runs-on: ubuntu-latest
     needs:
       - integration
+      - sandbox-runtime-sea-linux
     if: always()
     env:
-      WORKFLOW_RESULT: ${{ needs.integration.result }}
+      INTEGRATION_RESULT: ${{ needs.integration.result }}
+      SEA_RESULT: ${{ needs.sandbox-runtime-sea-linux.result }}
       RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
       WORKFLOW_NAME: ${{ github.workflow }}
 
@@ -112,7 +131,14 @@ jobs:
           import os
           import urllib.request
 
-          result = os.environ["WORKFLOW_RESULT"]
+          integration_result = os.environ["INTEGRATION_RESULT"]
+          sea_result = os.environ["SEA_RESULT"]
+          if integration_result == "success" and sea_result == "success":
+              result = "success"
+          elif integration_result == "cancelled" or sea_result == "cancelled":
+              result = "cancelled"
+          else:
+              result = "failure"
           color_by_result = {
               "success": "#2eb886",
               "failure": "#e01e5a",

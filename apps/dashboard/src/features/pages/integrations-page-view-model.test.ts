@@ -18,10 +18,31 @@ import {
 } from "./integrations-page-view-model.js";
 
 describe("integrations page view model", () => {
-  it("maps supported auth schemes to dialog method ids", () => {
-    expect(toConnectionMethods(["oauth", "api-key"])).toEqual([
-      IntegrationConnectionMethodIds.OAUTH,
-      IntegrationConnectionMethodIds.API_KEY,
+  it("passes through connection methods for the dialog", () => {
+    expect(
+      toConnectionMethods([
+        {
+          id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+          label: "GitHub App installation",
+          kind: "redirect",
+        },
+        {
+          id: IntegrationConnectionMethodIds.API_KEY,
+          label: "API key",
+          kind: "api-key",
+        },
+      ]),
+    ).toEqual([
+      {
+        id: IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
+        label: "GitHub App installation",
+        kind: "redirect",
+      },
+      {
+        id: IntegrationConnectionMethodIds.API_KEY,
+        label: "API key",
+        kind: "api-key",
+      },
     ]);
     expect(toConnectionMethods(undefined)).toEqual([]);
   });
@@ -61,7 +82,7 @@ describe("integrations page view model", () => {
     let receivedTargetKey: string | null = null;
 
     const [card] = buildAvailableIntegrationViewCards({
-      cards: [createCard({ description: "Bring GitHub into Mistle.", supportedAuthSchemes: [] })],
+      cards: [createCard({ description: "Bring GitHub into Mistle.", connectionMethods: [] })],
       onOpenCreateDialog: (input) => {
         receivedTargetKey = input.targetKey;
       },
@@ -81,7 +102,7 @@ describe("integrations page view model", () => {
           targetKey: "github",
           displayName: "Engineering GitHub",
           status: "active",
-          config: { auth_scheme: "oauth" },
+          config: { connection_method: "github-app-installation" },
           externalSubjectId: "mistle-labs",
           resources: [
             {
@@ -105,8 +126,8 @@ describe("integrations page view model", () => {
       ]),
     });
 
-    expect(item?.authMethodLabel).toBe("OAuth");
-    expect(item?.authMethodId).toBe("oauth");
+    expect(item?.authMethodLabel).toBe("GitHub App installation");
+    expect(item?.authMethodId).toBe("github-app-installation");
     expect(item?.resources[0]?.isRefreshing).toBe(true);
     expect(item?.resources[0]?.lastErrorMessage).toBe("Resource sync failed.");
   });
@@ -279,16 +300,18 @@ describe("integrations page view model", () => {
     ).toBe(false);
   });
 
-  it("fails fast when editing a connection with an unsupported auth scheme", () => {
+  it("fails fast when editing a connection with an unsupported method", () => {
     expect(() =>
       resolveEditableConnectionMethodId({
         id: "icn_123",
         targetKey: "github",
         config: {
-          auth_scheme: "bearer-token",
+          connection_method: "bearer-token",
         },
       }),
-    ).toThrow("Unsupported auth scheme for integration connection 'icn_123' on target 'github'.");
+    ).toThrow(
+      "Unsupported connection method for integration connection 'icn_123' on target 'github'.",
+    );
   });
 });
 
@@ -297,7 +320,11 @@ function createCard(input: {
   connectionCount?: number;
   connections?: readonly IntegrationConnection[];
   connectionStatuses?: readonly IntegrationConnection["status"][];
-  supportedAuthSchemes?: ("oauth" | "api-key")[];
+  connectionMethods?: readonly {
+    id: "api-key" | "oauth2" | "github-app-installation";
+    label: string;
+    kind: "api-key" | "oauth2" | "redirect";
+  }[];
 }): IntegrationCardViewModel {
   if (input.connections !== undefined) {
     return {
@@ -309,9 +336,9 @@ function createCard(input: {
         config: {},
         displayName: "GitHub",
         description: input.description,
-        ...(input.supportedAuthSchemes === undefined
+        ...(input.connectionMethods === undefined
           ? {}
-          : { supportedAuthSchemes: [...input.supportedAuthSchemes] }),
+          : { connectionMethods: [...input.connectionMethods] }),
         targetHealth: {
           configStatus: "valid",
         },
@@ -347,9 +374,9 @@ function createCard(input: {
       config: {},
       displayName: "GitHub",
       description: input.description,
-      ...(input.supportedAuthSchemes === undefined
+      ...(input.connectionMethods === undefined
         ? {}
-        : { supportedAuthSchemes: [...input.supportedAuthSchemes] }),
+        : { connectionMethods: [...input.connectionMethods] }),
       targetHealth: {
         configStatus: "valid",
       },

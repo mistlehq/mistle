@@ -42,7 +42,6 @@ export async function createApiKeyIntegrationConnection(input: {
 export async function updateIntegrationConnection(input: {
   connectionId: string;
   displayName: string;
-  apiKey?: string;
 }): Promise<CreatedIntegrationConnection> {
   try {
     const response = await requestControlPlane({
@@ -51,7 +50,6 @@ export async function updateIntegrationConnection(input: {
       pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}`,
       body: {
         displayName: input.displayName,
-        ...(input.apiKey === undefined ? {} : { apiKey: input.apiKey }),
       },
       fallbackMessage: "Could not update integration connection.",
     });
@@ -70,29 +68,66 @@ export async function updateIntegrationConnection(input: {
   }
 }
 
-export async function startOAuthIntegrationConnection(input: {
-  targetKey: string;
-  displayName?: string;
-}): Promise<StartedOAuthConnection> {
+export async function updateApiKeyIntegrationConnection(input: {
+  connectionId: string;
+  displayName: string;
+  apiKey: string;
+}): Promise<CreatedIntegrationConnection> {
   try {
     const response = await requestControlPlane({
-      operation: "startOAuthIntegrationConnection",
+      operation: "updateApiKeyIntegrationConnection",
+      method: "PUT",
+      pathname: `/v1/integration/connections/${encodeURIComponent(input.connectionId)}/api-key`,
+      body: {
+        displayName: input.displayName,
+        apiKey: input.apiKey,
+      },
+      fallbackMessage: "Could not update integration connection API key.",
+    });
+
+    return readJsonWithSchema({
+      response,
+      schema: IntegrationConnectionSchema,
+      operation: "updateApiKeyIntegrationConnection",
+    });
+  } catch (error) {
+    throw wrapIntegrationsApiError({
+      operation: "updateApiKeyIntegrationConnection",
+      error,
+      fallbackMessage: "Could not update integration connection API key.",
+    });
+  }
+}
+
+export async function startRedirectIntegrationConnection(input: {
+  targetKey: string;
+  methodId: "oauth2" | "github-app-installation";
+  displayName?: string;
+}): Promise<StartedOAuthConnection> {
+  const pathname =
+    input.methodId === "oauth2"
+      ? `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth/start`
+      : `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth/start`;
+
+  try {
+    const response = await requestControlPlane({
+      operation: "startRedirectIntegrationConnection",
       method: "POST",
-      pathname: `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth/start`,
+      pathname,
       ...(input.displayName === undefined ? {} : { body: { displayName: input.displayName } }),
-      fallbackMessage: "Could not start OAuth connection.",
+      fallbackMessage: "Could not start integration connection.",
     });
 
     return readJsonWithSchema({
       response,
       schema: StartedOAuthConnectionSchema,
-      operation: "startOAuthIntegrationConnection",
+      operation: "startRedirectIntegrationConnection",
     });
   } catch (error) {
     throw wrapIntegrationsApiError({
-      operation: "startOAuthIntegrationConnection",
+      operation: "startRedirectIntegrationConnection",
       error,
-      fallbackMessage: "Could not start OAuth connection.",
+      fallbackMessage: "Could not start integration connection.",
     });
   }
 }

@@ -1,5 +1,6 @@
 import type {
   IntegrationConfigSchema,
+  IntegrationFormConnectionMethodDefinition,
   IntegrationFormDefinition,
   IntegrationKind,
 } from "@mistle/integrations-core";
@@ -8,6 +9,10 @@ import { AtlassianConnectionConfigSchema } from "../atlassian/variants/atlassian
 import { AtlassianBindingConfigSchema } from "../atlassian/variants/atlassian-default/binding-config-schema.js";
 import { AtlassianConnectionConfigForm } from "../atlassian/variants/atlassian-default/connection-config-form.js";
 import { AtlassianTargetConfigSchema } from "../atlassian/variants/atlassian-default/target-config-schema.js";
+import {
+  GitHubApiKeyConnectionConfigSchema,
+  GitHubAppInstallationConnectionConfigSchema,
+} from "../github/shared/auth.js";
 import { resolveGitHubBindingConfigForm } from "../github/shared/binding-config-form.js";
 import { GitHubCloudBindingConfigSchema } from "../github/variants/github-cloud/binding-config-schema.js";
 import { GitHubCloudTargetConfigSchema } from "../github/variants/github-cloud/target-config-schema.js";
@@ -37,13 +42,12 @@ export type IntegrationFormDefinitionRecord = {
     Record<string, unknown>,
     Record<string, unknown>
   >;
-  connectionConfigSchema?: IntegrationConfigSchema<Record<string, unknown>>;
-  connectionConfigForm?: IntegrationFormDefinition<
+  connectionMethods: readonly IntegrationFormConnectionMethodDefinition<
     Record<string, unknown>,
     Record<string, string>,
     Record<string, unknown>,
     Record<string, unknown>
-  >;
+  >[];
 };
 
 const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRecord[] = [
@@ -54,6 +58,20 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
     targetConfigSchema: GitHubCloudTargetConfigSchema,
     bindingConfigSchema: GitHubCloudBindingConfigSchema,
     bindingConfigForm: resolveGitHubBindingConfigForm,
+    connectionMethods: [
+      {
+        id: "api-key",
+        label: "API key",
+        kind: "api-key",
+        configSchema: GitHubApiKeyConnectionConfigSchema,
+      },
+      {
+        id: "github-app-installation",
+        label: "GitHub App installation",
+        kind: "redirect",
+        configSchema: GitHubAppInstallationConnectionConfigSchema,
+      },
+    ],
   },
   {
     familyId: "github",
@@ -62,6 +80,20 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
     targetConfigSchema: GitHubEnterpriseServerTargetConfigSchema,
     bindingConfigSchema: GitHubEnterpriseServerBindingConfigSchema,
     bindingConfigForm: resolveGitHubBindingConfigForm,
+    connectionMethods: [
+      {
+        id: "api-key",
+        label: "API key",
+        kind: "api-key",
+        configSchema: GitHubApiKeyConnectionConfigSchema,
+      },
+      {
+        id: "github-app-installation",
+        label: "GitHub App installation",
+        kind: "redirect",
+        configSchema: GitHubAppInstallationConnectionConfigSchema,
+      },
+    ],
   },
   {
     familyId: "openai",
@@ -70,8 +102,15 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
     targetConfigSchema: OpenAiApiKeyTargetConfigSchema,
     bindingConfigSchema: OpenAiApiKeyBindingConfigSchema,
     bindingConfigForm: resolveOpenAiBindingConfigForm,
-    connectionConfigSchema: OpenAiConnectionConfigSchema,
-    connectionConfigForm: OpenAiConnectionConfigForm,
+    connectionMethods: [
+      {
+        id: "api-key",
+        label: "API key",
+        kind: "api-key",
+        configSchema: OpenAiConnectionConfigSchema,
+        configForm: OpenAiConnectionConfigForm,
+      },
+    ],
   },
   {
     familyId: "atlassian",
@@ -79,8 +118,15 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
     kind: "connector",
     targetConfigSchema: AtlassianTargetConfigSchema,
     bindingConfigSchema: AtlassianBindingConfigSchema,
-    connectionConfigSchema: AtlassianConnectionConfigSchema,
-    connectionConfigForm: AtlassianConnectionConfigForm,
+    connectionMethods: [
+      {
+        id: "api-key",
+        label: "API key",
+        kind: "api-key",
+        configSchema: AtlassianConnectionConfigSchema,
+        configForm: AtlassianConnectionConfigForm,
+      },
+    ],
   },
   {
     familyId: "linear",
@@ -88,8 +134,15 @@ const RegisteredIntegrationFormDefinitions: readonly IntegrationFormDefinitionRe
     kind: "connector",
     targetConfigSchema: LinearTargetConfigSchema,
     bindingConfigSchema: LinearBindingConfigSchema,
-    connectionConfigSchema: LinearConnectionConfigSchema,
-    connectionConfigForm: LinearConnectionConfigForm,
+    connectionMethods: [
+      {
+        id: "api-key",
+        label: "API key",
+        kind: "api-key",
+        configSchema: LinearConnectionConfigSchema,
+        configForm: LinearConnectionConfigForm,
+      },
+    ],
   },
 ];
 

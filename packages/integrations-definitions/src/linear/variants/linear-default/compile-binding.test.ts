@@ -20,7 +20,7 @@ describe("compileLinearBinding", () => {
         id: "icn_123",
         status: "active",
         config: {
-          auth_scheme: "api-key",
+          connection_method: "api-key",
         },
       },
       binding: {

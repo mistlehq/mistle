@@ -32,11 +32,13 @@ export function createOpenIntegrationConnectionDialogState(input: {
   draft: IntegrationConnectionDialogDraft;
 } {
   const supportedMethods =
-    input.openInput.mode === "create" ? input.openInput.methods : [input.openInput.currentMethodId];
+    input.openInput.mode === "create"
+      ? input.openInput.methods.map((method) => method.id)
+      : [input.openInput.currentMethodId];
   const defaultMethod = supportedMethods[0];
   if (defaultMethod === undefined) {
     throw new Error(
-      `Integration target '${input.openInput.targetKey}' does not declare any supported auth scheme.`,
+      `Integration target '${input.openInput.targetKey}' does not declare any supported connection methods.`,
     );
   }
 
@@ -117,7 +119,9 @@ export function resolveIntegrationConnectionDialogValidationError(input: {
   connectionDisplayNameValue: string;
 }): string | null {
   const supportedMethods =
-    input.dialog.mode === "create" ? input.dialog.methods : [input.dialog.currentMethodId];
+    input.dialog.mode === "create"
+      ? input.dialog.methods.map((method) => method.id)
+      : [input.dialog.currentMethodId];
   if (!supportedMethods.includes(input.methodId)) {
     throw new Error(
       `Connect method '${input.methodId}' is not supported for target '${input.dialog.targetKey}'.`,

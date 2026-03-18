@@ -9,7 +9,8 @@ import {
 } from "../integrations/integration-connection-dialog.js";
 import {
   createApiKeyIntegrationConnection,
-  startOAuthIntegrationConnection,
+  startRedirectIntegrationConnection,
+  updateApiKeyIntegrationConnection,
   updateIntegrationConnection,
 } from "../integrations/integrations-service.js";
 import type { OpenIntegrationConnectionDialogInput } from "./integration-connection-dialog-state-types.js";
@@ -20,6 +21,15 @@ import {
   isIntegrationConnectionDisplayNameChanged,
   resolveIntegrationConnectionDialogValidationError,
 } from "./use-integration-connection-dialog-state-helpers.js";
+
+function isRedirectConnectionMethodId(
+  methodId: IntegrationConnectionMethodId,
+): methodId is "oauth2" | "github-app-installation" {
+  return (
+    methodId === IntegrationConnectionMethodIds.OAUTH2 ||
+    methodId === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+  );
+}
 
 export function useIntegrationConnectionDialogState(input: { queryKey: readonly unknown[] }) {
   const queryClient = useQueryClient();
@@ -33,17 +43,25 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       createApiKeyIntegrationConnection(mutationInput),
   });
 
-  const startOAuthMutation = useMutation({
-    mutationFn: async (mutationInput: { targetKey: string }) =>
-      startOAuthIntegrationConnection(mutationInput),
+  const startRedirectMutation = useMutation({
+    mutationFn: async (mutationInput: {
+      targetKey: string;
+      methodId: "oauth2" | "github-app-installation";
+      displayName?: string;
+    }) => startRedirectIntegrationConnection(mutationInput),
   });
 
-  const updateConnectionMutation = useMutation({
+  const updateConnectionMetadataMutation = useMutation({
+    mutationFn: async (mutationInput: { connectionId: string; displayName: string }) =>
+      updateIntegrationConnection(mutationInput),
+  });
+
+  const updateApiKeyMutation = useMutation({
     mutationFn: async (mutationInput: {
       connectionId: string;
       displayName: string;
-      apiKey?: string;
-    }) => updateIntegrationConnection(mutationInput),
+      apiKey: string;
+    }) => updateApiKeyIntegrationConnection(mutationInput),
   });
 
   function closeDialog(): void {
@@ -84,10 +102,10 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       const normalizedConnectionDisplayName = draft.connectionDisplayNameValue.trim();
 
       if (dialog.mode === "update") {
-        await updateConnectionMutation.mutateAsync({
+        await updateApiKeyMutation.mutateAsync({
           connectionId: dialog.connectionId,
           displayName: normalizedConnectionDisplayName,
-          ...(normalizedApiKey.length === 0 ? {} : { apiKey: normalizedApiKey }),
+          apiKey: normalizedApiKey,
         });
       } else {
         await createApiKeyMutation.mutateAsync({
@@ -106,7 +124,7 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     }
 
     if (dialog.mode === "update") {
-      await updateConnectionMutation.mutateAsync({
+      await updateConnectionMetadataMutation.mutateAsync({
         connectionId: dialog.connectionId,
         displayName: draft.connectionDisplayNameValue.trim(),
       });
@@ -119,8 +137,13 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       return;
     }
 
-    const started = await startOAuthMutation.mutateAsync({
+    if (!isRedirectConnectionMethodId(draft.methodId)) {
+      throw new Error(`Unsupported redirect connection method '${draft.methodId}'.`);
+    }
+
+    const started = await startRedirectMutation.mutateAsync({
       targetKey: dialog.targetKey,
+      methodId: draft.methodId,
       ...(draft.connectionDisplayNameValue.trim().length === 0
         ? {}
         : { displayName: draft.connectionDisplayNameValue.trim() }),
@@ -156,8 +179,9 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
     error: draft.error,
     pending:
       createApiKeyMutation.isPending ||
-      startOAuthMutation.isPending ||
-      updateConnectionMutation.isPending,
+      startRedirectMutation.isPending ||
+      updateConnectionMetadataMutation.isPending ||
+      updateApiKeyMutation.isPending,
     hasChanges: hasIntegrationConnectionDialogChanges({
       dialog,
       connectionDisplayNamePlaceholder: draft.connectionDisplayNamePlaceholder,

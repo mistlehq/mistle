@@ -6,8 +6,8 @@ import {
   IntegrationCredentialSecretKinds,
 } from "@mistle/db/control-plane";
 import {
-  type IntegrationSupportedAuthScheme,
-  IntegrationSupportedAuthSchemes,
+  type IntegrationConnectionMethodId,
+  IntegrationConnectionMethodIds,
 } from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 
@@ -46,11 +46,13 @@ type CreatedConnection = {
   updatedAt: string;
 };
 
-export function assertApiKeyAuthSchemeSupportedOrThrow(input: {
+export function assertApiKeyConnectionMethodSupportedOrThrow(input: {
   targetKey: string;
-  supportedAuthSchemes: ReadonlyArray<IntegrationSupportedAuthScheme>;
+  connectionMethods: ReadonlyArray<{ id: IntegrationConnectionMethodId }>;
 }): void {
-  if (!input.supportedAuthSchemes.includes(IntegrationSupportedAuthSchemes.API_KEY)) {
+  if (
+    !input.connectionMethods.some((method) => method.id === IntegrationConnectionMethodIds.API_KEY)
+  ) {
     throw new IntegrationConnectionsBadRequestError(
       IntegrationConnectionsBadRequestCodes.API_KEY_NOT_SUPPORTED,
       `Integration target '${input.targetKey}' does not support API-key authentication.`,
@@ -86,9 +88,9 @@ export async function createApiKeyConnection(
     );
   }
 
-  assertApiKeyAuthSchemeSupportedOrThrow({
+  assertApiKeyConnectionMethodSupportedOrThrow({
     targetKey: input.targetKey,
-    supportedAuthSchemes: definition.supportedAuthSchemes,
+    connectionMethods: definition.connectionMethods,
   });
 
   const organizationCredentialKey = await db.query.organizationCredentialKeys.findFirst({
@@ -125,7 +127,7 @@ export async function createApiKeyConnection(
           displayName: input.displayName,
           status: IntegrationConnectionStatuses.ACTIVE,
           config: {
-            auth_scheme: IntegrationSupportedAuthSchemes.API_KEY,
+            connection_method: IntegrationConnectionMethodIds.API_KEY,
           },
           targetSnapshotConfig: target.config,
         })

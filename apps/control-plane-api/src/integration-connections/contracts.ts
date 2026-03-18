@@ -281,11 +281,16 @@ export const UpdateApiKeyConnectionParamsSchema = z
 export const UpdateIntegrationConnectionBodySchema = z
   .object({
     displayName: z.string().min(1),
+  })
+  .strict();
+
+export const UpdateApiKeyConnectionBodySchema = z
+  .object({
+    displayName: z.string().min(1),
     apiKey: z
       .string()
       .min(1)
-      .regex(/\S/, "`apiKey` must contain at least one non-whitespace character when provided.")
-      .optional(),
+      .regex(/\S/, "`apiKey` must contain at least one non-whitespace character when provided."),
   })
   .strict();
 
@@ -553,6 +558,74 @@ export const updateIntegrationConnectionRoute = createRoute({
   responses: {
     200: {
       description: "Update an existing integration connection.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ListIntegrationConnectionsBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsUnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsForbiddenResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Integration target or connection was not found.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsNotFoundResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
+export const updateApiKeyConnectionRoute = createRoute({
+  method: "put",
+  path: "/:connectionId/api-key",
+  tags: ["Integrations"],
+  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
+  request: {
+    params: UpdateApiKeyConnectionParamsSchema,
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: UpdateApiKeyConnectionBodySchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Rotate the API key for an existing integration connection.",
       content: {
         "application/json": {
           schema: IntegrationConnectionSchema,

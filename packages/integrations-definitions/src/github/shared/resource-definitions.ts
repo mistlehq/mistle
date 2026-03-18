@@ -1,9 +1,9 @@
 import {
+  IntegrationConnectionMethodIds,
   IntegrationResourceSelectionModes,
   type IntegrationResourceCredentialRef,
   type IntegrationResourceDefinition,
   type IntegrationResourceSyncTrigger,
-  IntegrationSupportedAuthSchemes,
 } from "@mistle/integrations-core";
 
 import { GitHubConnectionConfigSchema, GitHubCredentialSecretTypes } from "./auth.js";
@@ -31,7 +31,10 @@ export const GitHubResourceDefinitions: ReadonlyArray<IntegrationResourceDefinit
     credential: ({ connection }) => {
       const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(connection.config);
 
-      if (parsedConnectionConfig.auth_scheme === IntegrationSupportedAuthSchemes.OAUTH) {
+      if (
+        parsedConnectionConfig.connection_method ===
+        IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+      ) {
         return GitHubRepositoryOAuthResourceCredential;
       }
 

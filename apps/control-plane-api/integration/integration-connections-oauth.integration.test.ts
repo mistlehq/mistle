@@ -194,7 +194,7 @@ describe("integration connections oauth integration", () => {
     expect(persistedConnection.status).toBe("active");
     expect(persistedConnection.externalSubjectId).toBe("12345");
     expect(persistedConnection.config).toEqual({
-      auth_scheme: "oauth",
+      connection_method: "github-app-installation",
       installation_id: "12345",
       setup_action: "install",
     });

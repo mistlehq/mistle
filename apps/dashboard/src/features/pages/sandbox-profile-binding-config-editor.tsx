@@ -76,6 +76,20 @@ type ResolvedBindingEditorContext = {
   parsedConnectionConfig: Record<string, unknown>;
 };
 
+function resolveConnectionMethodDefinition(input: {
+  definition: IntegrationDefinition;
+  rawConnectionConfig: Record<string, unknown>;
+}) {
+  const connectionMethodId = input.rawConnectionConfig["connection_method"];
+  if (typeof connectionMethodId !== "string") {
+    return null;
+  }
+
+  return (
+    input.definition.connectionMethods.find((method) => method.id === connectionMethodId) ?? null
+  );
+}
+
 function resolveRecord(value: unknown): Record<string, unknown> {
   if (!isRecord(value)) {
     return {};
@@ -204,11 +218,15 @@ function resolveBindingDefinitionContext(input: {
 
   const rawConnectionConfig = connection.config ?? {};
   let parsedConnectionConfig: Record<string, unknown>;
-  if (definition.connectionConfigSchema === undefined) {
+  const connectionMethodDefinition = resolveConnectionMethodDefinition({
+    definition,
+    rawConnectionConfig,
+  });
+  if (connectionMethodDefinition?.configSchema === undefined) {
     parsedConnectionConfig = rawConnectionConfig;
   } else {
     const parsedConnectionConfigResult =
-      definition.connectionConfigSchema.safeParse(rawConnectionConfig);
+      connectionMethodDefinition.configSchema.safeParse(rawConnectionConfig);
     if (!parsedConnectionConfigResult.success) {
       return {
         ok: false,

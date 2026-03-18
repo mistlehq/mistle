@@ -1,5 +1,5 @@
 import {
-  IntegrationSupportedAuthSchemes,
+  IntegrationConnectionMethodIds,
   type DiscoveredIntegrationResource,
   type ListConnectionResourcesInput,
   type ListConnectionResourcesResult,
@@ -128,7 +128,10 @@ async function listGitHubRepositories(input: {
   credential: string;
   connectionConfig: GitHubConnectionConfig;
 }): Promise<ReadonlyArray<GitHubRepository>> {
-  if (input.connectionConfig.auth_scheme === IntegrationSupportedAuthSchemes.OAUTH) {
+  if (
+    input.connectionConfig.connection_method ===
+    IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+  ) {
     return listGitHubInstallationRepositories({
       apiBaseUrl: input.apiBaseUrl,
       token: input.credential,

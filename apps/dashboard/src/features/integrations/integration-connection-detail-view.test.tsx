@@ -19,7 +19,7 @@ describe("IntegrationConnectionDetailView", () => {
             id: "icn_github_primary",
             displayName: "Engineering GitHub",
             status: "active",
-            authMethodLabel: "OAuth",
+            authMethodLabel: "GitHub App installation",
             resources: [
               {
                 kind: "repositories",
@@ -101,7 +101,7 @@ describe("IntegrationConnectionDetailView", () => {
             id: "icn_github_primary",
             displayName: "Engineering GitHub",
             status: "active",
-            authMethodLabel: "OAuth",
+            authMethodLabel: "GitHub App installation",
             resources: [
               {
                 kind: "repositories",
@@ -129,16 +129,16 @@ describe("IntegrationConnectionDetailView", () => {
           {
             id: "icn_github_primary",
             displayName: "Engineering GitHub",
-            authMethodId: "oauth",
-            authMethodLabel: "OAuth",
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
             status: "active",
             resources: [],
           },
           {
             id: "icn_github_archive",
             displayName: "Archive Mirror",
-            authMethodId: "oauth",
-            authMethodLabel: "OAuth",
+            authMethodId: "github-app-installation",
+            authMethodLabel: "GitHub App installation",
             status: "active",
             resources: [],
           },

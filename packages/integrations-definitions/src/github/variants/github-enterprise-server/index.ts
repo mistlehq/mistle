@@ -8,8 +8,5 @@ export {
   type GitHubEnterpriseServerBindingConfig,
 } from "./binding-config-schema.js";
 export { compileGitHubEnterpriseServerBinding } from "./compile-binding.js";
-export {
-  GitHubEnterpriseServerCredentialSecretTypes,
-  GitHubEnterpriseServerSupportedAuthSchemes,
-} from "./auth.js";
+export { GitHubEnterpriseServerCredentialSecretTypes } from "./auth.js";
 export { GitHubEnterpriseServerWebhookHandler } from "./webhook.js";

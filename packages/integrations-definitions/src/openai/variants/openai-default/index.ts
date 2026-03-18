@@ -15,9 +15,9 @@ export {
 } from "./binding-config-form.js";
 export {
   createOpenAiRawBindingCapabilities,
-  OpenAiCapabilitiesByAuthScheme,
-  OpenAiCapabilitiesByAuthSchemeSchema,
-  OpenAiConnectionAuthSchemes,
+  OpenAiCapabilities,
+  OpenAiCapabilitiesSchema,
+  OpenAiConnectionMethodIds,
   OpenAiModelIds,
   OpenAiReasoningEffortLabelByValue,
   isOpenAiModelSupported,
@@ -25,4 +25,4 @@ export {
   resolveOpenAiDefaultReasoningEffort,
 } from "./model-capabilities.js";
 export { compileOpenAiApiKeyBinding } from "./compile-binding.js";
-export { OpenAiApiKeyCredentialSecretTypes, OpenAiApiKeySupportedAuthSchemes } from "./auth.js";
+export { OpenAiApiKeyCredentialSecretTypes } from "./auth.js";

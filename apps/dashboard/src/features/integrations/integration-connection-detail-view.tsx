@@ -20,7 +20,7 @@ export type IntegrationConnectionDetailResourceSummary = {
 };
 
 export type IntegrationConnectionDetailItem = {
-  authMethodId?: "api-key" | "oauth" | null;
+  authMethodId?: "api-key" | "oauth2" | "github-app-installation" | null;
   authMethodLabel?: string | null;
   contextItems?: readonly {
     label: string;

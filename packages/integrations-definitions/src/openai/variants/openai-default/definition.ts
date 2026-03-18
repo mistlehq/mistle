@@ -1,11 +1,13 @@
 import {
+  IntegrationConnectionMethodIds,
+  IntegrationConnectionMethodKinds,
   IntegrationKinds,
   IntegrationMcpConfigFormats,
   type IntegrationDefinition,
 } from "@mistle/integrations-core";
 import { z } from "zod";
 
-import { OpenAiApiKeySupportedAuthSchemes, OpenAiConnectionConfigSchema } from "./auth.js";
+import { type OpenAiConnectionConfig, OpenAiConnectionConfigSchema } from "./auth.js";
 import {
   OpenAiConnectionConfigForm,
   resolveOpenAiBindingConfigForm,
@@ -19,7 +21,7 @@ type OpenAiApiKeyIntegrationDefinition = IntegrationDefinition<
   typeof OpenAiApiKeyTargetConfigSchema,
   typeof OpenAiApiKeyTargetSecretSchema,
   typeof OpenAiApiKeyBindingConfigSchema,
-  typeof OpenAiConnectionConfigSchema
+  OpenAiConnectionConfig
 >;
 
 const OpenAiApiKeyTargetSecretSchema = z.object({}).strict();
@@ -29,15 +31,21 @@ export const OpenAiApiKeyDefinition: OpenAiApiKeyIntegrationDefinition = {
   variantId: "openai-default",
   kind: IntegrationKinds.AGENT,
   displayName: "OpenAI",
-  description: "Enable OpenAI model access with API key or ChatGPT subscription authentication.",
+  description: "Enable OpenAI model access with API key authentication.",
   logoKey: "openai",
   targetConfigSchema: OpenAiApiKeyTargetConfigSchema,
   targetSecretSchema: OpenAiApiKeyTargetSecretSchema,
   bindingConfigSchema: OpenAiApiKeyBindingConfigSchema,
   bindingConfigForm: resolveOpenAiBindingConfigForm,
-  connectionConfigSchema: OpenAiConnectionConfigSchema,
-  connectionConfigForm: OpenAiConnectionConfigForm,
-  supportedAuthSchemes: OpenAiApiKeySupportedAuthSchemes,
+  connectionMethods: [
+    {
+      id: IntegrationConnectionMethodIds.API_KEY,
+      label: "API key",
+      kind: IntegrationConnectionMethodKinds.API_KEY,
+      configSchema: OpenAiConnectionConfigSchema,
+      configForm: OpenAiConnectionConfigForm,
+    },
+  ],
   validateBindingWriteContext: validateOpenAiBindingWriteContext,
   mcpConfig: {
     clientId: "codex-cli",
