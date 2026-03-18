@@ -590,25 +590,6 @@ importers:
         specifier: workspace:*
         version: link:../../packages/test-harness
 
-  packages/codex-app-server-client:
-    dependencies:
-      '@mistle/sandbox-session-client':
-        specifier: workspace:*
-        version: link:../sandbox-session-client
-      zod:
-        specifier: ^4.1.12
-        version: 4.3.6
-    devDependencies:
-      '@mistle/sandbox-session-protocol':
-        specifier: workspace:*
-        version: link:../sandbox-session-protocol
-      '@types/ws':
-        specifier: ^8.18.1
-        version: 8.18.1
-      ws:
-        specifier: ^8.19.0
-        version: 8.19.0
-
   packages/config:
     dependencies:
       smol-toml:
