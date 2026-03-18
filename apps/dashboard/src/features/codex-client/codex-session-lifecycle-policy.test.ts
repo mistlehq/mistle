@@ -40,7 +40,7 @@ describe("codex session lifecycle policy", () => {
     });
   });
 
-  it("resumes the preferred thread when one exists", () => {
+  it("reuses the most recent loaded thread when one is already loaded", () => {
     expect(
       selectCodexConnectionThreadStrategy({
         availableThreads: [
@@ -60,6 +60,33 @@ describe("codex session lifecycle policy", () => {
           },
         ],
         loadedThreadIds: ["thread_old", "thread_new"],
+      }),
+    ).toEqual({
+      type: "reuse_loaded",
+      threadId: "thread_new",
+    });
+  });
+
+  it("resumes the most recent available thread when no thread is currently loaded", () => {
+    expect(
+      selectCodexConnectionThreadStrategy({
+        availableThreads: [
+          {
+            id: "thread_old",
+            name: null,
+            preview: null,
+            createdAt: 10,
+            updatedAt: 10,
+          },
+          {
+            id: "thread_new",
+            name: null,
+            preview: null,
+            createdAt: 20,
+            updatedAt: 20,
+          },
+        ],
+        loadedThreadIds: [],
       }),
     ).toEqual({
       type: "resume",

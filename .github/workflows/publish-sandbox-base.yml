@@ -59,7 +59,7 @@ jobs:
         run: |
           docker build \
             --platform linux/amd64 \
-            --target sandbox-base-prod \
+            --target sandbox-base \
             --file apps/sandbox-runtime/Dockerfile \
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
