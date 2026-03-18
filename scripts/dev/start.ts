@@ -1,6 +1,7 @@
 import type { ChildProcess, SpawnSyncReturns } from "node:child_process";
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,6 +18,23 @@ const TUNNEL_SERVICE_NAME = "tunnel";
 const LOCAL_REGISTRY_HOST = "127.0.0.1:5001";
 const SANDBOX_BASE_IMAGE_TAG = "mistle/sandbox-base:dev";
 const SANDBOX_BASE_IMAGE_REGISTRY_TAG = `${LOCAL_REGISTRY_HOST}/mistle/sandbox-base:dev`;
+
+const SEA_OUTPUT_DIR = resolve(REPO_ROOT, "apps/sandbox-runtime/dist-sea");
+const SEA_CACHE_KEY_PATH = resolve(SEA_OUTPUT_DIR, ".cache-key");
+
+const SEA_BUILD_INPUT_PATHS: readonly string[] = [
+  "packages/sandbox-rs-napi",
+  "apps/sandbox-runtime",
+  "packages/integrations-core",
+  "packages/integrations-definitions",
+  "packages/sandbox-session-client",
+  "packages/sandbox-session-protocol",
+  "packages/time",
+  "scripts/build/build-sandbox-runtime-sea-linux.mjs",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "tsconfig.base.json",
+];
 
 let localInfraStartAttempted = false;
 let localInfraEnv: NodeJS.ProcessEnv | undefined;
@@ -252,6 +270,78 @@ process.once("SIGTERM", () => {
   forwardSignal("SIGTERM");
 });
 
+function computeSeaBuildCacheKey(): string {
+  const result = spawnSync(
+    "git",
+    [
+      "ls-files",
+      "--cached",
+      "--others",
+      "--exclude-standard",
+      "-z",
+      "--",
+      ...SEA_BUILD_INPUT_PATHS,
+    ],
+    {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "pipe"],
+    },
+  );
+
+  if (result.status !== 0) {
+    throw new Error(`Failed to list tracked files for SEA cache key: ${result.stderr ?? ""}`);
+  }
+
+  const files = result.stdout.split("\0").filter(Boolean).sort();
+  const hash = createHash("sha256");
+
+  for (const file of files) {
+    const filePath = resolve(REPO_ROOT, file);
+
+    if (!existsSync(filePath)) {
+      hash.update(file);
+      hash.update("\0deleted\0");
+      continue;
+    }
+
+    const content = readFileSync(filePath);
+    hash.update(file);
+    hash.update("\0");
+    hash.update(content);
+  }
+
+  return hash.digest("hex");
+}
+
+function checkSeaBuildCache(): { hit: boolean; cacheKey: string } {
+  const cacheKey = computeSeaBuildCacheKey();
+
+  if (!existsSync(SEA_OUTPUT_DIR)) {
+    return { hit: false, cacheKey };
+  }
+
+  try {
+    const storedKey = readFileSync(SEA_CACHE_KEY_PATH, "utf8").trim();
+    return { hit: storedKey === cacheKey, cacheKey };
+  } catch {
+    return { hit: false, cacheKey };
+  }
+}
+
+function writeSeaBuildCacheKey(key: string): void {
+  writeFileSync(SEA_CACHE_KEY_PATH, key + "\n", "utf8");
+}
+
+function dockerImageExists(imageTag: string): boolean {
+  const result = spawnSync("docker", ["image", "inspect", imageTag], {
+    cwd: REPO_ROOT,
+    stdio: "pipe",
+  });
+
+  return result.status === 0;
+}
+
 function start(): void {
   console.log(
     "Starting local infra dependencies (Postgres 18, PgBouncer, Mailpit, Registry, OTel LGTM, tokenizer relay, gateway relay)...",
@@ -300,26 +390,42 @@ function start(): void {
     env: sharedDevEnv,
   });
 
-  console.log("Building and pushing sandbox runtime base image...");
-  runOrThrow({
-    command: "pnpm",
-    args: ["build:sandbox-runtime:sea:linux"],
-    env: sharedDevEnv,
-  });
-  runOrThrow({
-    command: "docker",
-    args: [
-      "build",
-      "--target",
-      "sandbox-base-dev",
-      "-f",
-      "apps/sandbox-runtime/Dockerfile",
-      "-t",
-      SANDBOX_BASE_IMAGE_TAG,
-      ".",
-    ],
-    env: sharedDevEnv,
-  });
+  console.log("Checking sandbox runtime base image cache...");
+  const { hit: seaCacheHit, cacheKey: seaCacheKey } = checkSeaBuildCache();
+
+  if (!seaCacheHit) {
+    console.log("Building sandbox runtime SEA (inputs changed)...");
+    runOrThrow({
+      command: "pnpm",
+      args: ["build:sandbox-runtime:sea:linux"],
+      env: sharedDevEnv,
+    });
+  }
+
+  if (!seaCacheHit || !dockerImageExists(SANDBOX_BASE_IMAGE_TAG)) {
+    if (seaCacheHit) {
+      console.log("SEA build cache valid but Docker image missing, rebuilding image...");
+    }
+    console.log("Building sandbox runtime base image...");
+    runOrThrow({
+      command: "docker",
+      args: [
+        "build",
+        "--target",
+        "sandbox-base-dev",
+        "-f",
+        "apps/sandbox-runtime/Dockerfile",
+        "-t",
+        SANDBOX_BASE_IMAGE_TAG,
+        ".",
+      ],
+      env: sharedDevEnv,
+    });
+  } else {
+    console.log("Sandbox runtime base image is up to date.");
+  }
+
+  console.log("Pushing sandbox runtime base image to local registry...");
   runOrThrow({
     command: "docker",
     args: ["tag", SANDBOX_BASE_IMAGE_TAG, SANDBOX_BASE_IMAGE_REGISTRY_TAG],
@@ -330,6 +436,10 @@ function start(): void {
     args: ["push", SANDBOX_BASE_IMAGE_REGISTRY_TAG],
     env: sharedDevEnv,
   });
+
+  if (!seaCacheHit) {
+    writeSeaBuildCacheKey(seaCacheKey);
+  }
 
   console.log("Building migration dependencies...");
   runOrThrow({
