@@ -60,7 +60,7 @@ export const DefaultSandboxBaseImageBuild: SandboxBaseImageBuild = {
   localReference: "mistle/sandbox-base:dev",
   repositoryPath: "mistle/sandbox-base",
   dockerfilePath: SANDBOX_BASE_IMAGE_DOCKERFILE_PATH,
-  dockerTarget: "sandbox-base-dev",
+  dockerTarget: "sandbox-base",
 };
 
 export type StartFullSystemEnvironmentInput = {

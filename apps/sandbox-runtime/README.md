@@ -39,7 +39,7 @@ TypeScript owns:
 Build with repository root as context:
 
 ```bash
-docker build --target sandbox-base-dev -f apps/sandbox-runtime/Dockerfile .
+docker build --target sandbox-base -f apps/sandbox-runtime/Dockerfile .
 ```
 
 Before building the image, generate Linux SEA artifacts into `apps/sandbox-runtime/dist-sea`:

@@ -412,7 +412,7 @@ function start(): void {
       args: [
         "build",
         "--target",
-        "sandbox-base-dev",
+        "sandbox-base",
         "-f",
         "apps/sandbox-runtime/Dockerfile",
         "-t",
