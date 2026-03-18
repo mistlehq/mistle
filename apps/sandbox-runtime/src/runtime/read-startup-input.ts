@@ -5,10 +5,29 @@ import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "@mistle/int
 
 export const DefaultStartupInputMaxBytes = 1024 * 1024;
 
+export type StartupInputInstanceVolumeMode = "native" | "staged";
+export type StartupInputInstanceVolumeState = "new" | "existing";
+
+export const StartupInputInstanceVolumeModes = {
+  NATIVE: "native",
+  STAGED: "staged",
+} satisfies Record<string, StartupInputInstanceVolumeMode>;
+
+export const StartupInputInstanceVolumeStates = {
+  NEW: "new",
+  EXISTING: "existing",
+} satisfies Record<string, StartupInputInstanceVolumeState>;
+
+export type StartupInputInstanceVolume = {
+  mode: StartupInputInstanceVolumeMode;
+  state: StartupInputInstanceVolumeState;
+};
+
 export type StartupInput = {
   bootstrapToken: string;
   tunnelExchangeToken: string;
   tunnelGatewayWsUrl: string;
+  instanceVolume: StartupInputInstanceVolume;
   runtimePlan: CompiledRuntimePlan;
 };
 
@@ -52,11 +71,72 @@ function readRequiredRuntimePlanField(payload: object): CompiledRuntimePlan {
   return parsedRuntimePlan.data;
 }
 
+function validateExpectedInstanceVolumeFields(payload: object): void {
+  const allowedFields = new Set(["mode", "state"]);
+
+  for (const fieldName of Object.keys(payload)) {
+    if (!allowedFields.has(fieldName)) {
+      throw new Error(`startup input instanceVolume is invalid: unexpected field ${fieldName}`);
+    }
+  }
+}
+
+function readRequiredInstanceVolumeMode(payload: object): StartupInputInstanceVolumeMode {
+  const mode = Object.getOwnPropertyDescriptor(payload, "mode")?.value;
+  if (typeof mode !== "string") {
+    throw new Error("startup input instanceVolume.mode is required");
+  }
+
+  switch (normalizeRequiredString(mode, "instance volume mode")) {
+    case StartupInputInstanceVolumeModes.NATIVE:
+      return StartupInputInstanceVolumeModes.NATIVE;
+    case StartupInputInstanceVolumeModes.STAGED:
+      return StartupInputInstanceVolumeModes.STAGED;
+    default:
+      throw new Error(`startup input instanceVolume.mode '${mode}' is not supported`);
+  }
+}
+
+function readRequiredInstanceVolumeState(payload: object): StartupInputInstanceVolumeState {
+  const state = Object.getOwnPropertyDescriptor(payload, "state")?.value;
+  if (typeof state !== "string") {
+    throw new Error("startup input instanceVolume.state is required");
+  }
+
+  switch (normalizeRequiredString(state, "instance volume state")) {
+    case StartupInputInstanceVolumeStates.NEW:
+      return StartupInputInstanceVolumeStates.NEW;
+    case StartupInputInstanceVolumeStates.EXISTING:
+      return StartupInputInstanceVolumeStates.EXISTING;
+    default:
+      throw new Error(`startup input instanceVolume.state '${state}' is not supported`);
+  }
+}
+
+function readRequiredInstanceVolumeField(payload: object): StartupInputInstanceVolume {
+  const instanceVolume = Object.getOwnPropertyDescriptor(payload, "instanceVolume")?.value;
+  if (
+    typeof instanceVolume !== "object" ||
+    instanceVolume === null ||
+    Array.isArray(instanceVolume)
+  ) {
+    throw new Error("startup input instanceVolume is required");
+  }
+
+  validateExpectedInstanceVolumeFields(instanceVolume);
+
+  return {
+    mode: readRequiredInstanceVolumeMode(instanceVolume),
+    state: readRequiredInstanceVolumeState(instanceVolume),
+  };
+}
+
 function validateExpectedFields(payload: object): void {
   const allowedFields = new Set([
     "bootstrapToken",
     "tunnelExchangeToken",
     "tunnelGatewayWsUrl",
+    "instanceVolume",
     "runtimePlan",
   ]);
 
@@ -229,6 +309,7 @@ function parseStartupInputJson(rawJson: string): StartupInput {
       readRequiredStringField(payload, "tunnelGatewayWsUrl"),
       "tunnel gateway ws url",
     ),
+    instanceVolume: readRequiredInstanceVolumeField(payload),
     runtimePlan: readRequiredRuntimePlanField(payload),
   };
 }

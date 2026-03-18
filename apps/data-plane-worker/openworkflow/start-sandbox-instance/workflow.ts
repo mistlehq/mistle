@@ -272,6 +272,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
             sandboxInstanceId: workflowInput.sandboxInstanceId,
             image: workflowInput.image,
             instanceVolume: provisionedInstanceVolume.handle,
+            instanceVolumeMode: provisionedInstanceVolume.instanceVolumeMode,
             runtimePlan: workflowInput.runtimePlan,
           },
         );

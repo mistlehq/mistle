@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 
 import type { CompiledWorkspaceSource, RuntimeArtifactCommand } from "@mistle/integrations-core";
 
+import type { ApplyRuntimePlanInstanceVolume } from "./apply.js";
 import { runRuntimeArtifactCommand } from "./artifact-command.js";
 import { errorMessage } from "./error-message.js";
 
@@ -26,14 +27,19 @@ async function runGitCommand(args: ReadonlyArray<string>): Promise<void> {
   await runRuntimeArtifactCommand(command);
 }
 
-async function applyGitCloneWorkspaceSource(
-  workspaceSource: CompiledWorkspaceSource,
-): Promise<void> {
-  if (await pathExists(workspaceSource.path)) {
-    throw new Error(`workspace source path '${workspaceSource.path}' already exists`);
+async function applyGitCloneWorkspaceSource(input: {
+  workspaceSource: CompiledWorkspaceSource;
+  instanceVolume: ApplyRuntimePlanInstanceVolume;
+}): Promise<void> {
+  if (await pathExists(input.workspaceSource.path)) {
+    if (input.instanceVolume.mode === "native" && input.instanceVolume.state === "existing") {
+      return;
+    }
+
+    throw new Error(`workspace source path '${input.workspaceSource.path}' already exists`);
   }
 
-  const parentDirectory = dirname(workspaceSource.path);
+  const parentDirectory = dirname(input.workspaceSource.path);
   try {
     await mkdir(parentDirectory, {
       recursive: true,
@@ -48,8 +54,8 @@ async function applyGitCloneWorkspaceSource(
       "clone",
       "--origin",
       "origin",
-      workspaceSource.originUrl,
-      workspaceSource.path,
+      input.workspaceSource.originUrl,
+      input.workspaceSource.path,
     ]);
   } catch (error) {
     throw new Error(`failed to clone repository: ${errorMessage(error)}`);
@@ -60,14 +66,15 @@ function unsupportedWorkspaceSource(sourceKind: string): never {
   throw new Error(`workspace source kind '${sourceKind}' is not supported`);
 }
 
-export async function applyWorkspaceSource(
-  workspaceSource: CompiledWorkspaceSource,
-): Promise<void> {
-  switch (workspaceSource.sourceKind) {
+export async function applyWorkspaceSource(input: {
+  workspaceSource: CompiledWorkspaceSource;
+  instanceVolume: ApplyRuntimePlanInstanceVolume;
+}): Promise<void> {
+  switch (input.workspaceSource.sourceKind) {
     case "git-clone":
-      await applyGitCloneWorkspaceSource(workspaceSource);
+      await applyGitCloneWorkspaceSource(input);
       return;
     default:
-      unsupportedWorkspaceSource(workspaceSource.sourceKind);
+      unsupportedWorkspaceSource(input.workspaceSource.sourceKind);
   }
 }

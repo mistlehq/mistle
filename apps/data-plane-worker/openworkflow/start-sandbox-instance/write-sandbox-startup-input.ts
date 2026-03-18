@@ -6,6 +6,8 @@ import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registr
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import {
+  SandboxStartupInstanceVolumeStates,
+  type SandboxStartupInstanceVolumeMode,
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxStartupInput,
 } from "./sandbox-startup-input.js";
@@ -15,6 +17,7 @@ export async function writeSandboxStartupInput(input: {
   sandboxAdapter: SandboxAdapter;
   sandboxInstanceId: string;
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
+  instanceVolumeMode: SandboxStartupInstanceVolumeMode;
   sandbox: SandboxHandle;
 }): Promise<void> {
   const bootstrapTokenJti = randomUUID();
@@ -54,6 +57,10 @@ export async function writeSandboxStartupInput(input: {
         bootstrapToken,
         tunnelExchangeToken,
         tunnelGatewayWsUrl,
+        instanceVolume: {
+          mode: input.instanceVolumeMode,
+          state: SandboxStartupInstanceVolumeStates.NEW,
+        },
         runtimePlan: input.runtimePlan,
       }),
     });
