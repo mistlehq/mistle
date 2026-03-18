@@ -81,6 +81,10 @@ const BadRequestCodeSchema = z.enum([
   IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
   IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
   IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED,
+  IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_START_INPUT,
+  IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_COMPLETE_INPUT,
+  IntegrationConnectionsBadRequestCodes.OAUTH2_NOT_SUPPORTED,
+  IntegrationConnectionsBadRequestCodes.OAUTH2_CAPABILITY_NOT_CONFIGURED,
   IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
   IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
   IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
@@ -272,6 +276,18 @@ export const StartGitHubAppInstallationConnectionBodySchema = z
   })
   .strict();
 
+export const StartOAuth2ConnectionParamsSchema = z
+  .object({
+    targetKey: z.string().min(1),
+  })
+  .strict();
+
+export const StartOAuth2ConnectionBodySchema = z
+  .object({
+    displayName: z.string().min(1).optional(),
+  })
+  .strict();
+
 export const UpdateApiKeyConnectionParamsSchema = z
   .object({
     connectionId: z.string().min(1),
@@ -300,6 +316,12 @@ export const StartGitHubAppInstallationConnectionResponseSchema = z
   })
   .strict();
 
+export const StartOAuth2ConnectionResponseSchema = z
+  .object({
+    authorizationUrl: z.url(),
+  })
+  .strict();
+
 export const CompleteGitHubAppInstallationConnectionParamsSchema = z
   .object({
     targetKey: z.string().min(1),
@@ -315,6 +337,22 @@ export const CompleteGitHubAppInstallationConnectionQuerySchema = z
     error_uri: z.string().min(1).optional(),
     installation_id: z.string().min(1).optional(),
     setup_action: z.string().min(1).optional(),
+  })
+  .catchall(z.string());
+
+export const CompleteOAuth2ConnectionParamsSchema = z
+  .object({
+    targetKey: z.string().min(1),
+  })
+  .strict();
+
+export const CompleteOAuth2ConnectionQuerySchema = z
+  .object({
+    state: z.string().min(1).optional(),
+    code: z.string().min(1).optional(),
+    error: z.string().min(1).optional(),
+    error_description: z.string().min(1).optional(),
+    error_uri: z.string().min(1).optional(),
   })
   .catchall(z.string());
 
@@ -743,6 +781,74 @@ export const startGitHubAppInstallationConnectionRoute = createRoute({
   },
 });
 
+export const startOAuth2ConnectionRoute = createRoute({
+  method: "post",
+  path: "/:targetKey/oauth2/start",
+  tags: ["Integrations"],
+  middleware: ProtectedIntegrationConnectionsRouteMiddleware,
+  request: {
+    params: StartOAuth2ConnectionParamsSchema,
+    body: {
+      required: false,
+      content: {
+        "application/json": {
+          schema: StartOAuth2ConnectionBodySchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Create an OAuth2 authorization URL for an integration target.",
+      content: {
+        "application/json": {
+          schema: StartOAuth2ConnectionResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ListIntegrationConnectionsBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsUnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsForbiddenResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Integration target was not found.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsNotFoundResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
 export const completeGitHubAppInstallationConnectionRoute = createRoute({
   method: "get",
   path: "/:targetKey/github-app-installation/complete",
@@ -755,6 +861,46 @@ export const completeGitHubAppInstallationConnectionRoute = createRoute({
     302: {
       description:
         "Complete GitHub App installation connection creation and redirect to dashboard integrations.",
+      headers: RedirectLocationHeaderSchema,
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: ListIntegrationConnectionsBadRequestResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Integration target was not found.",
+      content: {
+        "application/json": {
+          schema: IntegrationConnectionsNotFoundResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
+export const completeOAuth2ConnectionRoute = createRoute({
+  method: "get",
+  path: "/:targetKey/oauth2/complete",
+  tags: ["Integrations"],
+  request: {
+    params: CompleteOAuth2ConnectionParamsSchema,
+    query: CompleteOAuth2ConnectionQuerySchema,
+  },
+  responses: {
+    302: {
+      description: "Complete OAuth2 connection creation and redirect to dashboard integrations.",
       headers: RedirectLocationHeaderSchema,
     },
     400: {

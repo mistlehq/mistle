@@ -1,6 +1,7 @@
 import {
   integrationConnectionCredentials,
   integrationConnections,
+  IntegrationConnectionCredentialPurposes,
   IntegrationConnectionStatuses,
   integrationCredentials,
   IntegrationCredentialSecretKinds,
@@ -24,7 +25,6 @@ import {
   IntegrationConnectionsNotFoundError,
 } from "./errors.js";
 
-const API_KEY_CREDENTIAL_PURPOSE = "api_key";
 const registry = createIntegrationRegistry();
 
 export type CreateApiKeyConnectionInput = {
@@ -158,7 +158,7 @@ export async function createApiKeyConnection(
       await tx.insert(integrationConnectionCredentials).values({
         connectionId: createdConnection.id,
         credentialId: createdCredential.id,
-        purpose: API_KEY_CREDENTIAL_PURPOSE,
+        purpose: IntegrationConnectionCredentialPurposes.API_KEY,
       });
 
       return {

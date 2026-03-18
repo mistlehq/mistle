@@ -1,4 +1,6 @@
 import {
+  IntegrationConnectionCredentialPurposes,
+  type IntegrationConnectionCredentialPurpose,
   IntegrationConnectionStatuses,
   IntegrationCredentialSecretKinds,
   type IntegrationBindingKind,
@@ -182,17 +184,60 @@ function parsePersistedSecretType(secretType: string): IntegrationCredentialSecr
     return IntegrationCredentialSecretKinds.API_KEY;
   }
 
-  if (secretType === IntegrationCredentialSecretKinds.OAUTH_ACCESS_TOKEN) {
-    return IntegrationCredentialSecretKinds.OAUTH_ACCESS_TOKEN;
+  if (secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN) {
+    return IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN;
+  }
+
+  if (secretType === IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN) {
+    return IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN;
   }
 
   return undefined;
 }
 
+function parsePersistedCredentialPurpose(
+  purpose: string | undefined,
+): IntegrationConnectionCredentialPurpose | undefined {
+  if (purpose === undefined) {
+    return undefined;
+  }
+
+  if (purpose === IntegrationConnectionCredentialPurposes.API_KEY) {
+    return IntegrationConnectionCredentialPurposes.API_KEY;
+  }
+
+  if (purpose === IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN) {
+    return IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN;
+  }
+
+  if (purpose === IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN) {
+    return IntegrationConnectionCredentialPurposes.OAUTH2_REFRESH_TOKEN;
+  }
+
+  return undefined;
+}
+
+function normalizeCredentialExpiryOrThrow(expiresAt: string): string {
+  const epochMilliseconds = Date.parse(expiresAt);
+  if (Number.isNaN(epochMilliseconds)) {
+    throw new Error(`Persisted credential expiry timestamp '${expiresAt}' is invalid.`);
+  }
+
+  return new Date(epochMilliseconds).toISOString();
+}
+
 async function resolvePersistedCredential(
   input: ResolvePersistedCredentialInput,
 ): Promise<ResolvedIntegrationCredential> {
-  const credentialPurpose = input.purpose;
+  const credentialPurpose = parsePersistedCredentialPurpose(input.purpose);
+  if (input.purpose !== undefined && credentialPurpose === undefined) {
+    throw new InternalIntegrationCredentialsError(
+      InternalIntegrationCredentialsErrorCodes.CREDENTIAL_NOT_FOUND,
+      404,
+      "No linked integration credential was found for this purpose.",
+    );
+  }
+
   const linkedCredentials = await input.db.query.integrationConnectionCredentials.findMany({
     columns: {
       credentialId: true,
@@ -221,6 +266,7 @@ async function resolvePersistedCredential(
     ciphertext: string;
     nonce: string;
     organizationCredentialKeyVersion: number;
+    expiresAt: string | null;
   }> = [];
   const persistedSecretType = parsePersistedSecretType(input.secretType);
   if (persistedSecretType === undefined) {
@@ -238,6 +284,7 @@ async function resolvePersistedCredential(
         ciphertext: true,
         nonce: true,
         organizationCredentialKeyVersion: true,
+        expiresAt: true,
       },
       where: (table, { and, eq, isNull }) =>
         and(
@@ -305,6 +352,9 @@ async function resolvePersistedCredential(
 
     return {
       value,
+      ...(credential.expiresAt === null
+        ? {}
+        : { expiresAt: normalizeCredentialExpiryOrThrow(credential.expiresAt) }),
     };
   } finally {
     unwrappedOrganizationCredentialKey.fill(0);
