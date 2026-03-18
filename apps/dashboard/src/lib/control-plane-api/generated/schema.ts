@@ -2273,6 +2273,132 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/sandbox/instances": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get: {
+      parameters: {
+        query?: {
+          after?: string;
+          before?: string;
+          limit?: number;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description List sandbox instances. */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              items: {
+                createdAt: string;
+                failureCode: string | null;
+                failureMessage: string | null;
+                id: string;
+                sandboxProfileId: string;
+                sandboxProfileVersion: number;
+                /** @enum {string} */
+                source: "dashboard" | "webhook";
+                startedBy: {
+                  id: string;
+                  /** @enum {string} */
+                  kind: "user" | "system";
+                };
+                /** @enum {string} */
+                status: "starting" | "running" | "stopped" | "failed";
+                updatedAt: string;
+              }[];
+              nextPage: {
+                after: string;
+                limit: number;
+              } | null;
+              previousPage: {
+                before: string;
+                limit: number;
+              } | null;
+              totalResults: number;
+            };
+          };
+        };
+        /** @description Invalid request. */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json":
+              | {
+                  /** @enum {string} */
+                  code: "INVALID_INSTANCE_ID" | "INVALID_LIST_INSTANCES_INPUT";
+                  message: string;
+                }
+              | {
+                  error: {
+                    message: string;
+                    name: string;
+                  } & {
+                    [key: string]: unknown;
+                  };
+                  /** @enum {boolean} */
+                  success: false;
+                };
+          };
+        };
+        /** @description Authentication is required. */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "UNAUTHORIZED";
+              message: string;
+            };
+          };
+        };
+        /** @description Active organization is required. */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              /** @enum {string} */
+              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              message: string;
+            };
+          };
+        };
+        /** @description Internal server error. */
+        500: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "text/plain": string;
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/sandbox/instances/{instanceId}": {
     parameters: {
       query?: never;
@@ -2315,7 +2441,7 @@ export interface paths {
             "application/json":
               | {
                   /** @enum {string} */
-                  code: "INVALID_INSTANCE_ID";
+                  code: "INVALID_INSTANCE_ID" | "INVALID_LIST_INSTANCES_INPUT";
                   message: string;
                 }
               | {
@@ -2436,7 +2562,7 @@ export interface paths {
             "application/json":
               | {
                   /** @enum {string} */
-                  code: "INVALID_INSTANCE_ID";
+                  code: "INVALID_INSTANCE_ID" | "INVALID_LIST_INSTANCES_INPUT";
                   message: string;
                 }
               | {
