@@ -74,9 +74,9 @@ Optional:
 The integration fixture ensures the configured app exists (`createIfMissing: true`) before running
 adapter lifecycle operations.
 
-Integration tests derive the base image registry tag from
-`apps/sandbox-runtime/Dockerfile` (`sandbox-base-prod` stage `FROM` image) and build
-an ephemeral Modal image with a keepalive entrypoint for adapter lifecycle coverage.
+Integration tests build from the public base image
+`ghcr.io/mistlehq/sandbox-base:latest` and then apply an ephemeral keepalive entrypoint
+for adapter lifecycle coverage.
 
 Run:
 
