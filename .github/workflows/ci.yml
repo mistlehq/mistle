@@ -67,6 +67,16 @@ jobs:
       - name: Install Nix
         uses: cachix/install-nix-action@v31
 
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: sandbox-rs-napi
+          workspaces: |
+            packages/sandbox-rs-napi -> target
+          env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
+          cmd-format: nix develop --command {0}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
       - name: Restore pnpm store cache
         id: static-pnpm-store-cache
         uses: actions/cache/restore@v5
@@ -129,6 +139,16 @@ jobs:
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
+
+      - name: Restore Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: sandbox-rs-napi
+          workspaces: |
+            packages/sandbox-rs-napi -> target
+          env-vars: AR CARGO CC CFLAGS CMAKE CXX DEVELOPER_DIR HOST_PATH LD MACOSX_DEPLOYMENT_TARGET NIX NM RANLIB RUST SDKROOT
+          cmd-format: nix develop --command {0}
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Restore pnpm store cache
         id: test-pnpm-store-cache
