@@ -24,6 +24,9 @@ export function toTunnelForwardPayload(data: WSMessageReceive): string | ArrayBu
   if (data instanceof ArrayBuffer) {
     return data;
   }
+  if (ArrayBuffer.isView(data)) {
+    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength).slice().buffer;
+  }
 
   return undefined;
 }

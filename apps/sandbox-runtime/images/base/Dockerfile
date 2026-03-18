@@ -9,7 +9,7 @@ COPY apps/sandbox-runtime/internal ./internal
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/sandboxd ./cmd/sandboxd
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/sandbox-bootstrap ./cmd/sandbox-bootstrap
 
-FROM debian:bookworm-slim AS sandbox-base-prod
+FROM debian:bookworm-slim AS sandbox-base-common
 
 ARG SANDBOX_USER=sandbox
 ARG SANDBOX_UID=10001
@@ -46,24 +46,54 @@ RUN groupadd --gid "${SANDBOX_GID}" "${SANDBOX_USER}" \
 
 RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PATH="/usr/local/bin/mise" sh
 
-COPY --from=sandbox-runtime-builder /out/sandboxd /usr/local/bin/sandboxd
-COPY --from=sandbox-runtime-builder /out/sandbox-bootstrap /usr/local/bin/sandbox-bootstrap
 COPY apps/sandbox-runtime/images/base/mistle-path.sh /etc/profile.d/mistle-path.sh
 
 RUN chmod +x \
   /etc/profile.d/mistle-path.sh \
-  /usr/local/bin/mise \
-  /usr/local/bin/sandbox-bootstrap \
-  /usr/local/bin/sandboxd
+  /usr/local/bin/mise
 
 ENV PATH="/var/lib/mistle/bin:/home/${SANDBOX_USER}/.local/share/mise/shims:/usr/local/bin:${PATH}"
 
 WORKDIR /home/${SANDBOX_USER}
 USER root
 
+FROM sandbox-base-common AS sandbox-base-prod
+
+COPY --from=sandbox-runtime-builder /out/sandboxd /usr/local/bin/sandboxd
+COPY --from=sandbox-runtime-builder /out/sandbox-bootstrap /usr/local/bin/sandbox-bootstrap
+
+RUN chmod +x \
+  /usr/local/bin/sandbox-bootstrap \
+  /usr/local/bin/sandboxd
+
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandbox-bootstrap"]
 
 FROM sandbox-base-prod AS sandbox-base-dev
+
+USER root
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    procps \
+    strace \
+    vim \
+  && rm -rf /var/lib/apt/lists/*
+
+FROM sandbox-base-common AS sandbox-base-node-prod
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    libatomic1 \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY apps/sandbox-runtime-node/dist-sea/ /usr/local/bin/
+
+RUN chmod +x \
+  /usr/local/bin/sandbox-bootstrap-node \
+  /usr/local/bin/sandboxd-node
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandbox-bootstrap-node"]
+
+FROM sandbox-base-node-prod AS sandbox-base-node-dev
 
 USER root
 RUN apt-get update \

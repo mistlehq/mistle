@@ -1,4 +1,4 @@
-import { Readable } from "node:stream";
+import { PassThrough, Readable } from "node:stream";
 
 import { describe, expect, it } from "vitest";
 
@@ -25,7 +25,7 @@ const ValidStartupInputJson = `{
   "runtimePlan": ${ValidRuntimePlanJson}
 }`;
 
-function createReader(input: string): NodeJS.ReadableStream {
+function createReader(input: string): Readable {
   return Readable.from([input]);
 }
 
@@ -42,6 +42,25 @@ describe("readStartupInput", () => {
     expect(startupInput.runtimePlan.sandboxProfileId).toBe("sbp_123");
     expect(startupInput.runtimePlan.image.source).toBe("base");
     expect(startupInput.runtimePlan.agentRuntimes).toEqual([]);
+  });
+
+  it("reads startup input without waiting for stdin eof", async () => {
+    const reader = new PassThrough();
+    const startupInputPromise = readStartupInput({
+      reader,
+      maxBytes: 4096,
+    });
+
+    reader.write(ValidStartupInputJson);
+
+    await expect(startupInputPromise).resolves.toMatchObject({
+      bootstrapToken: "test-token",
+      tunnelExchangeToken: "test-exchange-token",
+      tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+    });
+
+    expect(reader.destroyed).toBe(false);
+    reader.destroy();
   });
 
   it("trims surrounding whitespace", async () => {
@@ -172,5 +191,14 @@ describe("readStartupInput", () => {
         maxBytes: 4096,
       }),
     ).rejects.toThrow("unexpected field unexpected");
+  });
+
+  it("fails when startup input has trailing json content in the same stream chunk", async () => {
+    await expect(
+      readStartupInput({
+        reader: createReader(`${ValidStartupInputJson}{"extra":true}`),
+        maxBytes: 4096,
+      }),
+    ).rejects.toThrow("unexpected trailing JSON content");
   });
 });

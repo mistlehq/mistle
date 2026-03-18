@@ -101,7 +101,7 @@ describe("buildRuntimeExecInput", () => {
 });
 
 describe("buildPackagedRuntimeExecInput", () => {
-  it("targets the packaged runtime binary and preserves trailing argv", () => {
+  it("targets the packaged runtime binary and forwards user arguments unchanged", () => {
     const input = buildPackagedRuntimeExecInput({
       processEnv: {
         KEEP_ME: "value",

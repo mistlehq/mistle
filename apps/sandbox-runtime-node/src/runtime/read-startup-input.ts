@@ -1,3 +1,6 @@
+import { type Readable } from "node:stream";
+import { StringDecoder } from "node:string_decoder";
+
 import { CompiledRuntimePlanSchema, type CompiledRuntimePlan } from "@mistle/integrations-core";
 
 export const DefaultStartupInputMaxBytes = 1024 * 1024;
@@ -10,7 +13,7 @@ export type StartupInput = {
 };
 
 type ReadStartupInputInput = {
-  reader: NodeJS.ReadableStream | null | undefined;
+  reader: Readable | null | undefined;
   maxBytes: number;
 };
 
@@ -64,14 +67,85 @@ function validateExpectedFields(payload: object): void {
   }
 }
 
-async function readStreamToString(
-  reader: NodeJS.ReadableStream,
-  maxBytes: number,
-): Promise<string> {
-  const chunks: Buffer[] = [];
-  let totalBytes = 0;
+type JsonScanState = {
+  started: boolean;
+  depth: number;
+  inString: boolean;
+  escaped: boolean;
+};
 
-  for await (const chunk of reader) {
+function updateJsonScanState(state: JsonScanState, value: string): number | undefined {
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (character === undefined) {
+      continue;
+    }
+
+    if (!state.started) {
+      if (/\s/u.test(character)) {
+        continue;
+      }
+
+      if (character !== "{") {
+        return undefined;
+      }
+
+      state.started = true;
+      state.depth = 1;
+      continue;
+    }
+
+    if (state.inString) {
+      if (state.escaped) {
+        state.escaped = false;
+        continue;
+      }
+
+      if (character === "\\") {
+        state.escaped = true;
+        continue;
+      }
+
+      if (character === '"') {
+        state.inString = false;
+      }
+
+      continue;
+    }
+
+    if (character === '"') {
+      state.inString = true;
+      continue;
+    }
+
+    if (character === "{") {
+      state.depth += 1;
+      continue;
+    }
+
+    if (character === "}") {
+      state.depth -= 1;
+      if (state.depth === 0) {
+        return index + 1;
+      }
+    }
+  }
+
+  return undefined;
+}
+
+async function readSingleJsonObjectFromStream(reader: Readable, maxBytes: number): Promise<string> {
+  const decoder = new StringDecoder("utf8");
+  let rawJson = "";
+  let totalBytes = 0;
+  const scanState: JsonScanState = {
+    started: false,
+    depth: 0,
+    inString: false,
+    escaped: false,
+  };
+
+  for await (const chunk of reader.iterator({ destroyOnReturn: false })) {
     const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     totalBytes += buffer.length;
 
@@ -79,10 +153,31 @@ async function readStreamToString(
       throw new Error(`startup input exceeds max size of ${maxBytes} bytes`);
     }
 
-    chunks.push(buffer);
+    const decodedChunk = decoder.write(buffer);
+    rawJson += decodedChunk;
+    const completeObjectEndInChunk = updateJsonScanState(scanState, decodedChunk);
+    if (completeObjectEndInChunk === undefined) {
+      continue;
+    }
+
+    const completeObjectEnd = rawJson.length - decodedChunk.length + completeObjectEndInChunk;
+    const completeJson = rawJson.slice(0, completeObjectEnd);
+    const trailingContent = rawJson.slice(completeObjectEnd);
+    if (trailingContent.trim().length > 0) {
+      throw new Error(
+        "startup input from stdin must be valid json: unexpected trailing JSON content",
+      );
+    }
+
+    return completeJson;
   }
 
-  return Buffer.concat(chunks).toString("utf8");
+  rawJson += decoder.end();
+  if (rawJson.trim().length === 0) {
+    throw new Error("startup input from stdin is empty");
+  }
+
+  return rawJson;
 }
 
 export async function readStartupInput(input: ReadStartupInputInput): Promise<StartupInput> {
@@ -94,7 +189,11 @@ export async function readStartupInput(input: ReadStartupInputInput): Promise<St
     throw new Error("startup input max bytes must be at least 1");
   }
 
-  const rawJson = await readStreamToString(input.reader, input.maxBytes);
+  const rawJson = await readSingleJsonObjectFromStream(input.reader, input.maxBytes);
+  return parseStartupInputJson(rawJson);
+}
+
+function parseStartupInputJson(rawJson: string): StartupInput {
   if (rawJson.trim().length === 0) {
     throw new Error("startup input from stdin is empty");
   }

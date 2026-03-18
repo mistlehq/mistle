@@ -55,6 +55,20 @@ export function isExpectedWebSocketClose(error: unknown): boolean {
 export function connectWebSocket(url: string, signal: AbortSignal): Promise<WebSocket> {
   return new Promise<WebSocket>((resolve, reject) => {
     const socket = new WebSocket(url);
+    const swallowPostAbortError = (): void => undefined;
+    const handleLateOpenAfterAbort = (): void => {
+      try {
+        socket.terminate();
+      } catch {
+        // The post-abort error/close listeners below handle the remainder of
+        // connection teardown even if ws throws while settling the socket.
+      }
+    };
+    const removePostAbortListeners = (): void => {
+      socket.off("error", swallowPostAbortError);
+      socket.off("close", removePostAbortListeners);
+      socket.off("open", handleLateOpenAfterAbort);
+    };
 
     const cleanup = (): void => {
       socket.off("open", handleOpen);
@@ -63,7 +77,24 @@ export function connectWebSocket(url: string, signal: AbortSignal): Promise<WebS
     };
     const handleAbort = (): void => {
       cleanup();
-      socket.terminate();
+      socket.on("error", swallowPostAbortError);
+      socket.on("close", removePostAbortListeners);
+      if (socket.readyState === WebSocket.CONNECTING) {
+        socket.once("open", handleLateOpenAfterAbort);
+        try {
+          socket.close();
+        } catch {
+          // Some ws states still throw synchronously here; a late open is still
+          // terminated by handleLateOpenAfterAbort.
+        }
+      } else if (socket.readyState === WebSocket.OPEN) {
+        try {
+          socket.terminate();
+        } catch {
+          // ws can throw here while still establishing a connection; the abort
+          // rejection below is the signal the caller actually consumes.
+        }
+      }
       reject(signal.reason ?? new Error("websocket connection was aborted"));
     };
     const handleOpen = (): void => {

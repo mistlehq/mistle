@@ -33,13 +33,19 @@ describe("AsyncQueue", () => {
     await expect(queue.next()).rejects.toThrow("queue closed");
   });
 
-  it("rejects aborted readers with the abort reason", async () => {
+  it("removes aborted waiters before delivering later items", async () => {
     const queue = new AsyncQueue<string>();
-    const controller = new AbortController();
+    const abandonedWaitAbortController = new AbortController();
+    const activeWaitAbortController = new AbortController();
 
-    const nextItem = queue.next(controller.signal);
-    controller.abort(new Error("aborted by test"));
+    const abandonedWait = queue.next(abandonedWaitAbortController.signal);
+    abandonedWaitAbortController.abort();
 
-    await expect(nextItem).rejects.toThrow("aborted by test");
+    await expect(abandonedWait).rejects.toThrow("This operation was aborted");
+
+    const activeWait = queue.next(activeWaitAbortController.signal);
+    queue.push("delivered");
+
+    await expect(activeWait).resolves.toBe("delivered");
   });
 });

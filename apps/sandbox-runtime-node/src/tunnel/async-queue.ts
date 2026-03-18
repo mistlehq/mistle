@@ -47,7 +47,21 @@ export class AsyncQueue<T> {
     }
 
     return new Promise<T>((resolve, reject) => {
+      const waiter = {
+        resolve: (value: T) => {
+          cleanup();
+          resolve(value);
+        },
+        reject: (error: unknown) => {
+          cleanup();
+          reject(error);
+        },
+      };
       const abortListener = (): void => {
+        const waiterIndex = this.#waiters.indexOf(waiter);
+        if (waiterIndex >= 0) {
+          this.#waiters.splice(waiterIndex, 1);
+        }
         cleanup();
         reject(signal?.reason ?? new Error("operation was aborted"));
       };
@@ -60,16 +74,7 @@ export class AsyncQueue<T> {
         return;
       }
 
-      this.#waiters.push({
-        resolve: (value) => {
-          cleanup();
-          resolve(value);
-        },
-        reject: (error) => {
-          cleanup();
-          reject(error);
-        },
-      });
+      this.#waiters.push(waiter);
 
       signal?.addEventListener("abort", abortListener, { once: true });
     });

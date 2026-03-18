@@ -1,6 +1,7 @@
 import type { CompiledAgentRuntime, CompiledRuntimeClient } from "@mistle/integrations-core";
 import type WebSocket from "ws";
 
+import { ignorePromiseRejectionAfterAbort } from "./abortable-race.js";
 import {
   finishActiveTunnelStreamRelay,
   type ActiveTunnelStreamRelay,
@@ -147,16 +148,30 @@ async function handleTunnelConnection(input: {
   let activePtySession: PtySession | undefined;
 
   while (!input.signal.aborted) {
-    const nextTunnelMessage = tunnelMessages.next(input.signal).then((message) => ({
-      source: "tunnel" as const,
-      message,
-    }));
-    const nextRelayResult = relayResultQueue.next(input.signal).then((result) => ({
-      source: "relay" as const,
-      result,
-    }));
+    const nextTunnelMessageAbortController = new AbortController();
+    const nextRelayResultAbortController = new AbortController();
+    const nextTunnelMessage = ignorePromiseRejectionAfterAbort(
+      tunnelMessages
+        .next(AbortSignal.any([input.signal, nextTunnelMessageAbortController.signal]))
+        .then((message) => ({
+          source: "tunnel" as const,
+          message,
+        })),
+      nextTunnelMessageAbortController.signal,
+    );
+    const nextRelayResult = ignorePromiseRejectionAfterAbort(
+      relayResultQueue
+        .next(AbortSignal.any([input.signal, nextRelayResultAbortController.signal]))
+        .then((result) => ({
+          source: "relay" as const,
+          result,
+        })),
+      nextRelayResultAbortController.signal,
+    );
 
     const nextEvent = await Promise.race([nextTunnelMessage, nextRelayResult]);
+    nextTunnelMessageAbortController.abort();
+    nextRelayResultAbortController.abort();
 
     if (nextEvent.source === "relay") {
       const updatedState = finishActiveTunnelStreamRelay(

@@ -1,5 +1,6 @@
 import { once } from "node:events";
 import { type Server } from "node:http";
+import { type Readable } from "node:stream";
 
 import { applyRuntimePlan } from "../runtime-plan/index.js";
 import {
@@ -7,6 +8,7 @@ import {
   type StartedTunnelClient,
   type TunnelCompletion,
 } from "../tunnel/client.js";
+import { aggregateArtifactEnvironment } from "./artifact-environment.js";
 import { loadRuntimeConfig, type RuntimeConfig } from "./config.js";
 import { createRuntimeHttpServer } from "./http-server.js";
 import { parseListenAddress } from "./parse-listen-address.js";
@@ -33,7 +35,7 @@ type LookupEnv = (key: string) => string | undefined;
 
 export type RunRuntimeInput = {
   lookupEnv: LookupEnv;
-  stdin: NodeJS.ReadableStream;
+  stdin: Readable;
 };
 
 export type StartedRuntime = {
@@ -124,6 +126,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
       tokenizerProxyEgressBaseUrl: config.tokenizerProxyEgressBaseUrl,
     }),
   );
+  let restoreArtifactEnvironment: (() => void) | undefined;
 
   let processManager: RuntimeClientProcessManager | undefined;
   let tunnelClient: StartedTunnelClient | undefined;
@@ -131,6 +134,10 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     await applyRuntimePlan({
       runtimePlan: startupInput.runtimePlan,
     });
+    const artifactEnvironment = aggregateArtifactEnvironment(startupInput.runtimePlan.artifacts);
+    if (artifactEnvironment !== undefined) {
+      restoreArtifactEnvironment = applyEnvironmentEntries(artifactEnvironment);
+    }
     processManager = await startRuntimeClientProcessManager(
       flattenRuntimeClientProcesses(startupInput.runtimePlan.runtimeClients),
     );
@@ -156,6 +163,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
     if (processManager !== undefined) {
       await processManager.stop().catch(() => undefined);
     }
+    restoreArtifactEnvironment?.();
     restoreProxyEnvironment();
     await closeServer(server);
 
@@ -194,6 +202,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
         await processManager.stop();
       }
 
+      restoreArtifactEnvironment?.();
       restoreProxyEnvironment();
     },
     closed,

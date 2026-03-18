@@ -54,6 +54,7 @@ describe("startRuntime", () => {
       lookupEnv: createLookupEnv(),
       stdin: Readable.from([ValidStartupInputJson]),
     });
+    void runtime.tunnelCompletion.catch(() => undefined);
     StartedRuntimes.push(runtime);
 
     const response = await fetch(`${runtime.baseUrl}/__healthz`);
@@ -68,10 +69,61 @@ describe("startRuntime", () => {
       lookupEnv: createLookupEnv(),
       stdin: Readable.from([ValidStartupInputJson]),
     });
+    void runtime.tunnelCompletion.catch(() => undefined);
     StartedRuntimes.push(runtime);
 
     const response = await fetch(`${runtime.baseUrl}/healthz`);
 
     expect(response.status).toBe(404);
+  });
+
+  it("applies artifact env during runtime startup and restores it on close", async () => {
+    const previousGhToken = process.env.GH_TOKEN;
+    delete process.env.GH_TOKEN;
+
+    const startupInputJson = `{
+      "bootstrapToken": "test-token",
+      "tunnelExchangeToken": "test-exchange-token",
+      "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+      "runtimePlan": {
+        "sandboxProfileId": "sbp_123",
+        "version": 1,
+        "image": {
+          "source": "base",
+          "imageRef": "mistle/sandbox-base:dev"
+        },
+        "egressRoutes": [],
+        "artifacts": [
+          {
+            "artifactKey": "gh-cli",
+            "name": "GitHub CLI",
+            "env": {
+              "GH_TOKEN": "dummy-token"
+            },
+            "lifecycle": {
+              "install": [],
+              "remove": []
+            }
+          }
+        ],
+        "runtimeClients": [],
+        "workspaceSources": [],
+        "agentRuntimes": []
+      }
+    }`;
+
+    const runtime = await startRuntime({
+      lookupEnv: createLookupEnv(),
+      stdin: Readable.from([startupInputJson]),
+    });
+    void runtime.tunnelCompletion.catch(() => undefined);
+
+    try {
+      expect(process.env.GH_TOKEN).toBe("dummy-token");
+    } finally {
+      await runtime.close();
+    }
+
+    expect(process.env.GH_TOKEN).toBe(previousGhToken);
   });
 });
