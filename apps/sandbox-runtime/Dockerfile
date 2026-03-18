@@ -68,5 +68,3 @@ RUN chmod +x \
   /usr/local/bin/sandboxd
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandbox-bootstrap"]
-
-FROM sandbox-base-prod AS sandbox-base-dev
