@@ -51,7 +51,7 @@
     "@vitest/coverage-v8": "^4.1.0",
     "fast-check": "^4.6.0",
     "jscpd": "^4.0.8",
-    "knip": "^5.87.0",
+    "knip": "^5.88.0",
     "lefthook": "^2.1.4",
     "lint-staged": "^16.4.0",
     "oxfmt": "^0.36.0",
