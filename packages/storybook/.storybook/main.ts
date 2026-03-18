@@ -2,7 +2,6 @@ import type { StorybookConfig } from "@storybook/react-vite";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { mergeConfig } from "vite";
-import tsconfigPaths from "vite-tsconfig-paths";
 
 const config: StorybookConfig = {
   framework: {
@@ -22,9 +21,10 @@ const config: StorybookConfig = {
   ],
   async viteFinal(config) {
     return mergeConfig(config, {
-      plugins: [react(), tailwindcss(), tsconfigPaths()],
+      plugins: [react(), tailwindcss()],
       resolve: {
         dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
+        tsconfigPaths: true,
       },
     });
   },
