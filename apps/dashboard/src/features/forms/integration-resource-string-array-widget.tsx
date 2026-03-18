@@ -166,6 +166,21 @@ export function IntegrationResourceStringArrayWidget(
     props.onChange(nextSelection);
   }
 
+  function toggleAll(): void {
+    const visibleHandleSet = new Set(visibleItems.map((item) => item.handle));
+    const allVisibleSelected = visibleItems.every((item) => selectedHandles.includes(item.handle));
+
+    if (allVisibleSelected) {
+      props.onChange(selectedHandles.filter((handle) => !visibleHandleSet.has(handle)));
+    } else {
+      const selectedSet = new Set(selectedHandles);
+      const handlesToAdd = visibleItems
+        .filter((item) => !selectedSet.has(item.handle))
+        .map((item) => item.handle);
+      props.onChange([...selectedHandles, ...handlesToAdd]);
+    }
+  }
+
   function triggerRefresh(): void {
     if (resourceOverride !== undefined) {
       return;
@@ -301,6 +316,7 @@ export function IntegrationResourceStringArrayWidget(
       }}
       onRefresh={triggerRefresh}
       onSearchChange={setSearch}
+      onToggleAll={toggleAll}
       onToggleHandle={toggleHandle}
       refreshErrorMessage={refreshErrorMessage}
       refreshLabel={refreshLabel}

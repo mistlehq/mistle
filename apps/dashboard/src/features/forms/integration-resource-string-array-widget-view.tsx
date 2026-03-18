@@ -1,5 +1,6 @@
 import { Button, Input, ScrollArea } from "@mistle/ui";
 import { ArrowClockwiseIcon } from "@phosphor-icons/react";
+import { useCallback } from "react";
 
 import type { IntegrationConnectionResource } from "../integrations/integrations-service.js";
 import {
@@ -23,6 +24,7 @@ export type IntegrationResourceStringArrayWidgetViewProps = {
   emptyMessage: string;
   onSearchChange: (nextValue: string) => void;
   onToggleHandle: (handle: string) => void;
+  onToggleAll: () => void;
   onRefresh: () => void;
   onBlur: () => void;
   onFocus: () => void;
@@ -61,6 +63,39 @@ function IntegrationResourceMessageSection(input: {
   );
 }
 
+function SelectAllRow(input: {
+  allVisibleSelected: boolean;
+  someVisibleSelected: boolean;
+  selectedCountLabel: string | null;
+  onToggleAll: () => void;
+}): React.JSX.Element {
+  const indeterminateRef = useCallback(
+    (element: HTMLInputElement | null) => {
+      if (element) {
+        element.indeterminate = input.someVisibleSelected;
+      }
+    },
+    [input.someVisibleSelected],
+  );
+
+  return (
+    <label className="hover:bg-muted/40 border-b gap-3 flex items-center p-3 select-none">
+      <input
+        checked={input.allVisibleSelected}
+        onChange={input.onToggleAll}
+        ref={indeterminateRef}
+        type="checkbox"
+      />
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium text-sm">Select all</div>
+      </div>
+      {input.selectedCountLabel === null ? null : (
+        <span className="text-muted-foreground shrink-0 text-xs">{input.selectedCountLabel}</span>
+      )}
+    </label>
+  );
+}
+
 export function IntegrationResourceStringArrayWidgetView(
   props: IntegrationResourceStringArrayWidgetViewProps,
 ): React.JSX.Element {
@@ -84,6 +119,13 @@ export function IntegrationResourceStringArrayWidgetView(
           : { mode: "error", message: props.listState.message },
     visibleItemsCount: props.visibleItems.length,
   });
+
+  const selectedSet = new Set(props.selectedHandles);
+  const allVisibleSelected =
+    props.visibleItems.length > 0 &&
+    props.visibleItems.every((item) => selectedSet.has(item.handle));
+  const someVisibleSelected =
+    !allVisibleSelected && props.visibleItems.some((item) => selectedSet.has(item.handle));
 
   return (
     <div className="gap-3 flex flex-col">
@@ -140,23 +182,20 @@ export function IntegrationResourceStringArrayWidgetView(
 
       {viewModel.hasVisibleItems ? (
         <div className="overflow-hidden rounded-md border">
-          {viewModel.selectedCountLabel === null ? null : (
-            <div className="text-muted-foreground border-b px-3 py-2 text-xs">
-              {viewModel.selectedCountLabel}
-            </div>
-          )}
+          <SelectAllRow
+            allVisibleSelected={allVisibleSelected}
+            someVisibleSelected={someVisibleSelected}
+            selectedCountLabel={viewModel.selectedCountLabel}
+            onToggleAll={props.onToggleAll}
+          />
           <ScrollArea className="h-56">
             {props.visibleItems.map((resource) => {
               const isSelected = props.selectedHandles.includes(resource.handle);
 
               return (
-                <label
-                  className="hover:bg-muted/40 gap-3 flex cursor-pointer items-start p-3"
-                  key={resource.id}
-                >
+                <label className="hover:bg-muted/40 gap-3 flex items-center p-3" key={resource.id}>
                   <input
                     checked={isSelected}
-                    className="mt-0.5"
                     onChange={() => {
                       props.onToggleHandle(resource.handle);
                     }}
