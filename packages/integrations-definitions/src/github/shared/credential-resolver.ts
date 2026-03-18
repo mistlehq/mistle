@@ -63,9 +63,9 @@ export function resolveGitHubInstallationRepositoryNames(
 function resolveGitHubAppCredentialContext(
   input: IntegrationCredentialResolverInput,
 ): ResolvedGitHubAppCredentialContext {
-  if (input.secretType !== GitHubCredentialSecretTypes.OAUTH_ACCESS_TOKEN) {
+  if (input.secretType !== GitHubCredentialSecretTypes.GITHUB_APP_INSTALLATION_TOKEN) {
     throw new Error(
-      `GitHub app installation resolver only supports '${GitHubCredentialSecretTypes.OAUTH_ACCESS_TOKEN}' secret type.`,
+      `GitHub app installation resolver only supports '${GitHubCredentialSecretTypes.GITHUB_APP_INSTALLATION_TOKEN}' secret type.`,
     );
   }
 

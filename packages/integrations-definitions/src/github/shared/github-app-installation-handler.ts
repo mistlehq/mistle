@@ -8,7 +8,7 @@ import type { GitHubTargetSecrets } from "./target-secret-schema.js";
 
 function resolveGitHubAppSlug(targetConfig: GitHubTargetConfig): string {
   if (targetConfig.appSlug === undefined || targetConfig.appSlug.length === 0) {
-    throw new Error("GitHub App OAuth flow requires `app_slug` in target config.");
+    throw new Error("GitHub App installation flow requires `app_slug` in target config.");
   }
 
   return targetConfig.appSlug;
@@ -28,13 +28,13 @@ function resolveInstallationId(query: URLSearchParams): string {
   const installationId = query.get("installation_id");
 
   if (installationId === null || installationId.length === 0) {
-    throw new Error("GitHub App OAuth callback is missing `installation_id`.");
+    throw new Error("GitHub App installation callback is missing `installation_id`.");
   }
 
   return installationId;
 }
 
-export const GitHubAppOAuthHandler: IntegrationOAuthHandler<
+export const GitHubAppInstallationRedirectHandler: IntegrationOAuthHandler<
   GitHubTargetConfig,
   GitHubTargetSecrets
 > = {

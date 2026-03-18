@@ -1,7 +1,7 @@
 import {
   integrationConnectionCredentials,
   integrationConnections,
-  integrationOauthSessions,
+  integrationConnectionRedirectSessions,
   integrationTargets,
 } from "@mistle/db/control-plane";
 import { eq } from "drizzle-orm";
@@ -9,8 +9,9 @@ import { describe, expect } from "vitest";
 
 import { buildDashboardUrl } from "../src/dashboard-url.js";
 import {
+  CompleteGitHubAppInstallationConnectionQuerySchema,
   IntegrationConnectionsBadRequestResponseSchema,
-  StartOAuthConnectionResponseSchema,
+  StartGitHubAppInstallationConnectionResponseSchema,
 } from "../src/integration-connections/contracts.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
@@ -77,31 +78,39 @@ function createDashboardOrganizationIntegrationsUrl(
   return buildDashboardUrl(fixture.config.dashboard.baseUrl, "/settings/organization/integrations");
 }
 
-describe("integration connections oauth integration", () => {
-  function createOAuthCompletePath(input: {
+describe("integration connections GitHub App installation integration", () => {
+  function createGitHubAppInstallationCompletePath(input: {
     targetKey: string;
     query: Record<string, string>;
   }): string {
-    const searchParams = new URLSearchParams(input.query);
-    return `/v1/integration/connections/${input.targetKey}/oauth/complete?${searchParams.toString()}`;
+    const query = CompleteGitHubAppInstallationConnectionQuerySchema.parse(input.query);
+    const searchParams = new URLSearchParams(query);
+    return `/v1/integration/connections/${input.targetKey}/github-app-installation/complete?${searchParams.toString()}`;
   }
 
-  it("creates an oauth authorization URL and persists oauth session state", async ({ fixture }) => {
+  it("creates a GitHub App installation authorization URL and persists redirect session state", async ({
+    fixture,
+  }) => {
     await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth-start@example.com",
+      email: "integration-connections-github-app-installation-start@example.com",
     });
 
-    const response = await fixture.request("/v1/integration/connections/github-cloud/oauth/start", {
-      method: "POST",
-      headers: {
-        cookie: authenticatedSession.cookie,
+    const response = await fixture.request(
+      "/v1/integration/connections/github-cloud/github-app-installation/start",
+      {
+        method: "POST",
+        headers: {
+          cookie: authenticatedSession.cookie,
+        },
       },
-    });
+    );
 
     expect(response.status).toBe(200);
-    const responseBody = StartOAuthConnectionResponseSchema.parse(await response.json());
+    const responseBody = StartGitHubAppInstallationConnectionResponseSchema.parse(
+      await response.json(),
+    );
     const authorizationUrl = new URL(responseBody.authorizationUrl);
     const state = authorizationUrl.searchParams.get("state");
 
@@ -109,10 +118,10 @@ describe("integration connections oauth integration", () => {
     expect(state).toBeTruthy();
 
     if (state === null) {
-      throw new Error("Expected oauth state in authorization URL.");
+      throw new Error("Expected redirect state in authorization URL.");
     }
 
-    const oauthSession = await fixture.db.query.integrationOauthSessions.findFirst({
+    const redirectSession = await fixture.db.query.integrationConnectionRedirectSessions.findFirst({
       where: (table, { and, eq }) =>
         and(
           eq(table.organizationId, authenticatedSession.organizationId),
@@ -121,26 +130,28 @@ describe("integration connections oauth integration", () => {
         ),
     });
 
-    expect(oauthSession).toBeDefined();
-    if (oauthSession === undefined) {
-      throw new Error("Expected persisted oauth session.");
+    expect(redirectSession).toBeDefined();
+    if (redirectSession === undefined) {
+      throw new Error("Expected persisted redirect session.");
     }
 
-    expect(Date.parse(oauthSession.expiresAt)).toBeGreaterThan(Date.parse(oauthSession.createdAt));
-    expect(oauthSession.usedAt).toBeNull();
+    expect(Date.parse(redirectSession.expiresAt)).toBeGreaterThan(
+      Date.parse(redirectSession.createdAt),
+    );
+    expect(redirectSession.usedAt).toBeNull();
   });
 
-  it("creates an oauth-backed connection without requiring auth and marks oauth state as used", async ({
+  it("creates a GitHub App installation connection without requiring auth and marks redirect state as used", async ({
     fixture,
   }) => {
     await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth-complete@example.com",
+      email: "integration-connections-github-app-installation-complete@example.com",
     });
 
     const startResponse = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/start",
+      "/v1/integration/connections/github-cloud/github-app-installation/start",
       {
         method: "POST",
         headers: {
@@ -149,16 +160,18 @@ describe("integration connections oauth integration", () => {
       },
     );
     expect(startResponse.status).toBe(200);
-    const startBody = StartOAuthConnectionResponseSchema.parse(await startResponse.json());
+    const startBody = StartGitHubAppInstallationConnectionResponseSchema.parse(
+      await startResponse.json(),
+    );
     const startUrl = new URL(startBody.authorizationUrl);
     const state = startUrl.searchParams.get("state");
 
     if (state === null || state.length === 0) {
-      throw new Error("Expected oauth state in authorization URL.");
+      throw new Error("Expected redirect state in authorization URL.");
     }
 
     const completeResponse = await fixture.request(
-      createOAuthCompletePath({
+      createGitHubAppInstallationCompletePath({
         targetKey: "github-cloud",
         query: {
           state,
@@ -187,7 +200,7 @@ describe("integration connections oauth integration", () => {
     });
     expect(persistedConnection).toBeDefined();
     if (persistedConnection === undefined) {
-      throw new Error("Expected persisted oauth-backed connection.");
+      throw new Error("Expected persisted GitHub App installation connection.");
     }
 
     expect(persistedConnection.displayName).toBe("12345");
@@ -205,7 +218,7 @@ describe("integration connections oauth integration", () => {
     });
     expect(persistedConnection.secrets).toBeNull();
 
-    const oauthSession = await fixture.db.query.integrationOauthSessions.findFirst({
+    const redirectSession = await fixture.db.query.integrationConnectionRedirectSessions.findFirst({
       where: (table, { and, eq }) =>
         and(
           eq(table.organizationId, authenticatedSession.organizationId),
@@ -213,12 +226,12 @@ describe("integration connections oauth integration", () => {
           eq(table.state, state),
         ),
     });
-    expect(oauthSession).toBeDefined();
-    if (oauthSession === undefined) {
-      throw new Error("Expected persisted oauth session.");
+    expect(redirectSession).toBeDefined();
+    if (redirectSession === undefined) {
+      throw new Error("Expected persisted redirect session.");
     }
 
-    expect(oauthSession.usedAt).not.toBeNull();
+    expect(redirectSession.usedAt).not.toBeNull();
 
     const linkedCredentials = await fixture.db
       .select({
@@ -229,17 +242,17 @@ describe("integration connections oauth integration", () => {
     expect(linkedCredentials).toHaveLength(0);
   });
 
-  it("preserves the requested display name when completing oauth connection creation", async ({
+  it("preserves the requested display name when completing GitHub App installation connection creation", async ({
     fixture,
   }) => {
     await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth-display-name@example.com",
+      email: "integration-connections-github-app-installation-display-name@example.com",
     });
 
     const startResponse = await fixture.request(
-      "/v1/integration/connections/github-cloud/oauth/start",
+      "/v1/integration/connections/github-cloud/github-app-installation/start",
       {
         method: "POST",
         headers: {
@@ -252,16 +265,18 @@ describe("integration connections oauth integration", () => {
       },
     );
     expect(startResponse.status).toBe(200);
-    const startBody = StartOAuthConnectionResponseSchema.parse(await startResponse.json());
+    const startBody = StartGitHubAppInstallationConnectionResponseSchema.parse(
+      await startResponse.json(),
+    );
     const startUrl = new URL(startBody.authorizationUrl);
     const state = startUrl.searchParams.get("state");
 
     if (state === null || state.length === 0) {
-      throw new Error("Expected oauth state in authorization URL.");
+      throw new Error("Expected redirect state in authorization URL.");
     }
 
     const completeResponse = await fixture.request(
-      createOAuthCompletePath({
+      createGitHubAppInstallationCompletePath({
         targetKey: "github-cloud",
         query: {
           state,
@@ -290,18 +305,20 @@ describe("integration connections oauth integration", () => {
     });
     expect(persistedConnection).toBeDefined();
     if (persistedConnection === undefined) {
-      throw new Error("Expected persisted oauth-backed connection.");
+      throw new Error("Expected persisted GitHub App installation connection.");
     }
 
     expect(persistedConnection.displayName).toBe("GitHub Prod");
     expect(persistedConnection.externalSubjectId).toBe("12345");
   });
 
-  it("returns 400 when oauth completion state is missing", async ({ fixture }) => {
+  it("returns 400 when GitHub App installation completion state is missing", async ({
+    fixture,
+  }) => {
     await ensureGithubCloudTarget(fixture);
 
     const response = await fixture.request(
-      createOAuthCompletePath({
+      createGitHubAppInstallationCompletePath({
         targetKey: "github-cloud",
         query: {
           installation_id: "12345",
@@ -316,14 +333,16 @@ describe("integration connections oauth integration", () => {
     const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
       await response.json(),
     );
-    expect(responseBody.code).toBe("INVALID_OAUTH_COMPLETE_INPUT");
+    expect(responseBody.code).toBe("INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT");
   });
 
-  it("returns 400 when oauth completion state is invalid", async ({ fixture }) => {
+  it("returns 400 when GitHub App installation completion state is invalid", async ({
+    fixture,
+  }) => {
     await ensureGithubCloudTarget(fixture);
 
     const response = await fixture.request(
-      createOAuthCompletePath({
+      createGitHubAppInstallationCompletePath({
         targetKey: "github-cloud",
         query: {
           state: "ios_nonexistent",
@@ -339,17 +358,19 @@ describe("integration connections oauth integration", () => {
     const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
       await response.json(),
     );
-    expect(responseBody.code).toBe("OAUTH_STATE_INVALID");
+    expect(responseBody.code).toBe("REDIRECT_STATE_INVALID");
   });
 
-  it("returns 400 when oauth completion state has expired", async ({ fixture }) => {
+  it("returns 400 when GitHub App installation completion state has expired", async ({
+    fixture,
+  }) => {
     await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth-complete-expired-state@example.com",
+      email: "integration-connections-github-app-installation-complete-expired-state@example.com",
     });
 
-    await fixture.db.insert(integrationOauthSessions).values({
+    await fixture.db.insert(integrationConnectionRedirectSessions).values({
       organizationId: authenticatedSession.organizationId,
       targetKey: "github-cloud",
       state: "oauth_state_expired",
@@ -357,7 +378,7 @@ describe("integration connections oauth integration", () => {
     });
 
     const response = await fixture.request(
-      createOAuthCompletePath({
+      createGitHubAppInstallationCompletePath({
         targetKey: "github-cloud",
         query: {
           state: "oauth_state_expired",
@@ -373,7 +394,7 @@ describe("integration connections oauth integration", () => {
     const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
       await response.json(),
     );
-    expect(responseBody.code).toBe("OAUTH_STATE_EXPIRED");
+    expect(responseBody.code).toBe("REDIRECT_STATE_EXPIRED");
 
     const connectionRows = await fixture.db
       .select({
@@ -384,14 +405,16 @@ describe("integration connections oauth integration", () => {
     expect(connectionRows).toHaveLength(0);
   });
 
-  it("returns 400 when oauth completion state was already used", async ({ fixture }) => {
+  it("returns 400 when GitHub App installation completion state was already used", async ({
+    fixture,
+  }) => {
     await ensureGithubCloudTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth-complete-used-state@example.com",
+      email: "integration-connections-github-app-installation-complete-used-state@example.com",
     });
 
-    await fixture.db.insert(integrationOauthSessions).values({
+    await fixture.db.insert(integrationConnectionRedirectSessions).values({
       organizationId: authenticatedSession.organizationId,
       targetKey: "github-cloud",
       state: "oauth_state_used",
@@ -400,7 +423,7 @@ describe("integration connections oauth integration", () => {
     });
 
     const response = await fixture.request(
-      createOAuthCompletePath({
+      createGitHubAppInstallationCompletePath({
         targetKey: "github-cloud",
         query: {
           state: "oauth_state_used",
@@ -416,18 +439,20 @@ describe("integration connections oauth integration", () => {
     const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
       await response.json(),
     );
-    expect(responseBody.code).toBe("OAUTH_STATE_ALREADY_USED");
+    expect(responseBody.code).toBe("REDIRECT_STATE_ALREADY_USED");
   });
 
-  it("returns 400 when the target oauth handler is not configured", async ({ fixture }) => {
+  it("returns 400 when the target does not support GitHub App installation", async ({
+    fixture,
+  }) => {
     await ensureOpenAiDefaultTarget(fixture);
 
     const authenticatedSession = await fixture.authSession({
-      email: "integration-connections-oauth-unsupported-target@example.com",
+      email: "integration-connections-github-app-installation-unsupported-target@example.com",
     });
 
     const response = await fixture.request(
-      "/v1/integration/connections/openai-default/oauth/start",
+      "/v1/integration/connections/openai-default/github-app-installation/start",
       {
         method: "POST",
         headers: {
@@ -440,6 +465,6 @@ describe("integration connections oauth integration", () => {
     const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
       await response.json(),
     );
-    expect(responseBody.code).toBe("OAUTH_HANDLER_NOT_CONFIGURED");
+    expect(responseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");
   });
 });

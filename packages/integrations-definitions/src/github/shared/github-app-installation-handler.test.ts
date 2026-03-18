@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { GitHubAppOAuthHandler } from "./oauth-handler.js";
+import { GitHubAppInstallationRedirectHandler } from "./github-app-installation-handler.js";
 
-describe("GitHubAppOAuthHandler", () => {
+describe("GitHubAppInstallationRedirectHandler", () => {
   it("builds github cloud install url with state", async () => {
-    const started = await GitHubAppOAuthHandler.start({
+    const started = await GitHubAppInstallationRedirectHandler.start({
       organizationId: "org_123",
       targetKey: "github_cloud",
       target: {
@@ -27,7 +27,7 @@ describe("GitHubAppOAuthHandler", () => {
   });
 
   it("builds github enterprise server install url with state", async () => {
-    const started = await GitHubAppOAuthHandler.start({
+    const started = await GitHubAppInstallationRedirectHandler.start({
       organizationId: "org_123",
       targetKey: "github_enterprise_server",
       target: {
@@ -51,7 +51,7 @@ describe("GitHubAppOAuthHandler", () => {
 
   it("fails fast when app slug is missing", async () => {
     await expect(async () =>
-      GitHubAppOAuthHandler.start({
+      GitHubAppInstallationRedirectHandler.start({
         organizationId: "org_123",
         targetKey: "github_cloud",
         target: {
@@ -66,11 +66,11 @@ describe("GitHubAppOAuthHandler", () => {
         },
         state: "state_123",
       }),
-    ).rejects.toThrowError("GitHub App OAuth flow requires `app_slug` in target config.");
+    ).rejects.toThrowError("GitHub App installation flow requires `app_slug` in target config.");
   });
 
-  it("maps callback installation id into oauth connection config", async () => {
-    const completed = await GitHubAppOAuthHandler.complete({
+  it("maps callback installation id into GitHub App installation connection config", async () => {
+    const completed = await GitHubAppInstallationRedirectHandler.complete({
       organizationId: "org_123",
       targetKey: "github_cloud",
       target: {
@@ -103,7 +103,7 @@ describe("GitHubAppOAuthHandler", () => {
 
   it("fails fast when callback omits installation_id", async () => {
     await expect(async () =>
-      GitHubAppOAuthHandler.complete({
+      GitHubAppInstallationRedirectHandler.complete({
         organizationId: "org_123",
         targetKey: "github_cloud",
         target: {
@@ -119,6 +119,6 @@ describe("GitHubAppOAuthHandler", () => {
         },
         query: new URLSearchParams(),
       }),
-    ).rejects.toThrowError("GitHub App OAuth callback is missing `installation_id`.");
+    ).rejects.toThrowError("GitHub App installation callback is missing `installation_id`.");
   });
 });

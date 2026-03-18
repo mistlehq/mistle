@@ -3,10 +3,10 @@ import { z } from "zod";
 
 export const GitHubCredentialSecretTypes: {
   API_KEY: "api_key";
-  OAUTH_ACCESS_TOKEN: "oauth_access_token";
+  GITHUB_APP_INSTALLATION_TOKEN: "github_app_installation_token";
 } = {
   API_KEY: "api_key",
-  OAUTH_ACCESS_TOKEN: "oauth_access_token",
+  GITHUB_APP_INSTALLATION_TOKEN: "github_app_installation_token",
 };
 
 export const GitHubApiKeyConnectionConfigSchema = z
@@ -39,5 +39,5 @@ export function resolveGitHubCredentialSecretType(input: unknown): GitHubCredent
     return GitHubCredentialSecretTypes.API_KEY;
   }
 
-  return GitHubCredentialSecretTypes.OAUTH_ACCESS_TOKEN;
+  return GitHubCredentialSecretTypes.GITHUB_APP_INSTALLATION_TOKEN;
 }

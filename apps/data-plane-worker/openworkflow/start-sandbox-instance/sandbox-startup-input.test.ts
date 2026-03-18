@@ -208,9 +208,8 @@ function createRuntimePlan(): StartSandboxInstanceWorkflowInput["runtimePlan"] {
         },
         credentialResolver: {
           connectionId: "icn_123",
-          secretType: "oauth_access_token",
-          purpose: "github_app_installation_token",
-          resolverKey: "github_installation_token",
+          secretType: "github_app_installation_token",
+          resolverKey: "github_app_installation_token",
         },
       },
     ],

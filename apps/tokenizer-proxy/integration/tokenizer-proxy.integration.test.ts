@@ -266,7 +266,7 @@ describe("tokenizer proxy integration", () => {
             [EgressRequestHeaders.AUTH_INJECTION_TARGET]: "authorization",
             [EgressRequestHeaders.AUTH_INJECTION_USERNAME]: "x-access-token",
             [EgressRequestHeaders.CONNECTION_ID]: "icn_github",
-            [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "oauth_access_token",
+            [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "github_app_installation_token",
             [EgressRequestHeaders.CREDENTIAL_RESOLVER_KEY]: "github_app_installation_token",
           },
         },
@@ -292,7 +292,7 @@ describe("tokenizer proxy integration", () => {
           bindingId: "ibd_github",
           connectionId: "icn_github",
           resolverKey: "github_app_installation_token",
-          secretType: "oauth_access_token",
+          secretType: "github_app_installation_token",
         },
       ]);
     } finally {
@@ -337,7 +337,7 @@ describe("tokenizer proxy integration", () => {
             [EgressRequestHeaders.AUTH_INJECTION_TARGET]: "authorization",
             [EgressRequestHeaders.AUTH_INJECTION_USERNAME]: "x-access-token",
             [EgressRequestHeaders.CONNECTION_ID]: "icn_github",
-            [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "oauth_access_token",
+            [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "github_app_installation_token",
             [EgressRequestHeaders.CREDENTIAL_RESOLVER_KEY]: "github_app_installation_token",
           },
         },
@@ -363,7 +363,7 @@ describe("tokenizer proxy integration", () => {
           bindingId: "ibd_github",
           connectionId: "icn_github",
           resolverKey: "github_app_installation_token",
-          secretType: "oauth_access_token",
+          secretType: "github_app_installation_token",
         },
       ]);
     } finally {
@@ -411,7 +411,7 @@ describe("tokenizer proxy integration", () => {
             [EgressRequestHeaders.AUTH_INJECTION_TYPE]: "bearer",
             [EgressRequestHeaders.AUTH_INJECTION_TARGET]: "authorization",
             [EgressRequestHeaders.CONNECTION_ID]: "icn_github",
-            [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "oauth_access_token",
+            [EgressRequestHeaders.CREDENTIAL_SECRET_TYPE]: "github_app_installation_token",
             [EgressRequestHeaders.CREDENTIAL_RESOLVER_KEY]: "github_app_installation_token",
           },
           body: JSON.stringify({ query: "{ viewer { login } }" }),

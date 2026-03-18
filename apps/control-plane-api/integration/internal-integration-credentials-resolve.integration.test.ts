@@ -308,7 +308,7 @@ describe("internal integration credentials resolve", () => {
         body: JSON.stringify({
           connectionId: "icn_github_other_connection",
           bindingId: githubFixture.bindingId,
-          secretType: "oauth_access_token",
+          secretType: "github_app_installation_token",
           resolverKey: "github_app_installation_token",
         }),
       },

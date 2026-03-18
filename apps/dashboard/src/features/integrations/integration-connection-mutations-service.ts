@@ -1,9 +1,9 @@
 import { requestControlPlane } from "../api/request-control-plane.js";
 import {
   type CreatedIntegrationConnection,
-  type StartedOAuthConnection,
+  type StartedRedirectConnection,
   IntegrationConnectionSchema,
-  StartedOAuthConnectionSchema,
+  StartedRedirectConnectionSchema,
   readJsonWithSchema,
   wrapIntegrationsApiError,
 } from "./integrations-service-shared.js";
@@ -103,11 +103,11 @@ export async function startRedirectIntegrationConnection(input: {
   targetKey: string;
   methodId: "oauth2" | "github-app-installation";
   displayName?: string;
-}): Promise<StartedOAuthConnection> {
+}): Promise<StartedRedirectConnection> {
   const pathname =
     input.methodId === "oauth2"
-      ? `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth/start`
-      : `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth/start`;
+      ? `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth2/start`
+      : `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/github-app-installation/start`;
 
   try {
     const response = await requestControlPlane({
@@ -120,7 +120,7 @@ export async function startRedirectIntegrationConnection(input: {
 
     return readJsonWithSchema({
       response,
-      schema: StartedOAuthConnectionSchema,
+      schema: StartedRedirectConnectionSchema,
       operation: "startRedirectIntegrationConnection",
     });
   } catch (error) {

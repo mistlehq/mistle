@@ -9,8 +9,8 @@ import {
 import { GitHubConnectionConfigSchema, GitHubCredentialSecretTypes } from "./auth.js";
 import { GitHubCredentialResolverKeys } from "./credential-resolver.js";
 
-const GitHubRepositoryOAuthResourceCredential: IntegrationResourceCredentialRef = {
-  secretType: GitHubCredentialSecretTypes.OAUTH_ACCESS_TOKEN,
+const GitHubRepositoryAppInstallationResourceCredential: IntegrationResourceCredentialRef = {
+  secretType: GitHubCredentialSecretTypes.GITHUB_APP_INSTALLATION_TOKEN,
   purpose: "list-resources",
   resolverKey: GitHubCredentialResolverKeys.GITHUB_APP_INSTALLATION_TOKEN,
 };
@@ -35,7 +35,7 @@ export const GitHubResourceDefinitions: ReadonlyArray<IntegrationResourceDefinit
         parsedConnectionConfig.connection_method ===
         IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
       ) {
-        return GitHubRepositoryOAuthResourceCredential;
+        return GitHubRepositoryAppInstallationResourceCredential;
       }
 
       return GitHubRepositoryApiKeyResourceCredential;

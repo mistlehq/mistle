@@ -141,7 +141,7 @@ export const IntegrationConnectionsPageSchema = z
   })
   .strict();
 
-export const StartedOAuthConnectionSchema = z
+export const StartedRedirectConnectionSchema = z
   .object({
     authorizationUrl: z.url(),
   })
@@ -157,7 +157,7 @@ export type IntegrationConnectionResourceSummary = NonNullable<
 >[number];
 export type IntegrationConnectionResource = z.infer<typeof IntegrationConnectionResourceSchema>;
 export type CreatedIntegrationConnection = z.infer<typeof IntegrationConnectionSchema>;
-export type StartedOAuthConnection = z.infer<typeof StartedOAuthConnectionSchema>;
+export type StartedRedirectConnection = z.infer<typeof StartedRedirectConnectionSchema>;
 export type IntegrationConnectionResources = Omit<
   z.infer<typeof IntegrationConnectionResourcesPageSchema>,
   "items" | "page"
