@@ -74,6 +74,9 @@ type JsonScanState = {
   escaped: boolean;
 };
 
+// This is intentionally a lightweight stream boundary detector, not a JSON validator.
+// We need to stop once the first complete top-level object arrives on stdin without
+// waiting for EOF or repeatedly using JSON.parse() exceptions as incremental control flow.
 function updateJsonScanState(state: JsonScanState, value: string): number | undefined {
   for (let index = 0; index < value.length; index += 1) {
     const character = value[index];
