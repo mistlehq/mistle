@@ -11,10 +11,17 @@ import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "./mark-sandbox-instance-running.js";
 import { persistSandboxInstanceProvisioning } from "./persist-sandbox-instance-provisioning.js";
+import { persistSandboxInstanceVolumeProvisioning } from "./persist-sandbox-instance-volume-provisioning.js";
+import {
+  provisionInstanceVolume,
+  type ProvisionedInstanceVolume,
+} from "./provision-instance-volume.js";
 import { startSandbox } from "./start-sandbox.js";
 import { waitForSandboxTunnelReadiness } from "./wait-for-sandbox-tunnel-readiness.js";
 
 const StartSandboxFailureCodes = {
+  INSTANCE_VOLUME_PROVISION_FAILED: "instance_volume_provision_failed",
+  PERSIST_INSTANCE_VOLUME_METADATA_FAILED: "persist_instance_volume_metadata_failed",
   SANDBOX_START_FAILED: "sandbox_start_failed",
   PERSIST_PROVISIONING_METADATA_FAILED: "persist_provisioning_metadata_failed",
   TUNNEL_CONNECT_ACK_TIMEOUT: "tunnel_connect_ack_timeout",
@@ -107,6 +114,62 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
       }
     }
 
+    async function handleFailedBeforeRuntimeStart(input: {
+      sandboxInstanceId: string;
+      instanceVolumeId?: string;
+      failureCode: string;
+      failureMessage: string;
+    }): Promise<void> {
+      let deleteVolumeError: unknown;
+      const instanceVolumeId = input.instanceVolumeId;
+      if (instanceVolumeId !== undefined) {
+        try {
+          await step.run({ name: "delete-instance-volume-after-startup-failure" }, async () => {
+            await ctx.sandboxAdapter.deleteVolume({
+              volumeId: instanceVolumeId,
+            });
+          });
+        } catch (error) {
+          deleteVolumeError = error;
+        }
+      }
+
+      let updateFailedStatusError: unknown;
+      try {
+        await markSandboxInstanceFailedStep({
+          sandboxInstanceId: input.sandboxInstanceId,
+          failureCode: input.failureCode,
+          failureMessage: input.failureMessage,
+        });
+      } catch (error) {
+        updateFailedStatusError = error;
+      }
+
+      if (deleteVolumeError !== undefined && updateFailedStatusError !== undefined) {
+        throw new Error(
+          "Failed to delete instance volume and failed to mark sandbox instance as failed before runtime start.",
+          {
+            cause: {
+              deleteVolumeError,
+              updateFailedStatusError,
+            },
+          },
+        );
+      }
+
+      if (deleteVolumeError !== undefined) {
+        throw new Error("Failed to delete instance volume before runtime start failure.", {
+          cause: deleteVolumeError,
+        });
+      }
+
+      if (updateFailedStatusError !== undefined) {
+        throw new Error("Failed to mark sandbox instance as failed before runtime start failure.", {
+          cause: updateFailedStatusError,
+        });
+      }
+    }
+
     const ensuredSandboxInstance = await step.run({ name: "ensure-sandbox-instance" }, async () => {
       const persisted = await ensureSandboxInstance(
         {
@@ -135,6 +198,69 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
       runtimeProvider: SandboxProvider;
       providerRuntimeId: string;
     };
+    let provisionedInstanceVolume: ProvisionedInstanceVolume;
+    try {
+      provisionedInstanceVolume = await step.run(
+        { name: "provision-instance-volume" },
+        async () => {
+          return provisionInstanceVolume({
+            runtimeProvider: ctx.config.sandbox.provider,
+            sandboxAdapter: ctx.sandboxAdapter,
+          });
+        },
+      );
+    } catch (error) {
+      await markSandboxInstanceFailedStep({
+        sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+        failureCode: StartSandboxFailureCodes.INSTANCE_VOLUME_PROVISION_FAILED,
+        failureMessage: "Failed to provision instance volume before runtime startup.",
+      });
+      throw error;
+    }
+
+    try {
+      await step.run({ name: "persist-instance-volume-metadata" }, async () => {
+        await persistSandboxInstanceVolumeProvisioning(
+          {
+            db: ctx.db,
+          },
+          {
+            sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+            instanceVolumeProvider: provisionedInstanceVolume.instanceVolumeProvider,
+            instanceVolumeId: provisionedInstanceVolume.instanceVolumeId,
+            instanceVolumeMode: provisionedInstanceVolume.instanceVolumeMode,
+          },
+        );
+      });
+    } catch (error) {
+      try {
+        await handleFailedBeforeRuntimeStart({
+          sandboxInstanceId: ensuredSandboxInstance.sandboxInstanceId,
+          instanceVolumeId: provisionedInstanceVolume.instanceVolumeId,
+          failureCode: StartSandboxFailureCodes.PERSIST_INSTANCE_VOLUME_METADATA_FAILED,
+          failureMessage:
+            "Failed to persist sandbox instance volume metadata before runtime startup.",
+        });
+      } catch (cleanupError) {
+        throw new Error(
+          "Failed to persist instance volume metadata and failed cleanup before runtime start.",
+          {
+            cause: {
+              persistInstanceVolumeError: error,
+              cleanupError,
+            },
+          },
+        );
+      }
+
+      throw new Error(
+        "Failed to persist instance volume metadata. Sandbox instance was marked as failed.",
+        {
+          cause: error,
+        },
+      );
+    }
+
     try {
       startedSandbox = await step.run({ name: "start-sandbox" }, async () => {
         return startSandbox(
@@ -145,6 +271,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
           {
             sandboxInstanceId: workflowInput.sandboxInstanceId,
             image: workflowInput.image,
+            instanceVolume: provisionedInstanceVolume.handle,
             runtimePlan: workflowInput.runtimePlan,
           },
         );

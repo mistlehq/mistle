@@ -2,6 +2,8 @@ export { DATA_PLANE_SCHEMA_NAME } from "./namespace.js";
 export {
   sandboxInstances,
   SandboxInstanceProviders,
+  SandboxInstanceVolumeModes,
+  SandboxInstanceVolumeProviders,
   SandboxInstanceSources,
   SandboxInstanceStarterKinds,
   SandboxInstanceStatuses,
@@ -10,6 +12,8 @@ export type {
   InsertSandboxInstance,
   SandboxInstance,
   SandboxInstanceProvider,
+  SandboxInstanceVolumeMode,
+  SandboxInstanceVolumeProvider,
   SandboxInstanceSource,
   SandboxInstanceStarterKind,
   SandboxInstanceStatus,

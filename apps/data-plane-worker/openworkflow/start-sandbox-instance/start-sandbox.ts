@@ -1,4 +1,4 @@
-import type { SandboxAdapter, SandboxProvider } from "@mistle/sandbox";
+import type { SandboxAdapter, SandboxProvider, SandboxVolumeHandleV1 } from "@mistle/sandbox";
 import type {
   StartSandboxInstanceWorkflowImageInput,
   StartSandboxInstanceWorkflowInput,
@@ -11,6 +11,7 @@ const SandboxRuntimeTokenizerProxyEgressBaseURLEnv =
   "SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL";
 const SandboxRuntimeTelemetryTracesEndpointEnv = "SANDBOX_RUNTIME_TELEMETRY_TRACES_ENDPOINT";
 const SandboxRuntimeSandboxInstanceIDEnv = "SANDBOX_RUNTIME_SANDBOX_INSTANCE_ID";
+const SandboxRuntimeInstanceVolumeMountPath = "/home/sandbox";
 
 export async function startSandbox(
   ctx: {
@@ -20,6 +21,7 @@ export async function startSandbox(
   input: {
     sandboxInstanceId: string;
     image: StartSandboxInstanceWorkflowImageInput;
+    instanceVolume: SandboxVolumeHandleV1;
     runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   },
 ): Promise<{
@@ -37,6 +39,12 @@ export async function startSandbox(
       ...input.image,
       provider: ctx.config.sandbox.provider,
     },
+    mounts: [
+      {
+        volume: input.instanceVolume,
+        mountPath: SandboxRuntimeInstanceVolumeMountPath,
+      },
+    ],
     env: {
       [SandboxRuntimeTokenizerProxyEgressBaseURLEnv]:
         ctx.config.app.sandbox.tokenizerProxyEgressBaseUrl,
