@@ -60,7 +60,7 @@ export function SessionWorkbenchPageView({
       {isSecondaryPanelVisible ? (
         <ResizablePanelGroup
           className="min-h-0 flex-1"
-          key={`${sandboxInstanceId}:${secondaryPanelSize}`}
+          key={sandboxInstanceId}
           orientation="vertical"
         >
           <ResizablePanel defaultSize={100 - secondaryPanelSize} minSize={25}>

@@ -57,6 +57,12 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
     setOutputChunks([]);
   }, []);
 
+  const clearLifecycleMetadata = useCallback((): void => {
+    setErrorMessage(null);
+    setExitInfo(null);
+    setResetInfo(null);
+  }, []);
+
   const isCurrentGeneration = useCallback((generation: number): boolean => {
     return openGenerationRef.current === generation;
   }, []);
@@ -122,6 +128,8 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
     const client = clientRef.current;
     if (client === null) {
       setPtyState(SandboxPtyStates.CLOSED);
+      clearLifecycleMetadata();
+      setOutputChunks([]);
       clearConnectedSandboxInstanceId();
       return;
     }
@@ -132,9 +140,11 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
       detachClientListeners();
       clientRef.current = null;
       clearConnectedSandboxInstanceId();
+      clearLifecycleMetadata();
+      setOutputChunks([]);
       setPtyState(SandboxPtyStates.CLOSED);
     }
-  }, [clearConnectedSandboxInstanceId, detachClientListeners]);
+  }, [clearConnectedSandboxInstanceId, clearLifecycleMetadata, detachClientListeners]);
 
   const disconnectPty = useCallback(async (): Promise<void> => {
     openGenerationRef.current += 1;
@@ -295,8 +305,10 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
       detachClientListeners();
       clientRef.current = null;
       clearConnectedSandboxInstanceId();
+      clearLifecycleMetadata();
+      setOutputChunks([]);
     };
-  }, [clearConnectedSandboxInstanceId, detachClientListeners]);
+  }, [clearConnectedSandboxInstanceId, clearLifecycleMetadata, detachClientListeners]);
 
   return {
     actions: {

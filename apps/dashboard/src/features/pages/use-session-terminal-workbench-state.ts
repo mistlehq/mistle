@@ -8,6 +8,10 @@ type PersistedTerminalWorkbenchState = {
   panelSize: number;
 };
 
+type TerminalWorkbenchStateRecord = PersistedTerminalWorkbenchState & {
+  sandboxInstanceId: string | null;
+};
+
 type SessionTerminalWorkbenchState = {
   closePanel: () => void;
   isVisible: boolean;
@@ -109,16 +113,20 @@ function readPersistedTerminalWorkbenchState(
 export function useSessionTerminalWorkbenchState(input: {
   sandboxInstanceId: string | null;
 }): SessionTerminalWorkbenchState {
-  const [state, setState] = useState<PersistedTerminalWorkbenchState>(() =>
-    readPersistedTerminalWorkbenchState(input.sandboxInstanceId),
-  );
+  const [state, setState] = useState<TerminalWorkbenchStateRecord>(() => ({
+    ...readPersistedTerminalWorkbenchState(input.sandboxInstanceId),
+    sandboxInstanceId: input.sandboxInstanceId,
+  }));
 
   useEffect(() => {
-    setState(readPersistedTerminalWorkbenchState(input.sandboxInstanceId));
+    setState({
+      ...readPersistedTerminalWorkbenchState(input.sandboxInstanceId),
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
   }, [input.sandboxInstanceId]);
 
   useEffect(() => {
-    if (input.sandboxInstanceId === null) {
+    if (input.sandboxInstanceId === null || state.sandboxInstanceId !== input.sandboxInstanceId) {
       return;
     }
 
