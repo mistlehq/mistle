@@ -1,5 +1,17 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "AR",
+    "CC",
+    "CXX",
+    "DEVELOPER_DIR",
+    "HOST_PATH",
+    "LD",
+    "MACOSX_DEPLOYMENT_TARGET",
+    "NM",
+    "RANLIB",
+    "SDKROOT"
+  ],
   "globalPassThroughEnv": [
     "MISTLE_CONFIG_PATH",
     "MISTLE_GLOBAL_TELEMETRY_ENABLED",
