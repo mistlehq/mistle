@@ -18,7 +18,6 @@
     "@types/pg": "^8.18.0",
     "openapi-fetch": "^0.17.0",
     "pg": "^8.20.0",
-    "vite-tsconfig-paths": "^6.1.0",
     "zod": "^4.1.12"
   }
 }
