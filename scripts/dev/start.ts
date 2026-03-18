@@ -32,6 +32,7 @@ const SEA_BUILD_INPUT_PATHS: readonly string[] = [
   "packages/time",
   "scripts/build/build-sandbox-runtime-sea-linux.mjs",
   "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
 ];
 
 let localInfraStartAttempted = false;
@@ -295,7 +296,15 @@ function computeSeaBuildCacheKey(): string {
   const hash = createHash("sha256");
 
   for (const file of files) {
-    const content = readFileSync(resolve(REPO_ROOT, file));
+    const filePath = resolve(REPO_ROOT, file);
+
+    if (!existsSync(filePath)) {
+      hash.update(file);
+      hash.update("\0deleted\0");
+      continue;
+    }
+
+    const content = readFileSync(filePath);
     hash.update(file);
     hash.update("\0");
     hash.update(content);
@@ -382,23 +391,21 @@ function start(): void {
 
   console.log("Checking sandbox runtime base image cache...");
   const { hit: seaCacheHit, cacheKey: seaCacheKey } = checkSeaBuildCache();
-  const sandboxImageExists = seaCacheHit && dockerImageExists(SANDBOX_BASE_IMAGE_TAG);
 
-  if (seaCacheHit && sandboxImageExists) {
-    console.log("Sandbox runtime base image is up to date, skipping rebuild.");
-  } else {
-    if (!seaCacheHit) {
-      console.log("Building sandbox runtime SEA (inputs changed)...");
-      runOrThrow({
-        command: "pnpm",
-        args: ["build:sandbox-runtime:sea:linux"],
-        env: sharedDevEnv,
-      });
-    } else {
+  if (!seaCacheHit) {
+    console.log("Building sandbox runtime SEA (inputs changed)...");
+    runOrThrow({
+      command: "pnpm",
+      args: ["build:sandbox-runtime:sea:linux"],
+      env: sharedDevEnv,
+    });
+  }
+
+  if (!seaCacheHit || !dockerImageExists(SANDBOX_BASE_IMAGE_TAG)) {
+    if (seaCacheHit) {
       console.log("SEA build cache valid but Docker image missing, rebuilding image...");
     }
-
-    console.log("Building and pushing sandbox runtime base image...");
+    console.log("Building sandbox runtime base image...");
     runOrThrow({
       command: "docker",
       args: [
@@ -413,20 +420,24 @@ function start(): void {
       ],
       env: sharedDevEnv,
     });
-    runOrThrow({
-      command: "docker",
-      args: ["tag", SANDBOX_BASE_IMAGE_TAG, SANDBOX_BASE_IMAGE_REGISTRY_TAG],
-      env: sharedDevEnv,
-    });
-    runOrThrow({
-      command: "docker",
-      args: ["push", SANDBOX_BASE_IMAGE_REGISTRY_TAG],
-      env: sharedDevEnv,
-    });
+  } else {
+    console.log("Sandbox runtime base image is up to date.");
+  }
 
-    if (!seaCacheHit) {
-      writeSeaBuildCacheKey(seaCacheKey);
-    }
+  console.log("Pushing sandbox runtime base image to local registry...");
+  runOrThrow({
+    command: "docker",
+    args: ["tag", SANDBOX_BASE_IMAGE_TAG, SANDBOX_BASE_IMAGE_REGISTRY_TAG],
+    env: sharedDevEnv,
+  });
+  runOrThrow({
+    command: "docker",
+    args: ["push", SANDBOX_BASE_IMAGE_REGISTRY_TAG],
+    env: sharedDevEnv,
+  });
+
+  if (!seaCacheHit) {
+    writeSeaBuildCacheKey(seaCacheKey);
   }
 
   console.log("Building migration dependencies...");
