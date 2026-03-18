@@ -1,6 +1,6 @@
 import {
   IntegrationConnectionMethodIds,
-  type IntegrationOAuthHandler,
+  type IntegrationRedirectHandler,
 } from "@mistle/integrations-core";
 
 import type { GitHubTargetConfig } from "./target-config-schema.js";
@@ -34,7 +34,7 @@ function resolveInstallationId(query: URLSearchParams): string {
   return installationId;
 }
 
-export const GitHubAppInstallationRedirectHandler: IntegrationOAuthHandler<
+export const GitHubAppInstallationRedirectHandler: IntegrationRedirectHandler<
   GitHubTargetConfig,
   GitHubTargetSecrets
 > = {

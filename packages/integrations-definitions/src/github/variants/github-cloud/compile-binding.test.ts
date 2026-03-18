@@ -315,7 +315,7 @@ describe("compileGitHubCloudBinding", () => {
     expect(compiled.egressRoutes[1]?.match.pathPrefixes).toEqual(["/"]);
   });
 
-  it("uses oauth access token secret type for github app-style oauth connections", () => {
+  it("uses github app installation token secret type for github app installation connections", () => {
     const compiled = compileGitHubCloudBinding({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",

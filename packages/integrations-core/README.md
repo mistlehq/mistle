@@ -85,27 +85,26 @@ Kinds are used on bindings and definitions to enforce compatibility (`binding.ki
 
 Key fields and what they drive:
 
-| Field                                   | Purpose                                                           | Where it is used                          |
-| --------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------- |
-| `familyId`, `variantId`                 | Global identity of a provider variant                             | Registry lookup, target records           |
-| `kind`                                  | Integration kind (`agent` / `git` / `connector`)                  | Binding validation during compile         |
-| `displayName`, `description`, `logoKey` | UI metadata                                                       | Target discovery responses                |
-| `targetConfigSchema`                    | Parse/validate target config                                      | target list/use, OAuth, compile, webhooks |
-| `targetConfigForm` (optional)           | Rendering metadata for target config                              | Operator-facing target config forms       |
-| `targetSecretSchema`                    | Parse/validate decrypted target secrets                           | OAuth, compile, webhooks                  |
-| `targetSecretForm` (optional)           | Rendering metadata for target secrets                             | Operator-facing target secret forms       |
-| `bindingConfigSchema`                   | Parse/validate per-binding config                                 | Runtime plan compile                      |
-| `bindingConfigForm` (optional)          | Rendering metadata for per-binding config                         | Dashboard binding editor                  |
-| `connectionConfigSchema`                | Parse/validate per-connection config                              | Binding write validation, compile         |
-| `connectionConfigForm` (optional)       | Rendering metadata for per-connection config                      | Connection-related forms                  |
-| `supportedAuthSchemes`                  | Declares allowed auth methods                                     | Connection creation and OAuth gating      |
-| `credentialResolvers` (optional)        | Dynamic credential generation/lookup                              | Internal credential resolution endpoint   |
-| `authHandlers.oauth` (optional)         | OAuth start/complete behavior                                     | OAuth connection flows                    |
-| `webhookHandler` (optional)             | Resolve inbound webhook requests to events or immediate responses | Webhook ingest                            |
-| `mcp` (optional)                        | Declare one or more MCP servers for this binding                  | MCP collection during compile             |
-| `mcpConfig` (optional)                  | Declarative MCP config target for an agent                        | Post-compile MCP file update              |
-| `validateBindingWriteContext(...)`      | Contextual target/connection/binding validation                   | Binding write and compile parity checks   |
-| `compileBinding(...)`                   | Generate egress/artifacts/runtime clients                         | Runtime plan compiler                     |
+| Field                                   | Purpose                                                           | Where it is used                                     |
+| --------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------- |
+| `familyId`, `variantId`                 | Global identity of a provider variant                             | Registry lookup, target records                      |
+| `kind`                                  | Integration kind (`agent` / `git` / `connector`)                  | Binding validation during compile                    |
+| `displayName`, `description`, `logoKey` | UI metadata                                                       | Target discovery responses                           |
+| `targetConfigSchema`                    | Parse/validate target config                                      | target list/use, redirect, oauth2, compile, webhooks |
+| `targetConfigForm` (optional)           | Rendering metadata for target config                              | Operator-facing target config forms                  |
+| `targetSecretSchema`                    | Parse/validate decrypted target secrets                           | redirect, oauth2, compile, webhooks                  |
+| `targetSecretForm` (optional)           | Rendering metadata for target secrets                             | Operator-facing target secret forms                  |
+| `bindingConfigSchema`                   | Parse/validate per-binding config                                 | Runtime plan compile                                 |
+| `bindingConfigForm` (optional)          | Rendering metadata for per-binding config                         | Dashboard binding editor                             |
+| `connectionMethods`                     | Declares supported connection methods                             | Connection creation and method gating                |
+| `credentialResolvers` (optional)        | Dynamic credential generation/lookup                              | Internal credential resolution endpoint              |
+| `oauth2` (optional)                     | OAuth2 authorization-code and refresh behavior                    | OAuth2 connection flows                              |
+| `redirectHandler` (optional)            | Non-OAuth redirect start/complete behavior                        | Redirect-based connection flows                      |
+| `webhookHandler` (optional)             | Resolve inbound webhook requests to events or immediate responses | Webhook ingest                                       |
+| `mcp` (optional)                        | Declare one or more MCP servers for this binding                  | MCP collection during compile                        |
+| `mcpConfig` (optional)                  | Declarative MCP config target for an agent                        | Post-compile MCP file update                         |
+| `validateBindingWriteContext(...)`      | Contextual target/connection/binding validation                   | Binding write and compile parity checks              |
+| `compileBinding(...)`                   | Generate egress/artifacts/runtime clients                         | Runtime plan compiler                                |
 
 ## Lifecycle End-To-End
 
@@ -132,15 +131,16 @@ flowchart TD
 
 - Targets are operator-managed records persisted in control-plane DB.
 - Discovery resolves metadata from definitions (`displayName`, `description`) with optional DB overrides.
-- Control-plane target discovery also returns definition-owned capability metadata (`logoKey`, `supportedAuthSchemes`) and config health metadata (`targetHealth`).
+- Control-plane target discovery also returns definition-owned capability metadata (`logoKey`, `connectionMethods`) and config health metadata (`targetHealth`).
 - UI consumers may use raw target and connection config together with definition-owned schema/form metadata to resolve form rendering client-side.
 - `@mistle/integrations-core` owns the renderer-agnostic schema/form contract and generic form resolution helpers.
 - For browser clients, definitions expose browser-safe integration registries through `@mistle/integrations-definitions/forms` so dashboard code does not duplicate provider-specific wiring.
 
 ### 2) Connection creation
 
-- API key flow: validates target + auth support; stores encrypted credentials and connection config.
-- OAuth flow: uses `authHandlers.oauth.start` and `authHandlers.oauth.complete`; stores connection config and any returned credential materials.
+- API key flow: validates target + method support; stores encrypted credentials and connection config.
+- OAuth2 flow: uses `oauth2.startAuthorization` and `oauth2.completeAuthorizationCodeGrant`; stores connection config and any returned credential materials.
+- Redirect flow: uses `redirectHandler.start` and `redirectHandler.complete`; stores connection config and any returned credential materials.
 
 ### 3) Binding to sandbox profile version
 
@@ -188,6 +188,7 @@ Current registry includes:
 - `github::github-cloud` (`kind: git`)
 - `github::github-enterprise-server` (`kind: git`)
 - `linear::linear-default` (`kind: connector`)
+- `notion::notion-default` (`kind: connector`)
 
 ## Creating A New Integration
 
@@ -213,10 +214,11 @@ This is the recommended workflow.
 - If binding semantics depend on cross-object context (target + connection + binding), implement `validateBindingWriteContext(...)` in the definition.
 - Keep schema fields as the source of truth for shape and validation. Form fields should only describe rendering behavior (widgets, ordering, labels, context-aware choice narrowing).
 
-4. Define auth behavior.
+4. Define connection and auth behavior.
 
-- Set `supportedAuthSchemes`.
-- If OAuth is needed, implement `authHandlers.oauth.start/complete`.
+- Set `connectionMethods`.
+- If OAuth2 is needed, implement `oauth2`.
+- If a non-OAuth redirect flow is needed, implement `redirectHandler`.
 - If credential material is dynamic, implement `credentialResolvers`.
 
 5. Define target secrets.
