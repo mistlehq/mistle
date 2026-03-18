@@ -18,3 +18,7 @@ export function getControlPlaneApiClient(): Client<paths> {
 
   return controlPlaneApiClient;
 }
+
+export function resetControlPlaneApiClientForTest(): void {
+  controlPlaneApiClient = null;
+}

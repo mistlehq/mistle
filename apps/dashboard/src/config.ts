@@ -51,3 +51,7 @@ export function getDashboardConfig(): DashboardConfig {
 
   return cachedDashboardConfig;
 }
+
+export function resetDashboardConfigForTest(): void {
+  cachedDashboardConfig = undefined;
+}
