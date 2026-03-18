@@ -46,8 +46,8 @@ export const sandboxInstances = dataPlaneSchema.table(
     organizationId: text("organization_id").notNull(),
     sandboxProfileId: text("sandbox_profile_id").notNull(),
     sandboxProfileVersion: bigint("sandbox_profile_version", { mode: "number" }).notNull(),
-    provider: text("provider").notNull().$type<SandboxInstanceProvider>(),
-    providerSandboxId: text("provider_sandbox_id"),
+    runtimeProvider: text("runtime_provider").notNull().$type<SandboxInstanceProvider>(),
+    providerRuntimeId: text("provider_runtime_id"),
     status: text("status")
       .notNull()
       .$type<SandboxInstanceStatus>()
@@ -86,9 +86,9 @@ export const sandboxInstances = dataPlaneSchema.table(
       table.status,
       table.updatedAt,
     ),
-    uniqueIndex("sandbox_instances_provider_sandbox_uidx").on(
-      table.provider,
-      table.providerSandboxId,
+    uniqueIndex("sandbox_instances_provider_runtime_uidx").on(
+      table.runtimeProvider,
+      table.providerRuntimeId,
     ),
   ],
 );

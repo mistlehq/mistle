@@ -232,7 +232,7 @@ describe("sandboxInstances.start integration", () => {
         organizationId: true,
         sandboxProfileId: true,
         sandboxProfileVersion: true,
-        providerSandboxId: true,
+        providerRuntimeId: true,
         status: true,
       },
       where: (table, { eq }) => eq(table.id, startedSandbox.sandboxInstanceId),
@@ -243,7 +243,7 @@ describe("sandboxInstances.start integration", () => {
       organizationId: workflowInput.organizationId,
       sandboxProfileId: workflowInput.sandboxProfileId,
       sandboxProfileVersion: workflowInput.sandboxProfileVersion,
-      providerSandboxId: null,
+      providerRuntimeId: null,
       status: SandboxInstanceStatuses.STARTING,
     });
 

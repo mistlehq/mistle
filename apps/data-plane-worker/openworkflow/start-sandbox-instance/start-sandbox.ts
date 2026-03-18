@@ -24,8 +24,8 @@ export async function startSandbox(
   },
 ): Promise<{
   sandboxInstanceId: string;
-  provider: SandboxProvider;
-  providerSandboxId: string;
+  runtimeProvider: SandboxProvider;
+  providerRuntimeId: string;
 }> {
   const sandboxRuntimeTracesEndpoint =
     ctx.config.telemetry.enabled && ctx.config.sandbox.provider === "docker"
@@ -63,7 +63,7 @@ export async function startSandbox(
 
   return {
     sandboxInstanceId: input.sandboxInstanceId,
-    provider: startedSandbox.provider,
-    providerSandboxId: startedSandbox.sandboxId,
+    runtimeProvider: startedSandbox.provider,
+    providerRuntimeId: startedSandbox.sandboxId,
   };
 }

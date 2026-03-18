@@ -124,7 +124,7 @@ function createDatabase() {
 
 async function insertSandboxInstance(input: {
   sandboxInstanceId: string;
-  providerSandboxId?: string;
+  providerRuntimeId?: string;
   source?: "webhook" | "dashboard";
   status?: "running" | "stopped";
   startedAt?: string;
@@ -138,8 +138,8 @@ async function insertSandboxInstance(input: {
       organizationId: "org_idle_reaper_integration",
       sandboxProfileId: "sbp_idle_reaper_integration",
       sandboxProfileVersion: 1,
-      provider: "docker",
-      providerSandboxId: input.providerSandboxId ?? `provider-${input.sandboxInstanceId}`,
+      runtimeProvider: "docker",
+      providerRuntimeId: input.providerRuntimeId ?? `provider-${input.sandboxInstanceId}`,
       status: input.status ?? SandboxInstanceStatuses.RUNNING,
       startedByKind: "system",
       startedById: "worker_idle_reaper_integration",

@@ -316,14 +316,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "provider": {
-          "name": "provider",
+        "runtime_provider": {
+          "name": "runtime_provider",
           "type": "text",
           "primaryKey": false,
           "notNull": true
         },
-        "provider_sandbox_id": {
-          "name": "provider_sandbox_id",
+        "provider_runtime_id": {
+          "name": "provider_runtime_id",
           "type": "text",
           "primaryKey": false,
           "notNull": false
@@ -492,17 +492,17 @@
           "method": "btree",
           "with": {}
         },
-        "sandbox_instances_provider_sandbox_uidx": {
-          "name": "sandbox_instances_provider_sandbox_uidx",
+        "sandbox_instances_provider_runtime_uidx": {
+          "name": "sandbox_instances_provider_runtime_uidx",
           "columns": [
             {
-              "expression": "provider",
+              "expression": "runtime_provider",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
             },
             {
-              "expression": "provider_sandbox_id",
+              "expression": "provider_runtime_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
