@@ -114,7 +114,7 @@ describe("trigger rules", () => {
           enabled: true,
         },
       ]),
-    ).toThrowError(IntegrationTriggerRulesError);
+    ).toThrow(IntegrationTriggerRulesError);
 
     try {
       parseTriggerRules([

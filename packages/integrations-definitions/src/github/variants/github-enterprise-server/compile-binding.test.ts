@@ -328,6 +328,6 @@ describe("compileGitHubEnterpriseServerBinding", () => {
           artifactBinPath,
         },
       }),
-    ).toThrowError();
+    ).toThrow();
   });
 });

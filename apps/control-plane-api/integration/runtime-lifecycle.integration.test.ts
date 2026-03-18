@@ -60,12 +60,10 @@ describe("runtime lifecycle integration", () => {
       const healthResponse = await fetch(healthURL);
       expect(healthResponse.status).toBe(200);
 
-      await expect(runtime.start()).rejects.toThrowError(
-        "Control plane API server is already started.",
-      );
+      await expect(runtime.start()).rejects.toThrow("Control plane API server is already started.");
 
       await Promise.all([runtime.stop(), runtime.stop(), runtime.stop()]);
-      await expect(runtime.start()).rejects.toThrowError(
+      await expect(runtime.start()).rejects.toThrow(
         "Control plane API runtime is already stopped.",
       );
     } finally {
@@ -102,7 +100,7 @@ describe("runtime lifecycle integration", () => {
       await runtime.stop();
     }
 
-    await expect(fetch(healthURL)).rejects.toThrowError();
+    await expect(fetch(healthURL)).rejects.toThrow();
   });
 
   it("releases app resources after stopApp", async ({ fixture }) => {
@@ -116,6 +114,6 @@ describe("runtime lifecycle integration", () => {
 
     await stopApp(app);
 
-    expect(() => getAppDatabase(app)).toThrowError("Control plane app instance is unknown.");
+    expect(() => getAppDatabase(app)).toThrow("Control plane app instance is unknown.");
   });
 });

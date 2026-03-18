@@ -184,10 +184,10 @@ describe("members directory parser", () => {
   });
 
   it("throws when paged list-members payload is not the expected object shape", () => {
-    expect(() => parseMembersPageResponse([])).toThrowError(
+    expect(() => parseMembersPageResponse([])).toThrow(
       "Members response did not include a members array.",
     );
-    expect(() => parseMembersPageResponse({})).toThrowError(
+    expect(() => parseMembersPageResponse({})).toThrow(
       "Members response did not include a members array.",
     );
   });
@@ -231,6 +231,6 @@ describe("members directory parser", () => {
       parseMembersPageResponse({
         members: [],
       }),
-    ).toThrowError("Members response did not include a numeric total.");
+    ).toThrow("Members response did not include a numeric total.");
   });
 });

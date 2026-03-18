@@ -83,7 +83,7 @@ describe("integration registry", () => {
 
     registry.register(definition);
 
-    expect(() => registry.register(definition)).toThrowError(IntegrationDefinitionRegistryError);
+    expect(() => registry.register(definition)).toThrow(IntegrationDefinitionRegistryError);
 
     try {
       registry.register(definition);

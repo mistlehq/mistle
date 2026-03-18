@@ -381,6 +381,6 @@ describe("compileOpenAiApiKeyBinding", () => {
           artifactBinPath,
         },
       }),
-    ).toThrowError();
+    ).toThrow();
   });
 });

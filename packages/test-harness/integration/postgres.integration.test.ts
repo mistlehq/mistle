@@ -115,7 +115,7 @@ describe("postgres + pgbouncer integration", () => {
       const databaseStack = await startPostgresWithPgBouncer();
       await databaseStack.stop();
 
-      await expect(databaseStack.stop()).rejects.toThrowError(
+      await expect(databaseStack.stop()).rejects.toThrow(
         "Postgres + PgBouncer stack was already stopped.",
       );
     },

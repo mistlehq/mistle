@@ -130,7 +130,7 @@ describe("members invitations parser", () => {
   });
 
   it("throws when invitation response is not an array", () => {
-    expect(() => parseInvitationsResponse({})).toThrowError(
+    expect(() => parseInvitationsResponse({})).toThrow(
       "Invitations response did not include an array.",
     );
   });

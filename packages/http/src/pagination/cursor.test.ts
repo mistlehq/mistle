@@ -50,7 +50,7 @@ describe("keyset cursor codec", () => {
         encodedCursor: "%",
         schema: CursorSchema,
       }),
-    ).toThrowError(KeysetCursorDecodeError);
+    ).toThrow(KeysetCursorDecodeError);
 
     try {
       decodeKeysetCursor({

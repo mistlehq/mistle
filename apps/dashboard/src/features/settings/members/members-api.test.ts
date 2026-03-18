@@ -32,7 +32,7 @@ describe("members api helpers", () => {
   });
 
   it("throws when required organization context is unavailable", () => {
-    expect(() => requireActiveOrganizationId(null)).toThrowError(
+    expect(() => requireActiveOrganizationId(null)).toThrow(
       "No active organization is available in the current session.",
     );
   });

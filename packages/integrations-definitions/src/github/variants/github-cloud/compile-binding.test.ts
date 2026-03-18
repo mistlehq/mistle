@@ -406,6 +406,6 @@ describe("compileGitHubCloudBinding", () => {
           artifactBinPath,
         },
       }),
-    ).toThrowError();
+    ).toThrow();
   });
 });

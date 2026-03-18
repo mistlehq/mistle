@@ -7,7 +7,7 @@ import {
 
 describe("requireAuthenticatedSession", () => {
   it("throws a clear error when session is missing", () => {
-    expect(() => requireAuthenticatedSession(null)).toThrowError(
+    expect(() => requireAuthenticatedSession(null)).toThrow(
       MISSING_AUTHENTICATED_SESSION_ERROR_MESSAGE,
     );
   });

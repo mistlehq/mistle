@@ -18,6 +18,6 @@ describe("GitHubCloudBindingConfigSchema", () => {
       GitHubCloudBindingConfigSchema.parse({
         repositories: ["acme"],
       }),
-    ).toThrowError();
+    ).toThrow();
   });
 });

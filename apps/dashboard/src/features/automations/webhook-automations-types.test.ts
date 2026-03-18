@@ -55,7 +55,7 @@ describe("webhook automations types", () => {
         },
         updatedAt: "2026-03-11T10:05:00.000Z",
       }),
-    ).toThrowError(/webhook/i);
+    ).toThrow(/webhook/i);
   });
 
   it("parses paginated list responses", () => {

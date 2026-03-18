@@ -70,7 +70,7 @@ describe("OpenAiApiKeyBindingConfigSchema", () => {
         defaultModel: "gpt-4.1",
         reasoningEffort: "medium",
       }),
-    ).toThrowError();
+    ).toThrow();
   });
 
   it("fails when runtime is not codex-cli", () => {
@@ -80,7 +80,7 @@ describe("OpenAiApiKeyBindingConfigSchema", () => {
         defaultModel: "gpt-5.3-codex",
         reasoningEffort: "medium",
       }),
-    ).toThrowError();
+    ).toThrow();
   });
 
   it("fails when reasoning effort is missing", () => {
@@ -89,6 +89,6 @@ describe("OpenAiApiKeyBindingConfigSchema", () => {
         runtime: "codex-cli",
         defaultModel: "gpt-5.3-codex",
       }),
-    ).toThrowError();
+    ).toThrow();
   });
 });

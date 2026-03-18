@@ -25,7 +25,7 @@ describe("validateModalSandboxConfig", () => {
         tokenSecret: "modal-token-secret",
         appName: "mistle-sandbox-app",
       }),
-    ).toThrowError(ZodError);
+    ).toThrow(ZodError);
   });
 
   it("throws when token secret is empty", () => {
@@ -35,7 +35,7 @@ describe("validateModalSandboxConfig", () => {
         tokenSecret: "",
         appName: "mistle-sandbox-app",
       }),
-    ).toThrowError(ZodError);
+    ).toThrow(ZodError);
   });
 
   it("throws when app name is empty", () => {
@@ -45,6 +45,6 @@ describe("validateModalSandboxConfig", () => {
         tokenSecret: "modal-token-secret",
         appName: " ",
       }),
-    ).toThrowError(ZodError);
+    ).toThrow(ZodError);
   });
 });
