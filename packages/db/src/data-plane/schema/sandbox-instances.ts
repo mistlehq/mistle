@@ -11,6 +11,18 @@ export const SandboxInstanceProviders = {
 export type SandboxInstanceProvider =
   (typeof SandboxInstanceProviders)[keyof typeof SandboxInstanceProviders];
 
+export const SandboxInstanceVolumeProviders = SandboxInstanceProviders;
+
+export type SandboxInstanceVolumeProvider = SandboxInstanceProvider;
+
+export const SandboxInstanceVolumeModes = {
+  NATIVE: "native",
+  STAGED: "staged",
+} as const;
+
+export type SandboxInstanceVolumeMode =
+  (typeof SandboxInstanceVolumeModes)[keyof typeof SandboxInstanceVolumeModes];
+
 export const SandboxInstanceStatuses = {
   STARTING: "starting",
   RUNNING: "running",
@@ -48,6 +60,9 @@ export const sandboxInstances = dataPlaneSchema.table(
     sandboxProfileVersion: bigint("sandbox_profile_version", { mode: "number" }).notNull(),
     runtimeProvider: text("runtime_provider").notNull().$type<SandboxInstanceProvider>(),
     providerRuntimeId: text("provider_runtime_id"),
+    instanceVolumeProvider: text("instance_volume_provider").$type<SandboxInstanceVolumeProvider>(),
+    instanceVolumeId: text("instance_volume_id"),
+    instanceVolumeMode: text("instance_volume_mode").$type<SandboxInstanceVolumeMode>(),
     status: text("status")
       .notNull()
       .$type<SandboxInstanceStatus>()
@@ -89,6 +104,10 @@ export const sandboxInstances = dataPlaneSchema.table(
     uniqueIndex("sandbox_instances_provider_runtime_uidx").on(
       table.runtimeProvider,
       table.providerRuntimeId,
+    ),
+    uniqueIndex("sandbox_instances_instance_volume_uidx").on(
+      table.instanceVolumeProvider,
+      table.instanceVolumeId,
     ),
   ],
 );

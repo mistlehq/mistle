@@ -328,6 +328,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "instance_volume_provider": {
+          "name": "instance_volume_provider",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "instance_volume_id": {
+          "name": "instance_volume_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "instance_volume_mode": {
+          "name": "instance_volume_mode",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "status": {
           "name": "status",
           "type": "text",
@@ -503,6 +521,27 @@
             },
             {
               "expression": "provider_runtime_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sandbox_instances_instance_volume_uidx": {
+          "name": "sandbox_instances_instance_volume_uidx",
+          "columns": [
+            {
+              "expression": "instance_volume_provider",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "instance_volume_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

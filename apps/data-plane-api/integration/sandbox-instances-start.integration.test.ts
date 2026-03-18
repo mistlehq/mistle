@@ -233,6 +233,9 @@ describe("sandboxInstances.start integration", () => {
         sandboxProfileId: true,
         sandboxProfileVersion: true,
         providerRuntimeId: true,
+        instanceVolumeProvider: true,
+        instanceVolumeId: true,
+        instanceVolumeMode: true,
         status: true,
       },
       where: (table, { eq }) => eq(table.id, startedSandbox.sandboxInstanceId),
@@ -244,6 +247,9 @@ describe("sandboxInstances.start integration", () => {
       sandboxProfileId: workflowInput.sandboxProfileId,
       sandboxProfileVersion: workflowInput.sandboxProfileVersion,
       providerRuntimeId: null,
+      instanceVolumeProvider: null,
+      instanceVolumeId: null,
+      instanceVolumeMode: null,
       status: SandboxInstanceStatuses.STARTING,
     });
 
