@@ -4,10 +4,10 @@ The base image includes a single sandbox runtime entrypoint that every sandbox w
 
 ## Current Responsibilities
 
-- Build Go `sandboxd` from `apps/sandbox-runtime`
+- Package the SEA sandbox bootstrap/runtime binaries from `apps/sandbox-runtime-node`
 - Start the root-owned bootstrap entrypoint under `tini`
-- Generate a fresh per-sandbox proxy CA, install its certificate into the OS trust store, and pass signer material to `sandboxd`
-- Drop privileges to the `sandbox` user before execing `sandboxd`
+- Generate a fresh per-sandbox proxy CA, install its certificate into the OS trust store, and pass signer material to the runtime
+- Drop privileges to the `sandbox` user before execing the runtime
 - Install `mise` as the runtime manager at `/usr/local/bin/mise`
 - Pre-create user-owned sandbox state under `/home/sandbox`
 - Pre-create runtime-owned mutable state under `/var/lib/mistle`
@@ -20,7 +20,7 @@ The base image includes a single sandbox runtime entrypoint that every sandbox w
 - Sandbox user env: `SANDBOX_USER` is reserved and must remain `sandbox`
 - Tokenizer proxy egress base URL env: `SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL`
 - Bootstrap-generated proxy CA install path: `/usr/local/share/ca-certificates/mistle-proxy-ca.crt`
-- Bootstrap passes the proxy CA signer into `sandboxd` through inherited file descriptors exposed as:
+- Bootstrap passes the proxy CA signer into the runtime through inherited file descriptors exposed as:
   - `SANDBOX_RUNTIME_PROXY_CA_CERT_FD`
   - `SANDBOX_RUNTIME_PROXY_CA_KEY_FD`
 - `update-ca-certificates` is run after writing the generated proxy CA certificate before privileges are dropped
@@ -29,7 +29,7 @@ The base image includes a single sandbox runtime entrypoint that every sandbox w
   - `tunnelGatewayWsUrl`
   - `runtimePlan`
 - Health endpoint: `GET /__healthz` returns 200 only after bootstrap token is loaded
-- Egress behavior: `sandboxd` acts as an outbound HTTP(S) proxy and forwards matched integration traffic to tokenizer proxy egress
+- Egress behavior: the runtime acts as an outbound HTTP(S) proxy and forwards matched integration traffic to tokenizer proxy egress
 - User-owned persistent state lives under `/home/sandbox`
 - Runtime-owned mutable state lives under `/var/lib/mistle`
 - `PATH` includes `/var/lib/mistle/bin` and `mise` shims at `/home/sandbox/.local/share/mise/shims`

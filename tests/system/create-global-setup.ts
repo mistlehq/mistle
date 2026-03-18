@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   DEFAULT_SHARED_SYSTEM_INFRA_KEY,
-  type SandboxBaseImageBuild,
+  DefaultSandboxBaseImageBuild,
   removeTestContext,
   startFullSystemEnvironment,
   writeTestContext,
@@ -15,9 +15,7 @@ const APP_STARTUP_TIMEOUT_MS = 120_000;
 const AUTH_ORIGIN = "http://localhost:5100";
 const TestContextId = "system";
 
-export function createSystemGlobalSetup(input: {
-  sandboxBaseImageBuild: SandboxBaseImageBuild;
-}): () => Promise<() => Promise<void>> {
+export function createSystemGlobalSetup(): () => Promise<() => Promise<void>> {
   return async function setup(): Promise<() => Promise<void>> {
     const environment = await startFullSystemEnvironment({
       buildContextHostPath: PROJECT_ROOT_HOST_PATH,
@@ -31,7 +29,7 @@ export function createSystemGlobalSetup(input: {
       dashboardBaseUrl: "http://localhost:5173",
       authTrustedOrigins:
         "http://localhost:5100,http://127.0.0.1:5100,http://localhost:5173,http://127.0.0.1:5173",
-      sandboxBaseImageBuild: input.sandboxBaseImageBuild,
+      sandboxBaseImageBuild: DefaultSandboxBaseImageBuild,
     });
 
     try {
@@ -46,6 +44,7 @@ export function createSystemGlobalSetup(input: {
           tokenizerProxyBaseUrl: environment.tokenizerProxy.hostBaseUrl,
           mailpitHttpBaseUrl: environment.mailpit.httpBaseUrl,
           controlPlaneDatabaseUrl: environment.database.hostDatabaseUrl,
+          sandboxNetworkName: environment.sandboxNetworkName,
         },
       });
     } catch (error) {

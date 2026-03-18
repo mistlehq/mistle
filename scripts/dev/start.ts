@@ -303,7 +303,21 @@ function start(): void {
   console.log("Building and pushing sandbox runtime base image...");
   runOrThrow({
     command: "pnpm",
-    args: ["--filter", "@mistle/sandbox-runtime", "image:build:dev"],
+    args: ["build:sandbox-runtime:sea:linux"],
+    env: sharedDevEnv,
+  });
+  runOrThrow({
+    command: "docker",
+    args: [
+      "build",
+      "--target",
+      "sandbox-base-dev",
+      "-f",
+      "apps/sandbox-runtime/images/base/Dockerfile",
+      "-t",
+      SANDBOX_BASE_IMAGE_TAG,
+      ".",
+    ],
     env: sharedDevEnv,
   });
   runOrThrow({

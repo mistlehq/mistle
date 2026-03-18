@@ -1,14 +1,3 @@
-FROM golang:1.26-bookworm AS sandbox-runtime-builder
-
-WORKDIR /src/apps/sandbox-runtime
-COPY apps/sandbox-runtime/go.mod ./go.mod
-COPY apps/sandbox-runtime/go.sum ./go.sum
-RUN go mod download
-COPY apps/sandbox-runtime/cmd ./cmd
-COPY apps/sandbox-runtime/internal ./internal
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/sandboxd ./cmd/sandboxd
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/sandbox-bootstrap ./cmd/sandbox-bootstrap
-
 FROM debian:bookworm-slim AS sandbox-base-common
 
 ARG SANDBOX_USER=sandbox
@@ -59,12 +48,18 @@ USER root
 
 FROM sandbox-base-common AS sandbox-base-prod
 
-COPY --from=sandbox-runtime-builder /out/sandboxd /usr/local/bin/sandboxd
-COPY --from=sandbox-runtime-builder /out/sandbox-bootstrap /usr/local/bin/sandbox-bootstrap
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends \
+    libatomic1 \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY apps/sandbox-runtime-node/dist-sea/ /usr/local/bin/
 
 RUN chmod +x \
-  /usr/local/bin/sandbox-bootstrap \
-  /usr/local/bin/sandboxd
+  /usr/local/bin/sandbox-bootstrap-node \
+  /usr/local/bin/sandboxd-node \
+  && ln -sf /usr/local/bin/sandbox-bootstrap-node /usr/local/bin/sandbox-bootstrap \
+  && ln -sf /usr/local/bin/sandboxd-node /usr/local/bin/sandboxd
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandbox-bootstrap"]
 
@@ -78,27 +73,6 @@ RUN apt-get update \
     vim \
   && rm -rf /var/lib/apt/lists/*
 
-FROM sandbox-base-common AS sandbox-base-node-prod
+FROM sandbox-base-prod AS sandbox-base-node-prod
 
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends \
-    libatomic1 \
-  && rm -rf /var/lib/apt/lists/*
-
-COPY apps/sandbox-runtime-node/dist-sea/ /usr/local/bin/
-
-RUN chmod +x \
-  /usr/local/bin/sandbox-bootstrap-node \
-  /usr/local/bin/sandboxd-node
-
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandbox-bootstrap-node"]
-
-FROM sandbox-base-node-prod AS sandbox-base-node-dev
-
-USER root
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends \
-    procps \
-    strace \
-    vim \
-  && rm -rf /var/lib/apt/lists/*
+FROM sandbox-base-dev AS sandbox-base-node-dev

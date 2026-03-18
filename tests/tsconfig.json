@@ -3,10 +3,5 @@
   "compilerOptions": {
     "types": ["node", "vitest/globals", "@playwright/test"]
   },
-  "include": [
-    "**/*.ts",
-    "vitest.system.config.ts",
-    "vitest.system.node-sandbox.config.ts",
-    "playwright.config.ts"
-  ]
+  "include": ["**/*.ts", "vitest.system.config.ts", "playwright.config.ts"]
 }

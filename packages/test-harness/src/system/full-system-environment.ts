@@ -63,13 +63,6 @@ export const DefaultSandboxBaseImageBuild: SandboxBaseImageBuild = {
   dockerTarget: "sandbox-base-dev",
 };
 
-export const NodeSandboxBaseImageBuild: SandboxBaseImageBuild = {
-  localReference: "mistle/sandbox-base-node:dev",
-  repositoryPath: "mistle/sandbox-base-node",
-  dockerfilePath: SANDBOX_BASE_IMAGE_DOCKERFILE_PATH,
-  dockerTarget: "sandbox-base-node-dev",
-};
-
 export type StartFullSystemEnvironmentInput = {
   buildContextHostPath: string;
   configPathInContainer: string;
@@ -112,6 +105,7 @@ export type StartedFullSystemEnvironment = {
     smtpPort: number;
   };
   containerHostGateway: string;
+  sandboxNetworkName: string;
   stop: () => Promise<void>;
 };
 
@@ -208,6 +202,12 @@ async function ensureSandboxBaseImageLocal(input: {
   buildContextHostPath: string;
   sandboxBaseImageBuild: SandboxBaseImageBuild;
 }): Promise<void> {
+  await runCommand({
+    command: "pnpm",
+    args: ["build:sandbox-runtime:sea:linux"],
+    cwd: input.buildContextHostPath,
+  });
+
   await runCommand({
     command: "docker",
     args: [
@@ -485,6 +485,7 @@ export async function startFullSystemEnvironment(
         smtpPort: sharedInfraLease.infra.mailpit.smtpPort,
       },
       containerHostGateway: sharedInfraLease.infra.containerHostGateway,
+      sandboxNetworkName: network.getName(),
       stop: async () => {
         if (stopped) {
           throw new Error("Full system environment was already stopped.");
