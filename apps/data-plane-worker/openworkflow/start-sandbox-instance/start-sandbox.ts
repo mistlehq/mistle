@@ -64,6 +64,6 @@ export async function startSandbox(
   return {
     sandboxInstanceId: input.sandboxInstanceId,
     runtimeProvider: startedSandbox.provider,
-    providerRuntimeId: startedSandbox.sandboxId,
+    providerRuntimeId: startedSandbox.runtimeId,
   };
 }

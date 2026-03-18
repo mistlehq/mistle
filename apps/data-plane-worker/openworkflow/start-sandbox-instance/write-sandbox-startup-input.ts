@@ -61,7 +61,7 @@ export async function writeSandboxStartupInput(input: {
   } catch (writeError) {
     try {
       await input.sandboxAdapter.stop({
-        sandboxId: input.sandbox.sandboxId,
+        runtimeId: input.sandbox.runtimeId,
       });
     } catch (stopError) {
       throw new Error(

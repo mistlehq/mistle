@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import http from "node:http";
 
 import Docker from "dockerode";
@@ -10,10 +11,14 @@ import {
 } from "./client-errors.js";
 import {
   DockerCloseSandboxStdinRequestSchema,
+  DockerCreateVolumeRequestSchema,
+  DockerDeleteVolumeRequestSchema,
   DockerStartSandboxRequestSchema,
   DockerStopSandboxRequestSchema,
   DockerWriteSandboxStdinRequestSchema,
   type DockerCloseSandboxStdinRequest,
+  type DockerCreateVolumeRequest,
+  type DockerDeleteVolumeRequest,
   type DockerSandboxConfig,
   type DockerStartSandboxRequest,
   type DockerStopSandboxRequest,
@@ -21,10 +26,16 @@ import {
 } from "./schemas.js";
 
 export type DockerStartSandboxResponse = {
-  sandboxId: string;
+  runtimeId: string;
+};
+
+export type DockerCreateVolumeResponse = {
+  volumeId: string;
 };
 
 export interface DockerClient {
+  createVolume(request: DockerCreateVolumeRequest): Promise<DockerCreateVolumeResponse>;
+  deleteVolume(request: DockerDeleteVolumeRequest): Promise<void>;
   startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse>;
   writeSandboxStdin(request: DockerWriteSandboxStdinRequest): Promise<void>;
   closeSandboxStdin(request: DockerCloseSandboxStdinRequest): Promise<void>;
@@ -104,6 +115,10 @@ function toDockerEnv(env: Record<string, string> | undefined): string[] | undefi
   return entries.map(([key, value]) => `${key}=${value}`);
 }
 
+function createDockerVolumeName(): string {
+  return `mistle-volume-${randomUUID().replaceAll("-", "")}`;
+}
+
 export class DockerApiClient implements DockerClient {
   readonly #config: DockerSandboxConfig;
   readonly #docker: Docker;
@@ -116,6 +131,33 @@ export class DockerApiClient implements DockerClient {
     });
   }
 
+  async createVolume(_request: DockerCreateVolumeRequest): Promise<DockerCreateVolumeResponse> {
+    DockerCreateVolumeRequestSchema.parse(_request);
+
+    const volumeId = createDockerVolumeName();
+    await this.#runDockerClientOperation(DockerClientOperationIds.CREATE_VOLUME, () =>
+      this.#docker.createVolume({
+        Name: volumeId,
+        Labels: {
+          "mistle.sandbox.provider": "docker",
+        },
+      }),
+    );
+
+    return {
+      volumeId,
+    };
+  }
+
+  async deleteVolume(request: DockerDeleteVolumeRequest): Promise<void> {
+    const parsedRequest = DockerDeleteVolumeRequestSchema.parse(request);
+    const volume = await this.#resolveVolume(parsedRequest.volumeId);
+
+    await this.#runDockerClientOperation(DockerClientOperationIds.REMOVE_VOLUME, () =>
+      volume.remove(),
+    );
+  }
+
   async startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse> {
     const parsedRequest = DockerStartSandboxRequestSchema.parse(request);
 
@@ -124,6 +166,13 @@ export class DockerApiClient implements DockerClient {
     const hostConfig: Docker.HostConfig = {};
     if (this.#config.networkName !== undefined) {
       hostConfig.NetworkMode = this.#config.networkName;
+    }
+    if (parsedRequest.mounts !== undefined && parsedRequest.mounts.length > 0) {
+      hostConfig.Mounts = parsedRequest.mounts.map((mount) => ({
+        Source: mount.volumeId,
+        Target: mount.mountPath,
+        Type: "volume",
+      }));
     }
     const createContainerOptions: Docker.ContainerCreateOptions = {
       Image: parsedRequest.imageRef,
@@ -152,7 +201,7 @@ export class DockerApiClient implements DockerClient {
     this.#trackAttachedStdinStream(container.id, attachedStdinStream);
 
     return {
-      sandboxId: container.id,
+      runtimeId: container.id,
     };
   }
 
@@ -161,7 +210,7 @@ export class DockerApiClient implements DockerClient {
 
     await this.#runDockerClientOperation(DockerClientOperationIds.WRITE_STDIN, async () => {
       const attachedStdinStream = await this.#getOrCreateAttachedStdinStream(
-        parsedRequest.sandboxId,
+        parsedRequest.runtimeId,
       );
       await this.#writeAttachedStdinStream(attachedStdinStream, parsedRequest.payload);
     });
@@ -172,17 +221,17 @@ export class DockerApiClient implements DockerClient {
 
     await this.#runDockerClientOperation(DockerClientOperationIds.CLOSE_STDIN, async () => {
       const attachedStdinStream = await this.#getOrCreateAttachedStdinStream(
-        parsedRequest.sandboxId,
+        parsedRequest.runtimeId,
       );
       await this.#closeAttachedStdinStream(attachedStdinStream);
-      this.#attachedStdinStreams.delete(parsedRequest.sandboxId);
+      this.#attachedStdinStreams.delete(parsedRequest.runtimeId);
     });
   }
 
   async stopSandbox(request: DockerStopSandboxRequest): Promise<void> {
     const parsedRequest = DockerStopSandboxRequestSchema.parse(request);
-    this.#releaseTrackedStdinStream(parsedRequest.sandboxId);
-    const container = await this.#resolveContainer(parsedRequest.sandboxId);
+    this.#releaseTrackedStdinStream(parsedRequest.runtimeId);
+    const container = await this.#resolveContainer(parsedRequest.runtimeId);
 
     await this.#runDockerClientOperation(DockerClientOperationIds.REMOVE_CONTAINER, () =>
       container.remove({
@@ -191,14 +240,24 @@ export class DockerApiClient implements DockerClient {
     );
   }
 
-  async #resolveContainer(sandboxId: string): Promise<Docker.Container> {
-    const container = this.#docker.getContainer(sandboxId);
+  async #resolveContainer(runtimeId: string): Promise<Docker.Container> {
+    const container = this.#docker.getContainer(runtimeId);
 
     await this.#runDockerClientOperation(DockerClientOperationIds.RESOLVE_CONTAINER, () =>
       container.inspect(),
     );
 
     return container;
+  }
+
+  async #resolveVolume(volumeId: string): Promise<Docker.Volume> {
+    const volume = this.#docker.getVolume(volumeId);
+
+    await this.#runDockerClientOperation(DockerClientOperationIds.RESOLVE_VOLUME, () =>
+      volume.inspect(),
+    );
+
+    return volume;
   }
 
   async #pullImage(imageRef: string): Promise<void> {
@@ -210,22 +269,22 @@ export class DockerApiClient implements DockerClient {
     await this.#consumeProgressStream(DockerClientOperationIds.PULL_IMAGE, pullStream);
   }
 
-  async #getOrCreateAttachedStdinStream(sandboxId: string): Promise<NodeJS.ReadWriteStream> {
-    const existingAttachedStdinStream = this.#attachedStdinStreams.get(sandboxId);
+  async #getOrCreateAttachedStdinStream(runtimeId: string): Promise<NodeJS.ReadWriteStream> {
+    const existingAttachedStdinStream = this.#attachedStdinStreams.get(runtimeId);
     if (existingAttachedStdinStream !== undefined) {
       return existingAttachedStdinStream;
     }
 
     const attachedStdinStream = await this.#runDockerClientOperation(
       DockerClientOperationIds.ATTACH_STDIN,
-      () => this.#attachContainerStdin(sandboxId),
+      () => this.#attachContainerStdin(runtimeId),
     );
-    this.#trackAttachedStdinStream(sandboxId, attachedStdinStream);
+    this.#trackAttachedStdinStream(runtimeId, attachedStdinStream);
 
     return attachedStdinStream;
   }
 
-  async #attachContainerStdin(sandboxId: string): Promise<NodeJS.ReadWriteStream> {
+  async #attachContainerStdin(runtimeId: string): Promise<NodeJS.ReadWriteStream> {
     const query = new URLSearchParams({
       stdin: "1",
       stream: "1",
@@ -237,7 +296,7 @@ export class DockerApiClient implements DockerClient {
     return await new Promise<NodeJS.ReadWriteStream>((resolve, reject) => {
       const request = http.request({
         socketPath: this.#config.socketPath,
-        path: `/containers/${encodeURIComponent(sandboxId)}/attach?${query.toString()}`,
+        path: `/containers/${encodeURIComponent(runtimeId)}/attach?${query.toString()}`,
         method: "POST",
         headers: {
           Connection: "Upgrade",
@@ -279,20 +338,20 @@ export class DockerApiClient implements DockerClient {
     });
   }
 
-  #trackAttachedStdinStream(sandboxId: string, attachedStdinStream: NodeJS.ReadWriteStream): void {
+  #trackAttachedStdinStream(runtimeId: string, attachedStdinStream: NodeJS.ReadWriteStream): void {
     attachedStdinStream.on("data", () => {
       // Drain attached stdout/stderr bytes so stream backpressure cannot block stdin writes.
     });
 
     const clearAttachedStdinStream = () => {
-      if (this.#attachedStdinStreams.get(sandboxId) === attachedStdinStream) {
-        this.#attachedStdinStreams.delete(sandboxId);
+      if (this.#attachedStdinStreams.get(runtimeId) === attachedStdinStream) {
+        this.#attachedStdinStreams.delete(runtimeId);
       }
     };
     attachedStdinStream.once("close", clearAttachedStdinStream);
     attachedStdinStream.once("error", clearAttachedStdinStream);
 
-    this.#attachedStdinStreams.set(sandboxId, attachedStdinStream);
+    this.#attachedStdinStreams.set(runtimeId, attachedStdinStream);
   }
 
   async #writeAttachedStdinStream(
@@ -323,13 +382,13 @@ export class DockerApiClient implements DockerClient {
     });
   }
 
-  #releaseTrackedStdinStream(sandboxId: string): void {
-    const trackedAttachedStdinStream = this.#attachedStdinStreams.get(sandboxId);
+  #releaseTrackedStdinStream(runtimeId: string): void {
+    const trackedAttachedStdinStream = this.#attachedStdinStreams.get(runtimeId);
     if (trackedAttachedStdinStream === undefined) {
       return;
     }
 
-    this.#attachedStdinStreams.delete(sandboxId);
+    this.#attachedStdinStreams.delete(runtimeId);
     trackedAttachedStdinStream.end();
   }
 
