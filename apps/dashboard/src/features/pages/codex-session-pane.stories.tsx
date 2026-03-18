@@ -32,8 +32,12 @@ const meta = {
       return (
         <SessionWorkbenchPageView
           alerts={[]}
-          bottomPanel={<CodexSessionPaneBottomPanel {...context.args} />}
+          isSecondaryPanelVisible={false}
           mainContent={<Story />}
+          onSecondaryPanelResize={function onSecondaryPanelResize() {}}
+          primaryBottomPanel={<CodexSessionPaneBottomPanel {...context.args} />}
+          secondaryPanel={<></>}
+          secondaryPanelSize={38}
           sandboxInstanceId="sbi_storybook"
         />
       );
