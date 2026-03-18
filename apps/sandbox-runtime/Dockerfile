@@ -11,12 +11,17 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
+    bash \
     ca-certificates \
     curl \
     git \
+    iproute2 \
     jq \
+    less \
+    lsof \
     ripgrep \
     tini \
+    unzip \
   && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid "${SANDBOX_GID}" "${SANDBOX_USER}" \
@@ -51,6 +56,9 @@ FROM sandbox-base-common AS sandbox-base-prod
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     libatomic1 \
+    procps \
+    strace \
+    vim \
   && rm -rf /var/lib/apt/lists/*
 
 COPY apps/sandbox-runtime/dist-sea/ /usr/local/bin/
@@ -62,11 +70,3 @@ RUN chmod +x \
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandbox-bootstrap"]
 
 FROM sandbox-base-prod AS sandbox-base-dev
-
-USER root
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends \
-    procps \
-    strace \
-    vim \
-  && rm -rf /var/lib/apt/lists/*

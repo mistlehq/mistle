@@ -55,11 +55,7 @@ The base image:
 - trusts a per-sandbox proxy CA before dropping privileges
 - execs `/usr/local/bin/sandboxd` as the `sandbox` user
 - provides `mise` at `/usr/local/bin/mise`
-
-Canonical image targets:
-
-- `sandbox-base-prod`
-- `sandbox-base-dev`
+- includes a small developer tool set: `bash`, `curl`, `git`, `iproute2`, `jq`, `less`, `lsof`, `procps`, `ripgrep`, `strace`, `unzip`, and `vim`
 
 ## Runtime Contract
 
