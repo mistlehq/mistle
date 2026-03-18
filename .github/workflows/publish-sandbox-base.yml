@@ -87,3 +87,80 @@ jobs:
             echo "- Alias: \`${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}\`"
             echo "- Digest: \`${{ steps.publish.outputs.image_ref }}\`"
           } >> "${GITHUB_STEP_SUMMARY}"
+
+  notify:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs:
+      - publish
+    if: always()
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      PUBLISH_RESULT: ${{ needs.publish.result }}
+      RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      WORKFLOW_NAME: ${{ github.workflow }}
+
+    steps:
+      - name: Fetch Infisical secrets
+        uses: Infisical/secrets-action@v1.0.11
+        with:
+          method: oidc
+          identity-id: ${{ vars.INFISICAL_IDENTITY_ID }}
+          project-slug: mistle-oss
+          env-slug: ci
+          secret-path: /ci-shared
+
+      - name: Post Slack notification
+        run: |
+          python3 <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          publish_result = os.environ["PUBLISH_RESULT"]
+          color_by_result = {
+              "success": "#2eb886",
+              "failure": "#e01e5a",
+              "cancelled": "#ecb22e",
+          }
+          emoji_by_result = {
+              "success": ":white_check_mark:",
+              "failure": ":x:",
+              "cancelled": ":warning:",
+          }
+          color = color_by_result.get(publish_result, "#808080")
+          emoji = emoji_by_result.get(publish_result, ":grey_question:")
+          payload = {
+              "attachments": [
+                  {
+                      "color": color,
+                      "title": os.environ["WORKFLOW_NAME"],
+                      "title_link": os.environ["RUN_URL"],
+                      "text": f"{emoji} Sandbox base image publish finished with result: {publish_result}.",
+                      "fields": [
+                          {
+                              "title": "Repository",
+                              "value": os.environ["GITHUB_REPOSITORY"],
+                              "short": True,
+                          },
+                          {
+                              "title": "Branch",
+                              "value": os.environ["GITHUB_REF_NAME"],
+                              "short": True,
+                          },
+                      ],
+                  }
+              ]
+          }
+          request = urllib.request.Request(
+              os.environ["SLACK_WEBHOOK_URL"],
+              data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(request) as response:
+              if response.status != 200:
+                  raise RuntimeError(f"Slack webhook returned unexpected status {response.status}.")
+          PY
