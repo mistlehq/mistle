@@ -125,8 +125,19 @@ export function useSessionTerminalWorkbenchState(input: {
     });
   }, [input.sandboxInstanceId]);
 
+  const resolvedState =
+    state.sandboxInstanceId === input.sandboxInstanceId
+      ? state
+      : {
+          ...readPersistedTerminalWorkbenchState(input.sandboxInstanceId),
+          sandboxInstanceId: input.sandboxInstanceId,
+        };
+
   useEffect(() => {
-    if (input.sandboxInstanceId === null || state.sandboxInstanceId !== input.sandboxInstanceId) {
+    if (
+      input.sandboxInstanceId === null ||
+      resolvedState.sandboxInstanceId !== input.sandboxInstanceId
+    ) {
       return;
     }
 
@@ -135,8 +146,14 @@ export function useSessionTerminalWorkbenchState(input: {
       return;
     }
 
-    storage.setItem(getTerminalWorkbenchStorageKey(input.sandboxInstanceId), JSON.stringify(state));
-  }, [input.sandboxInstanceId, state]);
+    storage.setItem(
+      getTerminalWorkbenchStorageKey(input.sandboxInstanceId),
+      JSON.stringify({
+        isVisible: resolvedState.isVisible,
+        panelSize: resolvedState.panelSize,
+      }),
+    );
+  }, [input.sandboxInstanceId, resolvedState]);
 
   const openPanel = useCallback((): void => {
     setState((currentState) => ({
@@ -168,9 +185,9 @@ export function useSessionTerminalWorkbenchState(input: {
 
   return {
     closePanel,
-    isVisible: state.isVisible,
+    isVisible: resolvedState.isVisible,
     openPanel,
-    panelSize: state.panelSize,
+    panelSize: resolvedState.panelSize,
     setPanelSize,
     togglePanel,
   };

@@ -38,8 +38,7 @@ export function SessionTerminalPanel({
     if (
       lifecycle.state === "open" ||
       lifecycle.state === "opening" ||
-      lifecycle.state === "connecting" ||
-      lifecycle.state === "connected"
+      lifecycle.state === "connecting"
     ) {
       return;
     }
