@@ -457,21 +457,19 @@ async function resolveOAuth2ManagedCredential(input: {
   }
 
   const resolution = await input.db.transaction<OAuth2ManagedCredentialResolution>(async (tx) => {
-    await tx.execute(
-      sql`select pg_advisory_xact_lock(hashtext(${input.connection.organizationId}), hashtext(${input.connection.id}))`,
-    );
-
-    const lockedConnection = await tx.query.integrationConnections.findFirst({
-      columns: {
-        id: true,
-        organizationId: true,
-        targetKey: true,
-        status: true,
-        externalSubjectId: true,
-        config: true,
-      },
-      where: (table, { eq }) => eq(table.id, input.connection.id),
-    });
+    const [lockedConnection] = await tx
+      .select({
+        id: integrationConnections.id,
+        organizationId: integrationConnections.organizationId,
+        targetKey: integrationConnections.targetKey,
+        status: integrationConnections.status,
+        externalSubjectId: integrationConnections.externalSubjectId,
+        config: integrationConnections.config,
+      })
+      .from(integrationConnections)
+      .where(eq(integrationConnections.id, input.connection.id))
+      .limit(1)
+      .for("update");
 
     if (lockedConnection === undefined) {
       throw new InternalIntegrationCredentialsError(
