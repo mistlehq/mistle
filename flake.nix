@@ -41,7 +41,7 @@
             export PIPX_BIN_DIR="$REPO_ROOT/.pipx/bin"
             mkdir -p "$PIPX_HOME" "$PIPX_BIN_DIR"
             export PATH="$PIPX_BIN_DIR:$PATH"
-            if [ ! -f .env.dev ]; then
+            if [ ! -f .env.dev ] && [ -z "${CI:-}" ] && [ -t 1 ]; then
               echo "Tip: copy sample.env.dev to .env.dev before running pnpm dev."
             fi
           '';
