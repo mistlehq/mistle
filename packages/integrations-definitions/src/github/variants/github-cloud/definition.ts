@@ -66,9 +66,7 @@ export const GitHubCloudDefinition: GitHubCloudIntegrationDefinition = {
         GitHubAppInstallationCredentialResolver,
     },
   },
-  authHandlers: {
-    oauth: GitHubAppInstallationRedirectHandler,
-  },
+  redirectHandler: GitHubAppInstallationRedirectHandler,
   webhookHandler: GitHubCloudWebhookHandler,
   resourceDefinitions: GitHubResourceDefinitions,
   resourceSyncTriggers: GitHubResourceSyncTriggers,

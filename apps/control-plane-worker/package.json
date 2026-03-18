@@ -15,7 +15,6 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@mistle/codex-app-server-client": "workspace:*",
     "@mistle/config": "workspace:*",
     "@mistle/control-plane-internal-client": "workspace:*",
     "@mistle/data-plane-internal-client": "workspace:*",

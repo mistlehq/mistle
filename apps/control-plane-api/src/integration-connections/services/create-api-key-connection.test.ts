@@ -26,7 +26,7 @@ describe("assertApiKeyConnectionMethodSupportedOrThrow", () => {
 
     try {
       assertApiKeyConnectionMethodSupportedOrThrow({
-        targetKey: "oauth-only-target",
+        targetKey: "oauth2-only-target",
         connectionMethods: [
           {
             id: IntegrationConnectionMethodIds.OAUTH2,
@@ -43,7 +43,7 @@ describe("assertApiKeyConnectionMethodSupportedOrThrow", () => {
     }
     expect(thrownError.code).toBe("API_KEY_NOT_SUPPORTED");
     expect(thrownError.message).toBe(
-      "Integration target 'oauth-only-target' does not support API-key authentication.",
+      "Integration target 'oauth2-only-target' does not support API-key authentication.",
     );
   });
 });

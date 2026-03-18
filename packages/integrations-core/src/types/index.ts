@@ -382,14 +382,14 @@ export type IntegrationCredentialResolvers = {
   custom?: Record<string, IntegrationCredentialResolver>;
 };
 
-export type IntegrationOAuthCredentialMaterial = {
+export type IntegrationRedirectCredentialMaterial = {
   purpose: string;
   secretType: string;
   plaintext: string;
   metadata?: Record<string, unknown>;
 };
 
-export type IntegrationOAuthStartInput<
+export type IntegrationRedirectStartInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
 > = {
@@ -399,11 +399,11 @@ export type IntegrationOAuthStartInput<
   state: string;
 };
 
-export type IntegrationOAuthStartResult = {
+export type IntegrationRedirectStartResult = {
   authorizationUrl: string;
 };
 
-export type IntegrationOAuthCompleteInput<
+export type IntegrationRedirectCompleteInput<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
 > = {
@@ -413,22 +413,22 @@ export type IntegrationOAuthCompleteInput<
   query: URLSearchParams;
 };
 
-export type IntegrationOAuthCompleteResult = {
+export type IntegrationRedirectCompleteResult = {
   externalSubjectId?: string;
   connectionConfig: Record<string, unknown>;
-  credentialMaterials: ReadonlyArray<IntegrationOAuthCredentialMaterial>;
+  credentialMaterials: ReadonlyArray<IntegrationRedirectCredentialMaterial>;
 };
 
-export type IntegrationOAuthHandler<
+export type IntegrationRedirectHandler<
   TTargetConfig = Record<string, unknown>,
   TTargetSecrets = Record<string, string>,
 > = {
   start(
-    input: IntegrationOAuthStartInput<TTargetConfig, TTargetSecrets>,
-  ): MaybePromise<IntegrationOAuthStartResult>;
+    input: IntegrationRedirectStartInput<TTargetConfig, TTargetSecrets>,
+  ): MaybePromise<IntegrationRedirectStartResult>;
   complete(
-    input: IntegrationOAuthCompleteInput<TTargetConfig, TTargetSecrets>,
-  ): MaybePromise<IntegrationOAuthCompleteResult>;
+    input: IntegrationRedirectCompleteInput<TTargetConfig, TTargetSecrets>,
+  ): MaybePromise<IntegrationRedirectCompleteResult>;
 };
 
 export type IntegrationOAuth2StartAuthorizationInput<
@@ -493,6 +493,32 @@ export type IntegrationOAuth2RefreshAccessTokenResult = {
   refreshTokenExpiresAt?: string;
   credentialMetadata?: Record<string, unknown>;
 };
+
+export type IntegrationOAuth2RefreshAccessTokenErrorClassification = "temporary" | "permanent";
+
+export const IntegrationOAuth2RefreshAccessTokenErrorClassifications: {
+  TEMPORARY: IntegrationOAuth2RefreshAccessTokenErrorClassification;
+  PERMANENT: IntegrationOAuth2RefreshAccessTokenErrorClassification;
+} = {
+  TEMPORARY: "temporary",
+  PERMANENT: "permanent",
+};
+
+export class IntegrationOAuth2RefreshAccessTokenError extends Error {
+  readonly classification: IntegrationOAuth2RefreshAccessTokenErrorClassification;
+  readonly code: string | undefined;
+
+  constructor(input: {
+    message: string;
+    classification: IntegrationOAuth2RefreshAccessTokenErrorClassification;
+    code?: string;
+  }) {
+    super(input.message);
+    this.name = "IntegrationOAuth2RefreshAccessTokenError";
+    this.classification = input.classification;
+    this.code = input.code;
+  }
+}
 
 export type IntegrationOAuth2Capability<
   TTargetConfig = Record<string, unknown>,
@@ -980,12 +1006,10 @@ export type IntegrationDefinition<
     ParsedSchemaOutput<TTargetSecretsSchema>,
     TConnectionConfig
   >;
-  authHandlers?: {
-    oauth?: IntegrationOAuthHandler<
-      ParsedSchemaOutput<TTargetConfigSchema>,
-      ParsedSchemaOutput<TTargetSecretsSchema>
-    >;
-  };
+  redirectHandler?: IntegrationRedirectHandler<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>
+  >;
   webhookHandler?: IntegrationWebhookHandler<
     ParsedSchemaOutput<TTargetConfigSchema>,
     ParsedSchemaOutput<TTargetSecretsSchema>,

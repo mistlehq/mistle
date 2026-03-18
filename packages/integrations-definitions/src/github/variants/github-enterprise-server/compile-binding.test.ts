@@ -241,7 +241,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
     expect(compiled.egressRoutes[1]?.match.pathPrefixes).toEqual(["/api/v3", "/api/graphql"]);
   });
 
-  it("uses oauth access token secret type for github app-style oauth connections", () => {
+  it("uses github app installation token secret type for github app installation connections", () => {
     const compiled = compileGitHubEnterpriseServerBinding({
       organizationId: "org_123",
       sandboxProfileId: "sbp_123",
@@ -292,7 +292,7 @@ describe("compileGitHubEnterpriseServerBinding", () => {
     );
   });
 
-  it("fails fast when oauth config omits installation_id", () => {
+  it("fails fast when github app installation config omits installation_id", () => {
     expect(() =>
       compileGitHubEnterpriseServerBinding({
         organizationId: "org_123",

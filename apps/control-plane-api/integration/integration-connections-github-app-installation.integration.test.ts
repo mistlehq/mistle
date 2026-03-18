@@ -373,7 +373,7 @@ describe("integration connections GitHub App installation integration", () => {
     await fixture.db.insert(integrationConnectionRedirectSessions).values({
       organizationId: authenticatedSession.organizationId,
       targetKey: "github-cloud",
-      state: "oauth_state_expired",
+      state: "redirect_state_expired",
       expiresAt: new Date("2020-01-01T00:00:00.000Z").toISOString(),
     });
 
@@ -381,7 +381,7 @@ describe("integration connections GitHub App installation integration", () => {
       createGitHubAppInstallationCompletePath({
         targetKey: "github-cloud",
         query: {
-          state: "oauth_state_expired",
+          state: "redirect_state_expired",
           installation_id: "12345",
         },
       }),
@@ -417,7 +417,7 @@ describe("integration connections GitHub App installation integration", () => {
     await fixture.db.insert(integrationConnectionRedirectSessions).values({
       organizationId: authenticatedSession.organizationId,
       targetKey: "github-cloud",
-      state: "oauth_state_used",
+      state: "redirect_state_used",
       expiresAt: new Date("2030-01-01T00:00:00.000Z").toISOString(),
       usedAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),
     });
@@ -426,7 +426,7 @@ describe("integration connections GitHub App installation integration", () => {
       createGitHubAppInstallationCompletePath({
         targetKey: "github-cloud",
         query: {
-          state: "oauth_state_used",
+          state: "redirect_state_used",
           installation_id: "12345",
         },
       }),

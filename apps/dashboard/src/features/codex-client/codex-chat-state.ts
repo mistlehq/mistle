@@ -1,13 +1,13 @@
 import type {
   CodexJsonRpcNotification,
   CodexThreadReadTurn,
-} from "@mistle/integrations-definitions/openai/agent/browser";
+} from "@mistle/integrations-definitions/openai/agent/client";
 import {
   buildCodexTurnTimelineFromNormalized,
   normalizeCodexThreadItem,
   type CodexTimelineEntry,
   type NormalizedCodexThreadItem,
-} from "@mistle/integrations-definitions/openai/agent/browser";
+} from "@mistle/integrations-definitions/openai/agent/client";
 import { z } from "zod";
 
 import type {

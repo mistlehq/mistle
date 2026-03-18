@@ -123,7 +123,6 @@ describe("sandbox profile compile runtime plan integration", () => {
         clientId: "codex-cli",
         setup: {
           env: {
-            OPENAI_BASE_URL: "https://api.openai.com/v1",
             OPENAI_MODEL: "gpt-5.3-codex",
             OPENAI_REASONING_EFFORT: "medium",
           },
@@ -136,6 +135,7 @@ describe("sandbox profile compile runtime plan integration", () => {
 model_reasoning_effort = "medium"
 approval_policy = "never"
 sandbox_mode = "danger-full-access"
+openai_base_url = "https://api.openai.com/v1"
 developer_instructions = "Prefer concise answers.\\nAlways explain tradeoffs."
 
 [projects."/"]

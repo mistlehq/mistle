@@ -50,7 +50,7 @@ describe("integrations-definitions index", () => {
         },
       ],
     });
-    expect(githubCloudDefinition?.authHandlers?.oauth).toBeDefined();
+    expect(githubCloudDefinition?.redirectHandler).toBeDefined();
     expect(
       githubCloudDefinition?.credentialResolvers?.custom?.github_app_installation_token,
     ).toBeDefined();
@@ -68,7 +68,7 @@ describe("integrations-definitions index", () => {
         },
       ],
     });
-    expect(githubEnterpriseServerDefinition?.authHandlers?.oauth).toBeDefined();
+    expect(githubEnterpriseServerDefinition?.redirectHandler).toBeDefined();
     expect(
       githubEnterpriseServerDefinition?.credentialResolvers?.custom?.github_app_installation_token,
     ).toBeDefined();
