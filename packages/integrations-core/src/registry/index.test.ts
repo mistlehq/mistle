@@ -205,6 +205,6 @@ describe("integration registry", () => {
           runtimeClients: [],
         }),
       }),
-    ).toThrowError(IntegrationDefinitionRegistryError);
+    ).toThrow(IntegrationDefinitionRegistryError);
   });
 });
