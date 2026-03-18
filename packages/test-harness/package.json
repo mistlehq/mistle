@@ -23,7 +23,7 @@
     "@mistle/time": "workspace:*",
     "@testcontainers/postgresql": "^11.13.0",
     "mailpit-api": "^1.7.2",
-    "testcontainers": "^11.7.2",
+    "testcontainers": "^11.13.0",
     "zod": "^4.3.6"
   }
 }
