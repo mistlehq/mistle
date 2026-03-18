@@ -1,6 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
-
 import { ModalClient as ModalSdkClient } from "modal";
 import { it as vitestIt } from "vitest";
 
@@ -27,10 +24,7 @@ export const modalAdapterIntegrationSettings = resolveModalAdapterIntegrationSet
   enabled: modalAdapterIntegrationEnabled,
 });
 
-const SANDBOX_RUNTIME_BASE_DOCKERFILE_PATH = fileURLToPath(
-  new URL("../../../../apps/sandbox-runtime/Dockerfile", import.meta.url),
-);
-const SANDBOX_RUNTIME_BASE_STAGE_NAME = "sandbox-base-prod";
+const SANDBOX_RUNTIME_BASE_REGISTRY_TAG = "ghcr.io/mistlehq/sandbox-base:latest";
 const SANDBOX_KEEPALIVE_ENTRYPOINT_COMMAND = 'ENTRYPOINT ["/bin/sh", "-c", "sleep infinity"]';
 const SANDBOX_STDIN_PROBE_ENTRYPOINT_COMMAND =
   'ENTRYPOINT ["/bin/sh", "-c", "cat > /tmp/mistle-stdin-bootstrap.sh && /bin/sh /tmp/mistle-stdin-bootstrap.sh"]';
@@ -112,7 +106,6 @@ async function resolveModalBaseImageHandle(input: {
   settings: EnabledModalAdapterIntegrationSettings;
   entrypointCommand: string;
 }): Promise<SandboxImageHandle> {
-  const runtimeBaseRegistryTag = await readSandboxRuntimeBaseRegistryTag();
   const appLookupOptions =
     input.settings.modalConfig.environmentName === undefined
       ? { createIfMissing: true }
@@ -125,26 +118,9 @@ async function resolveModalBaseImageHandle(input: {
     appLookupOptions,
   );
   const derivedImage = input.modalClient.images
-    .fromRegistry(runtimeBaseRegistryTag)
+    .fromRegistry(SANDBOX_RUNTIME_BASE_REGISTRY_TAG)
     .dockerfileCommands([input.entrypointCommand]);
   const builtImage = await derivedImage.build(app);
 
   return createBaseImageHandle(builtImage.imageId);
-}
-
-async function readSandboxRuntimeBaseRegistryTag(): Promise<string> {
-  const dockerfileContent = await readFile(SANDBOX_RUNTIME_BASE_DOCKERFILE_PATH, "utf8");
-  const runtimeBaseImagePattern = new RegExp(
-    `^FROM\\s+([^\\s]+)\\s+AS\\s+${SANDBOX_RUNTIME_BASE_STAGE_NAME}\\s*$`,
-    "im",
-  );
-  const runtimeBaseImageMatch = dockerfileContent.match(runtimeBaseImagePattern);
-
-  if (runtimeBaseImageMatch === null || runtimeBaseImageMatch[1] === undefined) {
-    throw new Error(
-      `Unable to derive runtime base image registry tag from ${SANDBOX_RUNTIME_BASE_DOCKERFILE_PATH}. Expected a FROM line for stage "${SANDBOX_RUNTIME_BASE_STAGE_NAME}".`,
-    );
-  }
-
-  return runtimeBaseImageMatch[1];
 }
