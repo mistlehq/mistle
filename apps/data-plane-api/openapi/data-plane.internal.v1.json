@@ -664,7 +664,7 @@
                         "null"
                       ],
                       "properties": {
-                        "after": {
+                        "before": {
                           "type": "string",
                           "minLength": 1
                         },
@@ -675,7 +675,7 @@
                         }
                       },
                       "required": [
-                        "after",
+                        "before",
                         "limit"
                       ],
                       "additionalProperties": false

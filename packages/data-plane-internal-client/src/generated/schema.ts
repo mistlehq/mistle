@@ -149,7 +149,7 @@ export interface paths {
                 limit: number;
               } | null;
               previousPage: {
-                after: string;
+                before: string;
                 limit: number;
               } | null;
               totalResults: number;

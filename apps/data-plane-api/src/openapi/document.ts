@@ -116,9 +116,16 @@ const ListSandboxInstancesItemSchema = z
   })
   .strict();
 
-const ListSandboxInstancesPageCursorSchema = z
+const ListSandboxInstancesNextPageCursorSchema = z
   .object({
     after: z.string().min(1),
+    limit: z.number().int().min(1).max(100),
+  })
+  .strict();
+
+const ListSandboxInstancesPreviousPageCursorSchema = z
+  .object({
+    before: z.string().min(1),
     limit: z.number().int().min(1).max(100),
   })
   .strict();
@@ -127,8 +134,8 @@ const ListSandboxInstancesResponseSchema = z
   .object({
     totalResults: z.number().int().nonnegative(),
     items: z.array(ListSandboxInstancesItemSchema),
-    nextPage: ListSandboxInstancesPageCursorSchema.nullable(),
-    previousPage: ListSandboxInstancesPageCursorSchema.nullable(),
+    nextPage: ListSandboxInstancesNextPageCursorSchema.nullable(),
+    previousPage: ListSandboxInstancesPreviousPageCursorSchema.nullable(),
   })
   .strict();
 
