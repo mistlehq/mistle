@@ -1,6 +1,17 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import {
+  createKeysetPaginationEnvelopeSchema,
+  createKeysetPaginationQuerySchema,
+} from "@mistle/http/pagination";
 
 const SandboxInstanceStatusSchema = z.enum(["starting", "running", "stopped", "failed"]);
+const SandboxInstanceSourceSchema = z.enum(["dashboard", "webhook"]);
+const SandboxInstanceStartedBySchema = z
+  .object({
+    kind: z.enum(["user", "system"]),
+    id: z.string().min(1),
+  })
+  .strict();
 
 export const SandboxInstanceIdParamsSchema = z
   .object({
@@ -33,6 +44,34 @@ export const SandboxInstanceStatusResponseSchema = z
   })
   .strict();
 
+export const SandboxInstanceListItemSchema = z
+  .object({
+    id: z.string().min(1),
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileVersion: z.number().int().min(1),
+    status: SandboxInstanceStatusSchema,
+    startedBy: SandboxInstanceStartedBySchema,
+    source: SandboxInstanceSourceSchema,
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+    failureCode: z.string().min(1).nullable(),
+    failureMessage: z.string().min(1).nullable(),
+  })
+  .strict();
+
+export const ListSandboxInstancesQuerySchema = createKeysetPaginationQuerySchema({
+  defaultLimit: 20,
+  maxLimit: 100,
+});
+
+export const ListSandboxInstancesResponseSchema = createKeysetPaginationEnvelopeSchema(
+  SandboxInstanceListItemSchema,
+  {
+    defaultLimit: 20,
+    maxLimit: 100,
+  },
+);
+
 export const ValidationErrorResponseSchema = z
   .object({
     success: z.literal(false),
@@ -43,7 +82,10 @@ export const ValidationErrorResponseSchema = z
   })
   .strict();
 
-const SandboxInstancesBadRequestCodeSchema = z.enum(["INVALID_INSTANCE_ID"]);
+const SandboxInstancesBadRequestCodeSchema = z.enum([
+  "INVALID_INSTANCE_ID",
+  "INVALID_LIST_INSTANCES_INPUT",
+]);
 const SandboxInstancesNotFoundCodeSchema = z.enum(["INSTANCE_NOT_FOUND"]);
 const SandboxInstancesConflictCodeSchema = z.enum(["INSTANCE_NOT_RUNNING"]);
 
@@ -84,6 +126,57 @@ export const SandboxInstancesForbiddenResponseSchema = z
     message: z.string().min(1),
   })
   .strict();
+
+export const listSandboxInstancesRoute = createRoute({
+  method: "get",
+  path: "/",
+  tags: ["Sandbox Instances"],
+  request: {
+    query: ListSandboxInstancesQuerySchema,
+  },
+  responses: {
+    200: {
+      description: "List sandbox instances.",
+      content: {
+        "application/json": {
+          schema: ListSandboxInstancesResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesUnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesForbiddenResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
 
 export const getSandboxInstanceRoute = createRoute({
   method: "get",

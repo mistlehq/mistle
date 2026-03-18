@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@mistle/config": ["../../packages/config/src/index.ts"],
+      "@mistle/db/data-plane": ["../../packages/db/src/data-plane/index.ts"],
+      "@mistle/http/pagination": ["../../packages/http/src/pagination/index.ts"],
+      "@mistle/integrations-core": ["../../packages/integrations-core/src/index.ts"],
+      "@mistle/logging": ["../../packages/logging/src/index.ts"],
+      "@mistle/time": ["../../packages/time/src/index.ts"],
+      "@mistle/workflow-registry/data-plane": [
+        "../../packages/workflow-registry/src/data-plane.ts"
+      ],
+      "@mistle/*": ["../../packages/*/src/index.ts"]
+    }
+  },
+  "include": ["src/openapi/**/*.ts"]
+}

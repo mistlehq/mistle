@@ -1,6 +1,7 @@
 import type {
   DataPlaneSandboxInstancesClient,
   GetSandboxInstanceResponse,
+  ListSandboxInstancesResponse,
 } from "@mistle/data-plane-internal-client";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 
@@ -35,7 +36,15 @@ export type SandboxInstanceStatus = {
   failureMessage: string | null;
 };
 
+export type ListSandboxInstancesResult = ListSandboxInstancesResponse;
+
 export type SandboxInstancesService = {
+  listInstances: (input: {
+    organizationId: string;
+    limit?: number;
+    after?: string;
+    before?: string;
+  }) => Promise<ListSandboxInstancesResult>;
   getInstance: (input: {
     organizationId: string;
     instanceId: string;
