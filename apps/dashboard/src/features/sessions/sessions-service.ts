@@ -1,8 +1,10 @@
 import { z } from "zod";
 
+import { getControlPlaneApiClient } from "../../lib/control-plane-api/client.js";
 import { normalizeHttpApiError } from "../api/http-api-error.js";
 import { requestControlPlane } from "../api/request-control-plane.js";
 import { SandboxProfilesApiError } from "../sandbox-profiles/sandbox-profiles-api-errors.js";
+import type { SandboxInstancesListResult } from "./sessions-types.js";
 
 const StartSandboxProfileInstanceResponseSchema = z
   .object({
@@ -48,6 +50,48 @@ export type MintSandboxConnectionTokenResult = {
   connectionToken: string;
   connectionExpiresAt: string;
 };
+
+export async function listSandboxInstances(input: {
+  limit: number;
+  after: string | null;
+  before: string | null;
+  signal?: AbortSignal;
+}): Promise<SandboxInstancesListResult> {
+  try {
+    const client = getControlPlaneApiClient();
+    const { data } = await client.GET("/v1/sandbox/instances", {
+      credentials: "include",
+      params: {
+        query: {
+          limit: input.limit,
+          ...(input.after === null ? {} : { after: input.after }),
+          ...(input.before === null ? {} : { before: input.before }),
+        },
+      },
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+    });
+
+    if (data === undefined) {
+      throw new SandboxProfilesApiError({
+        operation: "listSandboxInstances",
+        status: 500,
+        body: null,
+        message: "Sandbox instances list response was empty.",
+        code: null,
+      });
+    }
+
+    return data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "listSandboxInstances",
+        error,
+        fallbackMessage: "Could not load sandbox instances.",
+      }),
+    );
+  }
+}
 
 export async function startSandboxInstanceFromProfileVersion(input: {
   profileId: string;

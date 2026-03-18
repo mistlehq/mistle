@@ -26,6 +26,10 @@ import {
   type CodexServerRequestEntry,
 } from "./codex-server-requests-state.js";
 import {
+  describeCodexSessionStepError,
+  StaleConnectionAttemptError,
+} from "./codex-session-errors.js";
+import {
   parseThreadLifecycleEvent,
   parseThreadTokenUsageSnapshot,
   parseTurnDiffSnapshot,
@@ -47,20 +51,6 @@ import { useCodexChatController, type CodexChatState } from "./use-codex-chat-co
 import { useCodexSessionAdmin } from "./use-codex-session-admin.js";
 import { useCodexSessionDebugState } from "./use-codex-session-debug-state.js";
 import { useCodexThreadCollections } from "./use-codex-thread-collections.js";
-
-function describeStepError(stepLabel: string, error: unknown): Error {
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return new Error(`${stepLabel} failed: ${error.message}`);
-  }
-
-  return new Error(`${stepLabel} failed.`);
-}
-
-class StaleConnectionAttemptError extends Error {
-  constructor() {
-    super("Stale connection attempt.");
-  }
-}
 
 export type {
   ConnectedCodexSession,
@@ -467,7 +457,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
         });
         ensureCurrentGeneration(generation);
       } catch (error) {
-        throw describeStepError("Minting sandbox connection token", error);
+        throw describeCodexSessionStepError("Minting sandbox connection token", error);
       }
 
       const sessionClient = new CodexSessionClient({
@@ -486,7 +476,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
         await sessionClient.connect();
         ensureCurrentGeneration(generation);
       } catch (error) {
-        throw describeStepError("Connecting to sandbox agent channel", error);
+        throw describeCodexSessionStepError("Connecting to sandbox agent channel", error);
       }
 
       try {
@@ -494,7 +484,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
         ensureCurrentGeneration(generation);
       } catch (error) {
         sessionClient.disconnect(1000, "Initialization failed.");
-        throw describeStepError("Initializing Codex app server", error);
+        throw describeCodexSessionStepError("Initializing Codex app server", error);
       }
 
       const threadCollections = await refreshThreadCollections({
