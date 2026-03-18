@@ -1,6 +1,5 @@
 import { fileURLToPath } from "node:url";
 
-import tsconfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vitest/config";
 
 const TimeSourcePath = fileURLToPath(new URL("../packages/time/src/index.ts", import.meta.url));
@@ -12,8 +11,8 @@ const IntegrationsDefinitionsOpenAiAgentServerPath = fileURLToPath(
 );
 
 export default defineConfig({
-  plugins: [tsconfigPaths()],
   resolve: {
+    tsconfigPaths: true,
     alias: {
       "@mistle/integrations-definitions/openai/agent/server":
         IntegrationsDefinitionsOpenAiAgentServerPath,
