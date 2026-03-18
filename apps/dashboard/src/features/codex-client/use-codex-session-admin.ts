@@ -11,7 +11,7 @@ import {
   type CodexExternalAgentMigrationItem,
   type CodexJsonRpcClient,
   type CodexModelSummary,
-} from "@mistle/integrations-definitions/openai/agent/browser";
+} from "@mistle/integrations-definitions/openai/agent/client";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useState, type MutableRefObject } from "react";
 

@@ -1,4 +1,4 @@
-import type { CodexSessionConnectionState } from "@mistle/integrations-definitions/openai/agent/browser";
+import type { CodexSessionConnectionState } from "@mistle/integrations-definitions/openai/agent/client";
 import { useState } from "react";
 
 import type { ConnectedCodexSession } from "../codex-client/codex-session-types.js";

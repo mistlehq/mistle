@@ -4,7 +4,7 @@ import {
   startCodexTurn,
   steerCodexTurn,
   type CodexJsonRpcClient,
-} from "@mistle/integrations-definitions/openai/agent/browser";
+} from "@mistle/integrations-definitions/openai/agent/client";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useReducer, type MutableRefObject } from "react";
 

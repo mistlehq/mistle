@@ -10,8 +10,8 @@
     "test:e2e": "playwright test --config playwright.config.ts --pass-with-no-tests"
   },
   "devDependencies": {
-    "@mistle/codex-app-server-client": "workspace:*",
     "@mistle/db": "workspace:*",
+    "@mistle/integrations-definitions": "workspace:*",
     "@mistle/sandbox-session-protocol": "workspace:*",
     "@mistle/test-harness": "workspace:*",
     "@mistle/time": "workspace:*",

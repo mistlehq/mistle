@@ -18,12 +18,6 @@ export default defineConfig({
         ),
       },
       {
-        find: "@mistle/codex-app-server-client/json-rpc/client.js",
-        replacement: fileURLToPath(
-          new URL("../../packages/codex-app-server-client/src/json-rpc/client.ts", import.meta.url),
-        ),
-      },
-      {
         find: /^@mistle\/sandbox-session-client\/node$/,
         replacement: fileURLToPath(
           new URL("../../packages/sandbox-session-client/src/node.ts", import.meta.url),

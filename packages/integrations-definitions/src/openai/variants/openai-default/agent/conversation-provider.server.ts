@@ -1,7 +1,3 @@
-import {
-  CodexJsonRpcClient,
-  CodexJsonRpcRequestError,
-} from "@mistle/codex-app-server-client/json-rpc/client.js";
 import type {
   AgentConversationConnectInput,
   AgentConversationConnection,
@@ -10,6 +6,7 @@ import type {
 } from "@mistle/integrations-core";
 import { systemScheduler, type TimerHandle } from "@mistle/time";
 
+import { CodexJsonRpcClient, CodexJsonRpcRequestError } from "./codex-json-rpc.js";
 import {
   connectSandboxAgentConnection,
   type SandboxAgentConnection,
