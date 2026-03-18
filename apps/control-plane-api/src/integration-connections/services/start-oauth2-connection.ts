@@ -35,10 +35,6 @@ function buildOAuth2CompleteUrl(input: { controlPlaneBaseUrl: string; targetKey:
   ).toString();
 }
 
-function createPkceVerifier(): string {
-  return createRedirectState();
-}
-
 function createPkceChallenge(verifier: string): string {
   return createHash("sha256").update(verifier, "utf8").digest("base64url");
 }
@@ -86,7 +82,7 @@ export async function startOAuth2Connection(
     state: createRedirectState(),
     ...(input.displayName === undefined ? {} : { displayName: input.displayName }),
   });
-  const pkceVerifier = createPkceVerifier();
+  const pkceVerifier = createRedirectState();
   const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
     masterKeyVersion: integrationsConfig.activeMasterEncryptionKeyVersion,
     masterEncryptionKeys: integrationsConfig.masterEncryptionKeys,
