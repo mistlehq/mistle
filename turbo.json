@@ -33,17 +33,14 @@
       "outputs": ["dist/**"]
     },
     "lint": {
-      "outputLogs": "errors-only",
       "outputs": []
     },
     "typecheck": {
       "dependsOn": ["^build"],
-      "outputLogs": "errors-only",
       "outputs": []
     },
     "test": {
       "dependsOn": ["^build", "^typecheck"],
-      "outputLogs": "errors-only",
       "passThroughEnv": ["MISTLE_*"],
       "outputs": []
     },
