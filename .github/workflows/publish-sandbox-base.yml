@@ -35,6 +35,7 @@ jobs:
     env:
       IMAGE_REPOSITORY: ghcr.io/mistlehq/sandbox-base
       IMAGE_TAG: ${{ github.sha }}
+      IMAGE_LATEST_TAG: latest
       IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
 
     steps:
@@ -63,10 +64,13 @@ jobs:
             --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
             --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
             --tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}" \
+            --tag "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}" \
             .
 
       - name: Push sandbox base image
-        run: docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+        run: |
+          docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+          docker push "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}"
 
       - name: Resolve pushed digest
         id: publish
@@ -80,5 +84,6 @@ jobs:
             echo "## Published image"
             echo
             echo "- Tag: \`${IMAGE_REPOSITORY}:${IMAGE_TAG}\`"
+            echo "- Alias: \`${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}\`"
             echo "- Digest: \`${{ steps.publish.outputs.image_ref }}\`"
           } >> "${GITHUB_STEP_SUMMARY}"
