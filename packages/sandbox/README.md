@@ -4,6 +4,7 @@ Provider-agnostic sandbox lifecycle package used by Mistle services.
 
 Current scope:
 
+- create and delete provider-backed durable volumes
 - start a sandbox from an image handle
 - stop a running sandbox
 
@@ -42,8 +43,14 @@ Unknown provider names fail fast during integration config parsing.
 The package root exports:
 
 - `SandboxProvider`
+- `SandboxRuntimeProvider`
+- `SandboxVolumeProvider`
 - `SandboxImageHandle`
+- `SandboxVolumeHandleV1`
+- `SandboxVolumeMountV1`
 - `SandboxHandle`
+- `CreateVolumeRequestV1`
+- `DeleteVolumeRequestV1`
 - `SandboxStartRequest`
 - `SandboxStopRequest`
 - `SandboxAdapter`
@@ -67,18 +74,31 @@ const baseImage: SandboxImageHandle = {
   createdAt: new Date().toISOString(),
 };
 
-const sandbox = await adapter.start({ image: baseImage });
+const volume = await adapter.createVolume({});
+
+const sandbox = await adapter.start({
+  image: baseImage,
+  mounts: [
+    {
+      volume,
+      mountPath: "/home/sandbox",
+    },
+  ],
+});
 await sandbox.writeStdin({
   payload: Buffer.from("bootstrap payload\n", "utf8"),
 });
 await sandbox.closeStdin();
 
-await adapter.stop({ sandboxId: sandbox.sandboxId });
+await adapter.stop({ runtimeId: sandbox.runtimeId });
+await adapter.deleteVolume({ volumeId: volume.volumeId });
 ```
 
 ## Usage Notes
 
 - Sandbox image handles describe the provider image passed to `start({ image })`.
+- Sandbox volume handles are opaque provider-managed volume references returned by `createVolume({})`.
+- `SandboxStartRequest.mounts` attaches provider-backed volumes at the requested mount paths.
 - `SandboxHandle.writeStdin({ payload })` writes bytes to running sandbox stdin.
 - `SandboxHandle.closeStdin()` closes stdin to signal EOF.
 - Operations may throw `SandboxError` subclasses. Configuration failures throw `SandboxConfigurationError`.
@@ -87,6 +107,7 @@ await adapter.stop({ sandboxId: sandbox.sandboxId });
 
 `@mistle/sandbox` is responsible only for sandbox lifecycle operations exposed by the adapter interface:
 
+- create and delete provider-backed volumes
 - start a sandbox from an image handle
 - stop a sandbox
 
@@ -106,7 +127,7 @@ Use the current Modal provider as the reference implementation.
 8. Wire the provider into `createSandboxAdapter` in `src/factory.ts`.
 9. Add unit tests next to each provider module (config, errors, factory wiring, and adapter behavior).
 10. Add provider integration tests in `integration/<provider>/` (for example `integration/modal/modal-adapter.integration.test.ts`).
-11. Integration tests must cover the provider lifecycle surface: `start` from a base image, validate sandbox interaction such as stdin/filesystem/env behavior, and `stop`.
+11. Integration tests must cover the provider lifecycle surface: `createVolume`, `deleteVolume`, `start` from a base image, validate sandbox interaction such as stdin/filesystem/env behavior, mounted volume behavior, and `stop`.
 
 Design expectations:
 

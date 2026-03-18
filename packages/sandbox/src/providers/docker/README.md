@@ -27,9 +27,11 @@ const adapter = createSandboxAdapter({
 
 ## Provider Behavior
 
-- `start({ image })` pulls image reference and starts a Docker container.
+- `createVolume({})` creates a named Docker volume and returns an opaque handle.
+- `deleteVolume({ volumeId })` removes that Docker volume.
+- `start({ image, mounts })` pulls image reference and starts a Docker container with optional volume mounts.
 - returned `SandboxHandle` supports `writeStdin({ payload })` and `closeStdin()` for container stdin lifecycle.
-- `stop({ sandboxId })` force-removes the Docker container.
+- `stop({ runtimeId })` force-removes the Docker container.
 
 ## Error Surface
 

@@ -19,6 +19,6 @@ export async function stopSandbox(
   }
 
   await ctx.sandboxAdapter.stop({
-    sandboxId: input.providerRuntimeId,
+    runtimeId: input.providerRuntimeId,
   });
 }

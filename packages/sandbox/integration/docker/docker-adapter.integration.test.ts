@@ -9,6 +9,8 @@ import { dockerAdapterIntegrationEnabled, it } from "./test-context.js";
 const describeDockerAdapterIntegration = dockerAdapterIntegrationEnabled ? describe : describe.skip;
 const START_MARKER_FILE_PATH = "/tmp/mistle-start-marker.txt";
 const INJECTED_ENV_KEY = "MISTLE_SANDBOX_INJECTED_ENV";
+const VOLUME_MOUNT_PATH = "/mnt/mistle-volume";
+const VOLUME_MARKER_FILE_PATH = `${VOLUME_MOUNT_PATH}/mistle-volume-marker.txt`;
 
 type ContainerCommandResult = {
   exitCode: number;
@@ -43,10 +45,10 @@ async function readUtf8Stream(stream: NodeJS.ReadableStream): Promise<string> {
 
 async function runContainerCommand(input: {
   dockerClient: Docker;
-  sandboxId: string;
+  runtimeId: string;
   command: string[];
 }): Promise<ContainerCommandResult> {
-  const container = input.dockerClient.getContainer(input.sandboxId);
+  const container = input.dockerClient.getContainer(input.runtimeId);
   const exec = await container.exec({
     AttachStdout: true,
     AttachStderr: true,
@@ -62,7 +64,7 @@ async function runContainerCommand(input: {
 
   if (inspect.ExitCode === null) {
     throw new Error(
-      `Container command did not report an exit code for sandbox ${input.sandboxId}.`,
+      `Container command did not report an exit code for runtime ${input.runtimeId}.`,
     );
   }
 
@@ -74,14 +76,14 @@ async function runContainerCommand(input: {
 
 async function writeSandboxFile(input: {
   dockerClient: Docker;
-  sandboxId: string;
+  runtimeId: string;
   path: string;
   fileContents: string;
 }): Promise<void> {
   const command = ["sh", "-lc", `cat <<'EOF' > ${input.path}\n${input.fileContents}\nEOF`];
   const result = await runContainerCommand({
     dockerClient: input.dockerClient,
-    sandboxId: input.sandboxId,
+    runtimeId: input.runtimeId,
     command,
   });
 
@@ -94,12 +96,12 @@ async function writeSandboxFile(input: {
 
 async function readSandboxFile(input: {
   dockerClient: Docker;
-  sandboxId: string;
+  runtimeId: string;
   path: string;
 }): Promise<string> {
   const result = await runContainerCommand({
     dockerClient: input.dockerClient,
-    sandboxId: input.sandboxId,
+    runtimeId: input.runtimeId,
     command: ["cat", input.path],
   });
 
@@ -115,31 +117,31 @@ async function readSandboxFile(input: {
 describeDockerAdapterIntegration("docker adapter integration", () => {
   it("starts a sandbox from a base image and exposes its filesystem", async ({ fixture }) => {
     const startMarker = `mistle-docker-start-${randomUUID()}`;
-    let sandboxId: string | undefined;
+    let runtimeId: string | undefined;
 
     try {
       const sandbox = await fixture.adapter.start({ image: fixture.baseImage });
-      sandboxId = sandbox.sandboxId;
+      runtimeId = sandbox.runtimeId;
 
       expect(sandbox.provider).toBe(SandboxProvider.DOCKER);
-      expect(sandbox.sandboxId).not.toBe("");
+      expect(sandbox.runtimeId).not.toBe("");
 
       await writeSandboxFile({
         dockerClient: fixture.dockerClient,
-        sandboxId: sandbox.sandboxId,
+        runtimeId: sandbox.runtimeId,
         path: START_MARKER_FILE_PATH,
         fileContents: startMarker,
       });
 
       const readback = await readSandboxFile({
         dockerClient: fixture.dockerClient,
-        sandboxId: sandbox.sandboxId,
+        runtimeId: sandbox.runtimeId,
         path: START_MARKER_FILE_PATH,
       });
       expect(readback).toBe(startMarker);
     } finally {
-      if (sandboxId !== undefined) {
-        await fixture.adapter.stop({ sandboxId });
+      if (runtimeId !== undefined) {
+        await fixture.adapter.stop({ runtimeId });
       }
     }
   }, 300_000);
@@ -150,11 +152,11 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       `printf '%s' '${startupToken}' > /tmp/mistle-startup-token\nsleep 300\n`,
       "utf8",
     );
-    let sandboxId: string | undefined;
+    let runtimeId: string | undefined;
 
     try {
       const sandbox = await fixture.adapter.start({ image: fixture.startupStdinProbeImage });
-      sandboxId = sandbox.sandboxId;
+      runtimeId = sandbox.runtimeId;
       await sandbox.writeStdin({
         payload: startupScript,
       });
@@ -162,20 +164,20 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
 
       const tokenFromSandbox = await readSandboxFile({
         dockerClient: fixture.dockerClient,
-        sandboxId: sandbox.sandboxId,
+        runtimeId: sandbox.runtimeId,
         path: "/tmp/mistle-startup-token",
       });
       expect(tokenFromSandbox).toBe(startupToken);
     } finally {
-      if (sandboxId !== undefined) {
-        await fixture.adapter.stop({ sandboxId });
+      if (runtimeId !== undefined) {
+        await fixture.adapter.stop({ runtimeId });
       }
     }
   }, 300_000);
 
   it("injects start env into sandbox process", async ({ fixture }) => {
     const injectedEnvValue = `mistle-docker-env-${randomUUID()}`;
-    let sandboxId: string | undefined;
+    let runtimeId: string | undefined;
 
     try {
       const sandbox = await fixture.adapter.start({
@@ -184,20 +186,95 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
           [INJECTED_ENV_KEY]: injectedEnvValue,
         },
       });
-      sandboxId = sandbox.sandboxId;
+      runtimeId = sandbox.runtimeId;
 
       const result = await runContainerCommand({
         dockerClient: fixture.dockerClient,
-        sandboxId: sandbox.sandboxId,
+        runtimeId: sandbox.runtimeId,
         command: ["sh", "-lc", `printenv ${INJECTED_ENV_KEY}`],
       });
 
       expect(result.exitCode).toBe(0);
       expect(result.output.trimEnd()).toBe(injectedEnvValue);
     } finally {
-      if (sandboxId !== undefined) {
-        await fixture.adapter.stop({ sandboxId });
+      if (runtimeId !== undefined) {
+        await fixture.adapter.stop({ runtimeId });
       }
+    }
+  }, 300_000);
+
+  it("creates and deletes a docker volume", async ({ fixture }) => {
+    const volume = await fixture.adapter.createVolume({});
+
+    expect(volume.provider).toBe(SandboxProvider.DOCKER);
+    expect(volume.volumeId).not.toBe("");
+
+    await expect(fixture.dockerClient.getVolume(volume.volumeId).inspect()).resolves.toMatchObject({
+      Name: volume.volumeId,
+    });
+
+    await fixture.adapter.deleteVolume({ volumeId: volume.volumeId });
+
+    await expect(fixture.dockerClient.getVolume(volume.volumeId).inspect()).rejects.toMatchObject({
+      statusCode: 404,
+    });
+  }, 300_000);
+
+  it("mounts a created volume and preserves its contents across fresh runtime starts", async ({
+    fixture,
+  }) => {
+    const marker = `mistle-docker-volume-${randomUUID()}`;
+    const volume = await fixture.adapter.createVolume({});
+    let firstRuntimeId: string | undefined;
+    let secondRuntimeId: string | undefined;
+
+    try {
+      const firstSandbox = await fixture.adapter.start({
+        image: fixture.baseImage,
+        mounts: [
+          {
+            volume,
+            mountPath: VOLUME_MOUNT_PATH,
+          },
+        ],
+      });
+      firstRuntimeId = firstSandbox.runtimeId;
+
+      await writeSandboxFile({
+        dockerClient: fixture.dockerClient,
+        runtimeId: firstSandbox.runtimeId,
+        path: VOLUME_MARKER_FILE_PATH,
+        fileContents: marker,
+      });
+
+      await fixture.adapter.stop({ runtimeId: firstSandbox.runtimeId });
+      firstRuntimeId = undefined;
+
+      const secondSandbox = await fixture.adapter.start({
+        image: fixture.baseImage,
+        mounts: [
+          {
+            volume,
+            mountPath: VOLUME_MOUNT_PATH,
+          },
+        ],
+      });
+      secondRuntimeId = secondSandbox.runtimeId;
+
+      const readback = await readSandboxFile({
+        dockerClient: fixture.dockerClient,
+        runtimeId: secondSandbox.runtimeId,
+        path: VOLUME_MARKER_FILE_PATH,
+      });
+      expect(readback).toBe(marker);
+    } finally {
+      if (firstRuntimeId !== undefined) {
+        await fixture.adapter.stop({ runtimeId: firstRuntimeId });
+      }
+      if (secondRuntimeId !== undefined) {
+        await fixture.adapter.stop({ runtimeId: secondRuntimeId });
+      }
+      await fixture.adapter.deleteVolume({ volumeId: volume.volumeId });
     }
   }, 300_000);
 });
