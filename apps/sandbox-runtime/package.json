@@ -1,5 +1,5 @@
 {
-  "name": "@mistle/sandbox-runtime-node",
+  "name": "@mistle/sandbox-runtime",
   "private": true,
   "type": "module",
   "scripts": {

@@ -13,7 +13,7 @@ type SandboxUserRecord = {
 
 export const HomeEnv = "HOME";
 export const LognameEnv = "LOGNAME";
-export const PackagedRuntimeBinaryName = "sandboxd-node";
+export const PackagedRuntimeBinaryName = "sandboxd";
 export const UserEnv = "USER";
 
 function normalizePathArgument(argument: string): string {

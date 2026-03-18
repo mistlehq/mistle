@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const AppRootPath = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const SeaOutputDirectoryPath = resolve(AppRootPath, "dist-sea");
-const RuntimeBinaryPath = resolve(SeaOutputDirectoryPath, "sandboxd-node");
+const RuntimeBinaryPath = resolve(SeaOutputDirectoryPath, "sandboxd");
 
 function createStartupInputJson() {
   return JSON.stringify({

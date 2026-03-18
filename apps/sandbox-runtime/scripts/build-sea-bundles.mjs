@@ -10,8 +10,8 @@ const NativeAddonShimPath = resolve(AppRootPath, "scripts/sea/native-addon-shim.
 const SeaSourceRootPath = resolve(AppRootPath, "src/sea");
 
 export const SeaBundleFileNames = {
-  BOOTSTRAP: "sandbox-bootstrap-node.cjs",
-  RUNTIME: "sandboxd-node.cjs",
+  BOOTSTRAP: "sandbox-bootstrap.cjs",
+  RUNTIME: "sandboxd.cjs",
 };
 
 async function buildSeaBundle(input) {

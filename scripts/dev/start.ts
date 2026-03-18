@@ -313,7 +313,7 @@ function start(): void {
       "--target",
       "sandbox-base-dev",
       "-f",
-      "apps/sandbox-runtime/images/base/Dockerfile",
+      "apps/sandbox-runtime/Dockerfile",
       "-t",
       SANDBOX_BASE_IMAGE_TAG,
       ".",

@@ -110,13 +110,8 @@ describe("buildPackagedRuntimeExecInput", () => {
         USER: "root",
         SANDBOX_RUNTIME_PROXY_CA_KEY_FD: "88",
       },
-      processArgv: [
-        "/tmp/sandbox-bootstrap-node",
-        "/tmp/sandbox-bootstrap-node",
-        "--trace",
-        "child",
-      ],
-      runtimeExecutablePath: "/tmp/sandboxd-node",
+      processArgv: ["/tmp/sandbox-bootstrap", "/tmp/sandbox-bootstrap", "--trace", "child"],
+      runtimeExecutablePath: "/tmp/sandboxd",
       userRecord: {
         username: "sandbox",
         uid: 1000,
@@ -131,7 +126,7 @@ describe("buildPackagedRuntimeExecInput", () => {
     expect(input).toEqual({
       uid: 1000,
       gid: 1000,
-      command: "/tmp/sandboxd-node",
+      command: "/tmp/sandboxd",
       args: ["--trace", "child"],
       env: [
         {
@@ -161,7 +156,7 @@ describe("buildPackagedRuntimeExecInput", () => {
 
 describe("resolvePackagedRuntimeExecutablePath", () => {
   it("resolves a sibling packaged runtime binary", () => {
-    expect(resolvePackagedRuntimeExecutablePath("/tmp/bin/sandbox-bootstrap-node")).toBe(
+    expect(resolvePackagedRuntimeExecutablePath("/tmp/bin/sandbox-bootstrap")).toBe(
       `/tmp/bin/${PackagedRuntimeBinaryName}`,
     );
   });

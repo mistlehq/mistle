@@ -13,8 +13,8 @@ const SeaBundleDirectoryPath = resolve(SeaOutputDirectoryPath, "bundles");
 const SeaBlobDirectoryPath = resolve(SeaOutputDirectoryPath, "blobs");
 const NativeDistDirectoryPath = resolve(RepositoryRootPath, "packages/sandbox-rs-napi/dist");
 const SeaSentinelFuse = "NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2";
-const BootstrapBinaryName = "sandbox-bootstrap-node";
-const RuntimeBinaryName = "sandboxd-node";
+const BootstrapBinaryName = "sandbox-bootstrap";
+const RuntimeBinaryName = "sandboxd";
 
 function runCommand(command, args, cwd = RepositoryRootPath) {
   execFileSync(command, args, {
@@ -122,14 +122,14 @@ async function main() {
     fileName: "bootstrap.sea.json",
     config: createSeaConfig({
       bundleFileName: SeaBundleFileNames.BOOTSTRAP,
-      blobFileName: "sandbox-bootstrap-node.blob",
+      blobFileName: "sandbox-bootstrap.blob",
     }),
   });
   const runtimeConfigPath = await writeSeaConfig({
     fileName: "runtime.sea.json",
     config: createSeaConfig({
       bundleFileName: SeaBundleFileNames.RUNTIME,
-      blobFileName: "sandboxd-node.blob",
+      blobFileName: "sandboxd.blob",
     }),
   });
 
@@ -144,11 +144,11 @@ async function main() {
 
   injectSeaBlob({
     binaryPath: bootstrapBinaryPath,
-    blobPath: resolve(SeaBlobDirectoryPath, "sandbox-bootstrap-node.blob"),
+    blobPath: resolve(SeaBlobDirectoryPath, "sandbox-bootstrap.blob"),
   });
   injectSeaBlob({
     binaryPath: runtimeBinaryPath,
-    blobPath: resolve(SeaBlobDirectoryPath, "sandboxd-node.blob"),
+    blobPath: resolve(SeaBlobDirectoryPath, "sandboxd.blob"),
   });
 
   const nativeAddonPath = await resolveNativeAddonPath();

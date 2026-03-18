@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const ScriptDirectoryPath = dirname(fileURLToPath(import.meta.url));
 const RepositoryRootPath = resolve(ScriptDirectoryPath, "../..");
-const SeaOutputPath = resolve(RepositoryRootPath, "apps/sandbox-runtime-node/dist-sea");
+const SeaOutputPath = resolve(RepositoryRootPath, "apps/sandbox-runtime/dist-sea");
 const NodeToolchainImage = "node:25-bookworm-slim";
 
 function resolveContainerPlatform() {
@@ -32,7 +32,7 @@ function buildCopyCommand() {
     "--exclude=.git",
     "--exclude=.turbo",
     "--exclude=node_modules",
-    "--exclude=apps/sandbox-runtime-node/dist-sea",
+    "--exclude=apps/sandbox-runtime/dist-sea",
     "-cf",
     "-",
     ".",
@@ -46,7 +46,7 @@ function buildSeaCommand() {
     "set -euo pipefail",
     "cd /work",
     "pnpm install --frozen-lockfile",
-    "pnpm --filter @mistle/sandbox-runtime-node build:sea",
+    "pnpm --filter @mistle/sandbox-runtime build:sea",
   ].join(" && ");
 }
 
@@ -87,7 +87,7 @@ async function main() {
     runCommand("rm", ["-rf", SeaOutputPath]);
     runCommand("docker", [
       "cp",
-      `${containerName}:/work/apps/sandbox-runtime-node/dist-sea`,
+      `${containerName}:/work/apps/sandbox-runtime/dist-sea`,
       SeaOutputPath,
     ]);
   } finally {

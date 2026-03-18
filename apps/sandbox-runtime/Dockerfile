@@ -35,7 +35,7 @@ RUN groupadd --gid "${SANDBOX_GID}" "${SANDBOX_USER}" \
 
 RUN curl -fsSL https://mise.run | MISE_VERSION="${MISE_VERSION}" MISE_INSTALL_PATH="/usr/local/bin/mise" sh
 
-COPY apps/sandbox-runtime/images/base/mistle-path.sh /etc/profile.d/mistle-path.sh
+COPY apps/sandbox-runtime/mistle-path.sh /etc/profile.d/mistle-path.sh
 
 RUN chmod +x \
   /etc/profile.d/mistle-path.sh \
@@ -53,13 +53,11 @@ RUN apt-get update \
     libatomic1 \
   && rm -rf /var/lib/apt/lists/*
 
-COPY apps/sandbox-runtime-node/dist-sea/ /usr/local/bin/
+COPY apps/sandbox-runtime/dist-sea/ /usr/local/bin/
 
 RUN chmod +x \
-  /usr/local/bin/sandbox-bootstrap-node \
-  /usr/local/bin/sandboxd-node \
-  && ln -sf /usr/local/bin/sandbox-bootstrap-node /usr/local/bin/sandbox-bootstrap \
-  && ln -sf /usr/local/bin/sandboxd-node /usr/local/bin/sandboxd
+  /usr/local/bin/sandbox-bootstrap \
+  /usr/local/bin/sandboxd
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/sandbox-bootstrap"]
 
@@ -72,7 +70,3 @@ RUN apt-get update \
     strace \
     vim \
   && rm -rf /var/lib/apt/lists/*
-
-FROM sandbox-base-prod AS sandbox-base-node-prod
-
-FROM sandbox-base-dev AS sandbox-base-node-dev

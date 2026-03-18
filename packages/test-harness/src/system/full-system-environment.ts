@@ -36,7 +36,7 @@ const REGISTRY_IMAGE_REFERENCE = "registry:3";
 const REGISTRY_INTERNAL_PORT = 5000;
 const REGISTRY_NETWORK_ALIAS = "registry";
 const SANDBOX_SNAPSHOT_REPOSITORY_PATH = "mistle/snapshots";
-const SANDBOX_BASE_IMAGE_DOCKERFILE_PATH = "apps/sandbox-runtime/images/base/Dockerfile";
+const SANDBOX_BASE_IMAGE_DOCKERFILE_PATH = "apps/sandbox-runtime/Dockerfile";
 
 const execFileAsync = promisify(execFile);
 
