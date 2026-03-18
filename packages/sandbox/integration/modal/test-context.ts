@@ -28,7 +28,7 @@ export const modalAdapterIntegrationSettings = resolveModalAdapterIntegrationSet
 });
 
 const SANDBOX_RUNTIME_BASE_DOCKERFILE_PATH = fileURLToPath(
-  new URL("../../../../apps/sandbox-runtime/images/base/Dockerfile", import.meta.url),
+  new URL("../../../../apps/sandbox-runtime/Dockerfile", import.meta.url),
 );
 const SANDBOX_RUNTIME_BASE_STAGE_NAME = "sandbox-base-prod";
 const SANDBOX_KEEPALIVE_ENTRYPOINT_COMMAND = 'ENTRYPOINT ["/bin/sh", "-c", "sleep infinity"]';

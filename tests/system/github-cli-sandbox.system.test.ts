@@ -4,6 +4,13 @@
 
 import { randomUUID } from "node:crypto";
 
+import {
+  decodeDataFrame,
+  encodeDataFrame,
+  PayloadKindRawBytes,
+  parseBootstrapControlMessage,
+  type BootstrapControlMessage,
+} from "@mistle/sandbox-session-protocol";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect } from "vitest";
 import { z } from "zod";
@@ -73,50 +80,6 @@ const SandboxInstanceConnectionTokenResponseSchema = z
   })
   .strict();
 
-const StreamOpenOKSchema = z
-  .object({
-    type: z.literal("stream.open.ok"),
-    streamId: z.number().int().positive(),
-  })
-  .strict();
-
-const StreamOpenErrorSchema = z
-  .object({
-    type: z.literal("stream.open.error"),
-    streamId: z.number().int().positive(),
-    code: z.string().min(1),
-    message: z.string().min(1),
-  })
-  .strict();
-
-const StreamResetSchema = z
-  .object({
-    type: z.literal("stream.reset"),
-    streamId: z.number().int().positive(),
-    code: z.string().min(1),
-    message: z.string().min(1),
-  })
-  .strict();
-
-const PTYExitEventSchema = z
-  .object({
-    type: z.literal("stream.event"),
-    streamId: z.number().int().positive(),
-    event: z
-      .object({
-        type: z.literal("pty.exit"),
-        exitCode: z.number().int(),
-      })
-      .strict(),
-  })
-  .strict();
-
-type JsonControlMessage =
-  | z.infer<typeof StreamOpenOKSchema>
-  | z.infer<typeof StreamOpenErrorSchema>
-  | z.infer<typeof StreamResetSchema>
-  | z.infer<typeof PTYExitEventSchema>;
-
 type PtyFrame =
   | {
       kind: "binary";
@@ -124,7 +87,7 @@ type PtyFrame =
     }
   | {
       kind: "control";
-      payload: JsonControlMessage;
+      payload: BootstrapControlMessage;
     };
 
 type QueuedPtyFrame =
@@ -337,46 +300,27 @@ async function closeWebSocket(socket: WebSocket): Promise<void> {
   });
 }
 
-async function websocketDataToUtf8(data: unknown): Promise<string> {
-  if (typeof data === "string") {
-    return data;
-  }
+async function websocketDataToUint8Array(data: unknown): Promise<Uint8Array> {
   if (data instanceof ArrayBuffer) {
-    return Buffer.from(data).toString("utf8");
+    return new Uint8Array(data);
   }
   if (ArrayBuffer.isView(data)) {
-    return Buffer.from(data.buffer, data.byteOffset, data.byteLength).toString("utf8");
+    return new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
   }
   if (data instanceof Blob) {
-    const raw = await data.arrayBuffer();
-    return Buffer.from(raw).toString("utf8");
+    return new Uint8Array(await data.arrayBuffer());
   }
 
-  throw new Error(`Unsupported websocket message data type: ${String(typeof data)}.`);
+  throw new Error(`Unsupported websocket binary data type: ${String(typeof data)}.`);
 }
 
-function parseControlMessage(value: unknown): JsonControlMessage {
-  const parsedStreamOpenOk = StreamOpenOKSchema.safeParse(value);
-  if (parsedStreamOpenOk.success) {
-    return parsedStreamOpenOk.data;
+function parseControlMessage(payload: string): BootstrapControlMessage {
+  const parsed = parseBootstrapControlMessage(payload);
+  if (parsed === undefined) {
+    throw new Error(`Unexpected websocket control message: ${payload}`);
   }
 
-  const parsedStreamOpenError = StreamOpenErrorSchema.safeParse(value);
-  if (parsedStreamOpenError.success) {
-    return parsedStreamOpenError.data;
-  }
-
-  const parsedStreamReset = StreamResetSchema.safeParse(value);
-  if (parsedStreamReset.success) {
-    return parsedStreamReset.data;
-  }
-
-  const parsedPtyExitEvent = PTYExitEventSchema.safeParse(value);
-  if (parsedPtyExitEvent.success) {
-    return parsedPtyExitEvent.data;
-  }
-
-  throw new Error(`Unexpected websocket control message: ${JSON.stringify(value)}`);
+  return parsed;
 }
 
 function createPtyFramePump(socket: WebSocket): PtyFramePump {
@@ -394,17 +338,17 @@ function createPtyFramePump(socket: WebSocket): PtyFramePump {
     void (async () => {
       try {
         if (typeof event.data === "string") {
-          const parsed: unknown = JSON.parse(event.data);
           enqueue({
             kind: "control",
-            payload: parseControlMessage(parsed),
+            payload: parseControlMessage(event.data),
           });
           return;
         }
 
+        const dataFrame = decodeDataFrame(await websocketDataToUint8Array(event.data));
         enqueue({
           kind: "binary",
-          text: await websocketDataToUtf8(event.data),
+          text: Buffer.from(dataFrame.payload).toString("utf8"),
         });
       } catch (error) {
         enqueue({
@@ -504,12 +448,22 @@ function sendJson(socket: WebSocket, payload: unknown): void {
   socket.send(JSON.stringify(payload));
 }
 
-function sendPtyInput(socket: WebSocket, input: string): void {
-  if (socket.readyState !== WebSocket.OPEN) {
-    throw new Error(`Websocket is not open. Current readyState: ${String(socket.readyState)}.`);
+function sendPtyInput(input: { socket: WebSocket; streamId: number; payload: string }): void {
+  if (input.socket.readyState !== WebSocket.OPEN) {
+    throw new Error(
+      `Websocket is not open. Current readyState: ${String(input.socket.readyState)}.`,
+    );
   }
 
-  socket.send(Buffer.from(input, "utf8"));
+  input.socket.send(
+    Buffer.from(
+      encodeDataFrame({
+        streamId: input.streamId,
+        payloadKind: PayloadKindRawBytes,
+        payload: new TextEncoder().encode(input.payload),
+      }),
+    ),
+  );
 }
 
 async function connectPtyChannel(input: {
@@ -546,11 +500,7 @@ async function connectPtyChannel(input: {
   }
 }
 
-async function closePtyChannel(input: {
-  socket: WebSocket;
-  pump: PtyFramePump;
-  streamId: number;
-}): Promise<void> {
+async function closePtyChannel(input: { socket: WebSocket; streamId: number }): Promise<void> {
   if (input.socket.readyState !== WebSocket.OPEN) {
     return;
   }
@@ -559,21 +509,6 @@ async function closePtyChannel(input: {
     type: "stream.close",
     streamId: input.streamId,
   });
-
-  while (true) {
-    const frame = await waitForNextPtyFrame(input.pump, WebSocketMessageTimeoutMs);
-    if (frame.kind !== "control") {
-      continue;
-    }
-    if (frame.payload.type === "stream.event" && frame.payload.streamId === input.streamId) {
-      return;
-    }
-    if (frame.payload.type === "stream.reset" && frame.payload.streamId === input.streamId) {
-      throw new Error(
-        `PTY stream.close failed with ${frame.payload.code}: ${frame.payload.message}`,
-      );
-    }
-  }
 }
 
 async function runPtyCommand(input: {
@@ -598,7 +533,11 @@ async function runPtyCommand(input: {
   );
   const deadlineEpochMs = Date.now() + input.timeoutMs;
 
-  sendPtyInput(input.socket, `${commandEnvelope}\n`);
+  sendPtyInput({
+    socket: input.socket,
+    streamId: input.streamId,
+    payload: `${commandEnvelope}\n`,
+  });
 
   let aggregatedOutput = "";
   while (Date.now() < deadlineEpochMs) {
@@ -987,7 +926,6 @@ describeIf("system github cli sandbox", () => {
       } finally {
         await closePtyChannel({
           socket: websocket,
-          pump,
           streamId: streamId ?? 1,
         }).catch(() => undefined);
         await closeWebSocket(websocket);

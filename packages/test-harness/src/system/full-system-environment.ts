@@ -35,11 +35,8 @@ const DATA_PLANE_GATEWAY_TUNNEL_WS_URL = "ws://data-plane-gateway:5202/tunnel/sa
 const REGISTRY_IMAGE_REFERENCE = "registry:3";
 const REGISTRY_INTERNAL_PORT = 5000;
 const REGISTRY_NETWORK_ALIAS = "registry";
-const SANDBOX_BASE_IMAGE_LOCAL_REFERENCE = "mistle/sandbox-base:dev";
-const SANDBOX_BASE_IMAGE_REPOSITORY_PATH = "mistle/sandbox-base";
 const SANDBOX_SNAPSHOT_REPOSITORY_PATH = "mistle/snapshots";
-const SANDBOX_BASE_IMAGE_DOCKERFILE_PATH = "apps/sandbox-runtime/images/base/Dockerfile";
-const SANDBOX_BASE_IMAGE_DOCKER_TARGET = "sandbox-base-dev";
+const SANDBOX_BASE_IMAGE_DOCKERFILE_PATH = "apps/sandbox-runtime/Dockerfile";
 
 const execFileAsync = promisify(execFile);
 
@@ -52,6 +49,20 @@ type SharedPostgresOptions = Omit<
   (typeof OMITTED_POSTGRES_OPTIONS)[number]
 >;
 
+export type SandboxBaseImageBuild = {
+  localReference: string;
+  repositoryPath: string;
+  dockerfilePath: string;
+  dockerTarget: string;
+};
+
+export const DefaultSandboxBaseImageBuild: SandboxBaseImageBuild = {
+  localReference: "mistle/sandbox-base:dev",
+  repositoryPath: "mistle/sandbox-base",
+  dockerfilePath: SANDBOX_BASE_IMAGE_DOCKERFILE_PATH,
+  dockerTarget: "sandbox-base-dev",
+};
+
 export type StartFullSystemEnvironmentInput = {
   buildContextHostPath: string;
   configPathInContainer: string;
@@ -63,6 +74,7 @@ export type StartFullSystemEnvironmentInput = {
   authBaseUrl: string;
   dashboardBaseUrl: string;
   authTrustedOrigins: string;
+  sandboxBaseImageBuild: SandboxBaseImageBuild;
   cacheBustKey?: string;
   controlPlaneApiEnvironment?: Record<string, string>;
   controlPlaneWorkerEnvironment?: Record<string, string>;
@@ -93,6 +105,7 @@ export type StartedFullSystemEnvironment = {
     smtpPort: number;
   };
   containerHostGateway: string;
+  sandboxNetworkName: string;
   stop: () => Promise<void>;
 };
 
@@ -136,34 +149,96 @@ async function runCommand(input: { command: string; args: string[]; cwd: string 
   }
 }
 
-async function ensureSandboxBaseImageLocal(buildContextHostPath: string): Promise<void> {
+async function listDockerContainerIds(input: {
+  cwd: string;
+  filters: string[];
+}): Promise<string[]> {
+  const { stdout } = await execFileAsync("docker", ["ps", "-aq", ...input.filters], {
+    cwd: input.cwd,
+  });
+
+  return stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+}
+
+async function removeDockerContainers(input: {
+  cwd: string;
+  containerIds: string[];
+}): Promise<void> {
+  if (input.containerIds.length === 0) {
+    return;
+  }
+
+  await runCommand({
+    command: "docker",
+    args: ["rm", "--force", ...input.containerIds],
+    cwd: input.cwd,
+  });
+}
+
+async function removeDockerSandboxContainersOnNetwork(input: {
+  cwd: string;
+  networkName: string;
+}): Promise<void> {
+  const containerIds = await listDockerContainerIds({
+    cwd: input.cwd,
+    filters: [
+      "--filter",
+      "label=mistle.sandbox.provider=docker",
+      "--filter",
+      `network=${input.networkName}`,
+    ],
+  });
+
+  await removeDockerContainers({
+    cwd: input.cwd,
+    containerIds,
+  });
+}
+
+async function ensureSandboxBaseImageLocal(input: {
+  buildContextHostPath: string;
+  sandboxBaseImageBuild: SandboxBaseImageBuild;
+}): Promise<void> {
+  await runCommand({
+    command: "pnpm",
+    args: ["build:sandbox-runtime:sea:linux"],
+    cwd: input.buildContextHostPath,
+  });
+
   await runCommand({
     command: "docker",
     args: [
       "build",
       "--target",
-      SANDBOX_BASE_IMAGE_DOCKER_TARGET,
+      input.sandboxBaseImageBuild.dockerTarget,
       "-f",
-      SANDBOX_BASE_IMAGE_DOCKERFILE_PATH,
+      input.sandboxBaseImageBuild.dockerfilePath,
       "-t",
-      SANDBOX_BASE_IMAGE_LOCAL_REFERENCE,
+      input.sandboxBaseImageBuild.localReference,
       ".",
     ],
-    cwd: buildContextHostPath,
+    cwd: input.buildContextHostPath,
   });
 }
 
 async function publishSandboxBaseImage(input: {
   buildContextHostPath: string;
   registryAuthority: string;
+  sandboxBaseImageBuild: SandboxBaseImageBuild;
 }): Promise<string> {
-  await ensureSandboxBaseImageLocal(input.buildContextHostPath);
+  await ensureSandboxBaseImageLocal({
+    buildContextHostPath: input.buildContextHostPath,
+    sandboxBaseImageBuild: input.sandboxBaseImageBuild,
+  });
 
-  const registryImageReference = `${input.registryAuthority}/${SANDBOX_BASE_IMAGE_REPOSITORY_PATH}:dev`;
+  const registryImageReference = `${input.registryAuthority}/${input.sandboxBaseImageBuild.repositoryPath}:dev`;
 
   await runCommand({
     command: "docker",
-    args: ["tag", SANDBOX_BASE_IMAGE_LOCAL_REFERENCE, registryImageReference],
+    args: ["tag", input.sandboxBaseImageBuild.localReference, registryImageReference],
     cwd: input.buildContextHostPath,
   });
   await runCommand({
@@ -197,6 +272,14 @@ export async function startFullSystemEnvironment(
         await network.stop();
       }
     });
+    cleanupTasks.unshift(async () => {
+      if (network !== undefined) {
+        await removeDockerSandboxContainersOnNetwork({
+          cwd: input.buildContextHostPath,
+          networkName: network.getName(),
+        });
+      }
+    });
 
     const registryContainer = await new GenericContainer(REGISTRY_IMAGE_REFERENCE)
       .withEnvironment({
@@ -217,6 +300,7 @@ export async function startFullSystemEnvironment(
     const sandboxBaseImageReference = await publishSandboxBaseImage({
       buildContextHostPath: input.buildContextHostPath,
       registryAuthority,
+      sandboxBaseImageBuild: input.sandboxBaseImageBuild,
     });
     const sandboxSnapshotRepository = `${registryAuthority}/${SANDBOX_SNAPSHOT_REPOSITORY_PATH}`;
 
@@ -401,6 +485,7 @@ export async function startFullSystemEnvironment(
         smtpPort: sharedInfraLease.infra.mailpit.smtpPort,
       },
       containerHostGateway: sharedInfraLease.infra.containerHostGateway,
+      sandboxNetworkName: network.getName(),
       stop: async () => {
         if (stopped) {
           throw new Error("Full system environment was already stopped.");

@@ -531,9 +531,7 @@ importers:
         specifier: ^9.2.1
         version: 9.2.1
 
-  apps/sandbox-runtime: {}
-
-  apps/sandbox-runtime-node:
+  apps/sandbox-runtime:
     dependencies:
       '@mistle/integrations-core':
         specifier: workspace:*

@@ -30,7 +30,32 @@ pub fn set_current_process_non_dumpable_impl() -> Result<(), String> {
     Ok(())
 }
 
+fn ensure_running_as_root() -> Result<(), String> {
+    if !nix::unistd::geteuid().is_root() {
+        return Err("sandbox bootstrap must still be running as root".to_string());
+    }
+
+    Ok(())
+}
+
 pub fn exec_runtime_as_user_impl(input: ExecRuntimeAsUserInput) -> Result<(), String> {
+    // This native boundary owns the actual privilege transition. TS resolves the
+    // target sandbox identity first, but the syscall-level invariants live here.
+    //
+    // This intentionally follows the same broad methodology as a native privilege
+    // drop helper like rust-privdrop: validate that we are still privileged, make
+    // the group state explicit first, drop gid before uid, and only then cross the
+    // exec boundary. We keep the implementation local instead of depending on a
+    // general-purpose crate because this path also needs a repo-specific stdio
+    // inheritance fix around execve() for the packaged Node runtime.
+    //
+    // 1. confirm the bootstrap process is still privileged
+    // 2. replace supplementary groups with the sandbox gid only
+    // 3. drop primary gid, then uid
+    // 4. clear Node-added FD_CLOEXEC on stdio so exec inherits the original streams
+    // 5. execve() the runtime binary so bootstrap code does not continue in-process
+    ensure_running_as_root()?;
+
     if input.uid <= 0 {
         return Err("sandbox uid must be greater than zero".to_string());
     }
@@ -49,6 +74,12 @@ pub fn exec_runtime_as_user_impl(input: ExecRuntimeAsUserInput) -> Result<(), St
         .map_err(|error| format!("failed to drop group privileges: {error}"))?;
     nix::unistd::setuid(nix::unistd::Uid::from_raw(input.uid as u32))
         .map_err(|error| format!("failed to drop user privileges: {error}"))?;
+    // Node marks stdio fds as close-on-exec during process startup. We must clear
+    // FD_CLOEXEC here so the sandbox runtime inherits the original stdin/stdout/stderr
+    // streams across execve(), matching the Go bootstrap/runtime handoff.
+    clear_close_on_exec(0)?;
+    clear_close_on_exec(1)?;
+    clear_close_on_exec(2)?;
 
     let command = std::ffi::CString::new(input.command)
         .map_err(|_| "runtime command must not contain NUL bytes".to_string())?;
@@ -59,7 +90,38 @@ pub fn exec_runtime_as_user_impl(input: ExecRuntimeAsUserInput) -> Result<(), St
     }
 }
 
+fn clear_close_on_exec(fd: i32) -> Result<(), String> {
+    if fd < 0 {
+        return Err("fd must be non-negative".to_string());
+    }
+
+    // We intentionally preserve these descriptors across execve() for the sandbox
+    // runtime handoff. This is especially important for fd 0, because startup input
+    // is delivered on stdin and must still be readable by the runtime process.
+    let current_flags = unsafe { nix::libc::fcntl(fd, nix::libc::F_GETFD) };
+    if current_flags < 0 {
+        return Err(format!(
+            "failed to read fd flags for {fd}: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+
+    let updated_flags = current_flags & !nix::libc::FD_CLOEXEC;
+    let result = unsafe { nix::libc::fcntl(fd, nix::libc::F_SETFD, updated_flags) };
+    if result < 0 {
+        return Err(format!(
+            "failed to clear close-on-exec for fd {fd}: {}",
+            std::io::Error::last_os_error()
+        ));
+    }
+
+    Ok(())
+}
+
 fn set_supplementary_groups(gid: u32) -> Result<(), String> {
+    // Keep the supplementary group set explicit and minimal. We do not inherit the
+    // bootstrap process groups, and we do not ask libc to resolve any "default"
+    // user groups here. The sandbox runtime should run only with the sandbox gid.
     let groups = [gid as nix::libc::gid_t];
     let group_count = setgroups_count(groups.len())?;
     let result = unsafe { nix::libc::setgroups(group_count, groups.as_ptr()) };
@@ -140,7 +202,8 @@ pub fn exec_runtime_as_user(input: ExecRuntimeAsUserInput) -> napi::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::{
-        ExecRuntimeAsUserInput, ProcessEnvironmentEntry, build_exec_environment,
+        ExecRuntimeAsUserInput, ProcessEnvironmentEntry, build_exec_environment, clear_close_on_exec,
+        ensure_running_as_root,
     };
 
     #[cfg(target_os = "linux")]
@@ -166,7 +229,43 @@ mod tests {
             env: Vec::new(),
         });
 
-        assert!(matches!(result, Err(message) if message.contains("uid")));
+        if nix::unistd::geteuid().is_root() {
+            assert!(matches!(result, Err(message) if message.contains("uid")));
+        } else {
+            assert!(matches!(result, Err(message) if message.contains("still be running as root")));
+        }
+    }
+
+    #[test]
+    fn requires_root_for_native_exec_handoff() {
+        let result = ensure_running_as_root();
+
+        if nix::unistd::geteuid().is_root() {
+            assert!(result.is_ok(), "expected root test environment to satisfy root check");
+        } else {
+            assert!(
+                matches!(result, Err(message) if message.contains("still be running as root"))
+            );
+        }
+    }
+
+    #[test]
+    fn clears_close_on_exec_for_descriptor() {
+        let duplicated_stdin = unsafe { nix::libc::dup(0) };
+        assert!(duplicated_stdin >= 0, "expected stdin dup to succeed");
+
+        let set_result =
+            unsafe { nix::libc::fcntl(duplicated_stdin, nix::libc::F_SETFD, nix::libc::FD_CLOEXEC) };
+        assert_eq!(set_result, 0, "expected setting cloexec to succeed");
+
+        clear_close_on_exec(duplicated_stdin).expect("expected cloexec clearing to succeed");
+
+        let flags = unsafe { nix::libc::fcntl(duplicated_stdin, nix::libc::F_GETFD) };
+        assert!(flags >= 0, "expected reading descriptor flags to succeed");
+        assert_eq!(flags & nix::libc::FD_CLOEXEC, 0);
+
+        let close_result = unsafe { nix::libc::close(duplicated_stdin) };
+        assert_eq!(close_result, 0, "expected duplicated stdin close to succeed");
     }
 
     #[cfg(target_os = "linux")]

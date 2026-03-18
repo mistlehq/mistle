@@ -315,5 +315,5 @@ Useful entrypoints when reading the code:
 - `apps/control-plane-api/src/integration-webhooks/*`
 - `apps/control-plane-api/src/internal-integration-credentials/*`
 - `apps/control-plane-api/src/sandbox-profiles/services/compile-profile-version-runtime-plan.ts`
-- `apps/sandbox-runtime/internal/egress/*`
+- `apps/sandbox-runtime/src/runtime/proxy/*`
 - `apps/tokenizer-proxy/src/egress/*`
