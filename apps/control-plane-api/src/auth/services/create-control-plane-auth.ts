@@ -5,6 +5,7 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { emailOTP, organization } from "better-auth/plugins";
 import { eq } from "drizzle-orm";
 
+import { createBetterAuthControlPlaneTypeId } from "../../lib/ids.js";
 import type { createControlPlaneOpenWorkflow } from "../../openworkflow/index.js";
 import { AUTH_ROUTE_BASE_PATH } from "../constants.js";
 import { applyActiveOrganizationToSession } from "./apply-active-organization-to-session.js";
@@ -44,6 +45,11 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
   });
 
   return betterAuth({
+    advanced: {
+      database: {
+        generateId: ({ model }) => createBetterAuthControlPlaneTypeId(model),
+      },
+    },
     baseURL: config.authBaseUrl,
     basePath: AUTH_ROUTE_BASE_PATH,
     secret: config.authSecret,
