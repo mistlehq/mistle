@@ -431,6 +431,89 @@ export type IntegrationOAuthHandler<
   ): MaybePromise<IntegrationOAuthCompleteResult>;
 };
 
+export type IntegrationOAuth2StartAuthorizationInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  state: string;
+  redirectUrl: string;
+  pkce?: {
+    challenge: string;
+    challengeMethod: "S256";
+  };
+};
+
+export type IntegrationOAuth2StartAuthorizationResult = {
+  authorizationUrl: string;
+};
+
+export type IntegrationOAuth2CompleteAuthorizationCodeGrantInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  query: URLSearchParams;
+  redirectUrl: string;
+  pkceVerifier?: string;
+};
+
+export type IntegrationOAuth2CompleteAuthorizationCodeGrantResult = {
+  externalSubjectId?: string;
+  connectionConfig: Record<string, unknown>;
+  accessToken: string;
+  accessTokenExpiresAt?: string;
+  refreshToken?: string;
+  refreshTokenExpiresAt?: string;
+  credentialMetadata?: Record<string, unknown>;
+};
+
+export type IntegrationOAuth2RefreshAccessTokenInput<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  organizationId: string;
+  targetKey: string;
+  target: IntegrationResolvedTarget<TTargetConfig, TTargetSecrets>;
+  connection: IntegrationConnection & {
+    config: TConnectionConfig;
+  };
+  refreshToken: string;
+};
+
+export type IntegrationOAuth2RefreshAccessTokenResult = {
+  accessToken: string;
+  accessTokenExpiresAt?: string;
+  refreshToken?: string;
+  refreshTokenExpiresAt?: string;
+  credentialMetadata?: Record<string, unknown>;
+};
+
+export type IntegrationOAuth2Capability<
+  TTargetConfig = Record<string, unknown>,
+  TTargetSecrets = Record<string, string>,
+  TConnectionConfig = Record<string, unknown>,
+> = {
+  startAuthorization(
+    input: IntegrationOAuth2StartAuthorizationInput<TTargetConfig, TTargetSecrets>,
+  ): MaybePromise<IntegrationOAuth2StartAuthorizationResult>;
+  completeAuthorizationCodeGrant(
+    input: IntegrationOAuth2CompleteAuthorizationCodeGrantInput<TTargetConfig, TTargetSecrets>,
+  ): MaybePromise<IntegrationOAuth2CompleteAuthorizationCodeGrantResult>;
+  refreshAccessToken(
+    input: IntegrationOAuth2RefreshAccessTokenInput<
+      TTargetConfig,
+      TTargetSecrets,
+      TConnectionConfig
+    >,
+  ): MaybePromise<IntegrationOAuth2RefreshAccessTokenResult>;
+};
+
 export type IntegrationWebhookHeaders = Readonly<Record<string, string>>;
 
 export type IntegrationWebhookVerifyFailureCode =
@@ -892,6 +975,11 @@ export type IntegrationDefinition<
     >
   >;
   credentialResolvers?: IntegrationCredentialResolvers;
+  oauth2?: IntegrationOAuth2Capability<
+    ParsedSchemaOutput<TTargetConfigSchema>,
+    ParsedSchemaOutput<TTargetSecretsSchema>,
+    TConnectionConfig
+  >;
   authHandlers?: {
     oauth?: IntegrationOAuthHandler<
       ParsedSchemaOutput<TTargetConfigSchema>,

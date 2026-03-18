@@ -3,7 +3,10 @@
  * object-destructuring fixture signatures.
  */
 
+import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import { createControlPlaneDatabase, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { createMailpitInbox, readTestContext } from "@mistle/test-harness";
@@ -43,6 +46,8 @@ export type SystemTestFixture = {
 const AUTH_OTP_LENGTH = 6;
 const AUTH_ORIGIN = "http://localhost:5100";
 const TestContextId = "system";
+const PROJECT_ROOT_HOST_PATH = fileURLToPath(new URL("../..", import.meta.url));
+const execFileAsync = promisify(execFile);
 
 export const SystemTestContextSchema = z
   .object({
@@ -54,6 +59,7 @@ export const SystemTestContextSchema = z
     tokenizerProxyBaseUrl: z.url(),
     mailpitHttpBaseUrl: z.url(),
     controlPlaneDatabaseUrl: z.string().min(1),
+    sandboxNetworkName: z.string().min(1),
   })
   .strict();
 
@@ -100,6 +106,35 @@ function createRequestFn(baseUrl: string): (path: string, init?: RequestInit) =>
     const normalizedPath = path.startsWith("/") ? path : `/${path}`;
     return fetch(`${baseUrl}${normalizedPath}`, init);
   };
+}
+
+async function removeSandboxContainersOnNetwork(input: { networkName: string }): Promise<void> {
+  const { stdout } = await execFileAsync(
+    "docker",
+    [
+      "ps",
+      "-aq",
+      "--filter",
+      "label=mistle.sandbox.provider=docker",
+      "--filter",
+      `network=${input.networkName}`,
+    ],
+    {
+      cwd: PROJECT_ROOT_HOST_PATH,
+    },
+  );
+
+  const containerIds = stdout
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0);
+  if (containerIds.length === 0) {
+    return;
+  }
+
+  await execFileAsync("docker", ["rm", "--force", ...containerIds], {
+    cwd: PROJECT_ROOT_HOST_PATH,
+  });
 }
 
 export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
@@ -287,6 +322,9 @@ export const it = vitestIt.extend<{ fixture: SystemTestFixture }>({
           },
         });
       } finally {
+        await removeSandboxContainersOnNetwork({
+          networkName: systemTestContext.sandboxNetworkName,
+        });
         await databasePool.end();
       }
     },

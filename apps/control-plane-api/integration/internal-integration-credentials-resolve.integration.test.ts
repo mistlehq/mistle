@@ -2,8 +2,12 @@ import { generateKeyPairSync } from "node:crypto";
 
 import {
   IntegrationBindingKinds,
+  IntegrationConnectionCredentialPurposes,
+  integrationConnectionCredentials,
   IntegrationConnectionStatuses,
   integrationConnections,
+  IntegrationCredentialSecretKinds,
+  integrationCredentials,
   integrationTargets,
   sandboxProfiles,
   sandboxProfileVersionIntegrationBindings,
@@ -11,7 +15,12 @@ import {
 } from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
 
-import { encryptIntegrationTargetSecrets } from "../src/integration-credentials/crypto.js";
+import {
+  encryptCredentialUtf8,
+  encryptIntegrationTargetSecrets,
+  resolveMasterEncryptionKeyMaterial,
+  unwrapOrganizationCredentialKey,
+} from "../src/integration-credentials/crypto.js";
 import {
   CONTROL_PLANE_INTERNAL_AUTH_HEADER,
   INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH,
@@ -153,6 +162,96 @@ describe("internal integration credentials resolve", () => {
     expect(resolveResponse.status).toBe(200);
     await expect(resolveResponse.json()).resolves.toEqual({
       value: "sk-integration-test",
+    });
+  });
+
+  it("resolves persisted OAuth2 access tokens with structural expiry", async ({ fixture }) => {
+    const authSession = await fixture.authSession();
+
+    await fixture.db.insert(integrationTargets).values({
+      targetKey: "openai_oauth2_default",
+      familyId: "openai",
+      variantId: "openai-default",
+      enabled: true,
+      config: {
+        api_base_url: "https://api.openai.com/v1",
+      },
+    });
+
+    await fixture.db.insert(integrationConnections).values({
+      id: "icn_oauth2_access",
+      organizationId: authSession.organizationId,
+      targetKey: "openai_oauth2_default",
+      displayName: "Stored OAuth2 token",
+      status: IntegrationConnectionStatuses.ACTIVE,
+      config: {
+        connection_method: "oauth2",
+      },
+    });
+
+    const organizationCredentialKey = await fixture.db.query.organizationCredentialKeys.findFirst({
+      where: (table, { eq }) => eq(table.organizationId, authSession.organizationId),
+      orderBy: (table, { desc }) => [desc(table.version)],
+    });
+    if (organizationCredentialKey === undefined) {
+      throw new Error("Expected organization credential key.");
+    }
+
+    const masterEncryptionKeyMaterial = resolveMasterEncryptionKeyMaterial({
+      masterKeyVersion: organizationCredentialKey.masterKeyVersion,
+      masterEncryptionKeys: fixture.config.integrations.masterEncryptionKeys,
+    });
+    const unwrappedOrganizationCredentialKey = unwrapOrganizationCredentialKey({
+      wrappedCiphertext: organizationCredentialKey.ciphertext,
+      masterEncryptionKeyMaterial,
+    });
+
+    try {
+      const encryptedAccessToken = encryptCredentialUtf8({
+        plaintext: "oauth2-access-token-value",
+        organizationCredentialKey: unwrappedOrganizationCredentialKey,
+      });
+
+      await fixture.db.insert(integrationCredentials).values({
+        id: "icr_oauth2_access",
+        organizationId: authSession.organizationId,
+        secretKind: IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN,
+        ciphertext: encryptedAccessToken.ciphertext,
+        nonce: encryptedAccessToken.nonce,
+        organizationCredentialKeyVersion: organizationCredentialKey.version,
+        intendedFamilyId: "openai",
+        expiresAt: "2030-01-01T00:00:00.000Z",
+      });
+    } finally {
+      unwrappedOrganizationCredentialKey.fill(0);
+    }
+
+    await fixture.db.insert(integrationConnectionCredentials).values({
+      connectionId: "icn_oauth2_access",
+      credentialId: "icr_oauth2_access",
+      purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+    });
+
+    const resolveResponse = await fixture.request(
+      `${INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH}/resolve`,
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          [CONTROL_PLANE_INTERNAL_AUTH_HEADER]: fixture.internalAuthServiceToken,
+        },
+        body: JSON.stringify({
+          connectionId: "icn_oauth2_access",
+          secretType: "oauth2_access_token",
+          purpose: IntegrationConnectionCredentialPurposes.OAUTH2_ACCESS_TOKEN,
+        }),
+      },
+    );
+
+    expect(resolveResponse.status).toBe(200);
+    await expect(resolveResponse.json()).resolves.toEqual({
+      value: "oauth2-access-token-value",
+      expiresAt: "2030-01-01T00:00:00.000Z",
     });
   });
 
@@ -308,7 +407,7 @@ describe("internal integration credentials resolve", () => {
         body: JSON.stringify({
           connectionId: "icn_github_other_connection",
           bindingId: githubFixture.bindingId,
-          secretType: "oauth_access_token",
+          secretType: "github_app_installation_token",
           resolverKey: "github_app_installation_token",
         }),
       },

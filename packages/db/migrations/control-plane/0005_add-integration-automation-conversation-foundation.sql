@@ -116,7 +116,7 @@ CREATE TABLE "control_plane"."integration_connections" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "control_plane"."integration_oauth_sessions" (
+CREATE TABLE "control_plane"."integration_connection_redirect_sessions" (
 	"id" text PRIMARY KEY NOT NULL,
 	"organization_id" text NOT NULL,
 	"target_key" text NOT NULL,
@@ -212,8 +212,8 @@ ALTER TABLE "control_plane"."integration_connection_credentials" ADD CONSTRAINT 
 ALTER TABLE "control_plane"."integration_connection_credentials" ADD CONSTRAINT "integration_connection_credentials_credential_id_integration_credentials_id_fk" FOREIGN KEY ("credential_id") REFERENCES "control_plane"."integration_credentials"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."integration_connections" ADD CONSTRAINT "integration_connections_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "control_plane"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."integration_connections" ADD CONSTRAINT "integration_connections_target_key_integration_targets_target_key_fk" FOREIGN KEY ("target_key") REFERENCES "control_plane"."integration_targets"("target_key") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "control_plane"."integration_oauth_sessions" ADD CONSTRAINT "integration_oauth_sessions_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "control_plane"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "control_plane"."integration_oauth_sessions" ADD CONSTRAINT "integration_oauth_sessions_target_key_integration_targets_target_key_fk" FOREIGN KEY ("target_key") REFERENCES "control_plane"."integration_targets"("target_key") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "control_plane"."integration_connection_redirect_sessions" ADD CONSTRAINT "integration_connection_redirect_sessions_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "control_plane"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "control_plane"."integration_connection_redirect_sessions" ADD CONSTRAINT "integration_connection_redirect_sessions_target_key_integration_targets_target_key_fk" FOREIGN KEY ("target_key") REFERENCES "control_plane"."integration_targets"("target_key") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."integration_webhook_events" ADD CONSTRAINT "integration_webhook_events_organization_id_organizations_id_fk" FOREIGN KEY ("organization_id") REFERENCES "control_plane"."organizations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."integration_webhook_events" ADD CONSTRAINT "integration_webhook_events_integration_connection_id_integration_connections_id_fk" FOREIGN KEY ("integration_connection_id") REFERENCES "control_plane"."integration_connections"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "control_plane"."integration_webhook_events" ADD CONSTRAINT "integration_webhook_events_target_key_integration_targets_target_key_fk" FOREIGN KEY ("target_key") REFERENCES "control_plane"."integration_targets"("target_key") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
@@ -250,10 +250,10 @@ CREATE INDEX "integration_connection_credentials_credential_id_idx" ON "control_
 CREATE INDEX "integration_connections_organization_id_idx" ON "control_plane"."integration_connections" USING btree ("organization_id");--> statement-breakpoint
 CREATE INDEX "integration_connections_organization_id_target_key_idx" ON "control_plane"."integration_connections" USING btree ("organization_id","target_key");--> statement-breakpoint
 CREATE INDEX "integration_connections_organization_id_status_idx" ON "control_plane"."integration_connections" USING btree ("organization_id","status");--> statement-breakpoint
-CREATE INDEX "integration_oauth_sessions_organization_id_idx" ON "control_plane"."integration_oauth_sessions" USING btree ("organization_id");--> statement-breakpoint
-CREATE INDEX "integration_oauth_sessions_organization_id_target_key_idx" ON "control_plane"."integration_oauth_sessions" USING btree ("organization_id","target_key");--> statement-breakpoint
-CREATE UNIQUE INDEX "integration_oauth_sessions_state_uidx" ON "control_plane"."integration_oauth_sessions" USING btree ("state");--> statement-breakpoint
-CREATE INDEX "integration_oauth_sessions_expires_at_idx" ON "control_plane"."integration_oauth_sessions" USING btree ("expires_at");--> statement-breakpoint
+CREATE INDEX "integration_connection_redirect_sessions_organization_id_idx" ON "control_plane"."integration_connection_redirect_sessions" USING btree ("organization_id");--> statement-breakpoint
+CREATE INDEX "integration_connection_redirect_sessions_organization_id_target_key_idx" ON "control_plane"."integration_connection_redirect_sessions" USING btree ("organization_id","target_key");--> statement-breakpoint
+CREATE UNIQUE INDEX "integration_connection_redirect_sessions_state_uidx" ON "control_plane"."integration_connection_redirect_sessions" USING btree ("state");--> statement-breakpoint
+CREATE INDEX "integration_connection_redirect_sessions_expires_at_idx" ON "control_plane"."integration_connection_redirect_sessions" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "integration_targets_family_id_variant_id_idx" ON "control_plane"."integration_targets" USING btree ("family_id","variant_id");--> statement-breakpoint
 CREATE INDEX "integration_targets_enabled_idx" ON "control_plane"."integration_targets" USING btree ("enabled");--> statement-breakpoint
 CREATE UNIQUE INDEX "integration_webhook_events_target_key_external_event_id_uidx" ON "control_plane"."integration_webhook_events" USING btree ("target_key","external_event_id");--> statement-breakpoint

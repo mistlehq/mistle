@@ -53,7 +53,7 @@ const WebhookAutomationResponseSchema = z.looseObject({
   id: z.string().min(1),
 });
 
-const StartOAuthConnectionResponseSchema = z
+const StartRedirectConnectionResponseSchema = z
   .object({
     authorizationUrl: z.url(),
   })
@@ -122,12 +122,12 @@ function parseGitHubRepository(input: string): { owner: string; repo: string } {
   };
 }
 
-function createOAuthCompletePath(input: {
+function createGitHubAppInstallationCompletePath(input: {
   targetKey: string;
   query: Record<string, string>;
 }): string {
   const searchParams = new URLSearchParams(input.query);
-  return `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/oauth/complete?${searchParams.toString()}`;
+  return `/v1/integration/connections/${encodeURIComponent(input.targetKey)}/github-app-installation/complete?${searchParams.toString()}`;
 }
 
 function resolveControlPlaneApiLocalPort(controlPlaneApiBaseUrl: string): number {
@@ -413,10 +413,10 @@ describeIf("system GitHub webhook automation", () => {
 
       const githubOauthStart = await requestJsonOrThrow({
         request: fixture.request,
-        path: `/v1/integration/connections/${encodeURIComponent(GitHubTargetKey)}/oauth/start`,
+        path: `/v1/integration/connections/${encodeURIComponent(GitHubTargetKey)}/github-app-installation/start`,
         expectedStatus: 200,
-        description: "GitHub OAuth connection start",
-        schema: StartOAuthConnectionResponseSchema,
+        description: "GitHub App installation start",
+        schema: StartRedirectConnectionResponseSchema,
         init: {
           method: "POST",
           headers: {
@@ -430,11 +430,13 @@ describeIf("system GitHub webhook automation", () => {
       });
       const githubOauthState = new URL(githubOauthStart.authorizationUrl).searchParams.get("state");
       if (githubOauthState === null || githubOauthState.length === 0) {
-        throw new Error("Expected GitHub OAuth start response to include a non-empty state.");
+        throw new Error(
+          "Expected GitHub App installation start response to include a non-empty state.",
+        );
       }
 
-      const githubOAuthCompleteResponse = await fixture.request(
-        createOAuthCompletePath({
+      const githubAppInstallationCompleteResponse = await fixture.request(
+        createGitHubAppInstallationCompletePath({
           targetKey: GitHubTargetKey,
           query: {
             state: githubOauthState,
@@ -450,10 +452,10 @@ describeIf("system GitHub webhook automation", () => {
           redirect: "manual",
         },
       );
-      if (githubOAuthCompleteResponse.status !== 302) {
-        const errorBody = await githubOAuthCompleteResponse.text().catch(() => "");
+      if (githubAppInstallationCompleteResponse.status !== 302) {
+        const errorBody = await githubAppInstallationCompleteResponse.text().catch(() => "");
         throw new Error(
-          `GitHub OAuth connection completion expected status 302, got ${String(githubOAuthCompleteResponse.status)}. Response body: ${errorBody}`,
+          `GitHub App installation completion expected status 302, got ${String(githubAppInstallationCompleteResponse.status)}. Response body: ${errorBody}`,
         );
       }
       const githubConnection = await waitForCondition({

@@ -38,7 +38,7 @@ function createResolverInput(
         installation_id: "12345",
       },
     },
-    secretType: "oauth_access_token",
+    secretType: "github_app_installation_token",
   };
 
   const binding = overrides?.binding ?? {

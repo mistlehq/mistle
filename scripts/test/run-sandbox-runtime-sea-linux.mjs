@@ -22,7 +22,7 @@ function buildCopyCommand() {
     "--exclude=.git",
     "--exclude=.turbo",
     "--exclude=node_modules",
-    "--exclude=apps/sandbox-runtime-node/dist-sea",
+    "--exclude=apps/sandbox-runtime/dist-sea",
     "-cf",
     "-",
     ".",
@@ -36,7 +36,7 @@ function buildTestCommand() {
     "set -euo pipefail",
     "cd /work",
     "pnpm install --frozen-lockfile",
-    "pnpm --filter @mistle/sandbox-runtime-node test:sea",
+    "pnpm --filter @mistle/sandbox-runtime test:sea",
   ].join(" && ");
 }
 

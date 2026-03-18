@@ -1,18 +1,37 @@
 {
   "name": "@mistle/sandbox-runtime",
   "private": true,
+  "type": "module",
   "scripts": {
-    "dev": "printf '%s' '{\"bootstrapToken\":\"dev-connect-token\",\"tunnelExchangeToken\":\"dev-exchange-token\",\"tunnelGatewayWsUrl\":\"ws://127.0.0.1:5003/tunnel/sandbox\",\"runtimePlan\":{\"sandboxProfileId\":\"sbp_dev\",\"version\":1,\"image\":{\"source\":\"base\",\"imageRef\":\"mistle/sandbox-base:dev\"},\"egressRoutes\":[],\"artifacts\":[],\"runtimeClients\":[],\"workspaceSources\":[],\"agentRuntimes\":[]}}' | SANDBOX_RUNTIME_LISTEN_ADDR=:8090 SANDBOX_RUNTIME_TOKENIZER_PROXY_EGRESS_BASE_URL=http://127.0.0.1:5004/tokenizer-proxy/egress go run ./cmd/sandboxd",
-    "build": "mkdir -p dist/bin && go build -trimpath -o dist/bin/sandboxd ./cmd/sandboxd",
-    "image:build:prod": "test -n \"$IMAGE_TAG\" && docker build --target sandbox-base-prod -f images/base/Dockerfile -t mistle/sandbox-base:$IMAGE_TAG ../..",
-    "image:build:prod:sha": "IMAGE_TAG=$(git rev-parse --short=12 HEAD) pnpm image:build:prod",
-    "image:build:dev": "docker build --target sandbox-base-dev -f images/base/Dockerfile -t mistle/sandbox-base:dev ../..",
-    "start": "./dist/bin/sandboxd",
-    "lint": "go vet ./...",
-    "typecheck": "go test -run '^$' ./...",
-    "test": "go test ./cmd/... ./internal/...",
-    "test:integration": "go test ./integration/...",
-    "format": "gofmt -w ./cmd ./internal ./integration",
-    "format:check": "formatted_files=$(gofmt -l ./cmd ./internal ./integration) && test -z \"$formatted_files\" || (echo \"$formatted_files\"; exit 1)"
+    "build:native": "pnpm --filter @mistle/sandbox-rs-napi build",
+    "dev": "tsx watch src/main.ts",
+    "dev:bootstrap": "pnpm run build:native && tsx watch src/bootstrap/main.ts",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "build:sea:bundle": "node ./scripts/build-sea-bundles.mjs",
+    "build:sea": "node ./scripts/build-sea.mjs",
+    "test:sea": "pnpm run build:sea && node ./scripts/smoke-sea.mjs",
+    "start": "node dist/main.js",
+    "start:bootstrap": "pnpm run build:native && node dist/bootstrap/main.js",
+    "lint": "oxlint --type-aware --deny-warnings -c ./.oxlintrc.jsonc .",
+    "typecheck": "tsgo --noEmit",
+    "test": "node ./scripts/ensure-native-built.mjs && vitest run -c vitest.config.ts --passWithNoTests",
+    "test:integration": "node ./scripts/ensure-native-built.mjs && vitest run -c vitest.integration.config.ts --passWithNoTests",
+    "test:property": "vitest run -c vitest.property.config.ts --passWithNoTests",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check ."
+  },
+  "dependencies": {
+    "@mistle/integrations-core": "workspace:*",
+    "@mistle/integrations-definitions": "workspace:*",
+    "@mistle/sandbox-rs-napi": "workspace:*",
+    "@mistle/sandbox-session-protocol": "workspace:*",
+    "@mistle/time": "workspace:*",
+    "undici": "7.24.4",
+    "ws": "^8.19.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "esbuild": "0.27.4",
+    "postject": "1.0.0-alpha.6"
   }
 }
