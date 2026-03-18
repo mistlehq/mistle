@@ -15,7 +15,7 @@ import {
   type CodexModelSummary,
   type CodexThreadSummary,
   createBrowserCodexSessionRuntime,
-} from "@mistle/integrations-definitions/openai/agent/browser";
+} from "@mistle/integrations-definitions/openai/agent/client";
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 

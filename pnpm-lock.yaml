@@ -168,9 +168,6 @@ importers:
 
   apps/control-plane-worker:
     dependencies:
-      '@mistle/codex-app-server-client':
-        specifier: workspace:*
-        version: link:../../packages/codex-app-server-client
       '@mistle/config':
         specifier: workspace:*
         version: link:../../packages/config
@@ -745,9 +742,6 @@ importers:
 
   packages/integrations-definitions:
     dependencies:
-      '@mistle/codex-app-server-client':
-        specifier: workspace:*
-        version: link:../codex-app-server-client
       '@mistle/integrations-core':
         specifier: workspace:*
         version: link:../integrations-core
@@ -1065,12 +1059,12 @@ importers:
 
   tests:
     devDependencies:
-      '@mistle/codex-app-server-client':
-        specifier: workspace:*
-        version: link:../packages/codex-app-server-client
       '@mistle/db':
         specifier: workspace:*
         version: link:../packages/db
+      '@mistle/integrations-definitions':
+        specifier: workspace:*
+        version: link:../packages/integrations-definitions
       '@mistle/sandbox-session-protocol':
         specifier: workspace:*
         version: link:../packages/sandbox-session-protocol

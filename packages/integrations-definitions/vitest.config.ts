@@ -6,12 +6,6 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: "@mistle/codex-app-server-client/json-rpc/client.js",
-        replacement: fileURLToPath(
-          new URL("../codex-app-server-client/src/json-rpc/client.ts", import.meta.url),
-        ),
-      },
-      {
         find: /^@mistle\/integrations-core$/,
         replacement: fileURLToPath(new URL("../integrations-core/src/index.ts", import.meta.url)),
       },

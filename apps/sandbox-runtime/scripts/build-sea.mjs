@@ -94,7 +94,6 @@ function injectSeaBlob(input) {
 
 async function buildWorkspaceDependencies() {
   const buildTargets = [
-    "@mistle/codex-app-server-client",
     "@mistle/integrations-core",
     "@mistle/integrations-definitions",
     "@mistle/sandbox-rs-napi",

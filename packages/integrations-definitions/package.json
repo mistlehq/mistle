@@ -17,11 +17,15 @@
       "types": "./src/openai/agent.server.ts",
       "node": "./dist/openai/agent.server.js"
     },
-    "./openai/agent/browser": {
-      "types": "./src/openai/agent.ts",
-      "node": "./dist/openai/agent.js",
-      "import": "./src/openai/agent.ts",
-      "default": "./src/openai/agent.ts"
+    "./openai/agent/client": {
+      "types": "./src/openai/agent.client.ts",
+      "node": "./dist/openai/agent.client.js",
+      "import": "./src/openai/agent.client.ts",
+      "default": "./src/openai/agent.client.ts"
+    },
+    "./openai/agent/server": {
+      "types": "./src/openai/agent.server.ts",
+      "node": "./dist/openai/agent.server.js"
     },
     "./forms": {
       "types": "./src/forms/index.ts",
@@ -45,7 +49,6 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@mistle/codex-app-server-client": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
     "@mistle/sandbox-session-client": "workspace:*",
     "@mistle/time": "workspace:*",

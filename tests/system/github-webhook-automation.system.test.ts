@@ -4,14 +4,14 @@
 
 import { randomUUID } from "node:crypto";
 
+import { AutomationRunStatuses } from "@mistle/db/control-plane";
 import {
   CodexJsonRpcClient,
   CodexSessionClient,
   readCodexThread,
   resumeCodexThread,
-} from "@mistle/codex-app-server-client";
-import { createNodeCodexSessionRuntime } from "@mistle/codex-app-server-client/node";
-import { AutomationRunStatuses } from "@mistle/db/control-plane";
+} from "@mistle/integrations-definitions/openai/agent/server";
+import { createNodeCodexSessionRuntime } from "@mistle/integrations-definitions/openai/agent/server";
 import { systemSleeper } from "@mistle/time";
 import { afterAll, beforeAll, describe, expect } from "vitest";
 import { z } from "zod";
