@@ -1,13 +1,27 @@
 import { randomUUID } from "node:crypto";
 
 import { OpenAPIHono, z } from "@hono/zod-openapi";
-import { SandboxInstanceStatuses, sandboxInstances } from "@mistle/db/data-plane";
+import {
+  SandboxInstanceStatuses,
+  type SandboxInstance,
+  sandboxInstances,
+} from "@mistle/db/data-plane";
+import {
+  decodeKeysetCursorOrThrow,
+  encodeKeysetCursor,
+  KeysetCursorDecodeErrorReasons,
+  KeysetPaginationDirections,
+  KeysetPaginationInputError,
+  KeysetPaginationInputErrorReasons,
+  paginateKeyset,
+} from "@mistle/http/pagination";
 import { StartSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
+import { sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
 
 import { createRequireInternalAuthMiddleware } from "../middleware/require-internal-auth.js";
 import { DataPlaneOpenWorkflowSchema } from "../openworkflow/index.js";
-import type { AppContextBindings, AppRoutes } from "../types.js";
+import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 import {
   DATA_PLANE_INTERNAL_AUTH_HEADER,
   INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH,
@@ -15,8 +29,10 @@ import {
 import {
   GetSandboxInstanceResponseSchema,
   internalGetSandboxInstanceRoute,
+  internalListSandboxInstancesRoute,
   internalStartSandboxInstanceRoute,
   InternalSandboxInstancesErrorResponseSchema,
+  ListSandboxInstancesResponseSchema,
   StartSandboxInstanceAcceptedResponseSchema,
   StartSandboxInstanceInputValidationSchema,
 } from "./contracts.js";
@@ -27,9 +43,52 @@ const WorkflowRunInputSchema = z
   })
   .loose();
 
+const SandboxInstancesCursorSchema = z
+  .object({
+    createdAt: z.string().min(1),
+    id: z.string().min(1),
+  })
+  .strict();
+
+type SandboxInstancesCursor = z.infer<typeof SandboxInstancesCursorSchema>;
+
+type ListSandboxInstanceRow = Pick<
+  SandboxInstance,
+  | "id"
+  | "sandboxProfileId"
+  | "sandboxProfileVersion"
+  | "status"
+  | "startedByKind"
+  | "startedById"
+  | "source"
+  | "createdAt"
+  | "updatedAt"
+  | "failureCode"
+  | "failureMessage"
+>;
+
 const InternalSandboxInstancesErrorCodes = {
+  INVALID_LIST_INPUT: "INVALID_LIST_INPUT",
+  INVALID_PAGINATION_CURSOR: "INVALID_PAGINATION_CURSOR",
   UNAUTHORIZED: "UNAUTHORIZED",
 } as const;
+
+class InternalSandboxInstancesBadRequestError extends Error {
+  code:
+    | (typeof InternalSandboxInstancesErrorCodes)["INVALID_LIST_INPUT"]
+    | (typeof InternalSandboxInstancesErrorCodes)["INVALID_PAGINATION_CURSOR"];
+
+  constructor(
+    code:
+      | (typeof InternalSandboxInstancesErrorCodes)["INVALID_LIST_INPUT"]
+      | (typeof InternalSandboxInstancesErrorCodes)["INVALID_PAGINATION_CURSOR"],
+    message: string,
+  ) {
+    super(message);
+    this.name = "InternalSandboxInstancesBadRequestError";
+    this.code = code;
+  }
+}
 
 function createStartSandboxIdempotencyKey(
   input: z.infer<typeof StartSandboxInstanceInputValidationSchema>,
@@ -172,6 +231,124 @@ export function createInternalSandboxInstancesApp(): AppRoutes<
     return ctx.json(responseBody, 200);
   });
 
+  routes.openapi(internalListSandboxInstancesRoute, async (ctx) => {
+    try {
+      const body = ctx.req.valid("json");
+      const responseBody = await paginateKeyset<ListSandboxInstanceRow, SandboxInstancesCursor>({
+        query: {
+          after: body.after,
+          before: body.before,
+        },
+        pageSize: body.limit ?? 20,
+        decodeCursor: ({ encodedCursor, cursorName }) =>
+          decodeKeysetCursorOrThrow({
+            encodedCursor,
+            cursorName,
+            schema: SandboxInstancesCursorSchema,
+            mapDecodeError: ({ cursorName: decodeCursorName, reason }) => {
+              const reasonToMessage = {
+                [KeysetCursorDecodeErrorReasons.INVALID_BASE64URL]: `\`${decodeCursorName}\` cursor is not valid base64url.`,
+                [KeysetCursorDecodeErrorReasons.INVALID_JSON]: `\`${decodeCursorName}\` cursor does not contain valid JSON.`,
+                [KeysetCursorDecodeErrorReasons.INVALID_SHAPE]: `\`${decodeCursorName}\` cursor has an invalid shape.`,
+              } as const;
+
+              return new InternalSandboxInstancesBadRequestError(
+                InternalSandboxInstancesErrorCodes.INVALID_PAGINATION_CURSOR,
+                reasonToMessage[reason],
+              );
+            },
+          }),
+        encodeCursor: encodeKeysetCursor,
+        getCursor: (item) => ({
+          createdAt: item.createdAt,
+          id: item.id,
+        }),
+        fetchPage: async ({ direction, cursor, limitPlusOne }) =>
+          ctx.get("resources").db.query.sandboxInstances.findMany({
+            columns: {
+              id: true,
+              sandboxProfileId: true,
+              sandboxProfileVersion: true,
+              status: true,
+              startedByKind: true,
+              startedById: true,
+              source: true,
+              createdAt: true,
+              updatedAt: true,
+              failureCode: true,
+              failureMessage: true,
+            },
+            where: (table, { and, eq, gt, lt, or }) => {
+              const organizationScope = eq(table.organizationId, body.organizationId);
+
+              if (cursor === undefined) {
+                return organizationScope;
+              }
+
+              if (direction === KeysetPaginationDirections.FORWARD) {
+                return and(
+                  organizationScope,
+                  or(
+                    lt(table.createdAt, cursor.createdAt),
+                    and(eq(table.createdAt, cursor.createdAt), lt(table.id, cursor.id)),
+                  ),
+                );
+              }
+
+              return and(
+                organizationScope,
+                or(
+                  gt(table.createdAt, cursor.createdAt),
+                  and(eq(table.createdAt, cursor.createdAt), gt(table.id, cursor.id)),
+                ),
+              );
+            },
+            orderBy:
+              direction === KeysetPaginationDirections.BACKWARD
+                ? (table, { asc }) => [asc(table.createdAt), asc(table.id)]
+                : (table, { desc }) => [desc(table.createdAt), desc(table.id)],
+            limit: limitPlusOne,
+          }),
+        countTotalResults: async () => {
+          const [result] = await ctx
+            .get("resources")
+            .db.select({
+              totalResults: sql<number>`count(*)::int`,
+            })
+            .from(sandboxInstances)
+            .where(sql`${sandboxInstances.organizationId} = ${body.organizationId}`);
+
+          return result?.totalResults ?? 0;
+        },
+      });
+
+      const serializedResponse: z.infer<typeof ListSandboxInstancesResponseSchema> = {
+        totalResults: responseBody.totalResults,
+        items: responseBody.items.map((item) => ({
+          id: item.id,
+          sandboxProfileId: item.sandboxProfileId,
+          sandboxProfileVersion: item.sandboxProfileVersion,
+          status: item.status,
+          startedBy: {
+            kind: item.startedByKind,
+            id: item.startedById,
+          },
+          source: item.source,
+          createdAt: item.createdAt,
+          updatedAt: item.updatedAt,
+          failureCode: item.failureCode,
+          failureMessage: item.failureMessage,
+        })),
+        nextPage: responseBody.nextPage,
+        previousPage: responseBody.previousPage,
+      };
+
+      return ctx.json(serializedResponse, 200);
+    } catch (error) {
+      return handleListSandboxInstancesError(ctx, error);
+    }
+  });
+
   return {
     basePath: INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH,
     routes,
@@ -179,3 +356,28 @@ export function createInternalSandboxInstancesApp(): AppRoutes<
 }
 
 export { InternalSandboxInstancesErrorResponseSchema };
+
+function handleListSandboxInstancesError(ctx: AppContext, error: unknown) {
+  if (error instanceof InternalSandboxInstancesBadRequestError) {
+    const responseBody: z.infer<typeof InternalSandboxInstancesErrorResponseSchema> = {
+      code: error.code,
+      message: error.message,
+    };
+
+    return ctx.json(responseBody, 400);
+  }
+
+  if (
+    error instanceof KeysetPaginationInputError &&
+    error.reason === KeysetPaginationInputErrorReasons.BOTH_CURSORS_PROVIDED
+  ) {
+    const responseBody: z.infer<typeof InternalSandboxInstancesErrorResponseSchema> = {
+      code: InternalSandboxInstancesErrorCodes.INVALID_LIST_INPUT,
+      message: "Only one of `after` or `before` can be provided.",
+    };
+
+    return ctx.json(responseBody, 400);
+  }
+
+  throw error;
+}

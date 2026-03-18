@@ -10,6 +10,7 @@ const DefaultRequestTimeoutMs = 3000;
 
 const InternalErrorSchema = z
   .object({
+    code: z.string().optional(),
     message: z.string().optional(),
   })
   .catchall(z.unknown());
@@ -28,12 +29,31 @@ export type GetSandboxInstanceInput =
   paths["/internal/sandbox-instances/get"]["post"]["requestBody"]["content"]["application/json"];
 export type GetSandboxInstanceResponse =
   paths["/internal/sandbox-instances/get"]["post"]["responses"]["200"]["content"]["application/json"];
+export type ListSandboxInstancesInput =
+  paths["/internal/sandbox-instances/list"]["post"]["requestBody"]["content"]["application/json"];
+export type ListSandboxInstancesResponse =
+  paths["/internal/sandbox-instances/list"]["post"]["responses"]["200"]["content"]["application/json"];
+
+type InternalErrorBody = z.infer<typeof InternalErrorSchema>;
+
+export class DataPlaneSandboxInstancesClientError extends Error {
+  status: number;
+  body: InternalErrorBody | undefined;
+
+  constructor(input: { status: number; message: string; body: InternalErrorBody | undefined }) {
+    super(input.message);
+    this.name = "DataPlaneSandboxInstancesClientError";
+    this.status = input.status;
+    this.body = input.body;
+  }
+}
 
 export type DataPlaneSandboxInstancesClient = {
   startSandboxInstance: (
     input: StartSandboxInstanceInput,
   ) => Promise<StartSandboxInstanceAcceptedResponse>;
   getSandboxInstance: (input: GetSandboxInstanceInput) => Promise<GetSandboxInstanceResponse>;
+  listSandboxInstances: (input: ListSandboxInstancesInput) => Promise<ListSandboxInstancesResponse>;
 };
 
 function extractErrorMessage(input: unknown): string {
@@ -48,6 +68,33 @@ function extractErrorMessage(input: unknown): string {
   }
 
   return message;
+}
+
+function parseInternalErrorBody(input: unknown): InternalErrorBody | undefined {
+  const parsedError = InternalErrorSchema.safeParse(input);
+  if (!parsedError.success) {
+    return undefined;
+  }
+
+  return parsedError.data;
+}
+
+function createClientError(input: {
+  status: number;
+  error: unknown;
+  operation: "start" | "read" | "list";
+}): DataPlaneSandboxInstancesClientError {
+  const operationLabel = {
+    start: "start",
+    read: "read",
+    list: "list",
+  } as const;
+
+  return new DataPlaneSandboxInstancesClientError({
+    status: input.status,
+    message: `Data-plane internal sandbox ${operationLabel[input.operation]} failed with status ${String(input.status)}: ${extractErrorMessage(input.error)}`,
+    body: parseInternalErrorBody(input.error),
+  });
 }
 
 function createInternalClient(input: CreateDataPlaneSandboxInstancesClientInput): {
@@ -81,9 +128,11 @@ export function createDataPlaneSandboxInstancesClient(
         return result.data;
       }
 
-      throw new Error(
-        `Data-plane internal sandbox start failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
-      );
+      throw createClientError({
+        status: result.response.status,
+        error: result.error,
+        operation: "start",
+      });
     },
 
     async getSandboxInstance(getInput) {
@@ -96,9 +145,28 @@ export function createDataPlaneSandboxInstancesClient(
         return result.data;
       }
 
-      throw new Error(
-        `Data-plane internal sandbox read failed with status ${String(result.response.status)}: ${extractErrorMessage(result.error)}`,
-      );
+      throw createClientError({
+        status: result.response.status,
+        error: result.error,
+        operation: "read",
+      });
+    },
+
+    async listSandboxInstances(listInput) {
+      const result = await internalClient.client.POST("/internal/sandbox-instances/list", {
+        body: listInput,
+        signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+      });
+
+      if (result.response.status === 200 && result.data !== undefined) {
+        return result.data;
+      }
+
+      throw createClientError({
+        status: result.response.status,
+        error: result.error,
+        operation: "list",
+      });
     },
   };
 }

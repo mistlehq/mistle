@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { createKeysetPaginationEnvelopeSchema } from "@mistle/http/pagination";
 import { CompiledRuntimePlanSchema } from "@mistle/integrations-core";
 
 const DataPlaneSandboxInstanceStarterKinds = {
@@ -17,6 +18,9 @@ export const DataPlaneSandboxInstanceStatuses = {
   STOPPED: "stopped",
   FAILED: "failed",
 } as const;
+
+const DefaultListSandboxInstancesLimit = 20;
+const MaxListSandboxInstancesLimit = 100;
 
 const StartSandboxInstanceImageSchema = z
   .object({
@@ -67,6 +71,48 @@ export const GetSandboxInstanceResponseSchema = z
   })
   .strict()
   .nullable();
+
+export const ListSandboxInstancesInputSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    limit: z.number().int().min(1).max(MaxListSandboxInstancesLimit).optional(),
+    after: z.string().min(1).optional(),
+    before: z.string().min(1).optional(),
+  })
+  .strict()
+  .refine((value) => !(value.after !== undefined && value.before !== undefined), {
+    message: "Only one of `after` or `before` can be provided.",
+  });
+
+const SandboxInstanceStartedBySchema = z
+  .object({
+    kind: z.enum(DataPlaneSandboxInstanceStarterKinds),
+    id: z.string().min(1),
+  })
+  .strict();
+
+export const SandboxInstanceListItemSchema = z
+  .object({
+    id: z.string().min(1),
+    sandboxProfileId: z.string().min(1),
+    sandboxProfileVersion: z.number().int().min(1),
+    status: z.enum(DataPlaneSandboxInstanceStatuses),
+    startedBy: SandboxInstanceStartedBySchema,
+    source: z.enum(DataPlaneSandboxInstanceSources),
+    createdAt: z.string().min(1),
+    updatedAt: z.string().min(1),
+    failureCode: z.string().min(1).nullable(),
+    failureMessage: z.string().min(1).nullable(),
+  })
+  .strict();
+
+export const ListSandboxInstancesResponseSchema = createKeysetPaginationEnvelopeSchema(
+  SandboxInstanceListItemSchema,
+  {
+    defaultLimit: DefaultListSandboxInstancesLimit,
+    maxLimit: MaxListSandboxInstancesLimit,
+  },
+);
 
 export const InternalSandboxInstancesErrorResponseSchema = z
   .object({
@@ -190,9 +236,61 @@ export const internalGetSandboxInstanceRoute = createRoute({
   },
 });
 
+export const internalListSandboxInstancesRoute = createRoute({
+  method: "post",
+  path: "/list",
+  tags: ["Internal"],
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: ListSandboxInstancesInputSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "List sandbox instances for internal callers.",
+      content: {
+        "application/json": {
+          schema: ListSandboxInstancesResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request body.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Internal service authentication failed.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesErrorResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
 export type StartSandboxInstanceInput = z.infer<typeof StartSandboxInstanceInputValidationSchema>;
 export type StartSandboxInstanceAcceptedResponse = z.infer<
   typeof StartSandboxInstanceAcceptedResponseSchema
 >;
 export type GetSandboxInstanceInput = z.infer<typeof GetSandboxInstanceInputSchema>;
 export type GetSandboxInstanceResponse = z.infer<typeof GetSandboxInstanceResponseSchema>;
+export type ListSandboxInstancesInput = z.infer<typeof ListSandboxInstancesInputSchema>;
+export type ListSandboxInstancesResponse = z.infer<typeof ListSandboxInstancesResponseSchema>;
