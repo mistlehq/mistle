@@ -167,7 +167,6 @@ describe("compileOpenAiApiKeyBinding", () => {
 
     expect(compiled.runtimeClients).toHaveLength(1);
     expect(compiled.runtimeClients[0]?.setup.env).toEqual({
-      OPENAI_BASE_URL: "https://api.openai.com/v1",
       OPENAI_MODEL: "gpt-5.3-codex",
       OPENAI_REASONING_EFFORT: "medium",
     });
@@ -182,9 +181,9 @@ describe("compileOpenAiApiKeyBinding", () => {
     expect(configContent).toContain('model_reasoning_effort = "medium"');
     expect(configContent).toContain('approval_policy = "never"');
     expect(configContent).toContain('sandbox_mode = "danger-full-access"');
+    expect(configContent).toContain('openai_base_url = "https://api.openai.com/v1"');
     expect(configContent).toContain('trust_level = "trusted"');
     expect(configContent).not.toContain("developer_instructions");
-    expect(configContent).not.toContain("base_url =");
     expect(configContent).not.toContain("[model_providers.openai]");
     expect(compiled.runtimeClients[0]?.processes).toEqual([
       {
@@ -304,8 +303,8 @@ describe("compileOpenAiApiKeyBinding", () => {
 
     expect(compiled.egressRoutes[0]?.match.hosts).toEqual(["proxy.example.com"]);
     expect(compiled.egressRoutes[0]?.match.pathPrefixes).toEqual(["/"]);
-    expect(compiled.runtimeClients[0]?.setup.env.OPENAI_BASE_URL).toEqual(
-      "https://proxy.example.com/openai-v2",
+    expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain(
+      'openai_base_url = "https://proxy.example.com/openai-v2"',
     );
     expect(compiled.runtimeClients[0]?.processes).toHaveLength(1);
     expect(compiled.runtimeClients[0]?.processes[0]?.processKey).toBe("codex-app-server");
