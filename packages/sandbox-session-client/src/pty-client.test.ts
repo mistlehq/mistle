@@ -93,6 +93,41 @@ async function waitForEventLoopTurn(): Promise<void> {
   });
 }
 
+function waitForState(
+  client: SandboxPtyClient,
+  targetState: (typeof SandboxPtyStates)[keyof typeof SandboxPtyStates],
+): Promise<void> {
+  return new Promise<void>((resolve) => {
+    if (client.state === targetState) {
+      resolve();
+      return;
+    }
+    const unsubscribe = client.onState((state) => {
+      if (state === targetState) {
+        unsubscribe();
+        resolve();
+      }
+    });
+  });
+}
+
+async function retryUntilWriteSucceeds(
+  client: SandboxPtyClient,
+  data: Uint8Array,
+  timeoutMs = 2000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      await client.write(data);
+      return;
+    } catch {
+      await waitForEventLoopTurn();
+    }
+  }
+  throw new Error("Timed out waiting for send window to allow write.");
+}
+
 async function expectNoServerMessageWithin(
   server: PtyTestServer,
   timeoutMs: number,
@@ -784,7 +819,7 @@ describe("SandboxPtyClient", () => {
       exitCode: 0,
       streamId: 1,
     });
-    await waitForEventLoopTurn();
+    await waitForState(client, SandboxPtyStates.CONNECTED);
 
     expect(client.state).toBe(SandboxPtyStates.CONNECTED);
     expect(client.streamId).toBeNull();
@@ -926,7 +961,7 @@ describe("SandboxPtyClient", () => {
       exitCode: 0,
       streamId: 1,
     });
-    await waitForEventLoopTurn();
+    await waitForState(client, SandboxPtyStates.CONNECTED);
 
     expect(client.state).toBe(SandboxPtyStates.CONNECTED);
     expect(client.streamId).toBeNull();
@@ -1028,7 +1063,7 @@ describe("SandboxPtyClient", () => {
       message: "Sandbox bootstrap tunnel reconnected and invalidated the active PTY stream.",
       streamId: 1,
     });
-    await waitForEventLoopTurn();
+    await waitForState(client, SandboxPtyStates.CONNECTED);
 
     expect(client.state).toBe(SandboxPtyStates.CONNECTED);
 
@@ -1092,9 +1127,7 @@ describe("SandboxPtyClient", () => {
       bytes: 1,
       streamId: 1,
     });
-    await waitForEventLoopTurn();
-    await waitForEventLoopTurn();
-    await client.write(new Uint8Array([7]));
+    await retryUntilWriteSucceeds(client, new Uint8Array([7]));
 
     const secondWrite = await server.waitForNextMessage();
     expect(secondWrite).toEqual({
