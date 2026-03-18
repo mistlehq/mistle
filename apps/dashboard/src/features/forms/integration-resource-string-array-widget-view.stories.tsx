@@ -37,6 +37,7 @@ const meta = {
     emptyMessage: "No repositories available for this connection.",
     onSearchChange: () => {},
     onToggleHandle: () => {},
+    onToggleAll: () => {},
     onRefresh: () => {},
     onBlur: () => {},
     onFocus: () => {},
@@ -66,6 +67,7 @@ export const InteractiveSelection: Story = {
         emptyMessage={storyState.viewModel.emptyMessage}
         listState={createReadyState(storyState.visibleItems)}
         onSearchChange={storyState.setSearch}
+        onToggleAll={storyState.toggleAll}
         onToggleHandle={storyState.toggleHandle}
         search={storyState.search}
         searchPlaceholder={storyState.viewModel.searchPlaceholder}
