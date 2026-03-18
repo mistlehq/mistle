@@ -11,9 +11,7 @@
   "paths": {
     "/internal/sandbox-instances/start": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -49,15 +47,11 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "enum": [
-                              "user"
-                            ]
+                            "enum": ["user"]
                           },
                           {
                             "type": "string",
-                            "enum": [
-                              "system"
-                            ]
+                            "enum": ["system"]
                           }
                         ]
                       },
@@ -66,25 +60,18 @@
                         "minLength": 1
                       }
                     },
-                    "required": [
-                      "kind",
-                      "id"
-                    ],
+                    "required": ["kind", "id"],
                     "additionalProperties": false
                   },
                   "source": {
                     "anyOf": [
                       {
                         "type": "string",
-                        "enum": [
-                          "dashboard"
-                        ]
+                        "enum": ["dashboard"]
                       },
                       {
                         "type": "string",
-                        "enum": [
-                          "webhook"
-                        ]
+                        "enum": ["webhook"]
                       }
                     ]
                   },
@@ -100,10 +87,7 @@
                         "minLength": 1
                       }
                     },
-                    "required": [
-                      "imageId",
-                      "createdAt"
-                    ],
+                    "required": ["imageId", "createdAt"],
                     "additionalProperties": false
                   }
                 },
@@ -131,9 +115,7 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "accepted"
-                      ]
+                      "enum": ["accepted"]
                     },
                     "sandboxInstanceId": {
                       "type": "string",
@@ -144,11 +126,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "status",
-                    "sandboxInstanceId",
-                    "workflowRunId"
-                  ],
+                  "required": ["status", "sandboxInstanceId", "workflowRunId"],
                   "additionalProperties": false
                 }
               }
@@ -172,10 +150,7 @@
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     },
                     {
@@ -183,9 +158,7 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [
-                            false
-                          ]
+                          "enum": [false]
                         },
                         "error": {
                           "type": "object",
@@ -199,17 +172,11 @@
                               "minLength": 1
                             }
                           },
-                          "required": [
-                            "name",
-                            "message"
-                          ],
+                          "required": ["name", "message"],
                           "additionalProperties": {}
                         }
                       },
-                      "required": [
-                        "success",
-                        "error"
-                      ],
+                      "required": ["success", "error"],
                       "additionalProperties": false
                     }
                   ]
@@ -233,10 +200,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -258,9 +222,7 @@
     },
     "/internal/sandbox-instances/get": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -277,10 +239,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "organizationId",
-                  "instanceId"
-                ],
+                "required": ["organizationId", "instanceId"],
                 "additionalProperties": false
               }
             }
@@ -292,10 +251,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": [
-                    "object",
-                    "null"
-                  ],
+                  "type": ["object", "null"],
                   "properties": {
                     "id": {
                       "type": "string",
@@ -305,51 +261,32 @@
                       "anyOf": [
                         {
                           "type": "string",
-                          "enum": [
-                            "starting"
-                          ]
+                          "enum": ["starting"]
                         },
                         {
                           "type": "string",
-                          "enum": [
-                            "running"
-                          ]
+                          "enum": ["running"]
                         },
                         {
                           "type": "string",
-                          "enum": [
-                            "stopped"
-                          ]
+                          "enum": ["stopped"]
                         },
                         {
                           "type": "string",
-                          "enum": [
-                            "failed"
-                          ]
+                          "enum": ["failed"]
                         }
                       ]
                     },
                     "failureCode": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
+                      "type": ["string", "null"],
                       "minLength": 1
                     },
                     "failureMessage": {
-                      "type": [
-                        "string",
-                        "null"
-                      ],
+                      "type": ["string", "null"],
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "id",
-                    "status",
-                    "failureCode",
-                    "failureMessage"
-                  ],
+                  "required": ["id", "status", "failureCode", "failureMessage"],
                   "additionalProperties": false
                 }
               }
@@ -373,10 +310,7 @@
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     },
                     {
@@ -384,9 +318,7 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [
-                            false
-                          ]
+                          "enum": [false]
                         },
                         "error": {
                           "type": "object",
@@ -400,17 +332,11 @@
                               "minLength": 1
                             }
                           },
-                          "required": [
-                            "name",
-                            "message"
-                          ],
+                          "required": ["name", "message"],
                           "additionalProperties": {}
                         }
                       },
-                      "required": [
-                        "success",
-                        "error"
-                      ],
+                      "required": ["success", "error"],
                       "additionalProperties": false
                     }
                   ]
@@ -434,10 +360,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
@@ -459,9 +382,7 @@
     },
     "/internal/sandbox-instances/list": {
       "post": {
-        "tags": [
-          "Internal"
-        ],
+        "tags": ["Internal"],
         "requestBody": {
           "required": true,
           "content": {
@@ -487,9 +408,7 @@
                     "minLength": 1
                   }
                 },
-                "required": [
-                  "organizationId"
-                ],
+                "required": ["organizationId"],
                 "additionalProperties": false
               }
             }
@@ -528,27 +447,19 @@
                             "anyOf": [
                               {
                                 "type": "string",
-                                "enum": [
-                                  "starting"
-                                ]
+                                "enum": ["starting"]
                               },
                               {
                                 "type": "string",
-                                "enum": [
-                                  "running"
-                                ]
+                                "enum": ["running"]
                               },
                               {
                                 "type": "string",
-                                "enum": [
-                                  "stopped"
-                                ]
+                                "enum": ["stopped"]
                               },
                               {
                                 "type": "string",
-                                "enum": [
-                                  "failed"
-                                ]
+                                "enum": ["failed"]
                               }
                             ]
                           },
@@ -559,15 +470,11 @@
                                 "anyOf": [
                                   {
                                     "type": "string",
-                                    "enum": [
-                                      "user"
-                                    ]
+                                    "enum": ["user"]
                                   },
                                   {
                                     "type": "string",
-                                    "enum": [
-                                      "system"
-                                    ]
+                                    "enum": ["system"]
                                   }
                                 ]
                               },
@@ -576,25 +483,18 @@
                                 "minLength": 1
                               }
                             },
-                            "required": [
-                              "kind",
-                              "id"
-                            ],
+                            "required": ["kind", "id"],
                             "additionalProperties": false
                           },
                           "source": {
                             "anyOf": [
                               {
                                 "type": "string",
-                                "enum": [
-                                  "dashboard"
-                                ]
+                                "enum": ["dashboard"]
                               },
                               {
                                 "type": "string",
-                                "enum": [
-                                  "webhook"
-                                ]
+                                "enum": ["webhook"]
                               }
                             ]
                           },
@@ -607,17 +507,11 @@
                             "minLength": 1
                           },
                           "failureCode": {
-                            "type": [
-                              "string",
-                              "null"
-                            ],
+                            "type": ["string", "null"],
                             "minLength": 1
                           },
                           "failureMessage": {
-                            "type": [
-                              "string",
-                              "null"
-                            ],
+                            "type": ["string", "null"],
                             "minLength": 1
                           }
                         },
@@ -637,10 +531,7 @@
                       }
                     },
                     "nextPage": {
-                      "type": [
-                        "object",
-                        "null"
-                      ],
+                      "type": ["object", "null"],
                       "properties": {
                         "after": {
                           "type": "string",
@@ -652,17 +543,11 @@
                           "maximum": 100
                         }
                       },
-                      "required": [
-                        "after",
-                        "limit"
-                      ],
+                      "required": ["after", "limit"],
                       "additionalProperties": false
                     },
                     "previousPage": {
-                      "type": [
-                        "object",
-                        "null"
-                      ],
+                      "type": ["object", "null"],
                       "properties": {
                         "before": {
                           "type": "string",
@@ -674,19 +559,11 @@
                           "maximum": 100
                         }
                       },
-                      "required": [
-                        "before",
-                        "limit"
-                      ],
+                      "required": ["before", "limit"],
                       "additionalProperties": false
                     }
                   },
-                  "required": [
-                    "totalResults",
-                    "items",
-                    "nextPage",
-                    "previousPage"
-                  ],
+                  "required": ["totalResults", "items", "nextPage", "previousPage"],
                   "additionalProperties": false
                 }
               }
@@ -710,10 +587,7 @@
                           "minLength": 1
                         }
                       },
-                      "required": [
-                        "code",
-                        "message"
-                      ],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     },
                     {
@@ -721,9 +595,7 @@
                       "properties": {
                         "success": {
                           "type": "boolean",
-                          "enum": [
-                            false
-                          ]
+                          "enum": [false]
                         },
                         "error": {
                           "type": "object",
@@ -737,17 +609,11 @@
                               "minLength": 1
                             }
                           },
-                          "required": [
-                            "name",
-                            "message"
-                          ],
+                          "required": ["name", "message"],
                           "additionalProperties": {}
                         }
                       },
-                      "required": [
-                        "success",
-                        "error"
-                      ],
+                      "required": ["success", "error"],
                       "additionalProperties": false
                     }
                   ]
@@ -771,10 +637,7 @@
                       "minLength": 1
                     }
                   },
-                  "required": [
-                    "code",
-                    "message"
-                  ],
+                  "required": ["code", "message"],
                   "additionalProperties": false
                 }
               }
