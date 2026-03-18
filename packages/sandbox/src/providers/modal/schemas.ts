@@ -53,6 +53,24 @@ export const ModalStartSandboxRequestSchema = z
   .strict();
 export type ModalStartSandboxRequest = z.output<typeof ModalStartSandboxRequestSchema>;
 
+export const ModalResumeSandboxRequestSchema = z
+  .object({
+    imageId: z.string().trim().min(1, {
+      message: "Modal request field `imageId` is required.",
+    }),
+    mounts: z.array(ModalVolumeMountSchema).optional(),
+    env: z
+      .record(
+        z.string().trim().min(1, {
+          message: "Modal request field `env` keys must be non-empty.",
+        }),
+        z.string(),
+      )
+      .optional(),
+  })
+  .strict();
+export type ModalResumeSandboxRequest = z.output<typeof ModalResumeSandboxRequestSchema>;
+
 export const ModalWriteSandboxStdinRequestSchema = z
   .object({
     runtimeId: z.string().trim().min(1, {
@@ -94,3 +112,12 @@ export const ModalStopSandboxRequestSchema = z
   })
   .strict();
 export type ModalStopSandboxRequest = z.output<typeof ModalStopSandboxRequestSchema>;
+
+export const ModalDestroySandboxRequestSchema = z
+  .object({
+    runtimeId: z.string().trim().min(1, {
+      message: "Modal request field `runtimeId` is required.",
+    }),
+  })
+  .strict();
+export type ModalDestroySandboxRequest = z.output<typeof ModalDestroySandboxRequestSchema>;

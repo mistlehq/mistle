@@ -6,7 +6,7 @@ import {
 import { defineWorkflow } from "openworkflow";
 
 import { getWorkflowContext } from "../core/context.js";
-import { stopSandbox } from "../shared/stop-sandbox.js";
+import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { ensureSandboxInstance } from "./ensure-sandbox-instance.js";
 import { markSandboxInstanceFailed } from "./mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "./mark-sandbox-instance-running.js";
@@ -56,13 +56,13 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
       failureCode: string;
       failureMessage: string;
     }): Promise<void> {
-      let stopSandboxError: unknown;
+      let destroySandboxError: unknown;
       if (input.runtimeProvider !== undefined && input.providerRuntimeId !== undefined) {
         const runtimeProvider = input.runtimeProvider;
         const providerRuntimeId = input.providerRuntimeId;
         try {
-          await step.run({ name: "stop-sandbox-after-start-failure" }, async () => {
-            await stopSandbox(
+          await step.run({ name: "destroy-sandbox-after-start-failure" }, async () => {
+            await destroySandbox(
               {
                 config: ctx.config,
                 sandboxAdapter: ctx.sandboxAdapter,
@@ -74,7 +74,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
             );
           });
         } catch (error) {
-          stopSandboxError = error;
+          destroySandboxError = error;
         }
       }
 
@@ -89,21 +89,21 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
         updateFailedStatusError = error;
       }
 
-      if (stopSandboxError !== undefined && updateFailedStatusError !== undefined) {
+      if (destroySandboxError !== undefined && updateFailedStatusError !== undefined) {
         throw new Error(
-          "Failed to stop sandbox and failed to mark sandbox instance as failed after startup failure.",
+          "Failed to destroy sandbox and failed to mark sandbox instance as failed after startup failure.",
           {
             cause: {
-              stopSandboxError,
+              destroySandboxError,
               updateFailedStatusError,
             },
           },
         );
       }
 
-      if (stopSandboxError !== undefined) {
-        throw new Error("Failed to stop sandbox after startup failure.", {
-          cause: stopSandboxError,
+      if (destroySandboxError !== undefined) {
+        throw new Error("Failed to destroy sandbox after startup failure.", {
+          cause: destroySandboxError,
         });
       }
 

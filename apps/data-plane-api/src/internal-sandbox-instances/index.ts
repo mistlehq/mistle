@@ -10,6 +10,8 @@ export {
   InternalSandboxInstancesErrorResponseSchema,
   ListSandboxInstancesInputSchema,
   ListSandboxInstancesResponseSchema,
+  ResumeSandboxInstanceAcceptedResponseSchema,
+  ResumeSandboxInstanceInputValidationSchema,
   SandboxInstanceListItemSchema,
   StartSandboxInstanceAcceptedResponseSchema,
   StartSandboxInstanceInputValidationSchema,
@@ -17,6 +19,8 @@ export {
   type GetSandboxInstanceResponse,
   type ListSandboxInstancesInput,
   type ListSandboxInstancesResponse,
+  type ResumeSandboxInstanceAcceptedResponse,
+  type ResumeSandboxInstanceInput,
   type StartSandboxInstanceAcceptedResponse,
   type StartSandboxInstanceInput,
 } from "./contracts.js";

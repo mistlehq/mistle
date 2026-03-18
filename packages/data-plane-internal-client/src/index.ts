@@ -25,6 +25,10 @@ export type StartSandboxInstanceInput =
   paths["/internal/sandbox-instances/start"]["post"]["requestBody"]["content"]["application/json"];
 export type StartSandboxInstanceAcceptedResponse =
   paths["/internal/sandbox-instances/start"]["post"]["responses"]["200"]["content"]["application/json"];
+export type ResumeSandboxInstanceInput =
+  paths["/internal/sandbox-instances/resume"]["post"]["requestBody"]["content"]["application/json"];
+export type ResumeSandboxInstanceAcceptedResponse =
+  paths["/internal/sandbox-instances/resume"]["post"]["responses"]["200"]["content"]["application/json"];
 export type GetSandboxInstanceInput =
   paths["/internal/sandbox-instances/get"]["post"]["requestBody"]["content"]["application/json"];
 export type GetSandboxInstanceResponse =
@@ -52,6 +56,9 @@ export type DataPlaneSandboxInstancesClient = {
   startSandboxInstance: (
     input: StartSandboxInstanceInput,
   ) => Promise<StartSandboxInstanceAcceptedResponse>;
+  resumeSandboxInstance: (
+    input: ResumeSandboxInstanceInput,
+  ) => Promise<ResumeSandboxInstanceAcceptedResponse>;
   getSandboxInstance: (input: GetSandboxInstanceInput) => Promise<GetSandboxInstanceResponse>;
   listSandboxInstances: (input: ListSandboxInstancesInput) => Promise<ListSandboxInstancesResponse>;
 };
@@ -82,10 +89,11 @@ function parseInternalErrorBody(input: unknown): InternalErrorBody | undefined {
 function createClientError(input: {
   status: number;
   error: unknown;
-  operation: "start" | "read" | "list";
+  operation: "start" | "resume" | "read" | "list";
 }): DataPlaneSandboxInstancesClientError {
   const operationLabel = {
     start: "start",
+    resume: "resume",
     read: "read",
     list: "list",
   } as const;
@@ -132,6 +140,23 @@ export function createDataPlaneSandboxInstancesClient(
         status: result.response.status,
         error: result.error,
         operation: "start",
+      });
+    },
+
+    async resumeSandboxInstance(resumeInput) {
+      const result = await internalClient.client.POST("/internal/sandbox-instances/resume", {
+        body: resumeInput,
+        signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+      });
+
+      if (result.response.status === 200 && result.data !== undefined) {
+        return result.data;
+      }
+
+      throw createClientError({
+        status: result.response.status,
+        error: result.error,
+        operation: "resume",
       });
     },
 

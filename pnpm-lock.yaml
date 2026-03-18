@@ -493,6 +493,9 @@ importers:
       '@mistle/gateway-tunnel-auth':
         specifier: workspace:*
         version: link:../../packages/gateway-tunnel-auth
+      '@mistle/integrations-core':
+        specifier: workspace:*
+        version: link:../../packages/integrations-core
       '@mistle/logging':
         specifier: workspace:*
         version: link:../../packages/logging

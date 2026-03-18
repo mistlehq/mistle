@@ -6,7 +6,7 @@ import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registr
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import {
-  SandboxStartupInstanceVolumeStates,
+  type SandboxStartupInstanceVolumeState,
   type SandboxStartupInstanceVolumeMode,
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxStartupInput,
@@ -18,6 +18,7 @@ export async function writeSandboxStartupInput(input: {
   sandboxInstanceId: string;
   runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   instanceVolumeMode: SandboxStartupInstanceVolumeMode;
+  instanceVolumeState: SandboxStartupInstanceVolumeState;
   sandbox: SandboxHandle;
 }): Promise<void> {
   const bootstrapTokenJti = randomUUID();
@@ -59,7 +60,7 @@ export async function writeSandboxStartupInput(input: {
         tunnelGatewayWsUrl,
         instanceVolume: {
           mode: input.instanceVolumeMode,
-          state: SandboxStartupInstanceVolumeStates.NEW,
+          state: input.instanceVolumeState,
         },
         runtimePlan: input.runtimePlan,
       }),
@@ -67,16 +68,16 @@ export async function writeSandboxStartupInput(input: {
     await input.sandbox.closeStdin();
   } catch (writeError) {
     try {
-      await input.sandboxAdapter.stop({
+      await input.sandboxAdapter.destroy({
         runtimeId: input.sandbox.runtimeId,
       });
-    } catch (stopError) {
+    } catch (destroyError) {
       throw new Error(
-        "Failed to write sandbox startup input and failed to stop sandbox after startup write failure.",
+        "Failed to write sandbox startup input and failed to destroy sandbox after startup write failure.",
         {
           cause: {
             writeError,
-            stopError,
+            destroyError,
           },
         },
       );

@@ -38,6 +38,13 @@ export interface SandboxStartRequest {
   readonly env?: Readonly<Record<string, string>>;
 }
 
+export interface SandboxResumeRequestV1 {
+  readonly image: SandboxImageHandle;
+  readonly mounts?: ReadonlyArray<SandboxVolumeMountV1>;
+  readonly previousRuntimeId?: string | null;
+  readonly env?: Readonly<Record<string, string>>;
+}
+
 export interface CreateVolumeRequestV1 {}
 
 export interface DeleteVolumeRequestV1 {
@@ -48,9 +55,15 @@ export interface SandboxStopRequest {
   readonly runtimeId: string;
 }
 
+export interface SandboxDestroyRequest {
+  readonly runtimeId: string;
+}
+
 export interface SandboxAdapter {
   createVolume(request: CreateVolumeRequestV1): Promise<SandboxVolumeHandleV1>;
   deleteVolume(request: DeleteVolumeRequestV1): Promise<void>;
   start(request: SandboxStartRequest): Promise<SandboxHandle>;
+  resume(request: SandboxResumeRequestV1): Promise<SandboxHandle>;
   stop(request: SandboxStopRequest): Promise<void>;
+  destroy(request: SandboxDestroyRequest): Promise<void>;
 }

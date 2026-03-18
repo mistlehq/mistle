@@ -12,12 +12,16 @@ import {
 import {
   DockerCloseSandboxStdinRequestSchema,
   DockerCreateVolumeRequestSchema,
+  DockerDestroySandboxRequestSchema,
+  DockerResumeSandboxRequestSchema,
   DockerDeleteVolumeRequestSchema,
   DockerStartSandboxRequestSchema,
   DockerStopSandboxRequestSchema,
   DockerWriteSandboxStdinRequestSchema,
   type DockerCloseSandboxStdinRequest,
   type DockerCreateVolumeRequest,
+  type DockerDestroySandboxRequest,
+  type DockerResumeSandboxRequest,
   type DockerDeleteVolumeRequest,
   type DockerSandboxConfig,
   type DockerStartSandboxRequest,
@@ -37,9 +41,11 @@ export interface DockerClient {
   createVolume(request: DockerCreateVolumeRequest): Promise<DockerCreateVolumeResponse>;
   deleteVolume(request: DockerDeleteVolumeRequest): Promise<void>;
   startSandbox(request: DockerStartSandboxRequest): Promise<DockerStartSandboxResponse>;
+  resumeSandbox(request: DockerResumeSandboxRequest): Promise<DockerStartSandboxResponse>;
   writeSandboxStdin(request: DockerWriteSandboxStdinRequest): Promise<void>;
   closeSandboxStdin(request: DockerCloseSandboxStdinRequest): Promise<void>;
   stopSandbox(request: DockerStopSandboxRequest): Promise<void>;
+  destroySandbox(request: DockerDestroySandboxRequest): Promise<void>;
 }
 
 const DockerProgressMessageSchema = z
@@ -230,6 +236,35 @@ export class DockerApiClient implements DockerClient {
 
   async stopSandbox(request: DockerStopSandboxRequest): Promise<void> {
     const parsedRequest = DockerStopSandboxRequestSchema.parse(request);
+    this.#releaseTrackedStdinStream(parsedRequest.runtimeId);
+    const container = await this.#resolveContainer(parsedRequest.runtimeId);
+
+    await this.#runDockerClientOperation(DockerClientOperationIds.STOP_CONTAINER, () =>
+      container.stop(),
+    );
+  }
+
+  async resumeSandbox(request: DockerResumeSandboxRequest): Promise<DockerStartSandboxResponse> {
+    const parsedRequest = DockerResumeSandboxRequestSchema.parse(request);
+    const container = await this.#resolveContainer(parsedRequest.runtimeId);
+
+    await this.#runDockerClientOperation(DockerClientOperationIds.START_CONTAINER, () =>
+      container.start(),
+    );
+
+    const attachedStdinStream = await this.#runDockerClientOperation(
+      DockerClientOperationIds.ATTACH_STDIN,
+      () => this.#attachContainerStdin(parsedRequest.runtimeId),
+    );
+    this.#trackAttachedStdinStream(parsedRequest.runtimeId, attachedStdinStream);
+
+    return {
+      runtimeId: parsedRequest.runtimeId,
+    };
+  }
+
+  async destroySandbox(request: DockerDestroySandboxRequest): Promise<void> {
+    const parsedRequest = DockerDestroySandboxRequestSchema.parse(request);
     this.#releaseTrackedStdinStream(parsedRequest.runtimeId);
     const container = await this.#resolveContainer(parsedRequest.runtimeId);
 

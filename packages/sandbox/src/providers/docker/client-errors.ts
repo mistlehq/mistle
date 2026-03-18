@@ -29,6 +29,12 @@ export const DockerClientOperationIds = {
    */
   START_CONTAINER: "start_container",
   /**
+   * `container.stop(...)`.
+   * Source:
+   * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L422-L452
+   */
+  STOP_CONTAINER: "stop_container",
+  /**
    * `container.attach({ stdin: true, ... })`.
    * Source:
    * https://github.com/apocas/dockerode/blob/b9b1c71df369a7947ff398cbfdf4d20406598d38/lib/container.js#L737-L770

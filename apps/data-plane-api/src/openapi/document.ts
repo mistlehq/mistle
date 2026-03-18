@@ -58,6 +58,22 @@ const StartSandboxInstanceResponseSchema = z
   })
   .strict();
 
+const ResumeSandboxInstanceRequestSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    instanceId: z.string().min(1),
+    idempotencyKey: z.string().min(1).max(255).optional(),
+  })
+  .strict();
+
+const ResumeSandboxInstanceResponseSchema = z
+  .object({
+    status: z.literal("accepted"),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1),
+  })
+  .strict();
+
 const GetSandboxInstanceRequestSchema = z
   .object({
     organizationId: z.string().min(1),
@@ -225,6 +241,56 @@ const GetSandboxInstanceRoute = createRoute({
   },
 });
 
+const ResumeSandboxInstanceRoute = createRoute({
+  method: "post",
+  path: `${INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH}/resume`,
+  tags: ["Internal"],
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: ResumeSandboxInstanceRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Queue sandbox instance resume for internal callers.",
+      content: {
+        "application/json": {
+          schema: ResumeSandboxInstanceResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request body.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Internal service authentication failed.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesErrorResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
 const ListSandboxInstancesRoute = createRoute({
   method: "post",
   path: `${INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH}/list`,
@@ -284,6 +350,9 @@ export function createDataPlaneInternalOpenApiDocument(): ReturnType<
     throw new Error("OpenAPI route is documentation-only.");
   });
   app.openapi(GetSandboxInstanceRoute, () => {
+    throw new Error("OpenAPI route is documentation-only.");
+  });
+  app.openapi(ResumeSandboxInstanceRoute, () => {
     throw new Error("OpenAPI route is documentation-only.");
   });
   app.openapi(ListSandboxInstancesRoute, () => {

@@ -1,7 +1,10 @@
 import { CompiledRuntimePlanSchema, assembleCompiledRuntimePlan } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { StartSandboxInstanceInputValidationSchema } from "./contracts.js";
+import {
+  ResumeSandboxInstanceInputValidationSchema,
+  StartSandboxInstanceInputValidationSchema,
+} from "./contracts.js";
 
 function createRuntimePlan() {
   return assembleCompiledRuntimePlan({
@@ -146,5 +149,26 @@ describe("StartSandboxInstanceInputValidationSchema", () => {
         }),
       ]),
     );
+  });
+});
+
+describe("ResumeSandboxInstanceInputValidationSchema", () => {
+  it("accepts a valid resume request", () => {
+    const input = {
+      organizationId: "org_123",
+      instanceId: "sbi_123",
+      idempotencyKey: "req_456",
+    };
+
+    expect(ResumeSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
+  });
+
+  it("accepts omitted idempotency keys for server-generated defaults", () => {
+    const input = {
+      organizationId: "org_123",
+      instanceId: "sbi_123",
+    };
+
+    expect(ResumeSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
   });
 });

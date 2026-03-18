@@ -6,7 +6,9 @@ Current scope:
 
 - create and delete provider-backed durable volumes
 - start a sandbox from an image handle
-- stop a running sandbox
+- resume a sandbox against existing provider-managed state
+- stop a running sandbox without destroying its durable volume state
+- destroy a sandbox runtime
 
 Currently implemented providers:
 
@@ -52,7 +54,9 @@ The package root exports:
 - `CreateVolumeRequestV1`
 - `DeleteVolumeRequestV1`
 - `SandboxStartRequest`
+- `SandboxResumeRequestV1`
 - `SandboxStopRequest`
+- `SandboxDestroyRequest`
 - `SandboxAdapter`
 - `SandboxError`
 - `SandboxConfigurationError`
@@ -91,6 +95,17 @@ await sandbox.writeStdin({
 await sandbox.closeStdin();
 
 await adapter.stop({ runtimeId: sandbox.runtimeId });
+const resumedSandbox = await adapter.resume({
+  image: baseImage,
+  mounts: [
+    {
+      volume,
+      mountPath: "/home/sandbox",
+    },
+  ],
+  previousRuntimeId: sandbox.runtimeId,
+});
+await adapter.destroy({ runtimeId: resumedSandbox.runtimeId });
 await adapter.deleteVolume({ volumeId: volume.volumeId });
 ```
 
@@ -99,6 +114,7 @@ await adapter.deleteVolume({ volumeId: volume.volumeId });
 - Sandbox image handles describe the provider image passed to `start({ image })`.
 - Sandbox volume handles are opaque provider-managed volume references returned by `createVolume({})`.
 - `SandboxStartRequest.mounts` attaches provider-backed volumes at the requested mount paths.
+- `SandboxResumeRequestV1` resumes provider compute against existing mounts. Providers may reuse the same runtime id or return a new one.
 - `SandboxHandle.writeStdin({ payload })` writes bytes to running sandbox stdin.
 - `SandboxHandle.closeStdin()` closes stdin to signal EOF.
 - Operations may throw `SandboxError` subclasses. Configuration failures throw `SandboxConfigurationError`.
@@ -109,7 +125,9 @@ await adapter.deleteVolume({ volumeId: volume.volumeId });
 
 - create and delete provider-backed volumes
 - start a sandbox from an image handle
-- stop a sandbox
+- resume a sandbox runtime
+- stop a sandbox runtime
+- destroy a sandbox runtime
 
 It is not responsible for provisioning or managing provider infrastructure/resources. For current and future adapters (for example Modal, Docker, Kubernetes), platform concerns such as autoscaling, cluster/node lifecycle, scheduling policy, capacity management, and other underlying resource orchestration are out of scope for this package.
 
@@ -127,7 +145,7 @@ Use the current Modal provider as the reference implementation.
 8. Wire the provider into `createSandboxAdapter` in `src/factory.ts`.
 9. Add unit tests next to each provider module (config, errors, factory wiring, and adapter behavior).
 10. Add provider integration tests in `integration/<provider>/` (for example `integration/modal/modal-adapter.integration.test.ts`).
-11. Integration tests must cover the provider lifecycle surface: `createVolume`, `deleteVolume`, `start` from a base image, validate sandbox interaction such as stdin/filesystem/env behavior, mounted volume behavior, and `stop`.
+11. Integration tests must cover the provider lifecycle surface: `createVolume`, `deleteVolume`, `start`, `resume`, `stop`, and `destroy`, plus sandbox interaction such as stdin/filesystem/env behavior and mounted volume behavior.
 
 Design expectations:
 
