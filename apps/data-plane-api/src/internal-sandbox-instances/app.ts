@@ -15,7 +15,10 @@ import {
   KeysetPaginationInputErrorReasons,
   paginateKeyset,
 } from "@mistle/http/pagination";
-import { StartSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
+import {
+  ResumeSandboxInstanceWorkflowSpec,
+  StartSandboxInstanceWorkflowSpec,
+} from "@mistle/workflow-registry/data-plane";
 import { sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
 
@@ -30,9 +33,12 @@ import {
   GetSandboxInstanceResponseSchema,
   internalGetSandboxInstanceRoute,
   internalListSandboxInstancesRoute,
+  internalResumeSandboxInstanceRoute,
   internalStartSandboxInstanceRoute,
   InternalSandboxInstancesErrorResponseSchema,
   ListSandboxInstancesResponseSchema,
+  ResumeSandboxInstanceAcceptedResponseSchema,
+  ResumeSandboxInstanceInputValidationSchema,
   StartSandboxInstanceAcceptedResponseSchema,
   StartSandboxInstanceInputValidationSchema,
 } from "./contracts.js";
@@ -101,6 +107,20 @@ function createStartSandboxIdempotencyKey(
     sandboxProfileId: input.sandboxProfileId,
     sandboxProfileVersion: input.sandboxProfileVersion,
     source: input.source,
+    idempotencyKey,
+  });
+}
+
+function createResumeSandboxIdempotencyKey(
+  input: z.infer<typeof ResumeSandboxInstanceInputValidationSchema>,
+): string {
+  const idempotencyKey = input.idempotencyKey ?? randomUUID();
+
+  return JSON.stringify({
+    version: 1,
+    organizationId: input.organizationId,
+    sandboxInstanceId: input.instanceId,
+    action: "resume",
     idempotencyKey,
   });
 }
@@ -230,6 +250,27 @@ export function createInternalSandboxInstancesApp(): AppRoutes<
             failureCode: sandboxInstance.failureCode,
             failureMessage: sandboxInstance.failureMessage,
           };
+
+    return ctx.json(responseBody, 200);
+  });
+
+  routes.openapi(internalResumeSandboxInstanceRoute, async (ctx) => {
+    const body = ctx.req.valid("json");
+    const workflowRunHandle = await ctx.get("resources").openWorkflow.runWorkflow(
+      ResumeSandboxInstanceWorkflowSpec,
+      {
+        sandboxInstanceId: body.instanceId,
+      },
+      {
+        idempotencyKey: createResumeSandboxIdempotencyKey(body),
+      },
+    );
+
+    const responseBody: z.infer<typeof ResumeSandboxInstanceAcceptedResponseSchema> = {
+      status: "accepted",
+      sandboxInstanceId: body.instanceId,
+      workflowRunId: workflowRunHandle.workflowRun.id,
+    };
 
     return ctx.json(responseBody, 200);
   });

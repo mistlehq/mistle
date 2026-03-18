@@ -40,8 +40,10 @@ const adapter = createSandboxAdapter({
 - `createVolume({})` creates a named Modal volume and returns an opaque handle.
 - `deleteVolume({ volumeId })` deletes that named Modal volume.
 - `start({ image, mounts })` resolves Modal app and image, then creates a sandbox with optional volume mounts.
+- `resume({ image, mounts })` creates fresh Modal sandbox compute attached to the provided mounts. `previousRuntimeId` is accepted by the public API but not required by the provider implementation.
 - returned `SandboxHandle` supports `writeStdin({ payload })` and `closeStdin()` via Modal sandbox stdin stream APIs.
-- `stop({ runtimeId })` resolves sandbox and terminates it.
+- `stop({ runtimeId })` resolves sandbox and terminates the current runtime.
+- `destroy({ runtimeId })` resolves sandbox and terminates the current runtime.
 
 ## Error Surface
 
@@ -56,8 +58,8 @@ See implementation details in `client-errors.ts`.
 ## Integration Tests
 
 Modal adapter integration tests call the real Modal API and are opt-in.
-They cover the adapter lifecycle surface for `createVolume`, `deleteVolume`, `start`, `stop`,
-stdin writes, env injection, mounted-volume persistence, and filesystem access inside a started sandbox.
+They cover the adapter lifecycle surface for `createVolume`, `deleteVolume`, `start`, `resume`,
+`stop`, `destroy`, stdin writes, env injection, mounted-volume persistence, and filesystem access inside a started sandbox.
 
 Required environment variables when enabled:
 

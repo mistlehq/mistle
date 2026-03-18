@@ -5,6 +5,8 @@ import { defineWorkflowSpec } from "openworkflow";
 
 export const StartSandboxInstanceWorkflowName = "data-plane.sandbox-instances.start";
 export const StartSandboxInstanceWorkflowVersion = "1";
+export const ResumeSandboxInstanceWorkflowName = "data-plane.sandbox-instances.resume";
+export const ResumeSandboxInstanceWorkflowVersion = "1";
 export const StopSandboxInstanceWorkflowName = "data-plane.sandbox-instances.stop";
 export const StopSandboxInstanceWorkflowVersion = "1";
 
@@ -38,6 +40,22 @@ export const StartSandboxInstanceWorkflowSpec = defineWorkflowSpec<
 >({
   name: StartSandboxInstanceWorkflowName,
   version: StartSandboxInstanceWorkflowVersion,
+});
+
+export type ResumeSandboxInstanceWorkflowInput = {
+  sandboxInstanceId: string;
+};
+
+export type ResumeSandboxInstanceWorkflowOutput = {
+  sandboxInstanceId: string;
+};
+
+export const ResumeSandboxInstanceWorkflowSpec = defineWorkflowSpec<
+  ResumeSandboxInstanceWorkflowInput,
+  ResumeSandboxInstanceWorkflowOutput
+>({
+  name: ResumeSandboxInstanceWorkflowName,
+  version: ResumeSandboxInstanceWorkflowVersion,
 });
 
 export type StopSandboxInstanceWorkflowInput = {

@@ -6,7 +6,9 @@ import {
 import {
   SandboxProvider,
   type SandboxAdapter,
+  type SandboxDestroyRequest,
   type SandboxHandle,
+  type SandboxResumeRequestV1,
   type SandboxStartRequest,
   type SandboxStopRequest,
   type CreateVolumeRequestV1,
@@ -99,6 +101,45 @@ export class DockerSandboxAdapter implements SandboxAdapter {
     };
   }
 
+  async resume(request: SandboxResumeRequestV1): Promise<SandboxHandle> {
+    if (request.image.provider !== SandboxProvider.DOCKER) {
+      throw new SandboxConfigurationError("Docker adapter received a non-Docker image handle.");
+    }
+    if (
+      request.mounts !== undefined &&
+      request.mounts.some((mount) => mount.volume.provider !== SandboxProvider.DOCKER)
+    ) {
+      throw new SandboxConfigurationError("Docker adapter received a non-Docker volume handle.");
+    }
+    if (request.previousRuntimeId === undefined || request.previousRuntimeId === null) {
+      throw new SandboxConfigurationError("Docker adapter resume requires a previous runtime id.");
+    }
+    if (request.previousRuntimeId.trim().length === 0) {
+      throw new SandboxConfigurationError("Previous runtime id is required.");
+    }
+
+    const response = await this.#client.resumeSandbox({
+      runtimeId: request.previousRuntimeId,
+    });
+    const runtimeId = response.runtimeId;
+
+    return {
+      provider: SandboxProvider.DOCKER,
+      runtimeId,
+      writeStdin: async (input) => {
+        await this.#client.writeSandboxStdin({
+          runtimeId,
+          payload: input.payload,
+        });
+      },
+      closeStdin: async () => {
+        await this.#client.closeSandboxStdin({
+          runtimeId,
+        });
+      },
+    };
+  }
+
   async stop(request: SandboxStopRequest): Promise<void> {
     if (request.runtimeId.trim().length === 0) {
       throw new SandboxConfigurationError("Runtime id is required.");
@@ -106,6 +147,26 @@ export class DockerSandboxAdapter implements SandboxAdapter {
 
     try {
       await this.#client.stopSandbox({ runtimeId: request.runtimeId });
+    } catch (error) {
+      if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
+        throw new SandboxResourceNotFoundError({
+          resourceType: "sandbox",
+          resourceId: request.runtimeId,
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
+  }
+
+  async destroy(request: SandboxDestroyRequest): Promise<void> {
+    if (request.runtimeId.trim().length === 0) {
+      throw new SandboxConfigurationError("Runtime id is required.");
+    }
+
+    try {
+      await this.#client.destroySandbox({ runtimeId: request.runtimeId });
     } catch (error) {
       if (error instanceof DockerClientError && error.code === DockerClientErrorCodes.NOT_FOUND) {
         throw new SandboxResourceNotFoundError({

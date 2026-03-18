@@ -55,6 +55,22 @@ export const StartSandboxInstanceAcceptedResponseSchema = z
   })
   .strict();
 
+export const ResumeSandboxInstanceInputValidationSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    instanceId: z.string().min(1),
+    idempotencyKey: z.string().min(1).max(255).optional(),
+  })
+  .strict();
+
+export const ResumeSandboxInstanceAcceptedResponseSchema = z
+  .object({
+    status: z.literal("accepted"),
+    sandboxInstanceId: z.string().min(1),
+    workflowRunId: z.string().min(1),
+  })
+  .strict();
+
 export const GetSandboxInstanceInputSchema = z
   .object({
     organizationId: z.string().min(1),
@@ -236,6 +252,56 @@ export const internalGetSandboxInstanceRoute = createRoute({
   },
 });
 
+export const internalResumeSandboxInstanceRoute = createRoute({
+  method: "post",
+  path: "/resume",
+  tags: ["Internal"],
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: ResumeSandboxInstanceInputValidationSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Queue sandbox instance resume for internal callers.",
+      content: {
+        "application/json": {
+          schema: ResumeSandboxInstanceAcceptedResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request body.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Internal service authentication failed.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesErrorResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
 export const internalListSandboxInstancesRoute = createRoute({
   method: "post",
   path: "/list",
@@ -289,6 +355,10 @@ export const internalListSandboxInstancesRoute = createRoute({
 export type StartSandboxInstanceInput = z.infer<typeof StartSandboxInstanceInputValidationSchema>;
 export type StartSandboxInstanceAcceptedResponse = z.infer<
   typeof StartSandboxInstanceAcceptedResponseSchema
+>;
+export type ResumeSandboxInstanceInput = z.infer<typeof ResumeSandboxInstanceInputValidationSchema>;
+export type ResumeSandboxInstanceAcceptedResponse = z.infer<
+  typeof ResumeSandboxInstanceAcceptedResponseSchema
 >;
 export type GetSandboxInstanceInput = z.infer<typeof GetSandboxInstanceInputSchema>;
 export type GetSandboxInstanceResponse = z.infer<typeof GetSandboxInstanceResponseSchema>;

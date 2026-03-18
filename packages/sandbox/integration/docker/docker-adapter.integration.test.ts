@@ -141,7 +141,7 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       expect(readback).toBe(startMarker);
     } finally {
       if (runtimeId !== undefined) {
-        await fixture.adapter.stop({ runtimeId });
+        await fixture.adapter.destroy({ runtimeId });
       }
     }
   }, 300_000);
@@ -170,7 +170,7 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       expect(tokenFromSandbox).toBe(startupToken);
     } finally {
       if (runtimeId !== undefined) {
-        await fixture.adapter.stop({ runtimeId });
+        await fixture.adapter.destroy({ runtimeId });
       }
     }
   }, 300_000);
@@ -198,7 +198,7 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       expect(result.output.trimEnd()).toBe(injectedEnvValue);
     } finally {
       if (runtimeId !== undefined) {
-        await fixture.adapter.stop({ runtimeId });
+        await fixture.adapter.destroy({ runtimeId });
       }
     }
   }, 300_000);
@@ -247,7 +247,7 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
         fileContents: marker,
       });
 
-      await fixture.adapter.stop({ runtimeId: firstSandbox.runtimeId });
+      await fixture.adapter.destroy({ runtimeId: firstSandbox.runtimeId });
       firstRuntimeId = undefined;
 
       const secondSandbox = await fixture.adapter.start({
@@ -269,12 +269,52 @@ describeDockerAdapterIntegration("docker adapter integration", () => {
       expect(readback).toBe(marker);
     } finally {
       if (firstRuntimeId !== undefined) {
-        await fixture.adapter.stop({ runtimeId: firstRuntimeId });
+        await fixture.adapter.destroy({ runtimeId: firstRuntimeId });
       }
       if (secondRuntimeId !== undefined) {
-        await fixture.adapter.stop({ runtimeId: secondRuntimeId });
+        await fixture.adapter.destroy({ runtimeId: secondRuntimeId });
       }
       await fixture.adapter.deleteVolume({ volumeId: volume.volumeId });
+    }
+  }, 300_000);
+
+  it("stops and resumes a docker runtime with the same runtime id and filesystem state", async ({
+    fixture,
+  }) => {
+    const marker = `mistle-docker-resume-${randomUUID()}`;
+    let runtimeId: string | undefined;
+
+    try {
+      const sandbox = await fixture.adapter.start({ image: fixture.baseImage });
+      runtimeId = sandbox.runtimeId;
+
+      await writeSandboxFile({
+        dockerClient: fixture.dockerClient,
+        runtimeId: sandbox.runtimeId,
+        path: START_MARKER_FILE_PATH,
+        fileContents: marker,
+      });
+
+      await fixture.adapter.stop({ runtimeId: sandbox.runtimeId });
+
+      const resumedSandbox = await fixture.adapter.resume({
+        image: fixture.baseImage,
+        previousRuntimeId: sandbox.runtimeId,
+      });
+
+      expect(resumedSandbox.provider).toBe(SandboxProvider.DOCKER);
+      expect(resumedSandbox.runtimeId).toBe(sandbox.runtimeId);
+
+      const readback = await readSandboxFile({
+        dockerClient: fixture.dockerClient,
+        runtimeId: resumedSandbox.runtimeId,
+        path: START_MARKER_FILE_PATH,
+      });
+      expect(readback).toBe(marker);
+    } finally {
+      if (runtimeId !== undefined) {
+        await fixture.adapter.destroy({ runtimeId });
+      }
     }
   }, 300_000);
 });

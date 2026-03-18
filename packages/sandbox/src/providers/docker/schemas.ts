@@ -41,6 +41,15 @@ export const DockerStartSandboxRequestSchema = z
   .strict();
 export type DockerStartSandboxRequest = z.output<typeof DockerStartSandboxRequestSchema>;
 
+export const DockerResumeSandboxRequestSchema = z
+  .object({
+    runtimeId: z.string().trim().min(1, {
+      message: "Docker request field `runtimeId` is required.",
+    }),
+  })
+  .strict();
+export type DockerResumeSandboxRequest = z.output<typeof DockerResumeSandboxRequestSchema>;
+
 export const DockerWriteSandboxStdinRequestSchema = z
   .object({
     runtimeId: z.string().trim().min(1, {
@@ -82,3 +91,12 @@ export const DockerStopSandboxRequestSchema = z
   })
   .strict();
 export type DockerStopSandboxRequest = z.output<typeof DockerStopSandboxRequestSchema>;
+
+export const DockerDestroySandboxRequestSchema = z
+  .object({
+    runtimeId: z.string().trim().min(1, {
+      message: "Docker request field `runtimeId` is required.",
+    }),
+  })
+  .strict();
+export type DockerDestroySandboxRequest = z.output<typeof DockerDestroySandboxRequestSchema>;

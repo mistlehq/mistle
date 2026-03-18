@@ -6,7 +6,9 @@ import {
 import {
   SandboxProvider,
   type SandboxAdapter,
+  type SandboxDestroyRequest,
   type SandboxHandle,
+  type SandboxResumeRequestV1,
   type SandboxStartRequest,
   type SandboxStopRequest,
   type CreateVolumeRequestV1,
@@ -99,7 +101,69 @@ export class ModalSandboxAdapter implements SandboxAdapter {
     };
   }
 
+  async resume(request: SandboxResumeRequestV1): Promise<SandboxHandle> {
+    if (request.image.provider !== SandboxProvider.MODAL) {
+      throw new SandboxConfigurationError("Modal adapter received a non-Modal image handle.");
+    }
+    if (
+      request.mounts !== undefined &&
+      request.mounts.some((mount) => mount.volume.provider !== SandboxProvider.MODAL)
+    ) {
+      throw new SandboxConfigurationError("Modal adapter received a non-Modal volume handle.");
+    }
+
+    const response = await this.#client.startSandbox({
+      imageId: request.image.imageId,
+      ...(request.mounts === undefined
+        ? {}
+        : {
+            mounts: request.mounts.map((mount) => ({
+              volumeId: mount.volume.volumeId,
+              mountPath: mount.mountPath,
+            })),
+          }),
+      ...(request.env === undefined ? {} : { env: request.env }),
+    });
+    const runtimeId = response.runtimeId;
+
+    return {
+      provider: SandboxProvider.MODAL,
+      runtimeId,
+      writeStdin: async (input) => {
+        await this.#client.writeSandboxStdin({
+          runtimeId,
+          payload: input.payload,
+        });
+      },
+      closeStdin: async () => {
+        await this.#client.closeSandboxStdin({
+          runtimeId,
+        });
+      },
+    };
+  }
+
   async stop(request: SandboxStopRequest): Promise<void> {
+    if (request.runtimeId.trim().length === 0) {
+      throw new SandboxConfigurationError("Runtime id is required.");
+    }
+
+    try {
+      await this.#client.stopSandbox({ runtimeId: request.runtimeId });
+    } catch (error) {
+      if (error instanceof ModalClientError && error.code === ModalClientErrorCodes.NOT_FOUND) {
+        throw new SandboxResourceNotFoundError({
+          resourceType: "sandbox",
+          resourceId: request.runtimeId,
+          cause: error,
+        });
+      }
+
+      throw error;
+    }
+  }
+
+  async destroy(request: SandboxDestroyRequest): Promise<void> {
     if (request.runtimeId.trim().length === 0) {
       throw new SandboxConfigurationError("Runtime id is required.");
     }
