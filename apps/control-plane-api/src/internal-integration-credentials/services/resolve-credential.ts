@@ -13,7 +13,6 @@ import {
 } from "@mistle/db/control-plane";
 import {
   IntegrationConnectionMethodIds,
-  type IntegrationConnectionMethodId,
   type IntegrationOAuth2Capability,
   IntegrationOAuth2RefreshAccessTokenError,
   IntegrationOAuth2RefreshAccessTokenErrorClassifications,
@@ -253,25 +252,6 @@ function normalizeCredentialExpiryOrThrow(expiresAt: string): string {
   }
 
   return new Date(epochMilliseconds).toISOString();
-}
-
-function resolveConnectionMethodId(
-  connectionConfig: Record<string, unknown>,
-): IntegrationConnectionMethodId | undefined {
-  const connectionMethod = connectionConfig["connection_method"];
-  if (connectionMethod === IntegrationConnectionMethodIds.API_KEY) {
-    return IntegrationConnectionMethodIds.API_KEY;
-  }
-
-  if (connectionMethod === IntegrationConnectionMethodIds.OAUTH2) {
-    return IntegrationConnectionMethodIds.OAUTH2;
-  }
-
-  if (connectionMethod === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION) {
-    return IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION;
-  }
-
-  return undefined;
 }
 
 function isCredentialExpired(expiresAt: string | null): boolean {
@@ -975,7 +955,6 @@ export async function resolveIntegrationCredential(
     externalSubjectId: connection.externalSubjectId,
     config: connection.config,
   });
-  const connectionMethodId = resolveConnectionMethodId(connectionResolverContext.config);
 
   if (input.resolverKey !== undefined) {
     const customResolver = definition.credentialResolvers?.custom?.[input.resolverKey];
@@ -1006,7 +985,8 @@ export async function resolveIntegrationCredential(
   }
 
   if (
-    connectionMethodId === IntegrationConnectionMethodIds.OAUTH2 &&
+    connectionResolverContext.config["connection_method"] ===
+      IntegrationConnectionMethodIds.OAUTH2 &&
     definition.oauth2 !== undefined &&
     (input.secretType === IntegrationCredentialSecretKinds.OAUTH2_ACCESS_TOKEN ||
       input.secretType === IntegrationCredentialSecretKinds.OAUTH2_REFRESH_TOKEN)
