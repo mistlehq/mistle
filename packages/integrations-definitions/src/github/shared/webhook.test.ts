@@ -416,8 +416,8 @@ describe("GitHubWebhookHandler", () => {
     });
   });
 
-  it("parses issues opened events using the canonical issues event name", async () => {
-    const parsed = await GitHubWebhookHandler.parse({
+  it("resolves issues opened events using the canonical issues event name", async () => {
+    const resolved = await GitHubWebhookHandler.resolveWebhookRequest({
       targetKey: "github_cloud",
       target: createGitHubCloudTargetConfig(),
       headers: {
@@ -427,11 +427,16 @@ describe("GitHubWebhookHandler", () => {
       rawBody: encodePayload(IssuesOpenedPayload),
     });
 
-    expect(parsed.eventType).toBe("github.issues.opened");
+    expect(resolved).toMatchObject({
+      kind: "event",
+      event: {
+        eventType: "github.issues.opened",
+      },
+    });
   });
 
-  it("parses push events using the pushed action name", async () => {
-    const parsed = await GitHubWebhookHandler.parse({
+  it("resolves push events using the pushed action name", async () => {
+    const resolved = await GitHubWebhookHandler.resolveWebhookRequest({
       targetKey: "github_cloud",
       target: createGitHubCloudTargetConfig(),
       headers: {
@@ -441,7 +446,12 @@ describe("GitHubWebhookHandler", () => {
       rawBody: encodePayload(PushPayload),
     });
 
-    expect(parsed.eventType).toBe("github.push.pushed");
+    expect(resolved).toMatchObject({
+      kind: "event",
+      event: {
+        eventType: "github.push.pushed",
+      },
+    });
   });
 
   it("fails when x-github-delivery header is missing", () => {

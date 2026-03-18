@@ -214,7 +214,7 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
   resolveWebhookRequest(input) {
     const payload = parseJsonPayload(input.rawBody);
     const providerEventType = resolveProviderEventType(input.headers);
-    const action = resolveAction(payload);
+    const action = resolveCanonicalAction({ providerEventType, payload });
     const deliveryId = resolveDeliveryId(input.headers);
     resolveInstallationId(payload);
     const ordering = resolveCommentOrdering(payload);
@@ -308,29 +308,5 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
         message: "GitHub webhook signature verification failed.",
       };
     }
-  },
-  parse(input) {
-    const payload = parseJsonPayload(input.rawBody);
-    const providerEventType = resolveProviderEventType(input.headers);
-    const action = resolveCanonicalAction({
-      providerEventType,
-      payload,
-    });
-    const deliveryId = resolveDeliveryId(input.headers);
-    resolveInstallationId(payload);
-    const ordering = resolveCommentOrdering(payload);
-
-    return {
-      externalEventId: deliveryId,
-      externalDeliveryId: deliveryId,
-      providerEventType,
-      eventType: resolveEventType({
-        providerEventType,
-        action,
-      }),
-      payload,
-      ...(ordering.occurredAt === undefined ? {} : { occurredAt: ordering.occurredAt }),
-      ...(ordering.sourceOrderKey === undefined ? {} : { sourceOrderKey: ordering.sourceOrderKey }),
-    };
   },
 };

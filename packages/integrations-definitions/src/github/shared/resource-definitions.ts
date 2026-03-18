@@ -51,8 +51,11 @@ export const GitHubResourceDefinitions: ReadonlyArray<IntegrationResourceDefinit
     credential: ({ connection }) => {
       const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(connection.config);
 
-      if (parsedConnectionConfig.auth_scheme === IntegrationSupportedAuthSchemes.OAUTH) {
-        return GitHubRepositoryOAuthResourceCredential;
+      if (
+        parsedConnectionConfig.connection_method ===
+        IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+      ) {
+        return GitHubRepositoryAppInstallationResourceCredential;
       }
 
       return GitHubRepositoryApiKeyResourceCredential;
@@ -68,8 +71,11 @@ export const GitHubResourceDefinitions: ReadonlyArray<IntegrationResourceDefinit
     credential: ({ connection }) => {
       const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(connection.config);
 
-      if (parsedConnectionConfig.auth_scheme === IntegrationSupportedAuthSchemes.OAUTH) {
-        return GitHubRepositoryOAuthResourceCredential;
+      if (
+        parsedConnectionConfig.connection_method ===
+        IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION
+      ) {
+        return GitHubRepositoryAppInstallationResourceCredential;
       }
 
       return GitHubRepositoryApiKeyResourceCredential;
