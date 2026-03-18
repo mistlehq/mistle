@@ -74,6 +74,13 @@ function summarizeEventTypes(eventTypes: readonly string[] | null): string {
   return eventTypes.join(", ");
 }
 
+export function createWebhookAutomationTriggerId(input: {
+  connectionId: string;
+  eventType: string;
+}): string {
+  return `${input.connectionId}::${input.eventType}`;
+}
+
 export function buildWebhookAutomationConnectionOptions(input: {
   connections: readonly IntegrationConnection[];
   preservedConnectionId?: string;
@@ -112,63 +119,119 @@ export function buildWebhookAutomationEventOptions(input: {
   connections: readonly IntegrationConnection[];
   targets: readonly IntegrationTarget[];
   preservedConnectionId?: string;
-  selectedEventTypes: readonly string[];
+  selectedTriggerIds: readonly string[];
 }): readonly WebhookAutomationEventOption[] {
-  const selectedEventTypes = new Set(input.selectedEventTypes);
+  const selectedTriggerIds = new Set(input.selectedTriggerIds);
   const eligibleConnections = input.connections.filter(
     (connection) => connection.status === "active" || connection.id === input.preservedConnectionId,
   );
-  const eligibleTargetKeys = new Set(eligibleConnections.map((connection) => connection.targetKey));
-  const supportedEventOptionsByType = new Map<string, WebhookAutomationEventOption>();
 
-  for (const target of input.targets) {
-    if (!eligibleTargetKeys.has(target.targetKey)) {
+  const supportedEventOptions: WebhookAutomationEventOption[] = [];
+
+  for (const connection of eligibleConnections) {
+    const target = input.targets.find((candidate) => candidate.targetKey === connection.targetKey);
+    if (target === undefined) {
       continue;
     }
 
     for (const eventDefinition of target.supportedWebhookEvents ?? []) {
-      if (supportedEventOptionsByType.has(eventDefinition.eventType)) {
-        continue;
-      }
-
-      supportedEventOptionsByType.set(eventDefinition.eventType, {
-        value: eventDefinition.eventType,
+      supportedEventOptions.push({
+        id: createWebhookAutomationTriggerId({
+          connectionId: connection.id,
+          eventType: eventDefinition.eventType,
+        }),
+        eventType: eventDefinition.eventType,
+        connectionId: connection.id,
+        connectionLabel: connection.displayName,
         label: eventDefinition.displayName,
         ...(target.logoKey === undefined ? {} : { logoKey: target.logoKey }),
-        ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
+        ...(eventDefinition.conversationKeyOptions === undefined
+          ? {}
+          : {
+              conversationKeyOptions: eventDefinition.conversationKeyOptions.map(
+                (conversationKeyOption) => ({
+                  id: conversationKeyOption.id,
+                  label: conversationKeyOption.label,
+                  description: conversationKeyOption.description,
+                  template: conversationKeyOption.template,
+                }),
+              ),
+            }),
+        ...(eventDefinition.category === undefined
+          ? {}
+          : { category: `${connection.displayName} / ${eventDefinition.category}` }),
         ...(eventDefinition.parameters === undefined
           ? {}
           : {
-              parameters: eventDefinition.parameters.map((parameter) => ({
-                id: parameter.id,
-                label: parameter.label,
-                kind: parameter.kind,
-                resourceKind: parameter.resourceKind,
-                payloadPath: [...parameter.payloadPath],
-                ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-              })),
+              parameters: eventDefinition.parameters.map((parameter) =>
+                parameter.kind === "resource-select"
+                  ? {
+                      id: parameter.id,
+                      label: parameter.label,
+                      kind: parameter.kind,
+                      resourceKind: parameter.resourceKind,
+                      payloadPath: [...parameter.payloadPath],
+                      ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                      ...(parameter.placeholder === undefined
+                        ? {}
+                        : { placeholder: parameter.placeholder }),
+                    }
+                  : parameter.kind === "enum-select"
+                    ? {
+                        id: parameter.id,
+                        label: parameter.label,
+                        kind: parameter.kind,
+                        payloadPath: [...parameter.payloadPath],
+                        matchMode: parameter.matchMode,
+                        options: parameter.options.map((option) => ({
+                          value: option.value,
+                          label: option.label,
+                        })),
+                        ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                        ...(parameter.placeholder === undefined
+                          ? {}
+                          : { placeholder: parameter.placeholder }),
+                      }
+                    : {
+                        id: parameter.id,
+                        label: parameter.label,
+                        kind: parameter.kind,
+                        payloadPath: [...parameter.payloadPath],
+                        ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                        ...(parameter.placeholder === undefined
+                          ? {}
+                          : { placeholder: parameter.placeholder }),
+                      },
+              ),
             }),
       });
     }
   }
 
-  const supportedEventOptions = Array.from(supportedEventOptionsByType.values());
-  const missingEventOptions = input.selectedEventTypes
+  const missingEventOptions = input.selectedTriggerIds
     .filter(
-      (selectedEventType) =>
-        !supportedEventOptions.some((eventOption) => eventOption.value === selectedEventType),
+      (selectedTriggerId) =>
+        !supportedEventOptions.some((eventOption) => eventOption.id === selectedTriggerId),
     )
-    .map((selectedEventType) => ({
-      value: selectedEventType,
-      label: selectedEventType,
-      description: "No longer available from your connected integrations.",
-      category: "Unavailable",
-      unavailable: true,
-    }));
+    .map((selectedTriggerId) => {
+      const [connectionId = "", ...eventTypeParts] = selectedTriggerId.split("::");
+      const eventType = eventTypeParts.join("::");
+
+      return {
+        id: selectedTriggerId,
+        eventType,
+        connectionId,
+        connectionLabel: connectionId,
+        label: eventType,
+        description: "No longer available from your connected integrations.",
+        category: "Unavailable",
+        unavailable: true,
+      } satisfies WebhookAutomationEventOption;
+    });
 
   return [...supportedEventOptions, ...missingEventOptions].sort((left, right) => {
-    const leftSelected = selectedEventTypes.has(left.value);
-    const rightSelected = selectedEventTypes.has(right.value);
+    const leftSelected = selectedTriggerIds.has(left.id);
+    const rightSelected = selectedTriggerIds.has(right.id);
     if (leftSelected !== rightSelected) {
       return leftSelected ? -1 : 1;
     }

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { buildWebhookAutomationEventOptions } from "./webhook-automation-list-helpers.js";
+import {
+  buildWebhookAutomationEventOptions,
+  createWebhookAutomationTriggerId,
+} from "./webhook-automation-list-helpers.js";
 
 describe("buildWebhookAutomationEventOptions", () => {
-  it("returns supported webhook events from all connected integrations", () => {
+  it("returns connection-scoped supported webhook events from all connected integrations", () => {
     expect(
       buildWebhookAutomationEventOptions({
         connections: [
@@ -39,14 +42,12 @@ describe("buildWebhookAutomationEventOptions", () => {
                 providerEventType: "issue_comment",
                 displayName: "Issue comment created",
                 category: "Issues",
-                parameters: [
+                conversationKeyOptions: [
                   {
-                    id: "repository",
-                    label: "repository",
-                    kind: "resource-select",
-                    resourceKind: "repository",
-                    payloadPath: ["repository", "full_name"],
-                    prefix: "in",
+                    id: "issue",
+                    label: "Per issue thread",
+                    description: "All matching events for the same issue go to one conversation.",
+                    template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
                   },
                 ],
               },
@@ -55,14 +56,14 @@ describe("buildWebhookAutomationEventOptions", () => {
                 providerEventType: "pull_request",
                 displayName: "Pull request opened",
                 category: "Pull requests",
-                parameters: [
+                conversationKeyOptions: [
                   {
-                    id: "repository",
-                    label: "repository",
-                    kind: "resource-select",
-                    resourceKind: "repository",
-                    payloadPath: ["repository", "full_name"],
-                    prefix: "in",
+                    id: "pull-request",
+                    label: "Per pull request",
+                    description:
+                      "All matching events for the same pull request go to one conversation.",
+                    template:
+                      "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
                   },
                 ],
               },
@@ -93,49 +94,69 @@ describe("buildWebhookAutomationEventOptions", () => {
             },
           },
         ],
-        selectedEventTypes: ["github.pull_request.opened"],
+        selectedTriggerIds: [
+          createWebhookAutomationTriggerId({
+            connectionId: "conn_github",
+            eventType: "github.pull_request.opened",
+          }),
+        ],
       }),
     ).toEqual([
       {
-        value: "github.pull_request.opened",
+        id: createWebhookAutomationTriggerId({
+          connectionId: "conn_github",
+          eventType: "github.pull_request.opened",
+        }),
+        eventType: "github.pull_request.opened",
+        connectionId: "conn_github",
+        connectionLabel: "GitHub Engineering",
         label: "Pull request opened",
-        category: "Pull requests",
-        parameters: [
+        conversationKeyOptions: [
           {
-            id: "repository",
-            label: "repository",
-            kind: "resource-select",
-            resourceKind: "repository",
-            payloadPath: ["repository", "full_name"],
-            prefix: "in",
+            id: "pull-request",
+            label: "Per pull request",
+            description: "All matching events for the same pull request go to one conversation.",
+            template:
+              "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
           },
         ],
+        category: "GitHub Engineering / Pull requests",
       },
       {
-        value: "github.issue_comment.created",
+        id: createWebhookAutomationTriggerId({
+          connectionId: "conn_github",
+          eventType: "github.issue_comment.created",
+        }),
+        eventType: "github.issue_comment.created",
+        connectionId: "conn_github",
+        connectionLabel: "GitHub Engineering",
         label: "Issue comment created",
-        category: "Issues",
-        parameters: [
+        conversationKeyOptions: [
           {
-            id: "repository",
-            label: "repository",
-            kind: "resource-select",
-            resourceKind: "repository",
-            payloadPath: ["repository", "full_name"],
-            prefix: "in",
+            id: "issue",
+            label: "Per issue thread",
+            description: "All matching events for the same issue go to one conversation.",
+            template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
           },
         ],
+        category: "GitHub Engineering / Issues",
       },
       {
-        value: "linear.issue.created",
+        id: createWebhookAutomationTriggerId({
+          connectionId: "conn_linear",
+          eventType: "linear.issue.created",
+        }),
+        eventType: "linear.issue.created",
+        connectionId: "conn_linear",
+        connectionLabel: "Linear Workspace",
         label: "Issue created",
-        category: "Issues",
+        category: "Linear Workspace / Issues",
         logoKey: "linear",
       },
     ]);
   });
 
-  it("preserves selected event types that are no longer advertised by connected integrations", () => {
+  it("preserves selected triggers that are no longer advertised by connected integrations", () => {
     expect(
       buildWebhookAutomationEventOptions({
         connections: [
@@ -163,11 +184,22 @@ describe("buildWebhookAutomationEventOptions", () => {
             },
           },
         ],
-        selectedEventTypes: ["github.push.deleted"],
+        selectedTriggerIds: [
+          createWebhookAutomationTriggerId({
+            connectionId: "conn_github",
+            eventType: "github.push.deleted",
+          }),
+        ],
       }),
     ).toEqual([
       {
-        value: "github.push.deleted",
+        id: createWebhookAutomationTriggerId({
+          connectionId: "conn_github",
+          eventType: "github.push.deleted",
+        }),
+        eventType: "github.push.deleted",
+        connectionId: "conn_github",
+        connectionLabel: "conn_github",
         label: "github.push.deleted",
         description: "No longer available from your connected integrations.",
         category: "Unavailable",

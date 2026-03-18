@@ -63,6 +63,36 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
       );
     }
 
+    for (const conversationKeyOption of supportedWebhookEvent.conversationKeyOptions ?? []) {
+      if (conversationKeyOption.id.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].conversationKeyOptions[*].id must be non-empty.",
+        );
+      }
+
+      if (conversationKeyOption.label.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].conversationKeyOptions[*].label must be non-empty.",
+        );
+      }
+
+      if (conversationKeyOption.description.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].conversationKeyOptions[*].description must be non-empty.",
+        );
+      }
+
+      if (conversationKeyOption.template.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].conversationKeyOptions[*].template must be non-empty.",
+        );
+      }
+    }
+
     for (const parameter of supportedWebhookEvent.parameters ?? []) {
       if (parameter.id.trim().length === 0) {
         throw new IntegrationDefinitionRegistryError(
@@ -78,10 +108,25 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
         );
       }
 
-      if (parameter.resourceKind.trim().length === 0) {
+      if (
+        parameter.kind === "resource-select" &&
+        (parameter.resourceKind?.trim().length ?? 0) === 0
+      ) {
         throw new IntegrationDefinitionRegistryError(
           DefinitionRegistryErrorCodes.INVALID_DEFINITION,
           "Integration definition supportedWebhookEvents[*].parameters[*].resourceKind must be non-empty.",
+        );
+      }
+
+      if (
+        parameter.kind === "enum-select" &&
+        parameter.options.some(
+          (option) => option.value.trim().length === 0 || option.label.trim().length === 0,
+        )
+      ) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameters[*].options[*] must be non-empty.",
         );
       }
 

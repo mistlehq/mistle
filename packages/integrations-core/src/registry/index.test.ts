@@ -191,7 +191,7 @@ describe("integration registry", () => {
         targetConfigSchema: ConfigSchema,
         targetSecretSchema: EmptySecretsSchema,
         bindingConfigSchema: ConfigSchema,
-        supportedAuthSchemes: ["oauth", "api-key"],
+        connectionMethods: GitHubConnectionMethods,
         supportedWebhookEvents: [
           {
             eventType: "github.issue_comment.created",

@@ -4,19 +4,65 @@ import { useState } from "react";
 
 import { withDashboardPageWidth } from "../../storybook/decorators.js";
 import type { IntegrationConnectionResources } from "../integrations/integrations-service.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-list-helpers.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
 import type {
   WebhookAutomationEventOption,
   WebhookAutomationTriggerParameterValueMap,
 } from "./webhook-automation-trigger-types.js";
 
+const GitHubConnectionId = "conn_github_prod";
+const IssueCommentCreatedTriggerId = createWebhookAutomationTriggerId({
+  connectionId: GitHubConnectionId,
+  eventType: "github.issue_comment.created",
+});
+const PullRequestOpenedTriggerId = createWebhookAutomationTriggerId({
+  connectionId: GitHubConnectionId,
+  eventType: "github.pull_request.opened",
+});
+const PullRequestReviewCommentCreatedTriggerId = createWebhookAutomationTriggerId({
+  connectionId: GitHubConnectionId,
+  eventType: "github.pull_request_review_comment.created",
+});
+
 const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
   {
-    value: "github.issue_comment.created",
+    id: IssueCommentCreatedTriggerId,
+    eventType: "github.issue_comment.created",
+    connectionId: GitHubConnectionId,
+    connectionLabel: "GitHub Engineering",
     label: "Issue comment created",
-    category: "Issues",
+    category: "GitHub Engineering / Issues",
     logoKey: "github",
     parameters: [
+      {
+        id: "target",
+        label: "comment target",
+        kind: "enum-select",
+        payloadPath: ["issue", "pull_request"],
+        matchMode: "exists",
+        options: [
+          {
+            value: "exists",
+            label: "pull request",
+          },
+          {
+            value: "not_exists",
+            label: "issue",
+          },
+        ],
+        prefix: "in",
+        placeholder: "Any comment target",
+      },
+      {
+        id: "commenter",
+        label: "commenter",
+        kind: "resource-select",
+        resourceKind: "user",
+        payloadPath: ["sender", "login"],
+        prefix: "by",
+        placeholder: "Any commenter",
+      },
       {
         id: "repository",
         label: "repository",
@@ -28,15 +74,24 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
     ],
   },
   {
-    value: "github.issues.opened",
+    id: createWebhookAutomationTriggerId({
+      connectionId: GitHubConnectionId,
+      eventType: "github.issue.opened",
+    }),
+    eventType: "github.issue.opened",
+    connectionId: GitHubConnectionId,
+    connectionLabel: "GitHub Engineering",
     label: "Issue opened",
-    category: "Issues",
+    category: "GitHub Engineering / Issues",
     logoKey: "github",
   },
   {
-    value: "github.pull_request.opened",
+    id: PullRequestOpenedTriggerId,
+    eventType: "github.pull_request.opened",
+    connectionId: GitHubConnectionId,
+    connectionLabel: "GitHub Engineering",
     label: "Pull request opened",
-    category: "Pull requests",
+    category: "GitHub Engineering / Pull requests",
     logoKey: "github",
     parameters: [
       {
@@ -47,18 +102,39 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
         payloadPath: ["repository", "full_name"],
         prefix: "in",
       },
+      {
+        id: "author",
+        label: "author",
+        kind: "resource-select",
+        resourceKind: "user",
+        payloadPath: ["sender", "login"],
+        prefix: "by",
+        placeholder: "Any author",
+      },
+      {
+        id: "baseBranch",
+        label: "base branch",
+        kind: "resource-select",
+        resourceKind: "branch",
+        payloadPath: ["pull_request", "base", "ref"],
+        prefix: "to",
+        placeholder: "Any base branch",
+      },
     ],
   },
   {
-    value: "github.pull_request_review_comment.created",
+    id: PullRequestReviewCommentCreatedTriggerId,
+    eventType: "github.pull_request_review_comment.created",
+    connectionId: GitHubConnectionId,
+    connectionLabel: "GitHub Engineering",
     label: "Pull request review comment created",
-    category: "Pull requests",
+    category: "GitHub Engineering / Pull requests",
     logoKey: "github",
   },
 ];
 
 const StoryGithubRepositoryResources: IntegrationConnectionResources = {
-  connectionId: "conn_github_prod",
+  connectionId: GitHubConnectionId,
   familyId: "github",
   kind: "repository",
   syncState: "ready",
@@ -87,6 +163,70 @@ const StoryGithubRepositoryResources: IntegrationConnectionResources = {
   ],
 };
 
+const StoryGithubBranchResources: IntegrationConnectionResources = {
+  connectionId: GitHubConnectionId,
+  familyId: "github",
+  kind: "branch",
+  syncState: "ready",
+  lastSyncedAt: "2026-03-17T00:00:00.000Z",
+  items: [
+    {
+      id: "icr_github_branch_1",
+      familyId: "github",
+      kind: "branch",
+      externalId: "repo_1:main",
+      handle: "main",
+      displayName: "main",
+      status: "accessible",
+      metadata: {
+        repositoryFullName: "mistlehq/platform",
+      },
+    },
+    {
+      id: "icr_github_branch_2",
+      familyId: "github",
+      kind: "branch",
+      externalId: "repo_1:release",
+      handle: "release",
+      displayName: "release",
+      status: "accessible",
+      metadata: {
+        repositoryFullName: "mistlehq/platform",
+      },
+    },
+  ],
+};
+
+const StoryGithubUserResources: IntegrationConnectionResources = {
+  connectionId: GitHubConnectionId,
+  familyId: "github",
+  kind: "user",
+  syncState: "ready",
+  lastSyncedAt: "2026-03-17T00:00:00.000Z",
+  items: [
+    {
+      id: "icr_github_user_1",
+      familyId: "github",
+      kind: "user",
+      externalId: "1001",
+      handle: "octocat",
+      displayName: "octocat",
+      status: "accessible",
+      metadata: {},
+    },
+    {
+      id: "icr_github_user_2",
+      familyId: "github",
+      kind: "user",
+      externalId: "1002",
+      handle: "hubot",
+      displayName: "hubot",
+      status: "accessible",
+      metadata: {},
+    },
+  ],
+};
+
 function createWebhookAutomationTriggerPickerStoryQueryClient(): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -98,8 +238,16 @@ function createWebhookAutomationTriggerPickerStoryQueryClient(): QueryClient {
   });
 
   queryClient.setQueryData(
-    ["automation-trigger-parameters", "conn_github_prod", "repository"],
+    ["automation-trigger-parameters", GitHubConnectionId, "repository"],
     StoryGithubRepositoryResources,
+  );
+  queryClient.setQueryData(
+    ["automation-trigger-parameters", GitHubConnectionId, "branch"],
+    StoryGithubBranchResources,
+  );
+  queryClient.setQueryData(
+    ["automation-trigger-parameters", GitHubConnectionId, "user"],
+    StoryGithubUserResources,
   );
 
   return queryClient;
@@ -108,13 +256,13 @@ function createWebhookAutomationTriggerPickerStoryQueryClient(): QueryClient {
 function StoryHarness(input: {
   hasConnectedIntegrations: boolean;
   selectedConnectionId: string;
-  selectedEventTypes: readonly string[];
+  selectedTriggerIds: readonly string[];
   triggerParameterValues?: WebhookAutomationTriggerParameterValueMap;
   eventOptions: readonly WebhookAutomationEventOption[];
   error?: string;
 }): React.JSX.Element {
   const [queryClient] = useState(() => createWebhookAutomationTriggerPickerStoryQueryClient());
-  const [selectedEventTypes, setSelectedEventTypes] = useState([...input.selectedEventTypes]);
+  const [selectedTriggerIds, setSelectedTriggerIds] = useState([...input.selectedTriggerIds]);
   const [triggerParameterValues, setTriggerParameterValues] = useState(
     input.triggerParameterValues ?? {},
   );
@@ -126,18 +274,18 @@ function StoryHarness(input: {
           error={input.error}
           eventOptions={input.eventOptions}
           hasConnectedIntegrations={input.hasConnectedIntegrations}
-          onTriggerParameterValueChange={({ eventType, parameterId, value }) => {
+          onTriggerParameterValueChange={({ triggerId, parameterId, value }) => {
             setTriggerParameterValues((currentValues) => ({
               ...currentValues,
-              [eventType]: {
-                ...(currentValues[eventType] ?? {}),
+              [triggerId]: {
+                ...(currentValues[triggerId] ?? {}),
                 [parameterId]: value,
               },
             }));
           }}
-          onValueChange={setSelectedEventTypes}
+          onValueChange={setSelectedTriggerIds}
           selectedConnectionId={input.selectedConnectionId}
-          selectedEventTypes={selectedEventTypes}
+          selectedTriggerIds={selectedTriggerIds}
           triggerParameterValues={triggerParameterValues}
         />
       </div>
@@ -158,8 +306,19 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   args: {
     hasConnectedIntegrations: true,
-    selectedConnectionId: "conn_github_prod",
-    selectedEventTypes: ["github.pull_request.opened", "github.issue_comment.created"],
+    selectedConnectionId: GitHubConnectionId,
+    selectedTriggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+    triggerParameterValues: {
+      [PullRequestOpenedTriggerId]: {
+        author: "octocat",
+        baseBranch: "main",
+        repository: "mistlehq/platform",
+      },
+      [IssueCommentCreatedTriggerId]: {
+        target: "exists",
+        commenter: "hubot",
+      },
+    },
     eventOptions: GitHubEventOptions,
   },
 };
@@ -167,8 +326,8 @@ export const Default: Story = {
 export const NoSelection: Story = {
   args: {
     hasConnectedIntegrations: true,
-    selectedConnectionId: "conn_github_prod",
-    selectedEventTypes: [],
+    selectedConnectionId: GitHubConnectionId,
+    selectedTriggerIds: [],
     eventOptions: GitHubEventOptions,
   },
 };
@@ -177,7 +336,7 @@ export const NoConnectedIntegrations: Story = {
   args: {
     hasConnectedIntegrations: false,
     selectedConnectionId: "",
-    selectedEventTypes: [],
+    selectedTriggerIds: [],
     eventOptions: [],
   },
 };
@@ -185,8 +344,8 @@ export const NoConnectedIntegrations: Story = {
 export const NoTriggersAvailable: Story = {
   args: {
     hasConnectedIntegrations: true,
-    selectedConnectionId: "conn_github_prod",
-    selectedEventTypes: [],
+    selectedConnectionId: GitHubConnectionId,
+    selectedTriggerIds: [],
     eventOptions: [],
   },
 };
@@ -194,12 +353,24 @@ export const NoTriggersAvailable: Story = {
 export const UnavailableSavedTrigger: Story = {
   args: {
     hasConnectedIntegrations: true,
-    selectedConnectionId: "conn_github_prod",
-    selectedEventTypes: ["github.pull_request.opened", "github.push.deleted"],
+    selectedConnectionId: GitHubConnectionId,
+    selectedTriggerIds: [
+      PullRequestOpenedTriggerId,
+      createWebhookAutomationTriggerId({
+        connectionId: GitHubConnectionId,
+        eventType: "github.push.deleted",
+      }),
+    ],
     eventOptions: [
       ...GitHubEventOptions,
       {
-        value: "github.push.deleted",
+        id: createWebhookAutomationTriggerId({
+          connectionId: GitHubConnectionId,
+          eventType: "github.push.deleted",
+        }),
+        eventType: "github.push.deleted",
+        connectionId: GitHubConnectionId,
+        connectionLabel: "GitHub Engineering",
         label: "github.push.deleted",
         description: "No longer available from your connected integrations.",
         category: "Unavailable",

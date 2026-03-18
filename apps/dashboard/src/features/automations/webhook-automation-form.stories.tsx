@@ -11,15 +11,31 @@ import {
   type WebhookAutomationFormValues,
   type WebhookAutomationFormValueKey,
 } from "./webhook-automation-form.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-list-helpers.js";
+
+const GitHubConnectionId = "conn_github_prod";
+const StripeConnectionId = "conn_stripe_prod";
+const IssueCommentCreatedTriggerId = createWebhookAutomationTriggerId({
+  connectionId: GitHubConnectionId,
+  eventType: "github.issue_comment.created",
+});
+const PullRequestOpenedTriggerId = createWebhookAutomationTriggerId({
+  connectionId: GitHubConnectionId,
+  eventType: "github.pull_request.opened",
+});
+const StripePayoutFailedTriggerId = createWebhookAutomationTriggerId({
+  connectionId: StripeConnectionId,
+  eventType: "stripe.payout.failed",
+});
 
 const ConnectionOptions: readonly WebhookAutomationFormOption[] = [
   {
-    value: "conn_github_prod",
+    value: GitHubConnectionId,
     label: "GitHub Engineering",
     description: "github-cloud",
   },
   {
-    value: "conn_stripe_prod",
+    value: StripeConnectionId,
     label: "Stripe Production",
     description: "stripe-default",
   },
@@ -39,7 +55,7 @@ const SandboxProfileOptions: readonly WebhookAutomationFormOption[] = [
 ];
 
 const StoryGithubRepositoryResources: IntegrationConnectionResources = {
-  connectionId: "conn_github_prod",
+  connectionId: GitHubConnectionId,
   familyId: "github",
   kind: "repository",
   syncState: "ready",
@@ -68,6 +84,70 @@ const StoryGithubRepositoryResources: IntegrationConnectionResources = {
   ],
 };
 
+const StoryGithubBranchResources: IntegrationConnectionResources = {
+  connectionId: GitHubConnectionId,
+  familyId: "github",
+  kind: "branch",
+  syncState: "ready",
+  lastSyncedAt: "2026-03-17T00:00:00.000Z",
+  items: [
+    {
+      id: "icr_github_branch_1",
+      familyId: "github",
+      kind: "branch",
+      externalId: "repo_1:main",
+      handle: "main",
+      displayName: "main",
+      status: "accessible",
+      metadata: {
+        repositoryFullName: "mistlehq/platform",
+      },
+    },
+    {
+      id: "icr_github_branch_2",
+      familyId: "github",
+      kind: "branch",
+      externalId: "repo_1:release",
+      handle: "release",
+      displayName: "release",
+      status: "accessible",
+      metadata: {
+        repositoryFullName: "mistlehq/platform",
+      },
+    },
+  ],
+};
+
+const StoryGithubUserResources: IntegrationConnectionResources = {
+  connectionId: GitHubConnectionId,
+  familyId: "github",
+  kind: "user",
+  syncState: "ready",
+  lastSyncedAt: "2026-03-17T00:00:00.000Z",
+  items: [
+    {
+      id: "icr_github_user_1",
+      familyId: "github",
+      kind: "user",
+      externalId: "1001",
+      handle: "octocat",
+      displayName: "octocat",
+      status: "accessible",
+      metadata: {},
+    },
+    {
+      id: "icr_github_user_2",
+      familyId: "github",
+      kind: "user",
+      externalId: "1002",
+      handle: "hubot",
+      displayName: "hubot",
+      status: "accessible",
+      metadata: {},
+    },
+  ],
+};
+
 function createWebhookAutomationStoryQueryClient(): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -82,17 +162,56 @@ function createWebhookAutomationStoryQueryClient(): QueryClient {
     ["automation-trigger-parameters", "conn_github_prod", "repository"],
     StoryGithubRepositoryResources,
   );
+  queryClient.setQueryData(
+    ["automation-trigger-parameters", GitHubConnectionId, "branch"],
+    StoryGithubBranchResources,
+  );
+  queryClient.setQueryData(
+    ["automation-trigger-parameters", GitHubConnectionId, "user"],
+    StoryGithubUserResources,
+  );
 
   return queryClient;
 }
 
 const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
   {
-    value: "github.issue_comment.created",
+    id: IssueCommentCreatedTriggerId,
+    eventType: "github.issue_comment.created",
+    connectionId: GitHubConnectionId,
+    connectionLabel: "GitHub Engineering",
     label: "Issue comment created",
-    category: "Issues",
+    category: "GitHub Engineering / Issues",
     logoKey: "github",
     parameters: [
+      {
+        id: "target",
+        label: "comment target",
+        kind: "enum-select",
+        payloadPath: ["issue", "pull_request"],
+        matchMode: "exists",
+        options: [
+          {
+            value: "exists",
+            label: "pull request",
+          },
+          {
+            value: "not_exists",
+            label: "issue",
+          },
+        ],
+        prefix: "in",
+        placeholder: "Any comment target",
+      },
+      {
+        id: "commenter",
+        label: "commenter",
+        kind: "resource-select",
+        resourceKind: "user",
+        payloadPath: ["sender", "login"],
+        prefix: "by",
+        placeholder: "Any commenter",
+      },
       {
         id: "repository",
         label: "repository",
@@ -104,15 +223,24 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
     ],
   },
   {
-    value: "github.issues.opened",
+    id: createWebhookAutomationTriggerId({
+      connectionId: GitHubConnectionId,
+      eventType: "github.issue.opened",
+    }),
+    eventType: "github.issue.opened",
+    connectionId: GitHubConnectionId,
+    connectionLabel: "GitHub Engineering",
     label: "Issue opened",
-    category: "Issues",
+    category: "GitHub Engineering / Issues",
     logoKey: "github",
   },
   {
-    value: "github.pull_request.opened",
+    id: PullRequestOpenedTriggerId,
+    eventType: "github.pull_request.opened",
+    connectionId: GitHubConnectionId,
+    connectionLabel: "GitHub Engineering",
     label: "Pull request opened",
-    category: "Pull requests",
+    category: "GitHub Engineering / Pull requests",
     logoKey: "github",
     parameters: [
       {
@@ -123,39 +251,68 @@ const GitHubWebhookEventOptions: readonly WebhookAutomationEventOption[] = [
         payloadPath: ["repository", "full_name"],
         prefix: "in",
       },
+      {
+        id: "author",
+        label: "author",
+        kind: "resource-select",
+        resourceKind: "user",
+        payloadPath: ["sender", "login"],
+        prefix: "by",
+        placeholder: "Any author",
+      },
+      {
+        id: "baseBranch",
+        label: "base branch",
+        kind: "resource-select",
+        resourceKind: "branch",
+        payloadPath: ["pull_request", "base", "ref"],
+        prefix: "to",
+        placeholder: "Any base branch",
+      },
     ],
   },
   {
-    value: "github.pull_request_review_comment.created",
+    id: createWebhookAutomationTriggerId({
+      connectionId: GitHubConnectionId,
+      eventType: "github.pull_request_review_comment.created",
+    }),
+    eventType: "github.pull_request_review_comment.created",
+    connectionId: GitHubConnectionId,
+    connectionLabel: "GitHub Engineering",
     label: "Pull request review comment created",
-    category: "Pull requests",
+    category: "GitHub Engineering / Pull requests",
     logoKey: "github",
   },
 ];
 
-const CreateValues: WebhookAutomationFormValues = {
+const EmptyCreateValues: WebhookAutomationFormValues = {
+  name: "",
+  sandboxProfileId: "",
+  enabled: true,
+  inputTemplate: "",
+  conversationKeyTemplate: "",
+  triggerIds: [],
+  triggerParameterValues: {},
+};
+
+const ExistingAutomationValues: WebhookAutomationFormValues = {
   name: "GitHub pushes to repo triage",
-  integrationConnectionId: "conn_github_prod",
   sandboxProfileId: "sbp_repo_maintainer",
   enabled: true,
   inputTemplate: '{\n  "repo": "{{payload.repository.full_name}}",\n  "ref": "{{payload.ref}}"\n}',
   conversationKeyTemplate: "{{payload.repository.full_name}}:{{payload.ref}}",
-  idempotencyKeyTemplate: "{{delivery.id}}",
-  eventTypes: ["github.pull_request.opened", "github.issue_comment.created"],
-  triggerParameterValues: {},
-  payloadFilterEditorMode: "builder",
-  payloadFilterBuilderMode: "all",
-  payloadFilterConditions: [
-    {
-      id: "condition_0",
-      pathText: "action",
-      operator: "eq",
-      valueType: "string",
-      valueText: "opened",
-      valuesText: "",
+  triggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+  triggerParameterValues: {
+    [PullRequestOpenedTriggerId]: {
+      repository: "mistlehq/platform",
+      author: "octocat",
+      baseBranch: "main",
     },
-  ],
-  payloadFilterText: '{\n  "op": "eq",\n  "path": [\n    "action"\n  ],\n  "value": "opened"\n}',
+    [IssueCommentCreatedTriggerId]: {
+      target: "exists",
+      commenter: "hubot",
+    },
+  },
 };
 
 function StoryHarness(input: {
@@ -214,7 +371,7 @@ type Story = StoryObj<typeof meta>;
 export const Create: Story = {
   args: {
     mode: "create",
-    values: CreateValues,
+    values: EmptyCreateValues,
   },
 };
 
@@ -223,19 +380,21 @@ export const Edit: Story = {
     mode: "edit",
     onDelete: function onDelete() {},
     values: {
-      ...CreateValues,
+      ...ExistingAutomationValues,
       enabled: false,
-      eventTypes: ["stripe.payout.failed"],
+      triggerIds: [StripePayoutFailedTriggerId],
       name: "Stripe payouts incident intake",
-      integrationConnectionId: "conn_stripe_prod",
       sandboxProfileId: "sbp_finance_investigator",
       triggerParameterValues: {},
     },
     webhookEventOptions: [
       {
-        value: "stripe.payout.failed",
+        id: StripePayoutFailedTriggerId,
+        eventType: "stripe.payout.failed",
+        connectionId: StripeConnectionId,
+        connectionLabel: "Stripe Production",
         label: "Payout failed",
-        category: "Payouts",
+        category: "Stripe Production / Payouts",
         logoKey: "stripe",
       },
     ],
@@ -245,30 +404,15 @@ export const Edit: Story = {
 export const ValidationErrors: Story = {
   args: {
     mode: "create",
-    formError: "The selected integration connection does not support webhook automations.",
+    formError: "The selected triggers do not support this automation setup.",
     fieldErrors: {
       name: "Automation name is required.",
-      integrationConnectionId: "Choose a webhook-capable integration connection.",
+      triggerIds: "Select at least one trigger.",
       sandboxProfileId: "Choose a sandbox profile for the automation target.",
       inputTemplate: "Input template must be valid JSON template text.",
     },
     values: {
-      ...CreateValues,
-      name: "",
-      integrationConnectionId: "",
-      sandboxProfileId: "",
-      eventTypes: [],
-      triggerParameterValues: {},
-      payloadFilterConditions: [
-        {
-          id: "condition_0",
-          pathText: "",
-          operator: "eq",
-          valueType: "string",
-          valueText: "",
-          valuesText: "",
-        },
-      ],
+      ...EmptyCreateValues,
     },
   },
 };
@@ -278,12 +422,7 @@ export const NoConnectedIntegrations: Story = {
     mode: "create",
     connectionOptions: [],
     formError: "Create an integration connection before you configure an automation.",
-    values: {
-      ...CreateValues,
-      integrationConnectionId: "",
-      eventTypes: [],
-      triggerParameterValues: {},
-    },
+    values: EmptyCreateValues,
     webhookEventOptions: [],
   },
 };
@@ -294,18 +433,14 @@ export const Saving: Story = {
     isDeleting: false,
     isSaving: true,
     onDelete: function onDelete() {},
-    values: CreateValues,
+    values: ExistingAutomationValues,
   },
 };
 
 export const NoTriggersAvailable: Story = {
   args: {
     mode: "create",
-    values: {
-      ...CreateValues,
-      eventTypes: [],
-      triggerParameterValues: {},
-    },
+    values: EmptyCreateValues,
     webhookEventOptions: [],
   },
 };
@@ -315,14 +450,26 @@ export const UnavailableSavedEvent: Story = {
     mode: "edit",
     onDelete: function onDelete() {},
     values: {
-      ...CreateValues,
-      eventTypes: ["github.issue_comment.created", "github.push.deleted"],
+      ...ExistingAutomationValues,
+      triggerIds: [
+        IssueCommentCreatedTriggerId,
+        createWebhookAutomationTriggerId({
+          connectionId: GitHubConnectionId,
+          eventType: "github.push.deleted",
+        }),
+      ],
       triggerParameterValues: {},
     },
     webhookEventOptions: [
       ...GitHubWebhookEventOptions,
       {
-        value: "github.push.deleted",
+        id: createWebhookAutomationTriggerId({
+          connectionId: GitHubConnectionId,
+          eventType: "github.push.deleted",
+        }),
+        eventType: "github.push.deleted",
+        connectionId: GitHubConnectionId,
+        connectionLabel: "GitHub Engineering",
         label: "github.push.deleted",
         description: "No longer available from your connected integrations.",
         category: "Unavailable",

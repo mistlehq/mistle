@@ -3671,7 +3671,7 @@
                                   "type": "string",
                                   "minLength": 1
                                 },
-                                "parameters": {
+                                "conversationKeyOptions": {
                                   "type": "array",
                                   "items": {
                                     "type": "object",
@@ -3684,35 +3684,169 @@
                                         "type": "string",
                                         "minLength": 1
                                       },
-                                      "kind": {
-                                        "type": "string",
-                                        "enum": ["resource-select"]
-                                      },
-                                      "resourceKind": {
+                                      "description": {
                                         "type": "string",
                                         "minLength": 1
                                       },
-                                      "payloadPath": {
-                                        "type": "array",
-                                        "items": {
-                                          "type": "string",
-                                          "minLength": 1
-                                        },
-                                        "minItems": 1
-                                      },
-                                      "prefix": {
+                                      "template": {
                                         "type": "string",
                                         "minLength": 1
                                       }
                                     },
-                                    "required": [
-                                      "id",
-                                      "label",
-                                      "kind",
-                                      "resourceKind",
-                                      "payloadPath"
-                                    ],
+                                    "required": ["id", "label", "description", "template"],
                                     "additionalProperties": false
+                                  }
+                                },
+                                "parameters": {
+                                  "type": "array",
+                                  "items": {
+                                    "anyOf": [
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["resource-select"]
+                                          },
+                                          "resourceKind": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "payloadPath": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "minItems": 1
+                                          },
+                                          "prefix": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "placeholder": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "kind",
+                                          "resourceKind",
+                                          "payloadPath"
+                                        ],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["string"]
+                                          },
+                                          "payloadPath": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "minItems": 1
+                                          },
+                                          "prefix": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "placeholder": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": ["id", "label", "kind", "payloadPath"],
+                                        "additionalProperties": false
+                                      },
+                                      {
+                                        "type": "object",
+                                        "properties": {
+                                          "id": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "label": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "kind": {
+                                            "type": "string",
+                                            "enum": ["enum-select"]
+                                          },
+                                          "payloadPath": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "minItems": 1
+                                          },
+                                          "matchMode": {
+                                            "type": "string",
+                                            "enum": ["eq", "exists"]
+                                          },
+                                          "options": {
+                                            "type": "array",
+                                            "items": {
+                                              "type": "object",
+                                              "properties": {
+                                                "value": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                },
+                                                "label": {
+                                                  "type": "string",
+                                                  "minLength": 1
+                                                }
+                                              },
+                                              "required": ["value", "label"],
+                                              "additionalProperties": false
+                                            },
+                                            "minItems": 1
+                                          },
+                                          "prefix": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          },
+                                          "placeholder": {
+                                            "type": "string",
+                                            "minLength": 1
+                                          }
+                                        },
+                                        "required": [
+                                          "id",
+                                          "label",
+                                          "kind",
+                                          "payloadPath",
+                                          "matchMode",
+                                          "options"
+                                        ],
+                                        "additionalProperties": false
+                                      }
+                                    ]
                                   }
                                 }
                               },

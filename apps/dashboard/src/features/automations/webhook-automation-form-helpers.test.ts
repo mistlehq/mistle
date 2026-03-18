@@ -6,13 +6,84 @@ import {
   toWebhookAutomationFormValues,
   validateWebhookAutomationFormValues,
 } from "./webhook-automation-form-helpers.js";
+import type { WebhookAutomationFormValues } from "./webhook-automation-form.js";
+import { createWebhookAutomationTriggerId } from "./webhook-automation-list-helpers.js";
 import type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 import type { WebhookAutomation } from "./webhook-automations-types.js";
 
+const GitHubConnectionId = "conn_github";
+const PullRequestOpenedTriggerId = createWebhookAutomationTriggerId({
+  connectionId: GitHubConnectionId,
+  eventType: "github.pull_request.opened",
+});
+const IssueCommentCreatedTriggerId = createWebhookAutomationTriggerId({
+  connectionId: GitHubConnectionId,
+  eventType: "github.issue_comment.created",
+});
+
 const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
   {
-    value: "github.pull_request.opened",
+    id: IssueCommentCreatedTriggerId,
+    eventType: "github.issue_comment.created",
+    connectionId: GitHubConnectionId,
+    connectionLabel: "GitHub Engineering",
+    label: "Issue comment created",
+    conversationKeyOptions: [
+      {
+        id: "issue",
+        label: "Per issue thread",
+        description: "All matching events for the same issue go to one conversation.",
+        template: "{{payload.repository.full_name}}:issue:{{payload.issue.number}}",
+      },
+      {
+        id: "repository",
+        label: "Per repository",
+        description: "All matching events in the same repository go to one conversation.",
+        template: "{{payload.repository.full_name}}",
+      },
+    ],
+    parameters: [
+      {
+        id: "target",
+        label: "comment target",
+        kind: "enum-select",
+        payloadPath: ["issue", "pull_request"],
+        matchMode: "exists",
+        options: [
+          {
+            value: "exists",
+            label: "pull request",
+          },
+          {
+            value: "not_exists",
+            label: "issue",
+          },
+        ],
+        prefix: "in",
+        placeholder: "Any comment target",
+      },
+    ],
+  },
+  {
+    id: PullRequestOpenedTriggerId,
+    eventType: "github.pull_request.opened",
+    connectionId: GitHubConnectionId,
+    connectionLabel: "GitHub Engineering",
     label: "Pull request opened",
+    conversationKeyOptions: [
+      {
+        id: "pull-request",
+        label: "Per pull request",
+        description: "All matching events for the same pull request go to one conversation.",
+        template: "{{payload.repository.full_name}}:pull-request:{{payload.pull_request.number}}",
+      },
+      {
+        id: "repository",
+        label: "Per repository",
+        description: "All matching events in the same repository go to one conversation.",
+        template: "{{payload.repository.full_name}}",
+      },
+    ],
     parameters: [
       {
         id: "repository",
@@ -21,6 +92,15 @@ const GitHubEventOptions: readonly WebhookAutomationEventOption[] = [
         resourceKind: "repository",
         payloadPath: ["repository", "full_name"],
         prefix: "in",
+      },
+      {
+        id: "author",
+        label: "author",
+        kind: "resource-select",
+        resourceKind: "user",
+        payloadPath: ["sender", "login"],
+        prefix: "by",
+        placeholder: "Any author",
       },
     ],
   },
@@ -31,7 +111,7 @@ const SampleAutomation: WebhookAutomation = {
   kind: "webhook",
   name: "GitHub pushes to repo triage",
   enabled: true,
-  integrationConnectionId: "conn_github",
+  integrationConnectionId: GitHubConnectionId,
   inputTemplate: '{"ref":"{{event.ref}}"}',
   conversationKeyTemplate: "{{event.repository.id}}",
   idempotencyKeyTemplate: null,
@@ -50,140 +130,190 @@ const SampleAutomation: WebhookAutomation = {
   updatedAt: "2026-03-11T10:05:00.000Z",
 };
 
+const BaseFormValues: WebhookAutomationFormValues = {
+  name: "Pull request routing",
+  sandboxProfileId: "sbp_repo",
+  enabled: true,
+  inputTemplate: "{}",
+  conversationKeyTemplate: "{{event.id}}",
+  triggerIds: [PullRequestOpenedTriggerId],
+  triggerParameterValues: {},
+};
+
 describe("toWebhookAutomationFormValues", () => {
   it("creates empty defaults for create mode", () => {
     expect(toWebhookAutomationFormValues(null)).toEqual({
       name: "",
-      integrationConnectionId: "",
       sandboxProfileId: "",
       enabled: true,
       inputTemplate: "",
       conversationKeyTemplate: "",
-      idempotencyKeyTemplate: "",
-      eventTypes: [],
+      triggerIds: [],
       triggerParameterValues: {},
-      payloadFilterEditorMode: "builder",
-      payloadFilterBuilderMode: "all",
-      payloadFilterConditions: [],
-      payloadFilterText: "",
     });
   });
 
   it("maps an automation resource into form values", () => {
     expect(toWebhookAutomationFormValues(SampleAutomation)).toEqual({
       name: "GitHub pushes to repo triage",
-      integrationConnectionId: "conn_github",
       sandboxProfileId: "sbp_repo",
       enabled: true,
       inputTemplate: '{"ref":"{{event.ref}}"}',
       conversationKeyTemplate: "{{event.repository.id}}",
-      idempotencyKeyTemplate: "",
-      eventTypes: ["push", "pull_request"],
-      triggerParameterValues: {},
-      payloadFilterEditorMode: "builder",
-      payloadFilterBuilderMode: "all",
-      payloadFilterConditions: [
-        {
-          id: "condition_0",
-          pathText: "action",
-          operator: "eq",
-          valueType: "string",
-          valueText: "opened",
-          valuesText: "",
-        },
+      triggerIds: [
+        createWebhookAutomationTriggerId({
+          connectionId: GitHubConnectionId,
+          eventType: "push",
+        }),
+        createWebhookAutomationTriggerId({
+          connectionId: GitHubConnectionId,
+          eventType: "pull_request",
+        }),
       ],
-      payloadFilterText: JSON.stringify(
+      triggerParameterValues: {},
+    });
+  });
+
+  it("hydrates supported trigger parameters out of payload filters", () => {
+    expect(
+      toWebhookAutomationFormValues(
         {
-          op: "eq",
-          path: ["action"],
-          value: "opened",
+          ...SampleAutomation,
+          eventTypes: ["github.pull_request.opened", "github.issue_comment.created"],
+          payloadFilter: {
+            op: "and",
+            filters: [
+              {
+                op: "eq",
+                path: ["repository", "full_name"],
+                value: "mistlehq/mistle",
+              },
+              {
+                op: "eq",
+                path: ["sender", "login"],
+                value: "octocat",
+              },
+              {
+                op: "exists",
+                path: ["issue", "pull_request"],
+              },
+              {
+                op: "eq",
+                path: ["action"],
+                value: "opened",
+              },
+            ],
+          },
         },
-        null,
-        2,
+        GitHubEventOptions,
       ),
+    ).toMatchObject({
+      triggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+      triggerParameterValues: {
+        [PullRequestOpenedTriggerId]: {
+          repository: "mistlehq/mistle",
+          author: "octocat",
+        },
+        [IssueCommentCreatedTriggerId]: {
+          target: "exists",
+        },
+      },
     });
   });
 });
 
 describe("validateWebhookAutomationFormValues", () => {
-  it("returns field errors for missing required values and invalid JSON filters", () => {
+  it("returns field errors for missing required values", () => {
     expect(
-      validateWebhookAutomationFormValues({
-        name: "",
-        integrationConnectionId: "",
-        sandboxProfileId: "",
-        enabled: true,
-        inputTemplate: "",
-        conversationKeyTemplate: "",
-        idempotencyKeyTemplate: "",
-        eventTypes: [],
-        triggerParameterValues: {},
-        payloadFilterEditorMode: "builder",
-        payloadFilterBuilderMode: "all",
-        payloadFilterConditions: [
-          {
-            id: "condition_0",
-            pathText: "",
-            operator: "contains",
-            valueType: "string",
-            valueText: "",
-            valuesText: "",
-          },
-        ],
-        payloadFilterText: "[]",
-      }),
+      validateWebhookAutomationFormValues(
+        {
+          name: "",
+          sandboxProfileId: "",
+          enabled: true,
+          inputTemplate: "",
+          conversationKeyTemplate: "",
+          triggerIds: [],
+          triggerParameterValues: {},
+        },
+        GitHubEventOptions,
+      ),
     ).toEqual({
       name: "Automation name is required.",
-      integrationConnectionId: "Select an integration connection.",
+      triggerIds: "Select at least one trigger.",
       sandboxProfileId: "Select a sandbox profile.",
       inputTemplate: "Input template is required.",
       conversationKeyTemplate: "Conversation key template is required.",
-      payloadFilterText:
-        "Conditions must include a field path and valid value for the selected operator.",
+    });
+  });
+
+  it("rejects triggers from different connections", () => {
+    expect(
+      validateWebhookAutomationFormValues(
+        {
+          ...BaseFormValues,
+          triggerIds: [
+            PullRequestOpenedTriggerId,
+            createWebhookAutomationTriggerId({
+              connectionId: "conn_stripe",
+              eventType: "stripe.payout.failed",
+            }),
+          ],
+        },
+        [
+          ...GitHubEventOptions,
+          {
+            id: createWebhookAutomationTriggerId({
+              connectionId: "conn_stripe",
+              eventType: "stripe.payout.failed",
+            }),
+            eventType: "stripe.payout.failed",
+            connectionId: "conn_stripe",
+            connectionLabel: "Stripe Production",
+            label: "Payout failed",
+          },
+        ],
+      ),
+    ).toEqual({
+      triggerIds: "All triggers in one automation must come from the same integration connection.",
+    });
+  });
+
+  it("rejects unsupported conversation grouping templates for selected triggers", () => {
+    expect(
+      validateWebhookAutomationFormValues(
+        {
+          ...BaseFormValues,
+          conversationKeyTemplate: "{{webhookEvent.externalDeliveryId}}",
+          triggerIds: [PullRequestOpenedTriggerId],
+        },
+        GitHubEventOptions,
+      ),
+    ).toEqual({
+      conversationKeyTemplate: "Select a supported conversation grouping.",
     });
   });
 });
 
 describe("automation payload transforms", () => {
-  it("builds the create payload with normalized optional values", () => {
+  it("builds the create payload with a derived connection id", () => {
     expect(
-      toCreateWebhookAutomationPayload({
-        name: " GitHub pushes to repo triage ",
-        integrationConnectionId: "conn_github",
-        sandboxProfileId: "sbp_repo",
-        enabled: true,
-        inputTemplate: '{"ref":"{{event.ref}}"}',
-        conversationKeyTemplate: "{{event.repository.id}}",
-        idempotencyKeyTemplate: " ",
-        eventTypes: ["push", "pull_request"],
-        triggerParameterValues: {},
-        payloadFilterEditorMode: "builder",
-        payloadFilterBuilderMode: "all",
-        payloadFilterConditions: [
-          {
-            id: "condition_0",
-            pathText: "action",
-            operator: "eq",
-            valueType: "string",
-            valueText: "opened",
-            valuesText: "",
-          },
-        ],
-        payloadFilterText: "",
-      }),
+      toCreateWebhookAutomationPayload(
+        {
+          ...BaseFormValues,
+          name: " GitHub pushes to repo triage ",
+          triggerIds: [PullRequestOpenedTriggerId, IssueCommentCreatedTriggerId],
+        },
+        GitHubEventOptions,
+      ),
     ).toEqual({
       name: "GitHub pushes to repo triage",
       enabled: true,
-      integrationConnectionId: "conn_github",
-      inputTemplate: '{"ref":"{{event.ref}}"}',
-      conversationKeyTemplate: "{{event.repository.id}}",
+      integrationConnectionId: GitHubConnectionId,
+      inputTemplate: "{}",
+      conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
-      eventTypes: ["push", "pull_request"],
-      payloadFilter: {
-        op: "eq",
-        path: ["action"],
-        value: "opened",
-      },
+      eventTypes: ["github.pull_request.opened", "github.issue_comment.created"],
+      payloadFilter: null,
       target: {
         sandboxProfileId: "sbp_repo",
       },
@@ -192,67 +322,24 @@ describe("automation payload transforms", () => {
 
   it("builds the update payload with nullable optional fields", () => {
     expect(
-      toUpdateWebhookAutomationPayload({
-        name: "Stripe payouts incident intake",
-        integrationConnectionId: "conn_github",
-        sandboxProfileId: "sbp_repo",
-        enabled: false,
-        inputTemplate: "{}",
-        conversationKeyTemplate: "{{event.id}}",
-        idempotencyKeyTemplate: "",
-        eventTypes: [],
-        triggerParameterValues: {},
-        payloadFilterEditorMode: "builder",
-        payloadFilterBuilderMode: "all",
-        payloadFilterConditions: [],
-        payloadFilterText: "",
-      }),
+      toUpdateWebhookAutomationPayload(
+        {
+          ...BaseFormValues,
+          name: "Stripe payouts incident intake",
+          enabled: false,
+          triggerIds: [PullRequestOpenedTriggerId],
+        },
+        GitHubEventOptions,
+      ),
     ).toEqual({
       name: "Stripe payouts incident intake",
       enabled: false,
-      integrationConnectionId: "conn_github",
+      integrationConnectionId: GitHubConnectionId,
       inputTemplate: "{}",
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
-      eventTypes: null,
+      eventTypes: ["github.pull_request.opened"],
       payloadFilter: null,
-      target: {
-        sandboxProfileId: "sbp_repo",
-      },
-    });
-  });
-
-  it("builds the update payload from raw JSON when the JSON editor is selected", () => {
-    expect(
-      toUpdateWebhookAutomationPayload({
-        name: "Issue comments routing",
-        integrationConnectionId: "conn_github",
-        sandboxProfileId: "sbp_repo",
-        enabled: true,
-        inputTemplate: "{}",
-        conversationKeyTemplate: "{{event.id}}",
-        idempotencyKeyTemplate: "",
-        eventTypes: ["push"],
-        triggerParameterValues: {},
-        payloadFilterEditorMode: "json",
-        payloadFilterBuilderMode: "all",
-        payloadFilterConditions: [],
-        payloadFilterText:
-          '{\n  "op": "contains",\n  "path": ["repository", "full_name"],\n  "value": "mistle"\n}',
-      }),
-    ).toEqual({
-      name: "Issue comments routing",
-      enabled: true,
-      integrationConnectionId: "conn_github",
-      inputTemplate: "{}",
-      conversationKeyTemplate: "{{event.id}}",
-      idempotencyKeyTemplate: null,
-      eventTypes: ["push"],
-      payloadFilter: {
-        op: "contains",
-        path: ["repository", "full_name"],
-        value: "mistle",
-      },
       target: {
         sandboxProfileId: "sbp_repo",
       },
@@ -263,38 +350,70 @@ describe("automation payload transforms", () => {
     expect(
       toCreateWebhookAutomationPayload(
         {
-          name: "Pull request routing",
-          integrationConnectionId: "conn_github",
-          sandboxProfileId: "sbp_repo",
-          enabled: true,
-          inputTemplate: "{}",
-          conversationKeyTemplate: "{{event.id}}",
-          idempotencyKeyTemplate: "",
-          eventTypes: ["github.pull_request.opened"],
+          ...BaseFormValues,
           triggerParameterValues: {
-            "github.pull_request.opened": {
+            [PullRequestOpenedTriggerId]: {
               repository: "mistlehq/mistle",
+              author: "octocat",
             },
           },
-          payloadFilterEditorMode: "builder",
-          payloadFilterBuilderMode: "all",
-          payloadFilterConditions: [],
-          payloadFilterText: "",
         },
         GitHubEventOptions,
       ),
     ).toEqual({
       name: "Pull request routing",
       enabled: true,
-      integrationConnectionId: "conn_github",
+      integrationConnectionId: GitHubConnectionId,
       inputTemplate: "{}",
       conversationKeyTemplate: "{{event.id}}",
       idempotencyKeyTemplate: null,
       eventTypes: ["github.pull_request.opened"],
       payloadFilter: {
-        op: "eq",
-        path: ["repository", "full_name"],
-        value: "mistlehq/mistle",
+        op: "and",
+        filters: [
+          {
+            op: "eq",
+            path: ["repository", "full_name"],
+            value: "mistlehq/mistle",
+          },
+          {
+            op: "eq",
+            path: ["sender", "login"],
+            value: "octocat",
+          },
+        ],
+      },
+      target: {
+        sandboxProfileId: "sbp_repo",
+      },
+    });
+  });
+
+  it("builds enum trigger parameter filters into the payload filter", () => {
+    expect(
+      toCreateWebhookAutomationPayload(
+        {
+          ...BaseFormValues,
+          triggerIds: [IssueCommentCreatedTriggerId],
+          triggerParameterValues: {
+            [IssueCommentCreatedTriggerId]: {
+              target: "exists",
+            },
+          },
+        },
+        GitHubEventOptions,
+      ),
+    ).toEqual({
+      name: "Pull request routing",
+      enabled: true,
+      integrationConnectionId: GitHubConnectionId,
+      inputTemplate: "{}",
+      conversationKeyTemplate: "{{event.id}}",
+      idempotencyKeyTemplate: null,
+      eventTypes: ["github.issue_comment.created"],
+      payloadFilter: {
+        op: "exists",
+        path: ["issue", "pull_request"],
       },
       target: {
         sandboxProfileId: "sbp_repo",

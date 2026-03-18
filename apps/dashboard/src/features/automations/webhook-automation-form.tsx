@@ -4,50 +4,28 @@ import {
   AlertTitle,
   Button,
   Checkbox,
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
   Field,
   FieldContent,
   FieldLabel,
-  Input,
-  RadioGroup,
-  RadioGroupItem,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
   Textarea,
 } from "@mistle/ui";
-import { CaretDownIcon, TrashIcon } from "@phosphor-icons/react";
+import { TrashIcon } from "@phosphor-icons/react";
+import { useEffect, useMemo } from "react";
 
+import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
 import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
+import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
 import type {
+  WebhookAutomationConversationKeyOption,
   WebhookAutomationEventOption,
   WebhookAutomationTriggerParameterValueMap,
 } from "./webhook-automation-trigger-types.js";
-import {
-  buildPayloadFilterFromConditions,
-  createEmptyPayloadFilterConditionDraft,
-  parsePayloadFilterBuilder,
-  type PayloadFilterBuilderMode,
-  type PayloadFilterConditionDraft,
-  type PayloadFilterBuilderOperator,
-  type PayloadFilterBuilderValueType,
-} from "./webhook-payload-filter-builder.js";
-
-export type {
-  PayloadFilterBuilderMode,
-  PayloadFilterBuilderOperator,
-  PayloadFilterBuilderValueType,
-  PayloadFilterConditionDraft,
-} from "./webhook-payload-filter-builder.js";
 export type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 
 export type WebhookAutomationFormOption = {
@@ -58,18 +36,12 @@ export type WebhookAutomationFormOption = {
 
 export type WebhookAutomationFormValues = {
   name: string;
-  integrationConnectionId: string;
   sandboxProfileId: string;
   enabled: boolean;
   inputTemplate: string;
   conversationKeyTemplate: string;
-  idempotencyKeyTemplate: string;
-  eventTypes: string[];
+  triggerIds: string[];
   triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
-  payloadFilterEditorMode: "builder" | "json";
-  payloadFilterBuilderMode: PayloadFilterBuilderMode;
-  payloadFilterConditions: PayloadFilterConditionDraft[];
-  payloadFilterText: string;
 };
 
 export type WebhookAutomationFormValueKey = keyof WebhookAutomationFormValues;
@@ -86,40 +58,11 @@ type WebhookAutomationFormProps = {
   isDeleting: boolean;
   onValueChange: (
     key: WebhookAutomationFormValueKey,
-    value:
-      | string
-      | boolean
-      | string[]
-      | PayloadFilterConditionDraft[]
-      | WebhookAutomationTriggerParameterValueMap,
+    value: string | boolean | string[] | WebhookAutomationTriggerParameterValueMap,
   ) => void;
   onSubmit: () => void;
   onDelete: (() => void) | null;
 };
-
-const PayloadFilterOperatorOptions: ReadonlyArray<{
-  value: PayloadFilterBuilderOperator;
-  label: string;
-}> = [
-  { value: "eq", label: "is" },
-  { value: "neq", label: "is not" },
-  { value: "in", label: "is one of" },
-  { value: "contains", label: "contains" },
-  { value: "starts_with", label: "starts with" },
-  { value: "ends_with", label: "ends with" },
-  { value: "exists", label: "exists" },
-  { value: "not_exists", label: "does not exist" },
-];
-
-const PayloadFilterValueTypeOptions: ReadonlyArray<{
-  value: PayloadFilterBuilderValueType;
-  label: string;
-}> = [
-  { value: "string", label: "Text" },
-  { value: "number", label: "Number" },
-  { value: "boolean", label: "Boolean" },
-  { value: "null", label: "Null" },
-];
 
 function FieldError(input: { message: string | undefined }): React.JSX.Element | null {
   if (input.message === undefined) {
@@ -199,373 +142,93 @@ function FormSection(input: {
   );
 }
 
-function buildPayloadFilterTextFromBuilder(input: {
-  mode: PayloadFilterBuilderMode;
-  conditions: readonly PayloadFilterConditionDraft[];
-}): string {
-  const builtFilter = buildPayloadFilterFromConditions(input);
-  if (!builtFilter.success) {
-    return "";
+function resolveConversationKeyFieldOptions(input: {
+  selectedEventOptions: readonly WebhookAutomationEventOption[];
+  currentTemplate: string;
+}): {
+  supportedOptions: readonly WebhookAutomationConversationKeyOption[];
+  displayOptions: readonly WebhookAutomationConversationKeyOption[];
+  hasUnsupportedCurrentTemplate: boolean;
+} {
+  const supportedOptions = resolveCommonWebhookAutomationConversationKeyOptions({
+    selectedEventOptions: input.selectedEventOptions,
+  });
+
+  if (
+    input.currentTemplate.trim().length === 0 ||
+    supportedOptions.some((option) => option.template === input.currentTemplate)
+  ) {
+    return {
+      supportedOptions,
+      displayOptions: supportedOptions,
+      hasUnsupportedCurrentTemplate: false,
+    };
   }
 
-  return builtFilter.value === null ? "" : JSON.stringify(builtFilter.value, null, 2);
-}
-
-function updatePayloadFilterConditionAtIndex(input: {
-  conditions: readonly PayloadFilterConditionDraft[];
-  index: number;
-  condition: PayloadFilterConditionDraft;
-}): PayloadFilterConditionDraft[] {
-  return input.conditions.map((candidateCondition, candidateIndex) =>
-    candidateIndex === input.index ? input.condition : candidateCondition,
-  );
-}
-
-function parseJsonObject(
-  value: string,
-): { success: true; value: Record<string, unknown> | null } | { success: false } {
-  const normalized = value.trim();
-  if (normalized.length === 0) {
-    return { success: true, value: null };
-  }
-
-  try {
-    const parsed = JSON.parse(normalized);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      return { success: false };
-    }
-
-    return { success: true, value: parsed };
-  } catch {
-    return { success: false };
-  }
-}
-
-function PayloadFilterBuilderField(input: {
-  values: WebhookAutomationFormValues;
-  error: string | undefined;
-  onValueChange: (
-    key: WebhookAutomationFormValueKey,
-    value: string | PayloadFilterConditionDraft[],
-  ) => void;
-}): React.JSX.Element {
-  function updateConditions(nextConditions: PayloadFilterConditionDraft[]): void {
-    input.onValueChange("payloadFilterConditions", nextConditions);
-    input.onValueChange(
-      "payloadFilterText",
-      buildPayloadFilterTextFromBuilder({
-        mode: input.values.payloadFilterBuilderMode,
-        conditions: nextConditions,
-      }),
-    );
-  }
-
-  function updateBuilderMode(nextMode: PayloadFilterBuilderMode): void {
-    input.onValueChange("payloadFilterBuilderMode", nextMode);
-    input.onValueChange(
-      "payloadFilterText",
-      buildPayloadFilterTextFromBuilder({
-        mode: nextMode,
-        conditions: input.values.payloadFilterConditions,
-      }),
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="space-y-2">
-        <FieldLabel>Match</FieldLabel>
-        <RadioGroup
-          className="flex flex-wrap gap-4"
-          onValueChange={(value) => {
-            if (value === null || (value !== "all" && value !== "any")) {
-              return;
-            }
-
-            updateBuilderMode(value);
-          }}
-          value={input.values.payloadFilterBuilderMode}
-        >
-          <label className="flex items-center gap-2 text-sm">
-            <RadioGroupItem value="all" />
-            Match all conditions
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <RadioGroupItem value="any" />
-            Match any condition
-          </label>
-        </RadioGroup>
-      </div>
-
-      <div className="space-y-3">
-        {input.values.payloadFilterConditions.map((condition, index) => {
-          const showScalarValueField =
-            condition.operator !== "in" &&
-            condition.operator !== "exists" &&
-            condition.operator !== "not_exists";
-          const showValueTypeField =
-            condition.operator === "eq" ||
-            condition.operator === "neq" ||
-            condition.operator === "in";
-          const showListValueField = condition.operator === "in";
-
-          return (
-            <div className="space-y-3 rounded-lg border p-4" key={condition.id}>
-              <div className="grid gap-3 md:grid-cols-[minmax(0,2fr)_minmax(0,1.3fr)_minmax(0,1fr)]">
-                <Field>
-                  <FieldLabel>Payload field</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      onChange={(event) => {
-                        updateConditions(
-                          updatePayloadFilterConditionAtIndex({
-                            conditions: input.values.payloadFilterConditions,
-                            index,
-                            condition: {
-                              ...condition,
-                              pathText: event.currentTarget.value,
-                            },
-                          }),
-                        );
-                      }}
-                      placeholder="repository.full_name"
-                      value={condition.pathText}
-                    />
-                  </FieldContent>
-                </Field>
-
-                <Field>
-                  <FieldLabel>Operator</FieldLabel>
-                  <FieldContent>
-                    <Select
-                      onValueChange={(value) => {
-                        if (value === null) {
-                          return;
-                        }
-
-                        const nextOperator = value as PayloadFilterBuilderOperator;
-                        updateConditions(
-                          updatePayloadFilterConditionAtIndex({
-                            conditions: input.values.payloadFilterConditions,
-                            index,
-                            condition: {
-                              ...condition,
-                              operator: nextOperator,
-                              ...(nextOperator === "contains" ||
-                              nextOperator === "starts_with" ||
-                              nextOperator === "ends_with"
-                                ? { valueType: "string" as const }
-                                : {}),
-                            },
-                          }),
-                        );
-                      }}
-                      value={condition.operator}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {PayloadFilterOperatorOptions.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </FieldContent>
-                </Field>
-
-                {showValueTypeField ? (
-                  <Field>
-                    <FieldLabel>Value type</FieldLabel>
-                    <FieldContent>
-                      <Select
-                        onValueChange={(value) => {
-                          if (value === null) {
-                            return;
-                          }
-
-                          updateConditions(
-                            updatePayloadFilterConditionAtIndex({
-                              conditions: input.values.payloadFilterConditions,
-                              index,
-                              condition: {
-                                ...condition,
-                                valueType: value as PayloadFilterBuilderValueType,
-                              },
-                            }),
-                          );
-                        }}
-                        value={condition.valueType}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {PayloadFilterValueTypeOptions.map((option) => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FieldContent>
-                  </Field>
-                ) : (
-                  <div />
-                )}
-              </div>
-
-              {showListValueField ? (
-                <Field>
-                  <FieldLabel>Values</FieldLabel>
-                  <FieldContent>
-                    <Input
-                      onChange={(event) => {
-                        updateConditions(
-                          updatePayloadFilterConditionAtIndex({
-                            conditions: input.values.payloadFilterConditions,
-                            index,
-                            condition: {
-                              ...condition,
-                              valuesText: event.currentTarget.value,
-                            },
-                          }),
-                        );
-                      }}
-                      placeholder="open, triaged, blocked"
-                      value={condition.valuesText}
-                    />
-                  </FieldContent>
-                </Field>
-              ) : null}
-
-              {showScalarValueField ? (
-                <Field>
-                  <FieldLabel>Value</FieldLabel>
-                  <FieldContent>
-                    {condition.valueType === "boolean" &&
-                    (condition.operator === "eq" || condition.operator === "neq") ? (
-                      <Select
-                        onValueChange={(value) => {
-                          if (value === null) {
-                            return;
-                          }
-
-                          updateConditions(
-                            updatePayloadFilterConditionAtIndex({
-                              conditions: input.values.payloadFilterConditions,
-                              index,
-                              condition: {
-                                ...condition,
-                                valueText: value,
-                              },
-                            }),
-                          );
-                        }}
-                        value={condition.valueText}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select boolean value" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="true">true</SelectItem>
-                          <SelectItem value="false">false</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : condition.valueType === "null" &&
-                      (condition.operator === "eq" || condition.operator === "neq") ? (
-                      <Input disabled value="null" />
-                    ) : (
-                      <Input
-                        onChange={(event) => {
-                          updateConditions(
-                            updatePayloadFilterConditionAtIndex({
-                              conditions: input.values.payloadFilterConditions,
-                              index,
-                              condition: {
-                                ...condition,
-                                valueText: event.currentTarget.value,
-                              },
-                            }),
-                          );
-                        }}
-                        placeholder="opened"
-                        value={condition.valueText}
-                      />
-                    )}
-                  </FieldContent>
-                </Field>
-              ) : null}
-
-              <div className="flex justify-end">
-                <Button
-                  onClick={() => {
-                    updateConditions(
-                      input.values.payloadFilterConditions.filter(
-                        (_, candidateIndex) => candidateIndex !== index,
-                      ),
-                    );
-                  }}
-                  type="button"
-                  variant="ghost"
-                >
-                  Remove condition
-                </Button>
-              </div>
-            </div>
-          );
-        })}
-
-        <Button
-          onClick={() => {
-            updateConditions([
-              ...input.values.payloadFilterConditions,
-              createEmptyPayloadFilterConditionDraft(
-                `condition_${String(input.values.payloadFilterConditions.length)}`,
-              ),
-            ]);
-          }}
-          type="button"
-          variant="outline"
-        >
-          Add condition
-        </Button>
-      </div>
-
-      <FieldError message={input.error} />
-    </div>
-  );
+  return {
+    supportedOptions,
+    displayOptions: [
+      {
+        id: "__current_unsupported__",
+        label: "Current setting (unsupported)",
+        description:
+          "This saved grouping is no longer supported for the selected triggers. Choose a supported option before saving.",
+        template: input.currentTemplate,
+      },
+      ...supportedOptions,
+    ],
+    hasUnsupportedCurrentTemplate: true,
+  };
 }
 
 export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.JSX.Element {
   const submitLabel = input.mode === "create" ? "Create automation" : "Save changes";
+  const selectedTriggerOptions = resolveSelectedWebhookAutomationEventOptions({
+    eventOptions: input.webhookEventOptions,
+    selectedTriggerIds: input.values.triggerIds,
+  });
+  const selectedConnectionIds = new Set(
+    selectedTriggerOptions
+      .map((option) => option.connectionId)
+      .filter((connectionId) => connectionId.trim().length > 0),
+  );
+  const selectedConnectionId =
+    selectedConnectionIds.size === 1 ? ([...selectedConnectionIds][0] ?? "") : "";
+  const conversationKeyFieldOptions = useMemo(
+    () =>
+      resolveConversationKeyFieldOptions({
+        selectedEventOptions: selectedTriggerOptions,
+        currentTemplate: input.values.conversationKeyTemplate,
+      }),
+    [input.values.conversationKeyTemplate, selectedTriggerOptions],
+  );
 
-  function switchPayloadFilterEditorMode(nextMode: "builder" | "json"): void {
-    if (nextMode === input.values.payloadFilterEditorMode) {
+  useEffect(() => {
+    if (conversationKeyFieldOptions.supportedOptions.length === 0) {
       return;
     }
 
-    if (nextMode === "builder") {
-      const parsedPayloadFilter = parseJsonObject(input.values.payloadFilterText);
-      if (!parsedPayloadFilter.success) {
-        return;
-      }
-
-      const parsedBuilder = parsePayloadFilterBuilder({
-        payloadFilter: parsedPayloadFilter.value,
-      });
-      if (!parsedBuilder.supported) {
-        return;
-      }
-
-      input.onValueChange("payloadFilterBuilderMode", parsedBuilder.mode);
-      input.onValueChange("payloadFilterConditions", parsedBuilder.conditions);
+    if (conversationKeyFieldOptions.hasUnsupportedCurrentTemplate) {
+      return;
     }
 
-    input.onValueChange("payloadFilterEditorMode", nextMode);
-  }
+    if (
+      input.values.conversationKeyTemplate.trim().length === 0 ||
+      !conversationKeyFieldOptions.supportedOptions.some(
+        (option) => option.template === input.values.conversationKeyTemplate,
+      )
+    ) {
+      input.onValueChange(
+        "conversationKeyTemplate",
+        conversationKeyFieldOptions.supportedOptions[0]?.template ?? "",
+      );
+    }
+  }, [
+    conversationKeyFieldOptions.hasUnsupportedCurrentTemplate,
+    conversationKeyFieldOptions.supportedOptions,
+    input.onValueChange,
+    input.values.conversationKeyTemplate,
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -625,17 +288,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             ) : null}
 
             <SelectField
-              error={input.fieldErrors.integrationConnectionId}
-              label="Integration connection"
-              onValueChange={(value) => {
-                input.onValueChange("integrationConnectionId", value);
-              }}
-              options={input.connectionOptions}
-              placeholder="Select connection"
-              value={input.values.integrationConnectionId}
-            />
-
-            <SelectField
               error={input.fieldErrors.sandboxProfileId}
               label="Sandbox profile"
               onValueChange={(value) => {
@@ -647,18 +299,20 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             />
           </div>
 
-          <div className="bg-muted/40 flex items-start gap-3 rounded-lg border p-4">
-            <Checkbox
-              checked={input.values.enabled}
-              id="automation-enabled"
-              onCheckedChange={(checked) => {
-                input.onValueChange("enabled", checked === true);
-              }}
-            />
-            <div className="space-y-1">
-              <FieldLabel htmlFor="automation-enabled">Automation enabled</FieldLabel>
+          {input.mode === "edit" ? (
+            <div className="bg-muted/40 flex items-start gap-3 rounded-lg border p-4">
+              <Checkbox
+                checked={input.values.enabled}
+                id="automation-enabled"
+                onCheckedChange={(checked) => {
+                  input.onValueChange("enabled", checked === true);
+                }}
+              />
+              <div className="space-y-1">
+                <FieldLabel htmlFor="automation-enabled">Automation enabled</FieldLabel>
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
       </FormSection>
 
@@ -666,145 +320,93 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         description="These values are sent directly to the backend contract. Keep them aligned with the integration payload shape you expect."
         title="Templates"
       >
-        <div className="space-y-5">
-          <Field>
-            <FieldLabel htmlFor="conversation-key-template">Conversation key template</FieldLabel>
-            <FieldContent>
-              <Input
-                id="conversation-key-template"
-                onChange={(event) => {
-                  input.onValueChange("conversationKeyTemplate", event.currentTarget.value);
-                }}
-                value={input.values.conversationKeyTemplate}
-              />
-              <FieldError message={input.fieldErrors.conversationKeyTemplate} />
-            </FieldContent>
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="input-template">Input template</FieldLabel>
-            <FieldContent>
-              <Textarea
-                id="input-template"
-                onChange={(event) => {
-                  input.onValueChange("inputTemplate", event.currentTarget.value);
-                }}
-                rows={7}
-                value={input.values.inputTemplate}
-              />
-              <FieldError message={input.fieldErrors.inputTemplate} />
-            </FieldContent>
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="idempotency-key-template">Idempotency key template</FieldLabel>
-            <FieldContent>
-              <Input
-                id="idempotency-key-template"
-                onChange={(event) => {
-                  input.onValueChange("idempotencyKeyTemplate", event.currentTarget.value);
-                }}
-                placeholder="Optional"
-                value={input.values.idempotencyKeyTemplate}
-              />
-              <FieldError message={input.fieldErrors.idempotencyKeyTemplate} />
-            </FieldContent>
-          </Field>
-        </div>
+        <Field>
+          <FieldLabel htmlFor="input-template">Input template</FieldLabel>
+          <FieldContent>
+            <Textarea
+              id="input-template"
+              onChange={(event) => {
+                input.onValueChange("inputTemplate", event.currentTarget.value);
+              }}
+              rows={7}
+              value={input.values.inputTemplate}
+            />
+            <FieldError message={input.fieldErrors.inputTemplate} />
+          </FieldContent>
+        </Field>
       </FormSection>
 
       <FormSection description="" title="Triggers">
         <div className="space-y-5">
           <WebhookAutomationTriggerPicker
-            error={input.fieldErrors.eventTypes}
+            error={input.fieldErrors.triggerIds}
             eventOptions={input.webhookEventOptions}
             hasConnectedIntegrations={input.connectionOptions.length > 0}
-            onTriggerParameterValueChange={({ eventType, parameterId, value }) => {
+            onTriggerParameterValueChange={({ triggerId, parameterId, value }) => {
               input.onValueChange("triggerParameterValues", {
                 ...input.values.triggerParameterValues,
-                [eventType]: {
-                  ...(input.values.triggerParameterValues[eventType] ?? {}),
+                [triggerId]: {
+                  ...(input.values.triggerParameterValues[triggerId] ?? {}),
                   [parameterId]: value,
                 },
               });
             }}
             onValueChange={(value) => {
-              input.onValueChange("eventTypes", value);
+              input.onValueChange("triggerIds", value);
             }}
-            selectedConnectionId={input.values.integrationConnectionId}
-            selectedEventTypes={input.values.eventTypes}
+            selectedConnectionId={selectedConnectionId}
+            selectedTriggerIds={input.values.triggerIds}
             triggerParameterValues={input.values.triggerParameterValues}
           />
-          <FieldError message={input.fieldErrors.eventTypes} />
+          <FieldError message={input.fieldErrors.triggerIds} />
 
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <h3 className="text-sm font-medium">Advanced conditions</h3>
-              <p className="text-muted-foreground text-sm">
-                Optionally add extra payload filters beyond the trigger parameters above.
-              </p>
-            </div>
+          <Field>
+            <FieldLabel>Conversation grouping</FieldLabel>
+            <FieldContent>
+              <Select
+                disabled={conversationKeyFieldOptions.displayOptions.length === 0}
+                onValueChange={(value) => {
+                  if (value === null) {
+                    return;
+                  }
 
-            <Tabs
-              onValueChange={(value) => {
-                if (value !== "builder" && value !== "json") {
-                  return;
-                }
-
-                switchPayloadFilterEditorMode(value);
-              }}
-              value={input.values.payloadFilterEditorMode}
-            >
-              <TabsList>
-                <TabsTrigger value="builder">Builder</TabsTrigger>
-                <TabsTrigger value="json">JSON</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="builder">
-                <PayloadFilterBuilderField
-                  error={input.fieldErrors.payloadFilterText}
-                  onValueChange={(key, value) => {
-                    input.onValueChange(key, value);
-                  }}
-                  values={input.values}
-                />
-              </TabsContent>
-
-              <TabsContent value="json">
-                <Field>
-                  <FieldLabel htmlFor="payload-filter-json">Payload filter JSON</FieldLabel>
-                  <FieldContent>
-                    <Textarea
-                      id="payload-filter-json"
-                      onChange={(event) => {
-                        input.onValueChange("payloadFilterText", event.currentTarget.value);
-                      }}
-                      placeholder='Optional filter JSON, for example {"op":"eq","path":["action"],"value":"opened"}'
-                      rows={8}
-                      value={input.values.payloadFilterText}
-                    />
-                    <FieldError message={input.fieldErrors.payloadFilterText} />
-                  </FieldContent>
-                </Field>
-              </TabsContent>
-            </Tabs>
-
-            <Collapsible>
-              <CollapsibleTrigger
-                render={<Button type="button" variant="ghost" className="justify-start px-0" />}
+                  input.onValueChange("conversationKeyTemplate", value);
+                }}
+                value={input.values.conversationKeyTemplate}
               >
-                <CaretDownIcon aria-hidden className="size-4" />
-                View current filter JSON
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <pre className="bg-muted/40 overflow-x-auto rounded-lg border p-4 text-xs">
-                  {input.values.payloadFilterText.trim().length === 0
-                    ? "{}"
-                    : input.values.payloadFilterText}
-                </pre>
-              </CollapsibleContent>
-            </Collapsible>
-          </div>
+                <SelectTrigger className="w-full">
+                  <SelectValue
+                    placeholder={
+                      input.values.triggerIds.length === 0
+                        ? "Select triggers first"
+                        : "Select conversation grouping"
+                    }
+                  >
+                    {
+                      conversationKeyFieldOptions.displayOptions.find(
+                        (option) => option.template === input.values.conversationKeyTemplate,
+                      )?.label
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {conversationKeyFieldOptions.displayOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.template}>
+                      <div className="flex flex-col gap-0.5">
+                        <span>{option.label}</span>
+                        <span className="text-muted-foreground text-xs">{option.description}</span>
+                        <code className="text-muted-foreground text-[11px]">{option.template}</code>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-sm">
+                Events that render to the same key are routed into the same conversation.
+              </p>
+              <FieldError message={input.fieldErrors.conversationKeyTemplate} />
+            </FieldContent>
+          </Field>
         </div>
       </FormSection>
 

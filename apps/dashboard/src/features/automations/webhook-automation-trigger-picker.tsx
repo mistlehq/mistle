@@ -7,6 +7,7 @@ import {
   ComboboxItem,
   ComboboxLabel,
   ComboboxList,
+  Input,
   Select,
   SelectContent,
   SelectItem,
@@ -16,7 +17,7 @@ import {
 } from "@mistle/ui";
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
@@ -26,7 +27,7 @@ import type {
 } from "./webhook-automation-trigger-types.js";
 
 type GroupedWebhookAutomationEventOptions = {
-  category: string;
+  connectionLabel: string;
   items: readonly WebhookAutomationEventOption[];
 };
 
@@ -44,10 +45,11 @@ export function groupWebhookAutomationEventOptions(
   const groups = new Map<string, WebhookAutomationEventOption[]>();
 
   for (const option of eventOptions) {
-    const category = option.category ?? "Other events";
-    const existingItems = groups.get(category);
+    const connectionLabel =
+      option.connectionLabel.trim().length > 0 ? option.connectionLabel : "Other integrations";
+    const existingItems = groups.get(connectionLabel);
     if (existingItems === undefined) {
-      groups.set(category, [option]);
+      groups.set(connectionLabel, [option]);
       continue;
     }
 
@@ -55,26 +57,31 @@ export function groupWebhookAutomationEventOptions(
   }
 
   return Array.from(groups.entries())
-    .sort(([leftCategory], [rightCategory]) => leftCategory.localeCompare(rightCategory))
-    .map(([category, items]) => ({
-      category,
+    .sort(([leftConnectionLabel], [rightConnectionLabel]) =>
+      leftConnectionLabel.localeCompare(rightConnectionLabel),
+    )
+    .map(([connectionLabel, items]) => ({
+      connectionLabel,
       items: [...items].sort((left, right) => left.label.localeCompare(right.label)),
     }));
 }
 
 export function resolveSelectedWebhookAutomationEventOptions(input: {
   eventOptions: readonly WebhookAutomationEventOption[];
-  selectedEventTypes: readonly string[];
+  selectedTriggerIds: readonly string[];
 }): readonly WebhookAutomationEventOption[] {
-  return input.selectedEventTypes.map((eventType) => {
-    const matchedOption = input.eventOptions.find((candidate) => candidate.value === eventType);
+  return input.selectedTriggerIds.map((triggerId) => {
+    const matchedOption = input.eventOptions.find((candidate) => candidate.id === triggerId);
     if (matchedOption !== undefined) {
       return matchedOption;
     }
 
     return {
-      value: eventType,
-      label: eventType,
+      id: triggerId,
+      eventType: triggerId,
+      connectionId: "",
+      connectionLabel: "",
+      label: triggerId,
       description: "No longer available from your connected integrations.",
       category: "Unavailable",
       unavailable: true,
@@ -84,9 +91,13 @@ export function resolveSelectedWebhookAutomationEventOptions(input: {
 
 function resolveWebhookAutomationTriggerPickerState(input: {
   hasConnectedIntegrations: boolean;
+  selectedTriggerIds: readonly string[];
   eventOptions: readonly WebhookAutomationEventOption[];
 }): WebhookAutomationTriggerPickerState {
-  const availableEventOptions = input.eventOptions.filter((option) => option.unavailable !== true);
+  const selectedTriggerIdSet = new Set(input.selectedTriggerIds);
+  const availableEventOptions = input.eventOptions.filter(
+    (option) => option.unavailable !== true && !selectedTriggerIdSet.has(option.id),
+  );
   const hasAvailableTriggers = availableEventOptions.length > 0;
 
   return {
@@ -103,25 +114,27 @@ function resolveWebhookAutomationTriggerPickerState(input: {
 export function WebhookAutomationTriggerPicker(input: {
   hasConnectedIntegrations: boolean;
   selectedConnectionId: string;
-  selectedEventTypes: readonly string[];
+  selectedTriggerIds: readonly string[];
   eventOptions: readonly WebhookAutomationEventOption[];
   triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
   error: string | undefined;
   onValueChange: (value: string[]) => void;
   onTriggerParameterValueChange: (input: {
-    eventType: string;
+    triggerId: string;
     parameterId: string;
     value: string;
   }) => void;
 }): React.JSX.Element {
   const selectedEventOptions = resolveSelectedWebhookAutomationEventOptions({
     eventOptions: input.eventOptions,
-    selectedEventTypes: input.selectedEventTypes,
+    selectedTriggerIds: input.selectedTriggerIds,
   });
   const pickerState = resolveWebhookAutomationTriggerPickerState({
     hasConnectedIntegrations: input.hasConnectedIntegrations,
+    selectedTriggerIds: input.selectedTriggerIds,
     eventOptions: input.eventOptions,
   });
+  const [isOpen, setIsOpen] = useState(false);
   const anchorRef = useComboboxAnchor();
   const triggerPickerId = useId();
 
@@ -131,10 +144,13 @@ export function WebhookAutomationTriggerPicker(input: {
         autoHighlight
         disabled={pickerState.disabled}
         multiple
+        onOpenChange={setIsOpen}
         onValueChange={(value) => {
           input.onValueChange(value);
+          setIsOpen(false);
         }}
-        value={[...input.selectedEventTypes]}
+        open={isOpen}
+        value={[...input.selectedTriggerIds]}
       >
         <div ref={anchorRef}>
           <div className="relative">
@@ -157,10 +173,10 @@ export function WebhookAutomationTriggerPicker(input: {
         >
           <ComboboxList className="max-h-80">
             {pickerState.groupedAvailableEventOptions.map((group) => (
-              <ComboboxGroup key={group.category}>
-                <ComboboxLabel>{group.category}</ComboboxLabel>
+              <ComboboxGroup key={group.connectionLabel}>
+                <ComboboxLabel>{group.connectionLabel}</ComboboxLabel>
                 {group.items.map((option) => (
-                  <ComboboxItem key={option.value} value={option.value}>
+                  <ComboboxItem key={option.id} value={option.id}>
                     <span className="truncate">{option.label}</span>
                   </ComboboxItem>
                 ))}
@@ -179,7 +195,7 @@ export function WebhookAutomationTriggerPicker(input: {
           {selectedEventOptions.map((option) => (
             <div
               className="bg-muted/20 flex items-center justify-between gap-2.5 rounded-lg border px-3.5 py-2"
-              key={option.value}
+              key={option.id}
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -195,17 +211,17 @@ export function WebhookAutomationTriggerPicker(input: {
                   {option.parameters?.map((parameter) => (
                     <TriggerParameterField
                       connectionId={input.selectedConnectionId}
-                      eventType={option.value}
-                      key={`${option.value}:${parameter.id}`}
+                      eventType={option.eventType}
+                      key={`${option.id}:${parameter.id}`}
                       onValueChange={(value) => {
                         input.onTriggerParameterValueChange({
-                          eventType: option.value,
+                          triggerId: option.id,
                           parameterId: parameter.id,
                           value,
                         });
                       }}
                       parameter={parameter}
-                      value={input.triggerParameterValues[option.value]?.[parameter.id] ?? ""}
+                      value={input.triggerParameterValues[option.id]?.[parameter.id] ?? ""}
                     />
                   ))}
                   {option.unavailable === true ? (
@@ -217,8 +233,8 @@ export function WebhookAutomationTriggerPicker(input: {
                 aria-label={`Remove ${option.label} trigger`}
                 onClick={() => {
                   input.onValueChange(
-                    input.selectedEventTypes.filter(
-                      (selectedEventType) => selectedEventType !== option.value,
+                    input.selectedTriggerIds.filter(
+                      (selectedTriggerId) => selectedTriggerId !== option.id,
                     ),
                   );
                 }}
@@ -245,24 +261,96 @@ function TriggerParameterField(input: {
   onValueChange: (value: string) => void;
 }): React.JSX.Element | null {
   const resourceQuery = useQuery({
-    queryKey: ["automation-trigger-parameters", input.connectionId, input.parameter.resourceKind],
-    queryFn: async ({ signal }) =>
-      listIntegrationConnectionResources({
+    queryKey: [
+      "automation-trigger-parameters",
+      input.connectionId,
+      input.parameter.kind === "resource-select" ? input.parameter.resourceKind : "none",
+    ],
+    queryFn: async ({ signal }) => {
+      if (
+        input.parameter.kind !== "resource-select" ||
+        input.parameter.resourceKind === undefined
+      ) {
+        throw new Error("Resource parameter is missing resource kind.");
+      }
+
+      return listIntegrationConnectionResources({
         connectionId: input.connectionId,
         kind: input.parameter.resourceKind,
         signal,
-      }),
-    enabled: input.connectionId.trim().length > 0,
+      });
+    },
+    enabled:
+      input.parameter.kind === "resource-select" &&
+      input.parameter.resourceKind !== undefined &&
+      input.connectionId.trim().length > 0,
     retry: false,
   });
 
-  if (input.parameter.kind !== "resource-select") {
-    return null;
+  if (input.parameter.kind === "string") {
+    return (
+      <span className="flex items-center gap-2">
+        <span className="text-muted-foreground text-sm">
+          {input.parameter.prefix ?? input.parameter.label}
+        </span>
+        <Input
+          className="h-8 min-w-32 rounded-md border-0 bg-muted/50 px-2.5 text-sm"
+          onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+            input.onValueChange(event.currentTarget.value);
+          }}
+          placeholder={input.parameter.placeholder ?? input.parameter.label}
+          value={input.value}
+        />
+      </span>
+    );
+  }
+
+  if (input.parameter.kind === "enum-select") {
+    return (
+      <span className="flex items-center gap-2">
+        <span className="text-muted-foreground text-sm">
+          {input.parameter.prefix ?? input.parameter.label}
+        </span>
+        <Select
+          modal={false}
+          onValueChange={(value) => {
+            if (value === null) {
+              return;
+            }
+
+            input.onValueChange(value === "__any__" ? "" : value);
+          }}
+          value={input.value.length === 0 ? "__any__" : input.value}
+        >
+          <SelectTrigger className="h-8 min-w-44 rounded-md border-0 bg-muted/50 px-2.5 text-sm">
+            <SelectValue
+              placeholder={input.parameter.placeholder ?? `Any ${input.parameter.label}`}
+            >
+              {input.parameter.options.find((option) => option.value === input.value)?.label ??
+                (input.value.length === 0
+                  ? (input.parameter.placeholder ?? `Any ${input.parameter.label}`)
+                  : undefined)}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__any__">
+              {input.parameter.placeholder ?? `Any ${input.parameter.label}`}
+            </SelectItem>
+            {input.parameter.options.map((option) => (
+              <SelectItem key={`${input.eventType}:${option.value}`} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </span>
+    );
   }
 
   const resourceOptions = [...(resourceQuery.data?.items ?? [])].sort((left, right) =>
     left.displayName.localeCompare(right.displayName),
   );
+  const selectedResourceOption = resourceOptions.find((option) => option.handle === input.value);
   const placeholder =
     input.connectionId.trim().length === 0
       ? `Select ${input.parameter.label}`
@@ -271,37 +359,63 @@ function TriggerParameterField(input: {
         : resourceOptions.length === 0
           ? `No ${input.parameter.label}s available`
           : `Select ${input.parameter.label}`;
+  const resourceAnchorRef = useComboboxAnchor();
+  const [resourceQueryText, setResourceQueryText] = useState(
+    selectedResourceOption?.displayName ?? "",
+  );
+
+  useEffect(() => {
+    setResourceQueryText(selectedResourceOption?.displayName ?? "");
+  }, [selectedResourceOption?.displayName]);
 
   return (
     <span className="flex items-center gap-2">
       <span className="text-muted-foreground text-sm">
         {input.parameter.prefix ?? input.parameter.label}
       </span>
-      <Select
-        onValueChange={(value) => {
-          if (value === null) {
-            return;
+      <Combobox<string>
+        autoHighlight
+        items={resourceOptions.map((option) => ({
+          value: option.handle,
+          label: option.displayName,
+        }))}
+        inputValue={resourceQueryText}
+        onInputValueChange={setResourceQueryText}
+        onOpenChange={(open) => {
+          if (!open) {
+            setResourceQueryText(selectedResourceOption?.displayName ?? "");
           }
-
-          input.onValueChange(value === "__any__" ? "" : value);
         }}
-        value={input.value.length === 0 ? "__any__" : input.value}
+        onValueChange={(value) => {
+          const nextSelectedResourceOption = resourceOptions.find(
+            (option) => option.handle === value,
+          );
+          setResourceQueryText(nextSelectedResourceOption?.displayName ?? "");
+          input.onValueChange(value ?? "");
+        }}
+        value={input.value.length === 0 ? null : input.value}
       >
-        <SelectTrigger className="h-8 min-w-44 rounded-md border-0 bg-muted/50 px-2.5 text-sm">
-          <SelectValue placeholder={placeholder}>
-            {resourceOptions.find((option) => option.handle === input.value)?.displayName ??
-              (input.value.length === 0 ? `Any ${input.parameter.label}` : undefined)}
-          </SelectValue>
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="__any__">{`Any ${input.parameter.label}`}</SelectItem>
-          {resourceOptions.map((option) => (
-            <SelectItem key={`${input.eventType}:${option.id}`} value={option.handle}>
-              {option.displayName}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        <div className="min-w-44" ref={resourceAnchorRef}>
+          <ComboboxInput
+            className="w-full *:data-[slot=input-group]:h-8 *:data-[slot=input-group-control]:rounded-md *:data-[slot=input-group-control]:border-0 *:data-[slot=input-group-control]:bg-muted/50 *:data-[slot=input-group-control]:px-2.5 *:data-[slot=input-group-control]:text-sm"
+            placeholder={input.value.length === 0 ? `Any ${input.parameter.label}` : placeholder}
+            showClear={input.value.length > 0}
+          />
+        </div>
+        <ComboboxContent
+          align="start"
+          anchor={resourceAnchorRef}
+          className="w-[min(22rem,calc(100vw-2rem))] p-0"
+        >
+          <ComboboxList className="max-h-64">
+            {resourceOptions.map((option) => (
+              <ComboboxItem key={`${input.eventType}:${option.id}`} value={option.handle}>
+                <span className="truncate">{option.displayName}</span>
+              </ComboboxItem>
+            ))}
+          </ComboboxList>
+        </ComboboxContent>
+      </Combobox>
     </span>
   );
 }

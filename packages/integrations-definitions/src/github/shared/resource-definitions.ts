@@ -41,6 +41,40 @@ export const GitHubResourceDefinitions: ReadonlyArray<IntegrationResourceDefinit
       return GitHubRepositoryApiKeyResourceCredential;
     },
   },
+  {
+    kind: "branch",
+    selectionMode: IntegrationResourceSelectionModes.MULTI,
+    bindingField: "branches",
+    displayNameSingular: "branch",
+    displayNamePlural: "branches",
+    description: "Git branches accessible from repositories on this connection.",
+    credential: ({ connection }) => {
+      const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(connection.config);
+
+      if (parsedConnectionConfig.auth_scheme === IntegrationSupportedAuthSchemes.OAUTH) {
+        return GitHubRepositoryOAuthResourceCredential;
+      }
+
+      return GitHubRepositoryApiKeyResourceCredential;
+    },
+  },
+  {
+    kind: "user",
+    selectionMode: IntegrationResourceSelectionModes.MULTI,
+    bindingField: "users",
+    displayNameSingular: "user",
+    displayNamePlural: "users",
+    description: "GitHub users discovered from accessible repositories on this connection.",
+    credential: ({ connection }) => {
+      const parsedConnectionConfig = GitHubConnectionConfigSchema.parse(connection.config);
+
+      if (parsedConnectionConfig.auth_scheme === IntegrationSupportedAuthSchemes.OAUTH) {
+        return GitHubRepositoryOAuthResourceCredential;
+      }
+
+      return GitHubRepositoryApiKeyResourceCredential;
+    },
+  },
 ];
 
 export const GitHubResourceSyncTriggers: ReadonlyArray<IntegrationResourceSyncTrigger> = [

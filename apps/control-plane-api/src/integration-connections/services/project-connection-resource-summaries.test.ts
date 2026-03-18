@@ -18,6 +18,18 @@ describe("projectConnectionResourceSummaries", () => {
         count: 0,
         syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
       },
+      {
+        kind: "branch",
+        selectionMode: "multi",
+        count: 0,
+        syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+      },
+      {
+        kind: "user",
+        selectionMode: "multi",
+        count: 0,
+        syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+      },
     ]);
   });
 
@@ -49,6 +61,18 @@ describe("projectConnectionResourceSummaries", () => {
         count: 42,
         syncState: IntegrationConnectionResourceSyncStates.READY,
         lastSyncedAt: "2026-03-09T10:00:00.000Z",
+      },
+      {
+        kind: "branch",
+        selectionMode: "multi",
+        count: 0,
+        syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+      },
+      {
+        kind: "user",
+        selectionMode: "multi",
+        count: 0,
+        syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
       },
     ]);
   });

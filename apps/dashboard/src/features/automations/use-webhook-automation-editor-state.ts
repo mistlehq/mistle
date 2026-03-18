@@ -10,7 +10,7 @@ import {
   validateWebhookAutomationFormValues,
 } from "./webhook-automation-form-helpers.js";
 import type {
-  PayloadFilterConditionDraft,
+  WebhookAutomationEventOption,
   WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
 import { buildWebhookAutomationEventOptions } from "./webhook-automation-list-helpers.js";
@@ -53,21 +53,7 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
     label: string;
     description?: string;
   }[];
-  webhookEventOptions: readonly {
-    value: string;
-    label: string;
-    description?: string;
-    category?: string;
-    parameters?: readonly {
-      id: string;
-      label: string;
-      kind: "resource-select";
-      resourceKind: string;
-      payloadPath: string[];
-      prefix?: string;
-    }[];
-    unavailable?: boolean;
-  }[];
+  webhookEventOptions: readonly WebhookAutomationEventOption[];
   values: WebhookAutomationFormValues;
   fieldErrors: Partial<Record<keyof WebhookAutomationFormValues, string>>;
   formError: string | null;
@@ -83,12 +69,7 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
   onSubmit: () => void;
   onValueChange: (
     key: keyof WebhookAutomationFormValues,
-    value:
-      | string
-      | boolean
-      | string[]
-      | PayloadFilterConditionDraft[]
-      | WebhookAutomationFormValues["triggerParameterValues"],
+    value: string | boolean | string[] | WebhookAutomationFormValues["triggerParameterValues"],
   ) => void;
 } {
   const queryClient = useQueryClient();
@@ -134,12 +115,14 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
         : buildWebhookAutomationEventOptions({
             connections: prerequisites.integrationDirectoryQuery.data.connections,
             targets: prerequisites.integrationDirectoryQuery.data.targets,
-            preservedConnectionId: formValues.integrationConnectionId,
-            selectedEventTypes: formValues.eventTypes,
+            ...(automationQuery.data?.integrationConnectionId === undefined
+              ? {}
+              : { preservedConnectionId: automationQuery.data.integrationConnectionId }),
+            selectedTriggerIds: formValues.triggerIds,
           }),
     [
-      formValues.eventTypes,
-      formValues.integrationConnectionId,
+      automationQuery.data?.integrationConnectionId,
+      formValues.triggerIds,
       prerequisites.integrationDirectoryQuery.data,
     ],
   );
@@ -232,12 +215,7 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
 
   function onValueChange(
     key: keyof WebhookAutomationFormValues,
-    value:
-      | string
-      | boolean
-      | string[]
-      | PayloadFilterConditionDraft[]
-      | WebhookAutomationFormValues["triggerParameterValues"],
+    value: string | boolean | string[] | WebhookAutomationFormValues["triggerParameterValues"],
   ): void {
     setFormValues((currentValues) => ({
       ...currentValues,
@@ -251,7 +229,7 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
   }
 
   function submitForm(): void {
-    const nextFieldErrors = validateWebhookAutomationFormValues(formValues);
+    const nextFieldErrors = validateWebhookAutomationFormValues(formValues, webhookEventOptions);
     setFieldErrors(nextFieldErrors);
     setFormError(null);
 

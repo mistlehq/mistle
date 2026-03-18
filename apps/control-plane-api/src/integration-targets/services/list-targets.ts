@@ -54,17 +54,66 @@ type IntegrationTargetWebhookEventParameter = NonNullable<
   IntegrationTargetWebhookEvent["parameters"]
 >[number];
 
+type IntegrationTargetWebhookEventConversationKeyOption = NonNullable<
+  IntegrationTargetWebhookEvent["conversationKeyOptions"]
+>[number];
+
 function cloneWebhookEventParameters(
   parameters: readonly IntegrationWebhookEventParameterDefinition[],
 ): IntegrationTargetWebhookEventParameter[] {
-  return parameters.map((parameter) => ({
+  return parameters.map((parameter) => cloneWebhookEventParameter(parameter));
+}
+
+function cloneWebhookEventConversationKeyOptions(
+  options: NonNullable<IntegrationWebhookEventDefinition["conversationKeyOptions"]>,
+): IntegrationTargetWebhookEventConversationKeyOption[] {
+  return options.map((option) => ({
+    id: option.id,
+    label: option.label,
+    description: option.description,
+    template: option.template,
+  }));
+}
+
+function cloneWebhookEventParameter(
+  parameter: IntegrationWebhookEventParameterDefinition,
+): IntegrationTargetWebhookEventParameter {
+  if (parameter.kind === "resource-select") {
+    return {
+      id: parameter.id,
+      label: parameter.label,
+      kind: parameter.kind,
+      resourceKind: parameter.resourceKind,
+      payloadPath: [...parameter.payloadPath],
+      ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+      ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
+    };
+  }
+
+  if (parameter.kind === "enum-select") {
+    return {
+      id: parameter.id,
+      label: parameter.label,
+      kind: parameter.kind,
+      payloadPath: [...parameter.payloadPath],
+      matchMode: parameter.matchMode,
+      options: parameter.options.map((option) => ({
+        value: option.value,
+        label: option.label,
+      })),
+      ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+      ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
+    };
+  }
+
+  return {
     id: parameter.id,
     label: parameter.label,
     kind: parameter.kind,
-    resourceKind: parameter.resourceKind,
     payloadPath: [...parameter.payloadPath],
     ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
-  }));
+    ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
+  };
 }
 
 function cloneWebhookEvents(
@@ -75,6 +124,13 @@ function cloneWebhookEvents(
     providerEventType: eventDefinition.providerEventType,
     displayName: eventDefinition.displayName,
     ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
+    ...(eventDefinition.conversationKeyOptions === undefined
+      ? {}
+      : {
+          conversationKeyOptions: cloneWebhookEventConversationKeyOptions(
+            eventDefinition.conversationKeyOptions,
+          ),
+        }),
     ...(eventDefinition.parameters === undefined
       ? {}
       : {

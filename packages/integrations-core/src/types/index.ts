@@ -952,20 +952,53 @@ export type IntegrationMcpConfig = {
   path: ReadonlyArray<string>;
 };
 
-export type IntegrationWebhookEventParameterDefinition = {
-  id: string;
+export type IntegrationWebhookEventParameterOptionDefinition = {
+  value: string;
   label: string;
-  kind: "resource-select";
-  resourceKind: string;
-  payloadPath: ReadonlyArray<string>;
-  prefix?: string | undefined;
 };
+
+export type IntegrationWebhookEventParameterDefinition =
+  | {
+      id: string;
+      label: string;
+      kind: "resource-select";
+      resourceKind: string;
+      payloadPath: ReadonlyArray<string>;
+      prefix?: string | undefined;
+      placeholder?: string | undefined;
+    }
+  | {
+      id: string;
+      label: string;
+      kind: "string";
+      payloadPath: ReadonlyArray<string>;
+      prefix?: string | undefined;
+      placeholder?: string | undefined;
+    }
+  | {
+      id: string;
+      label: string;
+      kind: "enum-select";
+      payloadPath: ReadonlyArray<string>;
+      matchMode: "eq" | "exists";
+      options: ReadonlyArray<IntegrationWebhookEventParameterOptionDefinition>;
+      prefix?: string | undefined;
+      placeholder?: string | undefined;
+    };
 
 export type IntegrationWebhookEventDefinition = {
   eventType: string;
   providerEventType: string;
   displayName: string;
   category?: string | undefined;
+  conversationKeyOptions?:
+    | ReadonlyArray<{
+        id: string;
+        label: string;
+        description: string;
+        template: string;
+      }>
+    | undefined;
   parameters?: ReadonlyArray<IntegrationWebhookEventParameterDefinition> | undefined;
 };
 

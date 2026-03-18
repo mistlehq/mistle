@@ -12,6 +12,10 @@ type PayloadFilterNode =
       op: "eq";
       path: string[];
       value: string;
+    }
+  | {
+      op: "exists" | "not_exists";
+      path: string[];
     };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -59,6 +63,17 @@ function parseKnownPayloadFilterNode(value: unknown): PayloadFilterNode | null {
     };
   }
 
+  if (value["op"] === "exists" || value["op"] === "not_exists") {
+    if (!isStringArray(value["path"])) {
+      return null;
+    }
+
+    return {
+      op: value["op"],
+      path: value["path"],
+    };
+  }
+
   return null;
 }
 
@@ -70,22 +85,46 @@ function buildEqNode(input: { path: string[]; value: string }): PayloadFilterNod
   };
 }
 
+function buildExistsNode(input: {
+  path: string[];
+  operator: "exists" | "not_exists";
+}): PayloadFilterNode {
+  return {
+    op: input.operator,
+    path: input.path,
+  };
+}
+
 function buildPayloadFilterNodeFromTriggerParameters(input: {
   eventOptions: readonly WebhookAutomationEventOption[];
-  selectedEventTypes: readonly string[];
+  selectedTriggerIds: readonly string[];
   triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
 }): PayloadFilterNode | null {
   const filters: PayloadFilterNode[] = [];
 
-  for (const eventType of input.selectedEventTypes) {
-    const eventOption = input.eventOptions.find((option) => option.value === eventType);
+  for (const triggerId of input.selectedTriggerIds) {
+    const eventOption = input.eventOptions.find((option) => option.id === triggerId);
     if (eventOption === undefined) {
       continue;
     }
 
     for (const parameter of eventOption.parameters ?? []) {
-      const configuredValue = input.triggerParameterValues[eventType]?.[parameter.id]?.trim() ?? "";
+      const configuredValue = input.triggerParameterValues[triggerId]?.[parameter.id]?.trim() ?? "";
       if (configuredValue.length === 0) {
+        continue;
+      }
+
+      if (parameter.kind === "enum-select" && parameter.matchMode === "exists") {
+        if (configuredValue !== "exists" && configuredValue !== "not_exists") {
+          continue;
+        }
+
+        filters.push(
+          buildExistsNode({
+            path: [...parameter.payloadPath],
+            operator: configuredValue,
+          }),
+        );
         continue;
       }
 
@@ -112,13 +151,13 @@ function buildPayloadFilterNodeFromTriggerParameters(input: {
 
 export function mergeWebhookAutomationPayloadFilter(input: {
   eventOptions: readonly WebhookAutomationEventOption[];
-  selectedEventTypes: readonly string[];
+  selectedTriggerIds: readonly string[];
   triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
   advancedPayloadFilter: Record<string, unknown> | null;
 }): Record<string, unknown> | null {
   const triggerParameterFilter = buildPayloadFilterNodeFromTriggerParameters({
     eventOptions: input.eventOptions,
-    selectedEventTypes: input.selectedEventTypes,
+    selectedTriggerIds: input.selectedTriggerIds,
     triggerParameterValues: input.triggerParameterValues,
   });
 
@@ -138,7 +177,7 @@ export function mergeWebhookAutomationPayloadFilter(input: {
 
 export function extractWebhookAutomationTriggerParameterValues(input: {
   eventOptions: readonly WebhookAutomationEventOption[];
-  selectedEventTypes: readonly string[];
+  selectedTriggerIds: readonly string[];
   payloadFilter: Record<string, unknown> | null;
 }): {
   triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
@@ -165,15 +204,15 @@ export function extractWebhookAutomationTriggerParameterValues(input: {
   const remainingFilters: PayloadFilterNode[] = [];
 
   for (const filter of rootFilters) {
-    if (filter.op !== "eq") {
+    if (filter.op !== "eq" && filter.op !== "exists" && filter.op !== "not_exists") {
       remainingFilters.push(filter);
       continue;
     }
 
     let extracted = false;
 
-    for (const eventType of input.selectedEventTypes) {
-      const eventOption = input.eventOptions.find((option) => option.value === eventType);
+    for (const triggerId of input.selectedTriggerIds) {
+      const eventOption = input.eventOptions.find((option) => option.id === triggerId);
       if (eventOption === undefined) {
         continue;
       }
@@ -183,8 +222,23 @@ export function extractWebhookAutomationTriggerParameterValues(input: {
           parameter.payloadPath.length === filter.path.length &&
           parameter.payloadPath.every((segment, index) => segment === filter.path[index])
         ) {
-          triggerParameterValues[eventType] = {
-            ...(triggerParameterValues[eventType] ?? {}),
+          if (parameter.kind === "enum-select" && parameter.matchMode === "exists") {
+            if (filter.op === "exists" || filter.op === "not_exists") {
+              triggerParameterValues[triggerId] = {
+                ...(triggerParameterValues[triggerId] ?? {}),
+                [parameter.id]: filter.op,
+              };
+              extracted = true;
+            }
+            break;
+          }
+
+          if (filter.op !== "eq") {
+            break;
+          }
+
+          triggerParameterValues[triggerId] = {
+            ...(triggerParameterValues[triggerId] ?? {}),
             [parameter.id]: filter.value,
           };
           extracted = true;
