@@ -30,19 +30,6 @@
     },
     "build": {
       "dependsOn": ["^build"],
-      "env": [
-        "AR",
-        "CC",
-        "CXX",
-        "DEVELOPER_DIR",
-        "HOST_PATH",
-        "LD",
-        "MACOSX_DEPLOYMENT_TARGET",
-        "NIX_*",
-        "NM",
-        "RANLIB",
-        "SDKROOT"
-      ],
       "outputs": ["dist/**"]
     },
     "lint": {
