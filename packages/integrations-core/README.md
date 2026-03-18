@@ -188,7 +188,6 @@ Current registry includes:
 - `github::github-cloud` (`kind: git`)
 - `github::github-enterprise-server` (`kind: git`)
 - `linear::linear-default` (`kind: connector`)
-- `notion::notion-default` (`kind: connector`)
 
 ## Creating A New Integration
 
