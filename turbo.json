@@ -22,10 +22,12 @@
       "outputs": ["dist/**"]
     },
     "lint": {
+      "passThroughEnv": ["MISTLE_*"],
       "outputs": []
     },
     "typecheck": {
       "dependsOn": ["^build"],
+      "passThroughEnv": ["MISTLE_*"],
       "outputs": []
     },
     "test": {
