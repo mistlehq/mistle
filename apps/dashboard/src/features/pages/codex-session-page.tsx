@@ -24,8 +24,8 @@ export function CodexSessionPage(): React.JSX.Element {
     sandboxInstanceId,
   });
   const handleCloseTerminalPanel = useCallback(async (): Promise<void> => {
-    await workbench.ptyState.actions.disconnectPty();
     workbench.terminalPanelState.closePanel();
+    await workbench.ptyState.actions.disconnectPty();
   }, [workbench.ptyState.actions, workbench.terminalPanelState]);
   const headerActions = (
     <div className="flex items-center gap-2">

@@ -58,7 +58,11 @@ export function SessionWorkbenchPageView({
       )}
 
       {isSecondaryPanelVisible ? (
-        <ResizablePanelGroup className="min-h-0 flex-1" orientation="vertical">
+        <ResizablePanelGroup
+          className="min-h-0 flex-1"
+          key={`${sandboxInstanceId}:${secondaryPanelSize}`}
+          orientation="vertical"
+        >
           <ResizablePanel defaultSize={100 - secondaryPanelSize} minSize={25}>
             <div className="flex h-full min-h-0 flex-col overflow-hidden">
               <div

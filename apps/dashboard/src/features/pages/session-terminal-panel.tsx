@@ -23,10 +23,6 @@ export function SessionTerminalPanel({
   const { lifecycle, output, actions } = ptyState;
   const { openPty, resizePty, writeInput } = actions;
 
-  if (!isVisible) {
-    return null;
-  }
-
   useEffect(() => {
     if (!isVisible) {
       return;
@@ -56,6 +52,10 @@ export function SessionTerminalPanel({
   async function handleCloseTerminal(): Promise<void> {
     output.clearOutput();
     await onClose();
+  }
+
+  if (!isVisible) {
+    return null;
   }
 
   return (
