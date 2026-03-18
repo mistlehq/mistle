@@ -147,7 +147,7 @@ export class ModalApiClient implements ModalClient {
       () => this.#modalClient.sandboxes.fromId(parsedRequest.runtimeId),
     );
     await this.#runModalClientOperation(ModalClientOperationIds.STOP_SANDBOX, () =>
-      sandbox.terminate(),
+      sandbox.terminate({ wait: true }),
     );
   }
 

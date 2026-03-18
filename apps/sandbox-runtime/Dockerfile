@@ -51,7 +51,7 @@ ENV PATH="/var/lib/mistle/bin:/home/${SANDBOX_USER}/.local/share/mise/shims:/usr
 WORKDIR /home/${SANDBOX_USER}
 USER root
 
-FROM sandbox-base-common AS sandbox-base-prod
+FROM sandbox-base-common AS sandbox-base
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
