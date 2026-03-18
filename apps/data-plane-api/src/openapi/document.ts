@@ -1,5 +1,4 @@
 import { OpenAPIHono, createRoute, z } from "@hono/zod-openapi";
-import { createKeysetPaginationEnvelopeSchema } from "@mistle/http/pagination";
 
 import { INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "../internal-sandbox-instances/constants.js";
 import type { AppContextBindings } from "../types.js";
@@ -117,13 +116,21 @@ const ListSandboxInstancesItemSchema = z
   })
   .strict();
 
-const ListSandboxInstancesResponseSchema = createKeysetPaginationEnvelopeSchema(
-  ListSandboxInstancesItemSchema,
-  {
-    defaultLimit: 20,
-    maxLimit: 100,
-  },
-);
+const ListSandboxInstancesPageCursorSchema = z
+  .object({
+    after: z.string().min(1),
+    limit: z.number().int().min(1).max(100),
+  })
+  .strict();
+
+const ListSandboxInstancesResponseSchema = z
+  .object({
+    totalResults: z.number().int().nonnegative(),
+    items: z.array(ListSandboxInstancesItemSchema),
+    nextPage: ListSandboxInstancesPageCursorSchema.nullable(),
+    previousPage: ListSandboxInstancesPageCursorSchema.nullable(),
+  })
+  .strict();
 
 const StartSandboxInstanceRoute = createRoute({
   method: "post",
