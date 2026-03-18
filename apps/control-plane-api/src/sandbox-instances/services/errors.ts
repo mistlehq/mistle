@@ -33,7 +33,8 @@ export class SandboxInstancesBadRequestError extends Error {
 }
 
 export const SandboxInstancesConflictCodes = {
-  INSTANCE_NOT_RUNNING: "INSTANCE_NOT_RUNNING",
+  INSTANCE_NOT_RESUMABLE: "INSTANCE_NOT_RESUMABLE",
+  INSTANCE_FAILED: "INSTANCE_FAILED",
 } as const;
 
 export type SandboxInstancesConflictCode =

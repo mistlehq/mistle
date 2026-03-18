@@ -225,7 +225,7 @@ export const internalSandboxRuntimeMintConnectionTokenRoute = createRoute({
       },
     },
     409: {
-      description: "Sandbox instance is not running.",
+      description: "Sandbox instance could not be connected.",
       content: {
         "application/json": {
           schema: InternalSandboxRuntimeErrorResponseSchema,
