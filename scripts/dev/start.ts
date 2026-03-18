@@ -33,6 +33,7 @@ const SEA_BUILD_INPUT_PATHS: readonly string[] = [
   "scripts/build/build-sandbox-runtime-sea-linux.mjs",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",
+  "tsconfig.base.json",
 ];
 
 let localInfraStartAttempted = false;
