@@ -5015,7 +5015,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["INSTANCE_NOT_RUNNING"]
+                      "enum": ["INSTANCE_NOT_RESUMABLE", "INSTANCE_FAILED"]
                     },
                     "message": {
                       "type": "string",
