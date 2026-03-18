@@ -13,7 +13,10 @@ import type {
   WebhookAutomationEventOption,
   WebhookAutomationFormValues,
 } from "./webhook-automation-form.js";
-import { buildWebhookAutomationEventOptions } from "./webhook-automation-list-helpers.js";
+import {
+  buildWebhookAutomationEventOptions,
+  createWebhookAutomationTriggerId,
+} from "./webhook-automation-list-helpers.js";
 import {
   AUTOMATIONS_QUERY_KEY_PREFIX,
   webhookAutomationDetailQueryKey,
@@ -206,12 +209,32 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
   });
 
   useEffect(() => {
-    if (input.mode === "edit" && automationQuery.data !== undefined) {
-      setFormValues(toWebhookAutomationFormValues(automationQuery.data, webhookEventOptions));
-      setFieldErrors({});
-      setFormError(null);
+    if (input.mode !== "edit" || automationQuery.data === undefined) {
+      return;
     }
-  }, [automationQuery.data, input.mode, webhookEventOptions]);
+
+    const directoryData = prerequisites.integrationDirectoryQuery.data;
+    if (directoryData === undefined) {
+      return;
+    }
+
+    const automationTriggerIds = (automationQuery.data.eventTypes ?? []).map((eventType) =>
+      createWebhookAutomationTriggerId({
+        connectionId: automationQuery.data.integrationConnectionId,
+        eventType,
+      }),
+    );
+    const hydrationEventOptions = buildWebhookAutomationEventOptions({
+      connections: directoryData.connections,
+      targets: directoryData.targets,
+      preservedConnectionId: automationQuery.data.integrationConnectionId,
+      selectedTriggerIds: automationTriggerIds,
+    });
+
+    setFormValues(toWebhookAutomationFormValues(automationQuery.data, hydrationEventOptions));
+    setFieldErrors({});
+    setFormError(null);
+  }, [automationQuery.data, input.mode, prerequisites.integrationDirectoryQuery.data]);
 
   function onValueChange(
     key: keyof WebhookAutomationFormValues,
