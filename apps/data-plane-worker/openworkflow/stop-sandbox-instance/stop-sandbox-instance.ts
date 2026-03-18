@@ -11,8 +11,8 @@ import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceStopped } from "./mark-sandbox-instance-stopped.js";
 
 type RunningSandboxInstanceStopState = {
-  provider: SandboxInstanceProvider;
-  providerSandboxId: string;
+  runtimeProvider: SandboxInstanceProvider;
+  providerRuntimeId: string;
 };
 
 async function resolveRunningSandboxInstanceStopState(input: {
@@ -21,8 +21,8 @@ async function resolveRunningSandboxInstanceStopState(input: {
 }): Promise<RunningSandboxInstanceStopState | null> {
   const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
     columns: {
-      provider: true,
-      providerSandboxId: true,
+      runtimeProvider: true,
+      providerRuntimeId: true,
       status: true,
     },
     where: (table, { eq }) => eq(table.id, input.sandboxInstanceId),
@@ -42,15 +42,15 @@ async function resolveRunningSandboxInstanceStopState(input: {
     );
   }
 
-  if (sandboxInstance.providerSandboxId === null) {
+  if (sandboxInstance.providerRuntimeId === null) {
     throw new Error(
-      `Expected running sandbox instance '${input.sandboxInstanceId}' to have a providerSandboxId.`,
+      `Expected running sandbox instance '${input.sandboxInstanceId}' to have a providerRuntimeId.`,
     );
   }
 
   return {
-    provider: sandboxInstance.provider,
-    providerSandboxId: sandboxInstance.providerSandboxId,
+    runtimeProvider: sandboxInstance.runtimeProvider,
+    providerRuntimeId: sandboxInstance.providerRuntimeId,
   };
 }
 
@@ -79,8 +79,8 @@ export async function stopSandboxInstance(
         sandboxAdapter: ctx.sandboxAdapter,
       },
       {
-        provider: sandboxInstanceState.provider,
-        providerSandboxId: sandboxInstanceState.providerSandboxId,
+        runtimeProvider: sandboxInstanceState.runtimeProvider,
+        providerRuntimeId: sandboxInstanceState.providerRuntimeId,
       },
     );
   } catch (error) {

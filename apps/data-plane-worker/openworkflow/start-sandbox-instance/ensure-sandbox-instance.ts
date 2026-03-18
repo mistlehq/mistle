@@ -9,7 +9,7 @@ import type { StartSandboxInstanceWorkflowInput } from "@mistle/workflow-registr
 export async function ensureSandboxInstance(
   ctx: {
     db: DataPlaneDatabase;
-    provider: SandboxProvider;
+    runtimeProvider: SandboxProvider;
   },
   input: {
     sandboxInstanceId: string;
@@ -29,8 +29,8 @@ export async function ensureSandboxInstance(
       organizationId: input.organizationId,
       sandboxProfileId: input.sandboxProfileId,
       sandboxProfileVersion: input.sandboxProfileVersion,
-      provider: ctx.provider,
-      providerSandboxId: null,
+      runtimeProvider: ctx.runtimeProvider,
+      providerRuntimeId: null,
       status: SandboxInstanceStatuses.STARTING,
       startedByKind: input.startedBy.kind,
       startedById: input.startedBy.id,

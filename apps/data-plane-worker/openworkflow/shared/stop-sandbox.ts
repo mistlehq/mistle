@@ -8,17 +8,17 @@ export async function stopSandbox(
     sandboxAdapter: SandboxAdapter;
   },
   input: {
-    provider: SandboxProvider;
-    providerSandboxId: string;
+    runtimeProvider: SandboxProvider;
+    providerRuntimeId: string;
   },
 ): Promise<void> {
-  if (input.provider !== ctx.config.sandbox.provider) {
+  if (input.runtimeProvider !== ctx.config.sandbox.provider) {
     throw new Error(
       "Attempted to stop sandbox using provider different from configured runtime sandbox provider.",
     );
   }
 
   await ctx.sandboxAdapter.stop({
-    sandboxId: input.providerSandboxId,
+    sandboxId: input.providerRuntimeId,
   });
 }

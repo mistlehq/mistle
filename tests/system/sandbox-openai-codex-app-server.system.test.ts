@@ -1668,7 +1668,7 @@ describe("system sandbox openai codex app-server websocket tunnel", () => {
       } catch (error) {
         let diagnostics = `Websocket trace (tail):\n${formatWebSocketTrace(websocketTraceEntries)}`;
         const sandboxListDiagnostics = await collectSandboxContainerListDiagnostics();
-        diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\nproviderSandboxId unavailable\n\nKnown sandbox containers:\n${sandboxListDiagnostics}`;
+        diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\nproviderRuntimeId unavailable\n\nKnown sandbox containers:\n${sandboxListDiagnostics}`;
 
         throw new Error(
           `System test failed. Step trace: ${formatStepTrace(stepTrace)}. Cause: ${describeUnknownError(error)}\n\nDiagnostics:\n${diagnostics}`,
@@ -2261,7 +2261,7 @@ describeIfGitHubEnv("system sandbox openai codex app-server with github binding"
       } catch (error) {
         let diagnostics = `Websocket trace (tail):\n${formatWebSocketTrace(websocketTraceEntries)}`;
         const sandboxListDiagnostics = await collectSandboxContainerListDiagnostics();
-        diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\nproviderSandboxId unavailable\n\nKnown sandbox containers:\n${sandboxListDiagnostics}`;
+        diagnostics = `${diagnostics}\n\nSandbox container diagnostics:\nproviderRuntimeId unavailable\n\nKnown sandbox containers:\n${sandboxListDiagnostics}`;
 
         throw new Error(
           `System test failed. Step trace: ${formatStepTrace(stepTrace)}. Cause: ${describeUnknownError(error)}\n\nDiagnostics:\n${diagnostics}`,
