@@ -26,7 +26,7 @@ describe("useSandboxPtyState", () => {
         cols: 80,
         rows: 24,
       }),
-    ).rejects.toThrowError("Sandbox instance id is required to open a PTY session.");
+    ).rejects.toThrow("Sandbox instance id is required to open a PTY session.");
 
     expect(result.current.lifecycle.state).toBe("idle");
     expect(result.current.lifecycle.connectedSandboxInstanceId).toBeNull();

@@ -488,7 +488,7 @@ describe("SandboxPtyClient", () => {
       streamId: 1,
     });
 
-    await expect(openPromise).rejects.toThrowError("pty unavailable");
+    await expect(openPromise).rejects.toThrow("pty unavailable");
     expect(client.state).toBe(SandboxPtyStates.CONNECTED);
     expect(client.error?.message).toBe("pty unavailable");
   });
@@ -513,7 +513,7 @@ describe("SandboxPtyClient", () => {
       streamId: 1,
     });
 
-    await expect(firstOpenPromise).rejects.toThrowError("bootstrap unavailable");
+    await expect(firstOpenPromise).rejects.toThrow("bootstrap unavailable");
     expect(client.state).toBe(SandboxPtyStates.CONNECTED);
 
     const secondOpenPromise = client.open({
@@ -565,7 +565,7 @@ describe("SandboxPtyClient", () => {
       streamId: 1,
     });
 
-    await expect(openPromise).rejects.toThrowError(
+    await expect(openPromise).rejects.toThrow(
       "Sandbox PTY stream reset (invalid_stream_data): stream setup invalidated before open completed",
     );
     expect(client.state).toBe(SandboxPtyStates.CONNECTED);
@@ -596,19 +596,19 @@ describe("SandboxPtyClient", () => {
         cols: Number.NaN,
         rows: 24,
       }),
-    ).rejects.toThrowError("Sandbox PTY open size must use positive integer rows and columns.");
+    ).rejects.toThrow("Sandbox PTY open size must use positive integer rows and columns.");
     await expect(
       client.open({
         cols: 80.5,
         rows: 24,
       }),
-    ).rejects.toThrowError("Sandbox PTY open size must use positive integer rows and columns.");
+    ).rejects.toThrow("Sandbox PTY open size must use positive integer rows and columns.");
     await expect(
       client.open({
         cols: Number.POSITIVE_INFINITY,
         rows: 24,
       }),
-    ).rejects.toThrowError("Sandbox PTY open size must use positive integer rows and columns.");
+    ).rejects.toThrow("Sandbox PTY open size must use positive integer rows and columns.");
     await expectNoServerMessageWithin(server, 20);
   });
 
@@ -627,7 +627,7 @@ describe("SandboxPtyClient", () => {
         cols: 120,
         rows: 40,
       }),
-    ).rejects.toThrowError("Sandbox PTY stream is not open.");
+    ).rejects.toThrow("Sandbox PTY stream is not open.");
   });
 
   it("rejects invalid PTY resize dimensions before sending a protocol message", async () => {
@@ -652,19 +652,19 @@ describe("SandboxPtyClient", () => {
         cols: Number.NaN,
         rows: 24,
       }),
-    ).rejects.toThrowError("Sandbox PTY resize must use positive integer rows and columns.");
+    ).rejects.toThrow("Sandbox PTY resize must use positive integer rows and columns.");
     await expect(
       client.resize({
         cols: 80,
         rows: 24.5,
       }),
-    ).rejects.toThrowError("Sandbox PTY resize must use positive integer rows and columns.");
+    ).rejects.toThrow("Sandbox PTY resize must use positive integer rows and columns.");
     await expect(
       client.resize({
         cols: Number.POSITIVE_INFINITY,
         rows: 24,
       }),
-    ).rejects.toThrowError("Sandbox PTY resize must use positive integer rows and columns.");
+    ).rejects.toThrow("Sandbox PTY resize must use positive integer rows and columns.");
     await expectNoServerMessageWithin(server, 20);
   });
 
@@ -773,7 +773,7 @@ describe("SandboxPtyClient", () => {
         streamId: 1,
       },
     });
-    await expect(closePromise).rejects.toThrowError(
+    await expect(closePromise).rejects.toThrow(
       "Timed out while waiting for sandbox PTY close confirmation.",
     );
 
@@ -811,7 +811,7 @@ describe("SandboxPtyClient", () => {
     await server.waitForNextMessage();
     server.closeClientSocket();
 
-    await expect(closePromise).rejects.toThrowError(
+    await expect(closePromise).rejects.toThrow(
       "Sandbox PTY websocket closed before close confirmation was received.",
     );
     await client.disconnect();
@@ -845,7 +845,7 @@ describe("SandboxPtyClient", () => {
       streamId: 1,
     });
 
-    await expect(closePromise).rejects.toThrowError(
+    await expect(closePromise).rejects.toThrow(
       "Sandbox PTY stream reset (stream_close_failed): failed to terminate pty session",
     );
     expect(client.state).toBe(SandboxPtyStates.ERROR);
@@ -1003,7 +1003,7 @@ describe("SandboxPtyClient", () => {
         message: "Sandbox bootstrap tunnel reconnected and invalidated the active PTY stream.",
       },
     ]);
-    await expect(client.write("pwd\n")).rejects.toThrowError("Sandbox PTY stream is not open.");
+    await expect(client.write("pwd\n")).rejects.toThrow("Sandbox PTY stream is not open.");
   });
 
   it("can reopen after stream.reset on the same websocket", async () => {
@@ -1084,7 +1084,7 @@ describe("SandboxPtyClient", () => {
       payload: firstPayload,
     });
 
-    await expect(client.write(new Uint8Array([1]))).rejects.toThrowError(
+    await expect(client.write(new Uint8Array([1]))).rejects.toThrow(
       "Sandbox PTY stream send window is exhausted.",
     );
 
@@ -1149,7 +1149,7 @@ describe("SandboxPtyClient", () => {
 
     await client.disconnect();
 
-    await expect(connectPromise).rejects.toThrowError(
+    await expect(connectPromise).rejects.toThrow(
       /Sandbox PTY websocket connection (failed|closed before becoming ready)\./u,
     );
     expect(client.state).toBe(SandboxPtyStates.CLOSED);

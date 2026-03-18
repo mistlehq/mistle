@@ -39,6 +39,6 @@ describe("GitHubEnterpriseServerTargetConfigSchema", () => {
         api_base_url: "https://ghe.example.com/api/v3",
         web_base_url: "not-a-url",
       }),
-    ).toThrowError();
+    ).toThrow();
   });
 });

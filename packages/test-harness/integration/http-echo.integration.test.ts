@@ -58,8 +58,6 @@ describe("http echo service integration", () => {
     const echoService = await startHttpEcho();
     await echoService.stop();
 
-    await expect(echoService.stop()).rejects.toThrowError(
-      "HTTP echo container was already stopped.",
-    );
+    await expect(echoService.stop()).rejects.toThrow("HTTP echo container was already stopped.");
   }, 60_000);
 });

@@ -24,7 +24,7 @@ describe("createSandboxAdapter", () => {
       createSandboxAdapter({
         provider: SandboxProvider.MODAL,
       }),
-    ).toThrowError(SandboxConfigurationError);
+    ).toThrow(SandboxConfigurationError);
   });
 
   it("creates a docker adapter when docker config is provided", () => {
@@ -44,6 +44,6 @@ describe("createSandboxAdapter", () => {
       createSandboxAdapter({
         provider: SandboxProvider.DOCKER,
       }),
-    ).toThrowError(SandboxConfigurationError);
+    ).toThrow(SandboxConfigurationError);
   });
 });

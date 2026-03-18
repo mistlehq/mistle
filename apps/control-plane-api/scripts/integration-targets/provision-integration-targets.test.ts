@@ -64,7 +64,7 @@ describe("provision-integration-targets", () => {
           ],
         }),
       ),
-    ).toThrowError(/Duplicate provision target key 'github-cloud'\./u);
+    ).toThrow(/Duplicate provision target key 'github-cloud'\./u);
   });
 
   it("normalizes escaped newline sequences in config and secrets", () => {

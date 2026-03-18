@@ -82,6 +82,6 @@ describe("github binding config forms", () => {
           kind: "git",
         },
       }),
-    ).toThrowError("GitHub binding form requires connection context.");
+    ).toThrow("GitHub binding form requires connection context.");
   });
 });

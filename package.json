@@ -48,7 +48,7 @@
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@typescript/native-preview": "latest",
-    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/coverage-v8": "^4.1.0",
     "fast-check": "^4.5.3",
     "jscpd": "^4.0.8",
     "knip": "^5.87.0",
@@ -62,7 +62,7 @@
     "tsx": "^4.20.6",
     "turbo": "^2.8.16",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.0"
   },
   "engines": {
     "node": "^25.0.0",

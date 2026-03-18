@@ -17,14 +17,14 @@ describe("webhook filter path", () => {
   });
 
   it("throws for invalid path inputs", () => {
-    expect(() => path("")).toThrowError("Webhook payload filter path must not be empty.");
-    expect(() => path("comment..body")).toThrowError(
+    expect(() => path("")).toThrow("Webhook payload filter path must not be empty.");
+    expect(() => path("comment..body")).toThrow(
       "Webhook payload filter path must not contain empty segments.",
     );
-    expect(() => path([])).toThrowError(
+    expect(() => path([])).toThrow(
       "Webhook payload filter path must contain at least one segment.",
     );
-    expect(() => path(["comment", ""])).toThrowError(
+    expect(() => path(["comment", ""])).toThrow(
       "Webhook payload filter path must not contain empty segments.",
     );
   });

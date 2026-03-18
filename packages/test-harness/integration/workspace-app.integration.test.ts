@@ -76,9 +76,7 @@ describe("workspace app launcher integration", () => {
       });
 
       await service.stop();
-      await expect(service.stop()).rejects.toThrowError(
-        "Workspace app container was already stopped.",
-      );
+      await expect(service.stop()).rejects.toThrow("Workspace app container was already stopped.");
     },
     TEST_TIMEOUT_MS,
   );
@@ -236,6 +234,6 @@ describe("workspace app launcher integration", () => {
           times: 1,
         },
       }),
-    ).rejects.toThrowError("projectRootHostPath must be an absolute path.");
+    ).rejects.toThrow("projectRootHostPath must be an absolute path.");
   });
 });

@@ -29,7 +29,7 @@ describe("createKeysetPaginationQuerySchema", () => {
         after: "cursor-a",
         before: "cursor-b",
       }),
-    ).toThrowError("Only one of `after` or `before` can be provided.");
+    ).toThrow("Only one of `after` or `before` can be provided.");
   });
 });
 

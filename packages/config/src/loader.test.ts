@@ -506,7 +506,7 @@ describe("parseConfigRecord", () => {
       },
     };
 
-    expect(() => parseConfigRecord(configRecord)).toThrowError(
+    expect(() => parseConfigRecord(configRecord)).toThrow(
       /apps\.data_plane_worker\.sandbox\.docker is required when global\.sandbox\.provider is 'docker'/,
     );
   });
@@ -518,6 +518,6 @@ describe("loadConfig", () => {
       loadConfig({
         app: AppIds.CONTROL_PLANE_API,
       }),
-    ).toThrowError(/Missing config source/);
+    ).toThrow(/Missing config source/);
   });
 });

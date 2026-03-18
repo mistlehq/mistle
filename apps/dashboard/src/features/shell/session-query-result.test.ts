@@ -52,6 +52,6 @@ describe("resolveSessionFromAuthPayload", () => {
           message: "Auth backend unavailable",
         },
       }),
-    ).toThrowError("Auth backend unavailable");
+    ).toThrow("Auth backend unavailable");
   });
 });

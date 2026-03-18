@@ -20,20 +20,20 @@ describe("getKeysetPaginationLimits", () => {
       getKeysetPaginationLimits({
         defaultLimit: 0,
       }),
-    ).toThrowError("Keyset pagination `defaultLimit` must be an integer greater than 0.");
+    ).toThrow("Keyset pagination `defaultLimit` must be an integer greater than 0.");
 
     expect(() =>
       getKeysetPaginationLimits({
         maxLimit: 0,
       }),
-    ).toThrowError("Keyset pagination `maxLimit` must be an integer greater than 0.");
+    ).toThrow("Keyset pagination `maxLimit` must be an integer greater than 0.");
 
     expect(() =>
       getKeysetPaginationLimits({
         defaultLimit: 50,
         maxLimit: 10,
       }),
-    ).toThrowError("Keyset pagination `defaultLimit` must be less than or equal to `maxLimit`.");
+    ).toThrow("Keyset pagination `defaultLimit` must be less than or equal to `maxLimit`.");
   });
 });
 
@@ -46,7 +46,7 @@ describe("createKeysetPageSizeSchema", () => {
 
     expect(schema.parse(undefined)).toBe(10);
     expect(schema.parse(25)).toBe(25);
-    expect(() => schema.parse(26)).toThrowError(ZodError);
+    expect(() => schema.parse(26)).toThrow(ZodError);
   });
 });
 
@@ -57,7 +57,7 @@ describe("parseKeysetPageSize", () => {
   });
 
   it("throws zod errors on invalid limits", () => {
-    expect(() => parseKeysetPageSize(0, { defaultLimit: 5, maxLimit: 20 })).toThrowError(ZodError);
-    expect(() => parseKeysetPageSize(21, { defaultLimit: 5, maxLimit: 20 })).toThrowError(ZodError);
+    expect(() => parseKeysetPageSize(0, { defaultLimit: 5, maxLimit: 20 })).toThrow(ZodError);
+    expect(() => parseKeysetPageSize(21, { defaultLimit: 5, maxLimit: 20 })).toThrow(ZodError);
   });
 });

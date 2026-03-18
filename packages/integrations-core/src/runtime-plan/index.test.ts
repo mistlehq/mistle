@@ -355,7 +355,7 @@ describe("assembleCompiledRuntimePlan", () => {
           },
         ],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       assembleCompiledRuntimePlan({
@@ -474,7 +474,7 @@ describe("assembleCompiledRuntimePlan", () => {
           },
         ],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       assembleCompiledRuntimePlan({

@@ -22,7 +22,7 @@ describe("validateDockerSandboxConfig", () => {
         socketPath: "",
         networkName: "mistle-sandbox-dev",
       }),
-    ).toThrowError(ZodError);
+    ).toThrow(ZodError);
   });
 
   it("throws when network name is empty", () => {
@@ -31,6 +31,6 @@ describe("validateDockerSandboxConfig", () => {
         socketPath: "/var/run/docker.sock",
         networkName: "  ",
       }),
-    ).toThrowError(ZodError);
+    ).toThrow(ZodError);
   });
 });

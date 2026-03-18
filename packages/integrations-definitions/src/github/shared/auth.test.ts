@@ -21,7 +21,7 @@ describe("github shared auth", () => {
   });
 
   it("fails when connection_method is missing", () => {
-    expect(() => resolveGitHubCredentialSecretType({})).toThrowError();
+    expect(() => resolveGitHubCredentialSecretType({})).toThrow();
   });
 
   it("fails when GitHub App installation_id is missing", () => {
@@ -29,6 +29,6 @@ describe("github shared auth", () => {
       resolveGitHubCredentialSecretType({
         connection_method: "github-app-installation",
       }),
-    ).toThrowError();
+    ).toThrow();
   });
 });

@@ -93,13 +93,13 @@ describe("webhook filter helpers", () => {
   });
 
   it("throws for invalid helper inputs", () => {
-    expect(() => and([])).toThrowError(
+    expect(() => and([])).toThrow(
       "Webhook payload filter composition requires at least one filter.",
     );
-    expect(() => or([])).toThrowError(
+    expect(() => or([])).toThrow(
       "Webhook payload filter composition requires at least one filter.",
     );
-    expect(() => inList(path("action"), [])).toThrowError(
+    expect(() => inList(path("action"), [])).toThrow(
       "Webhook payload filter in-list requires at least one value.",
     );
   });

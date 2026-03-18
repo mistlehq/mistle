@@ -36,7 +36,7 @@ describe("requireActiveOrganizationId", () => {
   });
 
   it("throws when active organization id is unavailable", () => {
-    expect(() => requireActiveOrganizationId(null)).toThrowError(
+    expect(() => requireActiveOrganizationId(null)).toThrow(
       MISSING_ACTIVE_ORGANIZATION_ERROR_MESSAGE,
     );
   });

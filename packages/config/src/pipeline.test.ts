@@ -138,6 +138,6 @@ describe("pipeline", () => {
           },
         },
       }),
-    ).toThrowError(/./);
+    ).toThrow(/./);
   });
 });
