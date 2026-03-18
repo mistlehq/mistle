@@ -177,4 +177,34 @@ describe("integration registry", () => {
 
     expect(definition?.credentialResolvers?.custom?.github_installation_token).toBeDefined();
   });
+
+  it("rejects definitions with invalid supported webhook event metadata", () => {
+    const registry = new IntegrationRegistry();
+
+    expect(() =>
+      registry.register({
+        familyId: "github",
+        variantId: "github-cloud",
+        kind: "git",
+        displayName: "GitHub",
+        logoKey: "github",
+        targetConfigSchema: ConfigSchema,
+        targetSecretSchema: EmptySecretsSchema,
+        bindingConfigSchema: ConfigSchema,
+        connectionMethods: GitHubConnectionMethods,
+        supportedWebhookEvents: [
+          {
+            eventType: "github.issue_comment.created",
+            providerEventType: "issue_comment",
+            displayName: "",
+          },
+        ],
+        compileBinding: () => ({
+          egressRoutes: [],
+          artifacts: [],
+          runtimeClients: [],
+        }),
+      }),
+    ).toThrow(IntegrationDefinitionRegistryError);
+  });
 });

@@ -40,6 +40,104 @@ function validateDefinition(input: AnyIntegrationDefinition): void {
       "Integration definition logoKey must be non-empty.",
     );
   }
+
+  for (const supportedWebhookEvent of input.supportedWebhookEvents ?? []) {
+    if (supportedWebhookEvent.eventType.trim().length === 0) {
+      throw new IntegrationDefinitionRegistryError(
+        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        "Integration definition supportedWebhookEvents[*].eventType must be non-empty.",
+      );
+    }
+
+    if (supportedWebhookEvent.providerEventType.trim().length === 0) {
+      throw new IntegrationDefinitionRegistryError(
+        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        "Integration definition supportedWebhookEvents[*].providerEventType must be non-empty.",
+      );
+    }
+
+    if (supportedWebhookEvent.displayName.trim().length === 0) {
+      throw new IntegrationDefinitionRegistryError(
+        DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+        "Integration definition supportedWebhookEvents[*].displayName must be non-empty.",
+      );
+    }
+
+    for (const conversationKeyOption of supportedWebhookEvent.conversationKeyOptions ?? []) {
+      if (conversationKeyOption.id.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].conversationKeyOptions[*].id must be non-empty.",
+        );
+      }
+
+      if (conversationKeyOption.label.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].conversationKeyOptions[*].label must be non-empty.",
+        );
+      }
+
+      if (conversationKeyOption.description.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].conversationKeyOptions[*].description must be non-empty.",
+        );
+      }
+
+      if (conversationKeyOption.template.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].conversationKeyOptions[*].template must be non-empty.",
+        );
+      }
+    }
+
+    for (const parameter of supportedWebhookEvent.parameters ?? []) {
+      if (parameter.id.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameters[*].id must be non-empty.",
+        );
+      }
+
+      if (parameter.label.trim().length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameters[*].label must be non-empty.",
+        );
+      }
+
+      if (
+        parameter.kind === "resource-select" &&
+        (parameter.resourceKind?.trim().length ?? 0) === 0
+      ) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameters[*].resourceKind must be non-empty.",
+        );
+      }
+
+      if (
+        parameter.kind === "enum-select" &&
+        parameter.options.some(
+          (option) => option.value.trim().length === 0 || option.label.trim().length === 0,
+        )
+      ) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameters[*].options[*] must be non-empty.",
+        );
+      }
+
+      if (parameter.payloadPath.length === 0) {
+        throw new IntegrationDefinitionRegistryError(
+          DefinitionRegistryErrorCodes.INVALID_DEFINITION,
+          "Integration definition supportedWebhookEvents[*].parameters[*].payloadPath must be non-empty.",
+        );
+      }
+    }
+  }
 }
 
 export class IntegrationRegistry implements IntegrationDefinitionResolver {

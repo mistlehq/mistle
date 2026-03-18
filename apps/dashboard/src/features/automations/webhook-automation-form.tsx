@@ -7,7 +7,6 @@ import {
   Field,
   FieldContent,
   FieldLabel,
-  Input,
   Select,
   SelectContent,
   SelectItem,
@@ -16,8 +15,18 @@ import {
   Textarea,
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
+import { useEffect, useMemo } from "react";
 
+import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
+import { WebhookAutomationTriggerPicker } from "./webhook-automation-trigger-picker.js";
+import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
+import type {
+  WebhookAutomationConversationKeyOption,
+  WebhookAutomationEventOption,
+  WebhookAutomationTriggerParameterValueMap,
+} from "./webhook-automation-trigger-types.js";
+export type { WebhookAutomationEventOption } from "./webhook-automation-trigger-types.js";
 
 export type WebhookAutomationFormOption = {
   value: string;
@@ -27,14 +36,12 @@ export type WebhookAutomationFormOption = {
 
 export type WebhookAutomationFormValues = {
   name: string;
-  integrationConnectionId: string;
   sandboxProfileId: string;
   enabled: boolean;
   inputTemplate: string;
   conversationKeyTemplate: string;
-  idempotencyKeyTemplate: string;
-  eventTypesText: string;
-  payloadFilterText: string;
+  triggerIds: string[];
+  triggerParameterValues: WebhookAutomationTriggerParameterValueMap;
 };
 
 export type WebhookAutomationFormValueKey = keyof WebhookAutomationFormValues;
@@ -44,11 +51,15 @@ type WebhookAutomationFormProps = {
   values: WebhookAutomationFormValues;
   connectionOptions: readonly WebhookAutomationFormOption[];
   sandboxProfileOptions: readonly WebhookAutomationFormOption[];
+  webhookEventOptions: readonly WebhookAutomationEventOption[];
   fieldErrors: Partial<Record<WebhookAutomationFormValueKey, string>>;
   formError: string | null;
   isSaving: boolean;
   isDeleting: boolean;
-  onValueChange: (key: WebhookAutomationFormValueKey, value: string | boolean) => void;
+  onValueChange: (
+    key: WebhookAutomationFormValueKey,
+    value: string | boolean | string[] | WebhookAutomationTriggerParameterValueMap,
+  ) => void;
   onSubmit: () => void;
   onDelete: (() => void) | null;
 };
@@ -112,21 +123,112 @@ function FormSection(input: {
   description: string;
   children: React.ReactNode;
 }): React.JSX.Element {
+  const hasHeading = input.title.trim().length > 0 || input.description.trim().length > 0;
+
   return (
     <section className="space-y-5 border-t pt-6 first:border-t-0 first:pt-0">
-      <div className="space-y-1">
-        <h2 className="text-base font-semibold">{input.title}</h2>
-        {input.description === "" ? null : (
-          <p className="text-muted-foreground text-sm">{input.description}</p>
-        )}
-      </div>
+      {hasHeading ? (
+        <div className="space-y-1">
+          {input.title.trim().length > 0 ? (
+            <h2 className="text-base font-semibold">{input.title}</h2>
+          ) : null}
+          {input.description.trim().length > 0 ? (
+            <p className="text-muted-foreground text-sm">{input.description}</p>
+          ) : null}
+        </div>
+      ) : null}
       {input.children}
     </section>
   );
 }
 
+function resolveConversationKeyFieldOptions(input: {
+  selectedEventOptions: readonly WebhookAutomationEventOption[];
+  currentTemplate: string;
+}): {
+  supportedOptions: readonly WebhookAutomationConversationKeyOption[];
+  displayOptions: readonly WebhookAutomationConversationKeyOption[];
+  hasUnsupportedCurrentTemplate: boolean;
+} {
+  const supportedOptions = resolveCommonWebhookAutomationConversationKeyOptions({
+    selectedEventOptions: input.selectedEventOptions,
+  });
+
+  if (
+    input.currentTemplate.trim().length === 0 ||
+    supportedOptions.some((option) => option.template === input.currentTemplate)
+  ) {
+    return {
+      supportedOptions,
+      displayOptions: supportedOptions,
+      hasUnsupportedCurrentTemplate: false,
+    };
+  }
+
+  return {
+    supportedOptions,
+    displayOptions: [
+      {
+        id: "__current_unsupported__",
+        label: "Current setting (unsupported)",
+        description:
+          "This saved grouping is no longer supported for the selected triggers. Choose a supported option before saving.",
+        template: input.currentTemplate,
+      },
+      ...supportedOptions,
+    ],
+    hasUnsupportedCurrentTemplate: true,
+  };
+}
+
 export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.JSX.Element {
   const submitLabel = input.mode === "create" ? "Create automation" : "Save changes";
+  const selectedTriggerOptions = resolveSelectedWebhookAutomationEventOptions({
+    eventOptions: input.webhookEventOptions,
+    selectedTriggerIds: input.values.triggerIds,
+  });
+  const selectedConnectionIds = new Set(
+    selectedTriggerOptions
+      .map((option) => option.connectionId)
+      .filter((connectionId) => connectionId.trim().length > 0),
+  );
+  const selectedConnectionId =
+    selectedConnectionIds.size === 1 ? ([...selectedConnectionIds][0] ?? "") : "";
+  const conversationKeyFieldOptions = useMemo(
+    () =>
+      resolveConversationKeyFieldOptions({
+        selectedEventOptions: selectedTriggerOptions,
+        currentTemplate: input.values.conversationKeyTemplate,
+      }),
+    [input.values.conversationKeyTemplate, selectedTriggerOptions],
+  );
+
+  useEffect(() => {
+    if (conversationKeyFieldOptions.supportedOptions.length === 0) {
+      return;
+    }
+
+    if (conversationKeyFieldOptions.hasUnsupportedCurrentTemplate) {
+      return;
+    }
+
+    if (
+      input.values.conversationKeyTemplate.trim().length === 0 ||
+      !conversationKeyFieldOptions.supportedOptions.some(
+        (option) => option.template === input.values.conversationKeyTemplate,
+      )
+    ) {
+      input.onValueChange(
+        "conversationKeyTemplate",
+        conversationKeyFieldOptions.supportedOptions[0]?.template ?? "",
+      );
+    }
+  }, [
+    conversationKeyFieldOptions.hasUnsupportedCurrentTemplate,
+    conversationKeyFieldOptions.supportedOptions,
+    input.onValueChange,
+    input.values.conversationKeyTemplate,
+  ]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -186,17 +288,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             ) : null}
 
             <SelectField
-              error={input.fieldErrors.integrationConnectionId}
-              label="Integration connection"
-              onValueChange={(value) => {
-                input.onValueChange("integrationConnectionId", value);
-              }}
-              options={input.connectionOptions}
-              placeholder="Select connection"
-              value={input.values.integrationConnectionId}
-            />
-
-            <SelectField
               error={input.fieldErrors.sandboxProfileId}
               label="Sandbox profile"
               onValueChange={(value) => {
@@ -208,18 +299,20 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
             />
           </div>
 
-          <div className="bg-muted/40 flex items-start gap-3 rounded-lg border p-4">
-            <Checkbox
-              checked={input.values.enabled}
-              id="automation-enabled"
-              onCheckedChange={(checked) => {
-                input.onValueChange("enabled", checked === true);
-              }}
-            />
-            <div className="space-y-1">
-              <FieldLabel htmlFor="automation-enabled">Automation enabled</FieldLabel>
+          {input.mode === "edit" ? (
+            <div className="bg-muted/40 flex items-start gap-3 rounded-lg border p-4">
+              <Checkbox
+                checked={input.values.enabled}
+                id="automation-enabled"
+                onCheckedChange={(checked) => {
+                  input.onValueChange("enabled", checked === true);
+                }}
+              />
+              <div className="space-y-1">
+                <FieldLabel htmlFor="automation-enabled">Automation enabled</FieldLabel>
+              </div>
             </div>
-          </div>
+          ) : null}
         </div>
       </FormSection>
 
@@ -227,86 +320,91 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
         description="These values are sent directly to the backend contract. Keep them aligned with the integration payload shape you expect."
         title="Templates"
       >
-        <div className="space-y-5">
-          <Field>
-            <FieldLabel htmlFor="conversation-key-template">Conversation key template</FieldLabel>
-            <FieldContent>
-              <Input
-                id="conversation-key-template"
-                onChange={(event) => {
-                  input.onValueChange("conversationKeyTemplate", event.currentTarget.value);
-                }}
-                value={input.values.conversationKeyTemplate}
-              />
-              <FieldError message={input.fieldErrors.conversationKeyTemplate} />
-            </FieldContent>
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="input-template">Input template</FieldLabel>
-            <FieldContent>
-              <Textarea
-                id="input-template"
-                onChange={(event) => {
-                  input.onValueChange("inputTemplate", event.currentTarget.value);
-                }}
-                rows={7}
-                value={input.values.inputTemplate}
-              />
-              <FieldError message={input.fieldErrors.inputTemplate} />
-            </FieldContent>
-          </Field>
-
-          <Field>
-            <FieldLabel htmlFor="idempotency-key-template">Idempotency key template</FieldLabel>
-            <FieldContent>
-              <Input
-                id="idempotency-key-template"
-                onChange={(event) => {
-                  input.onValueChange("idempotencyKeyTemplate", event.currentTarget.value);
-                }}
-                placeholder="Optional"
-                value={input.values.idempotencyKeyTemplate}
-              />
-              <FieldError message={input.fieldErrors.idempotencyKeyTemplate} />
-            </FieldContent>
-          </Field>
-        </div>
+        <Field>
+          <FieldLabel htmlFor="input-template">Input template</FieldLabel>
+          <FieldContent>
+            <Textarea
+              id="input-template"
+              onChange={(event) => {
+                input.onValueChange("inputTemplate", event.currentTarget.value);
+              }}
+              rows={7}
+              value={input.values.inputTemplate}
+            />
+            <FieldError message={input.fieldErrors.inputTemplate} />
+          </FieldContent>
+        </Field>
       </FormSection>
 
-      <FormSection
-        description="Use these optional fields to narrow which events trigger the automation and what subset of the payload gets accepted."
-        title="Advanced filters"
-      >
+      <FormSection description="" title="Triggers">
         <div className="space-y-5">
-          <Field>
-            <FieldLabel htmlFor="event-types">Event types</FieldLabel>
-            <FieldContent>
-              <Input
-                id="event-types"
-                onChange={(event) => {
-                  input.onValueChange("eventTypesText", event.currentTarget.value);
-                }}
-                placeholder="Comma-separated, for example push,pull_request"
-                value={input.values.eventTypesText}
-              />
-              <FieldError message={input.fieldErrors.eventTypesText} />
-            </FieldContent>
-          </Field>
+          <WebhookAutomationTriggerPicker
+            error={input.fieldErrors.triggerIds}
+            eventOptions={input.webhookEventOptions}
+            hasConnectedIntegrations={input.connectionOptions.length > 0}
+            onTriggerParameterValueChange={({ triggerId, parameterId, value }) => {
+              input.onValueChange("triggerParameterValues", {
+                ...input.values.triggerParameterValues,
+                [triggerId]: {
+                  ...(input.values.triggerParameterValues[triggerId] ?? {}),
+                  [parameterId]: value,
+                },
+              });
+            }}
+            onValueChange={(value) => {
+              input.onValueChange("triggerIds", value);
+            }}
+            selectedConnectionId={selectedConnectionId}
+            selectedTriggerIds={input.values.triggerIds}
+            triggerParameterValues={input.values.triggerParameterValues}
+          />
+          <FieldError message={input.fieldErrors.triggerIds} />
 
           <Field>
-            <FieldLabel htmlFor="payload-filter">Payload filter</FieldLabel>
+            <FieldLabel>Conversation grouping</FieldLabel>
             <FieldContent>
-              <Textarea
-                id="payload-filter"
-                onChange={(event) => {
-                  input.onValueChange("payloadFilterText", event.currentTarget.value);
+              <Select
+                disabled={conversationKeyFieldOptions.displayOptions.length === 0}
+                onValueChange={(value) => {
+                  if (value === null) {
+                    return;
+                  }
+
+                  input.onValueChange("conversationKeyTemplate", value);
                 }}
-                placeholder='Optional JSON object, for example {"repository":"mistle"}'
-                rows={5}
-                value={input.values.payloadFilterText}
-              />
-              <FieldError message={input.fieldErrors.payloadFilterText} />
+                value={input.values.conversationKeyTemplate}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue
+                    placeholder={
+                      input.values.triggerIds.length === 0
+                        ? "Select triggers first"
+                        : "Select conversation grouping"
+                    }
+                  >
+                    {
+                      conversationKeyFieldOptions.displayOptions.find(
+                        (option) => option.template === input.values.conversationKeyTemplate,
+                      )?.label
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {conversationKeyFieldOptions.displayOptions.map((option) => (
+                    <SelectItem key={option.id} value={option.template}>
+                      <div className="flex flex-col gap-0.5">
+                        <span>{option.label}</span>
+                        <span className="text-muted-foreground text-xs">{option.description}</span>
+                        <code className="text-muted-foreground text-[11px]">{option.template}</code>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-muted-foreground text-sm">
+                Events that render to the same key are routed into the same conversation.
+              </p>
+              <FieldError message={input.fieldErrors.conversationKeyTemplate} />
             </FieldContent>
           </Field>
         </div>

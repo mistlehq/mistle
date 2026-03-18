@@ -22,6 +22,7 @@ import {
   GitHubResourceDefinitions,
   GitHubResourceSyncTriggers,
 } from "../../shared/resource-definitions.js";
+import { GitHubSupportedWebhookEvents } from "../../shared/supported-webhook-events.js";
 import { GitHubTargetSecretSchema } from "../../shared/target-secret-schema.js";
 import { GitHubEnterpriseServerBindingConfigSchema } from "./binding-config-schema.js";
 import { compileGitHubEnterpriseServerBinding } from "./compile-binding.js";
@@ -67,6 +68,7 @@ export const GitHubEnterpriseServerDefinition: GitHubEnterpriseServerIntegration
     },
   },
   redirectHandler: GitHubAppInstallationRedirectHandler,
+  supportedWebhookEvents: GitHubSupportedWebhookEvents,
   webhookHandler: GitHubEnterpriseServerWebhookHandler,
   resourceDefinitions: GitHubResourceDefinitions,
   resourceSyncTriggers: GitHubResourceSyncTriggers,

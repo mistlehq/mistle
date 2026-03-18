@@ -3,7 +3,10 @@ import type {
   IntegrationTarget,
 } from "../integrations/integrations-service.js";
 import type { SandboxProfile } from "../sandbox-profiles/sandbox-profiles-types.js";
-import type { WebhookAutomationFormOption } from "./webhook-automation-form.js";
+import type {
+  WebhookAutomationEventOption,
+  WebhookAutomationFormOption,
+} from "./webhook-automation-form.js";
 import type { WebhookAutomationListItemViewModel } from "./webhook-automation-list-view.js";
 import type { WebhookAutomation } from "./webhook-automations-types.js";
 
@@ -71,6 +74,13 @@ function summarizeEventTypes(eventTypes: readonly string[] | null): string {
   return eventTypes.join(", ");
 }
 
+export function createWebhookAutomationTriggerId(input: {
+  connectionId: string;
+  eventType: string;
+}): string {
+  return `${input.connectionId}::${input.eventType}`;
+}
+
 export function buildWebhookAutomationConnectionOptions(input: {
   connections: readonly IntegrationConnection[];
   preservedConnectionId?: string;
@@ -103,6 +113,138 @@ export function buildWebhookAutomationSandboxProfileOptions(input: {
       description: profile.status,
     })),
   );
+}
+
+export function buildWebhookAutomationEventOptions(input: {
+  connections: readonly IntegrationConnection[];
+  targets: readonly IntegrationTarget[];
+  preservedConnectionId?: string;
+  selectedTriggerIds: readonly string[];
+}): readonly WebhookAutomationEventOption[] {
+  const selectedTriggerIds = new Set(input.selectedTriggerIds);
+  const eligibleConnections = input.connections.filter(
+    (connection) => connection.status === "active" || connection.id === input.preservedConnectionId,
+  );
+
+  const supportedEventOptions: WebhookAutomationEventOption[] = [];
+
+  for (const connection of eligibleConnections) {
+    const target = input.targets.find((candidate) => candidate.targetKey === connection.targetKey);
+    if (target === undefined) {
+      continue;
+    }
+
+    for (const eventDefinition of target.supportedWebhookEvents ?? []) {
+      supportedEventOptions.push({
+        id: createWebhookAutomationTriggerId({
+          connectionId: connection.id,
+          eventType: eventDefinition.eventType,
+        }),
+        eventType: eventDefinition.eventType,
+        connectionId: connection.id,
+        connectionLabel: connection.displayName,
+        label: eventDefinition.displayName,
+        ...(target.logoKey === undefined ? {} : { logoKey: target.logoKey }),
+        ...(eventDefinition.conversationKeyOptions === undefined
+          ? {}
+          : {
+              conversationKeyOptions: eventDefinition.conversationKeyOptions.map(
+                (conversationKeyOption) => ({
+                  id: conversationKeyOption.id,
+                  label: conversationKeyOption.label,
+                  description: conversationKeyOption.description,
+                  template: conversationKeyOption.template,
+                }),
+              ),
+            }),
+        ...(eventDefinition.category === undefined
+          ? {}
+          : { category: `${connection.displayName} / ${eventDefinition.category}` }),
+        ...(eventDefinition.parameters === undefined
+          ? {}
+          : {
+              parameters: eventDefinition.parameters.map((parameter) =>
+                parameter.kind === "resource-select"
+                  ? {
+                      id: parameter.id,
+                      label: parameter.label,
+                      kind: parameter.kind,
+                      resourceKind: parameter.resourceKind,
+                      payloadPath: [...parameter.payloadPath],
+                      ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                      ...(parameter.placeholder === undefined
+                        ? {}
+                        : { placeholder: parameter.placeholder }),
+                    }
+                  : parameter.kind === "enum-select"
+                    ? {
+                        id: parameter.id,
+                        label: parameter.label,
+                        kind: parameter.kind,
+                        payloadPath: [...parameter.payloadPath],
+                        matchMode: parameter.matchMode,
+                        options: parameter.options.map((option) => ({
+                          value: option.value,
+                          label: option.label,
+                        })),
+                        ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                        ...(parameter.placeholder === undefined
+                          ? {}
+                          : { placeholder: parameter.placeholder }),
+                      }
+                    : {
+                        id: parameter.id,
+                        label: parameter.label,
+                        kind: parameter.kind,
+                        payloadPath: [...parameter.payloadPath],
+                        ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+                        ...(parameter.placeholder === undefined
+                          ? {}
+                          : { placeholder: parameter.placeholder }),
+                      },
+              ),
+            }),
+      });
+    }
+  }
+
+  const missingEventOptions = input.selectedTriggerIds
+    .filter(
+      (selectedTriggerId) =>
+        !supportedEventOptions.some((eventOption) => eventOption.id === selectedTriggerId),
+    )
+    .map((selectedTriggerId) => {
+      const [connectionId = "", ...eventTypeParts] = selectedTriggerId.split("::");
+      const eventType = eventTypeParts.join("::");
+
+      return {
+        id: selectedTriggerId,
+        eventType,
+        connectionId,
+        connectionLabel: connectionId,
+        label: eventType,
+        description: "No longer available from your connected integrations.",
+        category: "Unavailable",
+        unavailable: true,
+      } satisfies WebhookAutomationEventOption;
+    });
+
+  return [...supportedEventOptions, ...missingEventOptions].sort((left, right) => {
+    const leftSelected = selectedTriggerIds.has(left.id);
+    const rightSelected = selectedTriggerIds.has(right.id);
+    if (leftSelected !== rightSelected) {
+      return leftSelected ? -1 : 1;
+    }
+
+    const leftCategory = left.category ?? "";
+    const rightCategory = right.category ?? "";
+    const categoryComparison = leftCategory.localeCompare(rightCategory);
+    if (categoryComparison !== 0) {
+      return categoryComparison;
+    }
+
+    return left.label.localeCompare(right.label);
+  });
 }
 
 export function buildWebhookAutomationListItems(input: {

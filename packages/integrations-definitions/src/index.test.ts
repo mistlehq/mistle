@@ -51,6 +51,16 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(githubCloudDefinition?.redirectHandler).toBeDefined();
+    expect(githubCloudDefinition?.supportedWebhookEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "github.issue_comment.created",
+          providerEventType: "issue_comment",
+          displayName: "Issue comment created",
+          category: "Issues",
+        }),
+      ]),
+    );
     expect(
       githubCloudDefinition?.credentialResolvers?.custom?.github_app_installation_token,
     ).toBeDefined();
@@ -69,6 +79,16 @@ describe("integrations-definitions index", () => {
       ],
     });
     expect(githubEnterpriseServerDefinition?.redirectHandler).toBeDefined();
+    expect(githubEnterpriseServerDefinition?.supportedWebhookEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          eventType: "github.issue_comment.created",
+          providerEventType: "issue_comment",
+          displayName: "Issue comment created",
+          category: "Issues",
+        }),
+      ]),
+    );
     expect(
       githubEnterpriseServerDefinition?.credentialResolvers?.custom?.github_app_installation_token,
     ).toBeDefined();

@@ -112,6 +112,22 @@ function resolveAction(input: Record<string, unknown>): string {
   return "unknown";
 }
 
+function resolveCanonicalAction(input: {
+  providerEventType: string;
+  payload: Record<string, unknown>;
+}): string {
+  const action = resolveAction(input.payload);
+  if (action !== "unknown") {
+    return action;
+  }
+
+  if (input.providerEventType === "push") {
+    return "pushed";
+  }
+
+  return action;
+}
+
 function resolveNumericIdentifier(input: Record<string, unknown>, key: string): string | null {
   const value = input[key];
   if (typeof value === "number" && Number.isInteger(value) && value >= 0) {
@@ -198,7 +214,7 @@ export const GitHubWebhookHandler: IntegrationWebhookHandler<
   resolveWebhookRequest(input) {
     const payload = parseJsonPayload(input.rawBody);
     const providerEventType = resolveProviderEventType(input.headers);
-    const action = resolveAction(payload);
+    const action = resolveCanonicalAction({ providerEventType, payload });
     const deliveryId = resolveDeliveryId(input.headers);
     resolveInstallationId(payload);
     const ordering = resolveCommentOrdering(payload);

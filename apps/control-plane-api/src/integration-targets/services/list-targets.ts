@@ -10,6 +10,10 @@ import {
   paginateKeyset,
   parseKeysetPageSize,
 } from "@mistle/http/pagination";
+import type {
+  IntegrationWebhookEventDefinition,
+  IntegrationWebhookEventParameterDefinition,
+} from "@mistle/integrations-core";
 import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
@@ -42,6 +46,99 @@ type IntegrationTargetsCursor = z.infer<typeof CursorSchema>;
 
 const IntegrationRegistry = createIntegrationRegistry();
 
+type IntegrationTargetWebhookEvent = NonNullable<
+  IntegrationTargetListItem["supportedWebhookEvents"]
+>[number];
+
+type IntegrationTargetWebhookEventParameter = NonNullable<
+  IntegrationTargetWebhookEvent["parameters"]
+>[number];
+
+type IntegrationTargetWebhookEventConversationKeyOption = NonNullable<
+  IntegrationTargetWebhookEvent["conversationKeyOptions"]
+>[number];
+
+function cloneWebhookEventParameters(
+  parameters: readonly IntegrationWebhookEventParameterDefinition[],
+): IntegrationTargetWebhookEventParameter[] {
+  return parameters.map((parameter) => cloneWebhookEventParameter(parameter));
+}
+
+function cloneWebhookEventConversationKeyOptions(
+  options: NonNullable<IntegrationWebhookEventDefinition["conversationKeyOptions"]>,
+): IntegrationTargetWebhookEventConversationKeyOption[] {
+  return options.map((option) => ({
+    id: option.id,
+    label: option.label,
+    description: option.description,
+    template: option.template,
+  }));
+}
+
+function cloneWebhookEventParameter(
+  parameter: IntegrationWebhookEventParameterDefinition,
+): IntegrationTargetWebhookEventParameter {
+  if (parameter.kind === "resource-select") {
+    return {
+      id: parameter.id,
+      label: parameter.label,
+      kind: parameter.kind,
+      resourceKind: parameter.resourceKind,
+      payloadPath: [...parameter.payloadPath],
+      ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+      ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
+    };
+  }
+
+  if (parameter.kind === "enum-select") {
+    return {
+      id: parameter.id,
+      label: parameter.label,
+      kind: parameter.kind,
+      payloadPath: [...parameter.payloadPath],
+      matchMode: parameter.matchMode,
+      options: parameter.options.map((option) => ({
+        value: option.value,
+        label: option.label,
+      })),
+      ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+      ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
+    };
+  }
+
+  return {
+    id: parameter.id,
+    label: parameter.label,
+    kind: parameter.kind,
+    payloadPath: [...parameter.payloadPath],
+    ...(parameter.prefix === undefined ? {} : { prefix: parameter.prefix }),
+    ...(parameter.placeholder === undefined ? {} : { placeholder: parameter.placeholder }),
+  };
+}
+
+function cloneWebhookEvents(
+  events: readonly IntegrationWebhookEventDefinition[],
+): IntegrationTargetWebhookEvent[] {
+  return events.map((eventDefinition) => ({
+    eventType: eventDefinition.eventType,
+    providerEventType: eventDefinition.providerEventType,
+    displayName: eventDefinition.displayName,
+    ...(eventDefinition.category === undefined ? {} : { category: eventDefinition.category }),
+    ...(eventDefinition.conversationKeyOptions === undefined
+      ? {}
+      : {
+          conversationKeyOptions: cloneWebhookEventConversationKeyOptions(
+            eventDefinition.conversationKeyOptions,
+          ),
+        }),
+    ...(eventDefinition.parameters === undefined
+      ? {}
+      : {
+          parameters: cloneWebhookEventParameters(eventDefinition.parameters),
+        }),
+  }));
+}
+
 function resolveTargetMetadata(input: {
   familyId: string;
   variantId: string;
@@ -56,6 +153,7 @@ function resolveTargetMetadata(input: {
     label: string;
     kind: "api-key" | "oauth2" | "redirect";
   }[];
+  supportedWebhookEvents?: IntegrationTargetListItem["supportedWebhookEvents"];
 } {
   const definition = IntegrationRegistry.getDefinition({
     familyId: input.familyId,
@@ -86,6 +184,11 @@ function resolveTargetMetadata(input: {
           label: method.label,
           kind: method.kind,
         })),
+        ...(definition.supportedWebhookEvents === undefined
+          ? {}
+          : {
+              supportedWebhookEvents: cloneWebhookEvents(definition.supportedWebhookEvents),
+            }),
       };
     }
 
@@ -103,6 +206,11 @@ function resolveTargetMetadata(input: {
       label: method.label,
       kind: method.kind,
     })),
+    ...(definition.supportedWebhookEvents === undefined
+      ? {}
+      : {
+          supportedWebhookEvents: cloneWebhookEvents(definition.supportedWebhookEvents),
+        }),
   };
 }
 
@@ -214,6 +322,9 @@ export async function listIntegrationTargets(
           ...(resolvedMetadata.connectionMethods === undefined
             ? {}
             : { connectionMethods: resolvedMetadata.connectionMethods }),
+          ...(resolvedMetadata.supportedWebhookEvents === undefined
+            ? {}
+            : { supportedWebhookEvents: resolvedMetadata.supportedWebhookEvents }),
           targetHealth: projectedTargetUi.targetHealth,
           ...(target.displayNameOverride === null
             ? {}

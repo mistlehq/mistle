@@ -4,6 +4,7 @@ import { sign } from "@octokit/webhooks-methods";
 import type {
   IssueCommentCreatedEvent,
   PullRequestOpenedEvent,
+  PushEvent,
   PullRequestReviewCommentCreatedEvent,
   WebhookEventName,
 } from "@octokit/webhooks-types";
@@ -27,6 +28,7 @@ type WebhookDefinitionShape = {
 const IssueCommentEventName: WebhookEventName = "issue_comment";
 const PullRequestReviewCommentEventName: WebhookEventName = "pull_request_review_comment";
 const PullRequestEventName: WebhookEventName = "pull_request";
+const PushEventName: WebhookEventName = "push";
 
 function encodePayload(input: unknown): Uint8Array {
   return encoder.encode(JSON.stringify(input));
@@ -178,6 +180,19 @@ function resolvePullRequestOpenedPayload(): PullRequestOpenedEvent & Installatio
   return example;
 }
 
+function resolvePushPayload(): PushEvent & InstallationContext {
+  const definition = resolveWebhookDefinition(PushEventName);
+  const example = definition.examples.find(
+    (candidate): candidate is PushEvent & InstallationContext => hasInstallationContext(candidate),
+  );
+
+  if (example === undefined) {
+    throw new Error("Missing GitHub webhook example with installation for event push");
+  }
+
+  return example;
+}
+
 function withoutInstallation<TPayload extends InstallationContext>(
   payload: TPayload,
 ): Omit<TPayload, "installation"> {
@@ -193,6 +208,19 @@ const PullRequestReviewCommentCreatedPayload: PullRequestReviewCommentCreatedEve
 
 const PullRequestOpenedPayload: PullRequestOpenedEvent & InstallationContext =
   resolvePullRequestOpenedPayload();
+const IssuesOpenedPayload: Record<string, unknown> & InstallationContext = {
+  action: "opened",
+  installation: {
+    id: IssueCommentCreatedPayload.installation.id,
+  },
+  issue: {
+    number: 42,
+  },
+  repository: {
+    full_name: "mistlehq/mistle",
+  },
+};
+const PushPayload: PushEvent & InstallationContext = resolvePushPayload();
 
 describe("GitHubWebhookHandler", () => {
   it("verifies webhook signature with webhookSecret", async () => {
@@ -384,6 +412,44 @@ describe("GitHubWebhookHandler", () => {
       kind: "event",
       event: {
         eventType: "github.pull_request.opened",
+      },
+    });
+  });
+
+  it("resolves issues opened events using the canonical issues event name", async () => {
+    const resolved = await GitHubWebhookHandler.resolveWebhookRequest({
+      targetKey: "github_cloud",
+      target: createGitHubCloudTargetConfig(),
+      headers: {
+        "x-github-event": "issues",
+        "x-github-delivery": "delivery_issues_opened",
+      },
+      rawBody: encodePayload(IssuesOpenedPayload),
+    });
+
+    expect(resolved).toMatchObject({
+      kind: "event",
+      event: {
+        eventType: "github.issues.opened",
+      },
+    });
+  });
+
+  it("resolves push events using the pushed action name", async () => {
+    const resolved = await GitHubWebhookHandler.resolveWebhookRequest({
+      targetKey: "github_cloud",
+      target: createGitHubCloudTargetConfig(),
+      headers: {
+        "x-github-event": "push",
+        "x-github-delivery": "delivery_push",
+      },
+      rawBody: encodePayload(PushPayload),
+    });
+
+    expect(resolved).toMatchObject({
+      kind: "event",
+      event: {
+        eventType: "github.push.pushed",
       },
     });
   });

@@ -1966,6 +1966,54 @@ export interface paths {
                 enabled: boolean;
                 familyId: string;
                 logoKey?: string;
+                supportedWebhookEvents?: {
+                  category?: string;
+                  conversationKeyOptions?: {
+                    description: string;
+                    id: string;
+                    label: string;
+                    template: string;
+                  }[];
+                  displayName: string;
+                  eventType: string;
+                  parameters?: (
+                    | {
+                        id: string;
+                        /** @enum {string} */
+                        kind: "resource-select";
+                        label: string;
+                        payloadPath: string[];
+                        placeholder?: string;
+                        prefix?: string;
+                        resourceKind: string;
+                      }
+                    | {
+                        id: string;
+                        /** @enum {string} */
+                        kind: "string";
+                        label: string;
+                        payloadPath: string[];
+                        placeholder?: string;
+                        prefix?: string;
+                      }
+                    | {
+                        id: string;
+                        /** @enum {string} */
+                        kind: "enum-select";
+                        label: string;
+                        /** @enum {string} */
+                        matchMode: "eq" | "exists";
+                        options: {
+                          label: string;
+                          value: string;
+                        }[];
+                        payloadPath: string[];
+                        placeholder?: string;
+                        prefix?: string;
+                      }
+                  )[];
+                  providerEventType: string;
+                }[];
                 targetHealth: {
                   /** @enum {string} */
                   configStatus: "valid" | "invalid";
