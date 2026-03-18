@@ -2,7 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useCodexSessionState } from "../codex-client/use-codex-session-state.js";
-import { shouldAutoConnectSession } from "../sessions/session-connect-policy.js";
+import {
+  isConnectableSandboxStatus,
+  shouldAutoConnectSession,
+} from "../sessions/session-connect-policy.js";
 import { getSandboxInstanceStatus } from "../sessions/sessions-service.js";
 import { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import {
@@ -180,6 +183,7 @@ export function useCodexSessionPageController(input: {
       return status === "running" || status === "failed" || status === "stopped" ? false : 1_000;
     },
   });
+  const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
 
   useEffect(() => {
     setHasAttemptedAutoConnect(false);
@@ -196,7 +200,7 @@ export function useCodexSessionPageController(input: {
     if (
       !shouldAutoConnectSession({
         sandboxInstanceId: input.sandboxInstanceId,
-        sandboxStatus: sandboxStatusQuery.data?.status ?? null,
+        sandboxStatus,
         connected: connectedSession !== null,
         isStartingSession,
         hasAttemptedAutoConnect,
@@ -214,13 +218,29 @@ export function useCodexSessionPageController(input: {
     hasAttemptedAutoConnect,
     input.sandboxInstanceId,
     isStartingSession,
-    sandboxStatusQuery.data?.status,
+    sandboxStatus,
     startErrorMessage,
   ]);
 
+  useEffect(() => {
+    if (input.sandboxInstanceId === null || connectedSession === null) {
+      return;
+    }
+
+    if (!isConnectableSandboxStatus(sandboxStatus)) {
+      return;
+    }
+
+    if (sandboxStatus === "running") {
+      return;
+    }
+
+    void sandboxStatusQuery.refetch();
+  }, [connectedSession, input.sandboxInstanceId, sandboxStatus, sandboxStatusQuery.refetch]);
+
   const sessionHeaderStatusUi = useMemo(() => {
     const sandboxStatusLabel =
-      sandboxStatusQuery.data?.status ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
+      sandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
 
     return resolveSessionHeaderStatusUi({
       sandboxStatus: sandboxStatusLabel.toLowerCase(),
@@ -228,13 +248,7 @@ export function useCodexSessionPageController(input: {
       step,
       hasConnectionError: startErrorMessage !== null,
     });
-  }, [
-    agentConnectionState,
-    sandboxStatusQuery.data?.status,
-    sandboxStatusQuery.isPending,
-    startErrorMessage,
-    step,
-  ]);
+  }, [agentConnectionState, sandboxStatus, sandboxStatusQuery.isPending, startErrorMessage, step]);
 
   const hasActiveTurn = canInterruptTurn || canSteerTurn;
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;

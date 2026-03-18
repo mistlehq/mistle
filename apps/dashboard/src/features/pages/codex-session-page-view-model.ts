@@ -21,20 +21,6 @@ export function resolveSessionHeaderStatusUi(input: {
     };
   }
 
-  if (input.sandboxStatus === "stopped") {
-    return {
-      label: "Sandbox stopped",
-      variant: "outline",
-    };
-  }
-
-  if (input.sandboxStatus !== "running") {
-    return {
-      label: "Starting sandbox",
-      variant: "outline",
-    };
-  }
-
   if (input.hasConnectionError || input.agentConnectionState === "error") {
     return {
       label: "Connection failed",
@@ -47,6 +33,20 @@ export function resolveSessionHeaderStatusUi(input: {
       label: "Connected",
       variant: "secondary",
       className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+    };
+  }
+
+  if (input.sandboxStatus === "stopped" && input.step === "idle") {
+    return {
+      label: "Sandbox stopped",
+      variant: "outline",
+    };
+  }
+
+  if (input.sandboxStatus !== "running") {
+    return {
+      label: "Starting sandbox",
+      variant: "outline",
     };
   }
 

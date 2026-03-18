@@ -2672,7 +2672,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "INSTANCE_NOT_RUNNING";
+              code: "INSTANCE_NOT_RESUMABLE" | "INSTANCE_FAILED";
               message: string;
             };
           };

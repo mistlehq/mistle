@@ -49,6 +49,35 @@ describe("resolveSessionHeaderStatusUi", () => {
       variant: "outline",
     });
   });
+
+  it("shows connecting while a stopped sandbox is being resumed", () => {
+    expect(
+      resolveSessionHeaderStatusUi({
+        sandboxStatus: "stopped",
+        agentConnectionState: "idle",
+        step: "securing",
+        hasConnectionError: false,
+      }),
+    ).toEqual({
+      label: "Starting sandbox",
+      variant: "outline",
+    });
+  });
+
+  it("shows connected once the agent channel is ready even if sandbox status is stale", () => {
+    expect(
+      resolveSessionHeaderStatusUi({
+        sandboxStatus: "stopped",
+        agentConnectionState: "ready",
+        step: "connected",
+        hasConnectionError: false,
+      }),
+    ).toEqual({
+      label: "Connected",
+      variant: "secondary",
+      className: "bg-emerald-600 text-white hover:bg-emerald-600/90",
+    });
+  });
 });
 
 describe("hasSessionTopAlert", () => {
