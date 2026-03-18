@@ -8,6 +8,7 @@
     "HOST_PATH",
     "LD",
     "MACOSX_DEPLOYMENT_TARGET",
+    "NIX_*",
     "NM",
     "RANLIB",
     "SDKROOT"
