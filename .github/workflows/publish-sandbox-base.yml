@@ -1,0 +1,84 @@
+name: Publish Sandbox Base Image
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/publish-sandbox-base.yml"
+      - "apps/sandbox-runtime/**"
+      - "packages/sandbox-rs-napi/**"
+      - "packages/integrations-core/**"
+      - "packages/integrations-definitions/**"
+      - "packages/sandbox-session-client/**"
+      - "packages/sandbox-session-protocol/**"
+      - "packages/time/**"
+      - "scripts/build/build-sandbox-runtime-sea-linux.mjs"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "tsconfig.base.json"
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-sandbox-base-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    name: Publish Sandbox Base Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      IMAGE_REPOSITORY: ghcr.io/mistlehq/sandbox-base
+      IMAGE_TAG: ${{ github.sha }}
+      IMAGE_SOURCE: ${{ github.server_url }}/${{ github.repository }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 25
+
+      - name: Build Linux SEA artifacts
+        run: node ./scripts/build/build-sandbox-runtime-sea-linux.mjs
+
+      - name: Log in to GitHub Container Registry
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build sandbox base image
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --target sandbox-base-prod \
+            --file apps/sandbox-runtime/Dockerfile \
+            --label "org.opencontainers.image.source=${IMAGE_SOURCE}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}" \
+            .
+
+      - name: Push sandbox base image
+        run: docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
+
+      - name: Resolve pushed digest
+        id: publish
+        run: |
+          image_ref="$(docker inspect --format='{{index .RepoDigests 0}}' "${IMAGE_REPOSITORY}:${IMAGE_TAG}")"
+          echo "image_ref=${image_ref}" >> "${GITHUB_OUTPUT}"
+
+      - name: Summarize published image
+        run: |
+          {
+            echo "## Published image"
+            echo
+            echo "- Tag: \`${IMAGE_REPOSITORY}:${IMAGE_TAG}\`"
+            echo "- Digest: \`${{ steps.publish.outputs.image_ref }}\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
