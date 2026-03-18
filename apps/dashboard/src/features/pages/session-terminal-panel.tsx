@@ -1,6 +1,6 @@
 import { Button } from "@mistle/ui";
 import { MinusIcon, XIcon } from "@phosphor-icons/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import type { useSandboxPtyState } from "../sessions/use-sandbox-pty-state.js";
 import { INITIAL_PTY_DIMENSIONS, SessionTerminalSurface } from "./session-terminal-surface.js";
@@ -8,6 +8,7 @@ import { INITIAL_PTY_DIMENSIONS, SessionTerminalSurface } from "./session-termin
 const TERMINAL_BORDER_COLOR = "#D6D3D1";
 
 type SessionTerminalPanelProps = {
+  onHide: () => void;
   isVisible: boolean;
   onClose: () => Promise<void> | void;
   ptyState: ReturnType<typeof useSandboxPtyState>;
@@ -15,6 +16,7 @@ type SessionTerminalPanelProps = {
 };
 
 export function SessionTerminalPanel({
+  onHide,
   isVisible,
   onClose,
   ptyState,
@@ -22,6 +24,11 @@ export function SessionTerminalPanel({
 }: SessionTerminalPanelProps): React.JSX.Element | null {
   const { lifecycle, output, actions } = ptyState;
   const { openPty, resizePty, writeInput } = actions;
+  const hasAttemptedAutoOpenRef = useRef(false);
+
+  useEffect(() => {
+    hasAttemptedAutoOpenRef.current = false;
+  }, [isVisible, sandboxInstanceId]);
 
   useEffect(() => {
     if (!isVisible) {
@@ -37,6 +44,11 @@ export function SessionTerminalPanel({
       return;
     }
 
+    if (hasAttemptedAutoOpenRef.current) {
+      return;
+    }
+
+    hasAttemptedAutoOpenRef.current = true;
     void openPty({
       sandboxInstanceId,
       ...INITIAL_PTY_DIMENSIONS,
@@ -46,7 +58,7 @@ export function SessionTerminalPanel({
   }, [isVisible, lifecycle.state, openPty, sandboxInstanceId]);
 
   async function handleHideTerminal(): Promise<void> {
-    await onClose();
+    onHide();
   }
 
   async function handleCloseTerminal(): Promise<void> {

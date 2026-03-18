@@ -141,6 +141,9 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
           secondaryPanel={
             <SessionTerminalPanel
               isVisible={isTerminalVisible}
+              onHide={() => {
+                setIsTerminalVisible(false);
+              }}
               onClose={() => {
                 setIsTerminalVisible(false);
               }}

@@ -23,6 +23,9 @@ export function CodexSessionPage(): React.JSX.Element {
   const { codexPane, workbench } = useCodexSessionPageController({
     sandboxInstanceId,
   });
+  const handleHideTerminalPanel = useCallback((): void => {
+    workbench.terminalPanelState.closePanel();
+  }, [workbench.terminalPanelState]);
   const handleCloseTerminalPanel = useCallback(async (): Promise<void> => {
     workbench.terminalPanelState.closePanel();
     await workbench.ptyState.actions.disconnectPty();
@@ -176,6 +179,7 @@ export function CodexSessionPage(): React.JSX.Element {
       secondaryPanel={
         <SessionTerminalPanel
           isVisible={workbench.terminalPanelState.isVisible}
+          onHide={handleHideTerminalPanel}
           onClose={handleCloseTerminalPanel}
           ptyState={workbench.ptyState}
           sandboxInstanceId={sandboxInstanceId}
