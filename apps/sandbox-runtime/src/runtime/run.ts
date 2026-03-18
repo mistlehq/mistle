@@ -132,6 +132,7 @@ export async function startRuntime(input: RunRuntimeInput): Promise<StartedRunti
   let tunnelClient: StartedTunnelClient | undefined;
   try {
     await applyRuntimePlan({
+      instanceVolume: startupInput.instanceVolume,
       runtimePlan: startupInput.runtimePlan,
     });
     const artifactEnvironment = aggregateArtifactEnvironment(startupInput.runtimePlan.artifacts);

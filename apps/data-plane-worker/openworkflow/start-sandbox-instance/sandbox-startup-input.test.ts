@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import {
+  SandboxStartupInstanceVolumeModes,
+  SandboxStartupInstanceVolumeStates,
   createSandboxTunnelGatewayWsUrl,
   encodeSandboxStartupInput,
 } from "./sandbox-startup-input.js";
@@ -179,6 +181,16 @@ const SandboxStartupInputSchema = z.object({
   bootstrapToken: z.string().min(1),
   tunnelExchangeToken: z.string().min(1),
   tunnelGatewayWsUrl: z.string().min(1),
+  instanceVolume: z.object({
+    mode: z.enum([
+      SandboxStartupInstanceVolumeModes.NATIVE,
+      SandboxStartupInstanceVolumeModes.STAGED,
+    ]),
+    state: z.enum([
+      SandboxStartupInstanceVolumeStates.NEW,
+      SandboxStartupInstanceVolumeStates.EXISTING,
+    ]),
+  }),
   runtimePlan: RuntimePlanSchema,
 });
 
@@ -239,11 +251,15 @@ describe("encodeSandboxStartupInput", () => {
     expect(url).toBe("ws://127.0.0.1:5003/tunnel/sandbox/sbi_example_001");
   });
 
-  it("encodes bootstrap token, tunnel exchange token, tunnel gateway ws url, and runtime plan as newline-delimited json", () => {
+  it("encodes bootstrap token, tunnel exchange token, tunnel gateway ws url, instance volume, and runtime plan as newline-delimited json", () => {
     const encoded = encodeSandboxStartupInput({
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      instanceVolume: {
+        mode: SandboxStartupInstanceVolumeModes.NATIVE,
+        state: SandboxStartupInstanceVolumeStates.NEW,
+      },
       runtimePlan: createRuntimePlan(),
     });
 
@@ -255,6 +271,10 @@ describe("encodeSandboxStartupInput", () => {
       bootstrapToken: "bootstrap-token-value",
       tunnelExchangeToken: "tunnel-exchange-token-value",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      instanceVolume: {
+        mode: SandboxStartupInstanceVolumeModes.NATIVE,
+        state: SandboxStartupInstanceVolumeStates.NEW,
+      },
       runtimePlan: createRuntimePlan(),
     });
   });

@@ -9,7 +9,16 @@ import { errorMessage } from "./error-message.js";
 import { applyRuntimeFile } from "./runtime-file.js";
 import { applyWorkspaceSource } from "./workspace-source.js";
 
+export type ApplyRuntimePlanInstanceVolumeMode = "native" | "staged";
+export type ApplyRuntimePlanInstanceVolumeState = "new" | "existing";
+
+export type ApplyRuntimePlanInstanceVolume = {
+  mode: ApplyRuntimePlanInstanceVolumeMode;
+  state: ApplyRuntimePlanInstanceVolumeState;
+};
+
 type ApplyRuntimePlanInput = {
+  instanceVolume: ApplyRuntimePlanInstanceVolume;
   runtimePlan: CompiledRuntimePlan;
 };
 
@@ -27,6 +36,10 @@ function resolveArtifactLifecycleCommandSet(
 }
 
 export async function applyRuntimePlan(input: ApplyRuntimePlanInput): Promise<void> {
+  if (input.instanceVolume.mode === "staged") {
+    throw new Error("instance volume mode 'staged' is not yet supported");
+  }
+
   const commandSet = resolveArtifactLifecycleCommandSet(input.runtimePlan.image.source);
 
   for (const [artifactIndex, artifact] of input.runtimePlan.artifacts.entries()) {
@@ -46,7 +59,10 @@ export async function applyRuntimePlan(input: ApplyRuntimePlanInput): Promise<vo
 
   for (const [sourceIndex, workspaceSource] of input.runtimePlan.workspaceSources.entries()) {
     try {
-      await applyWorkspaceSource(workspaceSource);
+      await applyWorkspaceSource({
+        workspaceSource,
+        instanceVolume: input.instanceVolume,
+      });
     } catch (error) {
       throw new Error(
         `runtime plan workspaceSources[${sourceIndex}] failed (sourceKind=${workspaceSource.sourceKind} path=${workspaceSource.path}): ${errorMessage(error)}`,

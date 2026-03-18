@@ -2,7 +2,11 @@ import { PassThrough, Readable } from "node:stream";
 
 import { describe, expect, it } from "vitest";
 
-import { readStartupInput } from "./read-startup-input.js";
+import {
+  readStartupInput,
+  StartupInputInstanceVolumeModes,
+  StartupInputInstanceVolumeStates,
+} from "./read-startup-input.js";
 
 const ValidRuntimePlanJson = `{
   "sandboxProfileId": "sbp_123",
@@ -22,6 +26,10 @@ const ValidStartupInputJson = `{
   "bootstrapToken": "test-token",
   "tunnelExchangeToken": "test-exchange-token",
   "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+  "instanceVolume": {
+    "mode": "native",
+    "state": "new"
+  },
   "runtimePlan": ${ValidRuntimePlanJson}
 }`;
 
@@ -39,6 +47,10 @@ describe("readStartupInput", () => {
     expect(startupInput.bootstrapToken).toBe("test-token");
     expect(startupInput.tunnelExchangeToken).toBe("test-exchange-token");
     expect(startupInput.tunnelGatewayWsUrl).toBe("ws://127.0.0.1:5003/tunnel/sandbox");
+    expect(startupInput.instanceVolume).toEqual({
+      mode: StartupInputInstanceVolumeModes.NATIVE,
+      state: StartupInputInstanceVolumeStates.NEW,
+    });
     expect(startupInput.runtimePlan.sandboxProfileId).toBe("sbp_123");
     expect(startupInput.runtimePlan.image.source).toBe("base");
     expect(startupInput.runtimePlan.agentRuntimes).toEqual([]);
@@ -57,6 +69,10 @@ describe("readStartupInput", () => {
       bootstrapToken: "test-token",
       tunnelExchangeToken: "test-exchange-token",
       tunnelGatewayWsUrl: "ws://127.0.0.1:5003/tunnel/sandbox",
+      instanceVolume: {
+        mode: StartupInputInstanceVolumeModes.NATIVE,
+        state: StartupInputInstanceVolumeStates.NEW,
+      },
     });
 
     expect(reader.destroyed).toBe(false);
@@ -70,6 +86,10 @@ describe("readStartupInput", () => {
           "bootstrapToken": "  test-token  ",
           "tunnelExchangeToken": "  test-exchange-token  ",
           "tunnelGatewayWsUrl": "  ws://127.0.0.1:5003/tunnel/sandbox  ",
+          "instanceVolume": {
+            "mode": "  native  ",
+            "state": "  new  "
+          },
           "runtimePlan": ${ValidRuntimePlanJson}
         }
       `),
@@ -79,6 +99,10 @@ describe("readStartupInput", () => {
     expect(startupInput.bootstrapToken).toBe("test-token");
     expect(startupInput.tunnelExchangeToken).toBe("test-exchange-token");
     expect(startupInput.tunnelGatewayWsUrl).toBe("ws://127.0.0.1:5003/tunnel/sandbox");
+    expect(startupInput.instanceVolume).toEqual({
+      mode: StartupInputInstanceVolumeModes.NATIVE,
+      state: StartupInputInstanceVolumeStates.NEW,
+    });
   });
 
   it("fails when the reader is missing", async () => {
@@ -132,6 +156,10 @@ describe("readStartupInput", () => {
         reader: createReader(`{
           "tunnelExchangeToken": "test-exchange-token",
           "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+          "instanceVolume": {
+            "mode": "native",
+            "state": "new"
+          },
           "runtimePlan": ${ValidRuntimePlanJson}
         }`),
         maxBytes: 4096,
@@ -145,6 +173,10 @@ describe("readStartupInput", () => {
         reader: createReader(`{
           "bootstrapToken": "test-token",
           "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+          "instanceVolume": {
+            "mode": "native",
+            "state": "new"
+          },
           "runtimePlan": ${ValidRuntimePlanJson}
         }`),
         maxBytes: 4096,
@@ -158,11 +190,63 @@ describe("readStartupInput", () => {
         reader: createReader(`{
           "bootstrapToken": "test-token",
           "tunnelExchangeToken": "test-exchange-token",
+          "instanceVolume": {
+            "mode": "native",
+            "state": "new"
+          },
           "runtimePlan": ${ValidRuntimePlanJson}
         }`),
         maxBytes: 4096,
       }),
     ).rejects.toThrow("startup input tunnelGatewayWsUrl is required");
+  });
+
+  it("fails when instance volume is missing", async () => {
+    await expect(
+      readStartupInput({
+        reader: createReader(`{
+          "bootstrapToken": "test-token",
+          "tunnelExchangeToken": "test-exchange-token",
+          "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+          "runtimePlan": ${ValidRuntimePlanJson}
+        }`),
+        maxBytes: 4096,
+      }),
+    ).rejects.toThrow("startup input instanceVolume is required");
+  });
+
+  it("fails when instance volume mode is missing", async () => {
+    await expect(
+      readStartupInput({
+        reader: createReader(`{
+          "bootstrapToken": "test-token",
+          "tunnelExchangeToken": "test-exchange-token",
+          "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+          "instanceVolume": {
+            "state": "new"
+          },
+          "runtimePlan": ${ValidRuntimePlanJson}
+        }`),
+        maxBytes: 4096,
+      }),
+    ).rejects.toThrow("startup input instanceVolume.mode is required");
+  });
+
+  it("fails when instance volume state is missing", async () => {
+    await expect(
+      readStartupInput({
+        reader: createReader(`{
+          "bootstrapToken": "test-token",
+          "tunnelExchangeToken": "test-exchange-token",
+          "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+          "instanceVolume": {
+            "mode": "native"
+          },
+          "runtimePlan": ${ValidRuntimePlanJson}
+        }`),
+        maxBytes: 4096,
+      }),
+    ).rejects.toThrow("startup input instanceVolume.state is required");
   });
 
   it("fails when runtime plan is missing", async () => {
@@ -171,11 +255,34 @@ describe("readStartupInput", () => {
         reader: createReader(`{
           "bootstrapToken": "test-token",
           "tunnelExchangeToken": "test-exchange-token",
-          "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox"
+          "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+          "instanceVolume": {
+            "mode": "native",
+            "state": "new"
+          }
         }`),
         maxBytes: 4096,
       }),
     ).rejects.toThrow("startup input runtime plan is required");
+  });
+
+  it("fails when instance volume has an unknown field", async () => {
+    await expect(
+      readStartupInput({
+        reader: createReader(`{
+          "bootstrapToken": "test-token",
+          "tunnelExchangeToken": "test-exchange-token",
+          "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+          "instanceVolume": {
+            "mode": "native",
+            "state": "new",
+            "unexpected": true
+          },
+          "runtimePlan": ${ValidRuntimePlanJson}
+        }`),
+        maxBytes: 4096,
+      }),
+    ).rejects.toThrow("startup input instanceVolume is invalid: unexpected field unexpected");
   });
 
   it("fails when startup input has an unknown field", async () => {
@@ -185,6 +292,10 @@ describe("readStartupInput", () => {
           "bootstrapToken": "test-token",
           "tunnelExchangeToken": "test-exchange-token",
           "tunnelGatewayWsUrl": "ws://127.0.0.1:5003/tunnel/sandbox",
+          "instanceVolume": {
+            "mode": "native",
+            "state": "new"
+          },
           "runtimePlan": ${ValidRuntimePlanJson},
           "unexpected": true
         }`),

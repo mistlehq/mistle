@@ -6,7 +6,10 @@ import { dirname, join } from "node:path";
 import { RuntimeFileWriteMode, type CompiledRuntimePlan } from "@mistle/integrations-core";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { applyRuntimePlan } from "../src/runtime-plan/index.js";
+import {
+  applyRuntimePlan,
+  type ApplyRuntimePlanInstanceVolume,
+} from "../src/runtime-plan/index.js";
 
 type SeededGitRepository = {
   bareRepositoryPath: string;
@@ -14,6 +17,18 @@ type SeededGitRepository = {
 };
 
 const TemporaryDirectories: string[] = [];
+const NativeNewInstanceVolume = {
+  mode: "native",
+  state: "new",
+} satisfies ApplyRuntimePlanInstanceVolume;
+const NativeExistingInstanceVolume = {
+  mode: "native",
+  state: "existing",
+} satisfies ApplyRuntimePlanInstanceVolume;
+const StagedNewInstanceVolume = {
+  mode: "staged",
+  state: "new",
+} satisfies ApplyRuntimePlanInstanceVolume;
 
 function runGit(cwd: string, args: ReadonlyArray<string>): string {
   const result = spawnSync("git", [...args], {
@@ -118,6 +133,7 @@ describe("applyRuntimePlan", () => {
     const secondFilePath = join(tempDirectory, "github", "config.json");
 
     await applyRuntimePlan({
+      instanceVolume: NativeNewInstanceVolume,
       runtimePlan: createRuntimePlan({
         runtimeClients: [
           {
@@ -178,6 +194,7 @@ describe("applyRuntimePlan", () => {
     await writeFile(configPath, 'model = "user-choice"', "utf8");
 
     await applyRuntimePlan({
+      instanceVolume: NativeNewInstanceVolume,
       runtimePlan: createRuntimePlan({
         runtimeClients: [
           {
@@ -214,6 +231,7 @@ describe("applyRuntimePlan", () => {
     await writeFile(configPath, 'model = "old-value"', "utf8");
 
     await applyRuntimePlan({
+      instanceVolume: NativeNewInstanceVolume,
       runtimePlan: createRuntimePlan({
         runtimeClients: [
           {
@@ -246,6 +264,7 @@ describe("applyRuntimePlan", () => {
 
     await expect(
       applyRuntimePlan({
+        instanceVolume: NativeNewInstanceVolume,
         runtimePlan: createRuntimePlan({
           runtimeClients: [
             {
@@ -280,6 +299,7 @@ describe("applyRuntimePlan", () => {
 
     await expect(
       applyRuntimePlan({
+        instanceVolume: NativeNewInstanceVolume,
         runtimePlan: createRuntimePlan({
           runtimeClients: [
             {
@@ -310,6 +330,7 @@ describe("applyRuntimePlan", () => {
     const sharedPath = join(tempDirectory, "shared.txt");
 
     await applyRuntimePlan({
+      instanceVolume: NativeNewInstanceVolume,
       runtimePlan: createRuntimePlan({
         artifacts: [
           {
@@ -368,6 +389,7 @@ describe("applyRuntimePlan", () => {
     const clonePath = join(runtimeDirectory, "workspace", "repos", "mistlehq", "mistle");
 
     await applyRuntimePlan({
+      instanceVolume: NativeNewInstanceVolume,
       runtimePlan: createRuntimePlan({
         artifacts: [
           {
@@ -412,6 +434,7 @@ describe("applyRuntimePlan", () => {
     const installMarkerPath = join(tempDirectory, "install-marker.txt");
 
     await applyRuntimePlan({
+      instanceVolume: NativeNewInstanceVolume,
       runtimePlan: createRuntimePlan({
         image: {
           source: "profile-base",
@@ -451,6 +474,7 @@ describe("applyRuntimePlan", () => {
   it("returns explicit error when an artifact command fails", async () => {
     await expect(
       applyRuntimePlan({
+        instanceVolume: NativeNewInstanceVolume,
         runtimePlan: createRuntimePlan({
           artifacts: [
             {
@@ -474,6 +498,7 @@ describe("applyRuntimePlan", () => {
   it("includes stdout in artifact command failure output", async () => {
     await expect(
       applyRuntimePlan({
+        instanceVolume: NativeNewInstanceVolume,
         runtimePlan: createRuntimePlan({
           artifacts: [
             {
@@ -497,6 +522,7 @@ describe("applyRuntimePlan", () => {
   it("combines stdout and stderr in artifact command failure output", async () => {
     await expect(
       applyRuntimePlan({
+        instanceVolume: NativeNewInstanceVolume,
         runtimePlan: createRuntimePlan({
           artifacts: [
             {
@@ -527,6 +553,7 @@ describe("applyRuntimePlan", () => {
     });
 
     await applyRuntimePlan({
+      instanceVolume: NativeNewInstanceVolume,
       runtimePlan: createRuntimePlan({
         artifacts: [
           {
@@ -555,6 +582,7 @@ describe("applyRuntimePlan", () => {
   it("returns explicit error when an artifact command times out", async () => {
     await expect(
       applyRuntimePlan({
+        instanceVolume: NativeNewInstanceVolume,
         runtimePlan: createRuntimePlan({
           artifacts: [
             {
@@ -582,6 +610,7 @@ describe("applyRuntimePlan", () => {
     const clonePath = join(runtimeDirectory, "workspace", "repos", "mistlehq", "mistle");
 
     await applyRuntimePlan({
+      instanceVolume: NativeNewInstanceVolume,
       runtimePlan: createRuntimePlan({
         workspaceSources: [
           {
@@ -614,6 +643,7 @@ describe("applyRuntimePlan", () => {
     const readmePath = join(clonePath, "README.md");
 
     await applyRuntimePlan({
+      instanceVolume: NativeNewInstanceVolume,
       runtimePlan: createRuntimePlan({
         workspaceSources: [
           {
@@ -664,6 +694,7 @@ describe("applyRuntimePlan", () => {
 
     await expect(
       applyRuntimePlan({
+        instanceVolume: NativeNewInstanceVolume,
         runtimePlan: createRuntimePlan({
           workspaceSources: [
             {
@@ -678,6 +709,46 @@ describe("applyRuntimePlan", () => {
     ).rejects.toThrow(`workspace source path '${clonePath}' already exists`);
   });
 
+  it("skips workspace source seeding when native instance volume state is existing", async () => {
+    const runtimeDirectory = await createTemporaryDirectory(
+      "mistle-runtime-plan-existing-native-volume-",
+    );
+    const clonePath = join(runtimeDirectory, "workspace", "repos", "mistlehq", "mistle");
+
+    await mkdir(clonePath, {
+      recursive: true,
+      mode: 0o755,
+    });
+    await writeFile(join(clonePath, "README.md"), "already-present\n", "utf8");
+
+    await expect(
+      applyRuntimePlan({
+        instanceVolume: NativeExistingInstanceVolume,
+        runtimePlan: createRuntimePlan({
+          workspaceSources: [
+            {
+              sourceKind: "git-clone",
+              resourceKind: "repository",
+              path: clonePath,
+              originUrl: join(runtimeDirectory, "repos", "missing.git"),
+            },
+          ],
+        }),
+      }),
+    ).resolves.toBeUndefined();
+
+    await expect(readFile(join(clonePath, "README.md"), "utf8")).resolves.toBe("already-present\n");
+  });
+
+  it("fails when staged instance volume mode is used before staged startup is implemented", async () => {
+    await expect(
+      applyRuntimePlan({
+        instanceVolume: StagedNewInstanceVolume,
+        runtimePlan: createRuntimePlan({}),
+      }),
+    ).rejects.toThrow("instance volume mode 'staged' is not yet supported");
+  });
+
   it("fails when a workspace source parent directory cannot be created", async () => {
     const repository = await seedBareGitRepository();
     const runtimeDirectory = await createTemporaryDirectory(
@@ -688,6 +759,7 @@ describe("applyRuntimePlan", () => {
 
     await expect(
       applyRuntimePlan({
+        instanceVolume: NativeNewInstanceVolume,
         runtimePlan: createRuntimePlan({
           workspaceSources: [
             {
@@ -709,6 +781,7 @@ describe("applyRuntimePlan", () => {
 
     await expect(
       applyRuntimePlan({
+        instanceVolume: NativeNewInstanceVolume,
         runtimePlan: createRuntimePlan({
           workspaceSources: [
             {

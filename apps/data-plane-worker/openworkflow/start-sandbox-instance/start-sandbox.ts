@@ -1,3 +1,4 @@
+import type { SandboxInstanceVolumeMode } from "@mistle/db/data-plane";
 import type { SandboxAdapter, SandboxProvider, SandboxVolumeHandleV1 } from "@mistle/sandbox";
 import type {
   StartSandboxInstanceWorkflowImageInput,
@@ -22,6 +23,7 @@ export async function startSandbox(
     sandboxInstanceId: string;
     image: StartSandboxInstanceWorkflowImageInput;
     instanceVolume: SandboxVolumeHandleV1;
+    instanceVolumeMode: SandboxInstanceVolumeMode;
     runtimePlan: StartSandboxInstanceWorkflowInput["runtimePlan"];
   },
 ): Promise<{
@@ -66,6 +68,7 @@ export async function startSandbox(
     sandboxAdapter: ctx.sandboxAdapter,
     sandboxInstanceId: input.sandboxInstanceId,
     runtimePlan: input.runtimePlan,
+    instanceVolumeMode: input.instanceVolumeMode,
     sandbox: startedSandbox,
   });
 
