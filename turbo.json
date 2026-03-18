@@ -1,6 +1,17 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "globalPassThroughEnv": [
+    "AR",
+    "CC",
+    "CXX",
+    "DEVELOPER_DIR",
+    "HOST_PATH",
+    "LD",
+    "MACOSX_DEPLOYMENT_TARGET",
+    "NIX_*",
+    "NM",
+    "RANLIB",
+    "SDKROOT",
     "MISTLE_CONFIG_PATH",
     "MISTLE_GLOBAL_TELEMETRY_ENABLED",
     "MISTLE_GLOBAL_TELEMETRY_DEBUG",
@@ -19,6 +30,19 @@
     },
     "build": {
       "dependsOn": ["^build"],
+      "env": [
+        "AR",
+        "CC",
+        "CXX",
+        "DEVELOPER_DIR",
+        "HOST_PATH",
+        "LD",
+        "MACOSX_DEPLOYMENT_TARGET",
+        "NIX_*",
+        "NM",
+        "RANLIB",
+        "SDKROOT"
+      ],
       "outputs": ["dist/**"]
     },
     "lint": {
