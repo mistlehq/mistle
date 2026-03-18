@@ -97,7 +97,7 @@ describe("webhook helpers", () => {
         familyId: "openai",
         variantId: "openai-default",
       }),
-    ).toThrowError(IntegrationWebhookError);
+    ).toThrow(IntegrationWebhookError);
 
     try {
       getWebhookHandlerOrThrow({

@@ -68,6 +68,10 @@ export interface paths {
                     | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT"
                     | "GITHUB_APP_INSTALLATION_NOT_SUPPORTED"
                     | "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED"
+                    | "INVALID_OAUTH2_START_INPUT"
+                    | "INVALID_OAUTH2_COMPLETE_INPUT"
+                    | "OAUTH2_NOT_SUPPORTED"
+                    | "OAUTH2_CAPABILITY_NOT_CONFIGURED"
                     | "REDIRECT_STATE_INVALID"
                     | "REDIRECT_STATE_EXPIRED"
                     | "REDIRECT_STATE_ALREADY_USED";

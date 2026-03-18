@@ -758,7 +758,7 @@ describe("loadConfig integrations", () => {
           MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME: undefined,
         }),
       }),
-    ).toThrowError(
+    ).toThrow(
       /apps\.data_plane_worker\.sandbox\.docker is required when global\.sandbox\.provider is 'docker'/,
     );
   });

@@ -66,7 +66,7 @@ describe("GitHubAppInstallationRedirectHandler", () => {
         },
         state: "state_123",
       }),
-    ).rejects.toThrowError("GitHub App installation flow requires `app_slug` in target config.");
+    ).rejects.toThrow("GitHub App installation flow requires `app_slug` in target config.");
   });
 
   it("maps callback installation id into GitHub App installation connection config", async () => {
@@ -119,6 +119,6 @@ describe("GitHubAppInstallationRedirectHandler", () => {
         },
         query: new URLSearchParams(),
       }),
-    ).rejects.toThrowError("GitHub App installation callback is missing `installation_id`.");
+    ).rejects.toThrow("GitHub App installation callback is missing `installation_id`.");
   });
 });

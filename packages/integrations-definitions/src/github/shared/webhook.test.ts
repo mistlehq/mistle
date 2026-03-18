@@ -398,7 +398,7 @@ describe("GitHubWebhookHandler", () => {
         },
         rawBody: encodePayload(IssueCommentCreatedPayload),
       }),
-    ).toThrowError("GitHub webhook is missing x-github-delivery header.");
+    ).toThrow("GitHub webhook is missing x-github-delivery header.");
   });
 
   it("fails when installation id is missing from payload", () => {
@@ -414,6 +414,6 @@ describe("GitHubWebhookHandler", () => {
         },
         rawBody: encodePayload(payloadWithoutInstallation),
       }),
-    ).toThrowError("GitHub webhook payload is missing installation context.");
+    ).toThrow("GitHub webhook payload is missing installation context.");
   });
 });

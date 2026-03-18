@@ -18,6 +18,6 @@ describe("GitHubEnterpriseServerBindingConfigSchema", () => {
       GitHubEnterpriseServerBindingConfigSchema.parse({
         repositories: ["acme"],
       }),
-    ).toThrowError();
+    ).toThrow();
   });
 });

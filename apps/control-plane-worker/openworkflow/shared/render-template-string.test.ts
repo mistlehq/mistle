@@ -54,7 +54,7 @@ describe("renderTemplateString", () => {
         template: "{{comment.body}}",
         context: {},
       }),
-    ).toThrowError("undefined variable: comment");
+    ).toThrow("undefined variable: comment");
   });
 
   it("throws when a placeholder expression is empty", () => {
@@ -65,6 +65,6 @@ describe("renderTemplateString", () => {
           value: "x",
         },
       }),
-    ).toThrowError('invalid value expression: ""');
+    ).toThrow('invalid value expression: ""');
   });
 });

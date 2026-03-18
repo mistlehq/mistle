@@ -65,7 +65,7 @@ describe("parseBooleanEnv", () => {
   });
 
   it("throws for non-boolean strings", () => {
-    expect(() => parseBooleanEnv("1", "TEST_FLAG")).toThrowError(
+    expect(() => parseBooleanEnv("1", "TEST_FLAG")).toThrow(
       "Invalid TEST_FLAG. Expected 'true' or 'false'.",
     );
   });

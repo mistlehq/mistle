@@ -78,7 +78,7 @@ describe("mailpit service integration", () => {
         description: "subject: never-arrives",
         matcher: ({ message }) => message.Subject === "never-arrives",
       }),
-    ).rejects.toThrowError(
+    ).rejects.toThrow(
       "Timed out waiting for Mailpit message (subject: never-arrives) within 150ms.",
     );
   });
@@ -91,15 +91,13 @@ describe("mailpit service integration", () => {
         timeoutMs: 150,
         matcher: ({ message }) => message.Subject === "never-arrives",
       }),
-    ).rejects.toThrowError("Timed out waiting for a matching Mailpit message within 150ms.");
+    ).rejects.toThrow("Timed out waiting for a matching Mailpit message within 150ms.");
   });
 
   test("throws when stopping the same service twice", async () => {
     const mailpitService = await startMailpit();
     await mailpitService.stop();
 
-    await expect(mailpitService.stop()).rejects.toThrowError(
-      "Mailpit container was already stopped.",
-    );
+    await expect(mailpitService.stop()).rejects.toThrow("Mailpit container was already stopped.");
   });
 });

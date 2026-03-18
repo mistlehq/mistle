@@ -24,6 +24,6 @@ describe("resolveDockerAdapterIntegrationSettings", () => {
         },
         enabled: true,
       }),
-    ).toThrowError(ZodError);
+    ).toThrow(ZodError);
   });
 });

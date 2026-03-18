@@ -1409,7 +1409,7 @@ describe("handleAutomationRun integration", () => {
             db: database.db,
             automationRunId,
           }),
-        ).rejects.toThrowError("undefined variable: payload.comment.missing_field");
+        ).rejects.toThrow("undefined variable: payload.comment.missing_field");
 
         const persistedRun = await database.db.query.automationRuns.findFirst({
           where: (table, { eq }) => eq(table.id, automationRunId),

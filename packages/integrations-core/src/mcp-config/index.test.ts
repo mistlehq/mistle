@@ -128,6 +128,6 @@ trust_level = "trusted"
         },
         mcpServers: [createLinearMcpServer()],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
   });
 });

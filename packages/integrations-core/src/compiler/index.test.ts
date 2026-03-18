@@ -772,7 +772,7 @@ describe("compileRuntimePlan", () => {
           },
         ],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       compileRuntimePlan({
@@ -908,7 +908,7 @@ describe("compileRuntimePlan", () => {
           },
         ],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       compileRuntimePlan({
@@ -990,7 +990,7 @@ describe("compileRuntimePlan", () => {
           },
         ],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       compileRuntimePlan({
@@ -1076,7 +1076,7 @@ describe("compileRuntimePlan", () => {
           },
         ],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       compileRuntimePlan({
@@ -1191,7 +1191,7 @@ describe("compileRuntimePlan", () => {
           },
         ],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       compileRuntimePlan({
@@ -1281,7 +1281,7 @@ describe("compileRuntimePlan", () => {
           },
         ],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       compileRuntimePlan({

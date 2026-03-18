@@ -190,7 +190,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       validateCompiledBindingResults({
@@ -242,7 +242,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       validateCompiledBindingResults({
@@ -271,7 +271,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       validateCompiledBindingResults({
@@ -321,7 +321,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       validateCompiledBindingResults({
@@ -381,7 +381,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       validateCompiledBindingResults({
@@ -489,7 +489,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when runtime client process readiness is invalid", () => {
@@ -524,7 +524,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
   });
 
   it("accepts runtime client process ws readiness", () => {
@@ -592,7 +592,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when runtime client endpoint references missing process", () => {
@@ -620,7 +620,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when runtime client endpoint ws url uses unsupported url scheme", () => {
@@ -647,7 +647,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
   });
 
   it("fails on artifact key conflicts with different lifecycle specs", () => {
@@ -677,7 +677,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
   });
 
   it("fails on artifact key conflicts with different env specs", () => {
@@ -711,7 +711,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [resultA, resultB],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when an artifact has no install commands", () => {
@@ -729,7 +729,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when an artifact has no remove commands", () => {
@@ -747,7 +747,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when an artifact command has empty args", () => {
@@ -765,7 +765,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
   });
 
   it("fails when an artifact defines a reserved proxy env key", () => {
@@ -785,7 +785,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
   });
 
   it("accepts agent runtimes that reference an existing client endpoint", () => {
@@ -850,7 +850,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       validateCompiledBindingResults({
@@ -901,7 +901,7 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
 
     try {
       validateCompiledBindingResults({
@@ -952,6 +952,6 @@ describe("validateCompiledBindingResults", () => {
       validateCompiledBindingResults({
         compiledBindingResults: [result],
       }),
-    ).toThrowError(IntegrationCompilerError);
+    ).toThrow(IntegrationCompilerError);
   });
 });
