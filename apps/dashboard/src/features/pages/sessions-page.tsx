@@ -25,6 +25,7 @@ import {
   listSandboxProfiles,
   listSandboxProfileVersions,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
+import { isConnectableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { useSandboxSessionLaunchState } from "../sessions/use-sandbox-session-launch-state.js";
 import { formatDateTime } from "../shared/date-formatters.js";
 
@@ -333,7 +334,7 @@ export function SessionsPage(): React.JSX.Element {
                 </div>
                 <div className="flex shrink-0 flex-col gap-2">
                   <Button
-                    disabled={session.status !== "running"}
+                    disabled={!isConnectableSandboxStatus(session.status)}
                     onClick={() => {
                       navigate(`/sessions/${encodeURIComponent(session.sandboxInstanceId)}`);
                     }}

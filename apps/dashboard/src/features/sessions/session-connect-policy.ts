@@ -1,3 +1,9 @@
+export function isConnectableSandboxStatus(
+  sandboxStatus: string | null,
+): sandboxStatus is "starting" | "running" | "stopped" {
+  return sandboxStatus === "starting" || sandboxStatus === "running" || sandboxStatus === "stopped";
+}
+
 export function shouldAutoConnectSession(input: {
   sandboxInstanceId: string | null;
   sandboxStatus: string | null;
@@ -8,7 +14,7 @@ export function shouldAutoConnectSession(input: {
 }): boolean {
   return !(
     input.sandboxInstanceId === null ||
-    input.sandboxStatus !== "running" ||
+    !isConnectableSandboxStatus(input.sandboxStatus) ||
     input.connected ||
     input.isStartingSession ||
     input.hasAttemptedAutoConnect ||
