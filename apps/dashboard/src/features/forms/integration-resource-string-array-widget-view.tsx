@@ -66,6 +66,7 @@ function IntegrationResourceMessageSection(input: {
 function SelectAllRow(input: {
   allVisibleSelected: boolean;
   someVisibleSelected: boolean;
+  selectedCountLabel: string | null;
   onToggleAll: () => void;
 }): React.JSX.Element {
   const indeterminateRef = useCallback(
@@ -78,7 +79,7 @@ function SelectAllRow(input: {
   );
 
   return (
-    <label className="hover:bg-muted/40 border-b gap-3 flex cursor-pointer items-center p-3">
+    <label className="hover:bg-muted/40 border-b gap-3 flex items-center p-3 select-none">
       <input
         checked={input.allVisibleSelected}
         onChange={input.onToggleAll}
@@ -88,6 +89,9 @@ function SelectAllRow(input: {
       <div className="min-w-0 flex-1">
         <div className="truncate font-medium text-sm">Select all</div>
       </div>
+      {input.selectedCountLabel === null ? null : (
+        <span className="text-muted-foreground shrink-0 text-xs">{input.selectedCountLabel}</span>
+      )}
     </label>
   );
 }
@@ -178,14 +182,10 @@ export function IntegrationResourceStringArrayWidgetView(
 
       {viewModel.hasVisibleItems ? (
         <div className="overflow-hidden rounded-md border">
-          {viewModel.selectedCountLabel === null ? null : (
-            <div className="text-muted-foreground border-b px-3 py-2 text-xs">
-              {viewModel.selectedCountLabel}
-            </div>
-          )}
           <SelectAllRow
             allVisibleSelected={allVisibleSelected}
             someVisibleSelected={someVisibleSelected}
+            selectedCountLabel={viewModel.selectedCountLabel}
             onToggleAll={props.onToggleAll}
           />
           <ScrollArea className="h-56">
@@ -193,10 +193,7 @@ export function IntegrationResourceStringArrayWidgetView(
               const isSelected = props.selectedHandles.includes(resource.handle);
 
               return (
-                <label
-                  className="hover:bg-muted/40 gap-3 flex cursor-pointer items-center p-3"
-                  key={resource.id}
-                >
+                <label className="hover:bg-muted/40 gap-3 flex items-center p-3" key={resource.id}>
                   <input
                     checked={isSelected}
                     onChange={() => {
