@@ -44,6 +44,11 @@ export function createControlPlaneAuth(options: CreateControlPlaneAuthOptions) {
   });
 
   return betterAuth({
+    advanced: {
+      database: {
+        generateId: false,
+      },
+    },
     baseURL: config.authBaseUrl,
     basePath: AUTH_ROUTE_BASE_PATH,
     secret: config.authSecret,
