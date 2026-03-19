@@ -36,7 +36,8 @@ import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js
 import { listSandboxInstances } from "../sessions/sessions-service.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { useSandboxSessionLaunchState } from "../sessions/use-sandbox-session-launch-state.js";
-import { formatDateTime } from "../shared/date-formatters.js";
+import { formatRelativeOrDate } from "../shared/date-formatters.js";
+import { TablePagination } from "../shared/table-pagination.js";
 
 const SANDBOX_PROFILE_LIST_LIMIT = 100;
 const SANDBOX_INSTANCE_LIST_LIMIT = 20;
@@ -370,14 +371,10 @@ export function SessionsPage(): React.JSX.Element {
 
   const isLoadingSessions = sandboxInstancesQuery.isPending && optimisticSessions.length === 0;
 
-  const nextPageDisabled =
-    sandboxInstancesQuery.isPending || sandboxInstancesQuery.data?.nextPage === null;
-  const previousPageDisabled =
-    sandboxInstancesQuery.isPending || sandboxInstancesQuery.data?.previousPage === null;
-
-  const hasPagination =
-    sandboxInstancesQuery.data?.nextPage !== null ||
-    sandboxInstancesQuery.data?.previousPage !== null;
+  const hasNextPage = sandboxInstancesQuery.data?.nextPage != null;
+  const hasPreviousPage = sandboxInstancesQuery.data?.previousPage != null;
+  const nextPageDisabled = sandboxInstancesQuery.isPending;
+  const previousPageDisabled = sandboxInstancesQuery.isPending;
 
   const optimisticSessionIds = new Set(optimisticSessions.map((session) => session.id));
 
@@ -497,103 +494,105 @@ export function SessionsPage(): React.JSX.Element {
         )}
 
         <div className="flex flex-col gap-3">
-          <div className="overflow-x-auto rounded-md border">
-            <Table className="min-w-[72rem] table-fixed">
-              <TableHeader>
+          <Table className="table-fixed">
+            <colgroup>
+              <col className="w-[26%]" />
+              <col className="w-[26%]" />
+              <col className="w-[22%]" />
+              <col className="w-[10%]" />
+              <col className="w-[16%]" />
+            </colgroup>
+            <TableHeader className="bg-muted/60">
+              <TableRow className="h-9 border-b">
+                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                  Profile
+                </TableHead>
+                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                  Started by
+                </TableHead>
+                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                  Created
+                </TableHead>
+                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                  Status
+                </TableHead>
+                <TableHead className="text-right text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                  <span className="sr-only">Actions</span>
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!isLoadingSessions && !hasSessions ? (
                 <TableRow>
-                  <TableHead className="w-[31%]">Instance</TableHead>
-                  <TableHead className="w-[11%]">Status</TableHead>
-                  <TableHead className="w-[16%]">Profile</TableHead>
-                  <TableHead className="w-[13%]">Started by</TableHead>
-                  <TableHead className="w-[17%]">Created</TableHead>
-                  <TableHead className="w-[12%] text-right">Actions</TableHead>
+                  <TableCell className="text-muted-foreground" colSpan={5}>
+                    No sandbox instances yet.
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoadingSessions ? (
-                  <TableRow>
-                    <TableCell className="text-muted-foreground" colSpan={6}>
-                      Loading sandbox instances...
-                    </TableCell>
-                  </TableRow>
-                ) : !hasSessions ? (
-                  <TableRow>
-                    <TableCell className="text-muted-foreground" colSpan={6}>
-                      No sandbox instances yet.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sortedSessions.map((session) => {
-                    const statusUi = getSandboxSessionStatusBadgeUi(session.status);
+              ) : (
+                sortedSessions.map((session) => {
+                  const statusUi = getSandboxSessionStatusBadgeUi(session.status);
 
-                    return (
-                      <TableRow key={session.id}>
-                        <TableCell className="max-w-64">
-                          <div className="flex flex-col gap-1">
-                            <span className="break-all font-mono text-xs">{session.id}</span>
-                            {session.failureMessage === null ? null : (
-                              <span className="text-destructive whitespace-pre-wrap text-xs">
-                                {session.failureMessage}
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
+                  return (
+                    <TableRow key={session.id}>
+                      <TableCell>
+                        <div className="flex min-w-0 flex-col gap-1">
+                          <span className="font-medium">
+                            {resolveProfileDisplayName(session.sandboxProfileId)}
+                          </span>
+                          {optimisticSessionIds.has(session.id) ? (
+                            <span className="text-muted-foreground text-xs">Launching locally</span>
+                          ) : null}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        <div className="flex flex-col gap-1">
+                          <span>{formatStartedByLabel(session.startedBy)}</span>
+                          <span className="text-muted-foreground text-xs capitalize">
+                            {session.source}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground text-sm">
+                        {formatRelativeOrDate(session.createdAt)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
                           <Badge className={statusUi.className} variant={statusUi.variant}>
                             {statusUi.label}
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <span className="font-medium">
-                              {resolveProfileDisplayName(session.sandboxProfileId)}
+                          {session.failureMessage === null ? null : (
+                            <span className="text-destructive whitespace-pre-wrap text-xs">
+                              {session.failureMessage}
                             </span>
-                            <span className="text-muted-foreground text-xs">
-                              v{String(session.sandboxProfileVersion)}
-                              {optimisticSessionIds.has(session.id) ? " • Launching locally" : ""}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm">
-                          <div className="flex flex-col gap-1">
-                            <span>{formatStartedByLabel(session.startedBy)}</span>
-                            <span className="text-muted-foreground text-xs capitalize">
-                              {session.source}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground text-sm">
-                          {formatDateTime(session.createdAt)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            disabled={!isConnectableSandboxStatus(session.status)}
-                            onClick={() => {
-                              navigate(`/sessions/${encodeURIComponent(session.id)}`);
-                            }}
-                            type="button"
-                          >
-                            Open session
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          disabled={!isConnectableSandboxStatus(session.status)}
+                          onClick={() => {
+                            navigate(`/sessions/${encodeURIComponent(session.id)}`);
+                          }}
+                          type="button"
+                        >
+                          Open session
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
 
-          {!hasPagination ? null : (
-            <div className="flex items-center justify-end gap-2">
-              <Button disabled={previousPageDisabled} onClick={goToPreviousPage} type="button">
-                Previous
-              </Button>
-              <Button disabled={nextPageDisabled} onClick={goToNextPage} type="button">
-                Next
-              </Button>
-            </div>
-          )}
+          <TablePagination
+            hasNextPage={hasNextPage}
+            hasPreviousPage={hasPreviousPage}
+            nextPageDisabled={nextPageDisabled}
+            onNextPage={goToNextPage}
+            onPreviousPage={goToPreviousPage}
+            previousPageDisabled={previousPageDisabled}
+          />
         </div>
       </div>
     </div>

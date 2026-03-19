@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
@@ -36,5 +37,30 @@ describe("SessionsPage", () => {
       await queryClient.cancelQueries();
       queryClient.clear();
     }
+  });
+
+  it("uses the shared dashboard table styling for the session list", () => {
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider
+        client={
+          new QueryClient({
+            defaultOptions: {
+              queries: {
+                retry: false,
+              },
+            },
+          })
+        }
+      >
+        <MemoryRouter>
+          <SessionsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain('data-slot="table" class="w-full caption-bottom text-sm table-fixed"');
+    expect(markup).toContain("bg-muted/60");
+    expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
+    expect(markup).toContain('<span class="sr-only">Actions</span>');
   });
 });

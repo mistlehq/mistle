@@ -108,16 +108,7 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
       </div>
       <div className="h-[calc(100vh-3rem)]">
         <SessionWorkbenchPageView
-          alerts={
-            errorMessage === null
-              ? []
-              : [
-                  {
-                    title: "Terminal connection error",
-                    description: errorMessage,
-                  },
-                ]
-          }
+          alerts={[]}
           isSecondaryPanelVisible={isTerminalVisible}
           mainContent={
             <CodexSessionPaneMainContent
@@ -206,9 +197,25 @@ export const OpenWithOutput: Story = {
   },
 };
 
+export const Connecting: Story = {
+  args: {
+    initialState: "connecting",
+    initialTerminalVisible: true,
+  },
+};
+
 export const ErrorState: Story = {
   args: {
-    initialErrorMessage: "Could not open sandbox PTY session.",
+    initialErrorMessage: "Sandbox PTY websocket connection failed.",
+    initialState: "error",
+    initialTerminalVisible: true,
+  },
+};
+
+export const ErrorWithBufferedOutput: Story = {
+  args: {
+    initialErrorMessage: "Sandbox PTY websocket connection failed.",
+    initialOutput: ["mistle@sandbox:~/workspace$ ./long-task.sh", "running\u2026", ""].join("\n"),
     initialState: "error",
     initialTerminalVisible: true,
   },

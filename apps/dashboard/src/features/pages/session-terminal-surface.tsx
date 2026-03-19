@@ -1,5 +1,5 @@
-import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@mistle/ui";
-import { TerminalIcon } from "@phosphor-icons/react";
+import { SandboxPtyStates } from "@mistle/sandbox-session-client";
+import { cn } from "@mistle/ui";
 
 import "@xterm/xterm/css/xterm.css";
 import { FitAddon } from "@xterm/addon-fit";
@@ -82,8 +82,8 @@ export function SessionTerminalSurface({
     const terminal = new Terminal({
       allowTransparency: true,
       convertEol: true,
-      cursorBlink: true,
-      cursorInactiveStyle: "outline",
+      cursorBlink: false,
+      cursorInactiveStyle: "none",
       fontFamily:
         'ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
       fontSize: 12,
@@ -110,12 +110,12 @@ export function SessionTerminalSurface({
     fitTerminal();
 
     const dataDisposable = terminal.onData((data) => {
-      if (lifecycleStateRef.current !== "open") {
+      if (lifecycleStateRef.current !== SandboxPtyStates.OPEN) {
         return;
       }
 
       void onWriteInput(data).catch(() => {
-        // The lifecycle state and top-level alert surface the PTY error.
+        // The lifecycle state and toolbar status surface the PTY error.
       });
     });
 
@@ -125,7 +125,7 @@ export function SessionTerminalSurface({
         : new ResizeObserver(() => {
             fitTerminal();
 
-            if (lifecycleStateRef.current === "open") {
+            if (lifecycleStateRef.current === SandboxPtyStates.OPEN) {
               resizePtyToTerminal();
             }
           });
@@ -171,41 +171,50 @@ export function SessionTerminalSurface({
   }, [isVisible, outputChunks]);
 
   useEffect(() => {
-    if (!isVisible) {
+    const terminal = terminalRef.current;
+    if (terminal === null || !isVisible) {
       return;
     }
 
-    if (lifecycleState !== "open") {
-      return;
+    if (lifecycleState === SandboxPtyStates.OPEN) {
+      terminal.options.cursorBlink = true;
+      terminal.options.cursorInactiveStyle = "outline";
+      fitTerminal();
+      resizePtyToTerminal();
+      terminal.focus();
+    } else {
+      terminal.options.cursorBlink = false;
+      terminal.options.cursorInactiveStyle = "none";
     }
-
-    fitTerminal();
-    resizePtyToTerminal();
-    terminalRef.current?.focus();
   }, [fitTerminal, isVisible, lifecycleState, resizePtyToTerminal]);
 
   if (!isVisible) {
     return null;
   }
 
+  const isLive = lifecycleState === SandboxPtyStates.OPEN;
+  const hasOutput = outputChunks.length > 0;
+
   return (
-    <div className="relative min-h-0 flex-1">
-      <div className="bg-white h-full w-full px-3 py-3" ref={containerRef} />
-      {outputChunks.length === 0 ? (
-        <div className="pointer-events-none absolute inset-0 px-3 py-3">
-          <Empty className="h-full min-h-0 border-0 bg-transparent p-0 text-stone-400">
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <TerminalIcon className="size-5" />
-              </EmptyMedia>
-              <EmptyTitle className="text-stone-900">Terminal ready</EmptyTitle>
-              <EmptyDescription className="text-stone-500">
-                Open the PTY to start an interactive shell.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
-        </div>
-      ) : null}
+    <div className="relative min-h-0 flex-1 px-3 py-3">
+      <div
+        className={cn(
+          "relative h-full w-full transition-[opacity] duration-150",
+          isLive ? "opacity-100" : hasOutput ? "opacity-[0.52]" : "opacity-[0.38]",
+          !isLive && !hasOutput && "pointer-events-none",
+        )}
+      >
+        <div className="bg-white h-full w-full" ref={containerRef} />
+        {isLive ? null : (
+          <div
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute inset-0",
+              hasOutput ? "bg-stone-100/40" : "bg-stone-200/55",
+            )}
+          />
+        )}
+      </div>
     </div>
   );
 }
