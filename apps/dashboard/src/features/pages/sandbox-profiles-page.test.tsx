@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
@@ -67,5 +68,45 @@ describe("SandboxProfilesPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(screen.queryByRole("heading", { name: "Create profile" })).toBeNull();
+  });
+
+  it("uses the shared dashboard table styling for the profiles list", () => {
+    const queryClient = createQueryClient();
+    const listResult: SandboxProfilesListResult = {
+      items: [
+        {
+          createdAt: "2026-03-05T00:00:00.000Z",
+          displayName: "Default Profile",
+          id: "sbp_123",
+          organizationId: "org_123",
+          status: "active",
+          updatedAt: "2026-03-05T00:00:00.000Z",
+        },
+      ],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 1,
+    };
+
+    queryClient.setQueryData(
+      sandboxProfilesListQueryKey({
+        limit: 20,
+        after: null,
+        before: null,
+      }),
+      listResult,
+    );
+
+    const markup = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <SandboxProfilesPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(markup).toContain("min-w-[32rem] table-fixed");
+    expect(markup).toContain("bg-muted/60");
+    expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
   });
 });

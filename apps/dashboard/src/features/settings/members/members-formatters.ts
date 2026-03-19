@@ -1,5 +1,6 @@
 import type { OrganizationRole, SettingsMember } from "./members-api.js";
 export { formatDate } from "../../shared/date-formatters.js";
+import { formatUserDisplayName, resolveUserDisplayName } from "../../shared/user-display-name.js";
 
 const ROLE_LABELS: Record<OrganizationRole, string> = {
   owner: "Owner",
@@ -32,28 +33,11 @@ export function parseRoleSelectValue(value: string | null): OrganizationRole | n
 }
 
 export function resolveMemberDisplayName(input: { name: string; email: string }): string {
-  const trimmedName = input.name.trim();
-  if (trimmedName.length === 0) {
-    return input.email;
-  }
-
-  if (trimmedName === input.email) {
-    return input.email;
-  }
-
-  return trimmedName;
+  return resolveUserDisplayName(input);
 }
 
 export function formatMemberDisplayName(member: Pick<SettingsMember, "name" | "email">): string {
-  const displayName = resolveMemberDisplayName({
-    name: member.name,
-    email: member.email,
-  });
-  if (displayName === member.email) {
-    return member.email;
-  }
-
-  return `${displayName} (${member.email})`;
+  return formatUserDisplayName(member);
 }
 
 export type InvitationDisplayStatus =
