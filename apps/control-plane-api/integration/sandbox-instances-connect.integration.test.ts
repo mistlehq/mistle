@@ -213,9 +213,33 @@ async function insertSandboxInstance(input: {
   sandboxInstanceId: string;
   status: "starting" | "running" | "stopped" | "failed";
   providerRuntimeId?: string | null;
+  activeTunnelLeaseId?: string | null;
+  tunnelConnectedAt?: string | null;
+  lastTunnelSeenAt?: string | null;
+  tunnelDisconnectedAt?: string | null;
   failureCode?: string | null;
   failureMessage?: string | null;
 }) {
+  const hasExplicitTunnelState =
+    input.activeTunnelLeaseId !== undefined ||
+    input.tunnelConnectedAt !== undefined ||
+    input.lastTunnelSeenAt !== undefined ||
+    input.tunnelDisconnectedAt !== undefined;
+  const defaultConnectedTunnelState =
+    input.status === "running" && !hasExplicitTunnelState
+      ? {
+          activeTunnelLeaseId: "lease-connect-integration",
+          tunnelConnectedAt: "2026-03-19T00:00:00.000Z",
+          lastTunnelSeenAt: "2026-03-19T00:00:00.000Z",
+          tunnelDisconnectedAt: null,
+        }
+      : {
+          activeTunnelLeaseId: input.activeTunnelLeaseId ?? null,
+          tunnelConnectedAt: input.tunnelConnectedAt ?? null,
+          lastTunnelSeenAt: input.lastTunnelSeenAt ?? null,
+          tunnelDisconnectedAt: input.tunnelDisconnectedAt ?? null,
+        };
+
   await input.dataPlaneFixture.db.insert(sandboxInstances).values({
     id: input.sandboxInstanceId,
     organizationId: input.organizationId,
@@ -230,6 +254,10 @@ async function insertSandboxInstance(input: {
     startedByKind: "user",
     startedById: "usr_connect_integration",
     source: "dashboard",
+    activeTunnelLeaseId: defaultConnectedTunnelState.activeTunnelLeaseId,
+    tunnelConnectedAt: defaultConnectedTunnelState.tunnelConnectedAt,
+    lastTunnelSeenAt: defaultConnectedTunnelState.lastTunnelSeenAt,
+    tunnelDisconnectedAt: defaultConnectedTunnelState.tunnelDisconnectedAt,
     failureCode: input.failureCode ?? null,
     failureMessage: input.failureMessage ?? null,
   });
@@ -239,6 +267,10 @@ async function updateSandboxInstanceStatus(input: {
   dataPlaneFixture: StartedDataPlaneFixture;
   sandboxInstanceId: string;
   status: "running" | "failed";
+  activeTunnelLeaseId?: string | null;
+  tunnelConnectedAt?: string | null;
+  lastTunnelSeenAt?: string | null;
+  tunnelDisconnectedAt?: string | null;
   failureCode?: string | null;
   failureMessage?: string | null;
 }) {
@@ -246,6 +278,16 @@ async function updateSandboxInstanceStatus(input: {
     .update(sandboxInstances)
     .set({
       status: input.status,
+      ...(input.activeTunnelLeaseId === undefined
+        ? {}
+        : { activeTunnelLeaseId: input.activeTunnelLeaseId }),
+      ...(input.tunnelConnectedAt === undefined
+        ? {}
+        : { tunnelConnectedAt: input.tunnelConnectedAt }),
+      ...(input.lastTunnelSeenAt === undefined ? {} : { lastTunnelSeenAt: input.lastTunnelSeenAt }),
+      ...(input.tunnelDisconnectedAt === undefined
+        ? {}
+        : { tunnelDisconnectedAt: input.tunnelDisconnectedAt }),
       failureCode: input.failureCode ?? null,
       failureMessage: input.failureMessage ?? null,
     })
@@ -478,12 +520,97 @@ describe("sandbox instance connect integration", () => {
         dataPlaneFixture,
         sandboxInstanceId: "sbi_cp_connect_stopped_001",
         status: "running",
+        activeTunnelLeaseId: "lease-connect-resumed",
+        tunnelConnectedAt: "2026-03-19T00:01:00.000Z",
+        lastTunnelSeenAt: "2026-03-19T00:01:00.000Z",
+        tunnelDisconnectedAt: null,
       });
 
       const response = await responsePromise;
       expect(response.status).toBe(201);
       const body = SandboxInstanceConnectionTokenSchema.parse(await response.json());
       expect(body.instanceId).toBe("sbi_cp_connect_stopped_001");
+    } finally {
+      await controlPlaneRuntime.stop();
+    }
+  }, 60_000);
+
+  it("reconnects running instances whose live tunnel is no longer available", async ({
+    fixture,
+  }) => {
+    const dataPlaneFixture = await createStartedDataPlaneFixture({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
+    const controlPlaneRuntime = await createControlPlaneApiRuntime({
+      app: createControlPlaneConfig({
+        baseConfig: fixture.config,
+        dataPlaneBaseUrl: dataPlaneFixture.baseUrl,
+      }),
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      connectionToken: {
+        secret: "integration-connection-secret",
+        issuer: "integration-issuer",
+        audience: "integration-audience",
+      },
+      sandbox: {
+        defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+        gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+      },
+    });
+
+    try {
+      const authSession = await createAuthenticatedControlPlaneSession({
+        fixture,
+        request: controlPlaneRuntime.request,
+        db: controlPlaneRuntime.db,
+        email: "integration-sandbox-connect-running-disconnected@example.com",
+      });
+
+      await insertSandboxInstance({
+        dataPlaneFixture,
+        organizationId: authSession.organizationId,
+        sandboxInstanceId: "sbi_cp_connect_running_disconnected_001",
+        status: "running",
+        activeTunnelLeaseId: "lease-connect-stale",
+        tunnelConnectedAt: "2026-03-19T00:00:00.000Z",
+        lastTunnelSeenAt: "2026-03-19T00:00:30.000Z",
+        tunnelDisconnectedAt: "2026-03-19T00:01:00.000Z",
+      });
+
+      const responsePromise = controlPlaneRuntime.request(
+        "/v1/sandbox/instances/sbi_cp_connect_running_disconnected_001/connection-tokens",
+        {
+          method: "POST",
+          headers: {
+            cookie: authSession.cookie,
+          },
+        },
+      );
+
+      await waitForResumeWorkflowRun({
+        dataPlaneFixture,
+        workflowNamespaceId: fixture.config.workflow.namespaceId,
+        sandboxInstanceId: "sbi_cp_connect_running_disconnected_001",
+      });
+
+      await updateSandboxInstanceStatus({
+        dataPlaneFixture,
+        sandboxInstanceId: "sbi_cp_connect_running_disconnected_001",
+        status: "running",
+        activeTunnelLeaseId: "lease-connect-reconnected",
+        tunnelConnectedAt: "2026-03-19T00:02:00.000Z",
+        lastTunnelSeenAt: "2026-03-19T00:02:00.000Z",
+        tunnelDisconnectedAt: null,
+      });
+
+      const response = await responsePromise;
+      expect(response.status).toBe(201);
+      const body = SandboxInstanceConnectionTokenSchema.parse(await response.json());
+      expect(body.instanceId).toBe("sbi_cp_connect_running_disconnected_001");
     } finally {
       await controlPlaneRuntime.stop();
     }

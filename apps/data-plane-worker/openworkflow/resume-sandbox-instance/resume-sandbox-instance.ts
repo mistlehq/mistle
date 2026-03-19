@@ -11,9 +11,11 @@ import type { Clock, Sleeper } from "@mistle/time";
 
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
+import { stopSandbox } from "../shared/stop-sandbox.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
 import { markSandboxInstanceRunning } from "../start-sandbox-instance/mark-sandbox-instance-running.js";
 import { waitForSandboxTunnelReadiness } from "../start-sandbox-instance/wait-for-sandbox-tunnel-readiness.js";
+import { markSandboxInstanceStopped } from "../stop-sandbox-instance/mark-sandbox-instance-stopped.js";
 import { markSandboxInstanceStarting } from "./mark-sandbox-instance-starting.js";
 import { persistSandboxInstanceRuntimeAttachment } from "./persist-sandbox-instance-runtime-attachment.js";
 import { resumeSandbox } from "./resume-sandbox.js";
@@ -35,7 +37,22 @@ type ResumableSandboxInstanceState = {
   instanceVolume: SandboxVolumeHandleV1;
   instanceVolumeMode: SandboxInstanceVolumeMode;
   runtimePlan: CompiledRuntimePlan;
+  requiresReconnect: boolean;
 };
+
+function hasLiveTunnelConnection(input: {
+  activeTunnelLeaseId: string | null;
+  tunnelConnectedAt: string | null;
+  lastTunnelSeenAt: string | null;
+  tunnelDisconnectedAt: string | null;
+}): boolean {
+  return (
+    input.activeTunnelLeaseId !== null &&
+    input.tunnelConnectedAt !== null &&
+    input.lastTunnelSeenAt !== null &&
+    input.tunnelDisconnectedAt === null
+  );
+}
 
 function toSandboxProvider(provider: SandboxInstanceVolumeProvider): SandboxProvider {
   if (provider === "docker") {
@@ -57,6 +74,10 @@ async function resolveResumableSandboxInstanceState(input: {
       instanceVolumeId: true,
       instanceVolumeMode: true,
       status: true,
+      activeTunnelLeaseId: true,
+      tunnelConnectedAt: true,
+      lastTunnelSeenAt: true,
+      tunnelDisconnectedAt: true,
     },
     where: (table, { eq }) => eq(table.id, input.sandboxInstanceId),
   });
@@ -65,14 +86,20 @@ async function resolveResumableSandboxInstanceState(input: {
     throw new Error(`Sandbox instance '${input.sandboxInstanceId}' was not found.`);
   }
 
-  if (
-    sandboxInstance.status === SandboxInstanceStatuses.RUNNING ||
-    sandboxInstance.status === SandboxInstanceStatuses.STARTING
-  ) {
+  if (sandboxInstance.status === SandboxInstanceStatuses.STARTING) {
     return null;
   }
 
-  if (sandboxInstance.status !== SandboxInstanceStatuses.STOPPED) {
+  const requiresReconnect =
+    sandboxInstance.status === SandboxInstanceStatuses.RUNNING &&
+    !hasLiveTunnelConnection({
+      activeTunnelLeaseId: sandboxInstance.activeTunnelLeaseId,
+      tunnelConnectedAt: sandboxInstance.tunnelConnectedAt,
+      lastTunnelSeenAt: sandboxInstance.lastTunnelSeenAt,
+      tunnelDisconnectedAt: sandboxInstance.tunnelDisconnectedAt,
+    });
+
+  if (sandboxInstance.status !== SandboxInstanceStatuses.STOPPED && !requiresReconnect) {
     throw new Error(
       `Expected sandbox instance '${input.sandboxInstanceId}' to be stopped, starting, or running before resume execution.`,
     );
@@ -118,6 +145,7 @@ async function resolveResumableSandboxInstanceState(input: {
     },
     instanceVolumeMode: sandboxInstance.instanceVolumeMode,
     runtimePlan,
+    requiresReconnect,
   };
 }
 
@@ -143,6 +171,36 @@ export async function resumeSandboxInstance(
   });
   if (resumableSandboxInstance === null) {
     return;
+  }
+
+  if (resumableSandboxInstance.requiresReconnect) {
+    if (resumableSandboxInstance.previousProviderRuntimeId === null) {
+      throw new Error(
+        `Expected reconnecting sandbox instance '${input.sandboxInstanceId}' to have a provider runtime id.`,
+      );
+    }
+
+    try {
+      await stopSandbox(
+        {
+          config: ctx.config,
+          sandboxAdapter: ctx.sandboxAdapter,
+        },
+        {
+          runtimeProvider: resumableSandboxInstance.runtimeProvider,
+          providerRuntimeId: resumableSandboxInstance.previousProviderRuntimeId,
+        },
+      );
+    } catch (error) {
+      if (!isSandboxResourceNotFoundError(error)) {
+        throw error;
+      }
+    }
+
+    await markSandboxInstanceStopped({
+      db: ctx.db,
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
   }
 
   await markSandboxInstanceStarting({

@@ -234,6 +234,10 @@ export function createInternalSandboxInstancesApp(): AppRoutes<
       columns: {
         id: true,
         status: true,
+        activeTunnelLeaseId: true,
+        tunnelConnectedAt: true,
+        lastTunnelSeenAt: true,
+        tunnelDisconnectedAt: true,
         failureCode: true,
         failureMessage: true,
       },
@@ -247,6 +251,10 @@ export function createInternalSandboxInstancesApp(): AppRoutes<
         : {
             id: sandboxInstance.id,
             status: sandboxInstance.status,
+            activeTunnelLeaseId: sandboxInstance.activeTunnelLeaseId,
+            tunnelConnectedAt: sandboxInstance.tunnelConnectedAt,
+            lastTunnelSeenAt: sandboxInstance.lastTunnelSeenAt,
+            tunnelDisconnectedAt: sandboxInstance.tunnelDisconnectedAt,
             failureCode: sandboxInstance.failureCode,
             failureMessage: sandboxInstance.failureMessage,
           };

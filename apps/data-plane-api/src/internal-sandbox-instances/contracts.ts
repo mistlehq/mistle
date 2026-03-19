@@ -82,6 +82,10 @@ export const GetSandboxInstanceResponseSchema = z
   .object({
     id: z.string().min(1),
     status: z.enum(DataPlaneSandboxInstanceStatuses),
+    activeTunnelLeaseId: z.string().min(1).nullable(),
+    tunnelConnectedAt: z.string().min(1).nullable(),
+    lastTunnelSeenAt: z.string().min(1).nullable(),
+    tunnelDisconnectedAt: z.string().min(1).nullable(),
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
   })

@@ -82,6 +82,20 @@ function createInstanceNotResumableError(
   );
 }
 
+function readNullableStringProperty(input: object, key: string): string | null {
+  const value = Reflect.get(input, key);
+  return typeof value === "string" ? value : null;
+}
+
+function hasLiveTunnelConnection(sandboxInstance: ExistingSandboxInstance): boolean {
+  return (
+    readNullableStringProperty(sandboxInstance, "activeTunnelLeaseId") !== null &&
+    readNullableStringProperty(sandboxInstance, "tunnelConnectedAt") !== null &&
+    readNullableStringProperty(sandboxInstance, "lastTunnelSeenAt") !== null &&
+    readNullableStringProperty(sandboxInstance, "tunnelDisconnectedAt") === null
+  );
+}
+
 async function getExistingSandboxInstance(
   dataPlaneClient: DataPlaneSandboxInstancesClient,
   input: {
@@ -101,7 +115,7 @@ async function getExistingSandboxInstance(
   return sandboxInstance;
 }
 
-async function waitForRunningSandboxInstance(
+async function waitForConnectableSandboxInstance(
   dataPlaneClient: DataPlaneSandboxInstancesClient,
   input: {
     organizationId: string;
@@ -113,12 +127,12 @@ async function waitForRunningSandboxInstance(
   while (true) {
     const sandboxInstance = await getExistingSandboxInstance(dataPlaneClient, input);
 
-    if (sandboxInstance.status === "running") {
-      return sandboxInstance;
-    }
-
     if (sandboxInstance.status === "failed") {
       throw createInstanceFailedError(sandboxInstance);
+    }
+
+    if (sandboxInstance.status === "running" && hasLiveTunnelConnection(sandboxInstance)) {
+      return sandboxInstance;
     }
 
     const remainingMs = deadlineMs - systemClock.nowMs();
@@ -144,7 +158,7 @@ export async function mintConnectionToken(
   }
 
   if (sandboxInstance.status === "starting") {
-    sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
+    sandboxInstance = await waitForConnectableSandboxInstance(dataPlaneClient, {
       organizationId: input.organizationId,
       instanceId: input.instanceId,
     });
@@ -153,7 +167,16 @@ export async function mintConnectionToken(
       organizationId: input.organizationId,
       instanceId: input.instanceId,
     });
-    sandboxInstance = await waitForRunningSandboxInstance(dataPlaneClient, {
+    sandboxInstance = await waitForConnectableSandboxInstance(dataPlaneClient, {
+      organizationId: input.organizationId,
+      instanceId: input.instanceId,
+    });
+  } else if (sandboxInstance.status === "running" && !hasLiveTunnelConnection(sandboxInstance)) {
+    await dataPlaneClient.resumeSandboxInstance({
+      organizationId: input.organizationId,
+      instanceId: input.instanceId,
+    });
+    sandboxInstance = await waitForConnectableSandboxInstance(dataPlaneClient, {
       organizationId: input.organizationId,
       instanceId: input.instanceId,
     });
