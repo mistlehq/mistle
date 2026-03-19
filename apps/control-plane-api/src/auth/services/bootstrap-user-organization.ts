@@ -1,7 +1,6 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { ControlPlaneDbSchema, MemberRoles } from "@mistle/db/control-plane";
-
-import { ControlPlaneTypeIdPrefixes, createControlPlaneTypeId } from "../../lib/ids.js";
+import { typeid } from "typeid-js";
 
 type BootstrapUserOrganizationInput = {
   db: ControlPlaneDatabase;
@@ -17,7 +16,7 @@ export async function bootstrapUserOrganization(
   input: BootstrapUserOrganizationInput,
 ): Promise<void> {
   const { db, userId, name } = input;
-  const organizationId = createControlPlaneTypeId(ControlPlaneTypeIdPrefixes.ORGANIZATION);
+  const organizationId = typeid("org").toString();
 
   await db.transaction(async (tx) => {
     await tx.insert(ControlPlaneDbSchema.organizations).values({
