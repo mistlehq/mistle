@@ -148,6 +148,18 @@ describe("integration connections list integration", () => {
             syncState: IntegrationConnectionResourceSyncStates.READY,
             lastSyncedAt: "2026-01-04T00:00:00.000Z",
           },
+          {
+            kind: "branch",
+            selectionMode: "multi",
+            count: 0,
+            syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+          },
+          {
+            kind: "user",
+            selectionMode: "multi",
+            count: 0,
+            syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+          },
         ],
         createdAt: firstConnectionCreatedAt.toISOString(),
         updatedAt: firstConnectionCreatedAt.toISOString(),
@@ -196,6 +208,18 @@ describe("integration connections list integration", () => {
         resources: [
           {
             kind: "repository",
+            selectionMode: "multi",
+            count: 0,
+            syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+          },
+          {
+            kind: "branch",
+            selectionMode: "multi",
+            count: 0,
+            syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,
+          },
+          {
+            kind: "user",
             selectionMode: "multi",
             count: 0,
             syncState: IntegrationConnectionResourceSyncStates.NEVER_SYNCED,

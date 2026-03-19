@@ -102,11 +102,18 @@ export function useIntegrationConnectionDialogState(input: { queryKey: readonly 
       const normalizedConnectionDisplayName = draft.connectionDisplayNameValue.trim();
 
       if (dialog.mode === "update") {
-        await updateApiKeyMutation.mutateAsync({
-          connectionId: dialog.connectionId,
-          displayName: normalizedConnectionDisplayName,
-          apiKey: normalizedApiKey,
-        });
+        if (normalizedApiKey.length === 0) {
+          await updateConnectionMetadataMutation.mutateAsync({
+            connectionId: dialog.connectionId,
+            displayName: normalizedConnectionDisplayName,
+          });
+        } else {
+          await updateApiKeyMutation.mutateAsync({
+            connectionId: dialog.connectionId,
+            displayName: normalizedConnectionDisplayName,
+            apiKey: normalizedApiKey,
+          });
+        }
       } else {
         await createApiKeyMutation.mutateAsync({
           targetKey: dialog.targetKey,

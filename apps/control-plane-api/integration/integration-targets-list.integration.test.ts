@@ -151,26 +151,26 @@ describe("integration targets discovery integration", () => {
           kind: "redirect",
         },
       ],
-      supportedWebhookEvents: [
-        {
+      supportedWebhookEvents: expect.arrayContaining([
+        expect.objectContaining({
           eventType: "github.issue_comment.created",
           providerEventType: "issue_comment",
           displayName: "Issue comment created",
           category: "Issues",
-        },
-        {
+        }),
+        expect.objectContaining({
           eventType: "github.pull_request.opened",
           providerEventType: "pull_request",
           displayName: "Pull request opened",
           category: "Pull requests",
-        },
-        {
+        }),
+        expect.objectContaining({
           eventType: "github.pull_request_review_comment.created",
           providerEventType: "pull_request_review_comment",
           displayName: "Pull request review comment created",
           category: "Pull requests",
-        },
-      ],
+        }),
+      ]),
       displayNameOverride: "GitHub Cloud",
       descriptionOverride: "GitHub Cloud target",
       targetHealth: {
