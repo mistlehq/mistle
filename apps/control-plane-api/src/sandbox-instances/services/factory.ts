@@ -1,3 +1,5 @@
+import { connectInstance } from "./connect-instance.js";
+import { getConnectStatus } from "./get-connect-status.js";
 import { getInstance } from "./get-instance.js";
 import { listInstances } from "./list-instances.js";
 import { mintConnectionToken } from "./mint-connection-token.js";
@@ -19,6 +21,8 @@ export function createSandboxInstancesService(
   const sandboxInstancesService = {
     listInstances: (serviceInput) => listInstances(input.db, input.dataPlaneClient, serviceInput),
     getInstance: (serviceInput) => getInstance(input.dataPlaneClient, serviceInput),
+    connectInstance: (serviceInput) => connectInstance(input.dataPlaneClient, serviceInput),
+    getConnectStatus: (serviceInput) => getConnectStatus(input.dataPlaneClient, serviceInput),
     mintConnectionToken: (serviceInput) => mintConnectionToken(input.dataPlaneClient, serviceInput),
     mintConnectionTokenForInstance: (serviceInput) =>
       mintConnectionToken(input.dataPlaneClient, {

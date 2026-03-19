@@ -37,6 +37,20 @@ type ResumableSandboxInstanceState = {
   runtimePlan: CompiledRuntimePlan;
 };
 
+function hasLiveTunnelConnection(input: {
+  activeTunnelLeaseId: string | null;
+  tunnelConnectedAt: string | null;
+  lastTunnelSeenAt: string | null;
+  tunnelDisconnectedAt: string | null;
+}): boolean {
+  return (
+    input.activeTunnelLeaseId !== null &&
+    input.tunnelConnectedAt !== null &&
+    input.lastTunnelSeenAt !== null &&
+    input.tunnelDisconnectedAt === null
+  );
+}
+
 function toSandboxProvider(provider: SandboxInstanceVolumeProvider): SandboxProvider {
   if (provider === "docker") {
     return SandboxProvider.DOCKER;
@@ -57,6 +71,10 @@ async function resolveResumableSandboxInstanceState(input: {
       instanceVolumeId: true,
       instanceVolumeMode: true,
       status: true,
+      activeTunnelLeaseId: true,
+      tunnelConnectedAt: true,
+      lastTunnelSeenAt: true,
+      tunnelDisconnectedAt: true,
     },
     where: (table, { eq }) => eq(table.id, input.sandboxInstanceId),
   });
@@ -65,14 +83,26 @@ async function resolveResumableSandboxInstanceState(input: {
     throw new Error(`Sandbox instance '${input.sandboxInstanceId}' was not found.`);
   }
 
+  if (sandboxInstance.status === SandboxInstanceStatuses.STARTING) {
+    return null;
+  }
+
   if (
-    sandboxInstance.status === SandboxInstanceStatuses.RUNNING ||
-    sandboxInstance.status === SandboxInstanceStatuses.STARTING
+    sandboxInstance.status === SandboxInstanceStatuses.RUNNING &&
+    hasLiveTunnelConnection({
+      activeTunnelLeaseId: sandboxInstance.activeTunnelLeaseId,
+      tunnelConnectedAt: sandboxInstance.tunnelConnectedAt,
+      lastTunnelSeenAt: sandboxInstance.lastTunnelSeenAt,
+      tunnelDisconnectedAt: sandboxInstance.tunnelDisconnectedAt,
+    })
   ) {
     return null;
   }
 
-  if (sandboxInstance.status !== SandboxInstanceStatuses.STOPPED) {
+  if (
+    sandboxInstance.status !== SandboxInstanceStatuses.STOPPED &&
+    sandboxInstance.status !== SandboxInstanceStatuses.RUNNING
+  ) {
     throw new Error(
       `Expected sandbox instance '${input.sandboxInstanceId}' to be stopped, starting, or running before resume execution.`,
     );
@@ -99,7 +129,7 @@ async function resolveResumableSandboxInstanceState(input: {
 
   if (persistedRuntimePlan === undefined) {
     throw new Error(
-      `Expected stopped sandbox instance '${input.sandboxInstanceId}' to have an active runtime plan.`,
+      `Expected resumable sandbox instance '${input.sandboxInstanceId}' to have an active runtime plan.`,
     );
   }
 

@@ -19,7 +19,10 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
-import { mintSandboxInstanceConnectionToken } from "../sessions/sessions-service.js";
+import {
+  awaitSandboxInstanceConnectionReady,
+  mintSandboxInstanceConnectionToken,
+} from "../sessions/sessions-service.js";
 import {
   createInitialCodexServerRequestsState,
   reduceCodexServerRequestsState,
@@ -452,6 +455,11 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
 
       let mintedConnection;
       try {
+        await awaitSandboxInstanceConnectionReady({
+          instanceId: input.sandboxInstanceId,
+        });
+        ensureCurrentGeneration(generation);
+
         mintedConnection = await mintSandboxInstanceConnectionToken({
           instanceId: input.sandboxInstanceId,
         });

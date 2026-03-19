@@ -1,5 +1,6 @@
 import type {
   DataPlaneSandboxInstancesClient,
+  GetSandboxConnectStatusResponse,
   GetSandboxInstanceResponse,
   ListSandboxInstancesResponse,
 } from "@mistle/data-plane-internal-client";
@@ -31,6 +32,8 @@ export type SandboxInstanceConnectionToken = {
   expiresAt: string;
 };
 
+export type SandboxInstanceConnectStatus = NonNullable<GetSandboxConnectStatusResponse>;
+
 export type SandboxInstanceStatus = {
   id: string;
   status: NonNullable<GetSandboxInstanceResponse>["status"];
@@ -59,6 +62,14 @@ export type SandboxInstancesService = {
     organizationId: string;
     instanceId: string;
   }) => Promise<SandboxInstanceStatus>;
+  connectInstance: (input: {
+    organizationId: string;
+    instanceId: string;
+  }) => Promise<SandboxInstanceConnectStatus>;
+  getConnectStatus: (input: {
+    organizationId: string;
+    instanceId: string;
+  }) => Promise<SandboxInstanceConnectStatus>;
   mintConnectionToken: (
     input: MintSandboxInstanceConnectionTokenInput,
   ) => Promise<SandboxInstanceConnectionToken>;

@@ -16,6 +16,7 @@ import {
   paginateKeyset,
 } from "@mistle/http/pagination";
 import {
+  ResumeSandboxInstanceWorkflowName,
   ResumeSandboxInstanceWorkflowSpec,
   StartSandboxInstanceWorkflowSpec,
 } from "@mistle/workflow-registry/data-plane";
@@ -24,13 +25,18 @@ import { typeid } from "typeid-js";
 
 import { createRequireInternalAuthMiddleware } from "../middleware/require-internal-auth.js";
 import { DataPlaneOpenWorkflowSchema } from "../openworkflow/index.js";
+import type { AppRuntimeResources } from "../runtime/resources.js";
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 import {
   DATA_PLANE_INTERNAL_AUTH_HEADER,
   INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH,
 } from "./constants.js";
 import {
+  ConnectSandboxInstanceInputValidationSchema,
+  DataPlaneSandboxConnectStatuses,
   GetSandboxInstanceResponseSchema,
+  internalConnectSandboxInstanceRoute,
+  internalGetSandboxConnectStatusRoute,
   internalGetSandboxInstanceRoute,
   internalListSandboxInstancesRoute,
   internalResumeSandboxInstanceRoute,
@@ -39,6 +45,7 @@ import {
   ListSandboxInstancesResponseSchema,
   ResumeSandboxInstanceAcceptedResponseSchema,
   ResumeSandboxInstanceInputValidationSchema,
+  SandboxConnectStatusResponseSchema,
   StartSandboxInstanceAcceptedResponseSchema,
   StartSandboxInstanceInputValidationSchema,
 } from "./contracts.js";
@@ -71,6 +78,18 @@ type ListSandboxInstanceRow = Pick<
   | "updatedAt"
   | "failureCode"
   | "failureMessage"
+>;
+
+type ConnectStatusRow = Pick<
+  SandboxInstance,
+  | "id"
+  | "status"
+  | "failureCode"
+  | "failureMessage"
+  | "activeTunnelLeaseId"
+  | "tunnelConnectedAt"
+  | "lastTunnelSeenAt"
+  | "tunnelDisconnectedAt"
 >;
 
 const InternalSandboxInstancesErrorCodes = {
@@ -125,6 +144,20 @@ function createResumeSandboxIdempotencyKey(
   });
 }
 
+function createConnectSandboxIdempotencyKey(
+  input: z.infer<typeof ConnectSandboxInstanceInputValidationSchema>,
+): string {
+  const idempotencyKey = input.idempotencyKey ?? randomUUID();
+
+  return JSON.stringify({
+    version: 1,
+    organizationId: input.organizationId,
+    sandboxInstanceId: input.instanceId,
+    action: "connect",
+    idempotencyKey,
+  });
+}
+
 function createSandboxInstanceId(): string {
   return typeid("sbi").toString();
 }
@@ -162,6 +195,125 @@ async function resolveWorkflowSandboxInstanceId(input: {
   }
 
   return parsedInput.data.sandboxInstanceId;
+}
+
+function hasLiveTunnelConnection(sandboxInstance: ConnectStatusRow): boolean {
+  return (
+    sandboxInstance.activeTunnelLeaseId !== null &&
+    sandboxInstance.tunnelConnectedAt !== null &&
+    sandboxInstance.lastTunnelSeenAt !== null &&
+    sandboxInstance.tunnelDisconnectedAt === null
+  );
+}
+
+async function findConnectStatusRow(input: {
+  db: AppRuntimeResources["db"];
+  organizationId: string;
+  instanceId: string;
+}): Promise<ConnectStatusRow | null> {
+  const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
+    columns: {
+      id: true,
+      status: true,
+      failureCode: true,
+      failureMessage: true,
+      activeTunnelLeaseId: true,
+      tunnelConnectedAt: true,
+      lastTunnelSeenAt: true,
+      tunnelDisconnectedAt: true,
+    },
+    where: (table, { and, eq }) =>
+      and(eq(table.id, input.instanceId), eq(table.organizationId, input.organizationId)),
+  });
+
+  return sandboxInstance ?? null;
+}
+
+async function hasInProgressResumeWorkflow(input: {
+  workflowDbPool: AppRuntimeResources["workflowDbPool"];
+  workflowNamespaceId: string;
+  instanceId: string;
+}): Promise<boolean> {
+  const result = await input.workflowDbPool.query<{ id: string }>(
+    `
+      select id
+      from ${DataPlaneOpenWorkflowSchema}.workflow_runs
+      where namespace_id = $1
+        and workflow_name = $2
+        and status in ('pending', 'running')
+        and input->>'sandboxInstanceId' = $3
+      limit 1
+    `,
+    [input.workflowNamespaceId, ResumeSandboxInstanceWorkflowName, input.instanceId],
+  );
+
+  return result.rows.length > 0;
+}
+
+async function resolveSandboxConnectStatus(input: {
+  db: AppRuntimeResources["db"];
+  workflowDbPool: AppRuntimeResources["workflowDbPool"];
+  workflowNamespaceId: string;
+  organizationId: string;
+  instanceId: string;
+}): Promise<z.infer<typeof SandboxConnectStatusResponseSchema>> {
+  const sandboxInstance = await findConnectStatusRow({
+    db: input.db,
+    organizationId: input.organizationId,
+    instanceId: input.instanceId,
+  });
+
+  if (sandboxInstance === null) {
+    return null;
+  }
+
+  if (sandboxInstance.status === SandboxInstanceStatuses.FAILED) {
+    return {
+      instanceId: sandboxInstance.id,
+      status: DataPlaneSandboxConnectStatuses.FAILED,
+      code: sandboxInstance.failureCode,
+      message:
+        sandboxInstance.failureMessage ??
+        `Sandbox instance '${sandboxInstance.id}' cannot become connectable.`,
+    };
+  }
+
+  if (
+    sandboxInstance.status === SandboxInstanceStatuses.RUNNING &&
+    hasLiveTunnelConnection(sandboxInstance)
+  ) {
+    return {
+      instanceId: sandboxInstance.id,
+      status: DataPlaneSandboxConnectStatuses.READY,
+      code: null,
+      message: null,
+    };
+  }
+
+  if (sandboxInstance.status === SandboxInstanceStatuses.STARTING) {
+    return {
+      instanceId: sandboxInstance.id,
+      status: DataPlaneSandboxConnectStatuses.PENDING,
+      code: null,
+      message: null,
+    };
+  }
+
+  if (await hasInProgressResumeWorkflow(input)) {
+    return {
+      instanceId: sandboxInstance.id,
+      status: DataPlaneSandboxConnectStatuses.PENDING,
+      code: null,
+      message: null,
+    };
+  }
+
+  return {
+    instanceId: sandboxInstance.id,
+    status: DataPlaneSandboxConnectStatuses.NOT_RESUMABLE,
+    code: "INSTANCE_NOT_CONNECTABLE",
+    message: `Sandbox instance '${sandboxInstance.id}' is not connectable yet.`,
+  };
 }
 
 export function createInternalSandboxInstancesApp(): AppRoutes<
@@ -271,6 +423,63 @@ export function createInternalSandboxInstancesApp(): AppRoutes<
       sandboxInstanceId: body.instanceId,
       workflowRunId: workflowRunHandle.workflowRun.id,
     };
+
+    return ctx.json(responseBody, 200);
+  });
+
+  routes.openapi(internalConnectSandboxInstanceRoute, async (ctx) => {
+    const body = ctx.req.valid("json");
+    const currentStatus = await resolveSandboxConnectStatus({
+      db: ctx.get("resources").db,
+      workflowDbPool: ctx.get("resources").workflowDbPool,
+      workflowNamespaceId: ctx.get("config").workflow.namespaceId,
+      organizationId: body.organizationId,
+      instanceId: body.instanceId,
+    });
+
+    if (currentStatus === null) {
+      return ctx.json(currentStatus, 200);
+    }
+
+    if (
+      currentStatus.status === DataPlaneSandboxConnectStatuses.READY ||
+      currentStatus.status === DataPlaneSandboxConnectStatuses.PENDING ||
+      currentStatus.status === DataPlaneSandboxConnectStatuses.FAILED
+    ) {
+      return ctx.json(currentStatus, 200);
+    }
+
+    const workflowRunHandle = await ctx.get("resources").openWorkflow.runWorkflow(
+      ResumeSandboxInstanceWorkflowSpec,
+      {
+        sandboxInstanceId: body.instanceId,
+      },
+      {
+        idempotencyKey: createConnectSandboxIdempotencyKey(body),
+      },
+    );
+
+    void workflowRunHandle;
+
+    const responseBody: z.infer<typeof SandboxConnectStatusResponseSchema> = {
+      instanceId: body.instanceId,
+      status: DataPlaneSandboxConnectStatuses.PENDING,
+      code: null,
+      message: null,
+    };
+
+    return ctx.json(responseBody, 200);
+  });
+
+  routes.openapi(internalGetSandboxConnectStatusRoute, async (ctx) => {
+    const body = ctx.req.valid("json");
+    const responseBody = await resolveSandboxConnectStatus({
+      db: ctx.get("resources").db,
+      workflowDbPool: ctx.get("resources").workflowDbPool,
+      workflowNamespaceId: ctx.get("config").workflow.namespaceId,
+      organizationId: body.organizationId,
+      instanceId: body.instanceId,
+    });
 
     return ctx.json(responseBody, 200);
   });

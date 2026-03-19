@@ -74,6 +74,36 @@ const ResumeSandboxInstanceResponseSchema = z
   })
   .strict();
 
+const ConnectSandboxInstanceRequestSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    instanceId: z.string().min(1),
+    idempotencyKey: z.string().min(1).max(255).optional(),
+  })
+  .strict();
+
+const GetSandboxConnectStatusRequestSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    instanceId: z.string().min(1),
+  })
+  .strict();
+
+const SandboxConnectStatusResponseSchema = z
+  .object({
+    instanceId: z.string().min(1),
+    status: z.union([
+      z.literal("pending"),
+      z.literal("ready"),
+      z.literal("failed"),
+      z.literal("not_resumable"),
+    ]),
+    code: z.string().min(1).nullable(),
+    message: z.string().min(1).nullable(),
+  })
+  .strict()
+  .nullable();
+
 const GetSandboxInstanceRequestSchema = z
   .object({
     organizationId: z.string().min(1),
@@ -291,6 +321,106 @@ const ResumeSandboxInstanceRoute = createRoute({
   },
 });
 
+const ConnectSandboxInstanceRoute = createRoute({
+  method: "post",
+  path: `${INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH}/connect`,
+  tags: ["Internal"],
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: ConnectSandboxInstanceRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Ensure sandbox connect recovery is in progress for internal callers.",
+      content: {
+        "application/json": {
+          schema: SandboxConnectStatusResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request body.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Internal service authentication failed.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesErrorResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
+const GetSandboxConnectStatusRoute = createRoute({
+  method: "post",
+  path: `${INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH}/connect-status`,
+  tags: ["Internal"],
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: GetSandboxConnectStatusRequestSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Get sandbox connect status for internal callers.",
+      content: {
+        "application/json": {
+          schema: SandboxConnectStatusResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request body.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Internal service authentication failed.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesErrorResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
 const ListSandboxInstancesRoute = createRoute({
   method: "post",
   path: `${INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH}/list`,
@@ -353,6 +483,12 @@ export function createDataPlaneInternalOpenApiDocument(): ReturnType<
     throw new Error("OpenAPI route is documentation-only.");
   });
   app.openapi(ResumeSandboxInstanceRoute, () => {
+    throw new Error("OpenAPI route is documentation-only.");
+  });
+  app.openapi(ConnectSandboxInstanceRoute, () => {
+    throw new Error("OpenAPI route is documentation-only.");
+  });
+  app.openapi(GetSandboxConnectStatusRoute, () => {
     throw new Error("OpenAPI route is documentation-only.");
   });
   app.openapi(ListSandboxInstancesRoute, () => {

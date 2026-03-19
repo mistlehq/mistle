@@ -19,6 +19,13 @@ export const DataPlaneSandboxInstanceStatuses = {
   FAILED: "failed",
 } as const;
 
+export const DataPlaneSandboxConnectStatuses = {
+  PENDING: "pending",
+  READY: "ready",
+  FAILED: "failed",
+  NOT_RESUMABLE: "not_resumable",
+} as const;
+
 const DefaultListSandboxInstancesLimit = 20;
 const MaxListSandboxInstancesLimit = 100;
 
@@ -70,6 +77,31 @@ export const ResumeSandboxInstanceAcceptedResponseSchema = z
     workflowRunId: z.string().min(1),
   })
   .strict();
+
+export const ConnectSandboxInstanceInputValidationSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    instanceId: z.string().min(1),
+    idempotencyKey: z.string().min(1).max(255).optional(),
+  })
+  .strict();
+
+export const GetSandboxConnectStatusInputSchema = z
+  .object({
+    organizationId: z.string().min(1),
+    instanceId: z.string().min(1),
+  })
+  .strict();
+
+export const SandboxConnectStatusResponseSchema = z
+  .object({
+    instanceId: z.string().min(1),
+    status: z.enum(DataPlaneSandboxConnectStatuses),
+    code: z.string().min(1).nullable(),
+    message: z.string().min(1).nullable(),
+  })
+  .strict()
+  .nullable();
 
 export const GetSandboxInstanceInputSchema = z
   .object({
@@ -272,6 +304,106 @@ export const internalResumeSandboxInstanceRoute = createRoute({
       content: {
         "application/json": {
           schema: ResumeSandboxInstanceAcceptedResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request body.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Internal service authentication failed.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesErrorResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
+export const internalConnectSandboxInstanceRoute = createRoute({
+  method: "post",
+  path: "/connect",
+  tags: ["Internal"],
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: ConnectSandboxInstanceInputValidationSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Ensure sandbox connect recovery is in progress for internal callers.",
+      content: {
+        "application/json": {
+          schema: SandboxConnectStatusResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request body.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Internal service authentication failed.",
+      content: {
+        "application/json": {
+          schema: InternalSandboxInstancesErrorResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
+export const internalGetSandboxConnectStatusRoute = createRoute({
+  method: "post",
+  path: "/connect-status",
+  tags: ["Internal"],
+  request: {
+    body: {
+      required: true,
+      content: {
+        "application/json": {
+          schema: GetSandboxConnectStatusInputSchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Get sandbox connect status for internal callers.",
+      content: {
+        "application/json": {
+          schema: SandboxConnectStatusResponseSchema,
         },
       },
     },

@@ -525,6 +525,331 @@
         }
       }
     },
+    "/internal/sandbox-instances/connect": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "instanceId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "idempotencyKey": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "required": ["organizationId", "instanceId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ensure sandbox connect recovery is in progress for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": ["object", "null"],
+                  "properties": {
+                    "instanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["pending"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["ready"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["failed"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["not_resumable"]
+                        }
+                      ]
+                    },
+                    "code": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["instanceId", "status", "code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [false]
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["name", "message"],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": ["success", "error"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/internal/sandbox-instances/connect-status": {
+      "post": {
+        "tags": ["Internal"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "organizationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "instanceId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": ["organizationId", "instanceId"],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Get sandbox connect status for internal callers.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": ["object", "null"],
+                  "properties": {
+                    "instanceId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": ["pending"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["ready"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["failed"]
+                        },
+                        {
+                          "type": "string",
+                          "enum": ["not_resumable"]
+                        }
+                      ]
+                    },
+                    "code": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": ["string", "null"],
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["instanceId", "status", "code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request body.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "code": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": ["code", "message"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "enum": [false]
+                        },
+                        "error": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "message": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": ["name", "message"],
+                          "additionalProperties": {}
+                        }
+                      },
+                      "required": ["success", "error"],
+                      "additionalProperties": false
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Internal service authentication failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/internal/sandbox-instances/list": {
       "post": {
         "tags": ["Internal"],

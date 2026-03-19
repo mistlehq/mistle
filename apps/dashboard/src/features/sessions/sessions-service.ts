@@ -32,6 +32,17 @@ const SandboxInstanceConnectionTokenSchema = z
   })
   .strict();
 
+const SandboxInstanceConnectStatusSchema = z
+  .object({
+    instanceId: z.string().min(1),
+    status: z.enum(["pending", "ready", "failed", "not_resumable"]),
+    code: z.string().min(1).nullable(),
+    message: z.string().min(1).nullable(),
+  })
+  .strict();
+
+const ConnectPollingIntervalMs = 1_000;
+
 export type StartSandboxInstanceResult = {
   workflowRunId: string;
   sandboxInstanceId: string;
@@ -50,6 +61,55 @@ export type MintSandboxConnectionTokenResult = {
   connectionToken: string;
   connectionExpiresAt: string;
 };
+
+export type SandboxConnectStatusResult = {
+  instanceId: string;
+  status: "pending" | "ready" | "failed" | "not_resumable";
+  code: string | null;
+  message: string | null;
+};
+
+function createSandboxConnectError(
+  connectStatus: SandboxConnectStatusResult,
+): SandboxProfilesApiError {
+  return new SandboxProfilesApiError({
+    operation: "awaitSandboxInstanceConnectionReady",
+    status: 409,
+    body: connectStatus,
+    message: connectStatus.message ?? "Could not establish sandbox session connection.",
+    code: connectStatus.code ?? null,
+  });
+}
+
+async function sleepWithSignal(durationMs: number, signal?: AbortSignal): Promise<void> {
+  if (durationMs <= 0) {
+    return;
+  }
+
+  await new Promise<void>((resolve, reject) => {
+    function cleanup(): void {
+      if (timeoutId !== null) {
+        window.clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      signal?.removeEventListener("abort", handleAbort);
+    }
+
+    function handleTimeout(): void {
+      cleanup();
+      resolve();
+    }
+
+    function handleAbort(): void {
+      cleanup();
+      reject(new DOMException("The operation was aborted.", "AbortError"));
+    }
+
+    let timeoutId: number | null = window.setTimeout(handleTimeout, durationMs);
+    signal?.addEventListener("abort", handleAbort, { once: true });
+  });
+}
 
 export async function listSandboxInstances(input: {
   limit: number;
@@ -214,5 +274,107 @@ export async function mintSandboxInstanceConnectionToken(input: {
         fallbackMessage: "Could not establish sandbox session.",
       }),
     );
+  }
+}
+
+export async function connectSandboxInstance(input: {
+  instanceId: string;
+  signal?: AbortSignal;
+}): Promise<SandboxConnectStatusResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "connectSandboxInstance",
+      method: "POST",
+      pathname: `/v1/sandbox/instances/${encodeURIComponent(input.instanceId)}/connect`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not start sandbox session connection.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxInstanceConnectStatusSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "connectSandboxInstance",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox instance connect response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "connectSandboxInstance",
+        error,
+        fallbackMessage: "Could not start sandbox session connection.",
+      }),
+    );
+  }
+}
+
+export async function getSandboxConnectStatus(input: {
+  instanceId: string;
+  signal?: AbortSignal;
+}): Promise<SandboxConnectStatusResult> {
+  try {
+    const response = await requestControlPlane({
+      operation: "getSandboxConnectStatus",
+      method: "GET",
+      pathname: `/v1/sandbox/instances/${encodeURIComponent(input.instanceId)}/connect`,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      fallbackMessage: "Could not check sandbox session connection status.",
+    });
+
+    const responseBody = await response.json();
+    const parsedResponse = SandboxInstanceConnectStatusSchema.safeParse(responseBody);
+    if (!parsedResponse.success) {
+      throw new SandboxProfilesApiError({
+        operation: "getSandboxConnectStatus",
+        status: 500,
+        body: responseBody,
+        message: "Sandbox connect status response payload is invalid.",
+      });
+    }
+
+    return parsedResponse.data;
+  } catch (error) {
+    throw new SandboxProfilesApiError(
+      normalizeHttpApiError({
+        operation: "getSandboxConnectStatus",
+        error,
+        fallbackMessage: "Could not check sandbox session connection status.",
+      }),
+    );
+  }
+}
+
+export async function awaitSandboxInstanceConnectionReady(input: {
+  instanceId: string;
+  signal?: AbortSignal;
+}): Promise<SandboxConnectStatusResult> {
+  const initialStatus = await connectSandboxInstance(input);
+
+  if (initialStatus.status === "ready") {
+    return initialStatus;
+  }
+
+  if (initialStatus.status !== "pending") {
+    throw createSandboxConnectError(initialStatus);
+  }
+
+  while (true) {
+    await sleepWithSignal(ConnectPollingIntervalMs, input.signal);
+    const currentStatus = await getSandboxConnectStatus(input);
+
+    if (currentStatus.status === "pending") {
+      continue;
+    }
+
+    if (currentStatus.status === "ready") {
+      return currentStatus;
+    }
+
+    throw createSandboxConnectError(currentStatus);
   }
 }

@@ -2,7 +2,10 @@ import { CompiledRuntimePlanSchema, assembleCompiledRuntimePlan } from "@mistle/
 import { describe, expect, it } from "vitest";
 
 import {
+  ConnectSandboxInstanceInputValidationSchema,
+  GetSandboxConnectStatusInputSchema,
   ResumeSandboxInstanceInputValidationSchema,
+  SandboxConnectStatusResponseSchema,
   StartSandboxInstanceInputValidationSchema,
 } from "./contracts.js";
 
@@ -170,5 +173,54 @@ describe("ResumeSandboxInstanceInputValidationSchema", () => {
     };
 
     expect(ResumeSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
+  });
+});
+
+describe("ConnectSandboxInstanceInputValidationSchema", () => {
+  it("accepts a valid connect request", () => {
+    const input = {
+      organizationId: "org_123",
+      instanceId: "sbi_123",
+      idempotencyKey: "req_connect_123",
+    };
+
+    expect(ConnectSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
+  });
+
+  it("accepts omitted idempotency keys for server-generated defaults", () => {
+    const input = {
+      organizationId: "org_123",
+      instanceId: "sbi_123",
+    };
+
+    expect(ConnectSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
+  });
+});
+
+describe("GetSandboxConnectStatusInputSchema", () => {
+  it("accepts a valid connect-status request", () => {
+    const input = {
+      organizationId: "org_123",
+      instanceId: "sbi_123",
+    };
+
+    expect(GetSandboxConnectStatusInputSchema.parse(input)).toEqual(input);
+  });
+});
+
+describe("SandboxConnectStatusResponseSchema", () => {
+  it("accepts a ready response", () => {
+    const response = {
+      instanceId: "sbi_123",
+      status: "ready",
+      code: null,
+      message: null,
+    };
+
+    expect(SandboxConnectStatusResponseSchema.parse(response)).toEqual(response);
+  });
+
+  it("accepts a null response for unknown instances", () => {
+    expect(SandboxConnectStatusResponseSchema.parse(null)).toBeNull();
   });
 });

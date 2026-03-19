@@ -3,10 +3,13 @@ import { OpenAPIHono, z } from "@hono/zod-openapi";
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 import { SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "./constants.js";
 import {
+  createSandboxInstanceConnectRoute,
   createSandboxInstanceConnectionTokenRoute,
+  getSandboxInstanceConnectRoute,
   getSandboxInstanceRoute,
   listSandboxInstancesRoute,
   ListSandboxInstancesResponseSchema,
+  SandboxInstanceConnectStatusResponseSchema,
   SandboxInstancesConflictResponseSchema,
   SandboxInstancesBadRequestResponseSchema,
   SandboxInstancesNotFoundResponseSchema,
@@ -57,6 +60,50 @@ export function createSandboxInstancesApp(): AppRoutes<typeof SANDBOX_INSTANCES_
       });
 
       return ctx.json(sandboxInstance, 200);
+    } catch (error) {
+      return handleGetSandboxInstanceError(ctx, error);
+    }
+  });
+
+  routes.openapi(createSandboxInstanceConnectRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+
+      const connectStatus = await ctx.get("services").sandboxInstances.connectInstance({
+        organizationId: session.session.activeOrganizationId,
+        instanceId: params.instanceId,
+      });
+
+      const responseBody: z.infer<typeof SandboxInstanceConnectStatusResponseSchema> =
+        connectStatus;
+
+      return ctx.json(responseBody, 200);
+    } catch (error) {
+      return handleGetSandboxInstanceError(ctx, error);
+    }
+  });
+
+  routes.openapi(getSandboxInstanceConnectRoute, async (ctx) => {
+    try {
+      const params = ctx.req.valid("param");
+      const session = ctx.get("session");
+      if (session === null) {
+        throw new Error("Expected authenticated session to be available.");
+      }
+
+      const connectStatus = await ctx.get("services").sandboxInstances.getConnectStatus({
+        organizationId: session.session.activeOrganizationId,
+        instanceId: params.instanceId,
+      });
+
+      const responseBody: z.infer<typeof SandboxInstanceConnectStatusResponseSchema> =
+        connectStatus;
+
+      return ctx.json(responseBody, 200);
     } catch (error) {
       return handleGetSandboxInstanceError(ctx, error);
     }

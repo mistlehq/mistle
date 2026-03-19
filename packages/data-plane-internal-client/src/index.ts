@@ -33,6 +33,14 @@ export type GetSandboxInstanceInput =
   paths["/internal/sandbox-instances/get"]["post"]["requestBody"]["content"]["application/json"];
 export type GetSandboxInstanceResponse =
   paths["/internal/sandbox-instances/get"]["post"]["responses"]["200"]["content"]["application/json"];
+export type ConnectSandboxInstanceInput =
+  paths["/internal/sandbox-instances/connect"]["post"]["requestBody"]["content"]["application/json"];
+export type ConnectSandboxInstanceResponse =
+  paths["/internal/sandbox-instances/connect"]["post"]["responses"]["200"]["content"]["application/json"];
+export type GetSandboxConnectStatusInput =
+  paths["/internal/sandbox-instances/connect-status"]["post"]["requestBody"]["content"]["application/json"];
+export type GetSandboxConnectStatusResponse =
+  paths["/internal/sandbox-instances/connect-status"]["post"]["responses"]["200"]["content"]["application/json"];
 export type ListSandboxInstancesInput =
   paths["/internal/sandbox-instances/list"]["post"]["requestBody"]["content"]["application/json"];
 export type ListSandboxInstancesResponse =
@@ -60,6 +68,12 @@ export type DataPlaneSandboxInstancesClient = {
     input: ResumeSandboxInstanceInput,
   ) => Promise<ResumeSandboxInstanceAcceptedResponse>;
   getSandboxInstance: (input: GetSandboxInstanceInput) => Promise<GetSandboxInstanceResponse>;
+  connectSandboxInstance: (
+    input: ConnectSandboxInstanceInput,
+  ) => Promise<ConnectSandboxInstanceResponse>;
+  getSandboxConnectStatus: (
+    input: GetSandboxConnectStatusInput,
+  ) => Promise<GetSandboxConnectStatusResponse>;
   listSandboxInstances: (input: ListSandboxInstancesInput) => Promise<ListSandboxInstancesResponse>;
 };
 
@@ -89,12 +103,14 @@ function parseInternalErrorBody(input: unknown): InternalErrorBody | undefined {
 function createClientError(input: {
   status: number;
   error: unknown;
-  operation: "start" | "resume" | "read" | "list";
+  operation: "start" | "resume" | "read" | "connect" | "connectStatus" | "list";
 }): DataPlaneSandboxInstancesClientError {
   const operationLabel = {
     start: "start",
     resume: "resume",
     read: "read",
+    connect: "connect",
+    connectStatus: "connect status read",
     list: "list",
   } as const;
 
@@ -174,6 +190,43 @@ export function createDataPlaneSandboxInstancesClient(
         status: result.response.status,
         error: result.error,
         operation: "read",
+      });
+    },
+
+    async connectSandboxInstance(connectInput) {
+      const result = await internalClient.client.POST("/internal/sandbox-instances/connect", {
+        body: connectInput,
+        signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+      });
+
+      if (result.response.status === 200 && result.data !== undefined) {
+        return result.data;
+      }
+
+      throw createClientError({
+        status: result.response.status,
+        error: result.error,
+        operation: "connect",
+      });
+    },
+
+    async getSandboxConnectStatus(getInput) {
+      const result = await internalClient.client.POST(
+        "/internal/sandbox-instances/connect-status",
+        {
+          body: getInput,
+          signal: AbortSignal.timeout(internalClient.requestTimeoutMs),
+        },
+      );
+
+      if (result.response.status === 200 && result.data !== undefined) {
+        return result.data;
+      }
+
+      throw createClientError({
+        status: result.response.status,
+        error: result.error,
+        operation: "connectStatus",
       });
     },
 

@@ -5,6 +5,7 @@ import {
 } from "@mistle/http/pagination";
 
 const SandboxInstanceStatusSchema = z.enum(["starting", "running", "stopped", "failed"]);
+const SandboxConnectStatusSchema = z.enum(["pending", "ready", "failed", "not_resumable"]);
 const SandboxInstanceSourceSchema = z.enum(["dashboard", "webhook"]);
 const SandboxInstanceStartedBySchema = z
   .object({
@@ -26,6 +27,7 @@ export const SandboxInstanceIdParamsSchema = z
   .strict();
 
 export const MintSandboxInstanceConnectionTokenBodySchema = z.object({}).strict();
+export const ConnectSandboxInstanceBodySchema = z.object({}).strict();
 
 export const SandboxInstanceConnectionTokenSchema = z
   .object({
@@ -42,6 +44,15 @@ export const SandboxInstanceStatusResponseSchema = z
     status: SandboxInstanceStatusSchema,
     failureCode: z.string().min(1).nullable(),
     failureMessage: z.string().min(1).nullable(),
+  })
+  .strict();
+
+export const SandboxInstanceConnectStatusResponseSchema = z
+  .object({
+    instanceId: z.string().min(1),
+    status: SandboxConnectStatusSchema,
+    code: z.string().min(1).nullable(),
+    message: z.string().min(1).nullable(),
   })
   .strict();
 
@@ -299,6 +310,132 @@ export const createSandboxInstanceConnectionTokenRoute = createRoute({
       content: {
         "application/json": {
           schema: SandboxInstancesConflictResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
+export const createSandboxInstanceConnectRoute = createRoute({
+  method: "post",
+  path: "/{instanceId}/connect",
+  tags: ["Sandbox Instances"],
+  request: {
+    params: SandboxInstanceIdParamsSchema,
+    body: {
+      required: false,
+      content: {
+        "application/json": {
+          schema: ConnectSandboxInstanceBodySchema,
+        },
+      },
+    },
+  },
+  responses: {
+    200: {
+      description: "Initiate or coalesce sandbox connection readiness work.",
+      content: {
+        "application/json": {
+          schema: SandboxInstanceConnectStatusResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesUnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesForbiddenResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Sandbox instance was not found.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesNotFoundResponseSchema,
+        },
+      },
+    },
+    500: {
+      description: "Internal server error.",
+      content: {
+        "text/plain": {
+          schema: z.string().min(1),
+        },
+      },
+    },
+  },
+});
+
+export const getSandboxInstanceConnectRoute = createRoute({
+  method: "get",
+  path: "/{instanceId}/connect",
+  tags: ["Sandbox Instances"],
+  request: {
+    params: SandboxInstanceIdParamsSchema,
+  },
+  responses: {
+    200: {
+      description: "Get sandbox connection readiness status.",
+      content: {
+        "application/json": {
+          schema: SandboxInstanceConnectStatusResponseSchema,
+        },
+      },
+    },
+    400: {
+      description: "Invalid request.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesBadRequestResponseSchema,
+        },
+      },
+    },
+    401: {
+      description: "Authentication is required.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesUnauthorizedResponseSchema,
+        },
+      },
+    },
+    403: {
+      description: "Active organization is required.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesForbiddenResponseSchema,
+        },
+      },
+    },
+    404: {
+      description: "Sandbox instance was not found.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesNotFoundResponseSchema,
         },
       },
     },

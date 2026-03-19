@@ -9,7 +9,10 @@ import {
 import { createBrowserSandboxSessionRuntime } from "@mistle/sandbox-session-client/browser";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { mintSandboxInstanceConnectionToken } from "./sessions-service.js";
+import {
+  awaitSandboxInstanceConnectionReady,
+  mintSandboxInstanceConnectionToken,
+} from "./sessions-service.js";
 
 type SandboxPtyLifecycleState = {
   connectedSandboxInstanceId: string | null;
@@ -208,6 +211,10 @@ export function useSandboxPtyState(): UseSandboxPtyStateResult {
           throw new Error("Sandbox PTY connection attempt was superseded.");
         }
       }
+
+      await awaitSandboxInstanceConnectionReady({
+        instanceId: input.sandboxInstanceId,
+      });
 
       const mintedConnection = await mintSandboxInstanceConnectionToken({
         instanceId: input.sandboxInstanceId,
