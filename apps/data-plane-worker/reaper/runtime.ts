@@ -42,7 +42,7 @@ export type IdleReaperSweepResult = {
 
 export function createSandboxIdlePolicy(config: DataPlaneWorkerRuntimeConfig): SandboxIdlePolicy {
   return {
-    webhookIdleTimeoutMs: config.app.reaper.webhookIdleTimeoutSeconds * 1000,
+    idleTimeoutMs: config.app.reaper.idleTimeoutSeconds * 1000,
     executionLeaseFreshnessMs: config.app.reaper.executionLeaseFreshnessSeconds * 1000,
     tunnelDisconnectGraceMs: config.app.reaper.tunnelDisconnectGraceSeconds * 1000,
   };
@@ -235,7 +235,7 @@ export async function runIdleReaper(): Promise<void> {
     logger.info(
       {
         pollIntervalSeconds: runtimeConfig.app.reaper.pollIntervalSeconds,
-        webhookIdleTimeoutSeconds: runtimeConfig.app.reaper.webhookIdleTimeoutSeconds,
+        idleTimeoutSeconds: runtimeConfig.app.reaper.idleTimeoutSeconds,
         executionLeaseFreshnessSeconds: runtimeConfig.app.reaper.executionLeaseFreshnessSeconds,
         tunnelDisconnectGraceSeconds: runtimeConfig.app.reaper.tunnelDisconnectGraceSeconds,
       },

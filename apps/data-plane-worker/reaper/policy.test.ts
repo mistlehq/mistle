@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { evaluateSandboxStopReason, SandboxStopReasons, type SandboxIdlePolicy } from "./policy.js";
 
 const DefaultPolicy: SandboxIdlePolicy = {
-  webhookIdleTimeoutMs: 300_000,
+  idleTimeoutMs: 300_000,
   executionLeaseFreshnessMs: 30_000,
   tunnelDisconnectGraceMs: 60_000,
 };

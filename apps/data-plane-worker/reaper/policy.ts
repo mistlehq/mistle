@@ -6,7 +6,7 @@ export const SandboxStopReasons = {
 export type SandboxStopReason = (typeof SandboxStopReasons)[keyof typeof SandboxStopReasons];
 
 export type SandboxIdlePolicy = {
-  webhookIdleTimeoutMs: number;
+  idleTimeoutMs: number;
   executionLeaseFreshnessMs: number;
   tunnelDisconnectGraceMs: number;
 };
@@ -45,8 +45,8 @@ export function evaluateSandboxStopReason(input: {
   state: SandboxStopCandidateState;
 }): SandboxStopReason | null {
   requirePositiveDuration({
-    fieldName: "webhookIdleTimeoutMs",
-    value: input.policy.webhookIdleTimeoutMs,
+    fieldName: "idleTimeoutMs",
+    value: input.policy.idleTimeoutMs,
   });
   requirePositiveDuration({
     fieldName: "executionLeaseFreshnessMs",
@@ -90,7 +90,7 @@ export function evaluateSandboxStopReason(input: {
     return null;
   }
 
-  if (input.nowMs - latestActivityAtMs >= input.policy.webhookIdleTimeoutMs) {
+  if (input.nowMs - latestActivityAtMs >= input.policy.idleTimeoutMs) {
     return SandboxStopReasons.IDLE;
   }
 

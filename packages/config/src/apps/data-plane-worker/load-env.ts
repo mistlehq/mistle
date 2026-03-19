@@ -73,8 +73,8 @@ const loadReaperEnv = createEnvLoader<typeof DataPlaneWorkerReaperConfigSchema>(
     parse: Number,
   },
   {
-    key: "webhookIdleTimeoutSeconds",
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_WEBHOOK_IDLE_TIMEOUT_SECONDS",
+    key: "idleTimeoutSeconds",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_IDLE_TIMEOUT_SECONDS",
     parse: Number,
   },
   {

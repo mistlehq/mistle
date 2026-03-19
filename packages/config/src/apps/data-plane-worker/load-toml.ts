@@ -59,7 +59,7 @@ export function loadDataPlaneWorkerFromToml(
     },
     reaper: {
       pollIntervalSeconds: reaper.poll_interval_seconds,
-      webhookIdleTimeoutSeconds: reaper.webhook_idle_timeout_seconds,
+      idleTimeoutSeconds: reaper.idle_timeout_seconds,
       executionLeaseFreshnessSeconds: reaper.execution_lease_freshness_seconds,
       tunnelDisconnectGraceSeconds: reaper.tunnel_disconnect_grace_seconds,
     },

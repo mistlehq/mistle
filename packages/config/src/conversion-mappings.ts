@@ -341,9 +341,9 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_POLL_INTERVAL_SECONDS",
   },
   {
-    configPath: ["apps", "data_plane_worker", "reaper", "webhookIdleTimeoutSeconds"],
-    tomlPath: ["apps", "data_plane_worker", "reaper", "webhook_idle_timeout_seconds"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_WEBHOOK_IDLE_TIMEOUT_SECONDS",
+    configPath: ["apps", "data_plane_worker", "reaper", "idleTimeoutSeconds"],
+    tomlPath: ["apps", "data_plane_worker", "reaper", "idle_timeout_seconds"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_IDLE_TIMEOUT_SECONDS",
   },
   {
     configPath: ["apps", "data_plane_worker", "reaper", "executionLeaseFreshnessSeconds"],
