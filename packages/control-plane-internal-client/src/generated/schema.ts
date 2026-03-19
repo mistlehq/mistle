@@ -507,7 +507,7 @@ export interface paths {
             };
           };
         };
-        /** @description Sandbox instance is not running. */
+        /** @description Sandbox instance could not be connected. */
         409: {
           headers: {
             [name: string]: unknown;
