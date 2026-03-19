@@ -19,7 +19,7 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@better-auth/drizzle-adapter": "1.5.3",
+    "@better-auth/drizzle-adapter": "1.5.5",
     "@hono/node-server": "^1.19.11",
     "@hono/zod-openapi": "^1.2.2",
     "@mistle/config": "workspace:*",
