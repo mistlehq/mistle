@@ -417,12 +417,10 @@ describe("integration connections update api key integration", () => {
           "content-type": "application/json",
           cookie: authenticatedSession.cookie,
         },
-        body: JSON.stringify(
-          UpdateApiKeyConnectionBodySchema.parse({
-            displayName: "OpenAI renamed",
-            apiKey: "   ",
-          }),
-        ),
+        body: JSON.stringify({
+          displayName: "OpenAI renamed",
+          apiKey: "   ",
+        }),
       },
     );
 

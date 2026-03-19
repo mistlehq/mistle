@@ -152,7 +152,7 @@ describe("SessionsPage integration", () => {
       );
 
       try {
-        expect(await screen.findByText("Sandbox instances")).toBeDefined();
+        expect(await screen.findByText("Start a new session")).toBeDefined();
         expect(await screen.findByText("Alpha Profile")).toBeDefined();
         expect(await screen.findByText("sbi_page_1")).toBeDefined();
         expect(screen.getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
