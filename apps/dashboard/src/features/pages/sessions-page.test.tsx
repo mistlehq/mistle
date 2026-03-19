@@ -6,9 +6,48 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { SessionsPage } from "./sessions-page.js";
+import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
+import { buildOptimisticSessions, SessionsPage } from "./sessions-page.js";
 
 describe("SessionsPage", () => {
+  it("uses the authenticated user's display name for optimistic sessions", () => {
+    const optimisticSessions = buildOptimisticSessions({
+      launchedSessions: [
+        {
+          profileId: "sbp_profile_alpha",
+          profileVersion: 3,
+          sandboxInstanceId: "sbi_optimistic",
+          createdAtIso: "2026-03-10T00:00:00.000Z",
+          status: "starting",
+          failureCode: null,
+          failureMessage: null,
+        },
+      ],
+      listedItems: [],
+      currentUserId: "user-id",
+      currentUserDisplayName: "Mistle User",
+    });
+
+    expect(optimisticSessions).toStrictEqual([
+      {
+        id: "sbi_optimistic",
+        sandboxProfileId: "sbp_profile_alpha",
+        sandboxProfileVersion: 3,
+        status: "starting",
+        startedBy: {
+          kind: "user",
+          id: "user-id",
+          name: "Mistle User",
+        },
+        source: "dashboard",
+        createdAt: "2026-03-10T00:00:00.000Z",
+        updatedAt: "2026-03-10T00:00:00.000Z",
+        failureCode: null,
+        failureMessage: null,
+      },
+    ]);
+  });
+
   it("renders sandbox launcher controls", async () => {
     const queryClient = new QueryClient({
       defaultOptions: {
@@ -17,6 +56,7 @@ describe("SessionsPage", () => {
         },
       },
     });
+    seedAuthenticatedSession(queryClient);
 
     const rendered = render(
       <QueryClientProvider client={queryClient}>
@@ -40,18 +80,17 @@ describe("SessionsPage", () => {
   });
 
   it("uses the shared dashboard table styling for the session list", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+    seedAuthenticatedSession(queryClient);
+
     const markup = renderToStaticMarkup(
-      <QueryClientProvider
-        client={
-          new QueryClient({
-            defaultOptions: {
-              queries: {
-                retry: false,
-              },
-            },
-          })
-        }
-      >
+      <QueryClientProvider client={queryClient}>
         <MemoryRouter>
           <SessionsPage />
         </MemoryRouter>

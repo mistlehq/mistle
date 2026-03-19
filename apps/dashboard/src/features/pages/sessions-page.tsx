@@ -38,6 +38,8 @@ import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { useSandboxSessionLaunchState } from "../sessions/use-sandbox-session-launch-state.js";
 import { formatRelativeOrDate } from "../shared/date-formatters.js";
 import { TablePagination } from "../shared/table-pagination.js";
+import { resolveUserDisplayName } from "../shared/user-display-name.js";
+import { useCachedRequiredSession } from "../shell/session-context.js";
 
 const SANDBOX_PROFILE_LIST_LIMIT = 100;
 const SANDBOX_INSTANCE_LIST_LIMIT = 20;
@@ -127,8 +129,52 @@ function getSandboxSessionStatusBadgeUi(status: SandboxSessionStatus): {
   };
 }
 
+export function buildOptimisticSessions(input: {
+  launchedSessions: readonly {
+    profileId: string;
+    profileVersion: number;
+    sandboxInstanceId: string;
+    createdAtIso: string;
+    status: SandboxSessionStatus;
+    failureCode: string | null;
+    failureMessage: string | null;
+  }[];
+  listedItems: readonly SandboxInstanceListItem[];
+  currentUserId: string;
+  currentUserDisplayName: string;
+}): SandboxInstanceListItem[] {
+  const listedInstanceIds = new Set(input.listedItems.map((item) => item.id));
+  const items: SandboxInstanceListItem[] = [];
+
+  for (const session of input.launchedSessions) {
+    if (listedInstanceIds.has(session.sandboxInstanceId)) {
+      continue;
+    }
+
+    items.push({
+      id: session.sandboxInstanceId,
+      sandboxProfileId: session.profileId,
+      sandboxProfileVersion: session.profileVersion,
+      status: session.status,
+      startedBy: {
+        kind: "user",
+        id: input.currentUserId,
+        name: input.currentUserDisplayName,
+      },
+      source: "dashboard",
+      createdAt: session.createdAtIso,
+      updatedAt: session.createdAtIso,
+      failureCode: session.failureCode,
+      failureMessage: session.failureMessage,
+    });
+  }
+
+  return items;
+}
+
 export function SessionsPage(): React.JSX.Element {
   const navigate = useNavigate();
+  const session = useCachedRequiredSession();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const {
@@ -245,37 +291,17 @@ export function SessionsPage(): React.JSX.Element {
       ),
     [profilesQuery.data?.items],
   );
-  const optimisticSessions = useMemo(() => {
-    const listedInstanceIds = new Set(
-      (sandboxInstancesQuery.data?.items ?? []).map((item) => item.id),
-    );
-    const items: SandboxInstanceListItem[] = [];
-
-    for (const session of launchedSessions) {
-      if (listedInstanceIds.has(session.sandboxInstanceId)) {
-        continue;
-      }
-
-      items.push({
-        id: session.sandboxInstanceId,
-        sandboxProfileId: session.profileId,
-        sandboxProfileVersion: session.profileVersion,
-        status: session.status,
-        startedBy: {
-          kind: "user",
-          id: "current-user",
-          name: null,
-        },
-        source: "dashboard",
-        createdAt: session.createdAtIso,
-        updatedAt: session.createdAtIso,
-        failureCode: session.failureCode,
-        failureMessage: session.failureMessage,
-      });
-    }
-
-    return items;
-  }, [launchedSessions, sandboxInstancesQuery.data?.items]);
+  const currentUserDisplayName = resolveUserDisplayName(session.user);
+  const optimisticSessions = useMemo(
+    () =>
+      buildOptimisticSessions({
+        launchedSessions,
+        listedItems: sandboxInstancesQuery.data?.items ?? [],
+        currentUserId: session.user.id,
+        currentUserDisplayName,
+      }),
+    [currentUserDisplayName, launchedSessions, sandboxInstancesQuery.data?.items, session.user.id],
+  );
   const displayedSessions = useMemo(() => {
     const combinedItems = [...optimisticSessions, ...(sandboxInstancesQuery.data?.items ?? [])];
 

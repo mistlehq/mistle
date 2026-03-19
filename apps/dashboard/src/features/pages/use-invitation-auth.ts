@@ -4,7 +4,7 @@ import { useState } from "react";
 import { authClient } from "../../lib/auth/client.js";
 import { resolveEmailValidationError, resolveOtpValidationError } from "../auth/auth-flow.js";
 import { resolveErrorMessage } from "../auth/messages.js";
-import { SESSION_QUERY_KEY } from "../shell/session-query.js";
+import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
 
 type UseInvitationAuthInput = {
   initialEmail: string;
