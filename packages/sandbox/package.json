@@ -32,6 +32,6 @@
   },
   "devDependencies": {
     "@types/dockerode": "^4.0.1",
-    "testcontainers": "^11.7.2"
+    "testcontainers": "^11.13.0"
   }
 }
