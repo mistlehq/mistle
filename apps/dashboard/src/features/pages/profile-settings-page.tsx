@@ -6,7 +6,7 @@ import { resolveApiErrorMessage } from "../api/error-message.js";
 import { updateProfileDisplayName } from "../settings/profile/profile-service.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredSession } from "../shell/require-auth.js";
-import { SESSION_QUERY_KEY } from "../shell/session-query.js";
+import { SESSION_QUERY_KEY } from "../shell/session-query-key.js";
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 
 export function ProfileSettingsPage(): React.JSX.Element {

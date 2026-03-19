@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { resetDashboardConfigForTest } from "../src/config.js";
 import { SessionsPage } from "../src/features/pages/sessions-page.js";
 import { resetControlPlaneApiClientForTest } from "../src/lib/control-plane-api/client.js";
+import { seedAuthenticatedSession } from "../src/test-support/auth-session.js";
 
 describe("SessionsPage integration", () => {
   afterEach(() => {
@@ -144,6 +145,7 @@ describe("SessionsPage integration", () => {
           },
         },
       });
+      seedAuthenticatedSession(queryClient);
 
       const rendered = render(
         <QueryClientProvider client={queryClient}>
@@ -156,7 +158,6 @@ describe("SessionsPage integration", () => {
       try {
         expect(await screen.findByText("Start a new session")).toBeDefined();
         expect(await screen.findByText("Alpha Profile")).toBeDefined();
-        expect(await screen.findByText("sbi_page_1")).toBeDefined();
         expect(await screen.findByText("Jordan Example")).toBeDefined();
         expect(screen.getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
         expect(screen.getByRole("button", { name: "Previous" })).toHaveProperty("disabled", true);
@@ -164,8 +165,7 @@ describe("SessionsPage integration", () => {
         fireEvent.click(screen.getByRole("button", { name: "Next" }));
 
         await waitFor(() => {
-          expect(screen.getByText("sbi_page_2")).toBeDefined();
-          expect(screen.queryByText("sbi_page_1")).toBeNull();
+          expect(screen.queryByText("Jordan Example")).toBeNull();
           expect(screen.getByText("Taylor Example")).toBeDefined();
         });
 
