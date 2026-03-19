@@ -113,13 +113,6 @@ export function CodexSessionPage(): React.JSX.Element {
       description: workbench.sandboxFailureMessage,
     });
   }
-  if (workbench.ptyState.lifecycle.errorMessage !== null) {
-    alerts.push({
-      title: "Terminal connection error",
-      description: workbench.ptyState.lifecycle.errorMessage,
-    });
-  }
-
   if (sandboxInstanceId === null) {
     return (
       <SessionWorkbenchPageView
@@ -153,9 +146,7 @@ export function CodexSessionPage(): React.JSX.Element {
 
   return (
     <SessionWorkbenchPageView
-      alerts={
-        workbench.hasTopAlert || workbench.ptyState.lifecycle.errorMessage !== null ? alerts : []
-      }
+      alerts={workbench.hasTopAlert ? alerts : []}
       isSecondaryPanelVisible={workbench.terminalPanelState.isVisible}
       mainContent={
         <CodexSessionPaneMainContent
