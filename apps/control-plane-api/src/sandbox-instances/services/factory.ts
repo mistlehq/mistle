@@ -17,7 +17,7 @@ export function createSandboxInstancesService(
   input: CreateSandboxInstancesServiceInput,
 ): SandboxInstancesService {
   const sandboxInstancesService = {
-    listInstances: (serviceInput) => listInstances(input.dataPlaneClient, serviceInput),
+    listInstances: (serviceInput) => listInstances(input.db, input.dataPlaneClient, serviceInput),
     getInstance: (serviceInput) => getInstance(input.dataPlaneClient, serviceInput),
     mintConnectionToken: (serviceInput) => mintConnectionToken(input.dataPlaneClient, serviceInput),
     mintConnectionTokenForInstance: (serviceInput) =>

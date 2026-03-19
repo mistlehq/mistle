@@ -263,6 +263,7 @@ export function SessionsPage(): React.JSX.Element {
         startedBy: {
           kind: "user",
           id: "current-user",
+          name: null,
         },
         source: "dashboard",
         createdAt: session.createdAtIso,
@@ -345,6 +346,10 @@ export function SessionsPage(): React.JSX.Element {
   }
 
   function formatStartedByLabel(input: SandboxInstanceListItem["startedBy"]): string {
+    if (input.kind === "user" && input.name !== null) {
+      return input.name;
+    }
+
     if (input.kind === "system") {
       return "System";
     }

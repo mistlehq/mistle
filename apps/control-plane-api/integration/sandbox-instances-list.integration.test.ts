@@ -257,6 +257,7 @@ describe("sandbox instances list integration", () => {
       startedBy: {
         kind: "system",
         id: "aru_cp_list",
+        name: null,
       },
       source: "webhook",
       failureCode: "SANDBOX_START_FAILED",
@@ -285,6 +286,11 @@ describe("sandbox instances list integration", () => {
 
     expect(secondPage.totalResults).toBe(3);
     expect(secondPage.items.map((item) => item.id)).toEqual(["sbi_cp_list_a_001"]);
+    expect(secondPage.items[0]?.startedBy).toMatchObject({
+      kind: "user",
+      id: firstOrgSession.userId,
+      name: expect.any(String),
+    });
     expect(secondPage.previousPage).not.toBeNull();
     expect(secondPage.nextPage).toBeNull();
 

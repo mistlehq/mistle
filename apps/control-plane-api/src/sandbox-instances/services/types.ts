@@ -3,9 +3,11 @@ import type {
   GetSandboxInstanceResponse,
   ListSandboxInstancesResponse,
 } from "@mistle/data-plane-internal-client";
+import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 
 export type CreateSandboxInstancesServiceInput = {
+  db: ControlPlaneDatabase;
   dataPlaneClient: DataPlaneSandboxInstancesClient;
   defaultConnectionToken: {
     gatewayWebsocketUrl: string;
@@ -36,7 +38,15 @@ export type SandboxInstanceStatus = {
   failureMessage: string | null;
 };
 
-export type ListSandboxInstancesResult = ListSandboxInstancesResponse;
+export type ListSandboxInstancesResult = Omit<ListSandboxInstancesResponse, "items"> & {
+  items: Array<
+    ListSandboxInstancesResponse["items"][number] & {
+      startedBy: ListSandboxInstancesResponse["items"][number]["startedBy"] & {
+        name: string | null;
+      };
+    }
+  >;
+};
 
 export type SandboxInstancesService = {
   listInstances: (input: {

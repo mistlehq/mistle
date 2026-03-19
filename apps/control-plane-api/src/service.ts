@@ -24,6 +24,7 @@ export function createAppServices(input: CreateAppServicesInput): AppServices {
     serviceToken: runtimeConfig.internalAuthServiceToken,
   });
   const sandboxInstancesService = createSandboxInstancesService({
+    db: resources.db,
     dataPlaneClient,
     defaultConnectionToken: {
       gatewayWebsocketUrl: runtimeConfig.sandbox.gatewayWsUrl,
