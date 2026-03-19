@@ -33,6 +33,7 @@ import {
   createSandboxProfile,
   listSandboxProfiles,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
+import { TablePagination } from "../shared/table-pagination.js";
 
 const DEFAULT_LIST_LIMIT = 20;
 const MAX_LIST_LIMIT = 100;
@@ -289,11 +290,19 @@ export function SandboxProfilesPage(): React.JSX.Element {
 
       {!listQuery.isPending && !listQuery.isError ? (
         <>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Updated</TableHead>
+          <Table className="min-w-[32rem] table-fixed">
+            <colgroup>
+              <col className="w-[68%]" />
+              <col className="w-[32%]" />
+            </colgroup>
+            <TableHeader className="bg-muted/60">
+              <TableRow className="h-9 border-b">
+                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                  Name
+                </TableHead>
+                <TableHead className="text-foreground py-2 text-xs font-semibold tracking-wide uppercase">
+                  Updated
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -318,35 +327,19 @@ export function SandboxProfilesPage(): React.JSX.Element {
             </TableBody>
           </Table>
 
-          <div className="flex items-center justify-between">
-            <p className="text-muted-foreground text-sm">
-              Showing {items.length} of {listQuery.data.totalResults}
-            </p>
-            <div className="gap-2 flex">
-              <Button
-                disabled={
-                  listQuery.data.previousPage === null ||
-                  listQuery.isFetching ||
-                  listQuery.isPending
-                }
-                onClick={goToPreviousPage}
-                type="button"
-                variant="outline"
-              >
-                Previous
-              </Button>
-              <Button
-                disabled={
-                  listQuery.data.nextPage === null || listQuery.isFetching || listQuery.isPending
-                }
-                onClick={goToNextPage}
-                type="button"
-                variant="outline"
-              >
-                Next
-              </Button>
-            </div>
-          </div>
+          <TablePagination
+            hasNextPage={listQuery.data.nextPage !== null}
+            hasPreviousPage={listQuery.data.previousPage !== null}
+            nextPageDisabled={listQuery.isFetching || listQuery.isPending}
+            onNextPage={goToNextPage}
+            onPreviousPage={goToPreviousPage}
+            previousPageDisabled={listQuery.isFetching || listQuery.isPending}
+            summary={
+              <p className="text-muted-foreground text-sm">
+                Showing {items.length} of {listQuery.data.totalResults}
+              </p>
+            }
+          />
         </>
       ) : null}
     </div>

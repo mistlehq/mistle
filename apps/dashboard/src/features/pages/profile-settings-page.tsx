@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { updateProfileDisplayName } from "../settings/profile/profile-service.js";
+import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useRequiredSession } from "../shell/require-auth.js";
 import { SESSION_QUERY_KEY } from "../shell/session-query.js";
 import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
@@ -16,8 +17,8 @@ export function ProfileSettingsPage(): React.JSX.Element {
   const [fieldError, setFieldError] = useState<string | null>(null);
 
   useEffect(() => {
-    setDisplayNameDraft(session.user.name ?? session.user.email);
-  }, [session.user.email, session.user.name]);
+    setDisplayNameDraft(resolveUserDisplayName(session.user));
+  }, [session.user]);
 
   useEffect(() => {
     if (!saveSuccess) {
@@ -60,7 +61,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
   }
 
   function handleCancelChanges(): void {
-    setDisplayNameDraft(session.user.name ?? session.user.email);
+    setDisplayNameDraft(resolveUserDisplayName(session.user));
     setFieldError(null);
     setSaveSuccess(false);
   }
@@ -71,7 +72,7 @@ export function ProfileSettingsPage(): React.JSX.Element {
   }
 
   const normalizedDisplayName = displayNameDraft.trim();
-  const persistedDisplayName = session.user.name ?? session.user.email;
+  const persistedDisplayName = resolveUserDisplayName(session.user);
   const hasDirtyChanges = normalizedDisplayName !== persistedDisplayName.trim();
   const displayName = normalizedDisplayName.length > 0 ? normalizedDisplayName : session.user.email;
 

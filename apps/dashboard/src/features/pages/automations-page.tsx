@@ -1,4 +1,3 @@
-import { Button } from "@mistle/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router";
 
@@ -8,6 +7,7 @@ import { buildWebhookAutomationListItems } from "../automations/webhook-automati
 import { WebhookAutomationListView } from "../automations/webhook-automation-list-view.js";
 import { webhookAutomationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { listWebhookAutomations } from "../automations/webhook-automations-service.js";
+import { TablePagination } from "../shared/table-pagination.js";
 
 const AUTOMATIONS_LIST_LIMIT = 25;
 
@@ -91,47 +91,33 @@ export function AutomationsPage(): React.JSX.Element {
         }}
       />
 
-      {automationsQuery.data === undefined ||
-      (automationsQuery.data.nextPage === null &&
-        automationsQuery.data.previousPage === null) ? null : (
-        <div className="flex justify-end gap-2">
-          <Button
-            disabled={automationsQuery.data.previousPage === null}
-            onClick={() => {
-              const previousPage = automationsQuery.data?.previousPage;
-              if (previousPage === null || previousPage === undefined) {
-                return;
-              }
+      {automationsQuery.data === undefined ? null : (
+        <TablePagination
+          hasNextPage={automationsQuery.data.nextPage !== null}
+          hasPreviousPage={automationsQuery.data.previousPage !== null}
+          onNextPage={() => {
+            const nextPage = automationsQuery.data?.nextPage;
+            if (nextPage === null || nextPage === undefined) {
+              return;
+            }
 
-              updatePagination({
-                nextAfter: null,
-                nextBefore: previousPage.before,
-              });
-            }}
-            type="button"
-            variant="outline"
-          >
-            Previous
-          </Button>
-          <Button
-            disabled={automationsQuery.data.nextPage === null}
-            onClick={() => {
-              const nextPage = automationsQuery.data?.nextPage;
-              if (nextPage === null || nextPage === undefined) {
-                return;
-              }
+            updatePagination({
+              nextAfter: nextPage.after,
+              nextBefore: null,
+            });
+          }}
+          onPreviousPage={() => {
+            const previousPage = automationsQuery.data?.previousPage;
+            if (previousPage === null || previousPage === undefined) {
+              return;
+            }
 
-              updatePagination({
-                nextAfter: nextPage.after,
-                nextBefore: null,
-              });
-            }}
-            type="button"
-            variant="outline"
-          >
-            Next
-          </Button>
-        </div>
+            updatePagination({
+              nextAfter: null,
+              nextBefore: previousPage.before,
+            });
+          }}
+        />
       )}
     </div>
   );
