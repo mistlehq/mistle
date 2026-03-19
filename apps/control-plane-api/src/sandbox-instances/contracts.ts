@@ -10,6 +10,7 @@ const SandboxInstanceStartedBySchema = z
   .object({
     kind: z.enum(["user", "system"]),
     id: z.string().min(1),
+    name: z.string().min(1).nullable(),
   })
   .strict();
 

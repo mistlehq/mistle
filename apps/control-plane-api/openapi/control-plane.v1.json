@@ -4462,9 +4462,13 @@
                               "id": {
                                 "type": "string",
                                 "minLength": 1
+                              },
+                              "name": {
+                                "type": ["string", "null"],
+                                "minLength": 1
                               }
                             },
-                            "required": ["kind", "id"],
+                            "required": ["kind", "id", "name"],
                             "additionalProperties": false
                           },
                           "source": {

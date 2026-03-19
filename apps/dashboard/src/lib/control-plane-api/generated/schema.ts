@@ -2361,6 +2361,7 @@ export interface paths {
                   id: string;
                   /** @enum {string} */
                   kind: "user" | "system";
+                  name: string | null;
                 };
                 /** @enum {string} */
                 status: "starting" | "running" | "stopped" | "failed";

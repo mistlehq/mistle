@@ -1,12 +1,52 @@
 import {
   DataPlaneSandboxInstancesClientError,
   type DataPlaneSandboxInstancesClient,
+  type ListSandboxInstancesResponse,
 } from "@mistle/data-plane-internal-client";
+import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 
+import { resolveUserDisplayName } from "../../users/display-name.js";
 import { SandboxInstancesBadRequestCodes, SandboxInstancesBadRequestError } from "./errors.js";
 import type { ListSandboxInstancesResult } from "./types.js";
 
+async function resolveStartedByNames(
+  db: ControlPlaneDatabase,
+  input: ListSandboxInstancesResponse["items"],
+): Promise<Map<string, string>> {
+  const startedByUserIds = [
+    ...new Set(
+      input
+        .map((item) => item.startedBy)
+        .filter((starter) => starter.kind === "user")
+        .map((starter) => starter.id),
+    ),
+  ];
+  if (startedByUserIds.length === 0) {
+    return new Map();
+  }
+
+  const users = await db.query.users.findMany({
+    columns: {
+      id: true,
+      name: true,
+      email: true,
+    },
+    where: (table, { inArray }) => inArray(table.id, startedByUserIds),
+  });
+
+  return new Map(
+    users.map((user) => [
+      user.id,
+      resolveUserDisplayName({
+        name: user.name,
+        email: user.email,
+      }),
+    ]),
+  );
+}
+
 export async function listInstances(
+  db: ControlPlaneDatabase,
   dataPlaneClient: DataPlaneSandboxInstancesClient,
   input: {
     organizationId: string;
@@ -16,12 +56,26 @@ export async function listInstances(
   },
 ): Promise<ListSandboxInstancesResult> {
   try {
-    return await dataPlaneClient.listSandboxInstances({
+    const sandboxInstances = await dataPlaneClient.listSandboxInstances({
       organizationId: input.organizationId,
       ...(input.limit === undefined ? {} : { limit: input.limit }),
       ...(input.after === undefined ? {} : { after: input.after }),
       ...(input.before === undefined ? {} : { before: input.before }),
     });
+
+    const startedByNames = await resolveStartedByNames(db, sandboxInstances.items);
+
+    return {
+      ...sandboxInstances,
+      items: sandboxInstances.items.map((item) => ({
+        ...item,
+        startedBy: {
+          ...item.startedBy,
+          name:
+            item.startedBy.kind === "user" ? (startedByNames.get(item.startedBy.id) ?? null) : null,
+        },
+      })),
+    };
   } catch (error) {
     if (error instanceof DataPlaneSandboxInstancesClientError && error.status === 400) {
       throw new SandboxInstancesBadRequestError(

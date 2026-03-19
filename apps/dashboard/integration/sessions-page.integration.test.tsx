@@ -60,6 +60,7 @@ describe("SessionsPage integration", () => {
                   startedBy: {
                     kind: "user",
                     id: "usr_456",
+                    name: "Taylor Example",
                   },
                   source: "dashboard",
                   createdAt: "2026-03-12T12:00:00.000Z",
@@ -90,6 +91,7 @@ describe("SessionsPage integration", () => {
                 startedBy: {
                   kind: "user",
                   id: "usr_123",
+                  name: "Jordan Example",
                 },
                 source: "dashboard",
                 createdAt: "2026-03-11T12:00:00.000Z",
@@ -155,6 +157,7 @@ describe("SessionsPage integration", () => {
         expect(await screen.findByText("Start a new session")).toBeDefined();
         expect(await screen.findByText("Alpha Profile")).toBeDefined();
         expect(await screen.findByText("sbi_page_1")).toBeDefined();
+        expect(await screen.findByText("Jordan Example")).toBeDefined();
         expect(screen.getByRole("button", { name: "Next" })).toHaveProperty("disabled", false);
         expect(screen.getByRole("button", { name: "Previous" })).toHaveProperty("disabled", true);
 
@@ -163,6 +166,7 @@ describe("SessionsPage integration", () => {
         await waitFor(() => {
           expect(screen.getByText("sbi_page_2")).toBeDefined();
           expect(screen.queryByText("sbi_page_1")).toBeNull();
+          expect(screen.getByText("Taylor Example")).toBeDefined();
         });
 
         expect(screen.getByRole("button", { name: "Previous" })).toHaveProperty("disabled", false);
