@@ -286,12 +286,6 @@ const dataPlaneWorkerEnvConfig = {
     bootstrapTokenTtlSeconds: 120,
     exchangeTokenTtlSeconds: 3600,
   },
-  reaper: {
-    pollIntervalSeconds: 30,
-    idleTimeoutSeconds: 300,
-    executionLeaseFreshnessSeconds: 30,
-    tunnelDisconnectGraceSeconds: 60,
-  },
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5003",
   },
@@ -339,12 +333,6 @@ const dataPlaneWorkerDockerFixtureConfig = {
   tunnel: {
     bootstrapTokenTtlSeconds: 120,
     exchangeTokenTtlSeconds: 3600,
-  },
-  reaper: {
-    pollIntervalSeconds: 30,
-    idleTimeoutSeconds: 300,
-    executionLeaseFreshnessSeconds: 30,
-    tunnelDisconnectGraceSeconds: 60,
   },
   runtimeState: {
     gatewayBaseUrl: "http://127.0.0.1:5003",

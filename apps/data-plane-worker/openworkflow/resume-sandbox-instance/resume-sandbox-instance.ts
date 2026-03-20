@@ -9,6 +9,7 @@ import { SandboxProvider, type SandboxAdapter, type SandboxVolumeHandleV1 } from
 import { isSandboxResourceNotFoundError } from "@mistle/sandbox";
 import type { Clock, Sleeper } from "@mistle/time";
 
+import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "../core/config.js";
 import { destroySandbox } from "../shared/destroy-sandbox.js";
 import { markSandboxInstanceFailed } from "../start-sandbox-instance/mark-sandbox-instance-failed.js";
@@ -126,6 +127,7 @@ export async function resumeSandboxInstance(
     config: DataPlaneWorkerRuntimeConfig;
     db: DataPlaneDatabase;
     sandboxAdapter: SandboxAdapter;
+    runtimeStateReader: SandboxRuntimeStateReader;
     tunnelReadinessPolicy: {
       timeoutMs: number;
       pollIntervalMs: number;
@@ -272,7 +274,7 @@ export async function resumeSandboxInstance(
   try {
     tunnelReady = await waitForSandboxTunnelReadiness(
       {
-        db: ctx.db,
+        runtimeStateReader: ctx.runtimeStateReader,
         policy: ctx.tunnelReadinessPolicy,
         clock: ctx.clock,
         sleeper: ctx.sleeper,

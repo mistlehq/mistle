@@ -21,12 +21,6 @@ export const dataPlaneWorkerDevelopmentPreset = {
           bootstrap_token_ttl_seconds: 120,
           exchange_token_ttl_seconds: 3600,
         },
-        reaper: {
-          poll_interval_seconds: 30,
-          idle_timeout_seconds: 300,
-          execution_lease_freshness_seconds: 30,
-          tunnel_disconnect_grace_seconds: 60,
-        },
         runtime_state: {
           gateway_base_url: "http://data-plane-gateway-relay:5202",
         },

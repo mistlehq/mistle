@@ -3,7 +3,6 @@
   "include": [
     "instrument.ts",
     "logger.ts",
-    "reaper/**/*.ts",
     "runtime-state/**/*.ts",
     "openworkflow.config.ts",
     "openworkflow/**/*.ts",

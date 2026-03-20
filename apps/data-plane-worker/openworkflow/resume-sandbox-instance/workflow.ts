@@ -18,6 +18,7 @@ export const ResumeSandboxInstanceWorkflow = defineWorkflow(
           config: ctx.config,
           db: ctx.db,
           sandboxAdapter: ctx.sandboxAdapter,
+          runtimeStateReader: ctx.runtimeStateReader,
           tunnelReadinessPolicy: ctx.tunnelReadinessPolicy,
           clock: ctx.clock,
           sleeper: ctx.sleeper,
