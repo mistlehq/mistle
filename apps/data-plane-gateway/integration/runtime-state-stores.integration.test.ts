@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 
+import { ValkeySandboxPresenceStore } from "../src/runtime-state/adapters/valkey-sandbox-presence-store.js";
 import { ValkeySandboxRuntimeAttachmentStore } from "../src/runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import { createValkeyClient, closeValkeyClient } from "../src/runtime-state/valkey-client.js";
 import { ValkeySandboxOwnerStore } from "../src/tunnel/ownership/adapters/valkey-sandbox-owner-store.js";
@@ -160,6 +161,72 @@ describe("runtime-state store integrations", () => {
           nowMs: Date.now(),
         }),
       ).resolves.toBeNull();
+    } finally {
+      await deleteKeysByPrefix({
+        client,
+        keyPrefix,
+      });
+      await closeValkeyClient(client);
+    }
+  });
+
+  it("tracks active presence leases until they are released or expire", async () => {
+    const keyPrefix = `mistle:runtime-state:presence-it:${randomUUID()}`;
+    const client = createValkeyClient({
+      url: ValkeyUrl,
+    });
+    await client.connect();
+
+    try {
+      const store = new ValkeySandboxPresenceStore(client, keyPrefix);
+      const sandboxInstanceId = "sbi_presence_it";
+
+      await store.touchLease({
+        sandboxInstanceId,
+        leaseId: "spl_first",
+        kind: "pty",
+        source: "dashboard",
+        sessionId: "session_first",
+        ttlMs: 30_000,
+        nowMs: Date.now(),
+      });
+      await store.touchLease({
+        sandboxInstanceId,
+        leaseId: "spl_second",
+        kind: "agent",
+        source: "cli",
+        sessionId: "session_second",
+        ttlMs: 50,
+        nowMs: Date.now(),
+      });
+
+      await expect(
+        store.hasAnyActiveLease({
+          sandboxInstanceId,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toBe(true);
+      await expect(
+        store.releaseLease({
+          sandboxInstanceId,
+          leaseId: "spl_first",
+        }),
+      ).resolves.toBe(true);
+      await expect(
+        store.hasAnyActiveLease({
+          sandboxInstanceId,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toBe(true);
+
+      await systemSleeper.sleep(100);
+
+      await expect(
+        store.hasAnyActiveLease({
+          sandboxInstanceId,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toBe(false);
     } finally {
       await deleteKeysByPrefix({
         client,
