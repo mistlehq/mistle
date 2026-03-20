@@ -52,6 +52,12 @@ type KeyedValue<T> = {
   value: T;
 };
 
+type WebhookAutomationEditorState = KeyedValue<{
+  formValues: WebhookAutomationFormValues;
+  fieldErrors: Partial<Record<keyof WebhookAutomationFormValues, string>>;
+  formError: string | null;
+}>;
+
 function resolveNormalizedConversationKeyTemplate(input: {
   values: WebhookAutomationFormValues;
   eventOptions: readonly WebhookAutomationEventOption[];
@@ -144,18 +150,7 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
   );
   const formValuesSourceKey =
     input.mode === "edit" ? `edit:${input.automationId ?? "missing"}` : "create";
-  const [formValuesState, setFormValuesState] =
-    useState<KeyedValue<WebhookAutomationFormValues> | null>(null);
-  const [fieldErrorsState, setFieldErrorsState] = useState<
-    KeyedValue<Partial<Record<keyof WebhookAutomationFormValues, string>>>
-  >({
-    sourceKey: formValuesSourceKey,
-    value: {},
-  });
-  const [formErrorState, setFormErrorState] = useState<KeyedValue<string | null>>({
-    sourceKey: formValuesSourceKey,
-    value: null,
-  });
+  const [editorState, setEditorState] = useState<WebhookAutomationEditorState | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const hydratedFormValues = useMemo(() => {
@@ -185,13 +180,12 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
 
     return toWebhookAutomationFormValues(automationQuery.data, hydrationEventOptions);
   }, [automationQuery.data, input.mode, prerequisites.integrationDirectoryQuery.data]);
+  const currentEditorState =
+    editorState?.sourceKey === formValuesSourceKey ? editorState.value : null;
   const formValues =
-    formValuesState?.sourceKey === formValuesSourceKey
-      ? formValuesState.value
-      : (hydratedFormValues ?? toWebhookAutomationFormValues(null));
-  const fieldErrors =
-    fieldErrorsState.sourceKey === formValuesSourceKey ? fieldErrorsState.value : {};
-  const formError = formErrorState.sourceKey === formValuesSourceKey ? formErrorState.value : null;
+    currentEditorState?.formValues ?? hydratedFormValues ?? toWebhookAutomationFormValues(null);
+  const fieldErrors = currentEditorState?.fieldErrors ?? {};
+  const formError = currentEditorState?.formError ?? null;
   const webhookEventOptions = useMemo(
     () =>
       prerequisites.integrationDirectoryQuery.data === undefined
@@ -217,9 +211,13 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
         payload: toCreateWebhookAutomationPayload(values, webhookEventOptions),
       }),
     onSuccess: async (automation) => {
-      setFormErrorState({
+      setEditorState({
         sourceKey: formValuesSourceKey,
-        value: null,
+        value: {
+          formValues,
+          fieldErrors,
+          formError: null,
+        },
       });
       await queryClient.invalidateQueries({
         queryKey: AUTOMATIONS_QUERY_KEY_PREFIX,
@@ -227,12 +225,16 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
       await input.navigate(`/automations/${automation.id}`);
     },
     onError: (error: unknown) => {
-      setFormErrorState({
+      setEditorState({
         sourceKey: formValuesSourceKey,
-        value: resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not create automation.",
-        }),
+        value: {
+          formValues,
+          fieldErrors,
+          formError: resolveApiErrorMessage({
+            error,
+            fallbackMessage: "Could not create automation.",
+          }),
+        },
       });
     },
   });
@@ -251,25 +253,29 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
       });
     },
     onSuccess: async (automation) => {
-      setFormErrorState({
+      setEditorState({
         sourceKey: formValuesSourceKey,
-        value: null,
-      });
-      setFormValuesState({
-        sourceKey: formValuesSourceKey,
-        value: toWebhookAutomationFormValues(automation, webhookEventOptions),
+        value: {
+          formValues: toWebhookAutomationFormValues(automation, webhookEventOptions),
+          fieldErrors: {},
+          formError: null,
+        },
       });
       await queryClient.invalidateQueries({
         queryKey: AUTOMATIONS_QUERY_KEY_PREFIX,
       });
     },
     onError: (error: unknown) => {
-      setFormErrorState({
+      setEditorState({
         sourceKey: formValuesSourceKey,
-        value: resolveApiErrorMessage({
-          error,
-          fallbackMessage: "Could not update automation.",
-        }),
+        value: {
+          formValues,
+          fieldErrors,
+          formError: resolveApiErrorMessage({
+            error,
+            fallbackMessage: "Could not update automation.",
+          }),
+        },
       });
     },
   });
@@ -315,33 +321,28 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
         eventOptions: webhookEventOptions,
       });
     }
-
-    setFormValuesState({
-      sourceKey: formValuesSourceKey,
-      value: nextValues,
-    });
-    setFieldErrorsState({
+    setEditorState({
       sourceKey: formValuesSourceKey,
       value: {
-        ...fieldErrors,
-        [key]: undefined,
+        formValues: nextValues,
+        fieldErrors: {
+          ...fieldErrors,
+          [key]: undefined,
+        },
+        formError: null,
       },
-    });
-    setFormErrorState({
-      sourceKey: formValuesSourceKey,
-      value: null,
     });
   }
 
   function submitForm(): void {
     const nextFieldErrors = validateWebhookAutomationFormValues(formValues, webhookEventOptions);
-    setFieldErrorsState({
+    setEditorState({
       sourceKey: formValuesSourceKey,
-      value: nextFieldErrors,
-    });
-    setFormErrorState({
-      sourceKey: formValuesSourceKey,
-      value: null,
+      value: {
+        formValues,
+        fieldErrors: nextFieldErrors,
+        formError: null,
+      },
     });
 
     if (Object.keys(nextFieldErrors).length > 0) {

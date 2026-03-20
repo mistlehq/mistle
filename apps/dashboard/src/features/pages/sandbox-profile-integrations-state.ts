@@ -133,6 +133,13 @@ type KeyedValue<T> = {
   value: T;
 };
 
+type SandboxProfileIntegrationsEditorState = KeyedValue<{
+  integrationRows: SandboxProfileBindingEditorRow[];
+  integrationSaveError: string | null;
+  integrationRowErrorsByClientId: Record<string, string>;
+  integrationSaveSuccess: boolean;
+}>;
+
 export function useSandboxProfileIntegrationsState(
   input: UseSandboxProfileIntegrationsStateInput,
 ): {
@@ -189,15 +196,24 @@ export function useSandboxProfileIntegrationsState(
     input.mode === "edit" && input.profileId !== undefined && resolvedProfileVersion !== null
       ? `${input.profileId}:${String(resolvedProfileVersion)}`
       : "unavailable";
+  const [editorState, setEditorState] = useState<SandboxProfileIntegrationsEditorState | null>(
+    null,
+  );
 
   function clearIntegrationRowError(clientId: string): void {
-    setIntegrationRowErrorsState((currentState) => {
-      const currentErrors =
-        currentState?.sourceKey === integrationSourceKey ? currentState.value : {};
+    setEditorState((currentState) => {
+      const currentEditorState =
+        currentState?.sourceKey === integrationSourceKey ? currentState.value : null;
+      const currentErrors = currentEditorState?.integrationRowErrorsByClientId ?? {};
       if (currentErrors[clientId] === undefined) {
         return {
           sourceKey: integrationSourceKey,
-          value: currentErrors,
+          value: {
+            integrationRows: currentEditorState?.integrationRows ?? hydratedIntegrationRows,
+            integrationSaveError: currentEditorState?.integrationSaveError ?? null,
+            integrationRowErrorsByClientId: currentErrors,
+            integrationSaveSuccess: currentEditorState?.integrationSaveSuccess ?? false,
+          },
         };
       }
       const nextErrors: Record<string, string> = {};
@@ -208,38 +224,56 @@ export function useSandboxProfileIntegrationsState(
       }
       return {
         sourceKey: integrationSourceKey,
-        value: nextErrors,
+        value: {
+          integrationRows: currentEditorState?.integrationRows ?? hydratedIntegrationRows,
+          integrationSaveError: currentEditorState?.integrationSaveError ?? null,
+          integrationRowErrorsByClientId: nextErrors,
+          integrationSaveSuccess: currentEditorState?.integrationSaveSuccess ?? false,
+        },
       };
     });
   }
 
   function markIntegrationDirty(inputValue?: { clientId: string }): void {
-    setIntegrationSaveErrorState({
-      sourceKey: integrationSourceKey,
-      value: null,
-    });
+    const currentEditorState =
+      editorState?.sourceKey === integrationSourceKey ? editorState.value : null;
     if (inputValue === undefined) {
-      setIntegrationRowErrorsState({
+      setEditorState({
         sourceKey: integrationSourceKey,
-        value: {},
+        value: {
+          integrationRows: currentEditorState?.integrationRows ?? hydratedIntegrationRows,
+          integrationSaveError: null,
+          integrationRowErrorsByClientId: {},
+          integrationSaveSuccess: false,
+        },
       });
     } else {
       clearIntegrationRowError(inputValue.clientId);
+      setEditorState((currentState) => {
+        const nextEditorState =
+          currentState?.sourceKey === integrationSourceKey ? currentState.value : null;
+        return {
+          sourceKey: integrationSourceKey,
+          value: {
+            integrationRows: nextEditorState?.integrationRows ?? hydratedIntegrationRows,
+            integrationSaveError: null,
+            integrationRowErrorsByClientId: nextEditorState?.integrationRowErrorsByClientId ?? {},
+            integrationSaveSuccess: false,
+          },
+        };
+      });
     }
-    setIntegrationSaveSuccessState({
-      sourceKey: integrationSourceKey,
-      value: false,
-    });
   }
 
   function setIntegrationSaveFailure(message: string): void {
-    setIntegrationSaveErrorState({
+    setEditorState({
       sourceKey: integrationSourceKey,
-      value: message,
-    });
-    setIntegrationSaveSuccessState({
-      sourceKey: integrationSourceKey,
-      value: false,
+      value: {
+        integrationRows,
+        integrationSaveError: message,
+        integrationRowErrorsByClientId,
+        integrationSaveSuccess: false,
+      },
     });
   }
 
@@ -284,43 +318,12 @@ export function useSandboxProfileIntegrationsState(
         : mapBindingsToEditorRows(integrationBindingsQuery.data.bindings),
     [integrationBindingsQuery.data?.bindings],
   );
-  const [integrationRowsState, setIntegrationRowsState] = useState<KeyedValue<
-    SandboxProfileBindingEditorRow[]
-  > | null>(null);
-  const [integrationSaveErrorState, setIntegrationSaveErrorState] = useState<
-    KeyedValue<string | null>
-  >({
-    sourceKey: integrationSourceKey,
-    value: null,
-  });
-  const [integrationRowErrorsState, setIntegrationRowErrorsState] = useState<
-    KeyedValue<Record<string, string>>
-  >({
-    sourceKey: integrationSourceKey,
-    value: {},
-  });
-  const [integrationSaveSuccessState, setIntegrationSaveSuccessState] = useState<
-    KeyedValue<boolean>
-  >({
-    sourceKey: integrationSourceKey,
-    value: false,
-  });
-  const integrationRows =
-    integrationRowsState?.sourceKey === integrationSourceKey
-      ? integrationRowsState.value
-      : hydratedIntegrationRows;
-  const integrationSaveError =
-    integrationSaveErrorState.sourceKey === integrationSourceKey
-      ? integrationSaveErrorState.value
-      : null;
-  const integrationRowErrorsByClientId =
-    integrationRowErrorsState.sourceKey === integrationSourceKey
-      ? integrationRowErrorsState.value
-      : {};
-  const integrationSaveSuccess =
-    integrationSaveSuccessState.sourceKey === integrationSourceKey
-      ? integrationSaveSuccessState.value
-      : false;
+  const currentEditorState =
+    editorState?.sourceKey === integrationSourceKey ? editorState.value : null;
+  const integrationRows = currentEditorState?.integrationRows ?? hydratedIntegrationRows;
+  const integrationSaveError = currentEditorState?.integrationSaveError ?? null;
+  const integrationRowErrorsByClientId = currentEditorState?.integrationRowErrorsByClientId ?? {};
+  const integrationSaveSuccess = currentEditorState?.integrationSaveSuccess ?? false;
 
   const putIntegrationBindingsMutation = useMutation({
     mutationFn: async (mutationInput: {
@@ -340,21 +343,14 @@ export function useSandboxProfileIntegrationsState(
         bindings: mutationInput.bindings,
       }),
     onSuccess: async (updatedBindings, mutationInput) => {
-      setIntegrationRowsState({
+      setEditorState({
         sourceKey: integrationSourceKey,
-        value: mapBindingsToEditorRows(updatedBindings.bindings),
-      });
-      setIntegrationSaveErrorState({
-        sourceKey: integrationSourceKey,
-        value: null,
-      });
-      setIntegrationRowErrorsState({
-        sourceKey: integrationSourceKey,
-        value: {},
-      });
-      setIntegrationSaveSuccessState({
-        sourceKey: integrationSourceKey,
-        value: true,
+        value: {
+          integrationRows: mapBindingsToEditorRows(updatedBindings.bindings),
+          integrationSaveError: null,
+          integrationRowErrorsByClientId: {},
+          integrationSaveSuccess: true,
+        },
       });
 
       if (input.profileId !== undefined) {
@@ -382,29 +378,34 @@ export function useSandboxProfileIntegrationsState(
           }
           rowErrors[clientId] = issue.safeMessage;
         }
-        setIntegrationRowErrorsState({
+        setEditorState({
           sourceKey: integrationSourceKey,
-          value: rowErrors,
+          value: {
+            integrationRows,
+            integrationSaveError:
+              issues[0]?.safeMessage ??
+              resolveApiErrorMessage({
+                error,
+                fallbackMessage: "Could not save sandbox profile integrations.",
+              }),
+            integrationRowErrorsByClientId: rowErrors,
+            integrationSaveSuccess: false,
+          },
         });
       } else {
-        setIntegrationRowErrorsState({
+        setEditorState({
           sourceKey: integrationSourceKey,
-          value: {},
+          value: {
+            integrationRows,
+            integrationSaveError: resolveApiErrorMessage({
+              error,
+              fallbackMessage: "Could not save sandbox profile integrations.",
+            }),
+            integrationRowErrorsByClientId: {},
+            integrationSaveSuccess: false,
+          },
         });
       }
-      setIntegrationSaveErrorState({
-        sourceKey: integrationSourceKey,
-        value:
-          issues?.[0]?.safeMessage ??
-          resolveApiErrorMessage({
-            error,
-            fallbackMessage: "Could not save sandbox profile integrations.",
-          }),
-      });
-      setIntegrationSaveSuccessState({
-        sourceKey: integrationSourceKey,
-        value: false,
-      });
     },
   });
 
@@ -424,17 +425,14 @@ export function useSandboxProfileIntegrationsState(
     })) ?? [];
 
   function setNeutralSaveState(): void {
-    setIntegrationSaveErrorState({
+    setEditorState({
       sourceKey: integrationSourceKey,
-      value: null,
-    });
-    setIntegrationRowErrorsState({
-      sourceKey: integrationSourceKey,
-      value: {},
-    });
-    setIntegrationSaveSuccessState({
-      sourceKey: integrationSourceKey,
-      value: false,
+      value: {
+        integrationRows,
+        integrationSaveError: null,
+        integrationRowErrorsByClientId: {},
+        integrationSaveSuccess: false,
+      },
     });
   }
 
@@ -519,9 +517,14 @@ export function useSandboxProfileIntegrationsState(
         config: inputValue.config,
       },
     ];
-    setIntegrationRowsState({
+    setEditorState({
       sourceKey: integrationSourceKey,
-      value: nextRows,
+      value: {
+        integrationRows: nextRows,
+        integrationSaveError,
+        integrationRowErrorsByClientId,
+        integrationSaveSuccess,
+      },
     });
     markIntegrationDirty();
     return persistIntegrationRows(nextRows);
@@ -529,9 +532,14 @@ export function useSandboxProfileIntegrationsState(
 
   function onRemoveIntegrationBindingRow(clientId: string): void {
     const nextRows = integrationRows.filter((row) => row.clientId !== clientId);
-    setIntegrationRowsState({
+    setEditorState({
       sourceKey: integrationSourceKey,
-      value: nextRows,
+      value: {
+        integrationRows: nextRows,
+        integrationSaveError,
+        integrationRowErrorsByClientId,
+        integrationSaveSuccess,
+      },
     });
     markIntegrationDirty({ clientId });
     void persistIntegrationRows(nextRows);
@@ -550,9 +558,14 @@ export function useSandboxProfileIntegrationsState(
         ...changes,
       };
     });
-    setIntegrationRowsState({
+    setEditorState({
       sourceKey: integrationSourceKey,
-      value: nextRows,
+      value: {
+        integrationRows: nextRows,
+        integrationSaveError,
+        integrationRowErrorsByClientId,
+        integrationSaveSuccess,
+      },
     });
     markIntegrationDirty({ clientId });
     void persistIntegrationRows(nextRows);
