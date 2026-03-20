@@ -6,7 +6,7 @@ import {
 } from "./codex-session-connect.js";
 
 describe("codex session connect", () => {
-  it("resumes the most recent existing thread on reconnect", () => {
+  it("resumes the oldest created existing thread on reconnect", () => {
     expect(
       resolveInitialCodexThreadAction({
         availableThreads: [
@@ -25,10 +25,23 @@ describe("codex session connect", () => {
             updatedAt: 20,
           },
         ],
+        loadedThreadIds: [],
       }),
     ).toEqual({
       type: "resume",
-      threadId: "thread_new",
+      threadId: "thread_old",
+    });
+  });
+
+  it("resumes a loaded thread that is missing from the available page", () => {
+    expect(
+      resolveInitialCodexThreadAction({
+        availableThreads: [],
+        loadedThreadIds: ["thread_loaded_only"],
+      }),
+    ).toEqual({
+      type: "resume",
+      threadId: "thread_loaded_only",
     });
   });
 
@@ -36,6 +49,7 @@ describe("codex session connect", () => {
     expect(
       resolveInitialCodexThreadAction({
         availableThreads: [],
+        loadedThreadIds: [],
       }),
     ).toEqual({
       type: "start_new",

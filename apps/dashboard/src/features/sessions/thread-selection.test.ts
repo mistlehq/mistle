@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { selectPreferredThreadId } from "./thread-selection.js";
 
 describe("selectPreferredThreadId", () => {
-  it("prefers the most recent loaded thread when details are available", () => {
+  it("prefers the oldest created loaded thread when details are available", () => {
     const result = selectPreferredThreadId({
       availableThreads: [
         {
@@ -24,7 +24,7 @@ describe("selectPreferredThreadId", () => {
       loadedThreadIds: ["thread_old", "thread_new"],
     });
 
-    expect(result).toBe("thread_new");
+    expect(result).toBe("thread_old");
   });
 
   it("falls back to the first loaded thread when it is missing from the available list", () => {
@@ -36,7 +36,7 @@ describe("selectPreferredThreadId", () => {
     expect(result).toBe("thread_loaded_only");
   });
 
-  it("falls back to the most recent available thread when nothing is loaded", () => {
+  it("falls back to the oldest created available thread when nothing is loaded", () => {
     const result = selectPreferredThreadId({
       availableThreads: [
         {
