@@ -19,7 +19,7 @@
     "@storybook/addon-docs": "^10.2.19",
     "@storybook/addon-links": "^10.2.19",
     "@storybook/addon-vitest": "^10.3.0",
-    "@storybook/react-vite": "^10.3.0",
+    "@storybook/react-vite": "^10.3.1",
     "@tailwindcss/vite": "^4.1.14",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
