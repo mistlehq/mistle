@@ -11,6 +11,8 @@ import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
 import WebSocket from "ws";
 
+import { ValkeySandboxActivityStore } from "../src/runtime-state/adapters/valkey-sandbox-activity-store.js";
+import { closeValkeyClient, createValkeyClient } from "../src/runtime-state/valkey-client.js";
 import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import {
   closeWebSocket,
@@ -44,55 +46,48 @@ async function insertSandboxInstanceRow(input: {
   });
 }
 
-async function waitForExecutionLeaseRow(
-  input: DataPlaneGatewayIntegrationFixture & {
-    leaseId: string;
-    predicate: (lease: {
-      externalExecutionId: string | null;
-      id: string;
-      kind: string;
-      lastSeenAt: string;
-      metadata: Record<string, unknown> | null;
-      openedAt: string;
-      sandboxInstanceId: string;
-      source: string;
-    }) => boolean;
-  },
-): Promise<{
-  externalExecutionId: string | null;
-  id: string;
-  kind: string;
-  lastSeenAt: string;
-  metadata: Record<string, unknown> | null;
-  openedAt: string;
+async function waitForActiveActivityLease(input: {
+  store: ValkeySandboxActivityStore;
   sandboxInstanceId: string;
-  source: string;
-}> {
+}): Promise<void> {
   const deadline = Date.now() + 5_000;
 
   while (Date.now() < deadline) {
-    const lease = await input.db.query.sandboxExecutionLeases.findFirst({
-      columns: {
-        id: true,
-        sandboxInstanceId: true,
-        kind: true,
-        source: true,
-        externalExecutionId: true,
-        metadata: true,
-        openedAt: true,
-        lastSeenAt: true,
-      },
-      where: (table, { eq }) => eq(table.id, input.leaseId),
+    const hasAnyActiveLease = await input.store.hasAnyActiveLease({
+      sandboxInstanceId: input.sandboxInstanceId,
+      nowMs: Date.now(),
     });
-
-    if (lease !== undefined && input.predicate(lease)) {
-      return lease;
+    if (hasAnyActiveLease) {
+      return;
     }
 
     await systemSleeper.sleep(50);
   }
 
-  throw new Error(`Timed out waiting for execution lease '${input.leaseId}'.`);
+  throw new Error(`Timed out waiting for activity lease for sandbox '${input.sandboxInstanceId}'.`);
+}
+
+async function createActivityStore(fixture: DataPlaneGatewayIntegrationFixture): Promise<{
+  client: ReturnType<typeof createValkeyClient>;
+  store: ValkeySandboxActivityStore;
+}> {
+  if (fixture.config.app.runtimeState.backend !== "valkey") {
+    throw new Error("Expected Valkey runtime-state backend for sandbox activity integration test.");
+  }
+  const valkeyConfig = fixture.config.app.runtimeState.valkey;
+  if (valkeyConfig === undefined) {
+    throw new Error("Expected runtimeState.valkey config for sandbox activity integration test.");
+  }
+
+  const client = createValkeyClient({
+    url: valkeyConfig.url,
+  });
+  await client.connect();
+
+  return {
+    client,
+    store: new ValkeySandboxActivityStore(client, valkeyConfig.keyPrefix),
+  };
 }
 
 async function closeWebSocketIfOpen(socket: WebSocket | undefined): Promise<void> {
@@ -113,6 +108,7 @@ describe("sandbox execution lease integration", () => {
         fixture,
         sandboxInstanceId,
       });
+      const { client, store } = await createActivityStore(fixture);
       const bootstrapToken = await mintBootstrapToken({
         config: {
           bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
@@ -149,14 +145,9 @@ describe("sandbox execution lease integration", () => {
         );
         await noCreateResponse;
 
-        const createdLease = await waitForExecutionLeaseRow({
-          ...fixture,
-          leaseId,
-          predicate: (lease) =>
-            lease.kind === "agent_execution" &&
-            lease.source === "codex" &&
-            lease.externalExecutionId === "turn_123" &&
-            lease.openedAt === lease.lastSeenAt,
+        await waitForActiveActivityLease({
+          store,
+          sandboxInstanceId,
         });
 
         await systemSleeper.sleep(50);
@@ -171,25 +162,17 @@ describe("sandbox execution lease integration", () => {
         );
         await noRenewResponse;
 
-        const renewedLease = await waitForExecutionLeaseRow({
-          ...fixture,
-          leaseId,
-          predicate: (lease) => lease.lastSeenAt > createdLease.lastSeenAt,
+        await waitForActiveActivityLease({
+          store,
+          sandboxInstanceId,
         });
 
-        expect(renewedLease).toEqual({
-          id: leaseId,
-          sandboxInstanceId,
-          kind: "agent_execution",
-          source: "codex",
-          externalExecutionId: "turn_123",
-          metadata: {
-            threadId: "thr_123",
-          },
-          openedAt: createdLease.openedAt,
-          lastSeenAt: renewedLease.lastSeenAt,
+        const executionLeaseRow = await fixture.db.query.sandboxExecutionLeases.findFirst({
+          where: (table, { eq }) => eq(table.id, leaseId),
         });
+        expect(executionLeaseRow).toBeUndefined();
       } finally {
+        await closeValkeyClient(client);
         await closeWebSocketIfOpen(bootstrapSocket);
       }
     },
@@ -204,6 +187,7 @@ describe("sandbox execution lease integration", () => {
         fixture,
         sandboxInstanceId,
       });
+      const { client, store } = await createActivityStore(fixture);
       const bootstrapToken = await mintBootstrapToken({
         config: {
           bootstrapTokenSecret: fixture.config.sandbox.bootstrap.tokenSecret,
@@ -232,12 +216,20 @@ describe("sandbox execution lease integration", () => {
         await noResponsePromise;
         await sendWebSocketPingAndExpectPong(bootstrapSocket, Buffer.from("lease-renew-miss"));
 
+        await expect(
+          store.hasAnyActiveLease({
+            sandboxInstanceId,
+            nowMs: Date.now(),
+          }),
+        ).resolves.toBe(false);
+
         const missingLease = await fixture.db.query.sandboxExecutionLeases.findFirst({
           where: (table, { eq }) => eq(table.id, "sxl_missing"),
         });
 
         expect(missingLease).toBeUndefined();
       } finally {
+        await closeValkeyClient(client);
         if (bootstrapSocket.readyState === WebSocket.OPEN) {
           await closeWebSocket(bootstrapSocket);
         }

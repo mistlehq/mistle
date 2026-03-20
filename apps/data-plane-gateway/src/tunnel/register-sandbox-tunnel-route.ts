@@ -7,6 +7,7 @@ import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 import type { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { logger } from "../logger.js";
 import { OWNER_LEASE_TTL_MS } from "../runtime-state/durations.js";
+import type { SandboxActivityStore } from "../runtime-state/sandbox-activity-store.js";
 import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
 import type { DataPlaneGatewayApp } from "../types.js";
@@ -44,6 +45,7 @@ type RegisterSandboxTunnelRouteInput = {
   sandboxOwnerStore: SandboxOwnerStore;
   sandboxOwnerResolver: SandboxOwnerResolver;
   sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat;
+  sandboxActivityStore: SandboxActivityStore;
   sandboxPresenceStore: SandboxPresenceStore;
   sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
   sandboxIdleControllerRegistry: SandboxIdleControllerRegistry;
@@ -75,7 +77,12 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     sandboxOwnerStore: input.sandboxOwnerStore,
   });
   const tunnelProtocolTranslator = new TunnelProtocolTranslator(input.interactiveStreamRouter);
-  const executionLeaseRepository = new ExecutionLeaseRepository();
+  const executionLeaseRepository = new ExecutionLeaseRepository(
+    input.sandboxActivityStore,
+    input.sandboxIdleControllerRegistry,
+    input.clock,
+    input.gatewayNodeId,
+  );
   const tunnelSessionService = new TunnelSessionService(
     input.gatewayNodeId,
     input.interactiveStreamRouter,
@@ -262,7 +269,6 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             void handleTunnelWebSocketMessage({
               clientSessionId: relaySessionId,
               currentSocket: ws,
-              db: ctx.get("db"),
               executionLeaseRepository,
               interactiveStreamRouter: input.interactiveStreamRouter,
               payload,

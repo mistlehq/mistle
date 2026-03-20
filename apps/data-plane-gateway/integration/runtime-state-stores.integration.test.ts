@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect, it } from "vitest";
 
+import { ValkeySandboxActivityStore } from "../src/runtime-state/adapters/valkey-sandbox-activity-store.js";
 import { ValkeySandboxPresenceStore } from "../src/runtime-state/adapters/valkey-sandbox-presence-store.js";
 import { ValkeySandboxRuntimeAttachmentStore } from "../src/runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import { createValkeyClient, closeValkeyClient } from "../src/runtime-state/valkey-client.js";
@@ -224,6 +225,72 @@ describe("runtime-state store integrations", () => {
       await expect(
         store.hasAnyActiveLease({
           sandboxInstanceId,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toBe(false);
+    } finally {
+      await deleteKeysByPrefix({
+        client,
+        keyPrefix,
+      });
+      await closeValkeyClient(client);
+    }
+  });
+
+  it("renews activity leases without losing their stored metadata", async () => {
+    const keyPrefix = `mistle:runtime-state:activity-it:${randomUUID()}`;
+    const client = createValkeyClient({
+      url: ValkeyUrl,
+    });
+    await client.connect();
+
+    try {
+      const store = new ValkeySandboxActivityStore(client, keyPrefix);
+      const sandboxInstanceId = "sbi_activity_it";
+      const leaseId = "sal_first";
+      const detailKey = `${keyPrefix}:sandbox-activity:${sandboxInstanceId}:lease:${leaseId}`;
+
+      await store.touchLease({
+        sandboxInstanceId,
+        leaseId,
+        kind: "agent_execution",
+        source: "codex",
+        externalExecutionId: "turn_123",
+        metadata: {
+          threadId: "thr_123",
+        },
+        nodeId: "dpg_it",
+        ttlMs: 30_000,
+        nowMs: Date.now(),
+      });
+      await expect(
+        store.renewLease({
+          sandboxInstanceId,
+          leaseId,
+          ttlMs: 30_000,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toBe(true);
+
+      const serializedLease = await client.get(detailKey);
+      expect(serializedLease).not.toBeNull();
+      expect(JSON.parse(serializedLease ?? "null")).toMatchObject({
+        sandboxInstanceId,
+        leaseId,
+        kind: "agent_execution",
+        source: "codex",
+        externalExecutionId: "turn_123",
+        metadata: {
+          threadId: "thr_123",
+        },
+        nodeId: "dpg_it",
+      });
+
+      await expect(
+        store.renewLease({
+          sandboxInstanceId,
+          leaseId: "sal_missing",
+          ttlMs: 30_000,
           nowMs: Date.now(),
         }),
       ).resolves.toBe(false);

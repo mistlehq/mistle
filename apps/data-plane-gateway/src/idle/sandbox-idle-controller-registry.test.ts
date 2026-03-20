@@ -1,6 +1,7 @@
 import { createMutableClock, createManualScheduler } from "@mistle/time/testing";
 import { describe, expect, it } from "vitest";
 
+import { InMemorySandboxActivityStore } from "../runtime-state/adapters/in-memory-sandbox-activity-store.js";
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
 import { SandboxIdleControllerRegistry } from "./sandbox-idle-controller-registry.js";
@@ -11,6 +12,7 @@ describe("SandboxIdleControllerRegistry", () => {
     const clock = createMutableClock(1_000);
     const scheduler = createManualScheduler(clock);
     const ownerStore = new InMemorySandboxOwnerStore(clock);
+    const activityStore = new InMemorySandboxActivityStore(clock);
     const presenceStore = new InMemorySandboxPresenceStore(clock);
     const registry = new SandboxIdleControllerRegistry((input) => {
       return new LocalSandboxIdleController(
@@ -22,6 +24,7 @@ describe("SandboxIdleControllerRegistry", () => {
           clock,
           scheduler,
           ownerStore,
+          activityStore,
           presenceStore,
         },
         input.onDisposed,
@@ -46,6 +49,7 @@ describe("SandboxIdleControllerRegistry", () => {
     const clock = createMutableClock(1_000);
     const scheduler = createManualScheduler(clock);
     const ownerStore = new InMemorySandboxOwnerStore(clock);
+    const activityStore = new InMemorySandboxActivityStore(clock);
     const presenceStore = new InMemorySandboxPresenceStore(clock);
     const registry = new SandboxIdleControllerRegistry((input) => {
       return new LocalSandboxIdleController(
@@ -57,6 +61,7 @@ describe("SandboxIdleControllerRegistry", () => {
           clock,
           scheduler,
           ownerStore,
+          activityStore,
           presenceStore,
         },
         input.onDisposed,
@@ -82,6 +87,7 @@ describe("SandboxIdleControllerRegistry", () => {
     const clock = createMutableClock(1_000);
     const scheduler = createManualScheduler(clock);
     const ownerStore = new InMemorySandboxOwnerStore(clock);
+    const activityStore = new InMemorySandboxActivityStore(clock);
     const presenceStore = new InMemorySandboxPresenceStore(clock);
     const registry = new SandboxIdleControllerRegistry((input) => {
       return new LocalSandboxIdleController(
@@ -93,6 +99,7 @@ describe("SandboxIdleControllerRegistry", () => {
           clock,
           scheduler,
           ownerStore,
+          activityStore,
           presenceStore,
         },
         input.onDisposed,

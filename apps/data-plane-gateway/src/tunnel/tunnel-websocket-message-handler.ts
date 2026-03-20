@@ -1,4 +1,3 @@
-import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import type { WSContext, WSMessageReceive } from "hono/ws";
 
 import { ExecutionLeaseRepository } from "./execution-lease-repository.js";
@@ -39,7 +38,6 @@ export function toTunnelForwardPayload(data: WSMessageReceive): string | ArrayBu
 export async function handleTunnelWebSocketMessage(input: {
   clientSessionId: string;
   currentSocket: Pick<WSContext, "send">;
-  db: DataPlaneDatabase;
   executionLeaseRepository: ExecutionLeaseRepository;
   interactiveStreamRouter: InteractiveStreamRouter;
   payload: string | ArrayBuffer;
@@ -58,7 +56,6 @@ export async function handleTunnelWebSocketMessage(input: {
   if (translation.executionLeaseControlMessage !== undefined) {
     try {
       await input.executionLeaseRepository.applyControlMessage({
-        db: input.db,
         message: translation.executionLeaseControlMessage,
         sandboxInstanceId: input.sandboxInstanceId,
       });
