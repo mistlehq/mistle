@@ -6,6 +6,7 @@ import { typeid } from "typeid-js";
 import type { WebSocketServer } from "ws";
 
 import { createApp, stopApp } from "../app.js";
+import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
 import { startServer } from "../server.js";
 import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory-relay-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
@@ -71,6 +72,12 @@ export function createDataPlaneGatewayRuntime(
     systemScheduler,
     OwnerLeaseRenewIntervalMs,
   );
+
+  registerSandboxRuntimeStateRoute({
+    app,
+    internalAuthServiceToken: config.internalAuth.serviceToken,
+    sandboxOwnerStore,
+  });
 
   registerSandboxTunnelRoute({
     app,

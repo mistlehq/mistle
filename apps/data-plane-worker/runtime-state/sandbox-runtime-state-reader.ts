@@ -24,9 +24,10 @@ export type SandboxRuntimeStateSnapshot = {
 /**
  * Reads worker-visible runtime state regardless of the backing implementation.
  *
- * Later adapters may source this state from gateway-local memory through an
- * internal HTTP route or directly from Valkey. Worker callers should not branch
- * on the storage backend.
+ * Worker callers should not branch on the gateway's runtime-state storage
+ * backend. The current implementation reads through an internal gateway HTTP
+ * route, and later gateway-side backends may change without affecting worker
+ * call sites.
  */
 export interface SandboxRuntimeStateReader {
   /**
