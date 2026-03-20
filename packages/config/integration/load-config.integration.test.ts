@@ -245,6 +245,16 @@ const dataPlaneGatewayEnvConfig = {
   database: {
     url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
   },
+  runtimeState: {
+    backend: "valkey",
+    valkey: {
+      url: "redis://127.0.0.1:6379",
+      keyPrefix: "mistle:runtime-state:integration",
+    },
+  },
+  dataPlaneApi: {
+    baseUrl: "http://127.0.0.1:5002",
+  },
 } as const;
 
 const dataPlaneGatewayFixtureConfig = {
@@ -252,6 +262,9 @@ const dataPlaneGatewayFixtureConfig = {
   server: {
     host: "0.0.0.0",
     port: 5302,
+  },
+  dataPlaneApi: {
+    baseUrl: "http://127.0.0.1:5300",
   },
 } as const;
 
@@ -279,6 +292,9 @@ const dataPlaneWorkerEnvConfig = {
     executionLeaseFreshnessSeconds: 30,
     tunnelDisconnectGraceSeconds: 60,
   },
+  runtimeState: {
+    gatewayBaseUrl: "http://127.0.0.1:5003",
+  },
   sandbox: {
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
     modal: {
@@ -300,6 +316,9 @@ const dataPlaneWorkerFixtureConfig = {
     ...dataPlaneWorkerEnvConfig.workflow,
     namespaceId: "fixture",
     concurrency: 2,
+  },
+  runtimeState: {
+    gatewayBaseUrl: "http://127.0.0.1:5302",
   },
 } as const;
 
@@ -326,6 +345,9 @@ const dataPlaneWorkerDockerFixtureConfig = {
     idleTimeoutSeconds: 300,
     executionLeaseFreshnessSeconds: 30,
     tunnelDisconnectGraceSeconds: 60,
+  },
+  runtimeState: {
+    gatewayBaseUrl: "http://127.0.0.1:5003",
   },
   sandbox: {
     tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",

@@ -1,6 +1,9 @@
 import { createEnvLoader, hasEntries } from "../../core/load-env.js";
 import {
   DataPlaneGatewayDatabaseConfigSchema,
+  DataPlaneGatewayDataPlaneApiConfigSchema,
+  PartialDataPlaneGatewayRuntimeStateConfigSchema,
+  PartialDataPlaneGatewayRuntimeStateValkeyConfigSchema,
   type PartialDataPlaneGatewayConfigInput,
   DataPlaneGatewayServerConfigSchema,
   PartialDataPlaneGatewayConfigSchema,
@@ -25,6 +28,35 @@ const loadDatabaseEnv = createEnvLoader<typeof DataPlaneGatewayDatabaseConfigSch
   },
 ]);
 
+const loadRuntimeStateEnv = createEnvLoader<typeof PartialDataPlaneGatewayRuntimeStateConfigSchema>(
+  [
+    {
+      key: "backend",
+      envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND",
+    },
+  ],
+);
+
+const loadRuntimeStateValkeyEnv = createEnvLoader<
+  typeof PartialDataPlaneGatewayRuntimeStateValkeyConfigSchema
+>([
+  {
+    key: "url",
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL",
+  },
+  {
+    key: "keyPrefix",
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_KEY_PREFIX",
+  },
+]);
+
+const loadDataPlaneApiEnv = createEnvLoader<typeof DataPlaneGatewayDataPlaneApiConfigSchema>([
+  {
+    key: "baseUrl",
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL",
+  },
+]);
+
 export function loadDataPlaneGatewayFromEnv(
   env: NodeJS.ProcessEnv,
 ): PartialDataPlaneGatewayConfigInput {
@@ -38,6 +70,24 @@ export function loadDataPlaneGatewayFromEnv(
   const database = loadDatabaseEnv(env);
   if (hasEntries(database)) {
     partialConfig.database = database;
+  }
+
+  const runtimeState = loadRuntimeStateEnv(env);
+  const runtimeStateValkey = loadRuntimeStateValkeyEnv(env);
+  if (hasEntries(runtimeState) || hasEntries(runtimeStateValkey)) {
+    partialConfig.runtimeState = {
+      ...runtimeState,
+      ...(hasEntries(runtimeStateValkey)
+        ? {
+            valkey: runtimeStateValkey,
+          }
+        : {}),
+    };
+  }
+
+  const dataPlaneApi = loadDataPlaneApiEnv(env);
+  if (hasEntries(dataPlaneApi)) {
+    partialConfig.dataPlaneApi = dataPlaneApi;
   }
 
   return PartialDataPlaneGatewayConfigSchema.parse(partialConfig);

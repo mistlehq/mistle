@@ -27,6 +27,9 @@ export const dataPlaneWorkerDevelopmentPreset = {
           execution_lease_freshness_seconds: 30,
           tunnel_disconnect_grace_seconds: 60,
         },
+        runtime_state: {
+          gateway_base_url: "http://data-plane-gateway-relay:5202",
+        },
         sandbox: {
           tokenizer_proxy_egress_base_url:
             "http://tokenizer-proxy-relay:5025/tokenizer-proxy/egress",

@@ -3,6 +3,7 @@ import {
   type PartialDataPlaneWorkerConfigInput,
   DataPlaneWorkerDatabaseConfigSchema,
   DataPlaneWorkerReaperConfigSchema,
+  PartialDataPlaneWorkerRuntimeStateConfigSchema,
   DataPlaneWorkerSandboxDockerConfigSchema,
   DataPlaneWorkerSandboxModalConfigSchema,
   DataPlaneWorkerServerConfigSchema,
@@ -89,6 +90,13 @@ const loadReaperEnv = createEnvLoader<typeof DataPlaneWorkerReaperConfigSchema>(
   },
 ]);
 
+const loadRuntimeStateEnv = createEnvLoader<typeof PartialDataPlaneWorkerRuntimeStateConfigSchema>([
+  {
+    key: "gatewayBaseUrl",
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL",
+  },
+]);
+
 const loadSandboxModalEnv = createEnvLoader<typeof DataPlaneWorkerSandboxModalConfigSchema>([
   {
     key: "tokenId",
@@ -158,6 +166,11 @@ export function loadDataPlaneWorkerFromEnv(
   const reaper = loadReaperEnv(env);
   if (hasEntries(reaper)) {
     partialConfig.reaper = reaper;
+  }
+
+  const runtimeState = loadRuntimeStateEnv(env);
+  if (hasEntries(runtimeState)) {
+    partialConfig.runtimeState = runtimeState;
   }
 
   const sandbox = loadSandboxEnv(env);

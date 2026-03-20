@@ -108,6 +108,16 @@ port = 5302
 [apps.data_plane_gateway.database]
 url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 
+[apps.data_plane_gateway.runtime_state]
+backend = "valkey"
+
+[apps.data_plane_gateway.runtime_state.valkey]
+url = "redis://127.0.0.1:6379"
+key_prefix = "mistle:runtime-state:fixture"
+
+[apps.data_plane_gateway.data_plane_api]
+base_url = "http://127.0.0.1:5300"
+
 [apps.data_plane_worker.server]
 host = "0.0.0.0"
 port = 5303
@@ -130,6 +140,9 @@ poll_interval_seconds = 30
 idle_timeout_seconds = 300
 execution_lease_freshness_seconds = 30
 tunnel_disconnect_grace_seconds = 60
+
+[apps.data_plane_worker.runtime_state]
+gateway_base_url = "http://127.0.0.1:5302"
 
 [apps.data_plane_worker.sandbox]
 tokenizer_proxy_egress_base_url = "http://127.0.0.1:5004/tokenizer-proxy/egress"

@@ -291,6 +291,26 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL",
   },
   {
+    configPath: ["apps", "data_plane_gateway", "runtimeState", "backend"],
+    tomlPath: ["apps", "data_plane_gateway", "runtime_state", "backend"],
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND",
+  },
+  {
+    configPath: ["apps", "data_plane_gateway", "runtimeState", "valkey", "url"],
+    tomlPath: ["apps", "data_plane_gateway", "runtime_state", "valkey", "url"],
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL",
+  },
+  {
+    configPath: ["apps", "data_plane_gateway", "runtimeState", "valkey", "keyPrefix"],
+    tomlPath: ["apps", "data_plane_gateway", "runtime_state", "valkey", "key_prefix"],
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_KEY_PREFIX",
+  },
+  {
+    configPath: ["apps", "data_plane_gateway", "dataPlaneApi", "baseUrl"],
+    tomlPath: ["apps", "data_plane_gateway", "data_plane_api", "base_url"],
+    envVar: "MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL",
+  },
+  {
     configPath: ["apps", "data_plane_worker", "server", "host"],
     tomlPath: ["apps", "data_plane_worker", "server", "host"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_HOST",
@@ -354,6 +374,11 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     configPath: ["apps", "data_plane_worker", "reaper", "tunnelDisconnectGraceSeconds"],
     tomlPath: ["apps", "data_plane_worker", "reaper", "tunnel_disconnect_grace_seconds"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_TUNNEL_DISCONNECT_GRACE_SECONDS",
+  },
+  {
+    configPath: ["apps", "data_plane_worker", "runtimeState", "gatewayBaseUrl"],
+    tomlPath: ["apps", "data_plane_worker", "runtime_state", "gateway_base_url"],
+    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL",
   },
   {
     configPath: ["apps", "data_plane_worker", "sandbox", "tokenizerProxyEgressBaseUrl"],
