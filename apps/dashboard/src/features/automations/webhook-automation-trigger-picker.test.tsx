@@ -336,4 +336,124 @@ describe("WebhookAutomationTriggerPicker", () => {
       within(container).getByRole("button", { name: "Remove Issue comment created trigger" }),
     ).toBeDefined();
   });
+
+  it("resets unsaved resource query text when the selected value changes", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    queryClient.setQueryData(
+      ["automation-trigger-parameters", "icn_01kkk1g84mfetvga8a4b853k27", "user"],
+      {
+        connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+        familyId: "github",
+        kind: "user",
+        syncState: "ready",
+        items: [
+          {
+            id: "icr_github_user_1",
+            familyId: "github",
+            kind: "user",
+            externalId: "1001",
+            handle: "octocat",
+            displayName: "octocat",
+            status: "accessible",
+            metadata: {},
+          },
+          {
+            id: "icr_github_user_2",
+            familyId: "github",
+            kind: "user",
+            externalId: "1002",
+            handle: "hubot",
+            displayName: "hubot",
+            status: "accessible",
+            metadata: {},
+          },
+        ],
+        page: {
+          totalResults: 2,
+          nextCursor: null,
+          previousCursor: null,
+        },
+      },
+    );
+
+    function StatefulResourceSelection(): React.JSX.Element {
+      const triggerId = createWebhookAutomationTriggerId({
+        connectionId: "icn_01kkk1g84mfetvga8a4b853k27",
+        eventType: "github.pull_request.opened",
+      });
+      const [triggerParameterValues, setTriggerParameterValues] = useState<
+        Record<string, Record<string, string>>
+      >({
+        [triggerId]: {
+          author: "octocat",
+        },
+      });
+
+      return (
+        <>
+          <button
+            onClick={() => {
+              setTriggerParameterValues({
+                [triggerId]: {
+                  author: "hubot",
+                },
+              });
+            }}
+            type="button"
+          >
+            Switch author
+          </button>
+          <WebhookAutomationTriggerPicker
+            error={undefined}
+            eventOptions={WebhookEventOptions}
+            hasConnectedIntegrations={true}
+            onTriggerParameterValueChange={({ triggerId: nextTriggerId, parameterId, value }) => {
+              setTriggerParameterValues((currentValues) => ({
+                ...currentValues,
+                [nextTriggerId]: {
+                  ...currentValues[nextTriggerId],
+                  [parameterId]: value,
+                },
+              }));
+            }}
+            onValueChange={() => {}}
+            selectedConnectionId="icn_01kkk1g84mfetvga8a4b853k27"
+            selectedTriggerIds={[triggerId]}
+            triggerParameterValues={triggerParameterValues}
+          />
+        </>
+      );
+    }
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <StatefulResourceSelection />
+      </QueryClientProvider>,
+    );
+
+    const resourceComboboxes = screen
+      .getAllByRole("combobox")
+      .filter((element) => element.getAttribute("placeholder") === "Select author");
+    const resourceCombobox = resourceComboboxes[0];
+    if (resourceCombobox === undefined) {
+      throw new Error("Expected resource combobox.");
+    }
+    fireEvent.change(resourceCombobox, {
+      target: { value: "unsaved query" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Switch author" }));
+
+    const updatedResourceComboboxes = screen
+      .getAllByRole("combobox")
+      .filter((element) => element.getAttribute("placeholder") === "Select author");
+    expect(updatedResourceComboboxes[0]?.getAttribute("value")).toBe("hubot");
+    expect(screen.queryByDisplayValue("unsaved query")).toBeNull();
+  });
 });

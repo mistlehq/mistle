@@ -121,7 +121,7 @@ describe("IntegrationConnectionDetailView", () => {
   });
 
   it("starts title editing for the clicked connection", () => {
-    let editingConnectionId: string | null = null;
+    let editStarts = 0;
 
     render(
       <IntegrationConnectionDetailView
@@ -144,14 +144,11 @@ describe("IntegrationConnectionDetailView", () => {
           },
         ]}
         titleEditor={{
-          connectionId: null,
-          draftValue: "",
-          isEditing: false,
-          onCancel: () => {},
+          connectionIdWithError: null,
           onCommit: () => {},
-          onDraftValueChange: () => {},
-          onEditStart: (connectionId) => {
-            editingConnectionId = connectionId;
+          onEditCancel: () => {},
+          onEditStart: () => {
+            editStarts += 1;
           },
           saveDisabled: false,
         }}
@@ -164,7 +161,8 @@ describe("IntegrationConnectionDetailView", () => {
       throw new Error("Expected a second edit connection name button.");
     }
     fireEvent.click(secondEditButton);
-    expect(editingConnectionId).toBe("icn_github_archive");
+    expect(editStarts).toBe(1);
+    expect(screen.getByDisplayValue("Archive Mirror")).toBeTruthy();
   });
 
   it("renders a masked api key row for api key connections", () => {

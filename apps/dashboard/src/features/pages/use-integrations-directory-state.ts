@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useRef } from "react";
+import { useRef } from "react";
 import { useNavigate } from "react-router";
 
 import { buildIntegrationCards } from "../integrations/directory-model.js";
@@ -43,18 +43,10 @@ export function useIntegrationsDirectoryState(input: {
     },
   });
 
-  const cards = useMemo(() => {
-    if (integrationsQuery.data === undefined) {
-      return [];
-    }
+  const cards =
+    integrationsQuery.data === undefined ? [] : buildIntegrationCards(integrationsQuery.data);
 
-    return buildIntegrationCards(integrationsQuery.data);
-  }, [integrationsQuery.data]);
-
-  const connectedIntegrationCards = useMemo(
-    () => cards.filter((card) => card.connections.length > 0),
-    [cards],
-  );
+  const connectedIntegrationCards = cards.filter((card) => card.connections.length > 0);
 
   const { activeDetailConnectionId, selectedDetailCard, selectedDetailConnections } =
     useIntegrationDetailState({
@@ -68,25 +60,17 @@ export function useIntegrationsDirectoryState(input: {
     queryKey: SETTINGS_INTEGRATIONS_QUERY_KEY,
   });
 
-  const connectedViewCards = useMemo(
-    () =>
-      buildConnectedIntegrationViewCards({
-        connectedCards: connectedIntegrationCards,
-        onOpenTarget: (targetKey) => {
-          void navigate(`/settings/organization/integrations/${targetKey}`);
-        },
-      }),
-    [connectedIntegrationCards, navigate],
-  );
+  const connectedViewCards = buildConnectedIntegrationViewCards({
+    connectedCards: connectedIntegrationCards,
+    onOpenTarget: (targetKey) => {
+      void navigate(`/settings/organization/integrations/${targetKey}`);
+    },
+  });
 
-  const availableViewCards = useMemo(
-    () =>
-      buildAvailableIntegrationViewCards({
-        cards,
-        onOpenCreateDialog: input.onOpenCreateDialog,
-      }),
-    [cards, input.onOpenCreateDialog],
-  );
+  const availableViewCards = buildAvailableIntegrationViewCards({
+    cards,
+    onOpenCreateDialog: input.onOpenCreateDialog,
+  });
 
   return {
     availableViewCards,

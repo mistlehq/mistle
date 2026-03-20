@@ -37,8 +37,14 @@ import {
   type SandboxProfileBindingDialogState,
 } from "./sandbox-profile-binding-dialog.js";
 import { SandboxProfileBindingSection } from "./sandbox-profile-binding-section.js";
-import { useSandboxProfileIntegrationsState } from "./sandbox-profile-integrations-state.js";
-import { useSandboxProfileMetaState } from "./sandbox-profile-meta-state.js";
+import {
+  useLoadedSandboxProfileIntegrationsState,
+  useSandboxProfileIntegrationsLoader,
+} from "./sandbox-profile-integrations-state.js";
+import {
+  useCreateSandboxProfileMetaState,
+  useEditSandboxProfileMetaState,
+} from "./sandbox-profile-meta-state.js";
 
 type SandboxProfileEditorPageProps = {
   mode: "create" | "edit";
@@ -347,59 +353,98 @@ export function IntegrationsEditorSection(
 }
 
 export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): React.JSX.Element {
+  if (props.mode === "create") {
+    return <CreateSandboxProfileEditorPage />;
+  }
+
+  return <EditSandboxProfileEditorPage />;
+}
+
+function CreateSandboxProfileEditorPage(): React.JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const params = useParams();
-  const profileId = params["profileId"];
-  const profileQuery = useQuery({
-    queryKey:
-      props.mode === "edit" && profileId !== undefined
-        ? sandboxProfileDetailQueryKey(profileId)
-        : sandboxProfileDetailQueryKey("missing-profile-id"),
-    queryFn: async ({ signal }) => {
-      if (profileId === undefined) {
-        throw new Error("profileId is required.");
-      }
-
-      return getSandboxProfile({ profileId, signal });
-    },
-    enabled: props.mode === "edit",
-    retry: false,
-  });
-  const metaState = useSandboxProfileMetaState({
-    mode: props.mode,
-    profileId,
-    loadedProfile: profileQuery.data,
+  const metaState = useCreateSandboxProfileMetaState({
     navigate,
     invalidateSandboxProfiles: async () => {
       await queryClient.invalidateQueries({
         queryKey: ["sandbox-profiles"],
       });
     },
-    invalidateProfileDetail: async (invalidateProfileId) => {
-      await queryClient.invalidateQueries({
-        queryKey: sandboxProfileDetailQueryKey(invalidateProfileId),
-      });
-    },
   });
 
-  const integrationsState = useSandboxProfileIntegrationsState({
-    mode: props.mode,
-    profileId,
-    invalidateVersionBindings: async ({ profileId: invalidateProfileId, version }) => {
-      await queryClient.invalidateQueries({
-        queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
-          profileId: invalidateProfileId,
-          version,
-        }),
-      });
-    },
+  return (
+    <div className="gap-4 flex flex-col">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">{metaState.pageTitle}</h1>
+      </div>
+      {metaState.saveError ? (
+        <Alert variant="destructive">
+          <AlertTitle>Create failed</AlertTitle>
+          <AlertDescription>{metaState.saveError}</AlertDescription>
+        </Alert>
+      ) : null}
+
+      <Card>
+        <CardContent className="gap-4 flex flex-col pt-4">
+          <Field>
+            <FieldLabel htmlFor="sandbox-profile-display-name">
+              <span className="inline-flex items-center gap-0.5">
+                Profile Name
+                <span aria-hidden="true" className="text-destructive">
+                  *
+                </span>
+              </span>
+            </FieldLabel>
+            <FieldContent>
+              <Input
+                className="w-full max-w-2xl"
+                id="sandbox-profile-display-name"
+                onChange={(event) => {
+                  metaState.onDisplayNameChange(event.currentTarget.value);
+                }}
+                value={metaState.formState.displayName}
+              />
+            </FieldContent>
+          </Field>
+
+          <div className="gap-2 flex">
+            <Button
+              disabled={metaState.isDisplayNameInvalid || metaState.isCreating}
+              onClick={metaState.onCreate}
+              type="button"
+            >
+              {metaState.isCreating ? "Creating..." : "Create profile"}
+            </Button>
+            <Button onClick={metaState.onCancelCreate} type="button" variant="outline">
+              Cancel
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function EditSandboxProfileEditorPage(): React.JSX.Element {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const params = useParams();
+  const profileId = params["profileId"];
+
+  if (profileId === undefined) {
+    throw new Error("profileId is required.");
+  }
+
+  const profileQuery = useQuery({
+    queryKey: sandboxProfileDetailQueryKey(profileId),
+    queryFn: async ({ signal }) => getSandboxProfile({ profileId, signal }),
+    retry: false,
   });
 
-  if (props.mode === "edit" && profileQuery.isPending) {
+  if (profileQuery.isPending) {
     return (
       <div className="gap-4 flex flex-col">
-        <h1 className="text-xl font-semibold">{metaState.pageTitle}</h1>
+        <h1 className="text-xl font-semibold">{profileId}</h1>
         <Card>
           <CardContent className="pt-4">
             <div className="gap-3 flex flex-col">
@@ -415,13 +460,13 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
     );
   }
 
-  if (props.mode === "edit" && profileQuery.isError) {
+  if (profileQuery.isError || profileQuery.data === undefined) {
     const isNotFoundError =
       profileQuery.error instanceof SandboxProfilesApiError && profileQuery.error.status === 404;
 
     return (
       <div className="gap-4 flex flex-col">
-        <h1 className="text-xl font-semibold">{metaState.pageTitle}</h1>
+        <h1 className="text-xl font-semibold">{profileId}</h1>
         <Card>
           <CardContent className="gap-3 flex flex-col pt-4">
             <Alert variant="destructive">
@@ -455,95 +500,199 @@ export function SandboxProfileEditorPage(props: SandboxProfileEditorPageProps): 
   }
 
   return (
+    <LoadedSandboxProfileEditorPage
+      navigate={navigate}
+      profileId={profileId}
+      profile={profileQuery.data}
+      invalidateSandboxProfiles={async () => {
+        await queryClient.invalidateQueries({
+          queryKey: ["sandbox-profiles"],
+        });
+      }}
+      invalidateProfileDetail={async (invalidateProfileId) => {
+        await queryClient.invalidateQueries({
+          queryKey: sandboxProfileDetailQueryKey(invalidateProfileId),
+        });
+      }}
+      invalidateVersionBindings={async ({ profileId: invalidateProfileId, version }) => {
+        await queryClient.invalidateQueries({
+          queryKey: sandboxProfileVersionIntegrationBindingsQueryKey({
+            profileId: invalidateProfileId,
+            version,
+          }),
+        });
+      }}
+    />
+  );
+}
+
+function LoadedSandboxProfileEditorPage(input: {
+  navigate: ReturnType<typeof useNavigate>;
+  profileId: string;
+  profile: { displayName: string };
+  invalidateSandboxProfiles: () => Promise<void>;
+  invalidateProfileDetail: (profileId: string) => Promise<void>;
+  invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
+}): React.JSX.Element {
+  const integrationsLoader = useSandboxProfileIntegrationsLoader({
+    profileId: input.profileId,
+  });
+
+  return (
     <div className="gap-4 flex flex-col">
+      <LoadedSandboxProfileMetaSection
+        key={`${input.profileId}:${input.profile.displayName}`}
+        invalidateProfileDetail={input.invalidateProfileDetail}
+        invalidateSandboxProfiles={input.invalidateSandboxProfiles}
+        navigate={input.navigate}
+        profile={input.profile}
+        profileId={input.profileId}
+      />
+
+      <LoadedSandboxProfileIntegrationsSection
+        key={
+          integrationsLoader.version === null
+            ? `unavailable:${input.profileId}`
+            : `${input.profileId}:${String(integrationsLoader.version)}`
+        }
+        loader={integrationsLoader}
+        profileId={input.profileId}
+        invalidateVersionBindings={input.invalidateVersionBindings}
+      />
+    </div>
+  );
+}
+
+function LoadedSandboxProfileMetaSection(input: {
+  navigate: ReturnType<typeof useNavigate>;
+  profileId: string;
+  profile: { displayName: string };
+  invalidateSandboxProfiles: () => Promise<void>;
+  invalidateProfileDetail: (profileId: string) => Promise<void>;
+}): React.JSX.Element {
+  const metaState = useEditSandboxProfileMetaState({
+    profileId: input.profileId,
+    loadedProfile: input.profile,
+    navigate: input.navigate,
+    invalidateSandboxProfiles: input.invalidateSandboxProfiles,
+    invalidateProfileDetail: input.invalidateProfileDetail,
+  });
+
+  return (
+    <>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        {props.mode === "create" ? (
-          <h1 className="text-xl font-semibold">{metaState.pageTitle}</h1>
-        ) : (
-          <EditableHeading
-            ariaLabel="Profile name"
-            cancelOnEscape={true}
-            draftValue={metaState.profileNameDraft}
-            editButtonLabel="Edit profile name"
-            errorMessage={undefined}
-            isEditing={metaState.isEditingProfileName}
-            maxWidthClassName={undefined}
-            onCancel={metaState.onProfileNameEditCancel}
-            onCommit={metaState.onProfileNameEditCommit}
-            onDraftValueChange={metaState.onProfileNameDraftChange}
-            onEditStart={metaState.onProfileNameEditStart}
-            placeholder={undefined}
-            saveDisabled={metaState.isUpdating}
-            value={metaState.pageTitle}
-          />
-        )}
+        <EditableHeading
+          ariaLabel="Profile name"
+          cancelOnEscape={true}
+          draftValue={metaState.profileNameDraft}
+          editButtonLabel="Edit profile name"
+          errorMessage={undefined}
+          isEditing={metaState.isEditingProfileName}
+          maxWidthClassName={undefined}
+          onCancel={metaState.onProfileNameEditCancel}
+          onCommit={metaState.onProfileNameEditCommit}
+          onDraftValueChange={metaState.onProfileNameDraftChange}
+          onEditStart={metaState.onProfileNameEditStart}
+          placeholder={undefined}
+          saveDisabled={metaState.isUpdating}
+          value={metaState.pageTitle}
+        />
       </div>
       {metaState.saveError ? (
         <Alert variant="destructive">
-          <AlertTitle>{props.mode === "create" ? "Create failed" : "Update failed"}</AlertTitle>
+          <AlertTitle>Update failed</AlertTitle>
           <AlertDescription>{metaState.saveError}</AlertDescription>
         </Alert>
       ) : null}
+    </>
+  );
+}
 
-      {props.mode === "create" ? (
-        <Card>
-          <CardContent className="gap-4 flex flex-col pt-4">
-            <Field>
-              <FieldLabel htmlFor="sandbox-profile-display-name">
-                <span className="inline-flex items-center gap-0.5">
-                  Profile Name
-                  <span aria-hidden="true" className="text-destructive">
-                    *
-                  </span>
-                </span>
-              </FieldLabel>
-              <FieldContent>
-                <Input
-                  className="w-full max-w-2xl"
-                  id="sandbox-profile-display-name"
-                  onChange={(event) => {
-                    metaState.onDisplayNameChange(event.currentTarget.value);
-                  }}
-                  value={metaState.formState.displayName}
-                />
-              </FieldContent>
-            </Field>
+function LoadedSandboxProfileIntegrationsSection(input: {
+  profileId: string;
+  loader: ReturnType<typeof useSandboxProfileIntegrationsLoader>;
+  invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
+}): React.JSX.Element {
+  if (
+    input.loader.integrationBindingsQuery.isPending ||
+    input.loader.integrationBindingsQuery.isError ||
+    input.loader.integrationDirectoryQuery.isPending ||
+    input.loader.integrationDirectoryQuery.isError ||
+    input.loader.initialRows === null ||
+    input.loader.version === null
+  ) {
+    return (
+      <IntegrationsEditorSection
+        availableConnections={input.loader.availableConnections}
+        availableTargets={input.loader.availableTargets}
+        integrationBindingsQuery={input.loader.integrationBindingsQuery}
+        integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
+        integrationRowErrorsByClientId={{}}
+        integrationRows={[]}
+        integrationSaveError={null}
+        integrationSaveSuccess={false}
+        isSavingIntegrationBindings={false}
+        onAddIntegrationBindingRow={async () => false}
+        onIntegrationBindingRowChange={() => {}}
+        onRemoveIntegrationBindingRow={() => {}}
+        resolveSelectedConnectionDisplayName={() => undefined}
+      />
+    );
+  }
 
-            <div className="gap-2 flex">
-              <Button
-                disabled={metaState.isDisplayNameInvalid || metaState.isCreating}
-                onClick={metaState.onCreate}
-                type="button"
-              >
-                {metaState.isCreating ? "Creating..." : "Create profile"}
-              </Button>
-              <Button onClick={metaState.onCancelCreate} type="button" variant="outline">
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+  return (
+    <ReadySandboxProfileIntegrationsSection
+      key={`${input.profileId}:${String(input.loader.version)}`}
+      profileId={input.profileId}
+      version={input.loader.version}
+      initialRows={input.loader.initialRows}
+      availableConnections={input.loader.availableConnections}
+      availableTargets={input.loader.availableTargets}
+      invalidateVersionBindings={input.invalidateVersionBindings}
+      integrationDirectoryQuery={input.loader.integrationDirectoryQuery}
+    />
+  );
+}
 
-      {integrationsState.canEditIntegrations ? (
-        <IntegrationsEditorSection
-          availableConnections={integrationsState.availableConnections}
-          availableTargets={integrationsState.availableTargets}
-          integrationBindingsQuery={integrationsState.integrationBindingsQuery}
-          integrationDirectoryQuery={integrationsState.integrationDirectoryQuery}
-          integrationRowErrorsByClientId={integrationsState.integrationRowErrorsByClientId}
-          integrationRows={integrationsState.integrationRows}
-          integrationSaveError={integrationsState.integrationSaveError}
-          integrationSaveSuccess={integrationsState.integrationSaveSuccess}
-          isSavingIntegrationBindings={integrationsState.isSavingIntegrationBindings}
-          onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}
-          onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
-          onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
-          resolveSelectedConnectionDisplayName={
-            integrationsState.resolveSelectedConnectionDisplayName
-          }
-        />
-      ) : null}
-    </div>
+function ReadySandboxProfileIntegrationsSection(input: {
+  profileId: string;
+  version: number;
+  initialRows: readonly SandboxProfileBindingEditorRow[];
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
+  integrationDirectoryQuery: ReturnType<
+    typeof useSandboxProfileIntegrationsLoader
+  >["integrationDirectoryQuery"];
+}): React.JSX.Element {
+  const integrationsState = useLoadedSandboxProfileIntegrationsState({
+    profileId: input.profileId,
+    version: input.version,
+    initialRows: input.initialRows,
+    availableConnections: input.availableConnections,
+    availableTargets: input.availableTargets,
+    invalidateVersionBindings: input.invalidateVersionBindings,
+  });
+
+  return (
+    <IntegrationsEditorSection
+      availableConnections={integrationsState.availableConnections}
+      availableTargets={integrationsState.availableTargets}
+      integrationBindingsQuery={{
+        isError: false,
+        error: null,
+        isPending: false,
+      }}
+      integrationDirectoryQuery={input.integrationDirectoryQuery}
+      integrationRowErrorsByClientId={integrationsState.integrationRowErrorsByClientId}
+      integrationRows={integrationsState.integrationRows}
+      integrationSaveError={integrationsState.integrationSaveError}
+      integrationSaveSuccess={integrationsState.integrationSaveSuccess}
+      isSavingIntegrationBindings={integrationsState.isSavingIntegrationBindings}
+      onAddIntegrationBindingRow={integrationsState.onAddIntegrationBindingRow}
+      onIntegrationBindingRowChange={integrationsState.onIntegrationBindingRowChange}
+      onRemoveIntegrationBindingRow={integrationsState.onRemoveIntegrationBindingRow}
+      resolveSelectedConnectionDisplayName={integrationsState.resolveSelectedConnectionDisplayName}
+    />
   );
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { IntegrationCardViewModel } from "../integrations/directory-model.js";
@@ -43,6 +43,97 @@ describe("useIntegrationDetailState", () => {
       }),
     );
 
+    expect(result.current.activeDetailConnectionId).toBe("icn_active");
+  });
+
+  it("falls back to the default connection when the selected connection disappears", () => {
+    const cards = [
+      createCard({
+        targetKey: "github",
+        connections: [
+          createConnection({ id: "icn_error", status: "error" }),
+          createConnection({ id: "icn_active", status: "active" }),
+        ],
+      }),
+    ];
+    const { result, rerender } = renderHook(
+      ({ nextCards }) =>
+        useIntegrationDetailState({
+          cards: nextCards,
+          detailTargetKey: "github",
+        }),
+      {
+        initialProps: {
+          nextCards: cards,
+        },
+      },
+    );
+
+    act(() => {
+      result.current.setActiveDetailConnectionId("icn_error");
+    });
+    expect(result.current.activeDetailConnectionId).toBe("icn_error");
+
+    rerender({
+      nextCards: [
+        createCard({
+          targetKey: "github",
+          connections: [createConnection({ id: "icn_active", status: "active" })],
+        }),
+      ],
+    });
+
+    expect(result.current.activeDetailConnectionId).toBe("icn_active");
+  });
+
+  it("does not restore a stale requested connection when it reappears later", () => {
+    const { result, rerender } = renderHook(
+      ({ nextCards }) =>
+        useIntegrationDetailState({
+          cards: nextCards,
+          detailTargetKey: "github",
+        }),
+      {
+        initialProps: {
+          nextCards: [
+            createCard({
+              targetKey: "github",
+              connections: [
+                createConnection({ id: "icn_error", status: "error" }),
+                createConnection({ id: "icn_active", status: "active" }),
+              ],
+            }),
+          ],
+        },
+      },
+    );
+
+    act(() => {
+      result.current.setActiveDetailConnectionId("icn_error");
+    });
+    expect(result.current.activeDetailConnectionId).toBe("icn_error");
+
+    rerender({
+      nextCards: [
+        createCard({
+          targetKey: "github",
+          connections: [createConnection({ id: "icn_active", status: "active" })],
+        }),
+      ],
+    });
+    expect(result.current.activeDetailConnectionId).toBe("icn_active");
+
+    rerender({
+      nextCards: [
+        createCard({
+          targetKey: "github",
+          connections: [
+            createConnection({ id: "icn_error", status: "error" }),
+            createConnection({ id: "icn_active", status: "active" }),
+          ],
+        }),
+      ],
+    });
     expect(result.current.activeDetailConnectionId).toBe("icn_active");
   });
 });

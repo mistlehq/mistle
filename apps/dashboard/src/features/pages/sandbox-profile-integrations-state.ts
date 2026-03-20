@@ -1,5 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { z } from "zod";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -83,7 +83,7 @@ type PersistedBindingRecord = {
   config: Record<string, unknown>;
 };
 
-function mapBindingsToEditorRows(
+export function mapBindingsToEditorRows(
   bindings: readonly PersistedBindingRecord[],
 ): SandboxProfileBindingEditorRow[] {
   return bindings.map((binding) => ({
@@ -103,7 +103,7 @@ function resolveRecord(value: unknown): Record<string, unknown> {
   return isRecord(value) ? value : {};
 }
 
-function resolveLatestVersion(versions: readonly SandboxProfileVersion[]): number | null {
+export function resolveLatestVersion(versions: readonly SandboxProfileVersion[]): number | null {
   if (versions.length === 0) {
     return null;
   }
@@ -122,16 +122,7 @@ function resolveLatestVersion(versions: readonly SandboxProfileVersion[]): numbe
   return latestVersion;
 }
 
-type UseSandboxProfileIntegrationsStateInput = {
-  mode: "create" | "edit";
-  profileId: string | undefined;
-  invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
-};
-
-export function useSandboxProfileIntegrationsState(
-  input: UseSandboxProfileIntegrationsStateInput,
-): {
-  canEditIntegrations: boolean;
+export function useSandboxProfileIntegrationsLoader(input: { profileId: string }): {
   integrationBindingsQuery: {
     isError: boolean;
     error: unknown;
@@ -142,6 +133,95 @@ export function useSandboxProfileIntegrationsState(
     error: unknown;
     isPending: boolean;
   };
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  initialRows: readonly SandboxProfileBindingEditorRow[] | null;
+  version: number | null;
+} {
+  const profileVersionsQuery = useQuery({
+    queryKey: sandboxProfileVersionsQueryKey(input.profileId),
+    queryFn: async ({ signal }) =>
+      listSandboxProfileVersions({
+        profileId: input.profileId,
+        signal,
+      }),
+    retry: false,
+  });
+  const version = resolveLatestVersion(profileVersionsQuery.data?.versions ?? []);
+  const integrationBindingsQuery = useQuery({
+    queryKey:
+      version === null
+        ? sandboxProfileVersionIntegrationBindingsQueryKey({
+            profileId: input.profileId,
+            version: 0,
+          })
+        : sandboxProfileVersionIntegrationBindingsQueryKey({
+            profileId: input.profileId,
+            version,
+          }),
+    queryFn: async ({ signal }) => {
+      if (version === null) {
+        throw new Error("No sandbox profile version is available for this profile.");
+      }
+      return getSandboxProfileVersionIntegrationBindings({
+        profileId: input.profileId,
+        version,
+        signal,
+      });
+    },
+    enabled: version !== null && !profileVersionsQuery.isPending,
+    retry: false,
+  });
+  const integrationDirectoryQuery = useQuery({
+    queryKey: ["sandbox-profiles", "integration-directory"],
+    queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
+    retry: false,
+  });
+
+  return {
+    integrationBindingsQuery: {
+      isError:
+        profileVersionsQuery.isError ||
+        (!profileVersionsQuery.isPending && version === null) ||
+        integrationBindingsQuery.isError,
+      error:
+        profileVersionsQuery.error ??
+        (!profileVersionsQuery.isPending && version === null
+          ? new Error("No sandbox profile version is available for this profile.")
+          : integrationBindingsQuery.error),
+      isPending: profileVersionsQuery.isPending || integrationBindingsQuery.isPending,
+    },
+    integrationDirectoryQuery: {
+      isError: integrationDirectoryQuery.isError,
+      error: integrationDirectoryQuery.error,
+      isPending: integrationDirectoryQuery.isPending,
+    },
+    availableConnections:
+      integrationDirectoryQuery.data?.connections.map((connection) => ({
+        ...connection,
+        ...(connection.config === undefined ? {} : { config: resolveRecord(connection.config) }),
+      })) ?? [],
+    availableTargets:
+      integrationDirectoryQuery.data?.targets.map((target) => ({
+        ...target,
+        config: resolveRecord(target.config),
+      })) ?? [],
+    initialRows:
+      integrationBindingsQuery.data?.bindings === undefined
+        ? null
+        : mapBindingsToEditorRows(integrationBindingsQuery.data.bindings),
+    version,
+  };
+}
+
+export function useLoadedSandboxProfileIntegrationsState(input: {
+  profileId: string;
+  version: number;
+  initialRows: readonly SandboxProfileBindingEditorRow[];
+  availableConnections: readonly IntegrationConnectionSummary[];
+  availableTargets: readonly IntegrationTargetSummary[];
+  invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
+}): {
   integrationSaveError: string | null;
   integrationRows: readonly SandboxProfileBindingEditorRow[];
   integrationRowErrorsByClientId: Readonly<Record<string, string>>;
@@ -161,32 +241,12 @@ export function useSandboxProfileIntegrationsState(
   integrationSaveSuccess: boolean;
   isSavingIntegrationBindings: boolean;
 } {
-  const [integrationRows, setIntegrationRows] = useState<SandboxProfileBindingEditorRow[]>([]);
+  const [integrationRows, setIntegrationRows] = useState([...input.initialRows]);
   const [integrationSaveError, setIntegrationSaveError] = useState<string | null>(null);
   const [integrationRowErrorsByClientId, setIntegrationRowErrorsByClientId] = useState<
     Record<string, string>
   >({});
   const [integrationSaveSuccess, setIntegrationSaveSuccess] = useState(false);
-
-  const profileVersionsQuery = useQuery({
-    queryKey:
-      input.mode === "edit" && input.profileId !== undefined
-        ? sandboxProfileVersionsQueryKey(input.profileId)
-        : sandboxProfileVersionsQueryKey("missing-profile-id"),
-    queryFn: async ({ signal }) => {
-      if (input.profileId === undefined) {
-        throw new Error("profileId is required.");
-      }
-      return listSandboxProfileVersions({
-        profileId: input.profileId,
-        signal,
-      });
-    },
-    enabled: input.mode === "edit" && input.profileId !== undefined,
-    retry: false,
-  });
-
-  const resolvedProfileVersion = resolveLatestVersion(profileVersionsQuery.data?.versions ?? []);
 
   function clearIntegrationRowError(clientId: string): void {
     setIntegrationRowErrorsByClientId((currentErrors) => {
@@ -218,45 +278,8 @@ export function useSandboxProfileIntegrationsState(
     setIntegrationSaveSuccess(false);
   }
 
-  const integrationBindingsQuery = useQuery({
-    queryKey:
-      input.mode === "edit" && input.profileId !== undefined && resolvedProfileVersion !== null
-        ? sandboxProfileVersionIntegrationBindingsQueryKey({
-            profileId: input.profileId,
-            version: resolvedProfileVersion,
-          })
-        : sandboxProfileVersionIntegrationBindingsQueryKey({
-            profileId: "missing-profile-id",
-            version: 0,
-          }),
-    queryFn: async ({ signal }) => {
-      if (input.profileId === undefined || resolvedProfileVersion === null) {
-        throw new Error("profileId and version are required.");
-      }
-      return getSandboxProfileVersionIntegrationBindings({
-        profileId: input.profileId,
-        version: resolvedProfileVersion,
-        signal,
-      });
-    },
-    enabled:
-      input.mode === "edit" &&
-      input.profileId !== undefined &&
-      resolvedProfileVersion !== null &&
-      !profileVersionsQuery.isPending,
-    retry: false,
-  });
-
-  const integrationDirectoryQuery = useQuery({
-    queryKey: ["sandbox-profiles", "integration-directory"],
-    queryFn: async ({ signal }) => listIntegrationDirectory({ signal }),
-    enabled: input.mode === "edit",
-  });
-
   const putIntegrationBindingsMutation = useMutation({
     mutationFn: async (mutationInput: {
-      profileId: string;
-      version: number;
       bindings: Array<{
         id?: string;
         clientRef: string;
@@ -266,22 +289,19 @@ export function useSandboxProfileIntegrationsState(
       }>;
     }) =>
       putSandboxProfileVersionIntegrationBindings({
-        profileId: mutationInput.profileId,
-        version: mutationInput.version,
+        profileId: input.profileId,
+        version: input.version,
         bindings: mutationInput.bindings,
       }),
-    onSuccess: async (updatedBindings, mutationInput) => {
+    onSuccess: async (updatedBindings) => {
       setIntegrationRows(mapBindingsToEditorRows(updatedBindings.bindings));
       setIntegrationSaveError(null);
       setIntegrationRowErrorsByClientId({});
       setIntegrationSaveSuccess(true);
-
-      if (input.profileId !== undefined) {
-        await input.invalidateVersionBindings({
-          profileId: input.profileId,
-          version: mutationInput.version,
-        });
-      }
+      await input.invalidateVersionBindings({
+        profileId: input.profileId,
+        version: input.version,
+      });
     },
     onError: (error: unknown) => {
       const issues = readInvalidBindingConfigIssues(error);
@@ -316,30 +336,6 @@ export function useSandboxProfileIntegrationsState(
     },
   });
 
-  useEffect(() => {
-    const bindings = integrationBindingsQuery.data?.bindings;
-    if (bindings === undefined) {
-      return;
-    }
-    setIntegrationRows(mapBindingsToEditorRows(bindings));
-    markIntegrationDirty();
-  }, [integrationBindingsQuery.data]);
-
-  const availableConnections: readonly IntegrationConnectionSummary[] =
-    integrationDirectoryQuery.data?.connections.map((connection) => ({
-      ...connection,
-      ...(connection.config === undefined
-        ? {}
-        : {
-            config: resolveRecord(connection.config),
-          }),
-    })) ?? [];
-  const availableTargets: readonly IntegrationTargetSummary[] =
-    integrationDirectoryQuery.data?.targets.map((target) => ({
-      ...target,
-      config: resolveRecord(target.config),
-    })) ?? [];
-
   function setNeutralSaveState(): void {
     setIntegrationSaveError(null);
     setIntegrationRowErrorsByClientId({});
@@ -349,15 +345,7 @@ export function useSandboxProfileIntegrationsState(
   async function persistIntegrationRows(
     rowsToPersist: readonly SandboxProfileBindingEditorRow[],
   ): Promise<boolean> {
-    if (
-      input.mode !== "edit" ||
-      input.profileId === undefined ||
-      putIntegrationBindingsMutation.isPending
-    ) {
-      return false;
-    }
-    if (resolvedProfileVersion === null) {
-      setIntegrationSaveFailure("No sandbox profile version is available for this profile.");
+    if (putIntegrationBindingsMutation.isPending) {
       return false;
     }
 
@@ -378,8 +366,8 @@ export function useSandboxProfileIntegrationsState(
 
       const configUiModel = resolveBindingConfigUiModel({
         row,
-        connections: availableConnections,
-        targets: availableTargets,
+        connections: input.availableConnections,
+        targets: input.availableTargets,
       });
       if (configUiModel.mode === "missing-connection") {
         setIntegrationSaveFailure("Each integration binding must select a connection.");
@@ -403,8 +391,6 @@ export function useSandboxProfileIntegrationsState(
 
     try {
       await putIntegrationBindingsMutation.mutateAsync({
-        profileId: input.profileId,
-        version: resolvedProfileVersion,
         bindings: parsedBindings,
       });
       return true;
@@ -443,15 +429,14 @@ export function useSandboxProfileIntegrationsState(
     clientId: string,
     changes: Partial<Omit<SandboxProfileBindingEditorRow, "clientId">>,
   ): void {
-    const nextRows = integrationRows.map((row) => {
-      if (row.clientId !== clientId) {
-        return row;
-      }
-      return {
-        ...row,
-        ...changes,
-      };
-    });
+    const nextRows = integrationRows.map((row) =>
+      row.clientId === clientId
+        ? {
+            ...row,
+            ...changes,
+          }
+        : row,
+    );
     setIntegrationRows(nextRows);
     markIntegrationDirty({ clientId });
     void persistIntegrationRows(nextRows);
@@ -463,7 +448,7 @@ export function useSandboxProfileIntegrationsState(
     if (row.connectionId === "") {
       return undefined;
     }
-    const selectedConnection = availableConnections.find(
+    const selectedConnection = input.availableConnections.find(
       (connection) => connection.id === row.connectionId,
     );
     if (selectedConnection === undefined) {
@@ -475,29 +460,11 @@ export function useSandboxProfileIntegrationsState(
   }
 
   return {
-    canEditIntegrations: input.mode === "edit" && input.profileId !== undefined,
-    integrationBindingsQuery: {
-      isError:
-        profileVersionsQuery.isError ||
-        (!profileVersionsQuery.isPending && resolvedProfileVersion === null) ||
-        integrationBindingsQuery.isError,
-      error:
-        profileVersionsQuery.error ??
-        (!profileVersionsQuery.isPending && resolvedProfileVersion === null
-          ? new Error("No sandbox profile version is available for this profile.")
-          : integrationBindingsQuery.error),
-      isPending: profileVersionsQuery.isPending || integrationBindingsQuery.isPending,
-    },
-    integrationDirectoryQuery: {
-      isError: integrationDirectoryQuery.isError,
-      error: integrationDirectoryQuery.error,
-      isPending: integrationDirectoryQuery.isPending,
-    },
     integrationSaveError,
     integrationRows,
     integrationRowErrorsByClientId,
-    availableConnections,
-    availableTargets,
+    availableConnections: input.availableConnections,
+    availableTargets: input.availableTargets,
     onAddIntegrationBindingRow,
     onRemoveIntegrationBindingRow,
     onIntegrationBindingRowChange,

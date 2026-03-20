@@ -44,8 +44,42 @@ export function MemberInviteDialog(input: {
   onCompleted: () => Promise<void>;
   onOpenChange: (nextOpen: boolean) => void;
 }): React.JSX.Element {
+  if (!input.open) {
+    return (
+      <Dialog
+        isBusy={false}
+        isDismissible={true}
+        onOpenChange={(nextOpen) => {
+          input.onOpenChange(nextOpen);
+        }}
+        open={false}
+      >
+        <DialogContent />
+      </Dialog>
+    );
+  }
+
+  return (
+    <OpenMemberInviteDialog
+      key={`${input.organizationId}:${input.assignableRoles.join(",")}`}
+      {...input}
+    />
+  );
+}
+
+function OpenMemberInviteDialog(input: {
+  canExecute: boolean;
+  organizationId: string;
+  assignableRoles: OrganizationRole[];
+  inviteMemberRequest: (request: {
+    organizationId: string;
+    email: string;
+    role: OrganizationRole;
+  }) => Promise<InviteMemberResponse>;
+  onCompleted: () => Promise<void>;
+  onOpenChange: (nextOpen: boolean) => void;
+}): React.JSX.Element {
   const form = useMemberInviteForm({
-    open: input.open,
     canExecute: input.canExecute,
     assignableRoles: input.assignableRoles,
     organizationId: input.organizationId,
@@ -64,7 +98,7 @@ export function MemberInviteDialog(input: {
       onOpenChange={(nextOpen) => {
         input.onOpenChange(nextOpen);
       }}
-      open={input.open}
+      open={true}
     >
       <DialogContent>
         <DialogHeader variant="sectioned">

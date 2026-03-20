@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { IntegrationCardViewModel } from "../integrations/directory-model.js";
 
@@ -6,45 +6,47 @@ export function useIntegrationDetailState(input: {
   cards: readonly IntegrationCardViewModel[];
   detailTargetKey: string | null;
 }) {
-  const [activeDetailConnectionId, setActiveDetailConnectionId] = useState<string | null>(null);
+  const [requestedDetailConnectionId, setRequestedDetailConnectionId] = useState<string | null>(
+    null,
+  );
 
-  const selectedDetailCard = useMemo(() => {
-    if (input.detailTargetKey === null) {
-      return null;
-    }
+  const selectedDetailCard =
+    input.detailTargetKey === null
+      ? null
+      : (input.cards.find((card) => card.target.targetKey === input.detailTargetKey) ?? null);
 
-    return input.cards.find((card) => card.target.targetKey === input.detailTargetKey) ?? null;
-  }, [input.cards, input.detailTargetKey]);
+  const selectedDetailConnections = selectedDetailCard?.connections ?? [];
 
-  const selectedDetailConnections = useMemo(() => {
-    if (selectedDetailCard === null) {
-      return [];
-    }
-
-    return selectedDetailCard.connections;
-  }, [selectedDetailCard]);
+  const defaultConnectionId =
+    selectedDetailConnections.find((connection) => connection.status === "active")?.id ??
+    selectedDetailConnections[0]?.id ??
+    null;
 
   useEffect(() => {
-    const defaultConnection =
-      selectedDetailConnections.find((connection) => connection.status === "active") ??
-      selectedDetailConnections[0] ??
-      null;
-    if (defaultConnection === null) {
-      setActiveDetailConnectionId(null);
+    if (requestedDetailConnectionId === null) {
       return;
     }
 
-    const selectedStillExists = selectedDetailConnections.some(
-      (connection) => connection.id === activeDetailConnectionId,
+    const requestedConnectionStillExists = selectedDetailConnections.some(
+      (connection) => connection.id === requestedDetailConnectionId,
     );
-    if (!selectedStillExists) {
-      setActiveDetailConnectionId(defaultConnection.id);
+    if (requestedConnectionStillExists) {
+      return;
     }
-  }, [activeDetailConnectionId, selectedDetailConnections]);
+
+    setRequestedDetailConnectionId(null);
+  }, [requestedDetailConnectionId, selectedDetailConnections]);
+
+  const activeDetailConnectionId =
+    defaultConnectionId !== null &&
+    requestedDetailConnectionId !== null &&
+    selectedDetailConnections.some((connection) => connection.id === requestedDetailConnectionId)
+      ? requestedDetailConnectionId
+      : defaultConnectionId;
 
   return {
     activeDetailConnectionId,
-    setActiveDetailConnectionId,
+    setActiveDetailConnectionId: setRequestedDetailConnectionId,
     selectedDetailCard,
     selectedDetailConnections,
   };

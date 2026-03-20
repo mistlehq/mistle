@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -43,12 +42,8 @@ export function IntegrationsPage() {
     throw new Error(`Integration target '${detailTargetKey}' was not found.`);
   }
 
-  const detailSurface = useMemo(() => {
-    if (detailTargetKey === null || directoryState.selectedDetailCard === null) {
-      return null;
-    }
-
-    return (
+  const detailSurface =
+    detailTargetKey === null || directoryState.selectedDetailCard === null ? null : (
       <IntegrationConnectionDetailView
         connections={buildIntegrationConnectionDetailItems({
           connections: directoryState.selectedDetailConnections,
@@ -60,16 +55,6 @@ export function IntegrationsPage() {
         titleEditor={connectionEditors.titleEditor}
       />
     );
-  }, [
-    connectionEditors.onEditApiKey,
-    connectionEditors.titleEditor,
-    detailTargetKey,
-    directoryState.onRefreshResource,
-    directoryState.refreshingResourceKeys,
-    directoryState.resourceItemsByKey,
-    directoryState.selectedDetailCard,
-    directoryState.selectedDetailConnections,
-  ]);
 
   return (
     <OrganizationIntegrationsSettingsPageView

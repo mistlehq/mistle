@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import { listIntegrationDirectory } from "../integrations/integrations-service.js";
@@ -57,31 +56,25 @@ export function useWebhookAutomationPrerequisites(input?: { preservedConnectionI
     retry: false,
   });
 
-  const connectionOptions = useMemo(
-    () =>
-      integrationDirectoryQuery.data === undefined
-        ? []
-        : buildWebhookAutomationConnectionOptions({
-            connections: integrationDirectoryQuery.data.connections,
-            targets: integrationDirectoryQuery.data.targets,
-            ...(input?.preservedConnectionId === undefined
-              ? {}
-              : {
-                  preservedConnectionId: input.preservedConnectionId,
-                }),
-          }),
-    [input?.preservedConnectionId, integrationDirectoryQuery.data],
-  );
+  const connectionOptions =
+    integrationDirectoryQuery.data === undefined
+      ? []
+      : buildWebhookAutomationConnectionOptions({
+          connections: integrationDirectoryQuery.data.connections,
+          targets: integrationDirectoryQuery.data.targets,
+          ...(input?.preservedConnectionId === undefined
+            ? {}
+            : {
+                preservedConnectionId: input.preservedConnectionId,
+              }),
+        });
 
-  const sandboxProfileOptions = useMemo(
-    () =>
-      sandboxProfilesQuery.data === undefined
-        ? []
-        : buildWebhookAutomationSandboxProfileOptions({
-            sandboxProfiles: sandboxProfilesQuery.data,
-          }),
-    [sandboxProfilesQuery.data],
-  );
+  const sandboxProfileOptions =
+    sandboxProfilesQuery.data === undefined
+      ? []
+      : buildWebhookAutomationSandboxProfileOptions({
+          sandboxProfiles: sandboxProfilesQuery.data,
+        });
 
   const errorMessage =
     integrationDirectoryQuery.isError || sandboxProfilesQuery.isError

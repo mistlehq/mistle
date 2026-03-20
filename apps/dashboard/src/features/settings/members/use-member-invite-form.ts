@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import type { InviteChip } from "./member-invite-state.js";
 import {
@@ -101,7 +101,6 @@ export function resolveDefaultInviteRole(
 }
 
 export function useMemberInviteForm(input: {
-  open: boolean;
   canExecute: boolean;
   assignableRoles: OrganizationRole[];
   organizationId: string;
@@ -132,27 +131,14 @@ export function useMemberInviteForm(input: {
 } {
   const [chips, setChips] = useState<InviteChip[]>([]);
   const nextChipIndex = useRef(0);
-  const [selectedRole, setSelectedRole] = useState<OrganizationRole | null>(null);
+  const [selectedRole, setSelectedRole] = useState<OrganizationRole | null>(() =>
+    resolveDefaultInviteRole(input.assignableRoles),
+  );
   const [phase, setPhase] = useState<MemberInviteDialogPhase>("compose");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [dialogError, setDialogError] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
   const [draftEmailValue, setDraftEmailValue] = useState("");
-
-  useEffect(() => {
-    if (!input.open) {
-      return;
-    }
-
-    const firstRole = resolveDefaultInviteRole(input.assignableRoles);
-    setSelectedRole(firstRole);
-    setChips([]);
-    nextChipIndex.current = 0;
-    setPhase("compose");
-    setDialogError(null);
-    setRoleError(null);
-    setDraftEmailValue("");
-  }, [input.assignableRoles, input.open]);
 
   const validPendingChipIds = useMemo(() => {
     return chips

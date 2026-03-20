@@ -33,14 +33,6 @@ function settingsOrganizationGeneralQueryKey(
 export function OrganizationGeneralSettingsPage(): React.JSX.Element {
   const queryClient = useQueryClient();
   const organizationId = useRequiredOrganizationId();
-
-  const [formState, setFormState] = useState<OrganizationFormState>({
-    name: "",
-  });
-  const [persistedFormState, setPersistedFormState] = useState<OrganizationFormState>({
-    name: "",
-  });
-  const [persistedSlug, setPersistedSlug] = useState("");
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -51,19 +43,6 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
         organizationId,
       }),
   });
-
-  useEffect(() => {
-    if (!organizationQuery.data) {
-      return;
-    }
-
-    const loadedState = {
-      name: organizationQuery.data.name,
-    };
-    setFormState(loadedState);
-    setPersistedFormState(loadedState);
-    setPersistedSlug(organizationQuery.data.slug);
-  }, [organizationQuery.data]);
 
   useEffect(() => {
     if (!showSaveSuccess) {
@@ -80,27 +59,32 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
   }, [showSaveSuccess]);
 
   const saveMutation = useMutation({
-    mutationFn: async (nextState: OrganizationFormState) =>
-      updateOrganizationGeneral({
+    mutationFn: async (nextState: OrganizationFormState) => {
+      const currentOrganization = organizationQuery.data;
+      if (currentOrganization === undefined) {
+        throw new Error("Organization settings data is required.");
+      }
+
+      return updateOrganizationGeneral({
         organizationId,
         name: nextState.name,
-        slug: persistedSlug,
-      }),
+        slug: currentOrganization.slug,
+      });
+    },
     onSuccess: async (_result, variables) => {
+      const currentOrganization = organizationQuery.data;
+      if (currentOrganization === undefined) {
+        throw new Error("Organization settings data is required.");
+      }
+
       queryClient.setQueryData(organizationSummaryQueryKey(organizationId), {
         name: variables.name,
-        slug: persistedSlug,
+        slug: currentOrganization.slug,
       });
 
       const refetched = await organizationQuery.refetch();
       const latest = refetched.data;
       if (latest) {
-        const latestState = {
-          name: latest.name,
-        };
-        setFormState(latestState);
-        setPersistedFormState(latestState);
-        setPersistedSlug(latest.slug);
         queryClient.setQueryData(organizationSummaryQueryKey(organizationId), {
           name: latest.name,
           slug: latest.slug,
@@ -125,38 +109,13 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
     },
   });
 
-  const normalizedName = formState.name.trim();
-  const hasDirtyChanges = normalizedName !== persistedFormState.name.trim();
-  const hasNameError = normalizedName.length === 0;
-
-  function handleNameChange(nextValue: string): void {
-    setFormState((currentState) => ({
-      ...currentState,
-      name: nextValue,
-    }));
-    setSaveError(null);
-    setShowSaveSuccess(false);
-  }
-
-  function handleCancelChanges(): void {
-    setFormState(persistedFormState);
-    setSaveError(null);
-    setShowSaveSuccess(false);
-  }
-
-  async function saveChanges(): Promise<void> {
-    await saveMutation.mutateAsync({
-      name: normalizedName,
-    });
-  }
-
-  function handleSaveChanges(): void {
-    void saveChanges();
-  }
-
   return (
-    <OrganizationGeneralSettingsPageView
-      hasDirtyChanges={hasDirtyChanges}
+    <OrganizationGeneralSettingsEditor
+      key={
+        organizationQuery.data === undefined
+          ? "loading"
+          : `${organizationQuery.data.slug}:${organizationQuery.data.name}`
+      }
       isLoading={organizationQuery.isPending}
       isSaving={saveMutation.isPending}
       loadErrorMessage={
@@ -167,16 +126,66 @@ export function OrganizationGeneralSettingsPage(): React.JSX.Element {
             })
           : null
       }
-      name={formState.name}
-      nameErrorMessage={hasNameError ? "Organization name is required." : null}
-      onCancelChanges={handleCancelChanges}
-      onNameChange={handleNameChange}
+      onResetFeedback={() => {
+        setSaveError(null);
+        setShowSaveSuccess(false);
+      }}
       onRetryLoad={() => {
         void organizationQuery.refetch();
       }}
-      onSaveChanges={handleSaveChanges}
+      onSaveChanges={(name) => {
+        setSaveError(null);
+        setShowSaveSuccess(false);
+        void saveMutation.mutateAsync({
+          name: name.trim(),
+        });
+      }}
+      organization={organizationQuery.data}
       saveErrorMessage={saveError}
       saveSuccess={showSaveSuccess}
+    />
+  );
+}
+
+function OrganizationGeneralSettingsEditor(input: {
+  organization: { name: string; slug: string } | undefined;
+  isLoading: boolean;
+  isSaving: boolean;
+  loadErrorMessage: string | null;
+  saveErrorMessage: string | null;
+  saveSuccess: boolean;
+  onRetryLoad: () => void;
+  onSaveChanges: (name: string) => void;
+  onResetFeedback: () => void;
+}): React.JSX.Element {
+  const [name, setName] = useState(input.organization?.name ?? "");
+  const normalizedName = name.trim();
+  const persistedName = input.organization?.name ?? "";
+  const hasDirtyChanges = normalizedName !== persistedName.trim();
+  const hasNameError = normalizedName.length === 0;
+
+  return (
+    <OrganizationGeneralSettingsPageView
+      hasDirtyChanges={hasDirtyChanges}
+      isLoading={input.isLoading}
+      isSaving={input.isSaving}
+      loadErrorMessage={input.loadErrorMessage}
+      name={name}
+      nameErrorMessage={hasNameError ? "Organization name is required." : null}
+      onCancelChanges={() => {
+        setName(persistedName);
+        input.onResetFeedback();
+      }}
+      onNameChange={(nextValue) => {
+        setName(nextValue);
+        input.onResetFeedback();
+      }}
+      onRetryLoad={input.onRetryLoad}
+      onSaveChanges={() => {
+        input.onSaveChanges(name);
+      }}
+      saveErrorMessage={input.saveErrorMessage}
+      saveSuccess={input.saveSuccess}
     />
   );
 }
