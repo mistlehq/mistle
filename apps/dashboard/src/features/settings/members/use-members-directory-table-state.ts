@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import type { SettingsInvitation, SettingsMember } from "./members-api.js";
 import {
@@ -27,23 +27,15 @@ export function useMembersDirectoryTableState(input: {
   const [activeFilter, setActiveFilter] = useState<MembersDirectoryTableFilter>("all");
   const [searchValue, setSearchValue] = useState("");
 
-  const rows = useMemo(
-    () =>
-      buildMembersDirectoryRows({
-        members: input.members,
-        invitations: input.invitations,
-      }),
-    [input.members, input.invitations],
-  );
-  const visibleRows = useMemo(
-    () =>
-      filterMembersDirectoryRows({
-        rows,
-        filter: activeFilter,
-        search: searchValue,
-      }),
-    [rows, activeFilter, searchValue],
-  );
+  const rows = buildMembersDirectoryRows({
+    members: input.members,
+    invitations: input.invitations,
+  });
+  const visibleRows = filterMembersDirectoryRows({
+    rows,
+    filter: activeFilter,
+    search: searchValue,
+  });
 
   return {
     selectedInvitationForDetails,

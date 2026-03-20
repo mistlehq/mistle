@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 
 import {
   filterWebhookAutomationListItems,
@@ -19,15 +19,11 @@ export function useWebhookAutomationListState(input: {
   const [activeFilter, setActiveFilter] = useState<WebhookAutomationListFilter>("all");
   const [searchValue, setSearchValue] = useState("");
 
-  const visibleItems = useMemo(
-    () =>
-      filterWebhookAutomationListItems({
-        items: input.items,
-        filter: activeFilter,
-        search: searchValue,
-      }),
-    [input.items, activeFilter, searchValue],
-  );
+  const visibleItems = filterWebhookAutomationListItems({
+    items: input.items,
+    filter: activeFilter,
+    search: searchValue,
+  });
 
   return {
     activeFilter,

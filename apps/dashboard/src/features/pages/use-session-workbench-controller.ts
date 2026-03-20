@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import {
@@ -210,27 +210,22 @@ export function useSessionWorkbenchController(input: {
     },
   });
   const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
-  const connectionReadiness = useMemo(() => {
-    return resolveSessionConnectionReadiness({
-      sandboxInstanceId: input.sandboxInstanceId,
-      sandboxStatus,
-      isStatusPending: sandboxStatusQuery.isPending,
-    });
-  }, [input.sandboxInstanceId, sandboxStatus, sandboxStatusQuery.isPending]);
-  const stoppedSessionState = useMemo(() => {
-    const message = resolveStoppedSessionMessage({
-      connectionReadinessReason: connectionReadiness.reason,
-    });
-
-    return {
-      // Mirror the policy contract: stopped-state messaging stays separate from
-      // connection readiness until the control-plane API exposes a dedicated
-      // resume sandbox endpoint and the dashboard adopts that endpoint as the
-      // supported resume flow.
-      message,
-      requiresManualResume: message !== null,
-    };
-  }, [connectionReadiness.reason]);
+  const connectionReadiness = resolveSessionConnectionReadiness({
+    sandboxInstanceId: input.sandboxInstanceId,
+    sandboxStatus,
+    isStatusPending: sandboxStatusQuery.isPending,
+  });
+  const stoppedSessionMessage = resolveStoppedSessionMessage({
+    connectionReadinessReason: connectionReadiness.reason,
+  });
+  const stoppedSessionState = {
+    // Mirror the policy contract: stopped-state messaging stays separate from
+    // connection readiness until the control-plane API exposes a dedicated
+    // resume sandbox endpoint and the dashboard adopts that endpoint as the
+    // supported resume flow.
+    message: stoppedSessionMessage,
+    requiresManualResume: stoppedSessionMessage !== null,
+  };
 
   useEffect(() => {
     setHasAttemptedAutoConnect(false);
@@ -286,17 +281,14 @@ export function useSessionWorkbenchController(input: {
     sandboxStatusQuery.refetch,
   ]);
 
-  const sessionHeaderStatusUi = useMemo(() => {
-    const sandboxStatusLabel =
-      sandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
-
-    return resolveSessionHeaderStatusUi({
-      sandboxStatus: sandboxStatusLabel.toLowerCase(),
-      agentConnectionState,
-      step,
-      hasConnectionError: startErrorMessage !== null,
-    });
-  }, [agentConnectionState, sandboxStatus, sandboxStatusQuery.isPending, startErrorMessage, step]);
+  const sandboxStatusLabel =
+    sandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
+  const sessionHeaderStatusUi = resolveSessionHeaderStatusUi({
+    sandboxStatus: sandboxStatusLabel.toLowerCase(),
+    agentConnectionState,
+    step,
+    hasConnectionError: startErrorMessage !== null,
+  });
 
   const hasActiveTurn = canInterruptTurn || canSteerTurn;
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
@@ -362,12 +354,10 @@ export function useSessionWorkbenchController(input: {
     [admin.configJson, composerConfigSnapshot.model, writeConfigValue],
   );
 
-  const composerModelOptions = useMemo(() => {
-    return admin.availableModels.map((model) => ({
-      value: model.model,
-      label: model.displayName,
-    }));
-  }, [admin.availableModels]);
+  const composerModelOptions = admin.availableModels.map((model) => ({
+    value: model.model,
+    label: model.displayName,
+  }));
 
   const submitComposer = useCallback((): void => {
     const action = resolveChatComposerAction({
