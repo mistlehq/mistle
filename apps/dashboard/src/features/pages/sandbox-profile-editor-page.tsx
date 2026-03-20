@@ -12,7 +12,7 @@ import {
   Skeleton,
 } from "@mistle/ui";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -101,40 +101,38 @@ export function IntegrationsEditorSection(
   const [integrationDialogState, setIntegrationDialogState] =
     useState<SandboxProfileBindingDialogState | null>(null);
 
-  const availableConnectionsByKind = useMemo(() => {
-    const grouped: Record<SandboxIntegrationBindingKind, IntegrationConnectionSummary[]> = {
-      agent: [],
-      git: [],
-      connector: [],
-    };
+  const availableConnectionsByKind: Record<
+    SandboxIntegrationBindingKind,
+    IntegrationConnectionSummary[]
+  > = {
+    agent: [],
+    git: [],
+    connector: [],
+  };
 
-    for (const connection of props.availableConnections) {
-      const target = props.availableTargets.find(
-        (candidate) => candidate.targetKey === connection.targetKey,
-      );
-      const kind = resolveBindingKindFromTarget(target);
-      if (kind === undefined) {
-        continue;
-      }
-      grouped[kind].push(connection);
+  for (const connection of props.availableConnections) {
+    const target = props.availableTargets.find(
+      (candidate) => candidate.targetKey === connection.targetKey,
+    );
+    const kind = resolveBindingKindFromTarget(target);
+    if (kind === undefined) {
+      continue;
     }
+    availableConnectionsByKind[kind].push(connection);
+  }
 
-    return grouped;
-  }, [props.availableConnections, props.availableTargets]);
+  const integrationRowsByKind: Record<
+    SandboxIntegrationBindingKind,
+    SandboxProfileBindingEditorRow[]
+  > = {
+    agent: [],
+    git: [],
+    connector: [],
+  };
 
-  const integrationRowsByKind = useMemo(() => {
-    const grouped: Record<SandboxIntegrationBindingKind, SandboxProfileBindingEditorRow[]> = {
-      agent: [],
-      git: [],
-      connector: [],
-    };
-
-    for (const row of props.integrationRows) {
-      grouped[row.kind].push(row);
-    }
-
-    return grouped;
-  }, [props.integrationRows]);
+  for (const row of props.integrationRows) {
+    integrationRowsByKind[row.kind].push(row);
+  }
 
   function closeIntegrationDialog(): void {
     setIntegrationDialogState(null);
