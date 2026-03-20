@@ -1,5 +1,4 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
-import { useMemo } from "react";
 
 import { InvitationDetailsDialog } from "./invitation-details-dialog.js";
 import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
@@ -38,35 +37,20 @@ export function MembersDirectoryTable(input: {
     members: input.members,
     invitations: input.invitations,
   });
-  const tableRows = useMemo(
-    () =>
-      buildMembersDirectoryTableRowViewModels({
-        rows: visibleRows,
-        capabilities: input.capabilities,
-        canManageInvitations: input.canManageInvitations,
-        pendingMemberOperation: input.pendingMemberOperation,
-        invitationActionState: input.invitationActionState,
-        handlers: {
-          onChangeRole: input.onChangeRole,
-          onRemoveMember: input.onRemoveMember,
-          onViewInvitationDetails: setSelectedInvitationForDetails,
-          onResendInvite: input.onResendInvite,
-          onRevokeInvite: input.onRevokeInvite,
-        },
-      }),
-    [
-      visibleRows,
-      input.capabilities,
-      input.canManageInvitations,
-      input.pendingMemberOperation,
-      input.invitationActionState,
-      input.onChangeRole,
-      input.onRemoveMember,
-      input.onResendInvite,
-      input.onRevokeInvite,
-      setSelectedInvitationForDetails,
-    ],
-  );
+  const tableRows = buildMembersDirectoryTableRowViewModels({
+    rows: visibleRows,
+    capabilities: input.capabilities,
+    canManageInvitations: input.canManageInvitations,
+    pendingMemberOperation: input.pendingMemberOperation,
+    invitationActionState: input.invitationActionState,
+    handlers: {
+      onChangeRole: input.onChangeRole,
+      onRemoveMember: input.onRemoveMember,
+      onViewInvitationDetails: setSelectedInvitationForDetails,
+      onResendInvite: input.onResendInvite,
+      onRevokeInvite: input.onRevokeInvite,
+    },
+  });
 
   return (
     <>
