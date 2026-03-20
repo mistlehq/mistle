@@ -1,5 +1,5 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 
 import { InvitationDetailsDialog } from "./invitation-details-dialog.js";
 import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
@@ -38,28 +38,6 @@ export function MembersDirectoryTable(input: {
     members: input.members,
     invitations: input.invitations,
   });
-  const onViewInvitationDetails = useCallback(
-    (invitation: SettingsInvitation) => {
-      setSelectedInvitationForDetails(invitation);
-    },
-    [setSelectedInvitationForDetails],
-  );
-  const handlers = useMemo(
-    () => ({
-      onChangeRole: input.onChangeRole,
-      onRemoveMember: input.onRemoveMember,
-      onViewInvitationDetails,
-      onResendInvite: input.onResendInvite,
-      onRevokeInvite: input.onRevokeInvite,
-    }),
-    [
-      input.onChangeRole,
-      input.onRemoveMember,
-      onViewInvitationDetails,
-      input.onResendInvite,
-      input.onRevokeInvite,
-    ],
-  );
   const tableRows = useMemo(
     () =>
       buildMembersDirectoryTableRowViewModels({
@@ -68,7 +46,13 @@ export function MembersDirectoryTable(input: {
         canManageInvitations: input.canManageInvitations,
         pendingMemberOperation: input.pendingMemberOperation,
         invitationActionState: input.invitationActionState,
-        handlers,
+        handlers: {
+          onChangeRole: input.onChangeRole,
+          onRemoveMember: input.onRemoveMember,
+          onViewInvitationDetails: setSelectedInvitationForDetails,
+          onResendInvite: input.onResendInvite,
+          onRevokeInvite: input.onRevokeInvite,
+        },
       }),
     [
       visibleRows,
@@ -76,7 +60,11 @@ export function MembersDirectoryTable(input: {
       input.canManageInvitations,
       input.pendingMemberOperation,
       input.invitationActionState,
-      handlers,
+      input.onChangeRole,
+      input.onRemoveMember,
+      input.onResendInvite,
+      input.onRevokeInvite,
+      setSelectedInvitationForDetails,
     ],
   );
 

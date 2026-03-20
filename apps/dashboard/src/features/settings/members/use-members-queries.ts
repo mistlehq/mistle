@@ -45,7 +45,7 @@ export function useMembersQueries(input: {
   });
 
   const capabilities = capabilitiesQuery.isError ? null : (capabilitiesQuery.data ?? null);
-  const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data]);
+  const members = membersQuery.data ?? [];
   const invitations = useMemo(
     () =>
       (invitationsQuery.data ?? []).filter((invitation) =>

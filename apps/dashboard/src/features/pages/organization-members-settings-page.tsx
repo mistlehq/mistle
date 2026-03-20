@@ -1,4 +1,5 @@
 import { Button } from "@mistle/ui";
+import { useMemo } from "react";
 
 import { inviteMember } from "../settings/members/members-api.js";
 import {
@@ -14,14 +15,17 @@ export function OrganizationMembersSettingsPage(): React.JSX.Element {
   const membersState = useOrganizationMembersSettingsState({
     organizationId,
   });
-  const headerActions = (
-    <Button
-      disabled={membersState.inviteMembersDisabled}
-      onClick={() => membersState.setInviteDialogOpen(true)}
-      type="button"
-    >
-      Invite members
-    </Button>
+  const headerActions = useMemo(
+    () => (
+      <Button
+        disabled={membersState.inviteMembersDisabled}
+        onClick={() => membersState.setInviteDialogOpen(true)}
+        type="button"
+      >
+        Invite members
+      </Button>
+    ),
+    [membersState.inviteMembersDisabled, membersState.setInviteDialogOpen],
   );
   useSettingsHeaderActions(headerActions);
 

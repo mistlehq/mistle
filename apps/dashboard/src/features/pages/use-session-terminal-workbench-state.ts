@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 const DEFAULT_TERMINAL_PANEL_SIZE = 38;
 const TERMINAL_WORKBENCH_STORAGE_KEY_PREFIX = "dashboard:session-terminal-workbench:";
@@ -8,10 +8,6 @@ type PersistedTerminalWorkbenchState = {
   panelSize: number;
 };
 
-type TerminalWorkbenchStateRecord = PersistedTerminalWorkbenchState & {
-  sandboxInstanceId: string | null;
-};
-
 type SessionTerminalWorkbenchState = {
   closePanel: () => void;
   isVisible: boolean;
@@ -19,6 +15,11 @@ type SessionTerminalWorkbenchState = {
   panelSize: number;
   setPanelSize: (size: number) => void;
   togglePanel: () => void;
+};
+
+type VolatileTerminalWorkbenchState = {
+  generation: number;
+  state: PersistedTerminalWorkbenchState;
 };
 
 function getTerminalWorkbenchStorageKey(sandboxInstanceId: string): string {
@@ -113,35 +114,69 @@ function readPersistedTerminalWorkbenchState(
 export function useSessionTerminalWorkbenchState(input: {
   sandboxInstanceId: string | null;
 }): SessionTerminalWorkbenchState {
-  const [state, setState] = useState<TerminalWorkbenchStateRecord>(() => ({
-    ...readPersistedTerminalWorkbenchState(input.sandboxInstanceId),
-    sandboxInstanceId: input.sandboxInstanceId,
-  }));
-
-  useEffect(() => {
-    setState({
-      ...readPersistedTerminalWorkbenchState(input.sandboxInstanceId),
-      sandboxInstanceId: input.sandboxInstanceId,
-    });
-  }, [input.sandboxInstanceId]);
-
+  const storage = getBrowserStorage();
+  const previousSandboxInstanceIdRef = useRef(input.sandboxInstanceId);
+  const volatileStateGenerationRef = useRef(0);
+  if (previousSandboxInstanceIdRef.current !== input.sandboxInstanceId) {
+    previousSandboxInstanceIdRef.current = input.sandboxInstanceId;
+    volatileStateGenerationRef.current += 1;
+  }
+  const [stateBySandboxInstanceId, setStateBySandboxInstanceId] = useState<
+    Readonly<Record<string, PersistedTerminalWorkbenchState>>
+  >({});
+  const [volatileState, setVolatileState] = useState<VolatileTerminalWorkbenchState>({
+    generation: volatileStateGenerationRef.current,
+    state: readPersistedTerminalWorkbenchState(null),
+  });
   const resolvedState =
-    state.sandboxInstanceId === input.sandboxInstanceId
-      ? state
-      : {
-          ...readPersistedTerminalWorkbenchState(input.sandboxInstanceId),
-          sandboxInstanceId: input.sandboxInstanceId,
+    input.sandboxInstanceId === null
+      ? readPersistedTerminalWorkbenchState(null)
+      : storage === null
+        ? volatileState.generation === volatileStateGenerationRef.current
+          ? volatileState.state
+          : readPersistedTerminalWorkbenchState(null)
+        : (stateBySandboxInstanceId[input.sandboxInstanceId] ??
+          readPersistedTerminalWorkbenchState(input.sandboxInstanceId));
+
+  const updateCurrentState = useCallback(
+    (
+      updater: (currentState: PersistedTerminalWorkbenchState) => PersistedTerminalWorkbenchState,
+    ): void => {
+      if (input.sandboxInstanceId === null) {
+        return;
+      }
+      const sandboxInstanceId = input.sandboxInstanceId;
+
+      if (storage === null) {
+        setVolatileState((currentState) => ({
+          generation: volatileStateGenerationRef.current,
+          state: updater(
+            currentState.generation === volatileStateGenerationRef.current
+              ? currentState.state
+              : readPersistedTerminalWorkbenchState(null),
+          ),
+        }));
+        return;
+      }
+
+      setStateBySandboxInstanceId((currentState) => {
+        const persistedState =
+          currentState[sandboxInstanceId] ?? readPersistedTerminalWorkbenchState(sandboxInstanceId);
+
+        return {
+          ...currentState,
+          [sandboxInstanceId]: updater(persistedState),
         };
+      });
+    },
+    [input.sandboxInstanceId, storage, volatileStateGenerationRef],
+  );
 
   useEffect(() => {
-    if (
-      input.sandboxInstanceId === null ||
-      resolvedState.sandboxInstanceId !== input.sandboxInstanceId
-    ) {
+    if (input.sandboxInstanceId === null) {
       return;
     }
 
-    const storage = getBrowserStorage();
     if (storage === null) {
       return;
     }
@@ -156,32 +191,35 @@ export function useSessionTerminalWorkbenchState(input: {
   }, [input.sandboxInstanceId, resolvedState]);
 
   const openPanel = useCallback((): void => {
-    setState((currentState) => ({
+    updateCurrentState((currentState) => ({
       ...currentState,
       isVisible: true,
     }));
-  }, []);
+  }, [updateCurrentState]);
 
   const closePanel = useCallback((): void => {
-    setState((currentState) => ({
+    updateCurrentState((currentState) => ({
       ...currentState,
       isVisible: false,
     }));
-  }, []);
+  }, [updateCurrentState]);
 
   const togglePanel = useCallback((): void => {
-    setState((currentState) => ({
+    updateCurrentState((currentState) => ({
       ...currentState,
       isVisible: !currentState.isVisible,
     }));
-  }, []);
+  }, [updateCurrentState]);
 
-  const setPanelSize = useCallback((size: number): void => {
-    setState((currentState) => ({
-      ...currentState,
-      panelSize: normalizePanelSize(size),
-    }));
-  }, []);
+  const setPanelSize = useCallback(
+    (size: number): void => {
+      updateCurrentState((currentState) => ({
+        ...currentState,
+        panelSize: normalizePanelSize(size),
+      }));
+    },
+    [updateCurrentState],
+  );
 
   return {
     closePanel,

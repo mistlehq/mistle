@@ -281,10 +281,7 @@ export function SessionsPage(): React.JSX.Element {
     retry: false,
   });
 
-  const selectedProfileVersion = useMemo(
-    () => resolveLatestVersion(versionsQuery.data?.versions ?? []),
-    [versionsQuery.data?.versions],
-  );
+  const selectedProfileVersion = resolveLatestVersion(versionsQuery.data?.versions ?? []);
   const integrationBindingsQuery = useQuery({
     queryKey:
       selectedProfileId === null || selectedProfileVersion === null

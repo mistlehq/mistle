@@ -1,6 +1,6 @@
 import { Badge, Button } from "@mistle/ui";
 import { TerminalIcon } from "@phosphor-icons/react";
-import { useCallback } from "react";
+import { useMemo } from "react";
 import { useParams } from "react-router";
 
 import { SessionMoreActions } from "../sessions/session-more-actions.js";
@@ -23,13 +23,6 @@ export function SessionWorkbenchPage(): React.JSX.Element {
   const { conversationPane, workbench } = useSessionWorkbenchController({
     sandboxInstanceId,
   });
-  const handleHideTerminalPanel = useCallback((): void => {
-    workbench.terminalPanelState.closePanel();
-  }, [workbench.terminalPanelState]);
-  const handleCloseTerminalPanel = useCallback(async (): Promise<void> => {
-    workbench.terminalPanelState.closePanel();
-    await workbench.ptyState.actions.disconnectPty();
-  }, [workbench.ptyState.actions, workbench.terminalPanelState]);
   const isTerminalOpenDisabled =
     !workbench.terminalPanelState.isVisible && !workbench.connectionReadiness.canConnect;
   const terminalButtonLabel = workbench.terminalPanelState.isVisible ? "Terminal" : "Open terminal";
@@ -37,43 +30,65 @@ export function SessionWorkbenchPage(): React.JSX.Element {
     ? (workbench.stoppedSessionState.message ??
       "Terminal is available only when the sandbox is running.")
     : terminalButtonLabel;
-  const headerActions = (
-    <div className="flex items-center gap-2">
-      <Badge
-        className={workbench.sessionHeaderStatusUi.className}
-        variant={workbench.sessionHeaderStatusUi.variant}
-      >
-        {workbench.sessionHeaderStatusUi.label}
-      </Badge>
-      <SessionMoreActions
-        agentConnectionState={workbench.moreActionsState.agentConnectionState}
-        configJson={workbench.moreActionsState.configJson}
-        configRequirementsJson={workbench.moreActionsState.configRequirementsJson}
-        connectedSession={workbench.moreActionsState.connectedSession}
-        isReadingConfig={workbench.moreActionsState.isReadingConfig}
-        isReadingConfigRequirements={workbench.moreActionsState.isReadingConfigRequirements}
-        onLoadConfigSetup={workbench.moreActionsState.loadConfigSetup}
-        sandboxInstanceId={sandboxInstanceId}
-      />
-      <Button
-        disabled={isTerminalOpenDisabled}
-        onClick={() => {
-          if (workbench.terminalPanelState.isVisible) {
-            void handleCloseTerminalPanel();
-            return;
-          }
+  const headerActions = useMemo(
+    () => (
+      <div className="flex items-center gap-2">
+        <Badge
+          className={workbench.sessionHeaderStatusUi.className}
+          variant={workbench.sessionHeaderStatusUi.variant}
+        >
+          {workbench.sessionHeaderStatusUi.label}
+        </Badge>
+        <SessionMoreActions
+          agentConnectionState={workbench.moreActionsState.agentConnectionState}
+          configJson={workbench.moreActionsState.configJson}
+          configRequirementsJson={workbench.moreActionsState.configRequirementsJson}
+          connectedSession={workbench.moreActionsState.connectedSession}
+          isReadingConfig={workbench.moreActionsState.isReadingConfig}
+          isReadingConfigRequirements={workbench.moreActionsState.isReadingConfigRequirements}
+          onLoadConfigSetup={workbench.moreActionsState.loadConfigSetup}
+          sandboxInstanceId={sandboxInstanceId}
+        />
+        <Button
+          disabled={isTerminalOpenDisabled}
+          onClick={() => {
+            if (workbench.terminalPanelState.isVisible) {
+              workbench.terminalPanelState.closePanel();
+              void workbench.ptyState.actions.disconnectPty();
+              return;
+            }
 
-          workbench.terminalPanelState.openPanel();
-        }}
-        size="sm"
-        title={terminalButtonTitle}
-        type="button"
-        variant={workbench.terminalPanelState.isVisible ? "secondary" : "outline"}
-      >
-        <TerminalIcon className="size-4" />
-        Terminal
-      </Button>
-    </div>
+            workbench.terminalPanelState.openPanel();
+          }}
+          size="sm"
+          title={terminalButtonTitle}
+          type="button"
+          variant={workbench.terminalPanelState.isVisible ? "secondary" : "outline"}
+        >
+          <TerminalIcon className="size-4" />
+          Terminal
+        </Button>
+      </div>
+    ),
+    [
+      isTerminalOpenDisabled,
+      sandboxInstanceId,
+      terminalButtonTitle,
+      workbench.moreActionsState.agentConnectionState,
+      workbench.moreActionsState.configJson,
+      workbench.moreActionsState.configRequirementsJson,
+      workbench.moreActionsState.connectedSession,
+      workbench.moreActionsState.isReadingConfig,
+      workbench.moreActionsState.isReadingConfigRequirements,
+      workbench.moreActionsState.loadConfigSetup,
+      workbench.ptyState.actions.disconnectPty,
+      workbench.sessionHeaderStatusUi.className,
+      workbench.sessionHeaderStatusUi.label,
+      workbench.sessionHeaderStatusUi.variant,
+      workbench.terminalPanelState.closePanel,
+      workbench.terminalPanelState.isVisible,
+      workbench.terminalPanelState.openPanel,
+    ],
   );
   useAppShellHeaderActions(headerActions);
 
@@ -190,8 +205,11 @@ export function SessionWorkbenchPage(): React.JSX.Element {
         <SessionTerminalPanel
           isConnectionReady={workbench.connectionReadiness.canConnect}
           isVisible={workbench.terminalPanelState.isVisible}
-          onHide={handleHideTerminalPanel}
-          onClose={handleCloseTerminalPanel}
+          onHide={workbench.terminalPanelState.closePanel}
+          onClose={async (): Promise<void> => {
+            workbench.terminalPanelState.closePanel();
+            await workbench.ptyState.actions.disconnectPty();
+          }}
           ptyState={workbench.ptyState}
           sandboxInstanceId={sandboxInstanceId}
           sandboxStatus={workbench.sandboxStatusQuery.data?.status ?? null}

@@ -21,6 +21,10 @@ type ComposerConfigSnapshot = {
   modelReasoningEffort: string | null;
 };
 
+type ComposerConfigDraft = ComposerConfigSnapshot & {
+  baseConfigJson: string | null;
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -145,10 +149,7 @@ export function useSessionWorkbenchController(input: {
 }): UseSessionWorkbenchControllerResult {
   const [composerText, setComposerText] = useState("");
   const [hasAttemptedAutoConnect, setHasAttemptedAutoConnect] = useState(false);
-  const [selectedComposerModel, setSelectedComposerModel] = useState<string | null>(null);
-  const [selectedComposerReasoningEffort, setSelectedComposerReasoningEffort] = useState<
-    string | null
-  >(null);
+  const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
   const sessionState = useCodexSessionState();
   const ptyState = useSandboxPtyState();
   const terminalPanelState = useSessionTerminalWorkbenchState({
@@ -172,6 +173,22 @@ export function useSessionWorkbenchController(input: {
   const { canInterruptTurn, canSteerTurn, interruptTurn, startTurn, steerTurn } = chat;
   const { batchWriteConfig, loadModels, readConfig, readConfigRequirements, writeConfigValue } =
     admin;
+  const composerConfigSnapshot =
+    connectedSession === null
+      ? {
+          model: null,
+          modelReasoningEffort: null,
+        }
+      : readComposerConfigSnapshot(admin.configJson);
+  const activeComposerConfig =
+    connectedSession !== null &&
+    composerConfigDraft !== null &&
+    composerConfigDraft.baseConfigJson === admin.configJson
+      ? {
+          model: composerConfigDraft.model,
+          modelReasoningEffort: composerConfigDraft.modelReasoningEffort,
+        }
+      : composerConfigSnapshot;
 
   const sandboxStatusQuery = useQuery({
     queryKey: ["sandbox-instance-status", input.sandboxInstanceId],
@@ -296,8 +313,6 @@ export function useSessionWorkbenchController(input: {
 
   useEffect(() => {
     if (connectedSession === null) {
-      setSelectedComposerModel(null);
-      setSelectedComposerReasoningEffort(null);
       return;
     }
 
@@ -305,15 +320,16 @@ export function useSessionWorkbenchController(input: {
     readConfig(false);
   }, [connectedSession, loadModels, readConfig]);
 
-  useEffect(() => {
-    const snapshot = readComposerConfigSnapshot(admin.configJson);
-    setSelectedComposerModel(snapshot.model);
-    setSelectedComposerReasoningEffort(snapshot.modelReasoningEffort);
-  }, [admin.configJson]);
-
   const setComposerModel = useCallback(
     (nextModel: string): void => {
-      setSelectedComposerModel(nextModel);
+      setComposerConfigDraft((currentDraft) => ({
+        baseConfigJson: admin.configJson,
+        model: nextModel,
+        modelReasoningEffort:
+          currentDraft?.baseConfigJson === admin.configJson
+            ? currentDraft.modelReasoningEffort
+            : composerConfigSnapshot.modelReasoningEffort,
+      }));
       batchWriteConfig({
         edits: [
           {
@@ -324,19 +340,26 @@ export function useSessionWorkbenchController(input: {
         ],
       });
     },
-    [batchWriteConfig],
+    [admin.configJson, batchWriteConfig, composerConfigSnapshot.modelReasoningEffort],
   );
 
   const setComposerReasoningEffort = useCallback(
     (nextReasoningEffort: string): void => {
-      setSelectedComposerReasoningEffort(nextReasoningEffort);
+      setComposerConfigDraft((currentDraft) => ({
+        baseConfigJson: admin.configJson,
+        model:
+          currentDraft?.baseConfigJson === admin.configJson
+            ? currentDraft.model
+            : composerConfigSnapshot.model,
+        modelReasoningEffort: nextReasoningEffort,
+      }));
       writeConfigValue({
         keyPath: "model_reasoning_effort",
         value: nextReasoningEffort,
         mergeStrategy: "replace",
       });
     },
-    [writeConfigValue],
+    [admin.configJson, composerConfigSnapshot.model, writeConfigValue],
   );
 
   const composerModelOptions = useMemo(() => {
@@ -410,8 +433,8 @@ export function useSessionWorkbenchController(input: {
         onModelChange: setComposerModel,
         onReasoningEffortChange: setComposerReasoningEffort,
         onSubmit: submitComposer,
-        selectedModel: selectedComposerModel,
-        selectedReasoningEffort: selectedComposerReasoningEffort,
+        selectedModel: activeComposerConfig.model,
+        selectedReasoningEffort: activeComposerConfig.modelReasoningEffort,
       },
       serverRequestsState: {
         isRespondingToServerRequest: serverRequests.isRespondingToServerRequest,
