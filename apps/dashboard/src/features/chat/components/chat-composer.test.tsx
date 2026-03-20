@@ -118,4 +118,55 @@ describe("ChatComposer", () => {
       0,
     );
   });
+
+  it("renders safely when model and reasoning selections are unset", () => {
+    render(
+      <ChatComposer
+        canInterruptTurn={false}
+        canSteerTurn={false}
+        completedErrorMessage={null}
+        composerText="Ship it"
+        isConnected={true}
+        isInterruptingTurn={false}
+        isStartingTurn={false}
+        isSteeringTurn={false}
+        isUpdatingComposerConfig={false}
+        modelOptions={[{ value: "gpt-5.4-codex", label: "GPT-5.4" }]}
+        onComposerTextChange={() => {}}
+        onModelChange={() => {}}
+        onReasoningEffortChange={() => {}}
+        onSubmit={() => {}}
+        selectedModel={null}
+        selectedReasoningEffort={null}
+      />,
+    );
+
+    expect(screen.getByRole("combobox", { name: "Model switcher" })).toBeTruthy();
+    expect(screen.getByRole("combobox", { name: "Reasoning switcher" })).toBeTruthy();
+  });
+
+  it("renders safely when the selected model is no longer in the available options", () => {
+    render(
+      <ChatComposer
+        canInterruptTurn={false}
+        canSteerTurn={false}
+        completedErrorMessage={null}
+        composerText="Ship it"
+        isConnected={true}
+        isInterruptingTurn={false}
+        isStartingTurn={false}
+        isSteeringTurn={false}
+        isUpdatingComposerConfig={false}
+        modelOptions={[{ value: "gpt-5.4-codex", label: "GPT-5.4" }]}
+        onComposerTextChange={() => {}}
+        onModelChange={() => {}}
+        onReasoningEffortChange={() => {}}
+        onSubmit={() => {}}
+        selectedModel="gpt-5.3-codex"
+        selectedReasoningEffort="medium"
+      />,
+    );
+
+    expect(screen.getByRole("combobox", { name: "Model switcher" })).toBeTruthy();
+  });
 });

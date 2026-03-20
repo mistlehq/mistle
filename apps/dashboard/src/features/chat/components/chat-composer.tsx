@@ -11,6 +11,28 @@ import { ArrowCircleUpIcon, StopCircleIcon } from "@phosphor-icons/react";
 
 const REASONING_EFFORT_OPTIONS = ["low", "medium", "high", "xhigh"] as const;
 
+function resolveSelectableModelValue(input: {
+  selectedModel: string | null;
+  modelOptions: readonly {
+    value: string;
+    label: string;
+  }[];
+}): string | null {
+  if (input.selectedModel === null) {
+    return null;
+  }
+
+  return input.modelOptions.some((option) => option.value === input.selectedModel)
+    ? input.selectedModel
+    : null;
+}
+
+function resolveSelectableReasoningEffortValue(
+  selectedReasoningEffort: string | null,
+): (typeof REASONING_EFFORT_OPTIONS)[number] | null {
+  return REASONING_EFFORT_OPTIONS.find((option) => option === selectedReasoningEffort) ?? null;
+}
+
 type ChatComposerProps = {
   composerText: string;
   modelOptions: readonly {
@@ -78,9 +100,13 @@ export function ChatComposer({
       <ArrowCircleUpIcon aria-hidden="true" weight="fill" />
     );
   const isComposerConfigDisabled = !isConnected || isUpdatingComposerConfig;
+  const selectableModelValue = resolveSelectableModelValue({
+    selectedModel,
+    modelOptions,
+  });
   const selectedModelLabel = modelOptions.find((option) => option.value === selectedModel)?.label;
   const selectedReasoningEffortValue =
-    REASONING_EFFORT_OPTIONS.find((option) => option === selectedReasoningEffort) ?? null;
+    resolveSelectableReasoningEffortValue(selectedReasoningEffort);
 
   return (
     <div className="bg-card flex flex-col gap-3 rounded-md border p-1 shadow-xs">
@@ -112,11 +138,11 @@ export function ChatComposer({
             disabled={isComposerConfigDisabled}
             onValueChange={(value) => {
               if (value === null) {
-                throw new Error("Model switcher returned a null value.");
+                return;
               }
               onModelChange(value);
             }}
-            value={selectedModel ?? ""}
+            value={selectableModelValue}
           >
             <SelectTrigger
               aria-label="Model switcher"
@@ -139,11 +165,11 @@ export function ChatComposer({
             disabled={isComposerConfigDisabled}
             onValueChange={(value) => {
               if (value === null) {
-                throw new Error("Reasoning switcher returned a null value.");
+                return;
               }
               onReasoningEffortChange(value);
             }}
-            value={selectedReasoningEffort ?? ""}
+            value={selectedReasoningEffortValue}
           >
             <SelectTrigger
               aria-label="Reasoning switcher"
