@@ -4,6 +4,7 @@ import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
 import type { Clock, Scheduler } from "@mistle/time";
 import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 
+import type { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { logger } from "../logger.js";
 import { OWNER_LEASE_TTL_MS } from "../runtime-state/durations.js";
 import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
@@ -43,6 +44,7 @@ type RegisterSandboxTunnelRouteInput = {
   sandboxOwnerResolver: SandboxOwnerResolver;
   sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat;
   sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
+  sandboxIdleControllerRegistry: SandboxIdleControllerRegistry;
   clock: Clock;
   scheduler: Scheduler;
 };
@@ -80,6 +82,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     input.sandboxOwnerStore,
     input.sandboxOwnerLeaseHeartbeat,
     input.sandboxRuntimeAttachmentStore,
+    input.sandboxIdleControllerRegistry,
     new TunnelLivelinessRepository(),
     input.clock,
     input.scheduler,

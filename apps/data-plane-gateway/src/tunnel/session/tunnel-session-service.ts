@@ -1,6 +1,7 @@
 import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import type { Clock, Scheduler } from "@mistle/time";
 
+import type { SandboxIdleControllerRegistry } from "../../idle/sandbox-idle-controller-registry.js";
 import { logger } from "../../logger.js";
 import {
   ATTACHMENT_TTL_MS,
@@ -73,6 +74,7 @@ export class TunnelSessionService {
     private readonly sandboxOwnerStore: SandboxOwnerStore,
     private readonly sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat,
     private readonly sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore,
+    private readonly sandboxIdleControllerRegistry: SandboxIdleControllerRegistry,
     private readonly livelinessRepository: TunnelLivelinessRepository,
     private readonly clock: Clock,
     private readonly scheduler: Scheduler,
@@ -102,6 +104,14 @@ export class TunnelSessionService {
     const attachResult = this.tunnelSessionRegistry.attachBootstrapSession(relayTarget);
 
     const runtimeAttachmentAttachedAtMs = this.clock.nowMs();
+    const sandboxIdleController = this.sandboxIdleControllerRegistry.ensureController({
+      sandboxInstanceId: input.sandboxInstanceId,
+      ownerLeaseId: input.leaseId,
+      nowMs: runtimeAttachmentAttachedAtMs,
+    });
+    sandboxIdleController.start({
+      nowMs: runtimeAttachmentAttachedAtMs,
+    });
     let websocketHealthHandle:
       | {
           stop: () => void;
@@ -309,6 +319,13 @@ export class TunnelSessionService {
   }): Promise<void> {
     input.attachedPeer.leaseHeartbeatHandle?.stop();
     input.attachedPeer.websocketHealthHandle?.stop();
+    this.sandboxIdleControllerRegistry
+      .getController({
+        sandboxInstanceId: input.sandboxInstanceId,
+      })
+      ?.handleBootstrapDisconnect({
+        nowMs: this.clock.nowMs(),
+      });
 
     void this.livelinessRepository
       .markDisconnected({

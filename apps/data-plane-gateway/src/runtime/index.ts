@@ -6,10 +6,18 @@ import { typeid } from "typeid-js";
 import type { WebSocketServer } from "ws";
 
 import { createApp, stopApp } from "../app.js";
+import { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
+import { LocalSandboxIdleController } from "../idle/sandbox-idle-controller.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
+import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
+import { ValkeySandboxPresenceStore } from "../runtime-state/adapters/valkey-sandbox-presence-store.js";
 import { ValkeySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
-import { OWNER_LEASE_RENEW_INTERVAL_MS } from "../runtime-state/durations.js";
+import {
+  BOOTSTRAP_DISCONNECT_GRACE_MS,
+  IDLE_TIMEOUT_MS,
+  OWNER_LEASE_RENEW_INTERVAL_MS,
+} from "../runtime-state/durations.js";
 import {
   connectValkeyClient,
   createValkeyClient,
@@ -63,12 +71,14 @@ export function createDataPlaneGatewayRuntime(
   const relayCoordinator = createInMemoryTunnelRelayCoordinator(nodeId);
   let valkeyClient: ValkeyClient | undefined;
   let sandboxOwnerStore: InMemorySandboxOwnerStore | ValkeySandboxOwnerStore;
+  let sandboxPresenceStore: InMemorySandboxPresenceStore | ValkeySandboxPresenceStore;
   let sandboxRuntimeAttachmentStore:
     | InMemorySandboxRuntimeAttachmentStore
     | ValkeySandboxRuntimeAttachmentStore;
 
   if (config.app.runtimeState.backend === "memory") {
     sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
+    sandboxPresenceStore = new InMemorySandboxPresenceStore(systemClock);
     sandboxRuntimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
   } else {
     const valkeyConfig = config.app.runtimeState.valkey;
@@ -83,6 +93,7 @@ export function createDataPlaneGatewayRuntime(
     });
 
     sandboxOwnerStore = new ValkeySandboxOwnerStore(valkeyClient, valkeyConfig.keyPrefix);
+    sandboxPresenceStore = new ValkeySandboxPresenceStore(valkeyClient, valkeyConfig.keyPrefix);
     sandboxRuntimeAttachmentStore = new ValkeySandboxRuntimeAttachmentStore(
       valkeyClient,
       valkeyConfig.keyPrefix,
@@ -107,6 +118,21 @@ export function createDataPlaneGatewayRuntime(
     systemScheduler,
     OWNER_LEASE_RENEW_INTERVAL_MS,
   );
+  const sandboxIdleControllerRegistry = new SandboxIdleControllerRegistry((input) => {
+    return new LocalSandboxIdleController(
+      {
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: input.ownerLeaseId,
+        timeoutMs: IDLE_TIMEOUT_MS,
+        disconnectGraceMs: BOOTSTRAP_DISCONNECT_GRACE_MS,
+        clock: systemClock,
+        scheduler: systemScheduler,
+        ownerStore: sandboxOwnerStore,
+        presenceStore: sandboxPresenceStore,
+      },
+      input.onDisposed,
+    );
+  });
 
   registerSandboxRuntimeStateRoute({
     app,
@@ -137,6 +163,7 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerResolver,
     sandboxOwnerLeaseHeartbeat,
     sandboxRuntimeAttachmentStore,
+    sandboxIdleControllerRegistry,
     clock: systemClock,
     scheduler: systemScheduler,
   });
