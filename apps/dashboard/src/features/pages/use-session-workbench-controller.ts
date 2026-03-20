@@ -206,6 +206,10 @@ export function useSessionWorkbenchController(input: {
     });
 
     return {
+      // Mirror the policy contract: stopped-state messaging stays separate from
+      // connection readiness until the control-plane API exposes a dedicated
+      // resume sandbox endpoint and the dashboard adopts that endpoint as the
+      // supported resume flow.
       message,
       requiresManualResume: message !== null,
     };
