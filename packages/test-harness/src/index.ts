@@ -1,6 +1,7 @@
 export * from "./services/mailpit/index.js";
 export * from "./services/http-echo/index.js";
 export * from "./services/postgres/index.js";
+export * from "./services/valkey/index.js";
 export * from "./services/shared-mailpit.js";
 export * from "./services/shared-postgres.js";
 export * from "./services/shared-postgres-mailpit.js";

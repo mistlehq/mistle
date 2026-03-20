@@ -30,6 +30,7 @@ const SharedInfraConfigSchema = z
     databasePassword: z.string().min(1),
     databaseDirectHost: z.string().min(1),
     databaseDirectPort: z.number().int().min(1).max(65_535),
+    valkeyUrl: z.string().min(1),
     templateDatabaseName: z.string().min(1),
     integrationRunId: z.string().min(1),
   })
@@ -207,8 +208,8 @@ export const it = vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture 
             runtimeState: {
               backend: "valkey",
               valkey: {
-                url: "redis://127.0.0.1:6379",
-                keyPrefix: "mistle:runtime-state:gateway-integration",
+                url: sharedInfraConfig.valkeyUrl,
+                keyPrefix: `mistle:runtime-state:gateway-integration:${runtimeDatabaseName}`,
               },
             },
             dataPlaneApi: {
