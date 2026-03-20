@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { IntegrationCardViewModel } from "../integrations/directory-model.js";
 
@@ -10,30 +10,17 @@ export function useIntegrationDetailState(input: {
     null,
   );
 
-  const selectedDetailCard = useMemo(() => {
-    if (input.detailTargetKey === null) {
-      return null;
-    }
+  const selectedDetailCard =
+    input.detailTargetKey === null
+      ? null
+      : (input.cards.find((card) => card.target.targetKey === input.detailTargetKey) ?? null);
 
-    return input.cards.find((card) => card.target.targetKey === input.detailTargetKey) ?? null;
-  }, [input.cards, input.detailTargetKey]);
+  const selectedDetailConnections = selectedDetailCard?.connections ?? [];
 
-  const selectedDetailConnections = useMemo(() => {
-    if (selectedDetailCard === null) {
-      return [];
-    }
-
-    return selectedDetailCard.connections;
-  }, [selectedDetailCard]);
-
-  const defaultConnectionId = useMemo(() => {
-    const defaultConnection =
-      selectedDetailConnections.find((connection) => connection.status === "active") ??
-      selectedDetailConnections[0] ??
-      null;
-
-    return defaultConnection?.id ?? null;
-  }, [selectedDetailConnections]);
+  const defaultConnectionId =
+    selectedDetailConnections.find((connection) => connection.status === "active")?.id ??
+    selectedDetailConnections[0]?.id ??
+    null;
 
   useEffect(() => {
     if (requestedDetailConnectionId === null) {
@@ -50,20 +37,12 @@ export function useIntegrationDetailState(input: {
     setRequestedDetailConnectionId(null);
   }, [requestedDetailConnectionId, selectedDetailConnections]);
 
-  const activeDetailConnectionId = useMemo(() => {
-    if (defaultConnectionId === null) {
-      return null;
-    }
-
-    if (
-      requestedDetailConnectionId !== null &&
-      selectedDetailConnections.some((connection) => connection.id === requestedDetailConnectionId)
-    ) {
-      return requestedDetailConnectionId;
-    }
-
-    return defaultConnectionId;
-  }, [defaultConnectionId, requestedDetailConnectionId, selectedDetailConnections]);
+  const activeDetailConnectionId =
+    defaultConnectionId !== null &&
+    requestedDetailConnectionId !== null &&
+    selectedDetailConnections.some((connection) => connection.id === requestedDetailConnectionId)
+      ? requestedDetailConnectionId
+      : defaultConnectionId;
 
   return {
     activeDetailConnectionId,

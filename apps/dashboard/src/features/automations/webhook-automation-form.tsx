@@ -15,7 +15,6 @@ import {
   Textarea,
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
-import { useMemo } from "react";
 
 import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
@@ -194,14 +193,10 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
   );
   const selectedConnectionId =
     selectedConnectionIds.size === 1 ? ([...selectedConnectionIds][0] ?? "") : "";
-  const conversationKeyFieldOptions = useMemo(
-    () =>
-      resolveConversationKeyFieldOptions({
-        selectedEventOptions: selectedTriggerOptions,
-        currentTemplate: input.values.conversationKeyTemplate,
-      }),
-    [input.values.conversationKeyTemplate, selectedTriggerOptions],
-  );
+  const conversationKeyFieldOptions = resolveConversationKeyFieldOptions({
+    selectedEventOptions: selectedTriggerOptions,
+    currentTemplate: input.values.conversationKeyTemplate,
+  });
 
   return (
     <div className="flex flex-col gap-6">

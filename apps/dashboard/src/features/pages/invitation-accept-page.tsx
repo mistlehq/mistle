@@ -1,6 +1,6 @@
 import { Button, Card, CardContent, Spinner } from "@mistle/ui";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { MistleLogo } from "../../components/mistle-logo.js";
@@ -117,12 +117,9 @@ export function InvitationAcceptPage(): React.JSX.Element {
 
   const isSubmitting = acceptMutation.isPending || rejectMutation.isPending;
 
-  const invitationErrorMessage = useMemo(() => {
-    if (!invitationQuery.isError) {
-      return null;
-    }
-    return toInvitationFetchErrorMessage(invitationQuery.error);
-  }, [invitationQuery.error, invitationQuery.isError]);
+  const invitationErrorMessage = invitationQuery.isError
+    ? toInvitationFetchErrorMessage(invitationQuery.error)
+    : null;
   const canSignOutForDifferentAccount =
     invitationQuery.isError &&
     sessionQuery.data !== null &&
