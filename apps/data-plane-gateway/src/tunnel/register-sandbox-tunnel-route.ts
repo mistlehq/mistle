@@ -5,7 +5,7 @@ import type { Clock, Scheduler } from "@mistle/time";
 import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 
 import { logger } from "../logger.js";
-import { OWNER_LEASE_TTL_MS } from "../runtime-state/runtime-state-durations.js";
+import { OWNER_LEASE_TTL_MS } from "../runtime-state/durations.js";
 import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";

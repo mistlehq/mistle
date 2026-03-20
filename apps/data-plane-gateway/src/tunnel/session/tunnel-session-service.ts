@@ -6,7 +6,7 @@ import {
   ATTACHMENT_TTL_MS,
   WEBSOCKET_PING_INTERVAL_MS,
   WEBSOCKET_PONG_TIMEOUT_MS,
-} from "../../runtime-state/runtime-state-durations.js";
+} from "../../runtime-state/durations.js";
 import type { SandboxRuntimeAttachmentStore } from "../../runtime-state/sandbox-runtime-attachment-store.js";
 import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
 import type {

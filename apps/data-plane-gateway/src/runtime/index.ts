@@ -9,7 +9,7 @@ import { createApp, stopApp } from "../app.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
 import { ValkeySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
-import { OWNER_LEASE_RENEW_INTERVAL_MS } from "../runtime-state/runtime-state-durations.js";
+import { OWNER_LEASE_RENEW_INTERVAL_MS } from "../runtime-state/durations.js";
 import {
   connectValkeyClient,
   createValkeyClient,

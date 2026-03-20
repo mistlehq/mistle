@@ -12,7 +12,7 @@ import {
 import { typeid } from "typeid-js";
 
 import { logger } from "../../logger.js";
-import { OWNER_LEASE_TTL_MS } from "../../runtime-state/runtime-state-durations.js";
+import { OWNER_LEASE_TTL_MS } from "../../runtime-state/durations.js";
 import type { SandboxOwnerResolver } from "../ownership/sandbox-owner-resolver.js";
 import type { SandboxOwnerStore } from "../ownership/sandbox-owner-store.js";
 import { recordSandboxTunnelTokenRedemption } from "../token-redemption-store.js";
