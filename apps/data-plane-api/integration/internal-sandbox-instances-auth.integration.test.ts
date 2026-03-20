@@ -1,6 +1,7 @@
 import {
   DATA_PLANE_INTERNAL_AUTH_HEADER,
   createDataPlaneSandboxInstancesClient,
+  type StopSandboxInstanceInput,
   type StartSandboxInstanceInput,
 } from "@mistle/data-plane-internal-client";
 import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
@@ -67,6 +68,15 @@ function createSandboxInstancesClient(
 
 function createRouteUrl(baseUrl: string, path: string): string {
   return new URL(path, baseUrl).toString();
+}
+
+function createStopSandboxInput(input: { sandboxInstanceId: string }): StopSandboxInstanceInput {
+  return {
+    sandboxInstanceId: input.sandboxInstanceId,
+    stopReason: "idle",
+    expectedOwnerLeaseId: "sol_dp_api_integration_auth",
+    idempotencyKey: "gateway-stop-auth-001",
+  };
 }
 
 describe("internal sandbox instances auth integration", () => {
@@ -180,6 +190,41 @@ describe("internal sandbox instances auth integration", () => {
         name: "ZodError",
       },
     });
+  }, 60_000);
+
+  it("rejects stop requests missing service token", async ({ fixture }) => {
+    const response = await fetch(
+      createRouteUrl(fixture.baseUrl, `${INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH}/stop`),
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(
+          createStopSandboxInput({
+            sandboxInstanceId: "sbi_dp_api_integration_stop_unauth_missing",
+          }),
+        ),
+      },
+    );
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      code: "UNAUTHORIZED",
+      message: "Internal service authentication failed.",
+    });
+  }, 60_000);
+
+  it("rejects stop requests with invalid service token", async ({ fixture }) => {
+    const client = createSandboxInstancesClient(fixture.baseUrl, "invalid-service-token");
+
+    await expect(
+      client.stopSandboxInstance(
+        createStopSandboxInput({
+          sandboxInstanceId: "sbi_dp_api_integration_stop_unauth_invalid",
+        }),
+      ),
+    ).rejects.toThrow("Internal service authentication failed.");
   }, 60_000);
 
   it("returns null when a sandbox instance is not found", async ({ fixture }) => {
