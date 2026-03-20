@@ -118,63 +118,69 @@ describe("sandbox profile compile runtime plan integration", () => {
     expect(installScript).toContain("codex-x86_64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("codex-aarch64-unknown-linux-musl.tar.gz");
     expect(installScript).toContain("/var/lib/mistle/bin/codex");
-    expect(runtimePlan.runtimeClients).toEqual([
-      {
-        clientId: "codex-cli",
-        setup: {
-          env: {
-            OPENAI_MODEL: "gpt-5.3-codex",
-            OPENAI_REASONING_EFFORT: "medium",
-          },
-          files: [
-            {
-              fileId: "codex_config",
-              path: "/etc/codex/config.toml",
-              mode: 384,
-              content: `model = "gpt-5.3-codex"
-model_reasoning_effort = "medium"
-approval_policy = "never"
-sandbox_mode = "danger-full-access"
-openai_base_url = "https://api.openai.com/v1"
-developer_instructions = "Prefer concise answers.\\nAlways explain tradeoffs."
-
-[projects."/"]
-trust_level = "trusted"
-`,
-            },
-          ],
+    expect(runtimePlan.runtimeClients).toHaveLength(1);
+    expect(runtimePlan.runtimeClients[0]).toMatchObject({
+      clientId: "codex-cli",
+      setup: {
+        env: {
+          OPENAI_MODEL: "gpt-5.3-codex",
+          OPENAI_REASONING_EFFORT: "medium",
         },
-        processes: [
+        files: [
           {
-            processKey: "codex-app-server",
-            command: {
-              args: ["/var/lib/mistle/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
-            },
-            readiness: {
-              type: "ws",
-              url: "ws://127.0.0.1:4500",
-              timeoutMs: 5_000,
-            },
-            stop: {
-              signal: "sigterm",
-              timeoutMs: 10_000,
-              gracePeriodMs: 2_000,
-            },
-          },
-        ],
-        endpoints: [
-          {
-            endpointKey: "app-server",
-            processKey: "codex-app-server",
-            transport: {
-              type: "ws",
-              url: "ws://127.0.0.1:4500",
-            },
-            connectionMode: "dedicated",
+            fileId: "codex_config",
+            path: "/etc/codex/config.toml",
+            mode: 384,
           },
         ],
       },
-    ]);
+      processes: [
+        {
+          processKey: "codex-app-server",
+          command: {
+            args: ["/var/lib/mistle/bin/codex", "app-server", "--listen", "ws://127.0.0.1:4500"],
+          },
+          readiness: {
+            type: "ws",
+            url: "ws://127.0.0.1:4500",
+            timeoutMs: 5_000,
+          },
+          stop: {
+            signal: "sigterm",
+            timeoutMs: 10_000,
+            gracePeriodMs: 2_000,
+          },
+        },
+      ],
+      endpoints: [
+        {
+          endpointKey: "app-server",
+          processKey: "codex-app-server",
+          transport: {
+            type: "ws",
+            url: "ws://127.0.0.1:4500",
+          },
+          connectionMode: "dedicated",
+        },
+      ],
+    });
+    const configContent = runtimePlan.runtimeClients[0]?.setup.files[0]?.content;
+    expect(configContent).toContain('model = "gpt-5.3-codex"');
+    expect(configContent).toContain('model_provider = "proxy"');
+    expect(configContent).toContain('model_reasoning_effort = "medium"');
+    expect(configContent).toContain('approval_policy = "never"');
+    expect(configContent).toContain('sandbox_mode = "danger-full-access"');
+    expect(configContent).toContain(
+      'developer_instructions = "Prefer concise answers.\\nAlways explain tradeoffs."',
+    );
+    expect(configContent).toContain("[model_providers.proxy]");
+    expect(configContent).toContain('name = "Proxy"');
+    expect(configContent).toContain('base_url = "https://api.openai.com/v1"');
+    expect(configContent).toContain('wire_api = "responses"');
+    expect(configContent).toContain("requires_openai_auth = false");
+    expect(configContent).toContain("supports_websockets = true");
+    expect(configContent).toContain('[projects."/"]');
+    expect(configContent).toContain('trust_level = "trusted"');
   });
 
   it("returns profile not found when the sandbox profile does not exist", async ({ fixture }) => {

@@ -15,6 +15,8 @@ const CodexCliArtifactKey = "codex-cli";
 const CodexAppServerProcessKey = "codex-app-server";
 const CodexAppServerEndpointKey = "app-server";
 const CodexAppServerListenUrl = "ws://127.0.0.1:4500";
+const ProxyModelProviderKey = "proxy";
+const ProxyModelProviderName = "Proxy";
 const CodexGitHubRepository = "openai/codex";
 const CodexGitHubAssets = {
   x86_64: {
@@ -35,15 +37,24 @@ const OpenAiAllowedPathPrefix = "/";
 function renderCodexConfig(input: {
   model: string;
   reasoningEffort: string;
-  openAiBaseUrl: string;
+  apiBaseUrl: string;
   additionalInstructions?: string;
 }): string {
   return stringifyToml({
     model: input.model,
+    model_provider: ProxyModelProviderKey,
     model_reasoning_effort: input.reasoningEffort,
     approval_policy: "never",
     sandbox_mode: "danger-full-access",
-    openai_base_url: input.openAiBaseUrl,
+    model_providers: {
+      [ProxyModelProviderKey]: {
+        name: ProxyModelProviderName,
+        base_url: input.apiBaseUrl,
+        wire_api: "responses",
+        requires_openai_auth: false,
+        supports_websockets: true,
+      },
+    },
     ...(input.additionalInstructions === undefined
       ? {}
       : { developer_instructions: input.additionalInstructions }),
@@ -68,7 +79,7 @@ export function compileOpenAiApiKeyBinding(
         match: {
           hosts: [routeHost],
           pathPrefixes: [OpenAiAllowedPathPrefix],
-          methods: ["POST"],
+          methods: ["GET", "POST"],
         },
         upstream: {
           baseUrl: input.target.config.apiBaseUrl,
@@ -128,7 +139,7 @@ export function compileOpenAiApiKeyBinding(
               content: renderCodexConfig({
                 model: input.binding.config.defaultModel,
                 reasoningEffort: input.binding.config.reasoningEffort,
-                openAiBaseUrl: input.target.config.apiBaseUrl,
+                apiBaseUrl: input.target.config.apiBaseUrl,
                 ...(input.binding.config.additionalInstructions === undefined
                   ? {}
                   : {
