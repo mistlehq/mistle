@@ -34,11 +34,16 @@ pnpm install
 pnpm config:init:dev
 
 resume_command=""
+resume_command_cd=""
+resume_command_resume=""
 launched_terminal="no"
 copied_to_clipboard="no"
 
 if [ "${CODEX_THREAD_ID:-}" != "" ]; then
-  resume_command="cd $(quote_for_shell "$worktree_path") && codex resume $(quote_for_shell "$CODEX_THREAD_ID")"
+  resume_command_cd="cd $(quote_for_shell "$worktree_path")"
+  resume_command_resume="codex resume -C . $(quote_for_shell "$CODEX_THREAD_ID")"
+  resume_command="$resume_command_cd
+$resume_command_resume"
 fi
 
 printf 'worktree_path=%s\n' "$worktree_path"
@@ -47,7 +52,8 @@ printf 'base_ref=%s\n' "$base_ref"
 printf 'bootstrap_steps=pnpm install,pnpm config:init:dev\n'
 
 if [ "$resume_command" != "" ]; then
-  printf 'resume_command=%s\n' "$resume_command"
+  printf 'resume_command_cd=%s\n' "$resume_command_cd"
+  printf 'resume_command_resume=%s\n' "$resume_command_resume"
 
   if command -v pbcopy >/dev/null 2>&1; then
     if printf '%s' "$resume_command" | pbcopy; then
@@ -73,7 +79,8 @@ APPLESCRIPT
 
   printf 'launched_terminal=%s\n' "$launched_terminal"
 else
-  printf 'resume_command=\n'
+  printf 'resume_command_cd=\n'
+  printf 'resume_command_resume=\n'
   printf 'copied_to_clipboard=no\n'
   printf 'launched_terminal=no\n'
 fi

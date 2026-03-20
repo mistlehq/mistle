@@ -9,13 +9,18 @@ Use this skill when the user asks to create or bootstrap a git worktree for this
 
 ## Behavior
 
-1. Prefer worktree directories as siblings of the repository root, using the pattern `<repo-parent>/<repo-name>-<slug>`.
+1. When deriving a default worktree path, anchor it to the shared repository's primary worktree rather than the current checkout name.
+   - Resolve the shared git directory with `git rev-parse --git-common-dir`.
+   - Derive the primary worktree root from that shared git directory.
+   - Prefer sibling worktree directories using the pattern `<primary-repo-parent>/<primary-repo-name>-<slug>`.
 2. Default the base ref to `main` unless the user explicitly asks for another base.
 3. Derive a safe kebab-case slug from the user task when they do not provide a branch or path.
 4. After creation, bootstrap the new worktree by running:
    - `pnpm install`
    - `pnpm config:init:dev`
-5. If `CODEX_THREAD_ID` is available, prepare a resume handoff into the new worktree with `codex resume <thread-id>`.
+5. If `CODEX_THREAD_ID` is available, prepare a two-line resume handoff for the new worktree:
+   - `cd <worktree-path>`
+   - `codex resume -C . <thread-id>`
 6. Verify state after creation with `git worktree list --porcelain`.
 
 ## Create
@@ -34,7 +39,7 @@ When creating a worktree:
    - branch name
    - base ref
    - bootstrap commands that ran
-   - the resume command for the new worktree
+   - the two-line resume handoff for the new worktree
    - whether the resume command was copied to the clipboard
    - whether a new Terminal window was launched
    - verification output summary
