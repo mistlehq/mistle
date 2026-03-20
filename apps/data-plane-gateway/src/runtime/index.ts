@@ -62,36 +62,32 @@ export function createDataPlaneGatewayRuntime(
   const nodeId = typeid("dpg").toString();
   const relayCoordinator = createInMemoryTunnelRelayCoordinator(nodeId);
   let valkeyClient: ValkeyClient | undefined;
-  const sandboxOwnerStore =
-    config.app.runtimeState.backend === "memory"
-      ? new InMemorySandboxOwnerStore(systemClock)
-      : (() => {
-          const valkeyConfig = config.app.runtimeState.valkey;
-          if (valkeyConfig === undefined) {
-            throw new Error(
-              "Expected gateway runtimeState.valkey config when runtimeState.backend is 'valkey'.",
-            );
-          }
+  let sandboxOwnerStore: InMemorySandboxOwnerStore | ValkeySandboxOwnerStore;
+  let sandboxRuntimeAttachmentStore:
+    | InMemorySandboxRuntimeAttachmentStore
+    | ValkeySandboxRuntimeAttachmentStore;
 
-          valkeyClient = createValkeyClient({
-            url: valkeyConfig.url,
-          });
+  if (config.app.runtimeState.backend === "memory") {
+    sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
+    sandboxRuntimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
+  } else {
+    const valkeyConfig = config.app.runtimeState.valkey;
+    if (valkeyConfig === undefined) {
+      throw new Error(
+        "Expected gateway runtimeState.valkey config when runtimeState.backend is 'valkey'.",
+      );
+    }
 
-          return new ValkeySandboxOwnerStore(valkeyClient, valkeyConfig.keyPrefix);
-        })();
-  const sandboxRuntimeAttachmentStore =
-    config.app.runtimeState.backend === "memory"
-      ? new InMemorySandboxRuntimeAttachmentStore(systemClock)
-      : (() => {
-          const valkeyConfig = config.app.runtimeState.valkey;
-          if (valkeyConfig === undefined || valkeyClient === undefined) {
-            throw new Error(
-              "Expected initialized gateway Valkey client when runtimeState.backend is 'valkey'.",
-            );
-          }
+    valkeyClient = createValkeyClient({
+      url: valkeyConfig.url,
+    });
 
-          return new ValkeySandboxRuntimeAttachmentStore(valkeyClient, valkeyConfig.keyPrefix);
-        })();
+    sandboxOwnerStore = new ValkeySandboxOwnerStore(valkeyClient, valkeyConfig.keyPrefix);
+    sandboxRuntimeAttachmentStore = new ValkeySandboxRuntimeAttachmentStore(
+      valkeyClient,
+      valkeyConfig.keyPrefix,
+    );
+  }
   const sandboxOwnerResolver = new StoreBackedSandboxOwnerResolver(nodeId, sandboxOwnerStore);
   const tunnelSessionRegistry = new TunnelSessionRegistry(
     new InMemoryTunnelSessionRegistryAdapter(DefaultMaxActiveBindingsPerSandbox),
