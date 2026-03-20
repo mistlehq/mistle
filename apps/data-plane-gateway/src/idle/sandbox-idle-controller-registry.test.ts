@@ -3,16 +3,16 @@ import { describe, expect, it } from "vitest";
 
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
-import { InMemorySandboxIdleControllerRegistry } from "./sandbox-idle-controller-registry.js";
+import { SandboxIdleControllerRegistry } from "./sandbox-idle-controller-registry.js";
 import { LocalSandboxIdleController } from "./sandbox-idle-controller.js";
 
-describe("InMemorySandboxIdleControllerRegistry", () => {
+describe("SandboxIdleControllerRegistry", () => {
   it("returns the existing controller for the same sandbox owner lease", () => {
     const clock = createMutableClock(1_000);
     const scheduler = createManualScheduler(clock);
     const ownerStore = new InMemorySandboxOwnerStore(clock);
     const presenceStore = new InMemorySandboxPresenceStore(clock);
-    const registry = new InMemorySandboxIdleControllerRegistry((input) => {
+    const registry = new SandboxIdleControllerRegistry((input) => {
       return new LocalSandboxIdleController(
         {
           sandboxInstanceId: input.sandboxInstanceId,
@@ -47,7 +47,7 @@ describe("InMemorySandboxIdleControllerRegistry", () => {
     const scheduler = createManualScheduler(clock);
     const ownerStore = new InMemorySandboxOwnerStore(clock);
     const presenceStore = new InMemorySandboxPresenceStore(clock);
-    const registry = new InMemorySandboxIdleControllerRegistry((input) => {
+    const registry = new SandboxIdleControllerRegistry((input) => {
       return new LocalSandboxIdleController(
         {
           sandboxInstanceId: input.sandboxInstanceId,
@@ -83,7 +83,7 @@ describe("InMemorySandboxIdleControllerRegistry", () => {
     const scheduler = createManualScheduler(clock);
     const ownerStore = new InMemorySandboxOwnerStore(clock);
     const presenceStore = new InMemorySandboxPresenceStore(clock);
-    const registry = new InMemorySandboxIdleControllerRegistry((input) => {
+    const registry = new SandboxIdleControllerRegistry((input) => {
       return new LocalSandboxIdleController(
         {
           sandboxInstanceId: input.sandboxInstanceId,

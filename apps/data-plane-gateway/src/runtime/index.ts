@@ -6,7 +6,7 @@ import { typeid } from "typeid-js";
 import type { WebSocketServer } from "ws";
 
 import { createApp, stopApp } from "../app.js";
-import { InMemorySandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
+import { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { LocalSandboxIdleController } from "../idle/sandbox-idle-controller.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
@@ -118,7 +118,7 @@ export function createDataPlaneGatewayRuntime(
     systemScheduler,
     OWNER_LEASE_RENEW_INTERVAL_MS,
   );
-  const sandboxIdleControllerRegistry = new InMemorySandboxIdleControllerRegistry((input) => {
+  const sandboxIdleControllerRegistry = new SandboxIdleControllerRegistry((input) => {
     return new LocalSandboxIdleController(
       {
         sandboxInstanceId: input.sandboxInstanceId,
