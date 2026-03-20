@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
@@ -13,9 +13,7 @@ export function useIntegrationConnectionEditors(input: {
   queryKey: readonly ["settings", "integrations", "directory"];
 }) {
   const queryClient = useQueryClient();
-  const [isEditingConnectionName, setIsEditingConnectionName] = useState(false);
   const [editingConnectionNameId, setEditingConnectionNameId] = useState<string | null>(null);
-  const [connectionNameDraft, setConnectionNameDraft] = useState("");
   const [connectionNameError, setConnectionNameError] = useState<string | undefined>(undefined);
   const [editingApiKeyConnectionId, setEditingApiKeyConnectionId] = useState<string | null>(null);
   const [apiKeyDraft, setApiKeyDraft] = useState("");
@@ -54,24 +52,6 @@ export function useIntegrationConnectionEditors(input: {
       );
     },
   });
-
-  useEffect(() => {
-    const editingConnection =
-      input.connections.find((connection) => connection.id === editingConnectionNameId) ?? null;
-
-    if (editingConnection === null) {
-      setConnectionNameDraft("");
-      setConnectionNameError(undefined);
-      setIsEditingConnectionName(false);
-      setEditingConnectionNameId(null);
-      return;
-    }
-
-    if (!isEditingConnectionName) {
-      setConnectionNameDraft(editingConnection.displayName);
-      setConnectionNameError(undefined);
-    }
-  }, [editingConnectionNameId, input.connections, isEditingConnectionName]);
 
   const editingApiKeyConnection =
     input.connections.find((connection) => connection.id === editingApiKeyConnectionId) ?? null;
@@ -122,38 +102,29 @@ export function useIntegrationConnectionEditors(input: {
       input.connections.length === 0
         ? undefined
         : {
-            connectionId: editingConnectionNameId,
-            draftValue: connectionNameDraft,
+            connectionIdWithError: editingConnectionNameId,
             ...(connectionNameError === undefined ? {} : { errorMessage: connectionNameError }),
-            isEditing: isEditingConnectionName,
-            onCancel: () => {
+            onCommit: (connectionId: string, draftValue: string) => {
               const editingConnection =
-                input.connections.find((connection) => connection.id === editingConnectionNameId) ??
-                null;
-              setConnectionNameDraft(editingConnection?.displayName ?? "");
-              setConnectionNameError(undefined);
-              setIsEditingConnectionName(false);
-            },
-            onCommit: () => {
-              const editingConnection =
-                input.connections.find((connection) => connection.id === editingConnectionNameId) ??
-                null;
+                input.connections.find((connection) => connection.id === connectionId) ?? null;
               if (editingConnection === null) {
                 throw new Error("Editing connection is required.");
               }
 
-              const normalizedDraft = connectionNameDraft.trim();
+              const normalizedDraft = draftValue.trim();
               if (normalizedDraft.length === 0) {
+                setEditingConnectionNameId(connectionId);
                 setConnectionNameError("Connection name is required.");
                 return;
               }
 
               if (normalizedDraft === editingConnection.displayName) {
+                setEditingConnectionNameId(null);
                 setConnectionNameError(undefined);
-                setIsEditingConnectionName(false);
                 return;
               }
 
+              setEditingConnectionNameId(connectionId);
               setConnectionNameError(undefined);
               updateConnectionNameMutation.mutate(
                 {
@@ -170,27 +141,19 @@ export function useIntegrationConnectionEditors(input: {
                     );
                   },
                   onSuccess: () => {
+                    setEditingConnectionNameId(null);
                     setConnectionNameError(undefined);
-                    setIsEditingConnectionName(false);
                   },
                 },
               );
             },
-            onDraftValueChange: (nextValue: string) => {
-              setConnectionNameDraft(nextValue);
+            onEditStart: () => {
+              setEditingConnectionNameId(null);
               setConnectionNameError(undefined);
             },
-            onEditStart: (connectionId: string) => {
-              const editingConnection =
-                input.connections.find((connection) => connection.id === connectionId) ?? null;
-              if (editingConnection === null) {
-                throw new Error(`Integration connection '${connectionId}' was not found.`);
-              }
-
-              setEditingConnectionNameId(connectionId);
-              setConnectionNameDraft(editingConnection.displayName);
+            onEditCancel: () => {
+              setEditingConnectionNameId(null);
               setConnectionNameError(undefined);
-              setIsEditingConnectionName(true);
             },
             saveDisabled: updateConnectionNameMutation.isPending,
           },

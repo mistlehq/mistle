@@ -1,5 +1,6 @@
 import { Alert, AlertDescription, Badge, Button } from "@mistle/ui";
 import { ArrowClockwiseIcon, PencilSimpleIcon } from "@phosphor-icons/react";
+import { useState } from "react";
 
 import { EditableHeading } from "../shared/editable-heading.js";
 import {
@@ -48,14 +49,11 @@ export type IntegrationConnectionDetailViewProps = {
   >;
   titleEditor?:
     | {
-        connectionId: string | null;
-        draftValue: string;
+        connectionIdWithError: string | null;
         errorMessage?: string;
-        isEditing: boolean;
-        onCancel: () => void;
-        onCommit: () => void;
-        onDraftValueChange: (nextValue: string) => void;
-        onEditStart: (connectionId: string) => void;
+        onCommit: (connectionId: string, draftValue: string) => void;
+        onEditCancel: () => void;
+        onEditStart: () => void;
         saveDisabled: boolean;
       }
     | undefined;
@@ -101,39 +99,14 @@ function ConnectionCard(input: {
   resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
   titleEditor?: IntegrationConnectionDetailViewProps["titleEditor"];
 }): React.JSX.Element {
-  const connectionTitleEditor =
-    input.titleEditor === undefined
-      ? null
-      : {
-          ...input.titleEditor,
-          isEditing:
-            input.titleEditor.isEditing && input.titleEditor.connectionId === input.connection.id,
-          onEditStart: () => {
-            input.titleEditor?.onEditStart(input.connection.id);
-          },
-        };
-
   return (
     <section className="gap-4 flex flex-col overflow-hidden rounded-md border bg-card p-4">
       <div className="gap-4 flex flex-col">
         <div className="gap-2 flex flex-wrap items-start">
-          {connectionTitleEditor ? (
-            <EditableHeading
-              ariaLabel="Connection name"
-              cancelOnEscape={true}
-              draftValue={connectionTitleEditor.draftValue}
-              editButtonLabel="Edit connection name"
-              errorMessage={connectionTitleEditor.errorMessage}
-              headingClassName="text-base font-semibold leading-tight"
-              isEditing={connectionTitleEditor.isEditing}
-              maxWidthClassName="max-w-3xl"
-              onCancel={connectionTitleEditor.onCancel}
-              onCommit={connectionTitleEditor.onCommit}
-              onDraftValueChange={connectionTitleEditor.onDraftValueChange}
-              onEditStart={connectionTitleEditor.onEditStart}
-              placeholder="Connection name"
-              saveDisabled={connectionTitleEditor.saveDisabled}
-              value={input.connection.displayName}
+          {input.titleEditor ? (
+            <EditableConnectionTitle
+              connection={input.connection}
+              titleEditor={input.titleEditor}
             />
           ) : (
             <h2 className="text-base font-semibold leading-tight">
@@ -182,6 +155,53 @@ function ConnectionCard(input: {
         </div>
       )}
     </section>
+  );
+}
+
+function EditableConnectionTitle(input: {
+  connection: IntegrationConnectionDetailItem;
+  titleEditor: NonNullable<IntegrationConnectionDetailViewProps["titleEditor"]>;
+}): React.JSX.Element {
+  const [draftValue, setDraftValue] = useState(input.connection.displayName);
+  const [isEditing, setIsEditing] = useState(false);
+
+  return (
+    <EditableHeading
+      ariaLabel="Connection name"
+      cancelOnEscape={true}
+      draftValue={draftValue}
+      editButtonLabel="Edit connection name"
+      errorMessage={
+        input.titleEditor.connectionIdWithError === input.connection.id
+          ? input.titleEditor.errorMessage
+          : undefined
+      }
+      headingClassName="text-base font-semibold leading-tight"
+      isEditing={isEditing}
+      maxWidthClassName="max-w-3xl"
+      onCancel={() => {
+        setDraftValue(input.connection.displayName);
+        setIsEditing(false);
+        input.titleEditor.onEditCancel();
+      }}
+      onCommit={() => {
+        input.titleEditor.onCommit(input.connection.id, draftValue);
+        if (draftValue.trim().length > 0) {
+          setIsEditing(false);
+        }
+      }}
+      onDraftValueChange={(nextValue) => {
+        setDraftValue(nextValue);
+      }}
+      onEditStart={() => {
+        setDraftValue(input.connection.displayName);
+        setIsEditing(true);
+        input.titleEditor.onEditStart();
+      }}
+      placeholder="Connection name"
+      saveDisabled={input.titleEditor.saveDisabled}
+      value={input.connection.displayName}
+    />
   );
 }
 

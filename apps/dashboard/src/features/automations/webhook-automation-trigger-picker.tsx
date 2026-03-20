@@ -17,7 +17,7 @@ import {
 } from "@mistle/ui";
 import { PlusIcon, TrashIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 
 import { listIntegrationConnectionResources } from "../integrations/integrations-service.js";
 import { resolveIntegrationLogoPath } from "../integrations/logo.js";
@@ -359,14 +359,38 @@ function TriggerParameterField(input: {
         : resourceOptions.length === 0
           ? `No ${input.parameter.label}s available`
           : `Select ${input.parameter.label}`;
-  const resourceAnchorRef = useComboboxAnchor();
-  const [resourceQueryText, setResourceQueryText] = useState(
-    selectedResourceOption?.displayName ?? "",
+  return (
+    <ResourceSelectParameterField
+      key={`${input.connectionId}:${input.value}:${selectedResourceOption?.displayName ?? ""}`}
+      eventType={input.eventType}
+      onValueChange={input.onValueChange}
+      parameter={input.parameter}
+      placeholder={placeholder}
+      resourceOptions={resourceOptions}
+      selectedDisplayName={selectedResourceOption?.displayName ?? ""}
+      value={input.value}
+    />
   );
+}
 
-  useEffect(() => {
-    setResourceQueryText(selectedResourceOption?.displayName ?? "");
-  }, [selectedResourceOption?.displayName]);
+function ResourceSelectParameterField(input: {
+  eventType: string;
+  parameter: Extract<
+    NonNullable<WebhookAutomationEventOption["parameters"]>[number],
+    { kind: "resource-select" }
+  >;
+  value: string;
+  placeholder: string;
+  selectedDisplayName: string;
+  resourceOptions: Array<{
+    id: string;
+    handle: string;
+    displayName: string;
+  }>;
+  onValueChange: (value: string) => void;
+}): React.JSX.Element {
+  const resourceAnchorRef = useComboboxAnchor();
+  const [resourceQueryText, setResourceQueryText] = useState(input.selectedDisplayName);
 
   return (
     <span className="flex items-center gap-2">
@@ -375,7 +399,7 @@ function TriggerParameterField(input: {
       </span>
       <Combobox<string>
         autoHighlight
-        items={resourceOptions.map((option) => ({
+        items={input.resourceOptions.map((option) => ({
           value: option.handle,
           label: option.displayName,
         }))}
@@ -383,11 +407,11 @@ function TriggerParameterField(input: {
         onInputValueChange={setResourceQueryText}
         onOpenChange={(open) => {
           if (!open) {
-            setResourceQueryText(selectedResourceOption?.displayName ?? "");
+            setResourceQueryText(input.selectedDisplayName);
           }
         }}
         onValueChange={(value) => {
-          const nextSelectedResourceOption = resourceOptions.find(
+          const nextSelectedResourceOption = input.resourceOptions.find(
             (option) => option.handle === value,
           );
           setResourceQueryText(nextSelectedResourceOption?.displayName ?? "");
@@ -398,7 +422,9 @@ function TriggerParameterField(input: {
         <div className="min-w-44" ref={resourceAnchorRef}>
           <ComboboxInput
             className="w-full *:data-[slot=input-group]:h-8 *:data-[slot=input-group-control]:rounded-md *:data-[slot=input-group-control]:border-0 *:data-[slot=input-group-control]:bg-muted/50 *:data-[slot=input-group-control]:px-2.5 *:data-[slot=input-group-control]:text-sm"
-            placeholder={input.value.length === 0 ? `Any ${input.parameter.label}` : placeholder}
+            placeholder={
+              input.value.length === 0 ? `Any ${input.parameter.label}` : input.placeholder
+            }
             showClear={input.value.length > 0}
           />
         </div>
@@ -408,7 +434,7 @@ function TriggerParameterField(input: {
           className="w-[min(22rem,calc(100vw-2rem))] p-0"
         >
           <ComboboxList className="max-h-64">
-            {resourceOptions.map((option) => (
+            {input.resourceOptions.map((option) => (
               <ComboboxItem key={`${input.eventType}:${option.id}`} value={option.handle}>
                 <span className="truncate">{option.displayName}</span>
               </ComboboxItem>
