@@ -1,13 +1,16 @@
 import type { DataPlaneDatabase } from "@mistle/db/data-plane";
-import type { Clock, Scheduler } from "@mistle/time";
+import type { Clock, Scheduler, TimerHandle } from "@mistle/time";
 
 import type { SandboxIdleControllerRegistry } from "../../idle/sandbox-idle-controller-registry.js";
 import { logger } from "../../logger.js";
 import {
   ATTACHMENT_TTL_MS,
+  PRESENCE_LEASE_RENEW_INTERVAL_MS,
+  PRESENCE_LEASE_TTL_MS,
   WEBSOCKET_PING_INTERVAL_MS,
   WEBSOCKET_PONG_TIMEOUT_MS,
 } from "../../runtime-state/durations.js";
+import type { SandboxPresenceStore } from "../../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../../runtime-state/sandbox-runtime-attachment-store.js";
 import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
 import type {
@@ -23,8 +26,12 @@ import {
 } from "../tunnel-peer-notifier.js";
 import type { TunnelSessionRegistry } from "../tunnel-session/index.js";
 import type { RelayPeerSocket, RelayTarget } from "../types.js";
-import { startBootstrapWebSocketHealthMonitor } from "./bootstrap-websocket-health-monitor.js";
 import { TunnelLivelinessRepository } from "./tunnel-liveliness-repository.js";
+import { startWebSocketHealthMonitor } from "./websocket-health-monitor.js";
+
+const ConnectionPresenceLeaseKind = "agent";
+const ConnectionPresenceLeaseSource = "dashboard";
+const WebSocketOpenReadyState = 1;
 
 /**
  * Captures the live relay target for an attached websocket peer plus any
@@ -33,6 +40,9 @@ import { TunnelLivelinessRepository } from "./tunnel-liveliness-repository.js";
 export type AttachedTunnelPeer = {
   relayTarget: RelayTarget;
   leaseHeartbeatHandle?: SandboxOwnerLeaseHeartbeatHandle;
+  presenceLeaseRenewalHandle?: {
+    stop: () => void;
+  };
   websocketHealthHandle?: {
     stop: () => void;
     isHealthy: () => boolean;
@@ -73,6 +83,7 @@ export class TunnelSessionService {
     private readonly tunnelSessionRegistry: TunnelSessionRegistry,
     private readonly sandboxOwnerStore: SandboxOwnerStore,
     private readonly sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat,
+    private readonly sandboxPresenceStore: SandboxPresenceStore,
     private readonly sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore,
     private readonly sandboxIdleControllerRegistry: SandboxIdleControllerRegistry,
     private readonly livelinessRepository: TunnelLivelinessRepository,
@@ -120,7 +131,7 @@ export class TunnelSessionService {
       | undefined;
 
     try {
-      websocketHealthHandle = startBootstrapWebSocketHealthMonitor({
+      websocketHealthHandle = startWebSocketHealthMonitor({
         socket: input.socket,
         scheduler: this.scheduler,
         pingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,
@@ -291,6 +302,8 @@ export class TunnelSessionService {
    * Attaches a connection websocket as a relay peer for the target sandbox.
    */
   public attachConnectionPeer(input: {
+    onFatalError: (failure: TunnelSessionFatalError) => void;
+    onTransportUnhealthy: (failure: TunnelSessionTransportUnhealthy) => void;
     relaySessionId: string;
     sandboxInstanceId: string;
     socket: RelayPeerSocket;
@@ -302,8 +315,95 @@ export class TunnelSessionService {
       socket: input.socket,
     });
 
+    const sandboxIdleController = this.sandboxIdleControllerRegistry.getController({
+      sandboxInstanceId: input.sandboxInstanceId,
+    });
+    if (sandboxIdleController === null) {
+      throw new Error(
+        `Expected idle controller for sandbox '${input.sandboxInstanceId}' before attaching connection peer.`,
+      );
+    }
+
+    let websocketHealthHandle:
+      | {
+          stop: () => void;
+          isHealthy: () => boolean;
+        }
+      | undefined;
+    let presenceLeaseRenewalHandle:
+      | {
+          stop: () => void;
+        }
+      | undefined;
+    try {
+      websocketHealthHandle = startWebSocketHealthMonitor({
+        socket: input.socket,
+        scheduler: this.scheduler,
+        pingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,
+        pongTimeoutMs: WEBSOCKET_PONG_TIMEOUT_MS,
+        onUnhealthy: () => {
+          logger.error(
+            {
+              sandboxInstanceId: input.sandboxInstanceId,
+              relaySessionId: input.relaySessionId,
+            },
+            "Connection websocket stopped responding to ping/pong health checks",
+          );
+          presenceLeaseRenewalHandle?.stop();
+          input.onTransportUnhealthy({
+            closeReason: "Sandbox connection websocket stopped responding to ping.",
+            statusMessage: "Sandbox connection websocket stopped responding to ping.",
+          });
+        },
+      });
+    } catch (error) {
+      logger.error(
+        {
+          err: error,
+          sandboxInstanceId: input.sandboxInstanceId,
+          relaySessionId: input.relaySessionId,
+        },
+        "Failed to initialize connection websocket health checks",
+      );
+      input.onFatalError({
+        closeReason: "Failed to initialize connection websocket health checks.",
+        error,
+        statusMessage: "Failed to initialize connection websocket health checks.",
+      });
+    }
+
+    presenceLeaseRenewalHandle = this.startPresenceLeaseRenewal({
+      leaseId: input.relaySessionId,
+      onLeaseTouched: (nowMs) => {
+        sandboxIdleController.handlePresenceLeaseTouch({
+          leaseId: input.relaySessionId,
+          nowMs,
+        });
+      },
+      onTouchFailed: (error) => {
+        logger.error(
+          {
+            err: error,
+            sandboxInstanceId: input.sandboxInstanceId,
+            relaySessionId: input.relaySessionId,
+          },
+          "Failed to persist sandbox presence lease for connection peer",
+        );
+        input.onFatalError({
+          closeReason: "Failed to persist sandbox presence lease.",
+          error,
+          statusMessage: "Failed to persist sandbox presence lease.",
+        });
+      },
+      relaySessionId: input.relaySessionId,
+      sandboxInstanceId: input.sandboxInstanceId,
+      socket: input.socket,
+    });
+
     return {
+      ...(presenceLeaseRenewalHandle === undefined ? {} : { presenceLeaseRenewalHandle }),
       relayTarget,
+      ...(websocketHealthHandle === undefined ? {} : { websocketHealthHandle }),
     };
   }
 
@@ -419,6 +519,25 @@ export class TunnelSessionService {
     attachedPeer: AttachedTunnelPeer;
     sandboxInstanceId: string;
   }): Promise<void> {
+    input.attachedPeer.presenceLeaseRenewalHandle?.stop();
+    input.attachedPeer.websocketHealthHandle?.stop();
+
+    await this.sandboxPresenceStore
+      .releaseLease({
+        sandboxInstanceId: input.sandboxInstanceId,
+        leaseId: input.attachedPeer.relayTarget.sessionId,
+      })
+      .catch((error: unknown) => {
+        logger.error(
+          {
+            err: error,
+            sandboxInstanceId: input.sandboxInstanceId,
+            relaySessionId: input.attachedPeer.relayTarget.sessionId,
+          },
+          "Failed to release sandbox presence lease for disconnected connection peer",
+        );
+      });
+
     await this.interactiveStreamRouter
       .releaseClientSessionStreams({
         sandboxInstanceId: input.sandboxInstanceId,
@@ -460,5 +579,82 @@ export class TunnelSessionService {
       ttlMs: ATTACHMENT_TTL_MS,
       nowMs: this.clock.nowMs(),
     });
+  }
+
+  private startPresenceLeaseRenewal(input: {
+    leaseId: string;
+    onLeaseTouched: (nowMs: number) => void;
+    onTouchFailed: (error: unknown) => void;
+    relaySessionId: string;
+    sandboxInstanceId: string;
+    socket: RelayPeerSocket;
+  }): {
+    stop: () => void;
+  } {
+    let stopped = false;
+    let scheduledHandle: TimerHandle | undefined;
+
+    const scheduleNextRenewal = (): void => {
+      if (stopped) {
+        return;
+      }
+
+      scheduledHandle = this.scheduler.schedule(() => {
+        void renewPresenceLease();
+      }, PRESENCE_LEASE_RENEW_INTERVAL_MS);
+    };
+
+    const renewPresenceLease = async (): Promise<void> => {
+      if (stopped) {
+        return;
+      }
+      if (input.socket.readyState !== WebSocketOpenReadyState) {
+        stopped = true;
+        scheduledHandle = undefined;
+        return;
+      }
+
+      const nowMs = this.clock.nowMs();
+
+      try {
+        await this.sandboxPresenceStore.touchLease({
+          sandboxInstanceId: input.sandboxInstanceId,
+          leaseId: input.leaseId,
+          kind: ConnectionPresenceLeaseKind,
+          source: ConnectionPresenceLeaseSource,
+          sessionId: input.relaySessionId,
+          ttlMs: PRESENCE_LEASE_TTL_MS,
+          nowMs,
+        });
+      } catch (error) {
+        if (stopped) {
+          return;
+        }
+
+        stopped = true;
+        scheduledHandle = undefined;
+        input.onTouchFailed(error);
+        return;
+      }
+
+      input.onLeaseTouched(nowMs);
+      scheduleNextRenewal();
+    };
+
+    void renewPresenceLease();
+
+    return {
+      stop: () => {
+        if (stopped) {
+          return;
+        }
+
+        stopped = true;
+        if (scheduledHandle !== undefined) {
+          this.scheduler.cancel(scheduledHandle);
+          scheduledHandle = undefined;
+        }
+      },
+    };
   }
 }

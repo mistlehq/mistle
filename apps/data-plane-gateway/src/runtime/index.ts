@@ -162,6 +162,7 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerStore,
     sandboxOwnerResolver,
     sandboxOwnerLeaseHeartbeat,
+    sandboxPresenceStore,
     sandboxRuntimeAttachmentStore,
     sandboxIdleControllerRegistry,
     clock: systemClock,
