@@ -34,8 +34,14 @@ command -v direnv >/dev/null 2>&1 || {
 
 git -C "$repo_root" worktree add -b "$branch_name" "$worktree_path" "$base_ref"
 
-direnv exec "$worktree_path" pnpm install
-direnv exec "$worktree_path" pnpm config:init:dev
+(
+  cd "$worktree_path"
+  direnv exec "$worktree_path" pnpm install
+)
+(
+  cd "$worktree_path"
+  direnv exec "$worktree_path" pnpm config:init:dev
+)
 
 resume_command=""
 resume_command_cd=""
