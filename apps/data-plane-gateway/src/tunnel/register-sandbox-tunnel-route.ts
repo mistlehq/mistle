@@ -1,9 +1,12 @@
 import type { NodeWebSocket } from "@hono/node-ws";
 import type { ConnectionTokenConfig } from "@mistle/gateway-connection-auth";
 import type { BootstrapTokenConfig } from "@mistle/gateway-tunnel-auth";
+import type { Clock, Scheduler } from "@mistle/time";
 import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 
 import { logger } from "../logger.js";
+import { OWNER_LEASE_TTL_MS } from "../runtime-state/durations.js";
+import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
 import { ExecutionLeaseRepository } from "./execution-lease-repository.js";
@@ -39,6 +42,9 @@ type RegisterSandboxTunnelRouteInput = {
   sandboxOwnerStore: SandboxOwnerStore;
   sandboxOwnerResolver: SandboxOwnerResolver;
   sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat;
+  sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
+  clock: Clock;
+  scheduler: Scheduler;
 };
 
 type TokenKind = "bootstrap" | "connection";
@@ -50,7 +56,6 @@ const CloseCodes: {
   INTERNAL_ERROR: 1011,
   PROTOCOL_ERROR: 1008,
 };
-const OwnerLeaseTtlMs = 30_000;
 const TunnelLifecycleTracer = trace.getTracer("@mistle/data-plane-gateway");
 
 function toSourcePeerSide(tokenKind: TokenKind): RelayPeerSide {
@@ -68,12 +73,16 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
   const tunnelProtocolTranslator = new TunnelProtocolTranslator(input.interactiveStreamRouter);
   const executionLeaseRepository = new ExecutionLeaseRepository();
   const tunnelSessionService = new TunnelSessionService(
+    input.gatewayNodeId,
     input.interactiveStreamRouter,
     input.relayCoordinator,
     input.tunnelSessionRegistry,
     input.sandboxOwnerStore,
     input.sandboxOwnerLeaseHeartbeat,
+    input.sandboxRuntimeAttachmentStore,
     new TunnelLivelinessRepository(),
+    input.clock,
+    input.scheduler,
   );
 
   input.app.get(
@@ -174,7 +183,15 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                   });
                   ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
                 },
-                ownerLeaseTtlMs: OwnerLeaseTtlMs,
+                onTransportUnhealthy: (failure) => {
+                  tunnelSessionSpan?.addEvent("sandbox.tunnel.transport_health.lost");
+                  tunnelSessionSpan?.setStatus({
+                    code: SpanStatusCode.ERROR,
+                    message: failure.statusMessage,
+                  });
+                  ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
+                },
+                ownerLeaseTtlMs: OWNER_LEASE_TTL_MS,
                 relaySessionId,
                 sandboxInstanceId,
                 socket: ws,

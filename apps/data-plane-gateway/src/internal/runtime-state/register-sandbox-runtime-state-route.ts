@@ -1,3 +1,6 @@
+import type { Clock } from "@mistle/time";
+
+import type { SandboxRuntimeAttachmentStore } from "../../runtime-state/sandbox-runtime-attachment-store.js";
 import type { SandboxOwnerStore } from "../../tunnel/ownership/sandbox-owner-store.js";
 import type { DataPlaneGatewayApp } from "../../types.js";
 
@@ -6,7 +9,9 @@ const SandboxRuntimeStateRoutePath = "/internal/sandbox-instances/:instanceId/ru
 
 type RegisterSandboxRuntimeStateRouteInput = {
   app: DataPlaneGatewayApp;
+  clock: Clock;
   internalAuthServiceToken: string;
+  sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
   sandboxOwnerStore: SandboxOwnerStore;
 };
 
@@ -14,10 +19,9 @@ type RegisterSandboxRuntimeStateRouteInput = {
  * Registers the internal worker-facing runtime-state read route.
  *
  * This route is authenticated with the shared internal service token and
- * intentionally exposes only the bootstrap owner lease plus a placeholder
- * attachment payload. PR 5 upgrades the attachment side to use the dedicated
- * runtime-attachment store; until then, workers should expect `attachment` to
- * be `null`.
+ * The gateway remains the sole owner of runtime-state backend selection, so
+ * workers read owner and attachment state through this route regardless of
+ * whether the gateway is running in `memory` or `valkey` mode.
  */
 export function registerSandboxRuntimeStateRoute(
   input: RegisterSandboxRuntimeStateRouteInput,
@@ -51,11 +55,15 @@ export function registerSandboxRuntimeStateRoute(
     const owner = await input.sandboxOwnerStore.getOwner({
       sandboxInstanceId,
     });
+    const attachment = await input.sandboxRuntimeAttachmentStore.getAttachment({
+      sandboxInstanceId,
+      nowMs: input.clock.nowMs(),
+    });
 
     return ctx.json(
       {
         ownerLeaseId: owner?.leaseId ?? null,
-        attachment: null,
+        attachment,
       },
       200,
     );

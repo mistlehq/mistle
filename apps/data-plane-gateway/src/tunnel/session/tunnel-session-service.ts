@@ -1,6 +1,13 @@
 import type { DataPlaneDatabase } from "@mistle/db/data-plane";
+import type { Clock, Scheduler } from "@mistle/time";
 
 import { logger } from "../../logger.js";
+import {
+  ATTACHMENT_TTL_MS,
+  WEBSOCKET_PING_INTERVAL_MS,
+  WEBSOCKET_PONG_TIMEOUT_MS,
+} from "../../runtime-state/durations.js";
+import type { SandboxRuntimeAttachmentStore } from "../../runtime-state/sandbox-runtime-attachment-store.js";
 import type { InteractiveStreamRouter } from "../gateway-forwarding/index.js";
 import type {
   SandboxOwnerLeaseHeartbeat,
@@ -15,6 +22,7 @@ import {
 } from "../tunnel-peer-notifier.js";
 import type { TunnelSessionRegistry } from "../tunnel-session/index.js";
 import type { RelayPeerSocket, RelayTarget } from "../types.js";
+import { startBootstrapWebSocketHealthMonitor } from "./bootstrap-websocket-health-monitor.js";
 import { TunnelLivelinessRepository } from "./tunnel-liveliness-repository.js";
 
 /**
@@ -24,6 +32,10 @@ import { TunnelLivelinessRepository } from "./tunnel-liveliness-repository.js";
 export type AttachedTunnelPeer = {
   relayTarget: RelayTarget;
   leaseHeartbeatHandle?: SandboxOwnerLeaseHeartbeatHandle;
+  websocketHealthHandle?: {
+    stop: () => void;
+    isHealthy: () => boolean;
+  };
 };
 
 /**
@@ -44,14 +56,26 @@ export type TunnelSessionLeaseLost = {
   statusMessage: string;
 };
 
+/**
+ * Describes an unhealthy bootstrap websocket that should be closed.
+ */
+export type TunnelSessionTransportUnhealthy = {
+  closeReason: string;
+  statusMessage: string;
+};
+
 export class TunnelSessionService {
   public constructor(
+    private readonly gatewayNodeId: string,
     private readonly interactiveStreamRouter: InteractiveStreamRouter,
     private readonly relayCoordinator: TunnelRelayCoordinator,
     private readonly tunnelSessionRegistry: TunnelSessionRegistry,
     private readonly sandboxOwnerStore: SandboxOwnerStore,
     private readonly sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat,
+    private readonly sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore,
     private readonly livelinessRepository: TunnelLivelinessRepository,
+    private readonly clock: Clock,
+    private readonly scheduler: Scheduler,
   ) {}
 
   /**
@@ -63,6 +87,7 @@ export class TunnelSessionService {
     leaseId: string;
     onFatalError: (failure: TunnelSessionFatalError) => void;
     onLeaseLost: (failure: TunnelSessionLeaseLost) => void;
+    onTransportUnhealthy: (failure: TunnelSessionTransportUnhealthy) => void;
     ownerLeaseTtlMs: number;
     relaySessionId: string;
     sandboxInstanceId: string;
@@ -75,6 +100,69 @@ export class TunnelSessionService {
       socket: input.socket,
     });
     const attachResult = this.tunnelSessionRegistry.attachBootstrapSession(relayTarget);
+
+    const runtimeAttachmentAttachedAtMs = this.clock.nowMs();
+    let websocketHealthHandle:
+      | {
+          stop: () => void;
+          isHealthy: () => boolean;
+        }
+      | undefined;
+
+    try {
+      websocketHealthHandle = startBootstrapWebSocketHealthMonitor({
+        socket: input.socket,
+        scheduler: this.scheduler,
+        pingIntervalMs: WEBSOCKET_PING_INTERVAL_MS,
+        pongTimeoutMs: WEBSOCKET_PONG_TIMEOUT_MS,
+        onUnhealthy: () => {
+          logger.error(
+            {
+              sandboxInstanceId: input.sandboxInstanceId,
+              leaseId: input.leaseId,
+            },
+            "Bootstrap websocket stopped responding to ping/pong health checks",
+          );
+          input.onTransportUnhealthy({
+            closeReason: "Sandbox bootstrap websocket stopped responding to ping.",
+            statusMessage: "Sandbox bootstrap websocket stopped responding to ping.",
+          });
+        },
+      });
+    } catch (error) {
+      logger.error(
+        {
+          err: error,
+          sandboxInstanceId: input.sandboxInstanceId,
+        },
+        "Failed to initialize bootstrap websocket health checks",
+      );
+      input.onFatalError({
+        closeReason: "Failed to initialize bootstrap websocket health checks.",
+        error,
+        statusMessage: "Failed to initialize bootstrap websocket health checks.",
+      });
+    }
+
+    void this.refreshRuntimeAttachment({
+      attachedAtMs: runtimeAttachmentAttachedAtMs,
+      leaseId: input.leaseId,
+      relaySessionId: input.relaySessionId,
+      sandboxInstanceId: input.sandboxInstanceId,
+    }).catch((error: unknown) => {
+      logger.error(
+        {
+          err: error,
+          sandboxInstanceId: input.sandboxInstanceId,
+        },
+        "Failed to persist sandbox runtime attachment",
+      );
+      input.onFatalError({
+        closeReason: "Failed to persist sandbox runtime attachment.",
+        error,
+        statusMessage: "Failed to persist sandbox runtime attachment.",
+      });
+    });
 
     void notifyConnectionPeerOfReleasedInteractiveStreams({
       relayCoordinator: this.relayCoordinator,
@@ -121,6 +209,23 @@ export class TunnelSessionService {
       leaseId: input.leaseId,
       ttlMs: input.ownerLeaseTtlMs,
       onLeaseRenewed: () => {
+        if (websocketHealthHandle?.isHealthy() === true) {
+          void this.refreshRuntimeAttachment({
+            attachedAtMs: runtimeAttachmentAttachedAtMs,
+            leaseId: input.leaseId,
+            relaySessionId: input.relaySessionId,
+            sandboxInstanceId: input.sandboxInstanceId,
+          }).catch((error: unknown) => {
+            logger.error(
+              {
+                err: error,
+                sandboxInstanceId: input.sandboxInstanceId,
+              },
+              "Failed to refresh sandbox runtime attachment",
+            );
+          });
+        }
+
         void this.livelinessRepository
           .markSeen({
             db: input.db,
@@ -168,6 +273,7 @@ export class TunnelSessionService {
     return {
       leaseHeartbeatHandle,
       relayTarget,
+      ...(websocketHealthHandle === undefined ? {} : { websocketHealthHandle }),
     };
   }
 
@@ -202,6 +308,7 @@ export class TunnelSessionService {
     sandboxInstanceId: string;
   }): Promise<void> {
     input.attachedPeer.leaseHeartbeatHandle?.stop();
+    input.attachedPeer.websocketHealthHandle?.stop();
 
     void this.livelinessRepository
       .markDisconnected({
@@ -229,6 +336,21 @@ export class TunnelSessionService {
             sandboxInstanceId: input.sandboxInstanceId,
           },
           "Failed to persist sandbox tunnel disconnected timestamp",
+        );
+      });
+
+    void this.sandboxRuntimeAttachmentStore
+      .clearAttachment({
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: input.leaseId,
+      })
+      .catch((error: unknown) => {
+        logger.error(
+          {
+            err: error,
+            sandboxInstanceId: input.sandboxInstanceId,
+          },
+          "Failed to clear sandbox runtime attachment for disconnected bootstrap tunnel",
         );
       });
 
@@ -304,5 +426,22 @@ export class TunnelSessionService {
       .finally(() => {
         this.relayCoordinator.detachPeer(input.attachedPeer.relayTarget);
       });
+  }
+
+  private async refreshRuntimeAttachment(input: {
+    attachedAtMs: number;
+    leaseId: string;
+    relaySessionId: string;
+    sandboxInstanceId: string;
+  }): Promise<void> {
+    await this.sandboxRuntimeAttachmentStore.upsertAttachment({
+      sandboxInstanceId: input.sandboxInstanceId,
+      ownerLeaseId: input.leaseId,
+      nodeId: this.gatewayNodeId,
+      sessionId: input.relaySessionId,
+      attachedAtMs: input.attachedAtMs,
+      ttlMs: ATTACHMENT_TTL_MS,
+      nowMs: this.clock.nowMs(),
+    });
   }
 }
