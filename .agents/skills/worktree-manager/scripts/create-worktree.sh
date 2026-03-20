@@ -27,11 +27,15 @@ git -C "$repo_root" show-ref --verify --quiet "refs/heads/$branch_name" && {
   exit 1
 }
 
+command -v direnv >/dev/null 2>&1 || {
+  echo "direnv is required to bootstrap the worktree environment" >&2
+  exit 1
+}
+
 git -C "$repo_root" worktree add -b "$branch_name" "$worktree_path" "$base_ref"
 
-cd "$worktree_path"
-pnpm install
-pnpm config:init:dev
+direnv exec "$worktree_path" pnpm install
+direnv exec "$worktree_path" pnpm config:init:dev
 
 resume_command=""
 resume_command_cd=""
@@ -48,7 +52,7 @@ fi
 printf 'worktree_path=%s\n' "$worktree_path"
 printf 'branch_name=%s\n' "$branch_name"
 printf 'base_ref=%s\n' "$base_ref"
-printf 'bootstrap_steps=pnpm install,pnpm config:init:dev\n'
+printf 'bootstrap_steps=direnv exec <worktree_path> pnpm install,direnv exec <worktree_path> pnpm config:init:dev\n'
 
 if [ "$resume_command" != "" ]; then
   printf 'resume_command_cd=%s\n' "$resume_command_cd"

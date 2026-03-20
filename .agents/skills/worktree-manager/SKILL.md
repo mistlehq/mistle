@@ -16,8 +16,9 @@ Use this skill when the user asks to create or bootstrap a git worktree for this
 2. Default the base ref to `main` unless the user explicitly asks for another base.
 3. Derive a safe kebab-case slug from the user task when they do not provide a branch or path.
 4. After creation, bootstrap the new worktree by running:
-   - `pnpm install`
-   - `pnpm config:init:dev`
+   - `direnv exec <worktree-path> pnpm install`
+   - `direnv exec <worktree-path> pnpm config:init:dev`
+   - Fail fast if `direnv` is unavailable instead of relying on implicit shell activation.
 5. If `CODEX_THREAD_ID` is available, prepare a two-line resume handoff for the new worktree:
    - `cd <worktree-path>`
    - `codex resume -C . <thread-id>`
