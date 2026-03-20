@@ -26,6 +26,10 @@ import {
   type CodexApprovalRequestEntry,
 } from "../approvals/codex-approval-requests-state.js";
 import {
+  createConnectedCodexSession,
+  establishInitialCodexThread,
+} from "./codex-session-connect.js";
+import {
   describeCodexSessionStepError,
   StaleConnectionAttemptError,
 } from "./codex-session-errors.js";
@@ -35,10 +39,7 @@ import {
   parseTurnDiffSnapshot,
   parseTurnPlanSnapshot,
 } from "./codex-session-events.js";
-import {
-  resolveCodexConnectionStateTransition,
-  selectCodexConnectionThreadStrategy,
-} from "./codex-session-lifecycle-policy.js";
+import { resolveCodexConnectionStateTransition } from "./codex-session-lifecycle-policy.js";
 import {
   type CodexThreadLifecycleEvent,
   type CodexThreadTokenUsageSnapshot,
@@ -491,37 +492,15 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
         rpcClient,
         generation,
       });
-      const connectionThreadStrategy = selectCodexConnectionThreadStrategy({
-        availableThreads: threadCollections.availableThreads,
-      });
 
-      if (connectionThreadStrategy.type === "resume") {
-        const resumedThread = await resumeCodexThread({
-          rpcClient,
-          threadId: connectionThreadStrategy.threadId,
-        });
-        ensureCurrentGeneration(generation);
-
-        return {
-          generation,
-          sandboxInstanceId: input.sandboxInstanceId,
-          mintedConnection,
-          threadId: resumedThread.threadId,
-        };
-      }
-
-      const threadStart = await startCodexThread({
+      return await establishInitialCodexThread({
         rpcClient,
-        model: "gpt-5.3-codex",
-      });
-      ensureCurrentGeneration(generation);
-
-      return {
+        availableThreads: threadCollections.availableThreads,
         generation,
         sandboxInstanceId: input.sandboxInstanceId,
         mintedConnection,
-        threadId: threadStart.threadId,
-      };
+        ensureCurrentGeneration,
+      });
     },
     onSuccess: (result) => {
       if (connectionGenerationRef.current !== result.generation) {
@@ -530,12 +509,14 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
 
       updateActiveThread(result.threadId);
       resetChat();
-      setConnectedSession({
-        sandboxInstanceId: result.sandboxInstanceId,
-        connectedAtIso: new Date().toISOString(),
-        expiresAtIso: result.mintedConnection.connectionExpiresAt,
-        threadId: result.threadId,
-      });
+      setConnectedSession(
+        createConnectedCodexSession({
+          sandboxInstanceId: result.sandboxInstanceId,
+          connectedAtIso: new Date().toISOString(),
+          mintedConnection: result.mintedConnection,
+          threadId: result.threadId,
+        }),
+      );
       setAgentConnectionState("ready");
       setAgentConnectionError(null);
       setStep("connected");
