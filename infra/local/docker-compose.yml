@@ -68,6 +68,13 @@ services:
     networks:
       - sandbox-dev
 
+  valkey:
+    image: valkey/valkey:9.0-alpine
+    ports:
+      - "${DEV_VALKEY_PORT:-6379}:6379"
+    networks:
+      - sandbox-dev
+
   tokenizer-proxy-relay:
     image: nginx:1.27-alpine
     extra_hosts:

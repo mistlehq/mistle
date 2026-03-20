@@ -15,6 +15,7 @@ export function loadDataPlaneWorkerFromToml(
   const workflow = asObjectRecord(dataPlaneWorker.workflow);
   const tunnel = asObjectRecord(dataPlaneWorker.tunnel);
   const reaper = asObjectRecord(dataPlaneWorker.reaper);
+  const runtimeState = asObjectRecord(dataPlaneWorker.runtime_state);
   const sandbox = asObjectRecord(dataPlaneWorker.sandbox);
   const sandboxModal = asObjectRecord(sandbox.modal);
   const sandboxDocker = asObjectRecord(sandbox.docker);
@@ -62,6 +63,9 @@ export function loadDataPlaneWorkerFromToml(
       idleTimeoutSeconds: reaper.idle_timeout_seconds,
       executionLeaseFreshnessSeconds: reaper.execution_lease_freshness_seconds,
       tunnelDisconnectGraceSeconds: reaper.tunnel_disconnect_grace_seconds,
+    },
+    runtimeState: {
+      gatewayBaseUrl: runtimeState.gateway_base_url,
     },
     sandbox: sandboxConfig,
   });

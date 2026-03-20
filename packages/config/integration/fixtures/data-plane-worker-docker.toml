@@ -57,6 +57,9 @@ idle_timeout_seconds = 300
 execution_lease_freshness_seconds = 30
 tunnel_disconnect_grace_seconds = 60
 
+[apps.data_plane_worker.runtime_state]
+gateway_base_url = "http://127.0.0.1:5003"
+
 [apps.data_plane_worker.sandbox]
 tokenizer_proxy_egress_base_url = "http://127.0.0.1:5004/tokenizer-proxy/egress"
 

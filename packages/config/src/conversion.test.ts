@@ -41,12 +41,15 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "4",
       MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
+      MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "memory",
+      MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",
       MISTLE_APPS_DATA_PLANE_WORKER_REAPER_POLL_INTERVAL_SECONDS: "30",
       MISTLE_APPS_DATA_PLANE_WORKER_REAPER_IDLE_TIMEOUT_SECONDS: "300",
       MISTLE_APPS_DATA_PLANE_WORKER_REAPER_EXECUTION_LEASE_FRESHNESS_SECONDS: "30",
       MISTLE_APPS_DATA_PLANE_WORKER_REAPER_TUNNEL_DISCONNECT_GRACE_SECONDS: "60",
+      MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5202",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
         "http://127.0.0.1:5100/tokenizer-proxy/egress",
     });
@@ -127,8 +130,19 @@ describe("convertEnvToTomlRecord", () => {
             execution_lease_freshness_seconds: 30,
             tunnel_disconnect_grace_seconds: 60,
           },
+          runtime_state: {
+            gateway_base_url: "http://127.0.0.1:5202",
+          },
           sandbox: {
             tokenizer_proxy_egress_base_url: "http://127.0.0.1:5100/tokenizer-proxy/egress",
+          },
+        },
+        data_plane_gateway: {
+          runtime_state: {
+            backend: "memory",
+          },
+          data_plane_api: {
+            base_url: "http://127.0.0.1:5300",
           },
         },
       },
@@ -209,8 +223,19 @@ describe("convertTomlToEnvRecord", () => {
             execution_lease_freshness_seconds: 30,
             tunnel_disconnect_grace_seconds: 60,
           },
+          runtime_state: {
+            gateway_base_url: "http://127.0.0.1:5202",
+          },
           sandbox: {
             tokenizer_proxy_egress_base_url: "http://127.0.0.1:5100/tokenizer-proxy/egress",
+          },
+        },
+        data_plane_gateway: {
+          runtime_state: {
+            backend: "memory",
+          },
+          data_plane_api: {
+            base_url: "http://127.0.0.1:5300",
           },
         },
       },
@@ -242,12 +267,15 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "2",
       MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
+      MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "memory",
+      MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",
       MISTLE_APPS_DATA_PLANE_WORKER_REAPER_POLL_INTERVAL_SECONDS: "30",
       MISTLE_APPS_DATA_PLANE_WORKER_REAPER_IDLE_TIMEOUT_SECONDS: "300",
       MISTLE_APPS_DATA_PLANE_WORKER_REAPER_EXECUTION_LEASE_FRESHNESS_SECONDS: "30",
       MISTLE_APPS_DATA_PLANE_WORKER_REAPER_TUNNEL_DISCONNECT_GRACE_SECONDS: "60",
+      MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5202",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
         "http://127.0.0.1:5100/tokenizer-proxy/egress",
     });

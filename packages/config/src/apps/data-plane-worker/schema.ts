@@ -2,6 +2,11 @@ import { z } from "zod";
 
 const SandboxProviders = ["modal", "docker"] as const;
 
+const HttpBaseUrlSchema = z.url().refine((value) => {
+  const parsedUrl = new URL(value);
+  return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+}, "Expected an http or https URL.");
+
 export const DataPlaneWorkerServerConfigSchema = z
   .object({
     host: z.string().min(1),
@@ -37,6 +42,18 @@ export const DataPlaneWorkerReaperConfigSchema = z
     idleTimeoutSeconds: z.number().int().min(1),
     executionLeaseFreshnessSeconds: z.number().int().min(1),
     tunnelDisconnectGraceSeconds: z.number().int().min(1),
+  })
+  .strict();
+
+export const DataPlaneWorkerRuntimeStateConfigSchema = z
+  .object({
+    gatewayBaseUrl: HttpBaseUrlSchema,
+  })
+  .strict();
+
+export const PartialDataPlaneWorkerRuntimeStateConfigSchema = z
+  .object({
+    gatewayBaseUrl: HttpBaseUrlSchema.optional(),
   })
   .strict();
 
@@ -85,6 +102,7 @@ export const DataPlaneWorkerConfigSchema = z
     workflow: DataPlaneWorkerWorkflowConfigSchema,
     tunnel: DataPlaneWorkerTunnelConfigSchema,
     reaper: DataPlaneWorkerReaperConfigSchema,
+    runtimeState: DataPlaneWorkerRuntimeStateConfigSchema,
     sandbox: DataPlaneWorkerSandboxConfigSchema,
   })
   .strict();
@@ -96,6 +114,7 @@ export const PartialDataPlaneWorkerConfigSchema = z
     workflow: DataPlaneWorkerWorkflowConfigSchema.partial().optional(),
     tunnel: DataPlaneWorkerTunnelConfigSchema.partial().optional(),
     reaper: DataPlaneWorkerReaperConfigSchema.partial().optional(),
+    runtimeState: PartialDataPlaneWorkerRuntimeStateConfigSchema.optional(),
     sandbox: PartialDataPlaneWorkerSandboxConfigSchema.optional(),
   })
   .strict();

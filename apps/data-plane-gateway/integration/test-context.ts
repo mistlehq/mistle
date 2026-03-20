@@ -204,6 +204,12 @@ export const it = vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture 
             database: {
               url: runtimeDatabaseUrl,
             },
+            runtimeState: {
+              backend: "memory",
+            },
+            dataPlaneApi: {
+              baseUrl: "http://127.0.0.1:5300",
+            },
           },
           sandbox: {
             provider: "docker",

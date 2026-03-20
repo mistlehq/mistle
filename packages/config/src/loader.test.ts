@@ -140,6 +140,9 @@ describe("parseConfigRecord", () => {
             executionLeaseFreshnessSeconds: 30,
             tunnelDisconnectGraceSeconds: 60,
           },
+          runtimeState: {
+            gatewayBaseUrl: "http://127.0.0.1:5202",
+          },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
             modal: {
@@ -157,6 +160,12 @@ describe("parseConfigRecord", () => {
           },
           database: {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+          },
+          runtimeState: {
+            backend: "memory",
+          },
+          dataPlaneApi: {
+            baseUrl: "http://127.0.0.1:5200",
           },
         },
         tokenizer_proxy: {
@@ -311,6 +320,9 @@ describe("parseConfigRecord", () => {
             executionLeaseFreshnessSeconds: 30,
             tunnelDisconnectGraceSeconds: 60,
           },
+          runtimeState: {
+            gatewayBaseUrl: "http://127.0.0.1:5202",
+          },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
             docker: {
@@ -327,6 +339,12 @@ describe("parseConfigRecord", () => {
           },
           database: {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+          },
+          runtimeState: {
+            backend: "memory",
+          },
+          dataPlaneApi: {
+            baseUrl: "http://127.0.0.1:5200",
           },
         },
         tokenizer_proxy: {
@@ -481,6 +499,9 @@ describe("parseConfigRecord", () => {
             executionLeaseFreshnessSeconds: 30,
             tunnelDisconnectGraceSeconds: 60,
           },
+          runtimeState: {
+            gatewayBaseUrl: "http://127.0.0.1:5202",
+          },
           sandbox: {
             tokenizerProxyEgressBaseUrl: "http://127.0.0.1:5004/tokenizer-proxy/egress",
           },
@@ -492,6 +513,12 @@ describe("parseConfigRecord", () => {
           },
           database: {
             url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
+          },
+          runtimeState: {
+            backend: "memory",
+          },
+          dataPlaneApi: {
+            baseUrl: "http://127.0.0.1:5200",
           },
         },
         tokenizer_proxy: {
