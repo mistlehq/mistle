@@ -41,7 +41,6 @@ When creating a worktree:
    - bootstrap commands that ran
    - the two-line resume handoff for the new worktree
    - whether the resume command was copied to the clipboard
-   - whether a new Terminal window was launched
    - verification output summary
 
 ## Notes

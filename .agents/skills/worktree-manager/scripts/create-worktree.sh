@@ -36,7 +36,6 @@ pnpm config:init:dev
 resume_command=""
 resume_command_cd=""
 resume_command_resume=""
-launched_terminal="no"
 copied_to_clipboard="no"
 
 if [ "${CODEX_THREAD_ID:-}" != "" ]; then
@@ -62,27 +61,10 @@ if [ "$resume_command" != "" ]; then
   fi
 
   printf 'copied_to_clipboard=%s\n' "$copied_to_clipboard"
-
-  if [ "$(uname -s)" = "Darwin" ] && command -v osascript >/dev/null 2>&1; then
-    if osascript - "$resume_command" >/dev/null 2>&1 <<'APPLESCRIPT'
-on run argv
-  tell application "Terminal"
-    activate
-    do script (item 1 of argv)
-  end tell
-end run
-APPLESCRIPT
-    then
-      launched_terminal="yes"
-    fi
-  fi
-
-  printf 'launched_terminal=%s\n' "$launched_terminal"
 else
   printf 'resume_command_cd=\n'
   printf 'resume_command_resume=\n'
   printf 'copied_to_clipboard=no\n'
-  printf 'launched_terminal=no\n'
 fi
 
 git -C "$repo_root" worktree list --porcelain
