@@ -1,0 +1,4 @@
+interface:
+  display_name: "Worktree Manager"
+  short_description: "Create and bootstrap repo worktrees"
+  default_prompt: "Use $worktree-manager to create and bootstrap git worktrees for this repository."
