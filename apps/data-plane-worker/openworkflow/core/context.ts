@@ -3,6 +3,8 @@ import type { SandboxAdapter } from "@mistle/sandbox";
 import { systemClock, systemSleeper, type Clock, type Sleeper } from "@mistle/time";
 import { Pool } from "pg";
 
+import { createSandboxRuntimeStateReader } from "../../runtime-state/create-sandbox-runtime-state-reader.js";
+import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
 import type { DataPlaneWorkerRuntimeConfig } from "./config.js";
 import { getOpenWorkflowRuntime } from "./runtime.js";
 import { createSandboxRuntimeAdapter } from "./sandbox-runtime-adapter.js";
@@ -12,6 +14,7 @@ export type WorkflowContext = {
   db: DataPlaneDatabase;
   dbPool: Pool;
   sandboxAdapter: SandboxAdapter;
+  runtimeStateReader: SandboxRuntimeStateReader;
   tunnelReadinessPolicy: {
     timeoutMs: number;
     pollIntervalMs: number;
@@ -56,6 +59,10 @@ async function createWorkflowContext(): Promise<WorkflowContext> {
       db: createDataPlaneDatabase(dbPool),
       dbPool,
       sandboxAdapter: createSandboxRuntimeAdapter(config),
+      runtimeStateReader: createSandboxRuntimeStateReader({
+        gatewayBaseUrl: workerConfig.runtimeState.gatewayBaseUrl,
+        serviceToken: globalConfig.internalAuth.serviceToken,
+      }),
       tunnelReadinessPolicy: createDefaultTunnelReadinessPolicy(config),
       clock: systemClock,
       sleeper: systemSleeper,
