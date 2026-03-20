@@ -40,7 +40,7 @@ describe("codex session lifecycle policy", () => {
     });
   });
 
-  it("resumes the most recent available thread", () => {
+  it("resumes the oldest created available thread", () => {
     expect(
       selectCodexConnectionThreadStrategy({
         availableThreads: [
@@ -59,10 +59,23 @@ describe("codex session lifecycle policy", () => {
             updatedAt: 20,
           },
         ],
+        loadedThreadIds: [],
       }),
     ).toEqual({
       type: "resume",
-      threadId: "thread_new",
+      threadId: "thread_old",
+    });
+  });
+
+  it("resumes the loaded thread even when it is missing from the available page", () => {
+    expect(
+      selectCodexConnectionThreadStrategy({
+        availableThreads: [],
+        loadedThreadIds: ["thread_loaded_only"],
+      }),
+    ).toEqual({
+      type: "resume",
+      threadId: "thread_loaded_only",
     });
   });
 
@@ -70,6 +83,7 @@ describe("codex session lifecycle policy", () => {
     expect(
       selectCodexConnectionThreadStrategy({
         availableThreads: [],
+        loadedThreadIds: [],
       }),
     ).toEqual({
       type: "start_new",

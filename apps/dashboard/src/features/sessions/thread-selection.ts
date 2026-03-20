@@ -1,21 +1,17 @@
 import type { CodexThreadSummary } from "@mistle/integrations-definitions/openai/agent/client";
 
-function resolveThreadRecency(thread: CodexThreadSummary): number {
-  if (thread.updatedAt !== null) {
-    return thread.updatedAt;
-  }
-
+function resolveThreadCreatedAt(thread: CodexThreadSummary): number {
   if (thread.createdAt !== null) {
     return thread.createdAt;
   }
 
-  return Number.NEGATIVE_INFINITY;
+  return Number.POSITIVE_INFINITY;
 }
 
-function compareThreadRecency(left: CodexThreadSummary, right: CodexThreadSummary): number {
-  const recencyDifference = resolveThreadRecency(right) - resolveThreadRecency(left);
-  if (recencyDifference !== 0) {
-    return recencyDifference;
+function compareThreadCreation(left: CodexThreadSummary, right: CodexThreadSummary): number {
+  const creationDifference = resolveThreadCreatedAt(left) - resolveThreadCreatedAt(right);
+  if (creationDifference !== 0) {
+    return creationDifference;
   }
 
   return left.id.localeCompare(right.id);
@@ -32,12 +28,12 @@ export function selectPreferredThreadId(input: {
   });
 
   if (loadedAvailableThreads.length > 0) {
-    const mostRecentLoadedThread = [...loadedAvailableThreads].sort(compareThreadRecency)[0];
-    if (mostRecentLoadedThread === undefined) {
+    const oldestLoadedThread = [...loadedAvailableThreads].sort(compareThreadCreation)[0];
+    if (oldestLoadedThread === undefined) {
       throw new Error("Loaded thread selection requires at least one thread.");
     }
 
-    return mostRecentLoadedThread.id;
+    return oldestLoadedThread.id;
   }
 
   if (input.loadedThreadIds.length > 0) {
@@ -48,10 +44,10 @@ export function selectPreferredThreadId(input: {
     return null;
   }
 
-  const mostRecentThread = [...input.availableThreads].sort(compareThreadRecency)[0];
-  if (mostRecentThread === undefined) {
+  const oldestThread = [...input.availableThreads].sort(compareThreadCreation)[0];
+  if (oldestThread === undefined) {
     throw new Error("Available thread selection requires at least one thread.");
   }
 
-  return mostRecentThread.id;
+  return oldestThread.id;
 }

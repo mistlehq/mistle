@@ -496,6 +496,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       return await establishInitialCodexThread({
         rpcClient,
         availableThreads: threadCollections.availableThreads,
+        loadedThreadIds: threadCollections.loadedThreadIds,
         generation,
         sandboxInstanceId: input.sandboxInstanceId,
         mintedConnection,

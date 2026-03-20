@@ -20,15 +20,18 @@ export type CodexConnectionBootstrapResult = {
 
 export function resolveInitialCodexThreadAction(input: {
   availableThreads: readonly CodexThreadSummary[];
+  loadedThreadIds: readonly string[];
 }) {
   return selectCodexConnectionThreadStrategy({
     availableThreads: input.availableThreads,
+    loadedThreadIds: input.loadedThreadIds,
   });
 }
 
 export async function establishInitialCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
   availableThreads: readonly CodexThreadSummary[];
+  loadedThreadIds: readonly string[];
   generation: number;
   sandboxInstanceId: string;
   mintedConnection: MintSandboxConnectionTokenResult;
@@ -36,6 +39,7 @@ export async function establishInitialCodexThread(input: {
 }): Promise<CodexConnectionBootstrapResult> {
   const action = resolveInitialCodexThreadAction({
     availableThreads: input.availableThreads,
+    loadedThreadIds: input.loadedThreadIds,
   });
 
   if (action.type === "resume") {
