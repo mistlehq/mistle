@@ -9,29 +9,9 @@ import {
 } from "@mistle/ui";
 import { ArrowCircleUpIcon, StopCircleIcon } from "@phosphor-icons/react";
 
+import { resolveSelectableValue } from "../../shared/select-value.js";
+
 const REASONING_EFFORT_OPTIONS = ["low", "medium", "high", "xhigh"] as const;
-
-function resolveSelectableModelValue(input: {
-  selectedModel: string | null;
-  modelOptions: readonly {
-    value: string;
-    label: string;
-  }[];
-}): string | null {
-  if (input.selectedModel === null) {
-    return null;
-  }
-
-  return input.modelOptions.some((option) => option.value === input.selectedModel)
-    ? input.selectedModel
-    : null;
-}
-
-function resolveSelectableReasoningEffortValue(
-  selectedReasoningEffort: string | null,
-): (typeof REASONING_EFFORT_OPTIONS)[number] | null {
-  return REASONING_EFFORT_OPTIONS.find((option) => option === selectedReasoningEffort) ?? null;
-}
 
 type ChatComposerProps = {
   composerText: string;
@@ -100,13 +80,15 @@ export function ChatComposer({
       <ArrowCircleUpIcon aria-hidden="true" weight="fill" />
     );
   const isComposerConfigDisabled = !isConnected || isUpdatingComposerConfig;
-  const selectableModelValue = resolveSelectableModelValue({
-    selectedModel,
-    modelOptions,
+  const selectableModelValue = resolveSelectableValue({
+    selectedValue: selectedModel,
+    optionValues: modelOptions.map((option) => option.value),
   });
   const selectedModelLabel = modelOptions.find((option) => option.value === selectedModel)?.label;
-  const selectedReasoningEffortValue =
-    resolveSelectableReasoningEffortValue(selectedReasoningEffort);
+  const selectedReasoningEffortValue = resolveSelectableValue({
+    selectedValue: selectedReasoningEffort,
+    optionValues: REASONING_EFFORT_OPTIONS,
+  });
 
   return (
     <div className="bg-card flex flex-col gap-3 rounded-md border p-1 shadow-xs">

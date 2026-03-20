@@ -23,6 +23,7 @@ import {
   IntegrationSelectContentClassName,
 } from "../forms/integration-form-theme.js";
 import { formatConnectionDisplayName } from "../integrations/format-connection-display-name.js";
+import { resolveSelectableValue } from "../shared/select-value.js";
 import {
   SandboxProfileBindingConfigEditor,
   type IntegrationConnectionSummary,
@@ -75,11 +76,16 @@ export function SandboxProfileBindingDialog(input: {
                 <Select
                   onValueChange={(nextValue) => {
                     if (nextValue === null) {
-                      throw new Error("Binding connection must not be null.");
+                      return;
                     }
                     input.onConnectionIdChange(nextValue);
                   }}
-                  value={input.state.row.connectionId}
+                  value={resolveSelectableValue({
+                    selectedValue: input.state.row.connectionId,
+                    optionValues: input.availableConnectionsByKind[input.state.row.kind].map(
+                      (connection) => connection.id,
+                    ),
+                  })}
                 >
                   <div className="md:flex md:justify-end">
                     <SelectTrigger
