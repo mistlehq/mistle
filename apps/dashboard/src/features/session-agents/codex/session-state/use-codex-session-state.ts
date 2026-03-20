@@ -496,15 +496,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
         loadedThreadIds: threadCollections.loadedThreadIds,
       });
 
-      if (connectionThreadStrategy.type === "reuse_loaded") {
-        return {
-          generation,
-          sandboxInstanceId: input.sandboxInstanceId,
-          mintedConnection,
-          threadId: connectionThreadStrategy.threadId,
-        };
-      }
-
       if (connectionThreadStrategy.type === "resume") {
         const resumedThread = await resumeCodexThread({
           rpcClient,
