@@ -132,9 +132,3 @@
 - If the app is for a browser, assume we use all modern browsers unless otherwise specified, we don't need most polyfills.
 - Avoid IIFEs; use module scope or named functions for one-off initialization.
 - Avoid unnecessary inline closures, especially in hot paths or render loops; prefer named functions when it improves clarity or stable references. Closures are fine when they make intent clearer.
-
-#### React Compiler
-
-- Follow the Rules of React; compiler optimizations are skipped when rules are violated.
-- Keep renders pure (no side effects or mutations during render).
-- Use `/* @__NO_COMPILE__ */` on functions that must not be compiled.

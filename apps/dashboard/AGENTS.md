@@ -17,3 +17,10 @@
 - `useEffect` is acceptable for:
   DOM subscriptions and browser APIs, timers and intervals with cleanup, imperative third-party widgets, sockets and streams, terminal or session lifecycle wiring, and registration with an external owner when cleanup is required.
 - Every new `useEffect` must include a short code comment or PR note stating which external system it synchronizes with and why render logic, event handlers, React Query, or remounting were not sufficient.
+
+## React Compiler
+
+- React Compiler is enabled for `apps/dashboard` builds.
+- Follow the Rules of React; compiler optimizations are skipped when rules are violated.
+- Keep renders pure: do not cause side effects or mutate shared values during render.
+- Do not rely on `useMemo` or `useCallback` for correctness. They may still help readability or interoperability, but behavior must remain correct without them.

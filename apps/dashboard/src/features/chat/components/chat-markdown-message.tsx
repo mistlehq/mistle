@@ -1,17 +1,12 @@
-import { code } from "@streamdown/code";
-import { mermaid } from "@streamdown/mermaid";
 import { Streamdown } from "streamdown";
+
+import { StreamdownPlugins } from "./streamdown-plugins.js";
 
 type ChatMarkdownMessageProps = {
   className?: string;
   contentClassName?: string;
   isStreaming: boolean;
   text: string;
-};
-
-const StreamdownPlugins = {
-  code,
-  mermaid,
 };
 
 export function ChatMarkdownMessage(props: ChatMarkdownMessageProps): React.JSX.Element {
