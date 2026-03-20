@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import type { IntegrationCardViewModel } from "../integrations/directory-model.js";
 
@@ -34,6 +34,21 @@ export function useIntegrationDetailState(input: {
 
     return defaultConnection?.id ?? null;
   }, [selectedDetailConnections]);
+
+  useEffect(() => {
+    if (requestedDetailConnectionId === null) {
+      return;
+    }
+
+    const requestedConnectionStillExists = selectedDetailConnections.some(
+      (connection) => connection.id === requestedDetailConnectionId,
+    );
+    if (requestedConnectionStillExists) {
+      return;
+    }
+
+    setRequestedDetailConnectionId(null);
+  }, [requestedDetailConnectionId, selectedDetailConnections]);
 
   const activeDetailConnectionId = useMemo(() => {
     if (defaultConnectionId === null) {

@@ -158,27 +158,6 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
   });
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const webhookEventOptions = useMemo(
-    () =>
-      prerequisites.integrationDirectoryQuery.data === undefined
-        ? []
-        : buildWebhookAutomationEventOptions({
-            connections: prerequisites.integrationDirectoryQuery.data.connections,
-            targets: prerequisites.integrationDirectoryQuery.data.targets,
-            ...(automationQuery.data?.integrationConnectionId === undefined
-              ? {}
-              : { preservedConnectionId: automationQuery.data.integrationConnectionId }),
-            selectedTriggerIds: formValues.triggerIds,
-          }),
-    [
-      automationQuery.data?.integrationConnectionId,
-      (formValuesState?.sourceKey === formValuesSourceKey
-        ? formValuesState.value
-        : toWebhookAutomationFormValues(null)
-      ).triggerIds,
-      prerequisites.integrationDirectoryQuery.data,
-    ],
-  );
   const hydratedFormValues = useMemo(() => {
     if (input.mode === "create") {
       return toWebhookAutomationFormValues(null);
@@ -213,6 +192,24 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
   const fieldErrors =
     fieldErrorsState.sourceKey === formValuesSourceKey ? fieldErrorsState.value : {};
   const formError = formErrorState.sourceKey === formValuesSourceKey ? formErrorState.value : null;
+  const webhookEventOptions = useMemo(
+    () =>
+      prerequisites.integrationDirectoryQuery.data === undefined
+        ? []
+        : buildWebhookAutomationEventOptions({
+            connections: prerequisites.integrationDirectoryQuery.data.connections,
+            targets: prerequisites.integrationDirectoryQuery.data.targets,
+            ...(automationQuery.data?.integrationConnectionId === undefined
+              ? {}
+              : { preservedConnectionId: automationQuery.data.integrationConnectionId }),
+            selectedTriggerIds: formValues.triggerIds,
+          }),
+    [
+      automationQuery.data?.integrationConnectionId,
+      formValues.triggerIds,
+      prerequisites.integrationDirectoryQuery.data,
+    ],
+  );
 
   const createMutation = useMutation({
     mutationFn: async (values: WebhookAutomationFormValues) =>

@@ -85,6 +85,57 @@ describe("useIntegrationDetailState", () => {
 
     expect(result.current.activeDetailConnectionId).toBe("icn_active");
   });
+
+  it("does not restore a stale requested connection when it reappears later", () => {
+    const { result, rerender } = renderHook(
+      ({ nextCards }) =>
+        useIntegrationDetailState({
+          cards: nextCards,
+          detailTargetKey: "github",
+        }),
+      {
+        initialProps: {
+          nextCards: [
+            createCard({
+              targetKey: "github",
+              connections: [
+                createConnection({ id: "icn_error", status: "error" }),
+                createConnection({ id: "icn_active", status: "active" }),
+              ],
+            }),
+          ],
+        },
+      },
+    );
+
+    act(() => {
+      result.current.setActiveDetailConnectionId("icn_error");
+    });
+    expect(result.current.activeDetailConnectionId).toBe("icn_error");
+
+    rerender({
+      nextCards: [
+        createCard({
+          targetKey: "github",
+          connections: [createConnection({ id: "icn_active", status: "active" })],
+        }),
+      ],
+    });
+    expect(result.current.activeDetailConnectionId).toBe("icn_active");
+
+    rerender({
+      nextCards: [
+        createCard({
+          targetKey: "github",
+          connections: [
+            createConnection({ id: "icn_error", status: "error" }),
+            createConnection({ id: "icn_active", status: "active" }),
+          ],
+        }),
+      ],
+    });
+    expect(result.current.activeDetailConnectionId).toBe("icn_active");
+  });
 });
 
 function createConnection(input: {
