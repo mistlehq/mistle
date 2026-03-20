@@ -246,7 +246,11 @@ const dataPlaneGatewayEnvConfig = {
     url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle",
   },
   runtimeState: {
-    backend: "memory",
+    backend: "valkey",
+    valkey: {
+      url: "redis://127.0.0.1:6379",
+      keyPrefix: "mistle:runtime-state:integration",
+    },
   },
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5002",

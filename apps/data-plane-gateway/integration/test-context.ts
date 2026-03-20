@@ -205,7 +205,11 @@ export const it = vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture 
               url: runtimeDatabaseUrl,
             },
             runtimeState: {
-              backend: "memory",
+              backend: "valkey",
+              valkey: {
+                url: "redis://127.0.0.1:6379",
+                keyPrefix: "mistle:runtime-state:gateway-integration",
+              },
             },
             dataPlaneApi: {
               baseUrl: "http://127.0.0.1:5300",

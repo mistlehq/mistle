@@ -109,7 +109,11 @@ port = 5302
 url = "postgresql://mistle:mistle@127.0.0.1:5432/mistle"
 
 [apps.data_plane_gateway.runtime_state]
-backend = "memory"
+backend = "valkey"
+
+[apps.data_plane_gateway.runtime_state.valkey]
+url = "redis://127.0.0.1:6379"
+key_prefix = "mistle:runtime-state:fixture"
 
 [apps.data_plane_gateway.data_plane_api]
 base_url = "http://127.0.0.1:5300"

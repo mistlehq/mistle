@@ -41,7 +41,9 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "4",
       MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
-      MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "memory",
+      MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "valkey",
+      MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL: "redis://127.0.0.1:6379",
+      MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_KEY_PREFIX: "mistle:runtime-state:test",
       MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",
@@ -139,7 +141,11 @@ describe("convertEnvToTomlRecord", () => {
         },
         data_plane_gateway: {
           runtime_state: {
-            backend: "memory",
+            backend: "valkey",
+            valkey: {
+              url: "redis://127.0.0.1:6379",
+              key_prefix: "mistle:runtime-state:test",
+            },
           },
           data_plane_api: {
             base_url: "http://127.0.0.1:5300",
@@ -232,7 +238,11 @@ describe("convertTomlToEnvRecord", () => {
         },
         data_plane_gateway: {
           runtime_state: {
-            backend: "memory",
+            backend: "valkey",
+            valkey: {
+              url: "redis://127.0.0.1:6379",
+              key_prefix: "mistle:runtime-state:test",
+            },
           },
           data_plane_api: {
             base_url: "http://127.0.0.1:5300",
@@ -267,7 +277,9 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY: "2",
       MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL: "http://127.0.0.1:5100",
-      MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "memory",
+      MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND: "valkey",
+      MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL: "redis://127.0.0.1:6379",
+      MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_KEY_PREFIX: "mistle:runtime-state:test",
       MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",

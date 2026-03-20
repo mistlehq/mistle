@@ -112,7 +112,11 @@ port = 8084
 url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 
 [apps.data_plane_gateway.runtime_state]
-backend = "memory"
+backend = "valkey"
+
+[apps.data_plane_gateway.runtime_state.valkey]
+url = "redis://valkey:6379"
+key_prefix = "mistle:runtime-state"
 
 [apps.data_plane_gateway.data_plane_api]
 base_url = "http://data-plane-api:8082"

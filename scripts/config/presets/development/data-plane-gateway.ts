@@ -12,7 +12,11 @@ export const dataPlaneGatewayDevelopmentPreset = {
           url: "postgresql://mistle:mistle@127.0.0.1:5432/mistle_dev",
         },
         runtime_state: {
-          backend: "memory",
+          backend: "valkey",
+          valkey: {
+            url: "redis://127.0.0.1:6379",
+            key_prefix: "mistle:runtime-state:development",
+          },
         },
         data_plane_api: {
           base_url: "http://127.0.0.1:5200",
