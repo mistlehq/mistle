@@ -9,6 +9,8 @@ import {
 } from "@mistle/ui";
 import { ArrowCircleUpIcon, StopCircleIcon } from "@phosphor-icons/react";
 
+import { resolveSelectableValue } from "../../shared/select-value.js";
+
 const REASONING_EFFORT_OPTIONS = ["low", "medium", "high", "xhigh"] as const;
 
 type ChatComposerProps = {
@@ -78,9 +80,15 @@ export function ChatComposer({
       <ArrowCircleUpIcon aria-hidden="true" weight="fill" />
     );
   const isComposerConfigDisabled = !isConnected || isUpdatingComposerConfig;
+  const selectableModelValue = resolveSelectableValue({
+    selectedValue: selectedModel,
+    optionValues: modelOptions.map((option) => option.value),
+  });
   const selectedModelLabel = modelOptions.find((option) => option.value === selectedModel)?.label;
-  const selectedReasoningEffortValue =
-    REASONING_EFFORT_OPTIONS.find((option) => option === selectedReasoningEffort) ?? null;
+  const selectedReasoningEffortValue = resolveSelectableValue({
+    selectedValue: selectedReasoningEffort,
+    optionValues: REASONING_EFFORT_OPTIONS,
+  });
 
   return (
     <div className="bg-card flex flex-col gap-3 rounded-md border p-1 shadow-xs">
@@ -112,11 +120,11 @@ export function ChatComposer({
             disabled={isComposerConfigDisabled}
             onValueChange={(value) => {
               if (value === null) {
-                throw new Error("Model switcher returned a null value.");
+                return;
               }
               onModelChange(value);
             }}
-            value={selectedModel ?? ""}
+            value={selectableModelValue}
           >
             <SelectTrigger
               aria-label="Model switcher"
@@ -139,11 +147,11 @@ export function ChatComposer({
             disabled={isComposerConfigDisabled}
             onValueChange={(value) => {
               if (value === null) {
-                throw new Error("Reasoning switcher returned a null value.");
+                return;
               }
               onReasoningEffortChange(value);
             }}
-            value={selectedReasoningEffort ?? ""}
+            value={selectedReasoningEffortValue}
           >
             <SelectTrigger
               aria-label="Reasoning switcher"

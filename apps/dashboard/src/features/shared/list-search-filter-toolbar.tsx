@@ -1,6 +1,8 @@
 import { Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@mistle/ui";
 import { MagnifyingGlassIcon } from "@phosphor-icons/react";
 
+import { resolveSelectableValue } from "./select-value.js";
+
 export type ListSearchFilterToolbarOption = {
   value: string;
   label: string;
@@ -46,12 +48,15 @@ export function ListSearchFilterToolbar(input: {
       <Select
         onValueChange={(nextValue) => {
           if (nextValue === null) {
-            throw new Error("List search filter toolbar value must not be null.");
+            return;
           }
 
           input.onFilterValueChange(nextValue);
         }}
-        value={input.filterValue}
+        value={resolveSelectableValue({
+          selectedValue: input.filterValue,
+          optionValues: input.filterOptions.map((filterOption) => filterOption.value),
+        })}
       >
         <SelectTrigger
           aria-label={input.filterAriaLabel}

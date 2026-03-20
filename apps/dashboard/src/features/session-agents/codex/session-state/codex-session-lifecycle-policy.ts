@@ -7,10 +7,6 @@ import { selectPreferredThreadId } from "../../../sessions/thread-selection.js";
 
 export type CodexConnectionThreadStrategy =
   | {
-      type: "reuse_loaded";
-      threadId: string;
-    }
-  | {
       type: "resume";
       threadId: string;
     }
@@ -40,20 +36,7 @@ export function resolveCodexConnectionStateTransition(input: {
 
 export function selectCodexConnectionThreadStrategy(input: {
   availableThreads: readonly CodexThreadSummary[];
-  loadedThreadIds: readonly string[];
 }): CodexConnectionThreadStrategy {
-  const preferredLoadedThreadId = selectPreferredThreadId({
-    availableThreads: input.availableThreads,
-    loadedThreadIds: input.loadedThreadIds,
-  });
-
-  if (preferredLoadedThreadId !== null && input.loadedThreadIds.includes(preferredLoadedThreadId)) {
-    return {
-      type: "reuse_loaded",
-      threadId: preferredLoadedThreadId,
-    };
-  }
-
   const preferredThreadId = selectPreferredThreadId({
     availableThreads: input.availableThreads,
     loadedThreadIds: [],
