@@ -1,8 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
-import { useWebhookAutomationPrerequisites } from "./use-webhook-automation-prerequisites.js";
+import type {
+  IntegrationConnection,
+  IntegrationTarget,
+} from "../integrations/integrations-service.js";
 import {
   toCreateWebhookAutomationPayload,
   toUpdateWebhookAutomationPayload,
@@ -19,44 +22,37 @@ import {
   createWebhookAutomationTriggerId,
 } from "./webhook-automation-list-helpers.js";
 import { resolveSelectedWebhookAutomationEventOptions } from "./webhook-automation-trigger-picker.js";
-import {
-  AUTOMATIONS_QUERY_KEY_PREFIX,
-  webhookAutomationDetailQueryKey,
-} from "./webhook-automations-query-keys.js";
+import { AUTOMATIONS_QUERY_KEY_PREFIX } from "./webhook-automations-query-keys.js";
 import {
   createWebhookAutomation,
   deleteWebhookAutomation,
-  getWebhookAutomation,
   updateWebhookAutomation,
 } from "./webhook-automations-service.js";
+import type { WebhookAutomation } from "./webhook-automations-types.js";
 
 type NavigateFunction = (to: string) => void | Promise<void>;
 
-type UseWebhookAutomationEditorStateInput = {
+type DirectoryData = {
+  connections: readonly IntegrationConnection[];
+  targets: readonly IntegrationTarget[];
+};
+
+type WebhookAutomationOption = {
+  value: string;
+  label: string;
+  description?: string;
+};
+
+type LoadedWebhookAutomationEditorStateInput = {
   mode: "create" | "edit";
   automationId: string | undefined;
   navigate: NavigateFunction;
+  initialValues: WebhookAutomationFormValues;
+  connectionOptions: readonly WebhookAutomationOption[];
+  sandboxProfileOptions: readonly WebhookAutomationOption[];
+  directoryData: DirectoryData;
+  preservedConnectionId?: string;
 };
-
-function newWebhookAutomationDetailQueryKey(): readonly [
-  "automations",
-  "webhooks",
-  "detail",
-  "new",
-] {
-  return ["automations", "webhooks", "detail", "new"];
-}
-
-type KeyedValue<T> = {
-  sourceKey: string;
-  value: T;
-};
-
-type WebhookAutomationEditorState = KeyedValue<{
-  formValues: WebhookAutomationFormValues;
-  fieldErrors: Partial<Record<keyof WebhookAutomationFormValues, string>>;
-  formError: string | null;
-}>;
 
 function resolveNormalizedConversationKeyTemplate(input: {
   values: WebhookAutomationFormValues;
@@ -91,26 +87,38 @@ function resolveNormalizedConversationKeyTemplate(input: {
   return input.values.conversationKeyTemplate;
 }
 
-export function useWebhookAutomationEditorState(input: UseWebhookAutomationEditorStateInput): {
-  connectionOptions: readonly {
-    value: string;
-    label: string;
-    description?: string;
-  }[];
-  sandboxProfileOptions: readonly {
-    value: string;
-    label: string;
-    description?: string;
-  }[];
+export function resolveWebhookAutomationEditInitialValues(input: {
+  automation: WebhookAutomation;
+  directoryData: DirectoryData;
+}): WebhookAutomationFormValues {
+  const automationTriggerIds = (input.automation.eventTypes ?? []).map((eventType) =>
+    createWebhookAutomationTriggerId({
+      connectionId: input.automation.integrationConnectionId,
+      eventType,
+    }),
+  );
+  const hydrationEventOptions = buildWebhookAutomationEventOptions({
+    connections: input.directoryData.connections,
+    targets: input.directoryData.targets,
+    preservedConnectionId: input.automation.integrationConnectionId,
+    selectedTriggerIds: automationTriggerIds,
+  });
+
+  return toWebhookAutomationFormValues(input.automation, hydrationEventOptions);
+}
+
+export function useLoadedWebhookAutomationEditorState(
+  input: LoadedWebhookAutomationEditorStateInput,
+): {
+  connectionOptions: readonly WebhookAutomationOption[];
+  sandboxProfileOptions: readonly WebhookAutomationOption[];
   webhookEventOptions: readonly WebhookAutomationEventOption[];
   values: WebhookAutomationFormValues;
   fieldErrors: Partial<Record<keyof WebhookAutomationFormValues, string>>;
   formError: string | null;
-  pageError: string | null;
   deleteError: string | null;
   isDeleteDialogOpen: boolean;
   isDeleting: boolean;
-  isLoadingInitialData: boolean;
   isSaving: boolean;
   onDeleteDialogOpenChange: (isOpen: boolean) => void;
   onRequestDelete: (() => void) | null;
@@ -122,87 +130,25 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
   ) => void;
 } {
   const queryClient = useQueryClient();
-  const automationQuery = useQuery({
-    queryKey:
-      input.automationId === undefined
-        ? newWebhookAutomationDetailQueryKey()
-        : webhookAutomationDetailQueryKey(input.automationId),
-    queryFn: async ({ signal }) => {
-      if (input.automationId === undefined) {
-        throw new Error("Automation id is required.");
-      }
-
-      return getWebhookAutomation({
-        automationId: input.automationId,
-        signal,
-      });
-    },
-    enabled: input.mode === "edit" && input.automationId !== undefined,
-    retry: false,
-  });
-
-  const prerequisites = useWebhookAutomationPrerequisites(
-    automationQuery.data === undefined
-      ? undefined
-      : {
-          preservedConnectionId: automationQuery.data.integrationConnectionId,
-        },
-  );
-  const formValuesSourceKey =
-    input.mode === "edit" ? `edit:${input.automationId ?? "missing"}` : "create";
-  const [editorState, setEditorState] = useState<WebhookAutomationEditorState | null>(null);
+  const [formValues, setFormValues] = useState(input.initialValues);
+  const [fieldErrors, setFieldErrors] = useState<
+    Partial<Record<keyof WebhookAutomationFormValues, string>>
+  >({});
+  const [formError, setFormError] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  const hydratedFormValues = useMemo(() => {
-    if (input.mode === "create") {
-      return toWebhookAutomationFormValues(null);
-    }
 
-    if (
-      automationQuery.data === undefined ||
-      prerequisites.integrationDirectoryQuery.data === undefined
-    ) {
-      return null;
-    }
-
-    const automationTriggerIds = (automationQuery.data.eventTypes ?? []).map((eventType) =>
-      createWebhookAutomationTriggerId({
-        connectionId: automationQuery.data.integrationConnectionId,
-        eventType,
-      }),
-    );
-    const hydrationEventOptions = buildWebhookAutomationEventOptions({
-      connections: prerequisites.integrationDirectoryQuery.data.connections,
-      targets: prerequisites.integrationDirectoryQuery.data.targets,
-      preservedConnectionId: automationQuery.data.integrationConnectionId,
-      selectedTriggerIds: automationTriggerIds,
-    });
-
-    return toWebhookAutomationFormValues(automationQuery.data, hydrationEventOptions);
-  }, [automationQuery.data, input.mode, prerequisites.integrationDirectoryQuery.data]);
-  const currentEditorState =
-    editorState?.sourceKey === formValuesSourceKey ? editorState.value : null;
-  const formValues =
-    currentEditorState?.formValues ?? hydratedFormValues ?? toWebhookAutomationFormValues(null);
-  const fieldErrors = currentEditorState?.fieldErrors ?? {};
-  const formError = currentEditorState?.formError ?? null;
   const webhookEventOptions = useMemo(
     () =>
-      prerequisites.integrationDirectoryQuery.data === undefined
-        ? []
-        : buildWebhookAutomationEventOptions({
-            connections: prerequisites.integrationDirectoryQuery.data.connections,
-            targets: prerequisites.integrationDirectoryQuery.data.targets,
-            ...(automationQuery.data?.integrationConnectionId === undefined
-              ? {}
-              : { preservedConnectionId: automationQuery.data.integrationConnectionId }),
-            selectedTriggerIds: formValues.triggerIds,
-          }),
-    [
-      automationQuery.data?.integrationConnectionId,
-      formValues.triggerIds,
-      prerequisites.integrationDirectoryQuery.data,
-    ],
+      buildWebhookAutomationEventOptions({
+        connections: input.directoryData.connections,
+        targets: input.directoryData.targets,
+        ...(input.preservedConnectionId === undefined
+          ? {}
+          : { preservedConnectionId: input.preservedConnectionId }),
+        selectedTriggerIds: formValues.triggerIds,
+      }),
+    [formValues.triggerIds, input.directoryData, input.preservedConnectionId],
   );
 
   const createMutation = useMutation({
@@ -211,31 +157,19 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
         payload: toCreateWebhookAutomationPayload(values, webhookEventOptions),
       }),
     onSuccess: async (automation) => {
-      setEditorState({
-        sourceKey: formValuesSourceKey,
-        value: {
-          formValues,
-          fieldErrors,
-          formError: null,
-        },
-      });
+      setFormError(null);
       await queryClient.invalidateQueries({
         queryKey: AUTOMATIONS_QUERY_KEY_PREFIX,
       });
       await input.navigate(`/automations/${automation.id}`);
     },
     onError: (error: unknown) => {
-      setEditorState({
-        sourceKey: formValuesSourceKey,
-        value: {
-          formValues,
-          fieldErrors,
-          formError: resolveApiErrorMessage({
-            error,
-            fallbackMessage: "Could not create automation.",
-          }),
-        },
-      });
+      setFormError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not create automation.",
+        }),
+      );
     },
   });
 
@@ -253,30 +187,20 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
       });
     },
     onSuccess: async (automation) => {
-      setEditorState({
-        sourceKey: formValuesSourceKey,
-        value: {
-          formValues: toWebhookAutomationFormValues(automation, webhookEventOptions),
-          fieldErrors: {},
-          formError: null,
-        },
-      });
+      setFormValues(toWebhookAutomationFormValues(automation, webhookEventOptions));
+      setFieldErrors({});
+      setFormError(null);
       await queryClient.invalidateQueries({
         queryKey: AUTOMATIONS_QUERY_KEY_PREFIX,
       });
     },
     onError: (error: unknown) => {
-      setEditorState({
-        sourceKey: formValuesSourceKey,
-        value: {
-          formValues,
-          fieldErrors,
-          formError: resolveApiErrorMessage({
-            error,
-            fallbackMessage: "Could not update automation.",
-          }),
-        },
-      });
+      setFormError(
+        resolveApiErrorMessage({
+          error,
+          fallbackMessage: "Could not update automation.",
+        }),
+      );
     },
   });
 
@@ -321,29 +245,19 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
         eventOptions: webhookEventOptions,
       });
     }
-    setEditorState({
-      sourceKey: formValuesSourceKey,
-      value: {
-        formValues: nextValues,
-        fieldErrors: {
-          ...fieldErrors,
-          [key]: undefined,
-        },
-        formError: null,
-      },
-    });
+
+    setFormValues(nextValues);
+    setFieldErrors((currentErrors) => ({
+      ...currentErrors,
+      [key]: undefined,
+    }));
+    setFormError(null);
   }
 
-  function submitForm(): void {
+  function onSubmit(): void {
     const nextFieldErrors = validateWebhookAutomationFormValues(formValues, webhookEventOptions);
-    setEditorState({
-      sourceKey: formValuesSourceKey,
-      value: {
-        formValues,
-        fieldErrors: nextFieldErrors,
-        formError: null,
-      },
-    });
+    setFieldErrors(nextFieldErrors);
+    setFormError(null);
 
     if (Object.keys(nextFieldErrors).length > 0) {
       return;
@@ -366,38 +280,21 @@ export function useWebhookAutomationEditorState(input: UseWebhookAutomationEdito
     deleteMutation.mutate();
   }
 
-  const isLoadingInitialData =
-    prerequisites.isPending || (input.mode === "edit" && automationQuery.isPending);
-
-  const pageError =
-    prerequisites.errorMessage !== null || automationQuery.isError
-      ? resolveApiErrorMessage({
-          error: automationQuery.error,
-          fallbackMessage:
-            prerequisites.errorMessage ??
-            (input.mode === "edit"
-              ? "Could not load automation."
-              : "Could not load automation form."),
-        })
-      : null;
-
   return {
-    connectionOptions: prerequisites.connectionOptions,
-    sandboxProfileOptions: prerequisites.sandboxProfileOptions,
+    connectionOptions: input.connectionOptions,
+    sandboxProfileOptions: input.sandboxProfileOptions,
     webhookEventOptions,
     values: formValues,
     fieldErrors,
     formError,
-    pageError,
     deleteError,
     isDeleteDialogOpen,
     isDeleting: deleteMutation.isPending,
-    isLoadingInitialData,
     isSaving: createMutation.isPending || updateMutation.isPending,
     onDeleteDialogOpenChange: setIsDeleteDialogOpen,
     onRequestDelete: input.mode === "edit" ? requestDelete : null,
     onConfirmDelete: confirmDelete,
-    onSubmit: submitForm,
+    onSubmit,
     onValueChange,
   };
 }

@@ -12,55 +12,31 @@ type SandboxProfileEditorFormState = {
   displayName: string;
 };
 
-type UseSandboxProfileMetaStateInput = {
-  mode: "create" | "edit";
-  profileId: string | undefined;
-  loadedProfile:
-    | {
-        displayName: string;
-      }
-    | undefined;
+type CommonInput = {
   navigate: (to: string) => void | Promise<void>;
   invalidateSandboxProfiles: () => Promise<void>;
+};
+
+type EditInput = CommonInput & {
+  profileId: string;
+  loadedProfile: {
+    displayName: string;
+  };
   invalidateProfileDetail: (profileId: string) => Promise<void>;
 };
 
-type KeyedValue<T> = {
-  sourceKey: string;
-  value: T;
-};
-
-type SandboxProfileMetaEditorState = KeyedValue<{
-  displayName: string;
-  persistedDisplayName: string;
-  profileNameDraft: string;
-}>;
-
-export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInput): {
+export function useCreateSandboxProfileMetaState(input: CommonInput): {
   formState: SandboxProfileEditorFormState;
   saveError: string | null;
   pageTitle: string;
   isDisplayNameInvalid: boolean;
-  isEditingProfileName: boolean;
-  profileNameDraft: string;
   isCreating: boolean;
-  isUpdating: boolean;
   onDisplayNameChange: (nextValue: string) => void;
-  onProfileNameEditStart: () => void;
-  onProfileNameDraftChange: (nextValue: string) => void;
-  onProfileNameEditCancel: () => void;
-  onProfileNameEditCommit: () => void;
   onCreate: () => void;
   onCancelCreate: () => void;
 } {
-  const metaSourceKey = input.mode === "edit" ? `edit:${input.profileId ?? "missing"}` : "create";
-  const [editorState, setEditorState] = useState<SandboxProfileMetaEditorState | null>(null);
+  const [displayName, setDisplayName] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [isEditingProfileName, setIsEditingProfileName] = useState(false);
-  const persistedDisplayName = input.loadedProfile?.displayName ?? "";
-  const currentEditorState = editorState?.sourceKey === metaSourceKey ? editorState.value : null;
-  const displayName = currentEditorState?.displayName ?? persistedDisplayName;
-  const profileNameDraft = currentEditorState?.profileNameDraft ?? displayName;
 
   const createMutation = useMutation({
     mutationFn: async (createInput: SandboxProfileEditorFormState) =>
@@ -84,6 +60,56 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
     },
   });
 
+  const trimmedDisplayName = displayName.trim();
+
+  function onCreate(): void {
+    if (trimmedDisplayName.length === 0 || createMutation.isPending) {
+      return;
+    }
+
+    createMutation.mutate({
+      displayName: trimmedDisplayName,
+    });
+  }
+
+  return {
+    formState: {
+      displayName,
+    },
+    saveError,
+    pageTitle: "Create Profile",
+    isDisplayNameInvalid: trimmedDisplayName.length === 0,
+    isCreating: createMutation.isPending,
+    onDisplayNameChange: (nextValue) => {
+      setDisplayName(nextValue);
+      setSaveError(null);
+    },
+    onCreate,
+    onCancelCreate: () => {
+      void input.navigate("/sandbox-profiles");
+    },
+  };
+}
+
+export function useEditSandboxProfileMetaState(input: EditInput): {
+  formState: SandboxProfileEditorFormState;
+  saveError: string | null;
+  pageTitle: string;
+  isEditingProfileName: boolean;
+  profileNameDraft: string;
+  isUpdating: boolean;
+  onDisplayNameChange: (nextValue: string) => void;
+  onProfileNameEditStart: () => void;
+  onProfileNameDraftChange: (nextValue: string) => void;
+  onProfileNameEditCancel: () => void;
+  onProfileNameEditCommit: () => void;
+} {
+  const [displayName, setDisplayName] = useState(input.loadedProfile.displayName);
+  const [persistedDisplayName, setPersistedDisplayName] = useState(input.loadedProfile.displayName);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isEditingProfileName, setIsEditingProfileName] = useState(false);
+  const [profileNameDraft, setProfileNameDraft] = useState(input.loadedProfile.displayName);
+
   const updateMutation = useMutation({
     mutationFn: async (updateInput: {
       profileId: string;
@@ -99,14 +125,9 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
       }),
     onSuccess: async (updatedProfile, variables) => {
       if (variables.changes.displayName !== undefined) {
-        setEditorState({
-          sourceKey: metaSourceKey,
-          value: {
-            displayName: updatedProfile.displayName,
-            persistedDisplayName: updatedProfile.displayName,
-            profileNameDraft: updatedProfile.displayName,
-          },
-        });
+        setDisplayName(updatedProfile.displayName);
+        setPersistedDisplayName(updatedProfile.displayName);
+        setProfileNameDraft(updatedProfile.displayName);
       }
       setSaveError(null);
 
@@ -124,61 +145,10 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
   });
 
   const trimmedDisplayName = displayName.trim();
-  const editTitleProfileName =
-    trimmedDisplayName.length > 0 ? trimmedDisplayName : (input.profileId ?? "Profile");
-
-  function onDisplayNameChange(nextValue: string): void {
-    setEditorState({
-      sourceKey: metaSourceKey,
-      value: {
-        displayName: nextValue,
-        persistedDisplayName,
-        profileNameDraft,
-      },
-    });
-    setSaveError(null);
-  }
-
-  function onProfileNameEditStart(): void {
-    setEditorState({
-      sourceKey: metaSourceKey,
-      value: {
-        displayName,
-        persistedDisplayName,
-        profileNameDraft: displayName,
-      },
-    });
-    setIsEditingProfileName(true);
-    setSaveError(null);
-  }
-
-  function onProfileNameDraftChange(nextValue: string): void {
-    setEditorState({
-      sourceKey: metaSourceKey,
-      value: {
-        displayName,
-        persistedDisplayName,
-        profileNameDraft: nextValue,
-      },
-    });
-    setSaveError(null);
-  }
-
-  function onProfileNameEditCancel(): void {
-    setEditorState({
-      sourceKey: metaSourceKey,
-      value: {
-        displayName,
-        persistedDisplayName,
-        profileNameDraft: displayName,
-      },
-    });
-    setIsEditingProfileName(false);
-    setSaveError(null);
-  }
+  const editTitleProfileName = trimmedDisplayName.length > 0 ? trimmedDisplayName : input.profileId;
 
   function onProfileNameEditCommit(): void {
-    if (input.mode !== "edit" || input.profileId === undefined || updateMutation.isPending) {
+    if (updateMutation.isPending) {
       setIsEditingProfileName(false);
       return;
     }
@@ -189,25 +159,11 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
     });
     setIsEditingProfileName(false);
     if (decision.action === "revert") {
-      setEditorState({
-        sourceKey: metaSourceKey,
-        value: {
-          displayName,
-          persistedDisplayName,
-          profileNameDraft: persistedDisplayName,
-        },
-      });
+      setProfileNameDraft(persistedDisplayName);
       return;
     }
 
-    setEditorState({
-      sourceKey: metaSourceKey,
-      value: {
-        displayName: decision.displayName,
-        persistedDisplayName,
-        profileNameDraft,
-      },
-    });
+    setDisplayName(decision.displayName);
 
     if (decision.action === "noop") {
       return;
@@ -221,39 +177,33 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
     });
   }
 
-  function onCreate(): void {
-    if (trimmedDisplayName.length === 0 || createMutation.isPending) {
-      return;
-    }
-
-    createMutation.mutate({
-      displayName: trimmedDisplayName,
-    });
-  }
-
-  function onCancelCreate(): void {
-    void input.navigate("/sandbox-profiles");
-  }
-
-  const formState: SandboxProfileEditorFormState = {
-    displayName,
-  };
-
   return {
-    formState,
+    formState: {
+      displayName,
+    },
     saveError,
-    pageTitle: input.mode === "create" ? "Create Profile" : editTitleProfileName,
-    isDisplayNameInvalid: trimmedDisplayName.length === 0,
+    pageTitle: editTitleProfileName,
     isEditingProfileName,
     profileNameDraft,
-    isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
-    onDisplayNameChange,
-    onProfileNameEditStart,
-    onProfileNameDraftChange,
-    onProfileNameEditCancel,
+    onDisplayNameChange: (nextValue) => {
+      setDisplayName(nextValue);
+      setSaveError(null);
+    },
+    onProfileNameEditStart: () => {
+      setProfileNameDraft(displayName);
+      setIsEditingProfileName(true);
+      setSaveError(null);
+    },
+    onProfileNameDraftChange: (nextValue) => {
+      setProfileNameDraft(nextValue);
+      setSaveError(null);
+    },
+    onProfileNameEditCancel: () => {
+      setProfileNameDraft(displayName);
+      setIsEditingProfileName(false);
+      setSaveError(null);
+    },
     onProfileNameEditCommit,
-    onCreate,
-    onCancelCreate,
   };
 }
