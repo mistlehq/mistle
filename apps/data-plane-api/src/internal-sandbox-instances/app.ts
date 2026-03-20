@@ -18,6 +18,7 @@ import {
 import {
   ResumeSandboxInstanceWorkflowSpec,
   StartSandboxInstanceWorkflowSpec,
+  StopSandboxInstanceWorkflowSpec,
 } from "@mistle/workflow-registry/data-plane";
 import { sql } from "drizzle-orm";
 import { typeid } from "typeid-js";
@@ -35,10 +36,13 @@ import {
   internalListSandboxInstancesRoute,
   internalResumeSandboxInstanceRoute,
   internalStartSandboxInstanceRoute,
+  internalStopSandboxInstanceRoute,
   InternalSandboxInstancesErrorResponseSchema,
   ListSandboxInstancesResponseSchema,
   ResumeSandboxInstanceAcceptedResponseSchema,
   ResumeSandboxInstanceInputValidationSchema,
+  StopSandboxInstanceAcceptedResponseSchema,
+  StopSandboxInstanceInputValidationSchema,
   StartSandboxInstanceAcceptedResponseSchema,
   StartSandboxInstanceInputValidationSchema,
 } from "./contracts.js";
@@ -122,6 +126,19 @@ function createResumeSandboxIdempotencyKey(
     sandboxInstanceId: input.instanceId,
     action: "resume",
     idempotencyKey,
+  });
+}
+
+function createStopSandboxIdempotencyKey(
+  input: z.infer<typeof StopSandboxInstanceInputValidationSchema>,
+): string {
+  return JSON.stringify({
+    version: 1,
+    sandboxInstanceId: input.sandboxInstanceId,
+    action: "stop",
+    stopReason: input.stopReason,
+    expectedOwnerLeaseId: input.expectedOwnerLeaseId,
+    idempotencyKey: input.idempotencyKey,
   });
 }
 
@@ -269,6 +286,27 @@ export function createInternalSandboxInstancesApp(): AppRoutes<
     const responseBody: z.infer<typeof ResumeSandboxInstanceAcceptedResponseSchema> = {
       status: "accepted",
       sandboxInstanceId: body.instanceId,
+      workflowRunId: workflowRunHandle.workflowRun.id,
+    };
+
+    return ctx.json(responseBody, 200);
+  });
+
+  routes.openapi(internalStopSandboxInstanceRoute, async (ctx) => {
+    const body = ctx.req.valid("json");
+    const workflowRunHandle = await ctx.get("resources").openWorkflow.runWorkflow(
+      StopSandboxInstanceWorkflowSpec,
+      {
+        sandboxInstanceId: body.sandboxInstanceId,
+      },
+      {
+        idempotencyKey: createStopSandboxIdempotencyKey(body),
+      },
+    );
+
+    const responseBody: z.infer<typeof StopSandboxInstanceAcceptedResponseSchema> = {
+      status: "accepted",
+      sandboxInstanceId: body.sandboxInstanceId,
       workflowRunId: workflowRunHandle.workflowRun.id,
     };
 

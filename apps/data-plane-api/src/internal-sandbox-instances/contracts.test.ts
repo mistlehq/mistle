@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ResumeSandboxInstanceInputValidationSchema,
+  StopSandboxInstanceInputValidationSchema,
   StartSandboxInstanceInputValidationSchema,
 } from "./contracts.js";
 
@@ -170,5 +171,39 @@ describe("ResumeSandboxInstanceInputValidationSchema", () => {
     };
 
     expect(ResumeSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
+  });
+});
+
+describe("StopSandboxInstanceInputValidationSchema", () => {
+  it("accepts a valid stop request", () => {
+    const input = {
+      sandboxInstanceId: "sbi_123",
+      stopReason: "idle",
+      expectedOwnerLeaseId: "sol_123",
+      idempotencyKey: "stop-idempotency-123",
+    };
+
+    expect(StopSandboxInstanceInputValidationSchema.parse(input)).toEqual(input);
+  });
+
+  it("requires an explicit idempotency key", () => {
+    const result = StopSandboxInstanceInputValidationSchema.safeParse({
+      sandboxInstanceId: "sbi_123",
+      stopReason: "disconnected",
+      expectedOwnerLeaseId: "sol_123",
+    });
+
+    expect(result.success).toBe(false);
+    if (result.success) {
+      throw new Error("Expected stop request validation to fail.");
+    }
+
+    expect(result.error.issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          path: ["idempotencyKey"],
+        }),
+      ]),
+    );
   });
 });
