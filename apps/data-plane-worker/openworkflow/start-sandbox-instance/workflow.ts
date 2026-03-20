@@ -341,7 +341,7 @@ export const StartSandboxInstanceWorkflow = defineWorkflow(
         async () => {
           return waitForSandboxTunnelReadiness(
             {
-              db: ctx.db,
+              runtimeStateReader: ctx.runtimeStateReader,
               policy: ctx.tunnelReadinessPolicy,
               clock: ctx.clock,
               sleeper: ctx.sleeper,

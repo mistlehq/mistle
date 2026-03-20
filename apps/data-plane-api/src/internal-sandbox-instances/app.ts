@@ -298,6 +298,8 @@ export function createInternalSandboxInstancesApp(): AppRoutes<
       StopSandboxInstanceWorkflowSpec,
       {
         sandboxInstanceId: body.sandboxInstanceId,
+        stopReason: body.stopReason,
+        expectedOwnerLeaseId: body.expectedOwnerLeaseId,
       },
       {
         idempotencyKey: createStopSandboxIdempotencyKey(body),

@@ -47,10 +47,6 @@ describe("convertEnvToTomlRecord", () => {
       MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",
-      MISTLE_APPS_DATA_PLANE_WORKER_REAPER_POLL_INTERVAL_SECONDS: "30",
-      MISTLE_APPS_DATA_PLANE_WORKER_REAPER_IDLE_TIMEOUT_SECONDS: "300",
-      MISTLE_APPS_DATA_PLANE_WORKER_REAPER_EXECUTION_LEASE_FRESHNESS_SECONDS: "30",
-      MISTLE_APPS_DATA_PLANE_WORKER_REAPER_TUNNEL_DISCONNECT_GRACE_SECONDS: "60",
       MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5202",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
         "http://127.0.0.1:5100/tokenizer-proxy/egress",
@@ -125,12 +121,6 @@ describe("convertEnvToTomlRecord", () => {
           tunnel: {
             bootstrap_token_ttl_seconds: 120,
             exchange_token_ttl_seconds: 3600,
-          },
-          reaper: {
-            poll_interval_seconds: 30,
-            idle_timeout_seconds: 300,
-            execution_lease_freshness_seconds: 30,
-            tunnel_disconnect_grace_seconds: 60,
           },
           runtime_state: {
             gateway_base_url: "http://127.0.0.1:5202",
@@ -223,12 +213,6 @@ describe("convertTomlToEnvRecord", () => {
             bootstrap_token_ttl_seconds: 120,
             exchange_token_ttl_seconds: 3600,
           },
-          reaper: {
-            poll_interval_seconds: 30,
-            idle_timeout_seconds: 300,
-            execution_lease_freshness_seconds: 30,
-            tunnel_disconnect_grace_seconds: 60,
-          },
           runtime_state: {
             gateway_base_url: "http://127.0.0.1:5202",
           },
@@ -283,10 +267,6 @@ describe("convertTomlToEnvRecord", () => {
       MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL: "http://127.0.0.1:5300",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS: "120",
       MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS: "3600",
-      MISTLE_APPS_DATA_PLANE_WORKER_REAPER_POLL_INTERVAL_SECONDS: "30",
-      MISTLE_APPS_DATA_PLANE_WORKER_REAPER_IDLE_TIMEOUT_SECONDS: "300",
-      MISTLE_APPS_DATA_PLANE_WORKER_REAPER_EXECUTION_LEASE_FRESHNESS_SECONDS: "30",
-      MISTLE_APPS_DATA_PLANE_WORKER_REAPER_TUNNEL_DISCONNECT_GRACE_SECONDS: "60",
       MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL: "http://127.0.0.1:5202",
       MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL:
         "http://127.0.0.1:5100/tokenizer-proxy/egress",

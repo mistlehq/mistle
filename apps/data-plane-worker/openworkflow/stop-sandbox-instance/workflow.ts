@@ -18,9 +18,13 @@ export const StopSandboxInstanceWorkflow = defineWorkflow(
           config: ctx.config,
           db: ctx.db,
           sandboxAdapter: ctx.sandboxAdapter,
+          runtimeStateReader: ctx.runtimeStateReader,
+          clock: ctx.clock,
         },
         {
           sandboxInstanceId: input.sandboxInstanceId,
+          stopReason: input.stopReason,
+          expectedOwnerLeaseId: input.expectedOwnerLeaseId,
         },
       );
     });

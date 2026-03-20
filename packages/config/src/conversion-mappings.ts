@@ -356,26 +356,6 @@ export const configEnvTomlMappings: readonly ConfigEnvTomlMapping[] = [
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS",
   },
   {
-    configPath: ["apps", "data_plane_worker", "reaper", "pollIntervalSeconds"],
-    tomlPath: ["apps", "data_plane_worker", "reaper", "poll_interval_seconds"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_POLL_INTERVAL_SECONDS",
-  },
-  {
-    configPath: ["apps", "data_plane_worker", "reaper", "idleTimeoutSeconds"],
-    tomlPath: ["apps", "data_plane_worker", "reaper", "idle_timeout_seconds"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_IDLE_TIMEOUT_SECONDS",
-  },
-  {
-    configPath: ["apps", "data_plane_worker", "reaper", "executionLeaseFreshnessSeconds"],
-    tomlPath: ["apps", "data_plane_worker", "reaper", "execution_lease_freshness_seconds"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_EXECUTION_LEASE_FRESHNESS_SECONDS",
-  },
-  {
-    configPath: ["apps", "data_plane_worker", "reaper", "tunnelDisconnectGraceSeconds"],
-    tomlPath: ["apps", "data_plane_worker", "reaper", "tunnel_disconnect_grace_seconds"],
-    envVar: "MISTLE_APPS_DATA_PLANE_WORKER_REAPER_TUNNEL_DISCONNECT_GRACE_SECONDS",
-  },
-  {
     configPath: ["apps", "data_plane_worker", "runtimeState", "gatewayBaseUrl"],
     tomlPath: ["apps", "data_plane_worker", "runtime_state", "gateway_base_url"],
     envVar: "MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL",

@@ -10,6 +10,8 @@ export const ResumeSandboxInstanceWorkflowVersion = "1";
 export const StopSandboxInstanceWorkflowName = "data-plane.sandbox-instances.stop";
 export const StopSandboxInstanceWorkflowVersion = "1";
 
+export type SandboxStopReason = "idle" | "disconnected";
+
 export type StartSandboxInstanceWorkflowImageInput = Pick<
   SandboxImageHandle,
   "imageId" | "createdAt"
@@ -60,6 +62,8 @@ export const ResumeSandboxInstanceWorkflowSpec = defineWorkflowSpec<
 
 export type StopSandboxInstanceWorkflowInput = {
   sandboxInstanceId: string;
+  stopReason: SandboxStopReason;
+  expectedOwnerLeaseId: string;
 };
 
 export type StopSandboxInstanceWorkflowOutput = {

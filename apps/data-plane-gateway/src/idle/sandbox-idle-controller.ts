@@ -3,14 +3,16 @@ import type { Clock, Scheduler, TimerHandle } from "@mistle/time";
 import { logger } from "../logger.js";
 import type { SandboxActivityStore } from "../runtime-state/sandbox-activity-store.js";
 import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
+import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
 import type { SandboxOwnerStore } from "../tunnel/ownership/sandbox-owner-store.js";
+import type { StopSandboxRequester } from "./stop-sandbox-requester.js";
 
 /**
  * Constructor dependencies for an owner-local idle controller.
  *
- * The controller is responsible for one sandbox instance and one owner lease.
- * The controller currently owns local idle and disconnect-grace timing. Stop
- * execution is wired in a later PR.
+ * The controller is responsible for one sandbox instance and one fenced owner
+ * lease, including local idle timing, disconnect-grace handling, and stop
+ * request initiation.
  */
 export type SandboxIdleControllerDependencies = {
   sandboxInstanceId: string;
@@ -22,6 +24,8 @@ export type SandboxIdleControllerDependencies = {
   ownerStore: SandboxOwnerStore;
   activityStore: SandboxActivityStore;
   presenceStore: SandboxPresenceStore;
+  runtimeAttachmentStore: SandboxRuntimeAttachmentStore;
+  stopRequester: StopSandboxRequester;
 };
 
 /**
@@ -85,16 +89,14 @@ export type SandboxIdleControllerDisposeHandler = () => void;
 /**
  * Owner-local idle controller that manages one in-memory timer chain.
  *
- * In this PR the controller only logs when idle deadlines or disconnect-grace
- * timers elapse. Stop requests are wired later, but the controller already
- * owns the timing lifecycle and disposal semantics.
+ * The controller owns idle timing, disconnect-grace timing, and fenced stop
+ * requests for one currently owned sandbox instance.
  */
 export class LocalSandboxIdleController implements SandboxIdleController {
   readonly sandboxInstanceId: string;
   readonly ownerLeaseId: string;
 
   #currentTimerHandle: TimerHandle | undefined;
-  #idleDeadlineAtMs: number | undefined;
   #inDisconnectGracePath = false;
   #disposed = false;
 
@@ -141,16 +143,23 @@ export class LocalSandboxIdleController implements SandboxIdleController {
 
     this.#inDisconnectGracePath = true;
     this.cancelCurrentTimer();
+    void this.dependencies.runtimeAttachmentStore
+      .clearAttachment({
+        sandboxInstanceId: this.sandboxInstanceId,
+        ownerLeaseId: this.ownerLeaseId,
+      })
+      .catch((error: unknown) => {
+        logger.error(
+          {
+            err: error,
+            sandboxInstanceId: this.sandboxInstanceId,
+            ownerLeaseId: this.ownerLeaseId,
+          },
+          "Failed to clear fenced runtime attachment on bootstrap disconnect",
+        );
+      });
     this.scheduleTimer(input.nowMs + this.dependencies.disconnectGraceMs, () => {
-      logger.info(
-        {
-          sandboxInstanceId: this.sandboxInstanceId,
-          ownerLeaseId: this.ownerLeaseId,
-          disconnectGraceMs: this.dependencies.disconnectGraceMs,
-        },
-        "Sandbox bootstrap disconnect grace elapsed; stop request wiring is not enabled yet",
-      );
-      this.dispose();
+      void this.handleDisconnectGraceElapsed();
     });
   }
 
@@ -169,7 +178,6 @@ export class LocalSandboxIdleController implements SandboxIdleController {
   }
 
   private scheduleIdleDeadline(nextIdleDeadlineAtMs: number): void {
-    this.#idleDeadlineAtMs = nextIdleDeadlineAtMs;
     this.scheduleTimer(nextIdleDeadlineAtMs, () => {
       void this.handleIdleDeadlineElapsed();
     });
@@ -195,7 +203,10 @@ export class LocalSandboxIdleController implements SandboxIdleController {
 
   private async handleIdleDeadlineElapsed(): Promise<void> {
     const nowMs = this.dependencies.clock.nowMs();
-    const [hasActivePresence, hasActiveActivity] = await Promise.all([
+    const [currentOwner, hasActivePresence, hasActiveActivity] = await Promise.all([
+      this.dependencies.ownerStore.getOwner({
+        sandboxInstanceId: this.sandboxInstanceId,
+      }),
       this.dependencies.presenceStore.hasAnyActiveLease({
         sandboxInstanceId: this.sandboxInstanceId,
         nowMs,
@@ -210,21 +221,93 @@ export class LocalSandboxIdleController implements SandboxIdleController {
       return;
     }
 
+    if (currentOwner?.leaseId !== this.ownerLeaseId) {
+      this.dispose();
+      return;
+    }
+
     if (hasActivePresence || hasActiveActivity) {
       this.scheduleIdleDeadline(nowMs + this.dependencies.timeoutMs);
       return;
     }
 
-    logger.info(
-      {
+    try {
+      await this.dependencies.stopRequester.requestStop({
         sandboxInstanceId: this.sandboxInstanceId,
-        ownerLeaseId: this.ownerLeaseId,
-        idleDeadlineAtMs: this.#idleDeadlineAtMs,
-        timeoutMs: this.dependencies.timeoutMs,
-      },
-      "Sandbox idle deadline elapsed; stop request wiring is not enabled yet",
-    );
+        stopReason: "idle",
+        expectedOwnerLeaseId: this.ownerLeaseId,
+        idempotencyKey: this.createStopIdempotencyKey("idle"),
+      });
+    } catch (error) {
+      logger.error(
+        {
+          err: error,
+          sandboxInstanceId: this.sandboxInstanceId,
+          ownerLeaseId: this.ownerLeaseId,
+        },
+        "Failed to request fenced idle sandbox stop",
+      );
+      return;
+    }
 
-    this.scheduleIdleDeadline(nowMs + this.dependencies.timeoutMs);
+    this.dispose();
+  }
+
+  private async handleDisconnectGraceElapsed(): Promise<void> {
+    const nowMs = this.dependencies.clock.nowMs();
+    const [currentOwner, currentAttachment] = await Promise.all([
+      this.dependencies.ownerStore.getOwner({
+        sandboxInstanceId: this.sandboxInstanceId,
+      }),
+      this.dependencies.runtimeAttachmentStore.getAttachment({
+        sandboxInstanceId: this.sandboxInstanceId,
+        nowMs,
+      }),
+    ]);
+
+    if (this.#disposed || !this.#inDisconnectGracePath) {
+      return;
+    }
+
+    if (currentAttachment?.ownerLeaseId === this.ownerLeaseId) {
+      this.#inDisconnectGracePath = false;
+      this.scheduleIdleDeadline(nowMs + this.dependencies.timeoutMs);
+      return;
+    }
+
+    if (currentOwner?.leaseId !== undefined && currentOwner.leaseId !== this.ownerLeaseId) {
+      this.dispose();
+      return;
+    }
+
+    if (currentAttachment !== null) {
+      this.dispose();
+      return;
+    }
+
+    try {
+      await this.dependencies.stopRequester.requestStop({
+        sandboxInstanceId: this.sandboxInstanceId,
+        stopReason: "disconnected",
+        expectedOwnerLeaseId: this.ownerLeaseId,
+        idempotencyKey: this.createStopIdempotencyKey("disconnected"),
+      });
+    } catch (error) {
+      logger.error(
+        {
+          err: error,
+          sandboxInstanceId: this.sandboxInstanceId,
+          ownerLeaseId: this.ownerLeaseId,
+        },
+        "Failed to request fenced disconnected sandbox stop",
+      );
+      return;
+    }
+
+    this.dispose();
+  }
+
+  private createStopIdempotencyKey(stopReason: "idle" | "disconnected"): string {
+    return `${this.sandboxInstanceId}:${this.ownerLeaseId}:${stopReason}`;
   }
 }

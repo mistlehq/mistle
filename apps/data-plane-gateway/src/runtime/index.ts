@@ -6,6 +6,7 @@ import { typeid } from "typeid-js";
 import type { WebSocketServer } from "ws";
 
 import { createApp, stopApp } from "../app.js";
+import { DataPlaneApiStopSandboxClient } from "../clients/data-plane-api-stop-sandbox-client.js";
 import { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { LocalSandboxIdleController } from "../idle/sandbox-idle-controller.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
@@ -123,6 +124,10 @@ export function createDataPlaneGatewayRuntime(
     systemScheduler,
     OWNER_LEASE_RENEW_INTERVAL_MS,
   );
+  const stopSandboxRequester = new DataPlaneApiStopSandboxClient({
+    baseUrl: config.app.dataPlaneApi.baseUrl,
+    serviceToken: config.internalAuth.serviceToken,
+  });
   const sandboxIdleControllerRegistry = new SandboxIdleControllerRegistry((input) => {
     return new LocalSandboxIdleController(
       {
@@ -135,6 +140,8 @@ export function createDataPlaneGatewayRuntime(
         ownerStore: sandboxOwnerStore,
         activityStore: sandboxActivityStore,
         presenceStore: sandboxPresenceStore,
+        runtimeAttachmentStore: sandboxRuntimeAttachmentStore,
+        stopRequester: stopSandboxRequester,
       },
       input.onDisposed,
     );

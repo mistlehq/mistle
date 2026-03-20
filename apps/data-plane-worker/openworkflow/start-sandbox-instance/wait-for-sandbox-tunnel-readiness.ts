@@ -1,9 +1,11 @@
-import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import type { Clock, Sleeper } from "@mistle/time";
+
+import type { SandboxRuntimeStateReader } from "../../runtime-state/sandbox-runtime-state-reader.js";
+import { isSandboxRuntimeReady } from "../../runtime-state/sandbox-runtime-state-readiness.js";
 
 export async function waitForSandboxTunnelReadiness(
   ctx: {
-    db: DataPlaneDatabase;
+    runtimeStateReader: SandboxRuntimeStateReader;
     policy: {
       timeoutMs: number;
       pollIntervalMs: number;
@@ -25,27 +27,16 @@ export async function waitForSandboxTunnelReadiness(
 
   const deadlineMs = ctx.clock.nowMs() + ctx.policy.timeoutMs;
   while (true) {
-    const sandboxInstance = await ctx.db.query.sandboxInstances.findFirst({
-      columns: {
-        activeTunnelLeaseId: true,
-        tunnelConnectedAt: true,
-        lastTunnelSeenAt: true,
-        tunnelDisconnectedAt: true,
-      },
-      where: (table, { eq: whereEq }) => whereEq(table.id, input.sandboxInstanceId),
+    const nowMs = ctx.clock.nowMs();
+    const snapshot = await ctx.runtimeStateReader.readSnapshot({
+      sandboxInstanceId: input.sandboxInstanceId,
+      nowMs,
     });
-
-    if (
-      sandboxInstance?.activeTunnelLeaseId !== null &&
-      sandboxInstance?.activeTunnelLeaseId !== undefined &&
-      sandboxInstance.tunnelConnectedAt !== null &&
-      sandboxInstance.lastTunnelSeenAt !== null &&
-      sandboxInstance.tunnelDisconnectedAt === null
-    ) {
+    if (isSandboxRuntimeReady(snapshot)) {
       return true;
     }
 
-    const remainingMs = deadlineMs - ctx.clock.nowMs();
+    const remainingMs = deadlineMs - nowMs;
     if (remainingMs <= 0) {
       return false;
     }

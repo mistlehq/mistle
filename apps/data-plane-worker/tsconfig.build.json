@@ -8,11 +8,5 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": [
-    "instrument.ts",
-    "logger.ts",
-    "reaper/**/*.ts",
-    "runtime-state/**/*.ts",
-    "openworkflow/core/**/*.ts"
-  ]
+  "include": ["instrument.ts", "logger.ts", "runtime-state/**/*.ts", "openworkflow/core/**/*.ts"]
 }

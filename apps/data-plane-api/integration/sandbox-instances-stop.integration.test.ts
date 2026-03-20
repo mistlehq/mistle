@@ -22,6 +22,8 @@ type WorkflowRunRow = {
 const WorkflowRunInputSchema = z
   .object({
     sandboxInstanceId: z.string().min(1),
+    stopReason: z.union([z.literal("idle"), z.literal("disconnected")]),
+    expectedOwnerLeaseId: z.string().min(1),
   })
   .strict();
 
@@ -134,7 +136,11 @@ describe("sandboxInstances.stop integration", () => {
     expect(queuedRun.output).toBeNull();
 
     const parsedWorkflowInput = WorkflowRunInputSchema.parse(queuedRun.input);
-    expect(parsedWorkflowInput.sandboxInstanceId).toBe(sandboxInstanceId);
+    expect(parsedWorkflowInput).toEqual({
+      sandboxInstanceId,
+      stopReason: workflowInput.stopReason,
+      expectedOwnerLeaseId: workflowInput.expectedOwnerLeaseId,
+    });
     expect(
       WorkflowRunIdempotencyKeySchema.parse(JSON.parse(queuedRun.idempotency_key ?? "")),
     ).toEqual({
