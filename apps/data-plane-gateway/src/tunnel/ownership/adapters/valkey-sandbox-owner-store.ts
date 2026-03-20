@@ -51,10 +51,6 @@ function buildSandboxOwnerKey(input: { keyPrefix: string; sandboxInstanceId: str
   return `${input.keyPrefix}:sandbox-owner:${input.sandboxInstanceId}`;
 }
 
-function serializeSandboxOwnerRecord(record: SandboxOwnerRecord): string {
-  return JSON.stringify(record);
-}
-
 function parseSandboxOwnerRecord(json: string): SandboxOwnerRecord {
   return SandboxOwnerRecordSchema.parse(JSON.parse(json));
 }
@@ -112,7 +108,7 @@ export class ValkeySandboxOwnerStore implements SandboxOwnerStore {
         keyPrefix: this.keyPrefix,
         sandboxInstanceId: input.sandboxInstanceId,
       }),
-      serializeSandboxOwnerRecord(ownerRecord),
+      JSON.stringify(ownerRecord),
       {
         PX: input.ttlMs,
       },
@@ -154,7 +150,7 @@ export class ValkeySandboxOwnerStore implements SandboxOwnerStore {
       }),
       input.leaseId,
       String(input.ttlMs),
-      serializeSandboxOwnerRecord(nextOwnerRecord),
+      JSON.stringify(nextOwnerRecord),
     ]);
 
     return parseEvalBooleanResult(result);

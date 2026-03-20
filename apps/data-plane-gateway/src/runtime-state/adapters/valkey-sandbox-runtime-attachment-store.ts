@@ -40,10 +40,6 @@ function buildSandboxAttachmentKey(input: {
   return `${input.keyPrefix}:sandbox-attachment:${input.sandboxInstanceId}`;
 }
 
-function serializeSandboxRuntimeAttachmentRecord(record: SandboxRuntimeAttachmentRecord): string {
-  return JSON.stringify(record);
-}
-
 function parseSandboxRuntimeAttachmentRecord(json: string): SandboxRuntimeAttachmentRecord {
   return SandboxRuntimeAttachmentRecordSchema.parse(JSON.parse(json));
 }
@@ -85,7 +81,7 @@ export class ValkeySandboxRuntimeAttachmentStore implements SandboxRuntimeAttach
         keyPrefix: this.keyPrefix,
         sandboxInstanceId: input.sandboxInstanceId,
       }),
-      serializeSandboxRuntimeAttachmentRecord({
+      JSON.stringify({
         sandboxInstanceId: input.sandboxInstanceId,
         ownerLeaseId: input.ownerLeaseId,
         nodeId: input.nodeId,
