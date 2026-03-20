@@ -7,6 +7,7 @@ import { SpanStatusCode, trace, type Span } from "@opentelemetry/api";
 import type { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { logger } from "../logger.js";
 import { OWNER_LEASE_TTL_MS } from "../runtime-state/durations.js";
+import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
 import type { SandboxRuntimeAttachmentStore } from "../runtime-state/sandbox-runtime-attachment-store.js";
 import type { DataPlaneGatewayApp } from "../types.js";
 import { SandboxTunnelWebSocketAdmission } from "./admission/sandbox-tunnel-websocket-admission.js";
@@ -43,6 +44,7 @@ type RegisterSandboxTunnelRouteInput = {
   sandboxOwnerStore: SandboxOwnerStore;
   sandboxOwnerResolver: SandboxOwnerResolver;
   sandboxOwnerLeaseHeartbeat: SandboxOwnerLeaseHeartbeat;
+  sandboxPresenceStore: SandboxPresenceStore;
   sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore;
   sandboxIdleControllerRegistry: SandboxIdleControllerRegistry;
   clock: Clock;
@@ -81,6 +83,7 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     input.tunnelSessionRegistry,
     input.sandboxOwnerStore,
     input.sandboxOwnerLeaseHeartbeat,
+    input.sandboxPresenceStore,
     input.sandboxRuntimeAttachmentStore,
     input.sandboxIdleControllerRegistry,
     new TunnelLivelinessRepository(),
@@ -166,23 +169,49 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                 : "Sandbox connection peer attached",
             );
 
-            if (admittedRequest.kind === "bootstrap") {
-              attachedPeer = tunnelSessionService.attachBootstrapPeer({
-                db: ctx.get("db"),
-                leaseId: admittedRequest.ownerLeaseId,
+            try {
+              if (admittedRequest.kind === "bootstrap") {
+                attachedPeer = tunnelSessionService.attachBootstrapPeer({
+                  db: ctx.get("db"),
+                  leaseId: admittedRequest.ownerLeaseId,
+                  onFatalError: (failure) => {
+                    recordTunnelSessionError({
+                      tunnelSessionSpan,
+                      error: failure.error,
+                      statusMessage: failure.statusMessage,
+                    });
+                    ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
+                  },
+                  onLeaseLost: (failure) => {
+                    tunnelSessionSpan?.addEvent("sandbox.tunnel.owner_lease.lost");
+                    tunnelSessionSpan?.setStatus({
+                      code: SpanStatusCode.ERROR,
+                      message: failure.statusMessage,
+                    });
+                    ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
+                  },
+                  onTransportUnhealthy: (failure) => {
+                    tunnelSessionSpan?.addEvent("sandbox.tunnel.transport_health.lost");
+                    tunnelSessionSpan?.setStatus({
+                      code: SpanStatusCode.ERROR,
+                      message: failure.statusMessage,
+                    });
+                    ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
+                  },
+                  ownerLeaseTtlMs: OWNER_LEASE_TTL_MS,
+                  relaySessionId,
+                  sandboxInstanceId,
+                  socket: ws,
+                });
+                return;
+              }
+
+              attachedPeer = tunnelSessionService.attachConnectionPeer({
                 onFatalError: (failure) => {
                   recordTunnelSessionError({
                     tunnelSessionSpan,
                     error: failure.error,
                     statusMessage: failure.statusMessage,
-                  });
-                  ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
-                },
-                onLeaseLost: (failure) => {
-                  tunnelSessionSpan?.addEvent("sandbox.tunnel.owner_lease.lost");
-                  tunnelSessionSpan?.setStatus({
-                    code: SpanStatusCode.ERROR,
-                    message: failure.statusMessage,
                   });
                   ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
                 },
@@ -194,19 +223,21 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
                   });
                   ws.close(CloseCodes.INTERNAL_ERROR, failure.closeReason);
                 },
-                ownerLeaseTtlMs: OWNER_LEASE_TTL_MS,
                 relaySessionId,
                 sandboxInstanceId,
                 socket: ws,
               });
-              return;
+            } catch (error) {
+              recordTunnelSessionError({
+                tunnelSessionSpan,
+                error,
+                statusMessage: "Failed to attach sandbox tunnel websocket session.",
+              });
+              ws.close(
+                CloseCodes.INTERNAL_ERROR,
+                "Failed to attach sandbox tunnel websocket session.",
+              );
             }
-
-            attachedPeer = tunnelSessionService.attachConnectionPeer({
-              relaySessionId,
-              sandboxInstanceId,
-              socket: ws,
-            });
           },
           onMessage: (event, ws) => {
             const relayTarget = attachedPeer?.relayTarget;

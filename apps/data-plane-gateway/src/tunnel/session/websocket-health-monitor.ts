@@ -4,27 +4,27 @@ import type { RelayPeerSocket } from "../types.js";
 
 const WebSocketOpenReadyState = 1;
 
-export type BootstrapWebSocketHealthHandle = {
+export type WebSocketHealthHandle = {
   stop: () => void;
   isHealthy: () => boolean;
 };
 
 /**
- * Starts active ping/pong health checks for a bootstrap websocket.
+ * Starts active ping/pong health checks for a tunnel websocket.
  *
  * The gateway sends pings, expects timely pong responses, and calls
  * `onUnhealthy` when the socket stops responding while still nominally open.
  */
-export function startBootstrapWebSocketHealthMonitor(input: {
+export function startWebSocketHealthMonitor(input: {
   socket: RelayPeerSocket;
   scheduler: Scheduler;
   pingIntervalMs: number;
   pongTimeoutMs: number;
   onUnhealthy: () => void;
-}): BootstrapWebSocketHealthHandle {
+}): WebSocketHealthHandle {
   const rawSocket = input.socket.raw;
   if (rawSocket === undefined) {
-    throw new Error("Expected bootstrap websocket raw socket for health monitoring.");
+    throw new Error("Expected websocket raw socket for health monitoring.");
   }
 
   let healthy = true;
