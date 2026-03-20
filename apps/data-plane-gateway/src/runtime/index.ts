@@ -9,8 +9,10 @@ import { createApp, stopApp } from "../app.js";
 import { SandboxIdleControllerRegistry } from "../idle/sandbox-idle-controller-registry.js";
 import { LocalSandboxIdleController } from "../idle/sandbox-idle-controller.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
+import { InMemorySandboxActivityStore } from "../runtime-state/adapters/in-memory-sandbox-activity-store.js";
 import { InMemorySandboxPresenceStore } from "../runtime-state/adapters/in-memory-sandbox-presence-store.js";
 import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
+import { ValkeySandboxActivityStore } from "../runtime-state/adapters/valkey-sandbox-activity-store.js";
 import { ValkeySandboxPresenceStore } from "../runtime-state/adapters/valkey-sandbox-presence-store.js";
 import { ValkeySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import {
@@ -71,6 +73,7 @@ export function createDataPlaneGatewayRuntime(
   const relayCoordinator = createInMemoryTunnelRelayCoordinator(nodeId);
   let valkeyClient: ValkeyClient | undefined;
   let sandboxOwnerStore: InMemorySandboxOwnerStore | ValkeySandboxOwnerStore;
+  let sandboxActivityStore: InMemorySandboxActivityStore | ValkeySandboxActivityStore;
   let sandboxPresenceStore: InMemorySandboxPresenceStore | ValkeySandboxPresenceStore;
   let sandboxRuntimeAttachmentStore:
     | InMemorySandboxRuntimeAttachmentStore
@@ -78,6 +81,7 @@ export function createDataPlaneGatewayRuntime(
 
   if (config.app.runtimeState.backend === "memory") {
     sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
+    sandboxActivityStore = new InMemorySandboxActivityStore(systemClock);
     sandboxPresenceStore = new InMemorySandboxPresenceStore(systemClock);
     sandboxRuntimeAttachmentStore = new InMemorySandboxRuntimeAttachmentStore(systemClock);
   } else {
@@ -93,6 +97,7 @@ export function createDataPlaneGatewayRuntime(
     });
 
     sandboxOwnerStore = new ValkeySandboxOwnerStore(valkeyClient, valkeyConfig.keyPrefix);
+    sandboxActivityStore = new ValkeySandboxActivityStore(valkeyClient, valkeyConfig.keyPrefix);
     sandboxPresenceStore = new ValkeySandboxPresenceStore(valkeyClient, valkeyConfig.keyPrefix);
     sandboxRuntimeAttachmentStore = new ValkeySandboxRuntimeAttachmentStore(
       valkeyClient,
@@ -128,6 +133,7 @@ export function createDataPlaneGatewayRuntime(
         clock: systemClock,
         scheduler: systemScheduler,
         ownerStore: sandboxOwnerStore,
+        activityStore: sandboxActivityStore,
         presenceStore: sandboxPresenceStore,
       },
       input.onDisposed,
@@ -162,6 +168,7 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerStore,
     sandboxOwnerResolver,
     sandboxOwnerLeaseHeartbeat,
+    sandboxActivityStore,
     sandboxPresenceStore,
     sandboxRuntimeAttachmentStore,
     sandboxIdleControllerRegistry,

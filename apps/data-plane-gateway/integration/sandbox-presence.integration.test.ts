@@ -13,10 +13,7 @@ import { describe, expect } from "vitest";
 import WebSocket from "ws";
 
 import { ValkeySandboxPresenceStore } from "../src/runtime-state/adapters/valkey-sandbox-presence-store.js";
-import {
-  PRESENCE_LEASE_RENEW_INTERVAL_MS,
-  PRESENCE_LEASE_TTL_MS,
-} from "../src/runtime-state/durations.js";
+import { PRESENCE_LEASE_TTL_MS } from "../src/runtime-state/durations.js";
 import { closeValkeyClient, createValkeyClient } from "../src/runtime-state/valkey-client.js";
 import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import { closeWebSocket, waitForWebSocketClose } from "./websocket-test-helpers.js";
@@ -137,10 +134,15 @@ function connectTunnelSocket(input: {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(
       `${input.fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(input.sandboxInstanceId)}?${tokenQueryParam}=${encodeURIComponent(input.token)}`,
-      {
-        autoPong: input.autoPong,
-        handshakeTimeout: 4_000,
-      },
+      input.autoPong === undefined
+        ? {
+            autoPong: true,
+            handshakeTimeout: 4_000,
+          }
+        : {
+            autoPong: input.autoPong,
+            handshakeTimeout: 4_000,
+          },
     );
 
     const onOpen = (): void => {
@@ -236,7 +238,7 @@ async function closeSocketIfOpen(socket: WebSocket | undefined): Promise<void> {
 
 describe("sandbox presence integration", () => {
   it(
-    "renews connection presence leases and keeps them active while another client session remains attached",
+    "tracks presence leases per connected client session and keeps the sandbox active until the last session disconnects",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
@@ -263,14 +265,6 @@ describe("sandbox presence integration", () => {
           }),
         });
         firstConnectionSocket = await connectConnectionSocket({
-          fixture,
-          sandboxInstanceId,
-          token: await mintValidConnectionToken({
-            fixture,
-            sandboxInstanceId,
-          }),
-        });
-        secondConnectionSocket = await connectConnectionSocket({
           fixture,
           sandboxInstanceId,
           token: await mintValidConnectionToken({
@@ -314,13 +308,28 @@ describe("sandbox presence integration", () => {
         expect(firstLeaseTtlMs).toBeGreaterThan(0);
         expect(firstLeaseTtlMs).toBeLessThanOrEqual(PRESENCE_LEASE_TTL_MS);
 
-        await systemSleeper.sleep(PRESENCE_LEASE_RENEW_INTERVAL_MS + 2_000);
+        const presenceLeaseIdsAfterSecondAttach = await client.zRange(
+          indexKeyForSandbox(sandboxInstanceId),
+          0,
+          -1,
+        );
+        expect(presenceLeaseIdsAfterSecondAttach).toHaveLength(2);
 
-        const renewedLeaseTtlMs = await client.pTTL(
+        await closeWebSocket(firstConnectionSocket);
+
+        await expect(
+          waitForPresenceState({
+            fixture,
+            predicate: (hasActiveLease) => hasActiveLease,
+            sandboxInstanceId,
+            store,
+          }),
+        ).resolves.toBe(true);
+
+        const firstLeaseRemoved = await client.exists(
           detailKeyForLease(sandboxInstanceId, firstLeaseId),
         );
-        expect(renewedLeaseTtlMs).toBeGreaterThan(20_000);
-        await closeWebSocket(firstConnectionSocket);
+        expect(firstLeaseRemoved).toBe(0);
 
         await expect(
           waitForPresenceState({

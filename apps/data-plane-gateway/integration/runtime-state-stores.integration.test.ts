@@ -1,14 +1,32 @@
 import { randomUUID } from "node:crypto";
 
+import { readTestContext } from "@mistle/test-harness";
 import { systemSleeper } from "@mistle/time";
 import { describe, expect, it } from "vitest";
+import { z } from "zod";
 
+import { ValkeySandboxActivityStore } from "../src/runtime-state/adapters/valkey-sandbox-activity-store.js";
 import { ValkeySandboxPresenceStore } from "../src/runtime-state/adapters/valkey-sandbox-presence-store.js";
 import { ValkeySandboxRuntimeAttachmentStore } from "../src/runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
 import { createValkeyClient, closeValkeyClient } from "../src/runtime-state/valkey-client.js";
 import { ValkeySandboxOwnerStore } from "../src/tunnel/ownership/adapters/valkey-sandbox-owner-store.js";
 
-const ValkeyUrl = "redis://127.0.0.1:6379";
+const TestContextId = "data-plane-gateway.integration";
+
+const SharedInfraConfigSchema = z
+  .object({
+    valkeyUrl: z.string().min(1),
+  })
+  .loose();
+
+async function readValkeyUrl(): Promise<string> {
+  const testContext = await readTestContext({
+    id: TestContextId,
+    schema: SharedInfraConfigSchema,
+  });
+
+  return testContext.valkeyUrl;
+}
 
 async function deleteKeysByPrefix(input: {
   client: ReturnType<typeof createValkeyClient>;
@@ -25,8 +43,9 @@ async function deleteKeysByPrefix(input: {
 describe("runtime-state store integrations", () => {
   it("rejects stale owner renewals and releases after a newer owner claim", async () => {
     const keyPrefix = `mistle:runtime-state:owner-it:${randomUUID()}`;
+    const valkeyUrl = await readValkeyUrl();
     const client = createValkeyClient({
-      url: ValkeyUrl,
+      url: valkeyUrl,
     });
     await client.connect();
 
@@ -75,8 +94,9 @@ describe("runtime-state store integrations", () => {
 
   it("expires owner and attachment records when their TTL elapses", async () => {
     const keyPrefix = `mistle:runtime-state:expiry-it:${randomUUID()}`;
+    const valkeyUrl = await readValkeyUrl();
     const client = createValkeyClient({
-      url: ValkeyUrl,
+      url: valkeyUrl,
     });
     await client.connect();
 
@@ -124,8 +144,9 @@ describe("runtime-state store integrations", () => {
 
   it("fences attachment clears by owner lease id", async () => {
     const keyPrefix = `mistle:runtime-state:attachment-it:${randomUUID()}`;
+    const valkeyUrl = await readValkeyUrl();
     const client = createValkeyClient({
-      url: ValkeyUrl,
+      url: valkeyUrl,
     });
     await client.connect();
 
@@ -172,8 +193,9 @@ describe("runtime-state store integrations", () => {
 
   it("tracks active presence leases until they are released or expire", async () => {
     const keyPrefix = `mistle:runtime-state:presence-it:${randomUUID()}`;
+    const valkeyUrl = await readValkeyUrl();
     const client = createValkeyClient({
-      url: ValkeyUrl,
+      url: valkeyUrl,
     });
     await client.connect();
 
@@ -224,6 +246,73 @@ describe("runtime-state store integrations", () => {
       await expect(
         store.hasAnyActiveLease({
           sandboxInstanceId,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toBe(false);
+    } finally {
+      await deleteKeysByPrefix({
+        client,
+        keyPrefix,
+      });
+      await closeValkeyClient(client);
+    }
+  });
+
+  it("renews activity leases without losing their stored metadata", async () => {
+    const keyPrefix = `mistle:runtime-state:activity-it:${randomUUID()}`;
+    const valkeyUrl = await readValkeyUrl();
+    const client = createValkeyClient({
+      url: valkeyUrl,
+    });
+    await client.connect();
+
+    try {
+      const store = new ValkeySandboxActivityStore(client, keyPrefix);
+      const sandboxInstanceId = "sbi_activity_it";
+      const leaseId = "sal_first";
+      const detailKey = `${keyPrefix}:sandbox-activity:${sandboxInstanceId}:lease:${leaseId}`;
+
+      await store.touchLease({
+        sandboxInstanceId,
+        leaseId,
+        kind: "agent_execution",
+        source: "codex",
+        externalExecutionId: "turn_123",
+        metadata: {
+          threadId: "thr_123",
+        },
+        nodeId: "dpg_it",
+        ttlMs: 30_000,
+        nowMs: Date.now(),
+      });
+      await expect(
+        store.renewLease({
+          sandboxInstanceId,
+          leaseId,
+          ttlMs: 30_000,
+          nowMs: Date.now(),
+        }),
+      ).resolves.toBe(true);
+
+      const serializedLease = await client.get(detailKey);
+      expect(serializedLease).not.toBeNull();
+      expect(JSON.parse(serializedLease ?? "null")).toMatchObject({
+        sandboxInstanceId,
+        leaseId,
+        kind: "agent_execution",
+        source: "codex",
+        externalExecutionId: "turn_123",
+        metadata: {
+          threadId: "thr_123",
+        },
+        nodeId: "dpg_it",
+      });
+
+      await expect(
+        store.renewLease({
+          sandboxInstanceId,
+          leaseId: "sal_missing",
+          ttlMs: 30_000,
           nowMs: Date.now(),
         }),
       ).resolves.toBe(false);

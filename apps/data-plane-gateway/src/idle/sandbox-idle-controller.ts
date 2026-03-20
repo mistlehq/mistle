@@ -1,6 +1,7 @@
 import type { Clock, Scheduler, TimerHandle } from "@mistle/time";
 
 import { logger } from "../logger.js";
+import type { SandboxActivityStore } from "../runtime-state/sandbox-activity-store.js";
 import type { SandboxPresenceStore } from "../runtime-state/sandbox-presence-store.js";
 import type { SandboxOwnerStore } from "../tunnel/ownership/sandbox-owner-store.js";
 
@@ -8,8 +9,8 @@ import type { SandboxOwnerStore } from "../tunnel/ownership/sandbox-owner-store.
  * Constructor dependencies for an owner-local idle controller.
  *
  * The controller is responsible for one sandbox instance and one owner lease.
- * This PR only wires local idle and disconnect-grace timers. Future PRs will
- * extend the same boundary with activity and stop-request logic.
+ * The controller currently owns local idle and disconnect-grace timing. Stop
+ * execution is wired in a later PR.
  */
 export type SandboxIdleControllerDependencies = {
   sandboxInstanceId: string;
@@ -19,6 +20,7 @@ export type SandboxIdleControllerDependencies = {
   clock: Clock;
   scheduler: Scheduler;
   ownerStore: SandboxOwnerStore;
+  activityStore: SandboxActivityStore;
   presenceStore: SandboxPresenceStore;
 };
 
@@ -124,7 +126,12 @@ export class LocalSandboxIdleController implements SandboxIdleController {
 
   handleActivityLeaseTouch(input: { leaseId: string; nowMs: number }): void {
     void input.leaseId;
-    void input.nowMs;
+
+    if (this.#disposed || this.#inDisconnectGracePath) {
+      return;
+    }
+
+    this.scheduleIdleDeadline(input.nowMs + this.dependencies.timeoutMs);
   }
 
   handleBootstrapDisconnect(input: { nowMs: number }): void {
@@ -164,17 +171,7 @@ export class LocalSandboxIdleController implements SandboxIdleController {
   private scheduleIdleDeadline(nextIdleDeadlineAtMs: number): void {
     this.#idleDeadlineAtMs = nextIdleDeadlineAtMs;
     this.scheduleTimer(nextIdleDeadlineAtMs, () => {
-      logger.info(
-        {
-          sandboxInstanceId: this.sandboxInstanceId,
-          ownerLeaseId: this.ownerLeaseId,
-          idleDeadlineAtMs: this.#idleDeadlineAtMs,
-          timeoutMs: this.dependencies.timeoutMs,
-        },
-        "Sandbox idle deadline elapsed; stop request wiring is not enabled yet",
-      );
-
-      this.scheduleIdleDeadline(this.dependencies.clock.nowMs() + this.dependencies.timeoutMs);
+      void this.handleIdleDeadlineElapsed();
     });
   }
 
@@ -194,5 +191,40 @@ export class LocalSandboxIdleController implements SandboxIdleController {
 
     this.dependencies.scheduler.cancel(this.#currentTimerHandle);
     this.#currentTimerHandle = undefined;
+  }
+
+  private async handleIdleDeadlineElapsed(): Promise<void> {
+    const nowMs = this.dependencies.clock.nowMs();
+    const [hasActivePresence, hasActiveActivity] = await Promise.all([
+      this.dependencies.presenceStore.hasAnyActiveLease({
+        sandboxInstanceId: this.sandboxInstanceId,
+        nowMs,
+      }),
+      this.dependencies.activityStore.hasAnyActiveLease({
+        sandboxInstanceId: this.sandboxInstanceId,
+        nowMs,
+      }),
+    ]);
+
+    if (this.#disposed || this.#inDisconnectGracePath) {
+      return;
+    }
+
+    if (hasActivePresence || hasActiveActivity) {
+      this.scheduleIdleDeadline(nowMs + this.dependencies.timeoutMs);
+      return;
+    }
+
+    logger.info(
+      {
+        sandboxInstanceId: this.sandboxInstanceId,
+        ownerLeaseId: this.ownerLeaseId,
+        idleDeadlineAtMs: this.#idleDeadlineAtMs,
+        timeoutMs: this.dependencies.timeoutMs,
+      },
+      "Sandbox idle deadline elapsed; stop request wiring is not enabled yet",
+    );
+
+    this.scheduleIdleDeadline(nowMs + this.dependencies.timeoutMs);
   }
 }

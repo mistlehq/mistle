@@ -133,10 +133,15 @@ function connectBootstrapSocket(input: {
   return new Promise((resolve, reject) => {
     const socket = new WebSocket(
       `${input.fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(input.sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(input.token)}`,
-      {
-        autoPong: input.autoPong,
-        handshakeTimeout: 4_000,
-      },
+      input.autoPong === undefined
+        ? {
+            autoPong: true,
+            handshakeTimeout: 4_000,
+          }
+        : {
+            autoPong: input.autoPong,
+            handshakeTimeout: 4_000,
+          },
     );
 
     const onOpen = (): void => {

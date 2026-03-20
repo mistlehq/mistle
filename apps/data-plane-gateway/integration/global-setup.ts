@@ -9,6 +9,7 @@ import {
   DEFAULT_SHARED_INTEGRATION_INFRA_KEY,
   removeTestContext,
   resolveIntegrationRunId,
+  startValkey,
   writeTestContext,
 } from "@mistle/test-harness";
 import { Client as PgClient } from "pg";
@@ -96,6 +97,9 @@ export default async function setup(): Promise<() => Promise<void>> {
     key: SHARED_INFRA_KEY,
     postgres: {},
   });
+  const valkeyService = await startValkey({
+    manageProcessCleanup: false,
+  });
   const templateDatabaseName = createIntegrationTemplateDatabaseName({
     prefix: TEMPLATE_DATABASE_NAME_PREFIX,
     runId: integrationRunId,
@@ -135,6 +139,7 @@ export default async function setup(): Promise<() => Promise<void>> {
         databasePassword: postgresService.postgres.password,
         databaseDirectHost: postgresService.postgres.host,
         databaseDirectPort: postgresService.postgres.port,
+        valkeyUrl: valkeyService.url,
         templateDatabaseName: templateDatabaseName,
         integrationRunId,
       },
@@ -148,6 +153,7 @@ export default async function setup(): Promise<() => Promise<void>> {
       port: sharedInfraLease.infra.postgres.postgres.port,
       databaseName: templateDatabaseName,
     });
+    await valkeyService.stop();
     await sharedInfraLease.release();
     throw error;
   }
@@ -161,6 +167,7 @@ export default async function setup(): Promise<() => Promise<void>> {
       port: sharedInfraLease.infra.postgres.postgres.port,
       databaseName: templateDatabaseName,
     });
+    await valkeyService.stop();
     await sharedInfraLease.release();
   };
 }
