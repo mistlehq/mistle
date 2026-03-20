@@ -123,7 +123,7 @@ describe("compileOpenAiApiKeyBinding", () => {
         match: {
           hosts: ["api.openai.com"],
           pathPrefixes: ["/"],
-          methods: ["POST"],
+          methods: ["GET", "POST"],
         },
         upstream: {
           baseUrl: "https://api.openai.com/v1",
@@ -178,13 +178,19 @@ describe("compileOpenAiApiKeyBinding", () => {
     });
     const configContent = compiled.runtimeClients[0]?.setup.files[0]?.content;
     expect(configContent).toContain('model = "gpt-5.3-codex"');
+    expect(configContent).toContain('model_provider = "proxy"');
     expect(configContent).toContain('model_reasoning_effort = "medium"');
     expect(configContent).toContain('approval_policy = "never"');
     expect(configContent).toContain('sandbox_mode = "danger-full-access"');
-    expect(configContent).toContain('openai_base_url = "https://api.openai.com/v1"');
+    expect(configContent).toContain("[model_providers.proxy]");
+    expect(configContent).toContain('name = "Proxy"');
+    expect(configContent).toContain('base_url = "https://api.openai.com/v1"');
+    expect(configContent).toContain('wire_api = "responses"');
+    expect(configContent).toContain("requires_openai_auth = false");
+    expect(configContent).toContain("supports_websockets = true");
     expect(configContent).toContain('trust_level = "trusted"');
     expect(configContent).not.toContain("developer_instructions");
-    expect(configContent).not.toContain("[model_providers.openai]");
+    expect(configContent).not.toContain("openai_base_url");
     expect(compiled.runtimeClients[0]?.processes).toEqual([
       {
         processKey: "codex-app-server",
@@ -303,8 +309,9 @@ describe("compileOpenAiApiKeyBinding", () => {
 
     expect(compiled.egressRoutes[0]?.match.hosts).toEqual(["proxy.example.com"]);
     expect(compiled.egressRoutes[0]?.match.pathPrefixes).toEqual(["/"]);
+    expect(compiled.egressRoutes[0]?.match.methods).toEqual(["GET", "POST"]);
     expect(compiled.runtimeClients[0]?.setup.files[0]?.content).toContain(
-      'openai_base_url = "https://proxy.example.com/openai-v2"',
+      'base_url = "https://proxy.example.com/openai-v2"',
     );
     expect(compiled.runtimeClients[0]?.processes).toHaveLength(1);
     expect(compiled.runtimeClients[0]?.processes[0]?.processKey).toBe("codex-app-server");
