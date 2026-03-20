@@ -1,5 +1,5 @@
-import { ApprovalDecisionButtons } from "../../codex-client/approval-decision-buttons.js";
-import type { CodexFileChangeApprovalRequestEntry } from "../../codex-client/codex-server-requests-state.js";
+import { ApprovalDecisionButtons } from "../../session-agents/codex/approvals/approval-decision-buttons.js";
+import type { CodexFileChangeApprovalRequestEntry } from "../../session-agents/codex/approvals/index.js";
 
 type ChatFileChangeApprovalProps = {
   approvalRequest: CodexFileChangeApprovalRequestEntry;

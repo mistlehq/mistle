@@ -10,7 +10,6 @@ import {
 import { AuthScreen } from "./features/auth/auth-screen.js";
 import { ROUTE_HANDLES } from "./features/navigation/route-handles.js";
 import { AutomationsPage } from "./features/pages/automations-page.js";
-import { CodexSessionPage } from "./features/pages/codex-session-page.js";
 import { HomePage } from "./features/pages/home-page.js";
 import { IntegrationsCallbackResultPage } from "./features/pages/integrations-callback-result-page.js";
 import { InvitationAcceptPage } from "./features/pages/invitation-accept-page.js";
@@ -20,6 +19,7 @@ import { OrganizationMembersSettingsPage } from "./features/pages/organization-m
 import { ProfileSettingsPage } from "./features/pages/profile-settings-page.js";
 import { SandboxProfileEditorPage } from "./features/pages/sandbox-profile-editor-page.js";
 import { SandboxProfilesPage } from "./features/pages/sandbox-profiles-page.js";
+import { SessionWorkbenchPage } from "./features/pages/session-workbench-page.js";
 import { SessionsPage } from "./features/pages/sessions-page.js";
 import { WebhookAutomationEditorPage } from "./features/pages/webhook-automation-editor-page.js";
 import { SettingsLayout } from "./features/settings/settings-layout.js";
@@ -76,7 +76,7 @@ export const APP_ROUTES = createRoutesFromElements(
         <Route element={<RouteOutlet />} handle={ROUTE_HANDLES.sessions} path="sessions">
           <Route element={<SessionsPage />} index />
           <Route
-            element={<CodexSessionPage />}
+            element={<SessionWorkbenchPage />}
             handle={ROUTE_HANDLES.sessionsDetail}
             path=":sandboxInstanceId"
           />

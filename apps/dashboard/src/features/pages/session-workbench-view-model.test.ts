@@ -4,7 +4,8 @@ import {
   hasSessionTopAlert,
   resolveChatComposerAction,
   resolveSessionHeaderStatusUi,
-} from "./codex-session-page-view-model.js";
+  resolveStoppedSessionMessage,
+} from "./session-workbench-view-model.js";
 
 describe("resolveSessionHeaderStatusUi", () => {
   it("shows connected when the transport is ready", () => {
@@ -87,6 +88,7 @@ describe("hasSessionTopAlert", () => {
         hasSandboxStatusError: false,
         startErrorMessage: null,
         sandboxFailureMessage: null,
+        stoppedSessionMessage: null,
       }),
     ).toBe(false);
   });
@@ -97,8 +99,36 @@ describe("hasSessionTopAlert", () => {
         hasSandboxStatusError: false,
         startErrorMessage: "Could not connect.",
         sandboxFailureMessage: null,
+        stoppedSessionMessage: null,
       }),
     ).toBe(true);
+
+    expect(
+      hasSessionTopAlert({
+        hasSandboxStatusError: false,
+        startErrorMessage: null,
+        sandboxFailureMessage: null,
+        stoppedSessionMessage: "This sandbox is stopped.",
+      }),
+    ).toBe(true);
+  });
+});
+
+describe("resolveStoppedSessionMessage", () => {
+  it("returns a stopped-session message only for stopped readiness", () => {
+    expect(
+      resolveStoppedSessionMessage({
+        connectionReadinessReason: "stopped",
+      }),
+    ).toBe(
+      "This sandbox is stopped. Dashboard resume handling is not implemented yet, so chat and terminal stay disconnected until the sandbox is running.",
+    );
+
+    expect(
+      resolveStoppedSessionMessage({
+        connectionReadinessReason: "ready",
+      }),
+    ).toBeNull();
   });
 });
 

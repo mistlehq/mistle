@@ -3,12 +3,17 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   CodexStoryChatThreadEntriesWithStructuredPlan,
   CodexStoryChatThreadEntriesWithThinkingGroup,
+} from "../session-agents/codex/fixtures/chat-story-fixtures.js";
+import {
   CodexStorySessionComposerProps,
   CodexStorySessionEntries,
   CodexStorySessionEntriesWithExploringGroup,
   CodexStorySessionServerRequests,
-} from "../codex-client/codex-story-fixtures.js";
-import { CodexSessionPaneBottomPanel, CodexSessionPaneMainContent } from "./codex-session-pane.js";
+} from "../session-agents/codex/fixtures/session-story-fixtures.js";
+import {
+  SessionConversationBottomPanel,
+  SessionConversationMainContent,
+} from "./session-conversation-pane.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
 const baseArgs = {
@@ -20,8 +25,8 @@ const baseArgs = {
 };
 
 const meta = {
-  title: "Dashboard/Pages/CodexSessionPane",
-  component: CodexSessionPaneMainContent,
+  title: "Dashboard/Pages/SessionConversationPane",
+  component: SessionConversationMainContent,
   tags: ["autodocs"],
   parameters: {
     layout: "fullscreen",
@@ -35,7 +40,7 @@ const meta = {
           isSecondaryPanelVisible={false}
           mainContent={<Story />}
           onSecondaryPanelResize={function onSecondaryPanelResize() {}}
-          primaryBottomPanel={<CodexSessionPaneBottomPanel {...context.args} />}
+          primaryBottomPanel={<SessionConversationBottomPanel {...context.args} />}
           secondaryPanel={<></>}
           secondaryPanelSize={38}
           sandboxInstanceId="sbi_storybook"
@@ -43,7 +48,7 @@ const meta = {
       );
     },
   ],
-} satisfies Meta<typeof CodexSessionPaneMainContent>;
+} satisfies Meta<typeof SessionConversationMainContent>;
 
 export default meta;
 

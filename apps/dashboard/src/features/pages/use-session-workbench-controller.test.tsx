@@ -4,11 +4,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { useCodexSessionPageController } from "./use-codex-session-page-controller.js";
 import { DEFAULT_TERMINAL_PANEL_SIZE } from "./use-session-terminal-workbench-state.js";
+import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
-describe("useCodexSessionPageController", () => {
-  it("returns separate workbench and Codex pane state for a missing session id", () => {
+describe("useSessionWorkbenchController", () => {
+  it("returns separate workbench and conversation pane state for a missing session id", () => {
     const queryClient = new QueryClient({
       defaultOptions: {
         queries: {
@@ -23,7 +23,7 @@ describe("useCodexSessionPageController", () => {
 
     const { result } = renderHook(
       () =>
-        useCodexSessionPageController({
+        useSessionWorkbenchController({
           sandboxInstanceId: null,
         }),
       {
@@ -31,7 +31,15 @@ describe("useCodexSessionPageController", () => {
       },
     );
 
-    expect(Object.keys(result.current)).toEqual(["workbench", "codexPane"]);
+    expect(Object.keys(result.current)).toEqual(["workbench", "conversationPane"]);
+    expect(result.current.workbench.connectionReadiness).toEqual({
+      canConnect: false,
+      reason: "missing-session",
+    });
+    expect(result.current.workbench.stoppedSessionState).toEqual({
+      message: null,
+      requiresManualResume: false,
+    });
     expect(result.current.workbench.hasTopAlert).toBe(false);
     expect(result.current.workbench.ptyState.lifecycle.connectedSandboxInstanceId).toBeNull();
     expect(result.current.workbench.ptyState.lifecycle.state).toBe("closed");
@@ -41,10 +49,10 @@ describe("useCodexSessionPageController", () => {
     expect(result.current.workbench.startErrorMessage).toBeNull();
     expect(result.current.workbench.sandboxFailureMessage).toBeNull();
     expect(result.current.workbench.moreActionsState.connectedSession).toBeNull();
-    expect(result.current.codexPane.chatState.entries).toEqual([]);
-    expect(result.current.codexPane.composerProps.isConnected).toBe(false);
-    expect(result.current.codexPane.composerProps.modelOptions).toEqual([]);
-    expect(result.current.codexPane.serverRequestsState.pendingServerRequests).toEqual([]);
+    expect(result.current.conversationPane.chatState.entries).toEqual([]);
+    expect(result.current.conversationPane.composerProps.isConnected).toBe(false);
+    expect(result.current.conversationPane.composerProps.modelOptions).toEqual([]);
+    expect(result.current.conversationPane.serverRequestsState.pendingServerRequests).toEqual([]);
   });
 
   it("persists terminal panel visibility and size per sandbox instance", () => {
@@ -79,7 +87,7 @@ describe("useCodexSessionPageController", () => {
 
     const { result, rerender } = renderHook(
       ({ sandboxInstanceId }: { sandboxInstanceId: string | null }) =>
-        useCodexSessionPageController({
+        useSessionWorkbenchController({
           sandboxInstanceId,
         }),
       {

@@ -1,14 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { CodexServerRequestsPanel } from "./codex-server-requests-panel.js";
 import {
   createCodexStoryPanelEntriesWithResponseErrors,
   CodexStoryPanelEntries,
-} from "./codex-story-fixtures.js";
+} from "../fixtures/approval-story-fixtures.js";
+import { CodexApprovalRequestsPanel } from "./codex-approval-requests-panel.js";
 
 const meta = {
-  title: "Dashboard/Codex/CodexServerRequestsPanel",
-  component: CodexServerRequestsPanel,
+  title: "Dashboard/Codex/CodexApprovalRequestsPanel",
+  component: CodexApprovalRequestsPanel,
   tags: ["autodocs"],
   parameters: {
     layout: "padded",
@@ -18,7 +18,7 @@ const meta = {
     isRespondingToServerRequest: false,
     onRespondToServerRequest: function onRespondToServerRequest() {},
   },
-} satisfies Meta<typeof CodexServerRequestsPanel>;
+} satisfies Meta<typeof CodexApprovalRequestsPanel>;
 
 export default meta;
 

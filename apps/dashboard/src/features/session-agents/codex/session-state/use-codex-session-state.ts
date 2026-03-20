@@ -19,12 +19,12 @@ import {
 import { useMutation } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 
-import { mintSandboxInstanceConnectionToken } from "../sessions/sessions-service.js";
+import { mintSandboxInstanceConnectionToken } from "../../../sessions/sessions-service.js";
 import {
-  createInitialCodexServerRequestsState,
-  reduceCodexServerRequestsState,
-  type CodexServerRequestEntry,
-} from "./codex-server-requests-state.js";
+  createInitialCodexApprovalRequestsState,
+  reduceCodexApprovalRequestsState,
+  type CodexApprovalRequestEntry,
+} from "../approvals/codex-approval-requests-state.js";
 import {
   describeCodexSessionStepError,
   StaleConnectionAttemptError,
@@ -161,7 +161,7 @@ type CodexSessionDebugState = {
 };
 
 type CodexSessionServerRequestState = {
-  pendingServerRequests: readonly CodexServerRequestEntry[];
+  pendingServerRequests: readonly CodexApprovalRequestEntry[];
   isRespondingToServerRequest: boolean;
   respondToServerRequest: (requestId: string | number, result: unknown) => void;
 };
@@ -189,9 +189,9 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     useState<CodexSessionConnectionState>("idle");
   const [agentConnectionError, setAgentConnectionError] = useState<string | null>(null);
   const [serverRequestsState, dispatchServerRequestsAction] = useReducer(
-    reduceCodexServerRequestsState,
+    reduceCodexApprovalRequestsState,
     undefined,
-    createInitialCodexServerRequestsState,
+    createInitialCodexApprovalRequestsState,
   );
   const debugState = useCodexSessionDebugState();
   const {

@@ -1,4 +1,4 @@
-import type { CodexFileChangeApprovalRequestEntry } from "../../codex-client/codex-server-requests-state.js";
+import type { CodexFileChangeApprovalRequestEntry } from "../../session-agents/codex/approvals/index.js";
 import type { ChatFileChangeEntry } from "../chat-types.js";
 import { ChatDiffView } from "./chat-diff-view.js";
 import { ChatFileChangeApproval } from "./chat-file-change-approval.js";

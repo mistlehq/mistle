@@ -1,6 +1,6 @@
 import type { CodexSessionConnectionState } from "@mistle/integrations-definitions/openai/agent/client";
 
-import type { StartSessionStep } from "../codex-client/codex-session-types.js";
+import type { StartSessionStep } from "../session-agents/codex/session-state/index.js";
 
 export type SessionHeaderStatusUi = {
   label: string;
@@ -86,12 +86,31 @@ export function hasSessionTopAlert(input: {
   hasSandboxStatusError: boolean;
   startErrorMessage: string | null;
   sandboxFailureMessage: string | null;
+  stoppedSessionMessage: string | null;
 }): boolean {
   return (
     input.hasSandboxStatusError ||
     input.startErrorMessage !== null ||
-    input.sandboxFailureMessage !== null
+    input.sandboxFailureMessage !== null ||
+    input.stoppedSessionMessage !== null
   );
+}
+
+export function resolveStoppedSessionMessage(input: {
+  connectionReadinessReason:
+    | "failed"
+    | "loading"
+    | "missing-session"
+    | "ready"
+    | "starting"
+    | "stopped"
+    | "unknown";
+}): string | null {
+  if (input.connectionReadinessReason !== "stopped") {
+    return null;
+  }
+
+  return "This sandbox is stopped. Dashboard resume handling is not implemented yet, so chat and terminal stay disconnected until the sandbox is running.";
 }
 
 export type ChatComposerAction =

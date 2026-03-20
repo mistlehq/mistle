@@ -2,10 +2,10 @@ import { Button, Input } from "@mistle/ui";
 import { useState } from "react";
 
 import { ApprovalDecisionButtons } from "./approval-decision-buttons.js";
-import type { CodexServerRequestEntry } from "./codex-server-requests-state.js";
+import type { CodexApprovalRequestEntry } from "./codex-approval-requests-state.js";
 
-type CodexServerRequestsPanelProps = {
-  entries: readonly CodexServerRequestEntry[];
+type CodexApprovalRequestsPanelProps = {
+  entries: readonly CodexApprovalRequestEntry[];
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
 };
@@ -14,11 +14,11 @@ function createRequestKey(requestId: string | number): string {
   return String(requestId);
 }
 
-export function CodexServerRequestsPanel({
+export function CodexApprovalRequestsPanel({
   entries,
   isRespondingToServerRequest,
   onRespondToServerRequest,
-}: CodexServerRequestsPanelProps): React.JSX.Element | null {
+}: CodexApprovalRequestsPanelProps): React.JSX.Element | null {
   const [userInputAnswers, setUserInputAnswers] = useState<Record<string, string>>({});
 
   if (entries.length === 0) {
@@ -26,7 +26,7 @@ export function CodexServerRequestsPanel({
   }
 
   return (
-    <div className="space-y-3 pb-4" role="region" aria-label="Pending Codex requests">
+    <div className="space-y-3 pb-4" role="region" aria-label="Pending Codex approvals">
       {entries.map((entry) => {
         const requestKey = createRequestKey(entry.requestId);
 
@@ -186,3 +186,5 @@ export function CodexServerRequestsPanel({
     </div>
   );
 }
+
+export type { CodexApprovalRequestsPanelProps };

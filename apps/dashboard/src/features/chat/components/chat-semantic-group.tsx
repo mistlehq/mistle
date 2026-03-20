@@ -1,6 +1,6 @@
 import { CaretRightIcon } from "@phosphor-icons/react";
 
-import type { CodexServerRequestEntry } from "../../codex-client/codex-server-requests-state.js";
+import type { CodexApprovalRequestEntry } from "../../session-agents/codex/approvals/index.js";
 import type {
   ChatSemanticGroupDetailKind,
   ChatSemanticGroupEntry,
@@ -18,7 +18,7 @@ type ChatSemanticGroupProps = {
   block: ChatSemanticGroupEntry;
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
-  pendingServerRequests: readonly CodexServerRequestEntry[];
+  pendingServerRequests: readonly CodexApprovalRequestEntry[];
 };
 
 const SemanticGroupDisplayKeyLabels = {

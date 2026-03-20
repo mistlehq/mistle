@@ -3,14 +3,14 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { CodexServerRequestsPanel } from "./codex-server-requests-panel.js";
+import { CodexApprovalRequestsPanel } from "./codex-approval-requests-panel.js";
 
-describe("CodexServerRequestsPanel", () => {
+describe("CodexApprovalRequestsPanel", () => {
   it("renders command approvals in the standalone panel when passed through", () => {
     const submittedResults: unknown[] = [];
 
     render(
-      <CodexServerRequestsPanel
+      <CodexApprovalRequestsPanel
         entries={[
           {
             requestId: 11,
@@ -50,7 +50,7 @@ describe("CodexServerRequestsPanel", () => {
     const submittedResults: unknown[] = [];
 
     render(
-      <CodexServerRequestsPanel
+      <CodexApprovalRequestsPanel
         entries={[
           {
             requestId: 17,

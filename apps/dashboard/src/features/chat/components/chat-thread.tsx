@@ -1,4 +1,4 @@
-import type { CodexServerRequestEntry } from "../../codex-client/codex-server-requests-state.js";
+import type { CodexApprovalRequestEntry } from "../../session-agents/codex/approvals/index.js";
 import type { ChatEntry } from "../chat-types.js";
 import { buildChatTurnGroups } from "../chat-view-model.js";
 import {
@@ -17,7 +17,7 @@ type ChatThreadProps = {
   entries: readonly ChatEntry[];
   isRespondingToServerRequest: boolean;
   onRespondToServerRequest: (requestId: string | number, result: unknown) => void;
-  pendingServerRequests: readonly CodexServerRequestEntry[];
+  pendingServerRequests: readonly CodexApprovalRequestEntry[];
 };
 export function ChatThread({
   entries,

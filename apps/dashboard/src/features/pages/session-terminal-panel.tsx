@@ -12,6 +12,31 @@ import { INITIAL_PTY_DIMENSIONS, SessionTerminalSurface } from "./session-termin
 
 const TERMINAL_BORDER_COLOR = "#D6D3D1";
 
+function shouldAutoOpenTerminal(input: {
+  isVisible: boolean;
+  isConnectionReady: boolean;
+  lifecycleState: SandboxPtyState;
+  hasAttemptedAutoOpen: boolean;
+}): boolean {
+  if (!input.isVisible) {
+    return false;
+  }
+
+  if (!input.isConnectionReady) {
+    return false;
+  }
+
+  if (
+    input.lifecycleState === "open" ||
+    input.lifecycleState === "opening" ||
+    input.lifecycleState === "connecting"
+  ) {
+    return false;
+  }
+
+  return !input.hasAttemptedAutoOpen;
+}
+
 function SessionTerminalToolbarStatus(input: {
   errorMessage: string | null;
   state: SandboxPtyState;
@@ -52,17 +77,21 @@ function SessionTerminalToolbarStatus(input: {
 type SessionTerminalPanelProps = {
   onHide: () => void;
   isVisible: boolean;
+  isConnectionReady: boolean;
   onClose: () => Promise<void> | void;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   sandboxInstanceId: string;
+  sandboxStatus: string | null;
 };
 
 export function SessionTerminalPanel({
   onHide,
   isVisible,
+  isConnectionReady,
   onClose,
   ptyState,
   sandboxInstanceId,
+  sandboxStatus,
 }: SessionTerminalPanelProps): React.JSX.Element | null {
   const { lifecycle, output, actions } = ptyState;
   const { openPty, resizePty, writeInput } = actions;
@@ -70,22 +99,17 @@ export function SessionTerminalPanel({
 
   useEffect(() => {
     hasAttemptedAutoOpenRef.current = false;
-  }, [isVisible, sandboxInstanceId]);
+  }, [isConnectionReady, isVisible, sandboxInstanceId, sandboxStatus]);
 
   useEffect(() => {
-    if (!isVisible) {
-      return;
-    }
-
     if (
-      lifecycle.state === "open" ||
-      lifecycle.state === "opening" ||
-      lifecycle.state === "connecting"
+      !shouldAutoOpenTerminal({
+        isVisible,
+        isConnectionReady,
+        lifecycleState: lifecycle.state,
+        hasAttemptedAutoOpen: hasAttemptedAutoOpenRef.current,
+      })
     ) {
-      return;
-    }
-
-    if (hasAttemptedAutoOpenRef.current) {
       return;
     }
 
@@ -96,7 +120,7 @@ export function SessionTerminalPanel({
     }).catch(() => {
       // Error state is surfaced through lifecycle state and page alerts.
     });
-  }, [isVisible, lifecycle.state, openPty, sandboxInstanceId]);
+  }, [isConnectionReady, isVisible, lifecycle.state, openPty, sandboxInstanceId]);
 
   async function handleHideTerminal(): Promise<void> {
     onHide();
@@ -158,3 +182,5 @@ export function SessionTerminalPanel({
     </div>
   );
 }
+
+export { shouldAutoOpenTerminal };

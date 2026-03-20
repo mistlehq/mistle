@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import {
   CodexStoryCommandApprovalRequest,
   CodexStoryCommandBlock,
-} from "../../codex-client/codex-story-fixtures.js";
+} from "../../session-agents/codex/fixtures/approval-story-fixtures.js";
 import { ChatCommandBlock } from "./chat-command-block.js";
 
 const meta = {
