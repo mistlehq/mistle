@@ -15,7 +15,7 @@ import {
   Textarea,
 } from "@mistle/ui";
 import { TrashIcon } from "@phosphor-icons/react";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 
 import { resolveCommonWebhookAutomationConversationKeyOptions } from "./webhook-automation-conversation-key-options.js";
 import { WebhookAutomationTitleEditor } from "./webhook-automation-title-editor.js";
@@ -142,7 +142,7 @@ function FormSection(input: {
   );
 }
 
-function resolveConversationKeyFieldOptions(input: {
+export function resolveConversationKeyFieldOptions(input: {
   selectedEventOptions: readonly WebhookAutomationEventOption[];
   currentTemplate: string;
 }): {
@@ -202,33 +202,6 @@ export function WebhookAutomationForm(input: WebhookAutomationFormProps): React.
       }),
     [input.values.conversationKeyTemplate, selectedTriggerOptions],
   );
-
-  useEffect(() => {
-    if (conversationKeyFieldOptions.supportedOptions.length === 0) {
-      return;
-    }
-
-    if (conversationKeyFieldOptions.hasUnsupportedCurrentTemplate) {
-      return;
-    }
-
-    if (
-      input.values.conversationKeyTemplate.trim().length === 0 ||
-      !conversationKeyFieldOptions.supportedOptions.some(
-        (option) => option.template === input.values.conversationKeyTemplate,
-      )
-    ) {
-      input.onValueChange(
-        "conversationKeyTemplate",
-        conversationKeyFieldOptions.supportedOptions[0]?.template ?? "",
-      );
-    }
-  }, [
-    conversationKeyFieldOptions.hasUnsupportedCurrentTemplate,
-    conversationKeyFieldOptions.supportedOptions,
-    input.onValueChange,
-    input.values.conversationKeyTemplate,
-  ]);
 
   return (
     <div className="flex flex-col gap-6">

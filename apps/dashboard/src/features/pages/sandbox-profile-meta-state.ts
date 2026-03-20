@@ -1,5 +1,5 @@
 import { useMutation } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
 import {
@@ -25,6 +25,11 @@ type UseSandboxProfileMetaStateInput = {
   invalidateProfileDetail: (profileId: string) => Promise<void>;
 };
 
+type KeyedValue<T> = {
+  sourceKey: string;
+  value: T;
+};
+
 export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInput): {
   formState: SandboxProfileEditorFormState;
   saveError: string | null;
@@ -42,24 +47,23 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
   onCreate: () => void;
   onCancelCreate: () => void;
 } {
-  const [displayName, setDisplayName] = useState("");
-  const [persistedDisplayName, setPersistedDisplayName] = useState("");
+  const metaSourceKey = input.mode === "edit" ? `edit:${input.profileId ?? "missing"}` : "create";
+  const [displayNameState, setDisplayNameState] = useState<KeyedValue<string> | null>(null);
+  const [persistedDisplayNameState, setPersistedDisplayNameState] =
+    useState<KeyedValue<string> | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isEditingProfileName, setIsEditingProfileName] = useState(false);
-  const [profileNameDraft, setProfileNameDraft] = useState("");
-
-  useEffect(() => {
-    if (input.mode !== "edit") {
-      return;
-    }
-    if (input.loadedProfile === undefined) {
-      return;
-    }
-
-    setDisplayName(input.loadedProfile.displayName);
-    setPersistedDisplayName(input.loadedProfile.displayName);
-    setProfileNameDraft(input.loadedProfile.displayName);
-  }, [input.loadedProfile, input.mode]);
+  const [profileNameDraftState, setProfileNameDraftState] = useState<KeyedValue<string> | null>(
+    null,
+  );
+  const persistedDisplayName =
+    persistedDisplayNameState?.sourceKey === metaSourceKey
+      ? persistedDisplayNameState.value
+      : (input.loadedProfile?.displayName ?? "");
+  const displayName =
+    displayNameState?.sourceKey === metaSourceKey ? displayNameState.value : persistedDisplayName;
+  const profileNameDraft =
+    profileNameDraftState?.sourceKey === metaSourceKey ? profileNameDraftState.value : displayName;
 
   const createMutation = useMutation({
     mutationFn: async (createInput: SandboxProfileEditorFormState) =>
@@ -98,10 +102,19 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
       }),
     onSuccess: async (updatedProfile, variables) => {
       if (variables.changes.displayName !== undefined) {
-        setDisplayName(updatedProfile.displayName);
-        setPersistedDisplayName(updatedProfile.displayName);
+        setDisplayNameState({
+          sourceKey: metaSourceKey,
+          value: updatedProfile.displayName,
+        });
+        setPersistedDisplayNameState({
+          sourceKey: metaSourceKey,
+          value: updatedProfile.displayName,
+        });
       }
-      setProfileNameDraft(updatedProfile.displayName);
+      setProfileNameDraftState({
+        sourceKey: metaSourceKey,
+        value: updatedProfile.displayName,
+      });
       setSaveError(null);
 
       await input.invalidateSandboxProfiles();
@@ -122,23 +135,35 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
     trimmedDisplayName.length > 0 ? trimmedDisplayName : (input.profileId ?? "Profile");
 
   function onDisplayNameChange(nextValue: string): void {
-    setDisplayName(nextValue);
+    setDisplayNameState({
+      sourceKey: metaSourceKey,
+      value: nextValue,
+    });
     setSaveError(null);
   }
 
   function onProfileNameEditStart(): void {
-    setProfileNameDraft(displayName);
+    setProfileNameDraftState({
+      sourceKey: metaSourceKey,
+      value: displayName,
+    });
     setIsEditingProfileName(true);
     setSaveError(null);
   }
 
   function onProfileNameDraftChange(nextValue: string): void {
-    setProfileNameDraft(nextValue);
+    setProfileNameDraftState({
+      sourceKey: metaSourceKey,
+      value: nextValue,
+    });
     setSaveError(null);
   }
 
   function onProfileNameEditCancel(): void {
-    setProfileNameDraft(displayName);
+    setProfileNameDraftState({
+      sourceKey: metaSourceKey,
+      value: displayName,
+    });
     setIsEditingProfileName(false);
     setSaveError(null);
   }
@@ -155,11 +180,17 @@ export function useSandboxProfileMetaState(input: UseSandboxProfileMetaStateInpu
     });
     setIsEditingProfileName(false);
     if (decision.action === "revert") {
-      setProfileNameDraft(persistedDisplayName);
+      setProfileNameDraftState({
+        sourceKey: metaSourceKey,
+        value: persistedDisplayName,
+      });
       return;
     }
 
-    setDisplayName(decision.displayName);
+    setDisplayNameState({
+      sourceKey: metaSourceKey,
+      value: decision.displayName,
+    });
 
     if (decision.action === "noop") {
       return;
