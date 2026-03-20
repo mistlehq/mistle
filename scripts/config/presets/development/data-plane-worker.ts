@@ -23,7 +23,7 @@ export const dataPlaneWorkerDevelopmentPreset = {
         },
         reaper: {
           poll_interval_seconds: 30,
-          webhook_idle_timeout_seconds: 300,
+          idle_timeout_seconds: 300,
           execution_lease_freshness_seconds: 30,
           tunnel_disconnect_grace_seconds: 60,
         },

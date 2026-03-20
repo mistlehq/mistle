@@ -1,8 +1,4 @@
-import {
-  createDataPlaneDatabase,
-  SandboxInstanceSources,
-  SandboxInstanceStatuses,
-} from "@mistle/db/data-plane";
+import { createDataPlaneDatabase, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import type { Clock } from "@mistle/time";
 import { systemClock, systemSleeper } from "@mistle/time";
 import { StopSandboxInstanceWorkflowSpec } from "@mistle/workflow-registry/data-plane";
@@ -20,10 +16,10 @@ import {
   type DataPlaneWorkerRuntimeConfig,
 } from "../openworkflow/core/config.js";
 import {
-  evaluateWebhookSandboxStopReason,
-  type WebhookSandboxIdlePolicy,
-  type WebhookSandboxStopReason,
-  WebhookSandboxStopReasons,
+  evaluateSandboxStopReason,
+  type SandboxIdlePolicy,
+  type SandboxStopReason,
+  SandboxStopReasons,
 } from "./policy.js";
 
 const ReaperAdvisoryLockKey = 4_246_001;
@@ -35,26 +31,24 @@ type ReaperSandboxCandidate = {
   tunnelDisconnectedAt: string | null;
 };
 
-export type EligibleWebhookSandboxStop = {
+export type EligibleSandboxStop = {
   sandboxInstanceId: string;
-  reason: WebhookSandboxStopReason;
+  reason: SandboxStopReason;
 };
 
 export type IdleReaperSweepResult = {
   enqueuedStopWorkflowCount: number;
 };
 
-export function createWebhookIdlePolicy(
-  config: DataPlaneWorkerRuntimeConfig,
-): WebhookSandboxIdlePolicy {
+export function createSandboxIdlePolicy(config: DataPlaneWorkerRuntimeConfig): SandboxIdlePolicy {
   return {
-    webhookIdleTimeoutMs: config.app.reaper.webhookIdleTimeoutSeconds * 1000,
+    idleTimeoutMs: config.app.reaper.idleTimeoutSeconds * 1000,
     executionLeaseFreshnessMs: config.app.reaper.executionLeaseFreshnessSeconds * 1000,
     tunnelDisconnectGraceMs: config.app.reaper.tunnelDisconnectGraceSeconds * 1000,
   };
 }
 
-export async function listWebhookSandboxStopCandidates(input: {
+export async function listSandboxStopCandidates(input: {
   db: ReturnType<typeof createDataPlaneDatabase>;
 }): Promise<readonly ReaperSandboxCandidate[]> {
   const sandboxInstances = await input.db.query.sandboxInstances.findMany({
@@ -63,17 +57,13 @@ export async function listWebhookSandboxStopCandidates(input: {
       startedAt: true,
       tunnelDisconnectedAt: true,
     },
-    where: (table, { and, eq }) =>
-      and(
-        eq(table.status, SandboxInstanceStatuses.RUNNING),
-        eq(table.source, SandboxInstanceSources.WEBHOOK),
-      ),
+    where: (table, { eq }) => eq(table.status, SandboxInstanceStatuses.RUNNING),
   });
 
   return Promise.all(
     sandboxInstances.map(async (sandboxInstance) => {
       if (sandboxInstance.startedAt === null) {
-        throw new Error(`Expected startedAt for running webhook sandbox '${sandboxInstance.id}'.`);
+        throw new Error(`Expected startedAt for running sandbox '${sandboxInstance.id}'.`);
       }
 
       const newestExecutionLease = await input.db.query.sandboxExecutionLeases.findFirst({
@@ -94,17 +84,17 @@ export async function listWebhookSandboxStopCandidates(input: {
   );
 }
 
-export async function findWebhookSandboxesEligibleForStop(input: {
+export async function findSandboxesEligibleForStop(input: {
   db: ReturnType<typeof createDataPlaneDatabase>;
   clock: Clock;
-  policy: WebhookSandboxIdlePolicy;
-}): Promise<readonly EligibleWebhookSandboxStop[]> {
-  const candidates = await listWebhookSandboxStopCandidates({
+  policy: SandboxIdlePolicy;
+}): Promise<readonly EligibleSandboxStop[]> {
+  const candidates = await listSandboxStopCandidates({
     db: input.db,
   });
 
   return candidates.flatMap((candidate) => {
-    const reason = evaluateWebhookSandboxStopReason({
+    const reason = evaluateSandboxStopReason({
       nowMs: input.clock.nowMs(),
       policy: input.policy,
       sandboxInstanceId: candidate.sandboxInstanceId,
@@ -123,7 +113,7 @@ export async function findWebhookSandboxesEligibleForStop(input: {
       {
         sandboxInstanceId: candidate.sandboxInstanceId,
         reason,
-      } satisfies EligibleWebhookSandboxStop,
+      } satisfies EligibleSandboxStop,
     ];
   });
 }
@@ -134,8 +124,8 @@ export async function runIdleReaperSweep(input: {
   clock: Clock;
   enqueueStopWorkflow: (input: { sandboxInstanceId: string }) => Promise<void>;
 }): Promise<IdleReaperSweepResult> {
-  const policy = createWebhookIdlePolicy(input.config);
-  const candidates = await findWebhookSandboxesEligibleForStop({
+  const policy = createSandboxIdlePolicy(input.config);
+  const candidates = await findSandboxesEligibleForStop({
     db: input.db,
     clock: input.clock,
     policy,
@@ -153,7 +143,7 @@ export async function runIdleReaperSweep(input: {
         sandboxInstanceId: candidate.sandboxInstanceId,
         stopReason: candidate.reason,
       },
-      candidate.reason === WebhookSandboxStopReasons.DISCONNECTED
+      candidate.reason === SandboxStopReasons.DISCONNECTED
         ? "Enqueued sandbox stop workflow after disconnect grace elapsed"
         : "Enqueued idle sandbox stop workflow",
     );
@@ -245,7 +235,7 @@ export async function runIdleReaper(): Promise<void> {
     logger.info(
       {
         pollIntervalSeconds: runtimeConfig.app.reaper.pollIntervalSeconds,
-        webhookIdleTimeoutSeconds: runtimeConfig.app.reaper.webhookIdleTimeoutSeconds,
+        idleTimeoutSeconds: runtimeConfig.app.reaper.idleTimeoutSeconds,
         executionLeaseFreshnessSeconds: runtimeConfig.app.reaper.executionLeaseFreshnessSeconds,
         tunnelDisconnectGraceSeconds: runtimeConfig.app.reaper.tunnelDisconnectGraceSeconds,
       },

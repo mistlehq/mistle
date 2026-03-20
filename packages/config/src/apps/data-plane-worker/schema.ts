@@ -34,7 +34,7 @@ export const DataPlaneWorkerTunnelConfigSchema = z
 export const DataPlaneWorkerReaperConfigSchema = z
   .object({
     pollIntervalSeconds: z.number().int().min(1),
-    webhookIdleTimeoutSeconds: z.number().int().min(1),
+    idleTimeoutSeconds: z.number().int().min(1),
     executionLeaseFreshnessSeconds: z.number().int().min(1),
     tunnelDisconnectGraceSeconds: z.number().int().min(1),
   })

@@ -136,7 +136,7 @@ describe("parseConfigRecord", () => {
           },
           reaper: {
             pollIntervalSeconds: 30,
-            webhookIdleTimeoutSeconds: 300,
+            idleTimeoutSeconds: 300,
             executionLeaseFreshnessSeconds: 30,
             tunnelDisconnectGraceSeconds: 60,
           },
@@ -307,7 +307,7 @@ describe("parseConfigRecord", () => {
           },
           reaper: {
             pollIntervalSeconds: 30,
-            webhookIdleTimeoutSeconds: 300,
+            idleTimeoutSeconds: 300,
             executionLeaseFreshnessSeconds: 30,
             tunnelDisconnectGraceSeconds: 60,
           },
@@ -477,7 +477,7 @@ describe("parseConfigRecord", () => {
           },
           reaper: {
             pollIntervalSeconds: 30,
-            webhookIdleTimeoutSeconds: 300,
+            idleTimeoutSeconds: 300,
             executionLeaseFreshnessSeconds: 30,
             tunnelDisconnectGraceSeconds: 60,
           },

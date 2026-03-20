@@ -1,21 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  evaluateWebhookSandboxStopReason,
-  WebhookSandboxStopReasons,
-  type WebhookSandboxIdlePolicy,
-} from "./policy.js";
+import { evaluateSandboxStopReason, SandboxStopReasons, type SandboxIdlePolicy } from "./policy.js";
 
-const DefaultPolicy: WebhookSandboxIdlePolicy = {
-  webhookIdleTimeoutMs: 300_000,
+const DefaultPolicy: SandboxIdlePolicy = {
+  idleTimeoutMs: 300_000,
   executionLeaseFreshnessMs: 30_000,
   tunnelDisconnectGraceMs: 60_000,
 };
 
-describe("evaluateWebhookSandboxStopReason", () => {
+describe("evaluateSandboxStopReason", () => {
   it("stops sandboxes that have never reported an execution lease after the idle timeout", () => {
     expect(
-      evaluateWebhookSandboxStopReason({
+      evaluateSandboxStopReason({
         nowMs: Date.parse("2026-03-16T00:10:00.000Z"),
         policy: DefaultPolicy,
         sandboxInstanceId: "sbi_idle",
@@ -25,12 +21,12 @@ describe("evaluateWebhookSandboxStopReason", () => {
           tunnelDisconnectedAt: null,
         },
       }),
-    ).toBe(WebhookSandboxStopReasons.IDLE);
+    ).toBe(SandboxStopReasons.IDLE);
   });
 
   it("keeps sandboxes alive while the newest execution lease is still fresh", () => {
     expect(
-      evaluateWebhookSandboxStopReason({
+      evaluateSandboxStopReason({
         nowMs: Date.parse("2026-03-16T00:10:00.000Z"),
         policy: DefaultPolicy,
         sandboxInstanceId: "sbi_busy",
@@ -45,7 +41,7 @@ describe("evaluateWebhookSandboxStopReason", () => {
 
   it("waits for the idle timeout after the last execution lease renewal before stopping", () => {
     expect(
-      evaluateWebhookSandboxStopReason({
+      evaluateSandboxStopReason({
         nowMs: Date.parse("2026-03-16T00:10:00.000Z"),
         policy: DefaultPolicy,
         sandboxInstanceId: "sbi_recently_idle",
@@ -60,7 +56,7 @@ describe("evaluateWebhookSandboxStopReason", () => {
 
   it("stops sandboxes whose tunnel has been disconnected beyond the grace window", () => {
     expect(
-      evaluateWebhookSandboxStopReason({
+      evaluateSandboxStopReason({
         nowMs: Date.parse("2026-03-16T00:10:00.000Z"),
         policy: DefaultPolicy,
         sandboxInstanceId: "sbi_disconnected",
@@ -70,6 +66,6 @@ describe("evaluateWebhookSandboxStopReason", () => {
           tunnelDisconnectedAt: "2026-03-16T00:08:30.000Z",
         },
       }),
-    ).toBe(WebhookSandboxStopReasons.DISCONNECTED);
+    ).toBe(SandboxStopReasons.DISCONNECTED);
   });
 });

@@ -24,8 +24,8 @@ import {
 import type { DataPlaneWorkerRuntimeConfig } from "../openworkflow/core/config.js";
 import { markSandboxInstanceStopped } from "../openworkflow/stop-sandbox-instance/mark-sandbox-instance-stopped.js";
 import {
-  createWebhookIdlePolicy,
-  findWebhookSandboxesEligibleForStop,
+  createSandboxIdlePolicy,
+  findSandboxesEligibleForStop,
   runIdleReaperSweep,
 } from "../reaper/runtime.js";
 
@@ -57,7 +57,7 @@ const TestRuntimeConfig: DataPlaneWorkerRuntimeConfig = {
     },
     reaper: {
       pollIntervalSeconds: 30,
-      webhookIdleTimeoutSeconds: 300,
+      idleTimeoutSeconds: 300,
       executionLeaseFreshnessSeconds: 30,
       tunnelDisconnectGraceSeconds: 60,
     },
@@ -203,24 +203,24 @@ describe("idle reaper integration", () => {
   });
 
   it(
-    "finds only webhook sandboxes that are disconnected or idle beyond the policy thresholds",
+    "finds running sandboxes of every source that are disconnected or idle beyond the policy thresholds",
     async () => {
       const idleSandboxId = typeid("sbi").toString();
+      const dashboardIdleSandboxId = typeid("sbi").toString();
       const freshLeaseSandboxId = typeid("sbi").toString();
       const disconnectedSandboxId = typeid("sbi").toString();
-      const dashboardSandboxId = typeid("sbi").toString();
       const stoppedSandboxId = typeid("sbi").toString();
       const recentlyActiveSandboxId = typeid("sbi").toString();
 
       await insertSandboxInstance({ sandboxInstanceId: idleSandboxId });
+      await insertSandboxInstance({
+        sandboxInstanceId: dashboardIdleSandboxId,
+        source: SandboxInstanceSources.DASHBOARD,
+      });
       await insertSandboxInstance({ sandboxInstanceId: freshLeaseSandboxId });
       await insertSandboxInstance({
         sandboxInstanceId: disconnectedSandboxId,
         tunnelDisconnectedAt: "2026-03-16T00:08:30.000Z",
-      });
-      await insertSandboxInstance({
-        sandboxInstanceId: dashboardSandboxId,
-        source: SandboxInstanceSources.DASHBOARD,
       });
       await insertSandboxInstance({
         sandboxInstanceId: stoppedSandboxId,
@@ -239,16 +239,20 @@ describe("idle reaper integration", () => {
 
       const clock = createMutableClock(Date.parse("2026-03-16T00:10:00.000Z"));
 
-      const candidates = await findWebhookSandboxesEligibleForStop({
+      const candidates = await findSandboxesEligibleForStop({
         db: createDatabase(),
         clock,
-        policy: createWebhookIdlePolicy(TestRuntimeConfig),
+        policy: createSandboxIdlePolicy(TestRuntimeConfig),
       });
 
       expect(candidates).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             sandboxInstanceId: idleSandboxId,
+            reason: "idle",
+          }),
+          expect.objectContaining({
+            sandboxInstanceId: dashboardIdleSandboxId,
             reason: "idle",
           }),
           expect.objectContaining({
@@ -259,9 +263,6 @@ describe("idle reaper integration", () => {
       );
       expect(
         candidates.some((candidate) => candidate.sandboxInstanceId === freshLeaseSandboxId),
-      ).toBe(false);
-      expect(
-        candidates.some((candidate) => candidate.sandboxInstanceId === dashboardSandboxId),
       ).toBe(false);
       expect(candidates.some((candidate) => candidate.sandboxInstanceId === stoppedSandboxId)).toBe(
         false,
@@ -274,13 +275,18 @@ describe("idle reaper integration", () => {
   );
 
   it(
-    "enqueues stop workflows for eligible webhook sandboxes",
+    "enqueues stop workflows for eligible sandboxes across sources",
     async () => {
       const idleSandboxId = typeid("sbi").toString();
+      const dashboardIdleSandboxId = typeid("sbi").toString();
       const freshLeaseSandboxId = typeid("sbi").toString();
       const disconnectedSandboxId = typeid("sbi").toString();
 
       await insertSandboxInstance({ sandboxInstanceId: idleSandboxId });
+      await insertSandboxInstance({
+        sandboxInstanceId: dashboardIdleSandboxId,
+        source: SandboxInstanceSources.DASHBOARD,
+      });
       await insertSandboxInstance({ sandboxInstanceId: freshLeaseSandboxId });
       await insertSandboxInstance({
         sandboxInstanceId: disconnectedSandboxId,
@@ -313,7 +319,7 @@ describe("idle reaper integration", () => {
       });
 
       expect(sweepResult).toEqual({
-        enqueuedStopWorkflowCount: 2,
+        enqueuedStopWorkflowCount: 3,
       });
 
       const workflowRuns = await getWorkflowBackend().listWorkflowRuns({
@@ -325,6 +331,14 @@ describe("idle reaper integration", () => {
           (workflowRun) =>
             workflowRun.workflowName === StopSandboxInstanceWorkflowSpec.name &&
             workflowRun.idempotencyKey === `sandbox-stop:${idleSandboxId}` &&
+            workflowRun.status === "pending",
+        ),
+      ).toBe(true);
+      expect(
+        workflowRuns.data.some(
+          (workflowRun) =>
+            workflowRun.workflowName === StopSandboxInstanceWorkflowSpec.name &&
+            workflowRun.idempotencyKey === `sandbox-stop:${dashboardIdleSandboxId}` &&
             workflowRun.status === "pending",
         ),
       ).toBe(true);

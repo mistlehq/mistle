@@ -1,18 +1,17 @@
-export const WebhookSandboxStopReasons = {
+export const SandboxStopReasons = {
   DISCONNECTED: "disconnected",
   IDLE: "idle",
 } as const;
 
-export type WebhookSandboxStopReason =
-  (typeof WebhookSandboxStopReasons)[keyof typeof WebhookSandboxStopReasons];
+export type SandboxStopReason = (typeof SandboxStopReasons)[keyof typeof SandboxStopReasons];
 
-export type WebhookSandboxIdlePolicy = {
-  webhookIdleTimeoutMs: number;
+export type SandboxIdlePolicy = {
+  idleTimeoutMs: number;
   executionLeaseFreshnessMs: number;
   tunnelDisconnectGraceMs: number;
 };
 
-export type WebhookSandboxStopCandidateState = {
+export type SandboxStopCandidateState = {
   startedAt: string;
   latestExecutionLeaseSeenAt: string | null;
   tunnelDisconnectedAt: string | null;
@@ -39,15 +38,15 @@ function requirePositiveDuration(input: { fieldName: string; value: number }): v
   }
 }
 
-export function evaluateWebhookSandboxStopReason(input: {
+export function evaluateSandboxStopReason(input: {
   nowMs: number;
-  policy: WebhookSandboxIdlePolicy;
+  policy: SandboxIdlePolicy;
   sandboxInstanceId: string;
-  state: WebhookSandboxStopCandidateState;
-}): WebhookSandboxStopReason | null {
+  state: SandboxStopCandidateState;
+}): SandboxStopReason | null {
   requirePositiveDuration({
-    fieldName: "webhookIdleTimeoutMs",
-    value: input.policy.webhookIdleTimeoutMs,
+    fieldName: "idleTimeoutMs",
+    value: input.policy.idleTimeoutMs,
   });
   requirePositiveDuration({
     fieldName: "executionLeaseFreshnessMs",
@@ -71,7 +70,7 @@ export function evaluateWebhookSandboxStopReason(input: {
       sandboxInstanceId: input.sandboxInstanceId,
     });
     if (input.nowMs - disconnectedAtMs >= input.policy.tunnelDisconnectGraceMs) {
-      return WebhookSandboxStopReasons.DISCONNECTED;
+      return SandboxStopReasons.DISCONNECTED;
     }
   }
 
@@ -91,8 +90,8 @@ export function evaluateWebhookSandboxStopReason(input: {
     return null;
   }
 
-  if (input.nowMs - latestActivityAtMs >= input.policy.webhookIdleTimeoutMs) {
-    return WebhookSandboxStopReasons.IDLE;
+  if (input.nowMs - latestActivityAtMs >= input.policy.idleTimeoutMs) {
+    return SandboxStopReasons.IDLE;
   }
 
   return null;
