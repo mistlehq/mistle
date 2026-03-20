@@ -12,13 +12,8 @@ import { ProfileSettingsPageView } from "./profile-settings-page-view.js";
 export function ProfileSettingsPage(): React.JSX.Element {
   const queryClient = useQueryClient();
   const session = useRequiredSession();
-  const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
-
-  useEffect(() => {
-    setDisplayNameDraft(resolveUserDisplayName(session.user));
-  }, [session.user]);
 
   useEffect(() => {
     if (!saveSuccess) {
@@ -54,40 +49,64 @@ export function ProfileSettingsPage(): React.JSX.Element {
     },
   });
 
-  function handleDisplayNameChange(nextValue: string): void {
-    setDisplayNameDraft(nextValue);
-    setFieldError(null);
-    setSaveSuccess(false);
-  }
+  const persistedDisplayName = resolveUserDisplayName(session.user);
 
-  function handleCancelChanges(): void {
-    setDisplayNameDraft(resolveUserDisplayName(session.user));
-    setFieldError(null);
-    setSaveSuccess(false);
-  }
+  return (
+    <ProfileSettingsEditor
+      key={`${session.user.email}:${persistedDisplayName}`}
+      email={session.user.email}
+      fieldError={fieldError}
+      onDisplayNameSave={(displayNameDraft) => {
+        setFieldError(null);
+        setSaveSuccess(false);
+        void saveMutation.mutateAsync(displayNameDraft.trim());
+      }}
+      onResetFeedback={() => {
+        setFieldError(null);
+        setSaveSuccess(false);
+      }}
+      persistedDisplayName={persistedDisplayName}
+      saveSuccess={saveSuccess}
+      saving={saveMutation.isPending}
+    />
+  );
+}
 
-  function handleSaveChanges(): void {
-    const normalizedDisplayName = displayNameDraft.trim();
-    void saveMutation.mutateAsync(normalizedDisplayName);
-  }
+function ProfileSettingsEditor(input: {
+  persistedDisplayName: string;
+  email: string;
+  fieldError: string | null;
+  saveSuccess: boolean;
+  saving: boolean;
+  onDisplayNameSave: (displayNameDraft: string) => void;
+  onResetFeedback: () => void;
+}): React.JSX.Element {
+  const [displayNameDraft, setDisplayNameDraft] = useState(input.persistedDisplayName);
 
   const normalizedDisplayName = displayNameDraft.trim();
-  const persistedDisplayName = resolveUserDisplayName(session.user);
-  const hasDirtyChanges = normalizedDisplayName !== persistedDisplayName.trim();
-  const displayName = normalizedDisplayName.length > 0 ? normalizedDisplayName : session.user.email;
+  const hasDirtyChanges = normalizedDisplayName !== input.persistedDisplayName.trim();
+  const displayName = normalizedDisplayName.length > 0 ? normalizedDisplayName : input.email;
 
   return (
     <ProfileSettingsPageView
       displayName={displayName}
       displayNameDraft={displayNameDraft}
-      email={session.user.email}
-      fieldError={fieldError}
+      email={input.email}
+      fieldError={input.fieldError}
       hasDirtyChanges={hasDirtyChanges}
-      onCancelChanges={handleCancelChanges}
-      onDisplayNameChange={handleDisplayNameChange}
-      onSaveChanges={handleSaveChanges}
-      saveSuccess={saveSuccess}
-      saving={saveMutation.isPending}
+      onCancelChanges={() => {
+        setDisplayNameDraft(input.persistedDisplayName);
+        input.onResetFeedback();
+      }}
+      onDisplayNameChange={(nextValue) => {
+        setDisplayNameDraft(nextValue);
+        input.onResetFeedback();
+      }}
+      onSaveChanges={() => {
+        input.onDisplayNameSave(displayNameDraft);
+      }}
+      saveSuccess={input.saveSuccess}
+      saving={input.saving}
     />
   );
 }
