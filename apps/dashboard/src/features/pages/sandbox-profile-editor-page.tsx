@@ -501,7 +501,6 @@ function EditSandboxProfileEditorPage(): React.JSX.Element {
 
   return (
     <LoadedSandboxProfileEditorPage
-      key={`${profileId}:${profileQuery.data.displayName}`}
       navigate={navigate}
       profileId={profileId}
       profile={profileQuery.data}
@@ -535,6 +534,42 @@ function LoadedSandboxProfileEditorPage(input: {
   invalidateProfileDetail: (profileId: string) => Promise<void>;
   invalidateVersionBindings: (input: { profileId: string; version: number }) => Promise<void>;
 }): React.JSX.Element {
+  const integrationsLoader = useSandboxProfileIntegrationsLoader({
+    profileId: input.profileId,
+  });
+
+  return (
+    <div className="gap-4 flex flex-col">
+      <LoadedSandboxProfileMetaSection
+        key={`${input.profileId}:${input.profile.displayName}`}
+        invalidateProfileDetail={input.invalidateProfileDetail}
+        invalidateSandboxProfiles={input.invalidateSandboxProfiles}
+        navigate={input.navigate}
+        profile={input.profile}
+        profileId={input.profileId}
+      />
+
+      <LoadedSandboxProfileIntegrationsSection
+        key={
+          integrationsLoader.version === null
+            ? `unavailable:${input.profileId}`
+            : `${input.profileId}:${String(integrationsLoader.version)}`
+        }
+        loader={integrationsLoader}
+        profileId={input.profileId}
+        invalidateVersionBindings={input.invalidateVersionBindings}
+      />
+    </div>
+  );
+}
+
+function LoadedSandboxProfileMetaSection(input: {
+  navigate: ReturnType<typeof useNavigate>;
+  profileId: string;
+  profile: { displayName: string };
+  invalidateSandboxProfiles: () => Promise<void>;
+  invalidateProfileDetail: (profileId: string) => Promise<void>;
+}): React.JSX.Element {
   const metaState = useEditSandboxProfileMetaState({
     profileId: input.profileId,
     loadedProfile: input.profile,
@@ -543,12 +578,8 @@ function LoadedSandboxProfileEditorPage(input: {
     invalidateProfileDetail: input.invalidateProfileDetail,
   });
 
-  const integrationsLoader = useSandboxProfileIntegrationsLoader({
-    profileId: input.profileId,
-  });
-
   return (
-    <div className="gap-4 flex flex-col">
+    <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <EditableHeading
           ariaLabel="Profile name"
@@ -573,18 +604,7 @@ function LoadedSandboxProfileEditorPage(input: {
           <AlertDescription>{metaState.saveError}</AlertDescription>
         </Alert>
       ) : null}
-
-      <LoadedSandboxProfileIntegrationsSection
-        key={
-          integrationsLoader.version === null
-            ? `unavailable:${input.profileId}`
-            : `${input.profileId}:${String(integrationsLoader.version)}`
-        }
-        loader={integrationsLoader}
-        profileId={input.profileId}
-        invalidateVersionBindings={input.invalidateVersionBindings}
-      />
-    </div>
+    </>
   );
 }
 
