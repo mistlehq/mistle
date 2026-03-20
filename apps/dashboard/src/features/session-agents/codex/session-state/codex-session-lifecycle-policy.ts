@@ -36,11 +36,10 @@ export function resolveCodexConnectionStateTransition(input: {
 
 export function selectCodexConnectionThreadStrategy(input: {
   availableThreads: readonly CodexThreadSummary[];
-  loadedThreadIds: readonly string[];
 }): CodexConnectionThreadStrategy {
   const preferredThreadId = selectPreferredThreadId({
     availableThreads: input.availableThreads,
-    loadedThreadIds: input.loadedThreadIds,
+    loadedThreadIds: [],
   });
 
   if (preferredThreadId !== null) {

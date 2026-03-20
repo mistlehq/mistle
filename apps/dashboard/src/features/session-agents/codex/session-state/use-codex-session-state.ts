@@ -493,7 +493,6 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
       });
       const connectionThreadStrategy = selectCodexConnectionThreadStrategy({
         availableThreads: threadCollections.availableThreads,
-        loadedThreadIds: threadCollections.loadedThreadIds,
       });
 
       if (connectionThreadStrategy.type === "resume") {
