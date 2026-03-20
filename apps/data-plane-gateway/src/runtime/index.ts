@@ -7,12 +7,22 @@ import type { WebSocketServer } from "ws";
 
 import { createApp, stopApp } from "../app.js";
 import { registerSandboxRuntimeStateRoute } from "../internal/runtime-state/register-sandbox-runtime-state-route.js";
+import { InMemorySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/in-memory-sandbox-runtime-attachment-store.js";
+import { ValkeySandboxRuntimeAttachmentStore } from "../runtime-state/adapters/valkey-sandbox-runtime-attachment-store.js";
+import { OWNER_LEASE_RENEW_INTERVAL_MS } from "../runtime-state/runtime-state-durations.js";
+import {
+  connectValkeyClient,
+  createValkeyClient,
+  type ValkeyClient,
+  closeValkeyClient,
+} from "../runtime-state/valkey-client.js";
 import { startServer } from "../server.js";
 import { createInMemoryTunnelRelayCoordinator } from "../tunnel/create-in-memory-relay-coordinator.js";
 import { LocalGatewayForwardingClientAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-client-adapter.js";
 import { LocalGatewayForwardingServerAdapter } from "../tunnel/gateway-forwarding/adapters/local-gateway-forwarding-server-adapter.js";
 import { InteractiveStreamRouter } from "../tunnel/gateway-forwarding/index.js";
 import { InMemorySandboxOwnerStore } from "../tunnel/ownership/adapters/in-memory-sandbox-owner-store.js";
+import { ValkeySandboxOwnerStore } from "../tunnel/ownership/adapters/valkey-sandbox-owner-store.js";
 import { SandboxOwnerLeaseHeartbeat } from "../tunnel/ownership/sandbox-owner-lease-heartbeat.js";
 import { StoreBackedSandboxOwnerResolver } from "../tunnel/ownership/store-backed-sandbox-owner-resolver.js";
 import { registerSandboxTunnelRoute } from "../tunnel/register-sandbox-tunnel-route.js";
@@ -25,7 +35,6 @@ import type {
   StartedServer,
 } from "../types.js";
 
-const OwnerLeaseRenewIntervalMs = 10_000;
 const DefaultMaxActiveBindingsPerSandbox = 32;
 
 function closeWebSocketServer(webSocketServer: WebSocketServer): Promise<void> {
@@ -52,7 +61,37 @@ export function createDataPlaneGatewayRuntime(
   const nodeWebSocket = createNodeWebSocket({ app });
   const nodeId = typeid("dpg").toString();
   const relayCoordinator = createInMemoryTunnelRelayCoordinator(nodeId);
-  const sandboxOwnerStore = new InMemorySandboxOwnerStore(systemClock);
+  let valkeyClient: ValkeyClient | undefined;
+  const sandboxOwnerStore =
+    config.app.runtimeState.backend === "memory"
+      ? new InMemorySandboxOwnerStore(systemClock)
+      : (() => {
+          const valkeyConfig = config.app.runtimeState.valkey;
+          if (valkeyConfig === undefined) {
+            throw new Error(
+              "Expected gateway runtimeState.valkey config when runtimeState.backend is 'valkey'.",
+            );
+          }
+
+          valkeyClient = createValkeyClient({
+            url: valkeyConfig.url,
+          });
+
+          return new ValkeySandboxOwnerStore(valkeyClient, valkeyConfig.keyPrefix);
+        })();
+  const sandboxRuntimeAttachmentStore =
+    config.app.runtimeState.backend === "memory"
+      ? new InMemorySandboxRuntimeAttachmentStore(systemClock)
+      : (() => {
+          const valkeyConfig = config.app.runtimeState.valkey;
+          if (valkeyConfig === undefined || valkeyClient === undefined) {
+            throw new Error(
+              "Expected initialized gateway Valkey client when runtimeState.backend is 'valkey'.",
+            );
+          }
+
+          return new ValkeySandboxRuntimeAttachmentStore(valkeyClient, valkeyConfig.keyPrefix);
+        })();
   const sandboxOwnerResolver = new StoreBackedSandboxOwnerResolver(nodeId, sandboxOwnerStore);
   const tunnelSessionRegistry = new TunnelSessionRegistry(
     new InMemoryTunnelSessionRegistryAdapter(DefaultMaxActiveBindingsPerSandbox),
@@ -70,12 +109,14 @@ export function createDataPlaneGatewayRuntime(
   const sandboxOwnerLeaseHeartbeat = new SandboxOwnerLeaseHeartbeat(
     sandboxOwnerStore,
     systemScheduler,
-    OwnerLeaseRenewIntervalMs,
+    OWNER_LEASE_RENEW_INTERVAL_MS,
   );
 
   registerSandboxRuntimeStateRoute({
     app,
+    clock: systemClock,
     internalAuthServiceToken: config.internalAuth.serviceToken,
+    sandboxRuntimeAttachmentStore,
     sandboxOwnerStore,
   });
 
@@ -99,6 +140,9 @@ export function createDataPlaneGatewayRuntime(
     sandboxOwnerStore,
     sandboxOwnerResolver,
     sandboxOwnerLeaseHeartbeat,
+    sandboxRuntimeAttachmentStore,
+    clock: systemClock,
+    scheduler: systemScheduler,
   });
   registerSandboxTunnelTokenExchangeRoute({
     app,
@@ -126,6 +170,11 @@ export function createDataPlaneGatewayRuntime(
       startedServer = undefined;
     }
 
+    if (valkeyClient !== undefined) {
+      await closeValkeyClient(valkeyClient);
+      valkeyClient = undefined;
+    }
+
     await stopApp(app);
     stopped = true;
   }
@@ -139,6 +188,9 @@ export function createDataPlaneGatewayRuntime(
       }
       if (startedServer !== undefined) {
         throw new Error("Data plane gateway runtime is already started.");
+      }
+      if (valkeyClient !== undefined) {
+        await connectValkeyClient(valkeyClient);
       }
 
       startedServer = startServer({
