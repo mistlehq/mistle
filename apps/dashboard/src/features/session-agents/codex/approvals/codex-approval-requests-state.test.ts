@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  createInitialCodexServerRequestsState,
-  reduceCodexServerRequestsState,
-} from "./codex-server-requests-state.js";
+  createInitialCodexApprovalRequestsState,
+  reduceCodexApprovalRequestsState,
+} from "./codex-approval-requests-state.js";
 
-describe("reduceCodexServerRequestsState", () => {
+describe("reduceCodexApprovalRequestsState", () => {
   it("captures command approval requests", () => {
-    const state = reduceCodexServerRequestsState(createInitialCodexServerRequestsState(), {
+    const state = reduceCodexApprovalRequestsState(createInitialCodexApprovalRequestsState(), {
       type: "server_request_received",
       request: {
         id: 11,
@@ -51,7 +51,7 @@ describe("reduceCodexServerRequestsState", () => {
   });
 
   it("captures file change approval requests", () => {
-    const state = reduceCodexServerRequestsState(createInitialCodexServerRequestsState(), {
+    const state = reduceCodexApprovalRequestsState(createInitialCodexApprovalRequestsState(), {
       type: "server_request_received",
       request: {
         id: "req_1",
@@ -85,7 +85,7 @@ describe("reduceCodexServerRequestsState", () => {
   });
 
   it("uses protocol default file change decisions when the request omits them", () => {
-    const state = reduceCodexServerRequestsState(createInitialCodexServerRequestsState(), {
+    const state = reduceCodexApprovalRequestsState(createInitialCodexApprovalRequestsState(), {
       type: "server_request_received",
       request: {
         id: "req_2",
@@ -118,7 +118,7 @@ describe("reduceCodexServerRequestsState", () => {
   });
 
   it("uses protocol default file change decisions when the request sends an empty list", () => {
-    const state = reduceCodexServerRequestsState(createInitialCodexServerRequestsState(), {
+    const state = reduceCodexApprovalRequestsState(createInitialCodexApprovalRequestsState(), {
       type: "server_request_received",
       request: {
         id: "req_3",
@@ -150,7 +150,7 @@ describe("reduceCodexServerRequestsState", () => {
   });
 
   it("captures tool/requestUserInput requests", () => {
-    const state = reduceCodexServerRequestsState(createInitialCodexServerRequestsState(), {
+    const state = reduceCodexApprovalRequestsState(createInitialCodexApprovalRequestsState(), {
       type: "server_request_received",
       request: {
         id: 17,
@@ -208,8 +208,8 @@ describe("reduceCodexServerRequestsState", () => {
     ]);
   });
 
-  it("ignores unsupported server requests", () => {
-    const state = reduceCodexServerRequestsState(createInitialCodexServerRequestsState(), {
+  it("ignores unsupported approval requests", () => {
+    const state = reduceCodexApprovalRequestsState(createInitialCodexApprovalRequestsState(), {
       type: "server_request_received",
       request: {
         id: 17,
@@ -225,7 +225,7 @@ describe("reduceCodexServerRequestsState", () => {
   });
 
   it("marks a request as responding and restores error state on response failure", () => {
-    const pending = reduceCodexServerRequestsState(createInitialCodexServerRequestsState(), {
+    const pending = reduceCodexApprovalRequestsState(createInitialCodexApprovalRequestsState(), {
       type: "server_request_received",
       request: {
         id: 11,
@@ -238,11 +238,11 @@ describe("reduceCodexServerRequestsState", () => {
       },
     });
 
-    const responding = reduceCodexServerRequestsState(pending, {
+    const responding = reduceCodexApprovalRequestsState(pending, {
       type: "server_request_response_started",
       requestId: 11,
     });
-    const failed = reduceCodexServerRequestsState(responding, {
+    const failed = reduceCodexApprovalRequestsState(responding, {
       type: "server_request_response_failed",
       requestId: 11,
       errorMessage: "Socket closed.",
@@ -261,7 +261,7 @@ describe("reduceCodexServerRequestsState", () => {
   });
 
   it("removes a request when serverRequest/resolved arrives", () => {
-    const pending = reduceCodexServerRequestsState(createInitialCodexServerRequestsState(), {
+    const pending = reduceCodexApprovalRequestsState(createInitialCodexApprovalRequestsState(), {
       type: "server_request_received",
       request: {
         id: 11,
@@ -274,7 +274,7 @@ describe("reduceCodexServerRequestsState", () => {
       },
     });
 
-    const resolved = reduceCodexServerRequestsState(pending, {
+    const resolved = reduceCodexApprovalRequestsState(pending, {
       type: "notification_received",
       notification: {
         method: "serverRequest/resolved",

@@ -1,7 +1,7 @@
 import type { CodexSessionConnectionState } from "@mistle/integrations-definitions/openai/agent/client";
 import { DropdownMenuItem, MoreActionsMenu } from "@mistle/ui";
 
-import type { ConnectedCodexSession } from "../codex-client/codex-session-types.js";
+import type { ConnectedCodexSession } from "../session-agents/codex/session-state/index.js";
 import { SessionConfigDialog } from "./session-config-dialog.js";
 
 type SessionMoreActionsViewProps = {

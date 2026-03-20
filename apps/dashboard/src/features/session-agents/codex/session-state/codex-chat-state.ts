@@ -20,7 +20,7 @@ import type {
   ChatReasoningEntry,
   ChatSemanticGroupEntry,
   ChatUserEntry,
-} from "../chat/chat-types.js";
+} from "../../../chat/chat-types.js";
 import { parseTurnPlanSnapshot } from "./codex-session-events.js";
 import type { CodexTurnPlanSnapshot } from "./codex-session-types.js";
 

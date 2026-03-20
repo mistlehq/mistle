@@ -1,11 +1,11 @@
 import type {
   CodexCommandApprovalRequestEntry,
   CodexFileChangeApprovalRequestEntry,
-  CodexServerRequestEntry,
-} from "../../codex-client/codex-server-requests-state.js";
+  CodexApprovalRequestEntry,
+} from "../../session-agents/codex/approvals/index.js";
 
 export function findCommandApprovalRequest(
-  requests: readonly CodexServerRequestEntry[],
+  requests: readonly CodexApprovalRequestEntry[],
   itemId: string,
 ): CodexCommandApprovalRequestEntry | null {
   const request = requests.find(
@@ -17,7 +17,7 @@ export function findCommandApprovalRequest(
 }
 
 export function findFileChangeApprovalRequest(
-  requests: readonly CodexServerRequestEntry[],
+  requests: readonly CodexApprovalRequestEntry[],
   itemId: string,
 ): CodexFileChangeApprovalRequestEntry | null {
   const request = requests.find(

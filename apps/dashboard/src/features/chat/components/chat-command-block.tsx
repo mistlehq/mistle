@@ -1,4 +1,4 @@
-import type { CodexCommandApprovalRequestEntry } from "../../codex-client/codex-server-requests-state.js";
+import type { CodexCommandApprovalRequestEntry } from "../../session-agents/codex/approvals/index.js";
 import type { ChatCommandEntry } from "../chat-types.js";
 import { ChatCommandApproval } from "./chat-command-approval.js";
 

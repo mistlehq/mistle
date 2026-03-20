@@ -1,7 +1,7 @@
 import type { CodexSessionConnectionState } from "@mistle/integrations-definitions/openai/agent/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@mistle/ui";
 
-import type { ConnectedCodexSession } from "../codex-client/codex-session-types.js";
+import type { ConnectedCodexSession } from "../session-agents/codex/session-state/index.js";
 import { createSessionConfigDialogViewModel } from "./session-config-dialog-view-model.js";
 
 function SessionConfigSection(input: {

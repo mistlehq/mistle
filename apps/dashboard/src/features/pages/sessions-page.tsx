@@ -31,7 +31,7 @@ import {
   listSandboxProfiles,
   listSandboxProfileVersions,
 } from "../sandbox-profiles/sandbox-profiles-service.js";
-import { isConnectableSandboxStatus } from "../sessions/session-connect-policy.js";
+import { isSessionPageNavigableSandboxStatus } from "../sessions/session-connect-policy.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import { listSandboxInstances } from "../sessions/sessions-service.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
@@ -595,7 +595,7 @@ export function SessionsPage(): React.JSX.Element {
                       </TableCell>
                       <TableCell className="text-right">
                         <Button
-                          disabled={!isConnectableSandboxStatus(session.status)}
+                          disabled={!isSessionPageNavigableSandboxStatus(session.status)}
                           onClick={() => {
                             navigate(`/sessions/${encodeURIComponent(session.id)}`);
                           }}

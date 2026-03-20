@@ -7,7 +7,7 @@ import {
   CodexStorySearchingWebGroupEntry,
   CodexStoryThinkingGroupEntry,
   CodexStoryToolCallGroupEntry,
-} from "../../codex-client/codex-story-fixtures.js";
+} from "../../session-agents/codex/fixtures/chat-story-fixtures.js";
 import { ChatSemanticGroup } from "./chat-semantic-group.js";
 
 const meta = {

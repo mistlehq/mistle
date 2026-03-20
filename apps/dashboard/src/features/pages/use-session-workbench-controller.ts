@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { useCodexSessionState } from "../codex-client/use-codex-session-state.js";
+import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import {
-  isConnectableSandboxStatus,
+  resolveSessionConnectionReadiness,
   shouldAutoConnectSession,
 } from "../sessions/session-connect-policy.js";
 import { getSandboxInstanceStatus } from "../sessions/sessions-service.js";
@@ -12,7 +12,8 @@ import {
   hasSessionTopAlert,
   resolveChatComposerAction,
   resolveSessionHeaderStatusUi,
-} from "./codex-session-page-view-model.js";
+  resolveStoppedSessionMessage,
+} from "./session-workbench-view-model.js";
 import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workbench-state.js";
 
 type ComposerConfigSnapshot = {
@@ -58,7 +59,15 @@ function readComposerConfigSnapshot(configJson: string | null): ComposerConfigSn
   };
 }
 
-type CodexSessionWorkbenchState = {
+type SessionWorkbenchState = {
+  connectionReadiness: {
+    canConnect: boolean;
+    reason: "failed" | "loading" | "missing-session" | "ready" | "starting" | "stopped" | "unknown";
+  };
+  stoppedSessionState: {
+    message: string | null;
+    requiresManualResume: boolean;
+  };
   hasTopAlert: boolean;
   ptyState: ReturnType<typeof useSandboxPtyState>;
   sandboxFailureMessage: string | null;
@@ -88,7 +97,7 @@ type CodexSessionWorkbenchState = {
   };
 };
 
-type CodexSessionPaneState = {
+type SessionConversationPaneState = {
   chatState: ReturnType<typeof useCodexSessionState>["chat"]["chatState"];
   composerProps: {
     canInterruptTurn: boolean;
@@ -120,20 +129,20 @@ type CodexSessionPaneState = {
   };
 };
 
-type UseCodexSessionPageControllerResult = {
-  workbench: CodexSessionWorkbenchState;
-  codexPane: CodexSessionPaneState;
+type UseSessionWorkbenchControllerResult = {
+  workbench: SessionWorkbenchState;
+  conversationPane: SessionConversationPaneState;
 };
 
 export type {
-  CodexSessionPaneState,
-  CodexSessionWorkbenchState,
-  UseCodexSessionPageControllerResult,
+  SessionConversationPaneState,
+  SessionWorkbenchState,
+  UseSessionWorkbenchControllerResult,
 };
 
-export function useCodexSessionPageController(input: {
+export function useSessionWorkbenchController(input: {
   sandboxInstanceId: string | null;
-}): UseCodexSessionPageControllerResult {
+}): UseSessionWorkbenchControllerResult {
   const [composerText, setComposerText] = useState("");
   const [hasAttemptedAutoConnect, setHasAttemptedAutoConnect] = useState(false);
   const [selectedComposerModel, setSelectedComposerModel] = useState<string | null>(null);
@@ -184,6 +193,27 @@ export function useCodexSessionPageController(input: {
     },
   });
   const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
+  const connectionReadiness = useMemo(() => {
+    return resolveSessionConnectionReadiness({
+      sandboxInstanceId: input.sandboxInstanceId,
+      sandboxStatus,
+      isStatusPending: sandboxStatusQuery.isPending,
+    });
+  }, [input.sandboxInstanceId, sandboxStatus, sandboxStatusQuery.isPending]);
+  const stoppedSessionState = useMemo(() => {
+    const message = resolveStoppedSessionMessage({
+      connectionReadinessReason: connectionReadiness.reason,
+    });
+
+    return {
+      // Mirror the policy contract: stopped-state messaging stays separate from
+      // connection readiness until the control-plane API exposes a dedicated
+      // resume sandbox endpoint and the dashboard adopts that endpoint as the
+      // supported resume flow.
+      message,
+      requiresManualResume: message !== null,
+    };
+  }, [connectionReadiness.reason]);
 
   useEffect(() => {
     setHasAttemptedAutoConnect(false);
@@ -200,7 +230,7 @@ export function useCodexSessionPageController(input: {
     if (
       !shouldAutoConnectSession({
         sandboxInstanceId: input.sandboxInstanceId,
-        sandboxStatus,
+        canConnect: connectionReadiness.canConnect,
         connected: connectedSession !== null,
         isStartingSession,
         hasAttemptedAutoConnect,
@@ -218,7 +248,7 @@ export function useCodexSessionPageController(input: {
     hasAttemptedAutoConnect,
     input.sandboxInstanceId,
     isStartingSession,
-    sandboxStatus,
+    connectionReadiness.canConnect,
     startErrorMessage,
   ]);
 
@@ -227,16 +257,17 @@ export function useCodexSessionPageController(input: {
       return;
     }
 
-    if (!isConnectableSandboxStatus(sandboxStatus)) {
-      return;
-    }
-
-    if (sandboxStatus === "running") {
+    if (connectionReadiness.reason !== "starting") {
       return;
     }
 
     void sandboxStatusQuery.refetch();
-  }, [connectedSession, input.sandboxInstanceId, sandboxStatus, sandboxStatusQuery.refetch]);
+  }, [
+    connectedSession,
+    connectionReadiness.reason,
+    input.sandboxInstanceId,
+    sandboxStatusQuery.refetch,
+  ]);
 
   const sessionHeaderStatusUi = useMemo(() => {
     const sandboxStatusLabel =
@@ -256,6 +287,7 @@ export function useCodexSessionPageController(input: {
     hasSandboxStatusError: sandboxStatusQuery.isError,
     startErrorMessage,
     sandboxFailureMessage,
+    stoppedSessionMessage: stoppedSessionState.message,
   });
   const loadConfigSetup = useCallback((): void => {
     readConfig(true);
@@ -338,6 +370,8 @@ export function useCodexSessionPageController(input: {
 
   return {
     workbench: {
+      connectionReadiness,
+      stoppedSessionState,
       hasTopAlert,
       ptyState,
       sandboxFailureMessage,
@@ -355,7 +389,7 @@ export function useCodexSessionPageController(input: {
         loadConfigSetup,
       },
     },
-    codexPane: {
+    conversationPane: {
       chatState: chat.chatState,
       composerProps: {
         canInterruptTurn: chat.canInterruptTurn,

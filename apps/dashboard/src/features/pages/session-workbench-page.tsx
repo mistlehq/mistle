@@ -6,21 +6,21 @@ import { useParams } from "react-router";
 import { SessionMoreActions } from "../sessions/session-more-actions.js";
 import { useAppShellHeaderActions } from "../shell/app-shell-header-actions.js";
 import {
-  CodexSessionPaneBottomPanel,
-  CodexSessionPaneMainContent,
-  type CodexSessionPaneComposerProps,
-} from "./codex-session-pane.js";
+  SessionConversationBottomPanel,
+  SessionConversationMainContent,
+  type SessionConversationComposerProps,
+} from "./session-conversation-pane.js";
 import { SessionTerminalPanel } from "./session-terminal-panel.js";
 import {
   SessionWorkbenchPageView,
   type SessionWorkbenchAlert,
 } from "./session-workbench-page-view.js";
-import { useCodexSessionPageController } from "./use-codex-session-page-controller.js";
+import { useSessionWorkbenchController } from "./use-session-workbench-controller.js";
 
-export function CodexSessionPage(): React.JSX.Element {
+export function SessionWorkbenchPage(): React.JSX.Element {
   const params = useParams();
   const sandboxInstanceId = params["sandboxInstanceId"] ?? null;
-  const { codexPane, workbench } = useCodexSessionPageController({
+  const { conversationPane, workbench } = useSessionWorkbenchController({
     sandboxInstanceId,
   });
   const handleHideTerminalPanel = useCallback((): void => {
@@ -30,6 +30,13 @@ export function CodexSessionPage(): React.JSX.Element {
     workbench.terminalPanelState.closePanel();
     await workbench.ptyState.actions.disconnectPty();
   }, [workbench.ptyState.actions, workbench.terminalPanelState]);
+  const isTerminalOpenDisabled =
+    !workbench.terminalPanelState.isVisible && !workbench.connectionReadiness.canConnect;
+  const terminalButtonLabel = workbench.terminalPanelState.isVisible ? "Terminal" : "Open terminal";
+  const terminalButtonTitle = isTerminalOpenDisabled
+    ? (workbench.stoppedSessionState.message ??
+      "Terminal is available only when the sandbox is running.")
+    : terminalButtonLabel;
   const headerActions = (
     <div className="flex items-center gap-2">
       <Badge
@@ -49,6 +56,7 @@ export function CodexSessionPage(): React.JSX.Element {
         sandboxInstanceId={sandboxInstanceId}
       />
       <Button
+        disabled={isTerminalOpenDisabled}
         onClick={() => {
           if (workbench.terminalPanelState.isVisible) {
             void handleCloseTerminalPanel();
@@ -58,6 +66,7 @@ export function CodexSessionPage(): React.JSX.Element {
           workbench.terminalPanelState.openPanel();
         }}
         size="sm"
+        title={terminalButtonTitle}
         type="button"
         variant={workbench.terminalPanelState.isVisible ? "secondary" : "outline"}
       >
@@ -69,7 +78,7 @@ export function CodexSessionPage(): React.JSX.Element {
   useAppShellHeaderActions(headerActions);
 
   const chatItemIds = new Set(
-    codexPane.chatState.entries.flatMap((entry) => {
+    conversationPane.chatState.entries.flatMap((entry) => {
       if (entry.kind === "semantic-group") {
         return entry.items.map((item) => item.id);
       }
@@ -81,7 +90,7 @@ export function CodexSessionPage(): React.JSX.Element {
       return [];
     }),
   );
-  const unmatchedServerRequests = codexPane.serverRequestsState.pendingServerRequests.filter(
+  const unmatchedServerRequests = conversationPane.serverRequestsState.pendingServerRequests.filter(
     (entry) => {
       if (entry.kind !== "command-approval" && entry.kind !== "file-change-approval") {
         return true;
@@ -107,6 +116,12 @@ export function CodexSessionPage(): React.JSX.Element {
       description: workbench.startErrorMessage,
     });
   }
+  if (workbench.stoppedSessionState.message !== null) {
+    alerts.push({
+      title: "Stopped sandbox",
+      description: workbench.stoppedSessionState.message,
+    });
+  }
   if (workbench.sandboxFailureMessage !== null) {
     alerts.push({
       title: "Sandbox failed",
@@ -120,7 +135,7 @@ export function CodexSessionPage(): React.JSX.Element {
         isSecondaryPanelVisible={false}
         onSecondaryPanelResize={function onSecondaryPanelResize() {}}
         primaryBottomPanel={
-          <CodexSessionPaneBottomPanel
+          <SessionConversationBottomPanel
             chatEntries={[]}
             composerProps={createEmptyComposerProps()}
             isRespondingToServerRequest={false}
@@ -131,7 +146,7 @@ export function CodexSessionPage(): React.JSX.Element {
         secondaryPanel={<></>}
         secondaryPanelSize={38}
         mainContent={
-          <CodexSessionPaneMainContent
+          <SessionConversationMainContent
             chatEntries={[]}
             composerProps={createEmptyComposerProps()}
             isRespondingToServerRequest={false}
@@ -149,31 +164,37 @@ export function CodexSessionPage(): React.JSX.Element {
       alerts={workbench.hasTopAlert ? alerts : []}
       isSecondaryPanelVisible={workbench.terminalPanelState.isVisible}
       mainContent={
-        <CodexSessionPaneMainContent
-          chatEntries={codexPane.chatState.entries}
-          composerProps={codexPane.composerProps}
-          isRespondingToServerRequest={codexPane.serverRequestsState.isRespondingToServerRequest}
-          onRespondToServerRequest={codexPane.serverRequestsState.respondToServerRequest}
+        <SessionConversationMainContent
+          chatEntries={conversationPane.chatState.entries}
+          composerProps={conversationPane.composerProps}
+          isRespondingToServerRequest={
+            conversationPane.serverRequestsState.isRespondingToServerRequest
+          }
+          onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
           serverRequestPanelEntries={unmatchedServerRequests}
         />
       }
       onSecondaryPanelResize={workbench.terminalPanelState.setPanelSize}
       primaryBottomPanel={
-        <CodexSessionPaneBottomPanel
-          chatEntries={codexPane.chatState.entries}
-          composerProps={codexPane.composerProps}
-          isRespondingToServerRequest={codexPane.serverRequestsState.isRespondingToServerRequest}
-          onRespondToServerRequest={codexPane.serverRequestsState.respondToServerRequest}
+        <SessionConversationBottomPanel
+          chatEntries={conversationPane.chatState.entries}
+          composerProps={conversationPane.composerProps}
+          isRespondingToServerRequest={
+            conversationPane.serverRequestsState.isRespondingToServerRequest
+          }
+          onRespondToServerRequest={conversationPane.serverRequestsState.respondToServerRequest}
           serverRequestPanelEntries={unmatchedServerRequests}
         />
       }
       secondaryPanel={
         <SessionTerminalPanel
+          isConnectionReady={workbench.connectionReadiness.canConnect}
           isVisible={workbench.terminalPanelState.isVisible}
           onHide={handleHideTerminalPanel}
           onClose={handleCloseTerminalPanel}
           ptyState={workbench.ptyState}
           sandboxInstanceId={sandboxInstanceId}
+          sandboxStatus={workbench.sandboxStatusQuery.data?.status ?? null}
         />
       }
       secondaryPanelSize={workbench.terminalPanelState.panelSize}
@@ -182,7 +203,7 @@ export function CodexSessionPage(): React.JSX.Element {
   );
 }
 
-function createEmptyComposerProps(): CodexSessionPaneComposerProps {
+function createEmptyComposerProps(): SessionConversationComposerProps {
   return {
     canInterruptTurn: false,
     canSteerTurn: false,

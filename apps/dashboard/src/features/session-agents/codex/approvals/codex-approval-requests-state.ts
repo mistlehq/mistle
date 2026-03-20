@@ -134,16 +134,16 @@ export type CodexToolRequestUserInputEntry = {
   responseErrorMessage: string | null;
 };
 
-export type CodexServerRequestEntry =
+export type CodexApprovalRequestEntry =
   | CodexCommandApprovalRequestEntry
   | CodexFileChangeApprovalRequestEntry
   | CodexToolRequestUserInputEntry;
 
-export type CodexServerRequestsState = {
-  entries: readonly CodexServerRequestEntry[];
+export type CodexApprovalRequestsState = {
+  entries: readonly CodexApprovalRequestEntry[];
 };
 
-export type CodexServerRequestsAction =
+export type CodexApprovalRequestsAction =
   | {
       type: "reset";
     }
@@ -165,7 +165,7 @@ export type CodexServerRequestsAction =
       notification: CodexJsonRpcNotification;
     };
 
-export function createInitialCodexServerRequestsState(): CodexServerRequestsState {
+export function createInitialCodexApprovalRequestsState(): CodexApprovalRequestsState {
   return {
     entries: [],
   };
@@ -179,9 +179,9 @@ function hasMatchingRequestId(
 }
 
 function upsertEntry(
-  entries: readonly CodexServerRequestEntry[],
-  nextEntry: CodexServerRequestEntry,
-): readonly CodexServerRequestEntry[] {
+  entries: readonly CodexApprovalRequestEntry[],
+  nextEntry: CodexApprovalRequestEntry,
+): readonly CodexApprovalRequestEntry[] {
   const nextEntries = entries.filter(
     (entry) => !hasMatchingRequestId(entry.requestId, nextEntry.requestId),
   );
@@ -189,9 +189,9 @@ function upsertEntry(
 }
 
 function markEntryResponding(
-  entries: readonly CodexServerRequestEntry[],
+  entries: readonly CodexApprovalRequestEntry[],
   requestId: CodexJsonRpcId,
-): readonly CodexServerRequestEntry[] {
+): readonly CodexApprovalRequestEntry[] {
   return entries.map((entry) => {
     if (!hasMatchingRequestId(entry.requestId, requestId)) {
       return entry;
@@ -206,10 +206,10 @@ function markEntryResponding(
 }
 
 function markEntryResponseFailed(
-  entries: readonly CodexServerRequestEntry[],
+  entries: readonly CodexApprovalRequestEntry[],
   requestId: CodexJsonRpcId,
   errorMessage: string,
-): readonly CodexServerRequestEntry[] {
+): readonly CodexApprovalRequestEntry[] {
   return entries.map((entry) => {
     if (!hasMatchingRequestId(entry.requestId, requestId)) {
       return entry;
@@ -224,13 +224,15 @@ function markEntryResponseFailed(
 }
 
 function removeEntry(
-  entries: readonly CodexServerRequestEntry[],
+  entries: readonly CodexApprovalRequestEntry[],
   requestId: CodexJsonRpcId,
-): readonly CodexServerRequestEntry[] {
+): readonly CodexApprovalRequestEntry[] {
   return entries.filter((entry) => !hasMatchingRequestId(entry.requestId, requestId));
 }
 
-function toServerRequestEntry(request: CodexJsonRpcServerRequest): CodexServerRequestEntry | null {
+function toApprovalRequestEntry(
+  request: CodexJsonRpcServerRequest,
+): CodexApprovalRequestEntry | null {
   const commandApproval = CommandApprovalRequestSchema.safeParse(request);
   if (commandApproval.success) {
     return {
@@ -314,16 +316,16 @@ function resolveNotificationRequestId(
   return resolved.data.params.requestId ?? resolved.data.params.id ?? null;
 }
 
-export function reduceCodexServerRequestsState(
-  state: CodexServerRequestsState,
-  action: CodexServerRequestsAction,
-): CodexServerRequestsState {
+export function reduceCodexApprovalRequestsState(
+  state: CodexApprovalRequestsState,
+  action: CodexApprovalRequestsAction,
+): CodexApprovalRequestsState {
   if (action.type === "reset") {
-    return createInitialCodexServerRequestsState();
+    return createInitialCodexApprovalRequestsState();
   }
 
   if (action.type === "server_request_received") {
-    const entry = toServerRequestEntry(action.request);
+    const entry = toApprovalRequestEntry(action.request);
     if (entry === null) {
       return state;
     }

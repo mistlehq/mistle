@@ -1,7 +1,7 @@
 import type { CodexSessionConnectionState } from "@mistle/integrations-definitions/openai/agent/client";
 import { useState } from "react";
 
-import type { ConnectedCodexSession } from "../codex-client/codex-session-types.js";
+import type { ConnectedCodexSession } from "../session-agents/codex/session-state/index.js";
 import { SessionMoreActionsView } from "./session-more-actions-view.js";
 
 export function SessionMoreActions(input: {

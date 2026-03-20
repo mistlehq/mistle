@@ -9,7 +9,7 @@ import {
   CodexStoryRunningCommandsGroupEntry,
   CodexStorySearchingWebGroupEntry,
   CodexStoryThinkingGroupEntry,
-} from "../../codex-client/codex-story-fixtures.js";
+} from "../../session-agents/codex/fixtures/chat-story-fixtures.js";
 import type { ChatSemanticGroupEntry } from "../chat-types.js";
 import { ChatSemanticGroup } from "./chat-semantic-group.js";
 

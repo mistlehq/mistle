@@ -6,7 +6,7 @@ import {
   CodexStoryChatThreadEntriesWithGenericItem,
   CodexStoryChatThreadEntriesWithStructuredPlan,
   CodexStoryChatThreadEntriesWithThinkingGroup,
-} from "../../codex-client/codex-story-fixtures.js";
+} from "../../session-agents/codex/fixtures/chat-story-fixtures.js";
 import { ChatThread } from "./chat-thread.js";
 
 const meta = {

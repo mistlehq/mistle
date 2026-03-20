@@ -6,9 +6,12 @@ import {
   CodexStorySessionComposerProps,
   CodexStorySessionEntriesWithExploringGroup,
   CodexStorySessionServerRequests,
-} from "../codex-client/codex-story-fixtures.js";
+} from "../session-agents/codex/fixtures/session-story-fixtures.js";
 import { type UseSandboxPtyStateResult } from "../sessions/use-sandbox-pty-state.js";
-import { CodexSessionPaneBottomPanel, CodexSessionPaneMainContent } from "./codex-session-pane.js";
+import {
+  SessionConversationBottomPanel,
+  SessionConversationMainContent,
+} from "./session-conversation-pane.js";
 import { SessionTerminalPanel } from "./session-terminal-panel.js";
 import { SessionWorkbenchPageView } from "./session-workbench-page-view.js";
 
@@ -111,7 +114,7 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
           alerts={[]}
           isSecondaryPanelVisible={isTerminalVisible}
           mainContent={
-            <CodexSessionPaneMainContent
+            <SessionConversationMainContent
               chatEntries={CodexStorySessionEntriesWithExploringGroup}
               composerProps={CodexStorySessionComposerProps}
               isRespondingToServerRequest={false}
@@ -121,7 +124,7 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
           }
           onSecondaryPanelResize={setPanelSize}
           primaryBottomPanel={
-            <CodexSessionPaneBottomPanel
+            <SessionConversationBottomPanel
               chatEntries={CodexStorySessionEntriesWithExploringGroup}
               composerProps={CodexStorySessionComposerProps}
               isRespondingToServerRequest={false}
@@ -131,6 +134,7 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
           }
           secondaryPanel={
             <SessionTerminalPanel
+              isConnectionReady={true}
               isVisible={isTerminalVisible}
               onHide={() => {
                 setIsTerminalVisible(false);
@@ -140,6 +144,7 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
               }}
               ptyState={ptyState}
               sandboxInstanceId="sbi_storybook"
+              sandboxStatus="running"
             />
           }
           secondaryPanelSize={panelSize}
@@ -189,7 +194,7 @@ export const OpenWithOutput: Story = {
     initialOutput: [
       "mistle@sandbox:~/workspace$ git status --short",
       " M apps/dashboard/src/features/pages/session-terminal-panel.tsx",
-      " M apps/dashboard/src/features/pages/codex-session-page.tsx",
+      " M apps/dashboard/src/features/pages/session-workbench-page.tsx",
       "",
     ].join("\n"),
     initialState: "open",

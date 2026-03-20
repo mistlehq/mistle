@@ -3,7 +3,7 @@ import type {
   CodexThreadSummary,
 } from "@mistle/integrations-definitions/openai/agent/client";
 
-import { selectPreferredThreadId } from "../sessions/thread-selection.js";
+import { selectPreferredThreadId } from "../../../sessions/thread-selection.js";
 
 export type CodexConnectionThreadStrategy =
   | {
