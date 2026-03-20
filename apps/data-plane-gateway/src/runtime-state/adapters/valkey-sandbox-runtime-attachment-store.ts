@@ -48,8 +48,16 @@ function parseSandboxRuntimeAttachmentRecord(json: string): SandboxRuntimeAttach
   return SandboxRuntimeAttachmentRecordSchema.parse(JSON.parse(json));
 }
 
-function isTruthyEvalResult(result: unknown): boolean {
-  return result === 1 || result === "1";
+function parseEvalBooleanResult(result: unknown): boolean {
+  if (result === 0) {
+    return false;
+  }
+
+  if (result === 1) {
+    return true;
+  }
+
+  throw new Error(`Unexpected Valkey script result: ${String(result)}`);
 }
 
 /**
@@ -124,6 +132,6 @@ export class ValkeySandboxRuntimeAttachmentStore implements SandboxRuntimeAttach
       input.ownerLeaseId,
     ]);
 
-    return isTruthyEvalResult(result);
+    return parseEvalBooleanResult(result);
   }
 }

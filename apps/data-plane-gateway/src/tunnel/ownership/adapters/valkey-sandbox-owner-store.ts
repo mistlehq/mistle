@@ -69,8 +69,16 @@ function toSandboxOwner(record: SandboxOwnerRecord): SandboxOwner {
   };
 }
 
-function isTruthyEvalResult(result: unknown): boolean {
-  return result === 1 || result === "1";
+function parseEvalBooleanResult(result: unknown): boolean {
+  if (result === 0) {
+    return false;
+  }
+
+  if (result === 1) {
+    return true;
+  }
+
+  throw new Error(`Unexpected Valkey script result: ${String(result)}`);
 }
 
 /**
@@ -149,7 +157,7 @@ export class ValkeySandboxOwnerStore implements SandboxOwnerStore {
       serializeSandboxOwnerRecord(nextOwnerRecord),
     ]);
 
-    return isTruthyEvalResult(result);
+    return parseEvalBooleanResult(result);
   }
 
   async getOwner(input: { sandboxInstanceId: string }): Promise<SandboxOwner | undefined> {
@@ -178,6 +186,6 @@ export class ValkeySandboxOwnerStore implements SandboxOwnerStore {
       input.leaseId,
     ]);
 
-    return isTruthyEvalResult(result);
+    return parseEvalBooleanResult(result);
   }
 }
