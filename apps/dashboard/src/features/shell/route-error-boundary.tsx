@@ -147,13 +147,25 @@ type RouteErrorBoundaryProps = {
   runtimeEnv?: RuntimeEnv;
 };
 
+type CopyFeedbackState =
+  | {
+      status: "idle";
+    }
+  | {
+      status: "copied" | "failed";
+      detail: string;
+    };
+
 export function RouteErrorBoundary({ runtimeEnv }: RouteErrorBoundaryProps): React.JSX.Element {
   const error = useRouteError();
   const navigate = useNavigate();
   const resolvedRuntimeEnv = runtimeEnv ?? getRuntimeEnv();
   const showDiagnostics = shouldRenderRouteErrorDiagnostics(resolvedRuntimeEnv);
   const display = resolveRouteErrorDisplay(error, { showDiagnostics });
-  const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const [copyFeedback, setCopyFeedback] = useState<CopyFeedbackState>({
+    status: "idle",
+  });
+  const copyState = resolveVisibleCopyState(copyFeedback, display.detail);
 
   async function handleCopyDetails(): Promise<void> {
     if (display.detail === null) {
@@ -162,15 +174,17 @@ export function RouteErrorBoundary({ runtimeEnv }: RouteErrorBoundaryProps): Rea
 
     try {
       await navigator.clipboard.writeText(display.detail);
-      setCopyState("copied");
+      setCopyFeedback({
+        status: "copied",
+        detail: display.detail,
+      });
     } catch {
-      setCopyState("failed");
+      setCopyFeedback({
+        status: "failed",
+        detail: display.detail,
+      });
     }
   }
-
-  useEffect(() => {
-    setCopyState("idle");
-  }, [display.detail]);
 
   useEffect(() => {
     if (copyState !== "copied") {
@@ -178,7 +192,9 @@ export function RouteErrorBoundary({ runtimeEnv }: RouteErrorBoundaryProps): Rea
     }
 
     const handle = systemScheduler.schedule(() => {
-      setCopyState("idle");
+      setCopyFeedback({
+        status: "idle",
+      });
     }, COPY_SUCCESS_DISPLAY_MS);
 
     return () => {
@@ -241,4 +257,15 @@ export function RouteErrorBoundary({ runtimeEnv }: RouteErrorBoundaryProps): Rea
       </section>
     </main>
   );
+}
+
+export function resolveVisibleCopyState(
+  state: CopyFeedbackState,
+  currentDetail: string | null,
+): "idle" | "copied" | "failed" {
+  if (state.status === "idle" || currentDetail === null) {
+    return "idle";
+  }
+
+  return state.detail === currentDetail ? state.status : "idle";
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { EditableHeading } from "../shared/editable-heading.js";
 import { PageTitleField } from "../shared/page-title-field.js";
@@ -10,23 +10,6 @@ export function WebhookAutomationTitleEditor(input: {
   onCommit: (nextValue: string) => void;
   errorMessage: string | undefined;
 }): React.JSX.Element {
-  const [draftValue, setDraftValue] = useState(input.title);
-  const [isEditing, setIsEditing] = useState(input.mode === "create");
-
-  useEffect(() => {
-    setDraftValue(input.title);
-  }, [input.title]);
-
-  function commitDraft(): void {
-    setIsEditing(input.mode === "create");
-    input.onCommit(draftValue);
-  }
-
-  function cancelEdit(): void {
-    setDraftValue(input.title);
-    setIsEditing(input.mode === "create");
-  }
-
   if (input.mode === "create") {
     return (
       <PageTitleField
@@ -43,6 +26,36 @@ export function WebhookAutomationTitleEditor(input: {
         {...(input.errorMessage === undefined ? {} : { errorMessage: input.errorMessage })}
       />
     );
+  }
+
+  return (
+    <WebhookAutomationEditableTitle
+      key={input.title}
+      errorMessage={input.errorMessage}
+      onCommit={input.onCommit}
+      saveDisabled={input.saveDisabled}
+      title={input.title}
+    />
+  );
+}
+
+function WebhookAutomationEditableTitle(input: {
+  title: string;
+  saveDisabled: boolean;
+  onCommit: (nextValue: string) => void;
+  errorMessage: string | undefined;
+}): React.JSX.Element {
+  const [draftValue, setDraftValue] = useState(input.title);
+  const [isEditing, setIsEditing] = useState(false);
+
+  function commitDraft(): void {
+    setIsEditing(false);
+    input.onCommit(draftValue);
+  }
+
+  function cancelEdit(): void {
+    setDraftValue(input.title);
+    setIsEditing(false);
   }
 
   return (

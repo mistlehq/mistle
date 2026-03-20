@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import type { IntegrationCardViewModel } from "../integrations/directory-model.js";
 
@@ -6,7 +6,9 @@ export function useIntegrationDetailState(input: {
   cards: readonly IntegrationCardViewModel[];
   detailTargetKey: string | null;
 }) {
-  const [activeDetailConnectionId, setActiveDetailConnectionId] = useState<string | null>(null);
+  const [requestedDetailConnectionId, setRequestedDetailConnectionId] = useState<string | null>(
+    null,
+  );
 
   const selectedDetailCard = useMemo(() => {
     if (input.detailTargetKey === null) {
@@ -24,27 +26,33 @@ export function useIntegrationDetailState(input: {
     return selectedDetailCard.connections;
   }, [selectedDetailCard]);
 
-  useEffect(() => {
+  const defaultConnectionId = useMemo(() => {
     const defaultConnection =
       selectedDetailConnections.find((connection) => connection.status === "active") ??
       selectedDetailConnections[0] ??
       null;
-    if (defaultConnection === null) {
-      setActiveDetailConnectionId(null);
-      return;
+
+    return defaultConnection?.id ?? null;
+  }, [selectedDetailConnections]);
+
+  const activeDetailConnectionId = useMemo(() => {
+    if (defaultConnectionId === null) {
+      return null;
     }
 
-    const selectedStillExists = selectedDetailConnections.some(
-      (connection) => connection.id === activeDetailConnectionId,
-    );
-    if (!selectedStillExists) {
-      setActiveDetailConnectionId(defaultConnection.id);
+    if (
+      requestedDetailConnectionId !== null &&
+      selectedDetailConnections.some((connection) => connection.id === requestedDetailConnectionId)
+    ) {
+      return requestedDetailConnectionId;
     }
-  }, [activeDetailConnectionId, selectedDetailConnections]);
+
+    return defaultConnectionId;
+  }, [defaultConnectionId, requestedDetailConnectionId, selectedDetailConnections]);
 
   return {
     activeDetailConnectionId,
-    setActiveDetailConnectionId,
+    setActiveDetailConnectionId: setRequestedDetailConnectionId,
     selectedDetailCard,
     selectedDetailConnections,
   };
