@@ -15,7 +15,11 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from "@mistle/ui";
+import { InfoIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
@@ -127,6 +131,48 @@ function getSandboxSessionStatusBadgeUi(status: SandboxSessionStatus): {
     label: "Starting",
     variant: "outline",
   };
+}
+
+export function SandboxSessionStatusBadge(input: {
+  status: SandboxSessionStatus;
+  failureCode: string | null;
+  failureMessage: string | null;
+}): React.JSX.Element {
+  const statusUi = getSandboxSessionStatusBadgeUi(input.status);
+
+  if (input.failureMessage === null) {
+    return (
+      <Badge className={statusUi.className} variant={statusUi.variant}>
+        {statusUi.label}
+      </Badge>
+    );
+  }
+
+  const tooltipMessage =
+    input.failureCode === null
+      ? input.failureMessage
+      : `${input.failureCode}\n${input.failureMessage}`;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        aria-label="View failure details"
+        render={
+          <Badge
+            className={statusUi.className}
+            render={<span aria-hidden="true" title={tooltipMessage} />}
+            variant={statusUi.variant}
+          />
+        }
+      >
+        {statusUi.label}
+        <InfoIcon className="size-3.5" data-icon="inline-end" />
+      </TooltipTrigger>
+      <TooltipContent className="max-w-80 whitespace-pre-wrap text-left" side="top">
+        {tooltipMessage}
+      </TooltipContent>
+    </Tooltip>
+  );
 }
 
 export function buildOptimisticSessions(input: {
@@ -556,8 +602,6 @@ export function SessionsPage(): React.JSX.Element {
                 </TableRow>
               ) : (
                 sortedSessions.map((session) => {
-                  const statusUi = getSandboxSessionStatusBadgeUi(session.status);
-
                   return (
                     <TableRow key={session.id}>
                       <TableCell>
@@ -582,15 +626,12 @@ export function SessionsPage(): React.JSX.Element {
                         {formatRelativeOrDate(session.createdAt)}
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <Badge className={statusUi.className} variant={statusUi.variant}>
-                            {statusUi.label}
-                          </Badge>
-                          {session.failureMessage === null ? null : (
-                            <span className="text-destructive whitespace-pre-wrap text-xs">
-                              {session.failureMessage}
-                            </span>
-                          )}
+                        <div className="flex items-center gap-2">
+                          <SandboxSessionStatusBadge
+                            status={session.status}
+                            failureCode={session.failureCode}
+                            failureMessage={session.failureMessage}
+                          />
                         </div>
                       </TableCell>
                       <TableCell className="text-right">

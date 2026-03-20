@@ -7,7 +7,11 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
-import { buildOptimisticSessions, SessionsPage } from "./sessions-page.js";
+import {
+  buildOptimisticSessions,
+  SandboxSessionStatusBadge,
+  SessionsPage,
+} from "./sessions-page.js";
 
 describe("SessionsPage", () => {
   it("uses the authenticated user's display name for optimistic sessions", () => {
@@ -101,5 +105,21 @@ describe("SessionsPage", () => {
     expect(markup).toContain("bg-muted/60");
     expect(markup).toContain("text-xs font-semibold tracking-wide uppercase");
     expect(markup).toContain('<span class="sr-only">Actions</span>');
+  });
+
+  it("renders a compact failure indicator with tooltip details", () => {
+    const markup = renderToStaticMarkup(
+      <SandboxSessionStatusBadge
+        status="failed"
+        failureCode="INSTANCE_VOLUME_PROVISION_FAILED"
+        failureMessage="Failed to provision instance volume before runtime startup."
+      />,
+    );
+
+    expect(markup).toContain("View failure details");
+    expect(markup).toContain("Failed");
+    expect(markup).toContain("INSTANCE_VOLUME_PROVISION_FAILED");
+    expect(markup).toContain("Failed to provision instance volume before runtime startup.");
+    expect(markup).not.toContain("text-destructive whitespace-pre-wrap text-xs");
   });
 });
