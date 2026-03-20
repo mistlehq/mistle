@@ -7,39 +7,23 @@ description: Create and bootstrap git worktrees for this repository when the use
 
 Use this skill when the user asks to create or bootstrap a git worktree for this repository.
 
-## Behavior
+If the user only asks a conceptual question about worktrees, answer directly and do not run scripts.
 
-1. Prefer worktree directories as siblings of the repository root, using the pattern `<repo-parent>/<repo-name>-<slug>`.
-2. Default the base ref to `main` unless the user explicitly asks for another base.
-3. Derive a safe kebab-case slug from the user task when they do not provide a branch or path.
-4. After creation, bootstrap the new worktree by running:
-   - `pnpm install`
-   - `pnpm config:init:dev`
-5. If `CODEX_THREAD_ID` is available, prepare a resume handoff into the new worktree with `codex resume <thread-id>`.
-6. Verify state after creation with `git worktree list --porcelain`.
+For creation requests:
 
-## Create
-
-When creating a worktree:
-
-1. Resolve:
-   - repo root
+1. Resolve `repo_root`, `worktree_path`, `branch_name`, and `base_ref`.
+   - If the user does not provide a base ref, use the latest `origin/main`.
+   - If the user explicitly asks for `main`, normalize it to the latest `origin/main`.
+   - If the user does not provide a branch or path, derive a safe kebab-case slug from the task.
+   - Prefer sibling worktree directories using `<repo-parent>/<repo-name>-<slug>`.
+2. Fail fast if the destination path already exists unless the user explicitly asked to reuse or replace it.
+3. Run `scripts/create-worktree.sh <repo_root> <worktree_path> <branch_name> <base_ref>`.
+   - Prefer the helper script over recreating the workflow inline in shell commands.
+4. Verify the result with `git worktree list --porcelain`.
+5. Report:
    - worktree path
    - branch name
    - base ref
-2. Run `scripts/create-worktree.sh` with those four arguments in that order.
-3. Fail fast if the destination path already exists unless the user explicitly asked to reuse or replace it.
-4. Report:
-   - worktree path
-   - branch name
-   - base ref
-   - bootstrap commands that ran
-   - the resume command for the new worktree
+   - bootstrap steps: `pnpm install`, `pnpm config:init:dev`
+   - resume command
    - whether the resume command was copied to the clipboard
-   - whether a new Terminal window was launched
-   - verification output summary
-
-## Notes
-
-- Prefer using the helper scripts rather than recreating the workflow inline in shell commands.
-- If the user only asks a conceptual question about worktrees, answer directly and do not run the scripts.
