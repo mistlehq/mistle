@@ -21,7 +21,7 @@ import {
 } from "@mistle/ui";
 import { InfoIcon } from "@phosphor-icons/react";
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 
 import { resolveApiErrorMessage } from "../api/error-message.js";
@@ -281,10 +281,7 @@ export function SessionsPage(): React.JSX.Element {
     retry: false,
   });
 
-  const selectedProfileVersion = useMemo(
-    () => resolveLatestVersion(versionsQuery.data?.versions ?? []),
-    [versionsQuery.data?.versions],
-  );
+  const selectedProfileVersion = resolveLatestVersion(versionsQuery.data?.versions ?? []);
   const integrationBindingsQuery = useQuery({
     queryKey:
       selectedProfileId === null || selectedProfileVersion === null
@@ -330,43 +327,34 @@ export function SessionsPage(): React.JSX.Element {
     !integrationBindingsQuery.isError &&
     hasAgentBinding &&
     !isStartingSession;
-  const profilesById = useMemo(
-    () =>
-      new Map(
-        (profilesQuery.data?.items ?? []).map((profile) => [profile.id, profile.displayName]),
-      ),
-    [profilesQuery.data?.items],
+  const profilesById = new Map(
+    (profilesQuery.data?.items ?? []).map((profile) => [profile.id, profile.displayName]),
   );
   const currentUserDisplayName = resolveUserDisplayName(session.user);
-  const optimisticSessions = useMemo(
-    () =>
-      buildOptimisticSessions({
-        launchedSessions,
-        listedItems: sandboxInstancesQuery.data?.items ?? [],
-        currentUserId: session.user.id,
-        currentUserDisplayName,
-      }),
-    [currentUserDisplayName, launchedSessions, sandboxInstancesQuery.data?.items, session.user.id],
-  );
-  const displayedSessions = useMemo(() => {
-    const combinedItems = [...optimisticSessions, ...(sandboxInstancesQuery.data?.items ?? [])];
+  const optimisticSessions = buildOptimisticSessions({
+    launchedSessions,
+    listedItems: sandboxInstancesQuery.data?.items ?? [],
+    currentUserId: session.user.id,
+    currentUserDisplayName,
+  });
+  const displayedSessions = [
+    ...optimisticSessions,
+    ...(sandboxInstancesQuery.data?.items ?? []),
+  ].sort((left, right) => {
+    const statusRank: Record<SandboxSessionStatus, number> = {
+      starting: 0,
+      running: 1,
+      failed: 2,
+      stopped: 3,
+    };
 
-    return combinedItems.sort((left, right) => {
-      const statusRank: Record<SandboxSessionStatus, number> = {
-        starting: 0,
-        running: 1,
-        failed: 2,
-        stopped: 3,
-      };
+    const rankDifference = statusRank[left.status] - statusRank[right.status];
+    if (rankDifference !== 0) {
+      return rankDifference;
+    }
 
-      const rankDifference = statusRank[left.status] - statusRank[right.status];
-      if (rankDifference !== 0) {
-        return rankDifference;
-      }
-
-      return Date.parse(right.createdAt) - Date.parse(left.createdAt);
-    });
-  }, [optimisticSessions, sandboxInstancesQuery.data?.items]);
+    return Date.parse(right.createdAt) - Date.parse(left.createdAt);
+  });
 
   function updatePagination(input: {
     nextLimit: number;

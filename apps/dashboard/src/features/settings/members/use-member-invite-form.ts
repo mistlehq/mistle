@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import type { InviteChip } from "./member-invite-state.js";
 import {
@@ -140,24 +140,18 @@ export function useMemberInviteForm(input: {
   const [roleError, setRoleError] = useState<string | null>(null);
   const [draftEmailValue, setDraftEmailValue] = useState("");
 
-  const validPendingChipIds = useMemo(() => {
-    return chips
-      .filter((chip) => chip.status === "pending" && isValidInviteEmailShape(chip.normalizedEmail))
-      .map((chip) => chip.id);
-  }, [chips]);
+  const validPendingChipIds = chips
+    .filter((chip) => chip.status === "pending" && isValidInviteEmailShape(chip.normalizedEmail))
+    .map((chip) => chip.id);
 
-  const failedChipIds = useMemo(() => {
-    return chips.filter((chip) => chip.status === "error").map((chip) => chip.id);
-  }, [chips]);
+  const failedChipIds = chips.filter((chip) => chip.status === "error").map((chip) => chip.id);
 
-  const sendableDraftTokenCount = useMemo(() => {
-    return countSendableDraftInvites({
-      draftEmailValue,
-      existingChips: chips,
-    });
-  }, [chips, draftEmailValue]);
+  const sendableDraftTokenCount = countSendableDraftInvites({
+    draftEmailValue,
+    existingChips: chips,
+  });
 
-  const outcomeSummary = useMemo(() => summarizeInviteOutcomes(chips), [chips]);
+  const outcomeSummary = summarizeInviteOutcomes(chips);
 
   function addTokens(tokens: string[]): void {
     setChips((currentChips) => {

@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo } from "react";
 
 import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
 import { canResendInvitation, resolveInvitationDisplayStatus } from "./members-directory-model.js";
@@ -45,22 +44,15 @@ export function useMembersQueries(input: {
   });
 
   const capabilities = capabilitiesQuery.isError ? null : (capabilitiesQuery.data ?? null);
-  const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data]);
-  const invitations = useMemo(
-    () =>
-      (invitationsQuery.data ?? []).filter((invitation) =>
-        canResendInvitation(resolveInvitationDisplayStatus(invitation)),
-      ),
-    [invitationsQuery.data],
+  const members = membersQuery.data ?? [];
+  const invitations = (invitationsQuery.data ?? []).filter((invitation) =>
+    canResendInvitation(resolveInvitationDisplayStatus(invitation)),
   );
 
-  const inviterDisplayNames = useMemo(() => {
-    const displayNames = new Map<string, string>();
-    for (const member of members) {
-      displayNames.set(member.userId, formatMemberDisplayName(member));
-    }
-    return displayNames;
-  }, [members]);
+  const inviterDisplayNames = new Map<string, string>();
+  for (const member of members) {
+    inviterDisplayNames.set(member.userId, formatMemberDisplayName(member));
+  }
 
   return {
     capabilitiesQuery,

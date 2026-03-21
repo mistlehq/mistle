@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { useCodexSessionState } from "../session-agents/codex/session-state/index.js";
 import {
@@ -19,6 +19,10 @@ import { useSessionTerminalWorkbenchState } from "./use-session-terminal-workben
 type ComposerConfigSnapshot = {
   model: string | null;
   modelReasoningEffort: string | null;
+};
+
+type ComposerConfigDraft = ComposerConfigSnapshot & {
+  baseConfigJson: string | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -145,10 +149,7 @@ export function useSessionWorkbenchController(input: {
 }): UseSessionWorkbenchControllerResult {
   const [composerText, setComposerText] = useState("");
   const [hasAttemptedAutoConnect, setHasAttemptedAutoConnect] = useState(false);
-  const [selectedComposerModel, setSelectedComposerModel] = useState<string | null>(null);
-  const [selectedComposerReasoningEffort, setSelectedComposerReasoningEffort] = useState<
-    string | null
-  >(null);
+  const [composerConfigDraft, setComposerConfigDraft] = useState<ComposerConfigDraft | null>(null);
   const sessionState = useCodexSessionState();
   const ptyState = useSandboxPtyState();
   const terminalPanelState = useSessionTerminalWorkbenchState({
@@ -172,6 +173,22 @@ export function useSessionWorkbenchController(input: {
   const { canInterruptTurn, canSteerTurn, interruptTurn, startTurn, steerTurn } = chat;
   const { batchWriteConfig, loadModels, readConfig, readConfigRequirements, writeConfigValue } =
     admin;
+  const composerConfigSnapshot =
+    connectedSession === null
+      ? {
+          model: null,
+          modelReasoningEffort: null,
+        }
+      : readComposerConfigSnapshot(admin.configJson);
+  const activeComposerConfig =
+    connectedSession !== null &&
+    composerConfigDraft !== null &&
+    composerConfigDraft.baseConfigJson === admin.configJson
+      ? {
+          model: composerConfigDraft.model,
+          modelReasoningEffort: composerConfigDraft.modelReasoningEffort,
+        }
+      : composerConfigSnapshot;
 
   const sandboxStatusQuery = useQuery({
     queryKey: ["sandbox-instance-status", input.sandboxInstanceId],
@@ -193,27 +210,22 @@ export function useSessionWorkbenchController(input: {
     },
   });
   const sandboxStatus = sandboxStatusQuery.data?.status ?? null;
-  const connectionReadiness = useMemo(() => {
-    return resolveSessionConnectionReadiness({
-      sandboxInstanceId: input.sandboxInstanceId,
-      sandboxStatus,
-      isStatusPending: sandboxStatusQuery.isPending,
-    });
-  }, [input.sandboxInstanceId, sandboxStatus, sandboxStatusQuery.isPending]);
-  const stoppedSessionState = useMemo(() => {
-    const message = resolveStoppedSessionMessage({
-      connectionReadinessReason: connectionReadiness.reason,
-    });
-
-    return {
-      // Mirror the policy contract: stopped-state messaging stays separate from
-      // connection readiness until the control-plane API exposes a dedicated
-      // resume sandbox endpoint and the dashboard adopts that endpoint as the
-      // supported resume flow.
-      message,
-      requiresManualResume: message !== null,
-    };
-  }, [connectionReadiness.reason]);
+  const connectionReadiness = resolveSessionConnectionReadiness({
+    sandboxInstanceId: input.sandboxInstanceId,
+    sandboxStatus,
+    isStatusPending: sandboxStatusQuery.isPending,
+  });
+  const stoppedSessionMessage = resolveStoppedSessionMessage({
+    connectionReadinessReason: connectionReadiness.reason,
+  });
+  const stoppedSessionState = {
+    // Mirror the policy contract: stopped-state messaging stays separate from
+    // connection readiness until the control-plane API exposes a dedicated
+    // resume sandbox endpoint and the dashboard adopts that endpoint as the
+    // supported resume flow.
+    message: stoppedSessionMessage,
+    requiresManualResume: stoppedSessionMessage !== null,
+  };
 
   useEffect(() => {
     setHasAttemptedAutoConnect(false);
@@ -269,17 +281,14 @@ export function useSessionWorkbenchController(input: {
     sandboxStatusQuery.refetch,
   ]);
 
-  const sessionHeaderStatusUi = useMemo(() => {
-    const sandboxStatusLabel =
-      sandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
-
-    return resolveSessionHeaderStatusUi({
-      sandboxStatus: sandboxStatusLabel.toLowerCase(),
-      agentConnectionState,
-      step,
-      hasConnectionError: startErrorMessage !== null,
-    });
-  }, [agentConnectionState, sandboxStatus, sandboxStatusQuery.isPending, startErrorMessage, step]);
+  const sandboxStatusLabel =
+    sandboxStatus ?? (sandboxStatusQuery.isPending ? "Loading" : "Unknown");
+  const sessionHeaderStatusUi = resolveSessionHeaderStatusUi({
+    sandboxStatus: sandboxStatusLabel.toLowerCase(),
+    agentConnectionState,
+    step,
+    hasConnectionError: startErrorMessage !== null,
+  });
 
   const hasActiveTurn = canInterruptTurn || canSteerTurn;
   const sandboxFailureMessage = sandboxStatusQuery.data?.failureMessage ?? null;
@@ -296,8 +305,6 @@ export function useSessionWorkbenchController(input: {
 
   useEffect(() => {
     if (connectedSession === null) {
-      setSelectedComposerModel(null);
-      setSelectedComposerReasoningEffort(null);
       return;
     }
 
@@ -305,15 +312,16 @@ export function useSessionWorkbenchController(input: {
     readConfig(false);
   }, [connectedSession, loadModels, readConfig]);
 
-  useEffect(() => {
-    const snapshot = readComposerConfigSnapshot(admin.configJson);
-    setSelectedComposerModel(snapshot.model);
-    setSelectedComposerReasoningEffort(snapshot.modelReasoningEffort);
-  }, [admin.configJson]);
-
   const setComposerModel = useCallback(
     (nextModel: string): void => {
-      setSelectedComposerModel(nextModel);
+      setComposerConfigDraft((currentDraft) => ({
+        baseConfigJson: admin.configJson,
+        model: nextModel,
+        modelReasoningEffort:
+          currentDraft?.baseConfigJson === admin.configJson
+            ? currentDraft.modelReasoningEffort
+            : composerConfigSnapshot.modelReasoningEffort,
+      }));
       batchWriteConfig({
         edits: [
           {
@@ -324,27 +332,32 @@ export function useSessionWorkbenchController(input: {
         ],
       });
     },
-    [batchWriteConfig],
+    [admin.configJson, batchWriteConfig, composerConfigSnapshot.modelReasoningEffort],
   );
 
   const setComposerReasoningEffort = useCallback(
     (nextReasoningEffort: string): void => {
-      setSelectedComposerReasoningEffort(nextReasoningEffort);
+      setComposerConfigDraft((currentDraft) => ({
+        baseConfigJson: admin.configJson,
+        model:
+          currentDraft?.baseConfigJson === admin.configJson
+            ? currentDraft.model
+            : composerConfigSnapshot.model,
+        modelReasoningEffort: nextReasoningEffort,
+      }));
       writeConfigValue({
         keyPath: "model_reasoning_effort",
         value: nextReasoningEffort,
         mergeStrategy: "replace",
       });
     },
-    [writeConfigValue],
+    [admin.configJson, composerConfigSnapshot.model, writeConfigValue],
   );
 
-  const composerModelOptions = useMemo(() => {
-    return admin.availableModels.map((model) => ({
-      value: model.model,
-      label: model.displayName,
-    }));
-  }, [admin.availableModels]);
+  const composerModelOptions = admin.availableModels.map((model) => ({
+    value: model.model,
+    label: model.displayName,
+  }));
 
   const submitComposer = useCallback((): void => {
     const action = resolveChatComposerAction({
@@ -410,8 +423,8 @@ export function useSessionWorkbenchController(input: {
         onModelChange: setComposerModel,
         onReasoningEffortChange: setComposerReasoningEffort,
         onSubmit: submitComposer,
-        selectedModel: selectedComposerModel,
-        selectedReasoningEffort: selectedComposerReasoningEffort,
+        selectedModel: activeComposerConfig.model,
+        selectedReasoningEffort: activeComposerConfig.modelReasoningEffort,
       },
       serverRequestsState: {
         isRespondingToServerRequest: serverRequests.isRespondingToServerRequest,

@@ -1,5 +1,4 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@mistle/ui";
-import { useCallback, useMemo } from "react";
 
 import { InvitationDetailsDialog } from "./invitation-details-dialog.js";
 import type { MembershipCapabilities, SettingsInvitation, SettingsMember } from "./members-api.js";
@@ -38,47 +37,20 @@ export function MembersDirectoryTable(input: {
     members: input.members,
     invitations: input.invitations,
   });
-  const onViewInvitationDetails = useCallback(
-    (invitation: SettingsInvitation) => {
-      setSelectedInvitationForDetails(invitation);
-    },
-    [setSelectedInvitationForDetails],
-  );
-  const handlers = useMemo(
-    () => ({
+  const tableRows = buildMembersDirectoryTableRowViewModels({
+    rows: visibleRows,
+    capabilities: input.capabilities,
+    canManageInvitations: input.canManageInvitations,
+    pendingMemberOperation: input.pendingMemberOperation,
+    invitationActionState: input.invitationActionState,
+    handlers: {
       onChangeRole: input.onChangeRole,
       onRemoveMember: input.onRemoveMember,
-      onViewInvitationDetails,
+      onViewInvitationDetails: setSelectedInvitationForDetails,
       onResendInvite: input.onResendInvite,
       onRevokeInvite: input.onRevokeInvite,
-    }),
-    [
-      input.onChangeRole,
-      input.onRemoveMember,
-      onViewInvitationDetails,
-      input.onResendInvite,
-      input.onRevokeInvite,
-    ],
-  );
-  const tableRows = useMemo(
-    () =>
-      buildMembersDirectoryTableRowViewModels({
-        rows: visibleRows,
-        capabilities: input.capabilities,
-        canManageInvitations: input.canManageInvitations,
-        pendingMemberOperation: input.pendingMemberOperation,
-        invitationActionState: input.invitationActionState,
-        handlers,
-      }),
-    [
-      visibleRows,
-      input.capabilities,
-      input.canManageInvitations,
-      input.pendingMemberOperation,
-      input.invitationActionState,
-      handlers,
-    ],
-  );
+    },
+  });
 
   return (
     <>
