@@ -14,11 +14,8 @@ export async function markSandboxInstanceStarting(ctx: {
     .set({
       status: SandboxInstanceStatuses.STARTING,
       providerRuntimeId: null,
-      activeTunnelLeaseId: null,
-      tunnelConnectedAt: null,
-      lastTunnelSeenAt: null,
-      tunnelDisconnectedAt: null,
       stoppedAt: null,
+      stopReason: null,
       failedAt: null,
       failureCode: null,
       failureMessage: null,

@@ -55,9 +55,6 @@ async function insertSandboxInstanceRow(input: {
     startedByKind: "system",
     startedById: "workflow_data_plane_gateway_integration",
     source: "webhook",
-    tunnelConnectedAt: null,
-    lastTunnelSeenAt: null,
-    tunnelDisconnectedAt: "2026-03-13T00:00:00.000Z",
   });
 }
 

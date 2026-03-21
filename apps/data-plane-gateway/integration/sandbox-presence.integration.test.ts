@@ -35,10 +35,6 @@ async function insertSandboxInstanceRow(input: {
     startedByKind: "system",
     startedById: "workflow_sandbox_presence_it",
     source: "webhook",
-    activeTunnelLeaseId: null,
-    tunnelConnectedAt: null,
-    lastTunnelSeenAt: null,
-    tunnelDisconnectedAt: "2026-03-13T00:00:00.000Z",
   });
 }
 
