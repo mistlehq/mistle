@@ -17,6 +17,15 @@ import {
 } from "./integrations-page-view-model.js";
 
 type IntegrationDirectoryData = Awaited<ReturnType<typeof listIntegrationDirectory>>;
+type IntegrationConnectionResourcesResult = Awaited<
+  ReturnType<typeof listIntegrationConnectionResources>
+>;
+type IntegrationResourceQueryState = {
+  data: IntegrationConnectionResourcesResult | undefined;
+  error: Error | null;
+  isError: boolean;
+  isPending: boolean;
+};
 
 const RefreshIntegrationConnectionResourcesMutationKey = [
   "settings",
@@ -42,6 +51,41 @@ function isRefreshResourceMutationVariables(
   }
 
   return "kind" in value && typeof value.kind === "string";
+}
+
+function createRefreshingResourceKeys(pendingMutationVariables: readonly unknown[]): Set<string> {
+  return new Set<string>(
+    pendingMutationVariables
+      .filter(isRefreshResourceMutationVariables)
+      .map(createRefreshingResourceKey),
+  );
+}
+
+function buildResourceItemsByKey(input: {
+  resourceRequests: ReturnType<typeof buildIntegrationConnectionResourceRequests>;
+  resourceQueries: readonly IntegrationResourceQueryState[];
+}) {
+  return buildIntegrationConnectionResourceItemsByKey(
+    input.resourceRequests.map((resource, index) => {
+      const query = input.resourceQueries[index];
+
+      return {
+        connectionId: resource.connectionId,
+        state: {
+          errorMessage:
+            query?.isError === true
+              ? resolveApiErrorMessage({
+                  error: query.error,
+                  fallbackMessage: `Could not load ${resource.kind}.`,
+                })
+              : null,
+          isLoading: query?.isPending ?? false,
+          items: query?.data?.items ?? [],
+          kind: resource.kind,
+        },
+      };
+    }),
+  );
 }
 
 export function shouldPollIntegrationDirectory(input: {
@@ -88,13 +132,7 @@ export function useIntegrationResourceState(input: {
     select: (mutation) => mutation.state.variables,
   });
 
-  const refreshingResourceKeys = useMemo(() => {
-    return new Set<string>(
-      pendingRefreshMutationVariables
-        .filter(isRefreshResourceMutationVariables)
-        .map(createRefreshingResourceKey),
-    );
-  }, [pendingRefreshMutationVariables]);
+  const refreshingResourceKeys = createRefreshingResourceKeys(pendingRefreshMutationVariables);
 
   const resourceRequests = useMemo(
     () => buildIntegrationConnectionResourceRequests(input.detailConnections),
@@ -119,31 +157,10 @@ export function useIntegrationResourceState(input: {
     })),
   });
 
-  const resourceItemsByKey = useMemo(
-    () =>
-      buildIntegrationConnectionResourceItemsByKey(
-        resourceRequests.map((resource, index) => {
-          const query = resourceQueries[index];
-
-          return {
-            connectionId: resource.connectionId,
-            state: {
-              errorMessage:
-                query?.isError === true
-                  ? resolveApiErrorMessage({
-                      error: query.error,
-                      fallbackMessage: `Could not load ${resource.kind}.`,
-                    })
-                  : null,
-              isLoading: query?.isPending ?? false,
-              items: query?.data?.items ?? [],
-              kind: resource.kind,
-            },
-          };
-        }),
-      ),
-    [resourceQueries, resourceRequests],
-  );
+  const resourceItemsByKey = buildResourceItemsByKey({
+    resourceRequests,
+    resourceQueries,
+  });
 
   return {
     onRefreshResource: refreshResourceMutation.mutate,
