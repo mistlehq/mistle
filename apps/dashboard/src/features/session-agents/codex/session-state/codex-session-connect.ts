@@ -46,6 +46,10 @@ export async function establishInitialCodexThread(input: {
     loadedThreadIds: input.loadedThreadIds,
   });
 
+  if (action.type === "error") {
+    throw new Error(action.errorMessage);
+  }
+
   if (action.type === "resume") {
     const resumedThread = await resumeCodexThread({
       rpcClient: input.rpcClient,

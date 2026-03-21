@@ -2549,22 +2549,6 @@ export interface paths {
             };
           };
         };
-        /** @description Sandbox instance state conflicts with the requested operation. */
-        409: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/json": {
-              /** @enum {string} */
-              code:
-                | "INSTANCE_NOT_RESUMABLE"
-                | "INSTANCE_FAILED"
-                | "MULTIPLE_ACTIVE_AUTOMATION_CONVERSATIONS";
-              message: string;
-            };
-          };
-        };
         /** @description Internal server error. */
         500: {
           headers: {

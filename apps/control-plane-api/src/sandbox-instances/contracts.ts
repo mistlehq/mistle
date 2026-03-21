@@ -225,14 +225,6 @@ export const getSandboxInstanceRoute = createRoute({
         },
       },
     },
-    409: {
-      description: "Sandbox instance state conflicts with the requested operation.",
-      content: {
-        "application/json": {
-          schema: SandboxInstancesConflictResponseSchema,
-        },
-      },
-    },
     500: {
       description: "Internal server error.",
       content: {

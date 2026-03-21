@@ -5,12 +5,7 @@ import {
   type ControlPlaneDatabase,
 } from "@mistle/db/control-plane";
 
-import {
-  SandboxInstancesConflictCodes,
-  SandboxInstancesConflictError,
-  SandboxInstancesNotFoundCodes,
-  SandboxInstancesNotFoundError,
-} from "./errors.js";
+import { SandboxInstancesNotFoundCodes, SandboxInstancesNotFoundError } from "./errors.js";
 import type { SandboxInstanceAutomationConversation, SandboxInstanceStatus } from "./types.js";
 
 async function resolveAutomationConversation(
@@ -63,10 +58,7 @@ async function resolveAutomationConversation(
   }
 
   if (matchingRoutes.length > 1) {
-    throw new SandboxInstancesConflictError(
-      SandboxInstancesConflictCodes.MULTIPLE_ACTIVE_AUTOMATION_CONVERSATIONS,
-      `Expected at most one active automation conversation for sandbox instance '${input.instanceId}', found ${String(matchingRoutes.length)}.`,
-    );
+    return null;
   }
 
   return matchingRoutes[0] ?? null;

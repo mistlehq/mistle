@@ -141,14 +141,6 @@ function handleSandboxInstanceReadError(ctx: AppContext, error: unknown) {
     return ctx.json(responseBody, 404);
   }
 
-  if (error instanceof SandboxInstancesConflictError) {
-    const responseBody: z.infer<typeof InternalSandboxRuntimeErrorResponseSchema> = {
-      code: error.code,
-      message: error.message,
-    };
-    return ctx.json(responseBody, 409);
-  }
-
   throw error;
 }
 

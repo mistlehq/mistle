@@ -87,6 +87,13 @@ describe("codex session lifecycle policy", () => {
         preferredThreadId: "thread_persisted",
         availableThreads: [
           {
+            id: "thread_persisted",
+            name: null,
+            preview: null,
+            createdAt: 5,
+            updatedAt: 5,
+          },
+          {
             id: "thread_old",
             name: null,
             preview: null,
@@ -99,6 +106,20 @@ describe("codex session lifecycle policy", () => {
     ).toEqual({
       type: "resume",
       threadId: "thread_persisted",
+    });
+  });
+
+  it("returns an explicit error when the persisted thread binding is stale", () => {
+    expect(
+      selectCodexConnectionThreadStrategy({
+        preferredThreadId: "thread_persisted",
+        availableThreads: [],
+        loadedThreadIds: [],
+      }),
+    ).toEqual({
+      type: "error",
+      errorMessage:
+        "This session is linked to persisted Codex thread 'thread_persisted', but that thread is no longer available.",
     });
   });
 

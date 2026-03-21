@@ -22,10 +22,7 @@ import { afterEach, describe, expect } from "vitest";
 import { createDataPlaneBackend } from "../../data-plane-api/src/openworkflow/index.js";
 import { createDataPlaneApiRuntime } from "../../data-plane-api/src/runtime/index.js";
 import type { DataPlaneApiConfig } from "../../data-plane-api/src/types.js";
-import {
-  SandboxInstanceStatusResponseSchema,
-  SandboxInstancesConflictResponseSchema,
-} from "../src/sandbox-instances/contracts.js";
+import { SandboxInstanceStatusResponseSchema } from "../src/sandbox-instances/contracts.js";
 import { it } from "./test-context.js";
 
 type StartedDataPlaneFixture = {
@@ -292,7 +289,7 @@ describe("sandbox instances get integration", () => {
     expect(body.automationConversation).toBeNull();
   });
 
-  it("returns a conflict when multiple active automation conversations match the sandbox", async ({
+  it("returns null automation conversation metadata when multiple active automation conversations match the sandbox", async ({
     fixture,
   }) => {
     const dataPlaneFixture = await createStartedDataPlaneFixture({
@@ -386,13 +383,15 @@ describe("sandbox instances get integration", () => {
       },
     });
 
-    expect(response.status).toBe(409);
-    const body = SandboxInstancesConflictResponseSchema.parse(await response.json());
+    expect(response.status).toBe(200);
+    const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
 
     expect(body).toEqual({
-      code: "MULTIPLE_ACTIVE_AUTOMATION_CONVERSATIONS",
-      message:
-        "Expected at most one active automation conversation for sandbox instance 'sbi_cp_get_003', found 2.",
+      id: "sbi_cp_get_003",
+      status: "running",
+      failureCode: null,
+      failureMessage: null,
+      automationConversation: null,
     });
   });
 });

@@ -51,12 +51,34 @@ describe("codex session connect", () => {
     expect(
       resolveInitialCodexThreadAction({
         preferredThreadId: "thread_persisted",
-        availableThreads: [],
+        availableThreads: [
+          {
+            id: "thread_persisted",
+            name: null,
+            preview: null,
+            createdAt: 5,
+            updatedAt: 5,
+          },
+        ],
         loadedThreadIds: ["thread_loaded_only"],
       }),
     ).toEqual({
       type: "resume",
       threadId: "thread_persisted",
+    });
+  });
+
+  it("returns an explicit error when the persisted provider conversation id is stale", () => {
+    expect(
+      resolveInitialCodexThreadAction({
+        preferredThreadId: "thread_persisted",
+        availableThreads: [],
+        loadedThreadIds: [],
+      }),
+    ).toEqual({
+      type: "error",
+      errorMessage:
+        "This session is linked to persisted Codex thread 'thread_persisted', but that thread is no longer available.",
     });
   });
 

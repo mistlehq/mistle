@@ -11,6 +11,10 @@ export type CodexConnectionThreadStrategy =
       threadId: string;
     }
   | {
+      type: "error";
+      errorMessage: string;
+    }
+  | {
       type: "start_new";
     };
 
@@ -40,6 +44,17 @@ export function selectCodexConnectionThreadStrategy(input: {
   loadedThreadIds: readonly string[];
 }): CodexConnectionThreadStrategy {
   if (input.preferredThreadId !== null) {
+    const hasPreferredThread =
+      input.loadedThreadIds.includes(input.preferredThreadId) ||
+      input.availableThreads.some((thread) => thread.id === input.preferredThreadId);
+
+    if (!hasPreferredThread) {
+      return {
+        type: "error",
+        errorMessage: `This session is linked to persisted Codex thread '${input.preferredThreadId}', but that thread is no longer available.`,
+      };
+    }
+
     return {
       type: "resume",
       threadId: input.preferredThreadId,
