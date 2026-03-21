@@ -72,7 +72,8 @@ export function createDataPlaneGatewayRuntime(
   const nodeWebSocket = createNodeWebSocket({ app });
   const nodeId = typeid("dpg").toString();
   const relayCoordinator = createInMemoryTunnelRelayCoordinator(nodeId);
-  let valkeyClient: ValkeyClient | undefined;
+  let hasValkeyClient = false;
+  let valkeyClient!: ValkeyClient;
   let sandboxOwnerStore: InMemorySandboxOwnerStore | ValkeySandboxOwnerStore;
   let sandboxActivityStore: InMemorySandboxActivityStore | ValkeySandboxActivityStore;
   let sandboxPresenceStore: InMemorySandboxPresenceStore | ValkeySandboxPresenceStore;
@@ -96,6 +97,7 @@ export function createDataPlaneGatewayRuntime(
     valkeyClient = createValkeyClient({
       url: valkeyConfig.url,
     });
+    hasValkeyClient = true;
 
     sandboxOwnerStore = new ValkeySandboxOwnerStore(valkeyClient, valkeyConfig.keyPrefix);
     sandboxActivityStore = new ValkeySandboxActivityStore(valkeyClient, valkeyConfig.keyPrefix);
@@ -208,9 +210,9 @@ export function createDataPlaneGatewayRuntime(
       startedServer = undefined;
     }
 
-    if (valkeyClient !== undefined) {
+    if (hasValkeyClient) {
       await closeValkeyClient(valkeyClient);
-      valkeyClient = undefined;
+      hasValkeyClient = false;
     }
 
     await stopApp(app);
@@ -227,7 +229,7 @@ export function createDataPlaneGatewayRuntime(
       if (startedServer !== undefined) {
         throw new Error("Data plane gateway runtime is already started.");
       }
-      if (valkeyClient !== undefined) {
+      if (hasValkeyClient) {
         await connectValkeyClient(valkeyClient);
       }
 
