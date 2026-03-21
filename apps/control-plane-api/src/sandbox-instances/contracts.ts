@@ -96,7 +96,11 @@ const SandboxInstancesBadRequestCodeSchema = z.enum([
   "INVALID_LIST_INSTANCES_INPUT",
 ]);
 const SandboxInstancesNotFoundCodeSchema = z.enum(["INSTANCE_NOT_FOUND"]);
-const SandboxInstancesConflictCodeSchema = z.enum(["INSTANCE_NOT_RESUMABLE", "INSTANCE_FAILED"]);
+const SandboxInstancesConflictCodeSchema = z.enum([
+  "INSTANCE_NOT_RESUMABLE",
+  "INSTANCE_FAILED",
+  "MULTIPLE_ACTIVE_AUTOMATION_CONVERSATIONS",
+]);
 
 export const SandboxInstancesBadRequestResponseSchema = z.union([
   z
@@ -218,6 +222,14 @@ export const getSandboxInstanceRoute = createRoute({
       content: {
         "application/json": {
           schema: SandboxInstancesNotFoundResponseSchema,
+        },
+      },
+    },
+    409: {
+      description: "Sandbox instance state conflicts with the requested operation.",
+      content: {
+        "application/json": {
+          schema: SandboxInstancesConflictResponseSchema,
         },
       },
     },

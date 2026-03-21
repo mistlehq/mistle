@@ -4844,6 +4844,32 @@
               }
             }
           },
+          "409": {
+            "description": "Sandbox instance state conflicts with the requested operation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "INSTANCE_NOT_RESUMABLE",
+                        "INSTANCE_FAILED",
+                        "MULTIPLE_ACTIVE_AUTOMATION_CONVERSATIONS"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
           "500": {
             "description": "Internal server error.",
             "content": {
@@ -5043,7 +5069,11 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["INSTANCE_NOT_RESUMABLE", "INSTANCE_FAILED"]
+                      "enum": [
+                        "INSTANCE_NOT_RESUMABLE",
+                        "INSTANCE_FAILED",
+                        "MULTIPLE_ACTIVE_AUTOMATION_CONVERSATIONS"
+                      ]
                     },
                     "message": {
                       "type": "string",

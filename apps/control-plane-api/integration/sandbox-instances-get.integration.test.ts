@@ -22,7 +22,10 @@ import { afterEach, describe, expect } from "vitest";
 import { createDataPlaneBackend } from "../../data-plane-api/src/openworkflow/index.js";
 import { createDataPlaneApiRuntime } from "../../data-plane-api/src/runtime/index.js";
 import type { DataPlaneApiConfig } from "../../data-plane-api/src/types.js";
-import { SandboxInstanceStatusResponseSchema } from "../src/sandbox-instances/contracts.js";
+import {
+  SandboxInstanceStatusResponseSchema,
+  SandboxInstancesConflictResponseSchema,
+} from "../src/sandbox-instances/contracts.js";
 import { it } from "./test-context.js";
 
 type StartedDataPlaneFixture = {
@@ -287,5 +290,109 @@ describe("sandbox instances get integration", () => {
     const body = SandboxInstanceStatusResponseSchema.parse(await response.json());
 
     expect(body.automationConversation).toBeNull();
+  });
+
+  it("returns a conflict when multiple active automation conversations match the sandbox", async ({
+    fixture,
+  }) => {
+    const dataPlaneFixture = await createStartedDataPlaneFixture({
+      controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
+      internalAuthServiceToken: fixture.internalAuthServiceToken,
+      workflowNamespaceId: fixture.config.workflow.namespaceId,
+    });
+    startedDataPlaneFixtures.push(dataPlaneFixture);
+
+    const session = await fixture.authSession({
+      email: "integration-sandbox-instances-get-ambiguous@example.com",
+    });
+
+    await dataPlaneFixture.db.insert(sandboxInstances).values({
+      id: "sbi_cp_get_003",
+      organizationId: session.organizationId,
+      sandboxProfileId: "sbp_dp_get_003",
+      sandboxProfileVersion: 1,
+      runtimeProvider: "docker",
+      providerRuntimeId: "provider-cp-get-003",
+      status: SandboxInstanceStatuses.RUNNING,
+      startedByKind: "user",
+      startedById: session.userId,
+      source: "webhook",
+      createdAt: "2026-03-21T00:00:00.000Z",
+      updatedAt: "2026-03-21T00:00:00.000Z",
+    });
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "sbp_cp_get_003",
+      organizationId: session.organizationId,
+      displayName: "Webhook sandbox profile ambiguous",
+      status: SandboxProfileStatuses.ACTIVE,
+    });
+
+    await fixture.db.insert(automationConversations).values([
+      {
+        id: "cnv_cp_get_003_a",
+        organizationId: session.organizationId,
+        ownerKind: AutomationConversationOwnerKinds.AUTOMATION_TARGET,
+        ownerId: "aut_cp_get_003_a",
+        createdByKind: AutomationConversationCreatedByKinds.WEBHOOK,
+        createdById: "iwe_cp_get_003_a",
+        sandboxProfileId: "sbp_cp_get_003",
+        integrationFamilyId: "openai",
+        conversationKey: "webhook-conversation-key-003-a",
+        title: null,
+        preview: null,
+        status: AutomationConversationStatuses.ACTIVE,
+      },
+      {
+        id: "cnv_cp_get_003_b",
+        organizationId: session.organizationId,
+        ownerKind: AutomationConversationOwnerKinds.AUTOMATION_TARGET,
+        ownerId: "aut_cp_get_003_b",
+        createdByKind: AutomationConversationCreatedByKinds.WEBHOOK,
+        createdById: "iwe_cp_get_003_b",
+        sandboxProfileId: "sbp_cp_get_003",
+        integrationFamilyId: "openai",
+        conversationKey: "webhook-conversation-key-003-b",
+        title: null,
+        preview: null,
+        status: AutomationConversationStatuses.ACTIVE,
+      },
+    ]);
+
+    await fixture.db.insert(automationConversationRoutes).values([
+      {
+        id: "cvr_cp_get_003_a",
+        conversationId: "cnv_cp_get_003_a",
+        sandboxInstanceId: "sbi_cp_get_003",
+        providerConversationId: "thread_cp_get_003_a",
+        providerExecutionId: null,
+        providerState: null,
+        status: "active",
+      },
+      {
+        id: "cvr_cp_get_003_b",
+        conversationId: "cnv_cp_get_003_b",
+        sandboxInstanceId: "sbi_cp_get_003",
+        providerConversationId: "thread_cp_get_003_b",
+        providerExecutionId: null,
+        providerState: null,
+        status: "active",
+      },
+    ]);
+
+    const response = await fixture.request("/v1/sandbox/instances/sbi_cp_get_003", {
+      headers: {
+        cookie: session.cookie,
+      },
+    });
+
+    expect(response.status).toBe(409);
+    const body = SandboxInstancesConflictResponseSchema.parse(await response.json());
+
+    expect(body).toEqual({
+      code: "MULTIPLE_ACTIVE_AUTOMATION_CONVERSATIONS",
+      message:
+        "Expected at most one active automation conversation for sandbox instance 'sbi_cp_get_003', found 2.",
+    });
   });
 });
