@@ -31,11 +31,18 @@ export type SandboxInstanceConnectionToken = {
   expiresAt: string;
 };
 
+export type SandboxInstanceAutomationConversation = {
+  conversationId: string;
+  routeId: string | null;
+  providerConversationId: string | null;
+};
+
 export type SandboxInstanceStatus = {
   id: string;
   status: NonNullable<GetSandboxInstanceResponse>["status"];
   failureCode: string | null;
   failureMessage: string | null;
+  automationConversation: SandboxInstanceAutomationConversation | null;
 };
 
 export type ListSandboxInstancesResult = Omit<ListSandboxInstancesResponse, "items"> & {

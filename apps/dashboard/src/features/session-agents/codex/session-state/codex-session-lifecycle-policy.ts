@@ -35,9 +35,17 @@ export function resolveCodexConnectionStateTransition(input: {
 }
 
 export function selectCodexConnectionThreadStrategy(input: {
+  preferredThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
 }): CodexConnectionThreadStrategy {
+  if (input.preferredThreadId !== null) {
+    return {
+      type: "resume",
+      threadId: input.preferredThreadId,
+    };
+  }
+
   const preferredThreadId = selectPreferredThreadId({
     availableThreads: input.availableThreads,
     loadedThreadIds: input.loadedThreadIds,

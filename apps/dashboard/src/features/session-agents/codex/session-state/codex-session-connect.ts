@@ -19,10 +19,12 @@ export type CodexConnectionBootstrapResult = {
 };
 
 export function resolveInitialCodexThreadAction(input: {
+  preferredThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
 }) {
   return selectCodexConnectionThreadStrategy({
+    preferredThreadId: input.preferredThreadId,
     availableThreads: input.availableThreads,
     loadedThreadIds: input.loadedThreadIds,
   });
@@ -30,6 +32,7 @@ export function resolveInitialCodexThreadAction(input: {
 
 export async function establishInitialCodexThread(input: {
   rpcClient: CodexJsonRpcClient;
+  preferredThreadId: string | null;
   availableThreads: readonly CodexThreadSummary[];
   loadedThreadIds: readonly string[];
   generation: number;
@@ -38,6 +41,7 @@ export async function establishInitialCodexThread(input: {
   ensureCurrentGeneration: (generation: number) => void;
 }): Promise<CodexConnectionBootstrapResult> {
   const action = resolveInitialCodexThreadAction({
+    preferredThreadId: input.preferredThreadId,
     availableThreads: input.availableThreads,
     loadedThreadIds: input.loadedThreadIds,
   });

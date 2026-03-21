@@ -253,7 +253,11 @@ export function useSessionWorkbenchController(input: {
     }
 
     setHasAttemptedAutoConnect(true);
-    connectSession({ sandboxInstanceId: input.sandboxInstanceId });
+    connectSession({
+      sandboxInstanceId: input.sandboxInstanceId,
+      preferredThreadId:
+        sandboxStatusQuery.data?.automationConversation?.providerConversationId ?? null,
+    });
   }, [
     connectSession,
     connectedSession,
@@ -261,6 +265,7 @@ export function useSessionWorkbenchController(input: {
     input.sandboxInstanceId,
     isStartingSession,
     connectionReadiness.canConnect,
+    sandboxStatusQuery.data?.automationConversation?.providerConversationId,
     startErrorMessage,
   ]);
 

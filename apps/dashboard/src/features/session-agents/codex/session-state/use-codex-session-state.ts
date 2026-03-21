@@ -69,7 +69,7 @@ type CodexSessionLifecycleState = {
   agentConnectionState: CodexSessionConnectionState;
   agentConnectionError: string | null;
   isStartingSession: boolean;
-  connectSession: (input: { sandboxInstanceId: string }) => void;
+  connectSession: (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => void;
   disconnectSession: () => void;
   clearStartErrorMessage: () => void;
 };
@@ -443,7 +443,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
   }
 
   const connectSessionMutation = useMutation({
-    mutationFn: async (input: { sandboxInstanceId: string }) => {
+    mutationFn: async (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => {
       const generation = connectionGenerationRef.current + 1;
       connectionGenerationRef.current = generation;
       teardownConnection("Superseded by a new Codex session.");
@@ -495,6 +495,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
 
       return await establishInitialCodexThread({
         rpcClient,
+        preferredThreadId: input.preferredThreadId,
         availableThreads: threadCollections.availableThreads,
         loadedThreadIds: threadCollections.loadedThreadIds,
         generation,
@@ -812,7 +813,7 @@ export function useCodexSessionState(): UseCodexSessionStateResult {
     respondToServerRequestMutation;
 
   const connectSession = useCallback(
-    (input: { sandboxInstanceId: string }) => {
+    (input: { sandboxInstanceId: string; preferredThreadId: string | null }) => {
       connectSessionMutate(input);
     },
     [connectSessionMutate],
