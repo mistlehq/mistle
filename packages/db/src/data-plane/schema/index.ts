@@ -2,6 +2,7 @@ export { DATA_PLANE_SCHEMA_NAME } from "./namespace.js";
 export {
   sandboxInstances,
   SandboxInstanceProviders,
+  SandboxStopReasons,
   SandboxInstanceVolumeModes,
   SandboxInstanceVolumeProviders,
   SandboxInstanceSources,
@@ -12,18 +13,13 @@ export type {
   InsertSandboxInstance,
   SandboxInstance,
   SandboxInstanceProvider,
+  SandboxStopReason,
   SandboxInstanceVolumeMode,
   SandboxInstanceVolumeProvider,
   SandboxInstanceSource,
   SandboxInstanceStarterKind,
   SandboxInstanceStatus,
 } from "./sandbox-instances.js";
-export { sandboxExecutionLeases } from "./sandbox-execution-leases.js";
-export type {
-  InsertSandboxExecutionLease,
-  SandboxExecutionLease,
-  SandboxExecutionLeaseMetadata,
-} from "./sandbox-execution-leases.js";
 export { sandboxInstanceRuntimePlans } from "./sandbox-instance-runtime-plans.js";
 export type {
   InsertSandboxInstanceRuntimePlan,

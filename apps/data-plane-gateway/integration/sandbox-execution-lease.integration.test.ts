@@ -39,10 +39,6 @@ async function insertSandboxInstanceRow(input: {
     startedByKind: "system",
     startedById: "workflow_data_plane_gateway_integration",
     source: "webhook",
-    activeTunnelLeaseId: null,
-    tunnelConnectedAt: null,
-    lastTunnelSeenAt: null,
-    tunnelDisconnectedAt: "2026-03-13T00:00:00.000Z",
   });
 }
 
@@ -166,11 +162,6 @@ describe("sandbox execution lease integration", () => {
           store,
           sandboxInstanceId,
         });
-
-        const executionLeaseRow = await fixture.db.query.sandboxExecutionLeases.findFirst({
-          where: (table, { eq }) => eq(table.id, leaseId),
-        });
-        expect(executionLeaseRow).toBeUndefined();
       } finally {
         await closeValkeyClient(client);
         await closeWebSocketIfOpen(bootstrapSocket);
@@ -222,12 +213,6 @@ describe("sandbox execution lease integration", () => {
             nowMs: Date.now(),
           }),
         ).resolves.toBe(false);
-
-        const missingLease = await fixture.db.query.sandboxExecutionLeases.findFirst({
-          where: (table, { eq }) => eq(table.id, "sxl_missing"),
-        });
-
-        expect(missingLease).toBeUndefined();
       } finally {
         await closeValkeyClient(client);
         if (bootstrapSocket.readyState === WebSocket.OPEN) {

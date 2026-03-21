@@ -153,5 +153,6 @@ export async function stopSandboxInstance(
   await markSandboxInstanceStopped({
     db: ctx.db,
     sandboxInstanceId: input.sandboxInstanceId,
+    stopReason: input.stopReason,
   });
 }

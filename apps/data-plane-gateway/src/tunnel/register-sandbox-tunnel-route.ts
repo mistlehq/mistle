@@ -19,7 +19,6 @@ import type { SandboxOwnerResolver } from "./ownership/sandbox-owner-resolver.js
 import type { SandboxOwnerStore } from "./ownership/sandbox-owner-store.js";
 import { TunnelProtocolTranslator } from "./protocol/tunnel-protocol-translator.js";
 import type { TunnelRelayCoordinator } from "./relay-coordinator.js";
-import { TunnelLivelinessRepository } from "./session/tunnel-liveliness-repository.js";
 import { type AttachedTunnelPeer, TunnelSessionService } from "./session/tunnel-session-service.js";
 import { getSandboxTunnelSessionAttributes, getSandboxTunnelSessionSpanName } from "./telemetry.js";
 import { finalizeTunnelSession, recordTunnelSessionError } from "./tunnel-session-observability.js";
@@ -93,7 +92,6 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
     input.sandboxPresenceStore,
     input.sandboxRuntimeAttachmentStore,
     input.sandboxIdleControllerRegistry,
-    new TunnelLivelinessRepository(),
     input.clock,
     input.scheduler,
   );
@@ -179,7 +177,6 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
             try {
               if (admittedRequest.kind === "bootstrap") {
                 attachedPeer = tunnelSessionService.attachBootstrapPeer({
-                  db: ctx.get("db"),
                   leaseId: admittedRequest.ownerLeaseId,
                   onFatalError: (failure) => {
                     recordTunnelSessionError({
@@ -313,7 +310,6 @@ export function registerSandboxTunnelRoute(input: RegisterSandboxTunnelRouteInpu
               if (admittedRequest.kind === "bootstrap") {
                 void tunnelSessionService.detachBootstrapPeer({
                   attachedPeer,
-                  db: ctx.get("db"),
                   leaseId: admittedRequest.ownerLeaseId,
                   sandboxInstanceId,
                 });

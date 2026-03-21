@@ -1,4 +1,3 @@
-import type { DataPlaneDatabase } from "@mistle/db/data-plane";
 import type { Clock, Scheduler, TimerHandle } from "@mistle/time";
 
 import type { SandboxIdleControllerRegistry } from "../../idle/sandbox-idle-controller-registry.js";
@@ -26,7 +25,6 @@ import {
 } from "../tunnel-peer-notifier.js";
 import type { TunnelSessionRegistry } from "../tunnel-session/index.js";
 import type { RelayPeerSocket, RelayTarget } from "../types.js";
-import { TunnelLivelinessRepository } from "./tunnel-liveliness-repository.js";
 import { startWebSocketHealthMonitor } from "./websocket-health-monitor.js";
 
 const ConnectionPresenceLeaseKind = "agent";
@@ -86,7 +84,6 @@ export class TunnelSessionService {
     private readonly sandboxPresenceStore: SandboxPresenceStore,
     private readonly sandboxRuntimeAttachmentStore: SandboxRuntimeAttachmentStore,
     private readonly sandboxIdleControllerRegistry: SandboxIdleControllerRegistry,
-    private readonly livelinessRepository: TunnelLivelinessRepository,
     private readonly clock: Clock,
     private readonly scheduler: Scheduler,
   ) {}
@@ -96,7 +93,6 @@ export class TunnelSessionService {
    * the lease heartbeat and liveliness persistence side effects for that lease.
    */
   public attachBootstrapPeer(input: {
-    db: DataPlaneDatabase;
     leaseId: string;
     onFatalError: (failure: TunnelSessionFatalError) => void;
     onLeaseLost: (failure: TunnelSessionLeaseLost) => void;
@@ -204,27 +200,6 @@ export class TunnelSessionService {
       });
     });
 
-    void this.livelinessRepository
-      .markConnected({
-        db: input.db,
-        leaseId: input.leaseId,
-        sandboxInstanceId: input.sandboxInstanceId,
-      })
-      .catch((error: unknown) => {
-        logger.error(
-          {
-            err: error,
-            sandboxInstanceId: input.sandboxInstanceId,
-          },
-          "Failed to persist sandbox tunnel connected timestamp",
-        );
-        input.onFatalError({
-          closeReason: "Failed to persist sandbox tunnel connection.",
-          error,
-          statusMessage: "Failed to persist sandbox tunnel connection.",
-        });
-      });
-
     const leaseHeartbeatHandle = this.sandboxOwnerLeaseHeartbeat.start({
       sandboxInstanceId: input.sandboxInstanceId,
       leaseId: input.leaseId,
@@ -246,35 +221,6 @@ export class TunnelSessionService {
             );
           });
         }
-
-        void this.livelinessRepository
-          .markSeen({
-            db: input.db,
-            leaseId: input.leaseId,
-            sandboxInstanceId: input.sandboxInstanceId,
-          })
-          .then((updated: boolean) => {
-            if (updated) {
-              return;
-            }
-
-            logger.info(
-              {
-                leaseId: input.leaseId,
-                sandboxInstanceId: input.sandboxInstanceId,
-              },
-              "Skipped sandbox tunnel heartbeat update for stale bootstrap lease",
-            );
-          })
-          .catch((error: unknown) => {
-            logger.error(
-              {
-                err: error,
-                sandboxInstanceId: input.sandboxInstanceId,
-              },
-              "Failed to persist sandbox tunnel heartbeat timestamp",
-            );
-          });
       },
       onLeaseLost: () => {
         logger.error(
@@ -413,47 +359,26 @@ export class TunnelSessionService {
    */
   public async detachBootstrapPeer(input: {
     attachedPeer: AttachedTunnelPeer;
-    db: DataPlaneDatabase;
     leaseId: string;
     sandboxInstanceId: string;
   }): Promise<void> {
     input.attachedPeer.leaseHeartbeatHandle?.stop();
     input.attachedPeer.websocketHealthHandle?.stop();
+
+    if (!this.relayCoordinator.isCurrentPeer(input.attachedPeer.relayTarget)) {
+      this.relayCoordinator.detachPeerWithOptions({
+        target: input.attachedPeer.relayTarget,
+        notifyOppositePeer: false,
+      });
+      return;
+    }
+
     this.sandboxIdleControllerRegistry
       .getController({
         sandboxInstanceId: input.sandboxInstanceId,
       })
       ?.handleBootstrapDisconnect({
         nowMs: this.clock.nowMs(),
-      });
-
-    void this.livelinessRepository
-      .markDisconnected({
-        db: input.db,
-        leaseId: input.leaseId,
-        sandboxInstanceId: input.sandboxInstanceId,
-      })
-      .then((updated: boolean) => {
-        if (updated) {
-          return;
-        }
-
-        logger.debug(
-          {
-            leaseId: input.leaseId,
-            sandboxInstanceId: input.sandboxInstanceId,
-          },
-          "Skipped sandbox tunnel disconnected update for stale bootstrap lease",
-        );
-      })
-      .catch((error: unknown) => {
-        logger.error(
-          {
-            err: error,
-            sandboxInstanceId: input.sandboxInstanceId,
-          },
-          "Failed to persist sandbox tunnel disconnected timestamp",
-        );
       });
 
     void this.sandboxRuntimeAttachmentStore

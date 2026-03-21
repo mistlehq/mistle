@@ -10,6 +10,7 @@ import { mintBootstrapToken } from "@mistle/gateway-tunnel-auth";
 import { systemSleeper } from "@mistle/time";
 import { typeid } from "typeid-js";
 import { describe, expect } from "vitest";
+import { z } from "zod";
 
 import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
 import {
@@ -20,6 +21,34 @@ import {
 } from "./websocket-test-helpers.js";
 
 const IntegrationTestTimeoutMs = 30_000;
+const InternalServiceTokenHeader = "x-mistle-service-token";
+
+type RuntimeStateSnapshot = {
+  ownerLeaseId: string | null;
+  attachment: {
+    sandboxInstanceId: string;
+    ownerLeaseId: string;
+    nodeId: string;
+    sessionId: string;
+    attachedAtMs: number;
+  } | null;
+};
+
+const RuntimeStateSnapshotSchema = z
+  .object({
+    ownerLeaseId: z.string().min(1).nullable(),
+    attachment: z
+      .object({
+        sandboxInstanceId: z.string().min(1),
+        ownerLeaseId: z.string().min(1),
+        nodeId: z.string().min(1),
+        sessionId: z.string().min(1),
+        attachedAtMs: z.number().int().nonnegative(),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
 
 async function insertSandboxInstanceRow(input: {
   fixture: DataPlaneGatewayIntegrationFixture;
@@ -36,51 +65,48 @@ async function insertSandboxInstanceRow(input: {
     startedByKind: "system",
     startedById: "workflow_data_plane_gateway_integration",
     source: "webhook",
-    activeTunnelLeaseId: null,
-    tunnelConnectedAt: null,
-    lastTunnelSeenAt: null,
-    tunnelDisconnectedAt: "2026-03-13T00:00:00.000Z",
   });
 }
 
-async function waitForSandboxInstanceProjection(
+async function readRuntimeState(input: {
+  fixture: DataPlaneGatewayIntegrationFixture;
+  sandboxInstanceId: string;
+}): Promise<RuntimeStateSnapshot> {
+  const response = await fetch(
+    `${input.fixture.baseUrl}/internal/sandbox-instances/${encodeURIComponent(input.sandboxInstanceId)}/runtime-state`,
+    {
+      headers: {
+        [InternalServiceTokenHeader]: input.fixture.config.internalAuth.serviceToken,
+      },
+    },
+  );
+
+  expect(response.status).toBe(200);
+  return RuntimeStateSnapshotSchema.parse(await response.json());
+}
+
+async function waitForRuntimeState(
   input: DataPlaneGatewayIntegrationFixture & {
     sandboxInstanceId: string;
-    predicate: (sandboxInstance: {
-      activeTunnelLeaseId: string | null;
-      tunnelConnectedAt: string | null;
-      lastTunnelSeenAt: string | null;
-      tunnelDisconnectedAt: string | null;
-    }) => boolean;
+    predicate: (snapshot: RuntimeStateSnapshot) => boolean;
   },
-): Promise<{
-  activeTunnelLeaseId: string | null;
-  tunnelConnectedAt: string | null;
-  lastTunnelSeenAt: string | null;
-  tunnelDisconnectedAt: string | null;
-}> {
+): Promise<RuntimeStateSnapshot> {
   const deadline = Date.now() + 5_000;
 
   while (Date.now() < deadline) {
-    const sandboxInstance = await input.db.query.sandboxInstances.findFirst({
-      columns: {
-        activeTunnelLeaseId: true,
-        tunnelConnectedAt: true,
-        lastTunnelSeenAt: true,
-        tunnelDisconnectedAt: true,
-      },
-      where: (table, { eq }) => eq(table.id, input.sandboxInstanceId),
+    const snapshot = await readRuntimeState({
+      fixture: input,
+      sandboxInstanceId: input.sandboxInstanceId,
     });
-
-    if (sandboxInstance !== undefined && input.predicate(sandboxInstance)) {
-      return sandboxInstance;
+    if (input.predicate(snapshot)) {
+      return snapshot;
     }
 
     await systemSleeper.sleep(50);
   }
 
   throw new Error(
-    `Timed out waiting for sandbox tunnel projection for instance '${input.sandboxInstanceId}'.`,
+    `Timed out waiting for runtime-state snapshot for sandbox '${input.sandboxInstanceId}'.`,
   );
 }
 
@@ -111,21 +137,18 @@ describe("sandbox tunnel connect endpoint integration", () => {
       const recordedRedemption = await fixture.db.query.sandboxTunnelTokenRedemptions.findFirst({
         where: (table, { eq }) => eq(table.tokenJti, jti),
       });
-      const sandboxInstance = await waitForSandboxInstanceProjection({
+      const sandboxRuntimeState = await waitForRuntimeState({
         ...fixture,
         sandboxInstanceId,
-        predicate: (currentSandboxInstance) =>
-          currentSandboxInstance.activeTunnelLeaseId !== null &&
-          currentSandboxInstance.tunnelConnectedAt !== null &&
-          currentSandboxInstance.lastTunnelSeenAt !== null &&
-          currentSandboxInstance.tunnelDisconnectedAt === null,
+        predicate: (currentSnapshot) =>
+          currentSnapshot.ownerLeaseId !== null && currentSnapshot.attachment !== null,
       });
 
-      expect(sandboxInstance?.activeTunnelLeaseId).not.toBeNull();
+      expect(sandboxRuntimeState.ownerLeaseId).not.toBeNull();
+      expect(sandboxRuntimeState.attachment).not.toBeNull();
       expect(recordedRedemption?.tokenJti).toBe(jti);
-      expect(sandboxInstance?.tunnelConnectedAt).not.toBeNull();
-      expect(sandboxInstance?.lastTunnelSeenAt).not.toBeNull();
-      expect(sandboxInstance?.tunnelDisconnectedAt).toBeNull();
+      expect(sandboxRuntimeState.attachment?.ownerLeaseId).toBe(sandboxRuntimeState.ownerLeaseId);
+      expect(sandboxRuntimeState.attachment?.sandboxInstanceId).toBe(sandboxInstanceId);
 
       await closeWebSocket(socket);
     },
@@ -204,13 +227,17 @@ describe("sandbox tunnel connect endpoint integration", () => {
 
       await closeWebSocket(socket);
 
-      const sandboxInstance = await waitForSandboxInstanceProjection({
+      const sandboxRuntimeState = await waitForRuntimeState({
         ...fixture,
         sandboxInstanceId,
-        predicate: (currentSandboxInstance) => currentSandboxInstance.tunnelDisconnectedAt !== null,
+        predicate: (currentSnapshot) =>
+          currentSnapshot.ownerLeaseId === null && currentSnapshot.attachment === null,
       });
 
-      expect(sandboxInstance?.tunnelDisconnectedAt).not.toBeNull();
+      expect(sandboxRuntimeState).toEqual({
+        ownerLeaseId: null,
+        attachment: null,
+      });
     },
     IntegrationTestTimeoutMs,
   );
@@ -247,48 +274,50 @@ describe("sandbox tunnel connect endpoint integration", () => {
       const firstSocket = await connectWebSocket(
         `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(firstToken)}`,
       );
-      const firstConnectedProjection = await waitForSandboxInstanceProjection({
+      const firstConnectedSnapshot = await waitForRuntimeState({
         ...fixture,
         sandboxInstanceId,
-        predicate: (currentSandboxInstance) => currentSandboxInstance.activeTunnelLeaseId !== null,
+        predicate: (currentSnapshot) =>
+          currentSnapshot.ownerLeaseId !== null && currentSnapshot.attachment !== null,
       });
-      const firstActiveTunnelLeaseId = firstConnectedProjection.activeTunnelLeaseId;
-      if (firstActiveTunnelLeaseId === null) {
-        throw new Error(
-          "Expected the first bootstrap connection to persist an active tunnel lease id.",
-        );
+      const firstOwnerLeaseId = firstConnectedSnapshot.ownerLeaseId;
+      if (firstOwnerLeaseId === null) {
+        throw new Error("Expected the first bootstrap connection to persist an owner lease id.");
       }
 
       const firstSocketClosePromise = waitForWebSocketClose(firstSocket);
       const secondSocket = await connectWebSocket(
         `${fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(secondToken)}`,
       );
-      const secondConnectedProjection = await waitForSandboxInstanceProjection({
+      const secondConnectedSnapshot = await waitForRuntimeState({
         ...fixture,
         sandboxInstanceId,
-        predicate: (currentSandboxInstance) =>
-          currentSandboxInstance.activeTunnelLeaseId !== null &&
-          currentSandboxInstance.activeTunnelLeaseId !== firstActiveTunnelLeaseId &&
-          currentSandboxInstance.tunnelDisconnectedAt === null,
+        predicate: (currentSnapshot) =>
+          currentSnapshot.ownerLeaseId !== null &&
+          currentSnapshot.ownerLeaseId !== firstOwnerLeaseId &&
+          currentSnapshot.attachment !== null,
       });
 
-      expect(secondConnectedProjection.activeTunnelLeaseId).not.toBe(firstActiveTunnelLeaseId);
+      expect(secondConnectedSnapshot.ownerLeaseId).not.toBe(firstOwnerLeaseId);
+      expect(secondConnectedSnapshot.attachment?.ownerLeaseId).toBe(
+        secondConnectedSnapshot.ownerLeaseId,
+      );
 
       const firstSocketClose = await firstSocketClosePromise;
       expect(firstSocketClose.code).toBe(1012);
 
-      const projectionAfterStaleClose = await waitForSandboxInstanceProjection({
+      const snapshotAfterStaleClose = await waitForRuntimeState({
         ...fixture,
         sandboxInstanceId,
-        predicate: (currentSandboxInstance) =>
-          currentSandboxInstance.activeTunnelLeaseId ===
-          secondConnectedProjection.activeTunnelLeaseId,
+        predicate: (currentSnapshot) =>
+          currentSnapshot.ownerLeaseId === secondConnectedSnapshot.ownerLeaseId &&
+          currentSnapshot.attachment?.ownerLeaseId === secondConnectedSnapshot.ownerLeaseId,
       });
 
-      expect(projectionAfterStaleClose.activeTunnelLeaseId).toBe(
-        secondConnectedProjection.activeTunnelLeaseId,
+      expect(snapshotAfterStaleClose.ownerLeaseId).toBe(secondConnectedSnapshot.ownerLeaseId);
+      expect(snapshotAfterStaleClose.attachment?.ownerLeaseId).toBe(
+        secondConnectedSnapshot.ownerLeaseId,
       );
-      expect(projectionAfterStaleClose.tunnelDisconnectedAt).toBeNull();
 
       await closeWebSocket(secondSocket);
     },

@@ -1,4 +1,5 @@
 import {
+  type SandboxStopReason,
   SandboxInstanceStatuses,
   sandboxInstances,
   type DataPlaneDatabase,
@@ -8,13 +9,14 @@ import { and, eq, sql } from "drizzle-orm";
 export async function markSandboxInstanceStopped(ctx: {
   db: DataPlaneDatabase;
   sandboxInstanceId: string;
+  stopReason: SandboxStopReason;
 }): Promise<void> {
   const updatedRows = await ctx.db
     .update(sandboxInstances)
     .set({
       status: SandboxInstanceStatuses.STOPPED,
-      activeTunnelLeaseId: null,
       stoppedAt: sql`now()`,
+      stopReason: ctx.stopReason,
       updatedAt: sql`now()`,
     })
     .where(

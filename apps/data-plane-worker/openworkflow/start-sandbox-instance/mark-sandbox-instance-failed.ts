@@ -1,5 +1,6 @@
 import {
   SandboxInstanceStatuses,
+  SandboxStopReasons,
   sandboxInstances,
   type DataPlaneDatabase,
 } from "@mistle/db/data-plane";
@@ -19,6 +20,7 @@ export async function markSandboxInstanceFailed(
     .update(sandboxInstances)
     .set({
       status: SandboxInstanceStatuses.FAILED,
+      stopReason: SandboxStopReasons.FAILED,
       failedAt: sql`now()`,
       failureCode: input.failureCode,
       failureMessage: input.failureMessage,

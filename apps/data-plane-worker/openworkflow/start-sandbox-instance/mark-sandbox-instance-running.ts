@@ -18,6 +18,7 @@ export async function markSandboxInstanceRunning(
     .set({
       status: SandboxInstanceStatuses.RUNNING,
       startedAt: sql`now()`,
+      stopReason: null,
       failedAt: null,
       failureCode: null,
       failureMessage: null,

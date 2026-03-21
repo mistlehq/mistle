@@ -1,6 +1,7 @@
 import {
   createDataPlaneDatabase,
   sandboxInstances,
+  SandboxStopReasons,
   SandboxInstanceStatuses,
   SandboxInstanceVolumeModes,
 } from "@mistle/db/data-plane";
@@ -64,7 +65,7 @@ describe("resume sandbox instance state integration", () => {
   });
 
   it(
-    "transitions a stopped sandbox instance back to starting and clears stale tunnel state",
+    "transitions a stopped sandbox instance back to starting and clears stale stop state",
     async () => {
       const db = createDatabase();
       const sandboxInstanceId = "sbi_resume_state_integration";
@@ -83,11 +84,8 @@ describe("resume sandbox instance state integration", () => {
         startedByKind: "system",
         startedById: "worker_resume_state_integration",
         source: "dashboard",
-        activeTunnelLeaseId: "lease_old",
-        tunnelConnectedAt: "2026-03-18T00:00:00.000Z",
-        lastTunnelSeenAt: "2026-03-18T00:01:00.000Z",
-        tunnelDisconnectedAt: "2026-03-18T00:02:00.000Z",
         stoppedAt: "2026-03-18T00:03:00.000Z",
+        stopReason: SandboxStopReasons.DISCONNECTED,
       });
 
       await markSandboxInstanceStarting({
@@ -99,11 +97,8 @@ describe("resume sandbox instance state integration", () => {
         columns: {
           status: true,
           providerRuntimeId: true,
-          activeTunnelLeaseId: true,
-          tunnelConnectedAt: true,
-          lastTunnelSeenAt: true,
-          tunnelDisconnectedAt: true,
           stoppedAt: true,
+          stopReason: true,
           failureCode: true,
           failureMessage: true,
         },
@@ -113,11 +108,8 @@ describe("resume sandbox instance state integration", () => {
       expect(startingSandboxInstance).toEqual({
         status: SandboxInstanceStatuses.STARTING,
         providerRuntimeId: null,
-        activeTunnelLeaseId: null,
-        tunnelConnectedAt: null,
-        lastTunnelSeenAt: null,
-        tunnelDisconnectedAt: null,
         stoppedAt: null,
+        stopReason: null,
         failureCode: null,
         failureMessage: null,
       });
