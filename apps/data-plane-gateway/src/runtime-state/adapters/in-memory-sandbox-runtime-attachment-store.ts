@@ -1,5 +1,6 @@
 import type { Clock } from "@mistle/time";
 
+import { logger } from "../../logger.js";
 import type {
   SandboxRuntimeAttachment,
   SandboxRuntimeAttachmentStore,
@@ -39,6 +40,18 @@ export class InMemorySandboxRuntimeAttachmentStore implements SandboxRuntimeAtta
       },
       expiresAtMs: this.clock.nowMs() + input.ttlMs,
     });
+    logger.debug(
+      {
+        event: "sandbox_runtime_attachment_upserted",
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: input.ownerLeaseId,
+        nodeId: input.nodeId,
+        sessionId: input.sessionId,
+        attachedAtMs: input.attachedAtMs,
+        ttlMs: input.ttlMs,
+      },
+      "Upserted sandbox runtime attachment",
+    );
   }
 
   async getAttachment(input: {
@@ -69,13 +82,40 @@ export class InMemorySandboxRuntimeAttachmentStore implements SandboxRuntimeAtta
       nowMs: this.clock.nowMs(),
     });
     if (currentRecord === null) {
+      logger.debug(
+        {
+          event: "sandbox_runtime_attachment_clear_rejected",
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.ownerLeaseId,
+          reason: "missing_attachment",
+        },
+        "Rejected sandbox runtime attachment clear",
+      );
       return false;
     }
     if (currentRecord.ownerLeaseId !== input.ownerLeaseId) {
+      logger.debug(
+        {
+          event: "sandbox_runtime_attachment_clear_rejected",
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.ownerLeaseId,
+          currentOwnerLeaseId: currentRecord.ownerLeaseId,
+          reason: "stale_owner",
+        },
+        "Rejected sandbox runtime attachment clear",
+      );
       return false;
     }
 
     this.#attachmentsBySandboxInstanceId.delete(input.sandboxInstanceId);
+    logger.debug(
+      {
+        event: "sandbox_runtime_attachment_cleared",
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: input.ownerLeaseId,
+      },
+      "Cleared sandbox runtime attachment",
+    );
     return true;
   }
 }

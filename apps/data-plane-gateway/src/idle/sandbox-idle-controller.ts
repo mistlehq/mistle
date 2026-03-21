@@ -113,27 +113,23 @@ export class LocalSandboxIdleController implements SandboxIdleController {
       return;
     }
 
-    this.scheduleIdleDeadline(input.nowMs + this.dependencies.timeoutMs);
+    this.scheduleIdleDeadline(input.nowMs + this.dependencies.timeoutMs, "start");
   }
 
   handlePresenceLeaseTouch(input: { leaseId: string; nowMs: number }): void {
-    void input.leaseId;
-
     if (this.#disposed || this.#inDisconnectGracePath) {
       return;
     }
 
-    this.scheduleIdleDeadline(input.nowMs + this.dependencies.timeoutMs);
+    this.scheduleIdleDeadline(input.nowMs + this.dependencies.timeoutMs, "presence_touch");
   }
 
   handleActivityLeaseTouch(input: { leaseId: string; nowMs: number }): void {
-    void input.leaseId;
-
     if (this.#disposed || this.#inDisconnectGracePath) {
       return;
     }
 
-    this.scheduleIdleDeadline(input.nowMs + this.dependencies.timeoutMs);
+    this.scheduleIdleDeadline(input.nowMs + this.dependencies.timeoutMs, "activity_touch");
   }
 
   handleBootstrapDisconnect(input: { nowMs: number }): void {
@@ -143,6 +139,16 @@ export class LocalSandboxIdleController implements SandboxIdleController {
 
     this.#inDisconnectGracePath = true;
     this.cancelCurrentTimer();
+    logger.info(
+      {
+        event: "sandbox_disconnect_grace_started",
+        sandboxInstanceId: this.sandboxInstanceId,
+        ownerLeaseId: this.ownerLeaseId,
+        nowMs: input.nowMs,
+        disconnectGraceMs: this.dependencies.disconnectGraceMs,
+      },
+      "Started sandbox disconnect grace period",
+    );
     void this.dependencies.runtimeAttachmentStore
       .clearAttachment({
         sandboxInstanceId: this.sandboxInstanceId,
@@ -164,20 +170,46 @@ export class LocalSandboxIdleController implements SandboxIdleController {
   }
 
   handleSandboxStopped(): void {
-    this.dispose();
+    this.disposeWithReason("sandbox_stopped");
   }
 
   dispose(): void {
+    this.disposeWithReason("explicit_dispose");
+  }
+
+  private disposeWithReason(reason: string): void {
     if (this.#disposed) {
       return;
     }
 
     this.#disposed = true;
     this.cancelCurrentTimer();
+    logger.debug(
+      {
+        event: "sandbox_idle_controller_disposed_locally",
+        sandboxInstanceId: this.sandboxInstanceId,
+        ownerLeaseId: this.ownerLeaseId,
+        reason,
+      },
+      "Disposed local sandbox idle controller",
+    );
     this.onDispose();
   }
 
-  private scheduleIdleDeadline(nextIdleDeadlineAtMs: number): void {
+  private scheduleIdleDeadline(
+    nextIdleDeadlineAtMs: number,
+    trigger: "start" | "presence_touch" | "activity_touch" | "active_leases",
+  ): void {
+    logger.debug(
+      {
+        event: "sandbox_idle_timer_scheduled",
+        sandboxInstanceId: this.sandboxInstanceId,
+        ownerLeaseId: this.ownerLeaseId,
+        trigger,
+        dueAtMs: nextIdleDeadlineAtMs,
+      },
+      "Scheduled sandbox idle timer",
+    );
     this.scheduleTimer(nextIdleDeadlineAtMs, () => {
       void this.handleIdleDeadlineElapsed();
     });
@@ -217,17 +249,41 @@ export class LocalSandboxIdleController implements SandboxIdleController {
       }),
     ]);
 
+    logger.debug(
+      {
+        event: "sandbox_idle_timer_fired",
+        sandboxInstanceId: this.sandboxInstanceId,
+        ownerLeaseId: this.ownerLeaseId,
+        nowMs,
+        currentOwnerLeaseId: currentOwner?.leaseId,
+        hasActivePresence,
+        hasActiveActivity,
+      },
+      "Sandbox idle timer fired",
+    );
+
     if (this.#disposed || this.#inDisconnectGracePath) {
       return;
     }
 
     if (currentOwner?.leaseId !== this.ownerLeaseId) {
-      this.dispose();
+      logger.info(
+        {
+          event: "sandbox_idle_timer_skipped",
+          sandboxInstanceId: this.sandboxInstanceId,
+          ownerLeaseId: this.ownerLeaseId,
+          currentOwnerLeaseId: currentOwner?.leaseId,
+          trigger: "owner_lost",
+          nowMs,
+        },
+        "Skipping sandbox idle stop because ownership changed",
+      );
+      this.disposeWithReason("owner_lost");
       return;
     }
 
     if (hasActivePresence || hasActiveActivity) {
-      this.scheduleIdleDeadline(nowMs + this.dependencies.timeoutMs);
+      this.scheduleIdleDeadline(nowMs + this.dependencies.timeoutMs, "active_leases");
       return;
     }
 
@@ -238,6 +294,16 @@ export class LocalSandboxIdleController implements SandboxIdleController {
         expectedOwnerLeaseId: this.ownerLeaseId,
         idempotencyKey: this.createStopIdempotencyKey("idle"),
       });
+      logger.info(
+        {
+          event: "sandbox_stop_requested",
+          sandboxInstanceId: this.sandboxInstanceId,
+          ownerLeaseId: this.ownerLeaseId,
+          stopReason: "idle",
+          nowMs,
+        },
+        "Requested fenced sandbox stop",
+      );
     } catch (error) {
       logger.error(
         {
@@ -250,7 +316,7 @@ export class LocalSandboxIdleController implements SandboxIdleController {
       return;
     }
 
-    this.dispose();
+    this.disposeWithReason("idle_stop_requested");
   }
 
   private async handleDisconnectGraceElapsed(): Promise<void> {
@@ -271,17 +337,48 @@ export class LocalSandboxIdleController implements SandboxIdleController {
 
     if (currentAttachment?.ownerLeaseId === this.ownerLeaseId) {
       this.#inDisconnectGracePath = false;
-      this.scheduleIdleDeadline(nowMs + this.dependencies.timeoutMs);
+      logger.info(
+        {
+          event: "sandbox_disconnect_grace_recovered",
+          sandboxInstanceId: this.sandboxInstanceId,
+          ownerLeaseId: this.ownerLeaseId,
+          nowMs,
+        },
+        "Recovered sandbox bootstrap attachment during disconnect grace period",
+      );
+      this.scheduleIdleDeadline(nowMs + this.dependencies.timeoutMs, "active_leases");
       return;
     }
 
     if (currentOwner?.leaseId !== undefined && currentOwner.leaseId !== this.ownerLeaseId) {
-      this.dispose();
+      logger.info(
+        {
+          event: "sandbox_disconnected_stop_skipped",
+          sandboxInstanceId: this.sandboxInstanceId,
+          ownerLeaseId: this.ownerLeaseId,
+          currentOwnerLeaseId: currentOwner.leaseId,
+          reason: "replacement_owner",
+          nowMs,
+        },
+        "Skipping disconnected sandbox stop because a replacement owner took over",
+      );
+      this.disposeWithReason("owner_replaced");
       return;
     }
 
     if (currentAttachment !== null) {
-      this.dispose();
+      logger.info(
+        {
+          event: "sandbox_disconnected_stop_skipped",
+          sandboxInstanceId: this.sandboxInstanceId,
+          ownerLeaseId: this.ownerLeaseId,
+          currentAttachmentOwnerLeaseId: currentAttachment.ownerLeaseId,
+          reason: "attachment_present",
+          nowMs,
+        },
+        "Skipping disconnected sandbox stop because a runtime attachment is still present",
+      );
+      this.disposeWithReason("attachment_present");
       return;
     }
 
@@ -292,6 +389,16 @@ export class LocalSandboxIdleController implements SandboxIdleController {
         expectedOwnerLeaseId: this.ownerLeaseId,
         idempotencyKey: this.createStopIdempotencyKey("disconnected"),
       });
+      logger.info(
+        {
+          event: "sandbox_stop_requested",
+          sandboxInstanceId: this.sandboxInstanceId,
+          ownerLeaseId: this.ownerLeaseId,
+          stopReason: "disconnected",
+          nowMs,
+        },
+        "Requested fenced sandbox stop",
+      );
     } catch (error) {
       logger.error(
         {
@@ -304,7 +411,7 @@ export class LocalSandboxIdleController implements SandboxIdleController {
       return;
     }
 
-    this.dispose();
+    this.disposeWithReason("disconnected_stop_requested");
   }
 
   private createStopIdempotencyKey(stopReason: "idle" | "disconnected"): string {

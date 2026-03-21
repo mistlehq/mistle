@@ -1,3 +1,4 @@
+import { logger } from "../../logger.js";
 import type {
   SandboxActivityLeaseKind,
   SandboxActivityLeaseSource,
@@ -98,6 +99,11 @@ export class ValkeySandboxActivityStore implements SandboxActivityStore {
     nowMs: number;
   }): Promise<void> {
     const expiresAtMs = input.nowMs + input.ttlMs;
+    const detailKey = buildSandboxActivityDetailKey({
+      keyPrefix: this.keyPrefix,
+      sandboxInstanceId: input.sandboxInstanceId,
+      leaseId: input.leaseId,
+    });
 
     await Promise.all([
       this.client.zAdd(
@@ -113,11 +119,7 @@ export class ValkeySandboxActivityStore implements SandboxActivityStore {
         ],
       ),
       this.client.set(
-        buildSandboxActivityDetailKey({
-          keyPrefix: this.keyPrefix,
-          sandboxInstanceId: input.sandboxInstanceId,
-          leaseId: input.leaseId,
-        }),
+        detailKey,
         JSON.stringify({
           sandboxInstanceId: input.sandboxInstanceId,
           leaseId: input.leaseId,
@@ -135,6 +137,23 @@ export class ValkeySandboxActivityStore implements SandboxActivityStore {
         },
       ),
     ]);
+
+    logger.debug(
+      {
+        event: "sandbox_activity_lease_touched",
+        sandboxInstanceId: input.sandboxInstanceId,
+        activityLeaseId: input.leaseId,
+        kind: input.kind,
+        source: input.source,
+        nodeId: input.nodeId,
+        ttlMs: input.ttlMs,
+        expiresAtMs,
+        ...(input.externalExecutionId === undefined
+          ? {}
+          : { externalExecutionId: input.externalExecutionId }),
+      },
+      "Touched sandbox activity lease",
+    );
   }
 
   async renewLease(input: {
@@ -156,6 +175,15 @@ export class ValkeySandboxActivityStore implements SandboxActivityStore {
           sandboxInstanceId: input.sandboxInstanceId,
         }),
         input.leaseId,
+      );
+      logger.debug(
+        {
+          event: "sandbox_activity_lease_renew_rejected",
+          sandboxInstanceId: input.sandboxInstanceId,
+          activityLeaseId: input.leaseId,
+          ttlMs: input.ttlMs,
+        },
+        "Rejected sandbox activity lease renewal",
       );
       return false;
     }
@@ -188,6 +216,23 @@ export class ValkeySandboxActivityStore implements SandboxActivityStore {
       ),
     ]);
 
+    logger.debug(
+      {
+        event: "sandbox_activity_lease_renewed",
+        sandboxInstanceId: input.sandboxInstanceId,
+        activityLeaseId: input.leaseId,
+        kind: currentLease.kind,
+        source: currentLease.source,
+        nodeId: currentLease.nodeId,
+        ttlMs: input.ttlMs,
+        expiresAtMs,
+        ...(currentLease.externalExecutionId === undefined
+          ? {}
+          : { externalExecutionId: currentLease.externalExecutionId }),
+      },
+      "Renewed sandbox activity lease",
+    );
+
     return true;
   }
 
@@ -206,6 +251,20 @@ export class ValkeySandboxActivityStore implements SandboxActivityStore {
         sandboxInstanceId: input.sandboxInstanceId,
         leaseId: input.leaseId,
       }),
+    );
+
+    logger.debug(
+      {
+        event:
+          removedCount === 1
+            ? "sandbox_activity_lease_released"
+            : "sandbox_activity_lease_release_rejected",
+        sandboxInstanceId: input.sandboxInstanceId,
+        activityLeaseId: input.leaseId,
+      },
+      removedCount === 1
+        ? "Released sandbox activity lease"
+        : "Rejected sandbox activity lease release",
     );
 
     return removedCount === 1;

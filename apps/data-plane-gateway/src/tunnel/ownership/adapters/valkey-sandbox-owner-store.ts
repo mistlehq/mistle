@@ -1,6 +1,7 @@
 import { typeid } from "typeid-js";
 import { z } from "zod";
 
+import { logger } from "../../../logger.js";
 import type { ValkeyClient } from "../../../runtime-state/valkey-client.js";
 import type { SandboxOwnerStore } from "../sandbox-owner-store.js";
 import type { SandboxOwner } from "../types.js";
@@ -114,6 +115,19 @@ export class ValkeySandboxOwnerStore implements SandboxOwnerStore {
       },
     );
 
+    logger.info(
+      {
+        event: "sandbox_owner_claimed",
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: ownerRecord.leaseId,
+        nodeId: input.nodeId,
+        sessionId: input.sessionId,
+        ttlMs: input.ttlMs,
+        expiresAtMs: ownerRecord.expiresAtMs,
+      },
+      "Claimed sandbox owner lease",
+    );
+
     return toSandboxOwner(ownerRecord);
   }
 
@@ -126,9 +140,30 @@ export class ValkeySandboxOwnerStore implements SandboxOwnerStore {
       sandboxInstanceId: input.sandboxInstanceId,
     });
     if (currentOwner === undefined) {
+      logger.debug(
+        {
+          event: "sandbox_owner_renew_rejected",
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.leaseId,
+          ttlMs: input.ttlMs,
+          reason: "missing_owner",
+        },
+        "Rejected sandbox owner lease renewal",
+      );
       return false;
     }
     if (currentOwner.leaseId !== input.leaseId) {
+      logger.debug(
+        {
+          event: "sandbox_owner_renew_rejected",
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.leaseId,
+          currentOwnerLeaseId: currentOwner.leaseId,
+          ttlMs: input.ttlMs,
+          reason: "stale_lease",
+        },
+        "Rejected sandbox owner lease renewal",
+      );
       return false;
     }
 
@@ -153,7 +188,32 @@ export class ValkeySandboxOwnerStore implements SandboxOwnerStore {
       JSON.stringify(nextOwnerRecord),
     ]);
 
-    return parseEvalBooleanResult(result);
+    const didRenew = parseEvalBooleanResult(result);
+    if (didRenew) {
+      logger.debug(
+        {
+          event: "sandbox_owner_renewed",
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.leaseId,
+          ttlMs: input.ttlMs,
+          expiresAtMs: nextOwnerRecord.expiresAtMs,
+        },
+        "Renewed sandbox owner lease",
+      );
+    } else {
+      logger.debug(
+        {
+          event: "sandbox_owner_renew_rejected",
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.leaseId,
+          ttlMs: input.ttlMs,
+          reason: "script_rejected",
+        },
+        "Rejected sandbox owner lease renewal",
+      );
+    }
+
+    return didRenew;
   }
 
   async getOwner(input: { sandboxInstanceId: string }): Promise<SandboxOwner | undefined> {
@@ -182,6 +242,28 @@ export class ValkeySandboxOwnerStore implements SandboxOwnerStore {
       input.leaseId,
     ]);
 
-    return parseEvalBooleanResult(result);
+    const didRelease = parseEvalBooleanResult(result);
+    if (didRelease) {
+      logger.info(
+        {
+          event: "sandbox_owner_released",
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.leaseId,
+        },
+        "Released sandbox owner lease",
+      );
+    } else {
+      logger.debug(
+        {
+          event: "sandbox_owner_release_rejected",
+          sandboxInstanceId: input.sandboxInstanceId,
+          ownerLeaseId: input.leaseId,
+          reason: "script_rejected",
+        },
+        "Rejected sandbox owner lease release",
+      );
+    }
+
+    return didRelease;
   }
 }

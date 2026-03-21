@@ -1,5 +1,6 @@
 import type { Clock } from "@mistle/time";
 
+import { logger } from "../../logger.js";
 import type {
   SandboxPresenceLeaseKind,
   SandboxPresenceLeaseSource,
@@ -38,6 +39,7 @@ export class InMemorySandboxPresenceStore implements SandboxPresenceStore {
     const currentLeases =
       this.#leasesBySandboxInstanceId.get(input.sandboxInstanceId) ??
       new Map<string, InMemoryPresenceLeaseRecord>();
+    const expiresAtMs = input.nowMs + input.ttlMs;
 
     currentLeases.set(input.leaseId, {
       sandboxInstanceId: input.sandboxInstanceId,
@@ -45,10 +47,23 @@ export class InMemorySandboxPresenceStore implements SandboxPresenceStore {
       kind: input.kind,
       source: input.source,
       sessionId: input.sessionId,
-      expiresAtMs: input.nowMs + input.ttlMs,
+      expiresAtMs,
     });
 
     this.#leasesBySandboxInstanceId.set(input.sandboxInstanceId, currentLeases);
+    logger.debug(
+      {
+        event: "sandbox_presence_lease_touched",
+        sandboxInstanceId: input.sandboxInstanceId,
+        presenceLeaseId: input.leaseId,
+        kind: input.kind,
+        source: input.source,
+        sessionId: input.sessionId,
+        ttlMs: input.ttlMs,
+        expiresAtMs,
+      },
+      "Touched sandbox presence lease",
+    );
   }
 
   async releaseLease(input: { sandboxInstanceId: string; leaseId: string }): Promise<boolean> {
@@ -63,6 +78,17 @@ export class InMemorySandboxPresenceStore implements SandboxPresenceStore {
     if (currentLeases.size === 0) {
       this.#leasesBySandboxInstanceId.delete(input.sandboxInstanceId);
     }
+
+    logger.debug(
+      {
+        event: didDelete
+          ? "sandbox_presence_lease_released"
+          : "sandbox_presence_lease_release_rejected",
+        sandboxInstanceId: input.sandboxInstanceId,
+        presenceLeaseId: input.leaseId,
+      },
+      didDelete ? "Released sandbox presence lease" : "Rejected sandbox presence lease release",
+    );
 
     return didDelete;
   }

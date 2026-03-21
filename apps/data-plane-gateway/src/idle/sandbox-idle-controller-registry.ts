@@ -1,3 +1,4 @@
+import { logger } from "../logger.js";
 import type { SandboxIdleController } from "./sandbox-idle-controller.js";
 
 /**
@@ -38,14 +39,24 @@ export class SandboxIdleControllerRegistry {
     ownerLeaseId: string;
     nowMs: number;
   }): SandboxIdleController {
-    void input.nowMs;
-
     const currentController = this.#controllersBySandboxInstanceId.get(input.sandboxInstanceId);
     if (currentController !== undefined && currentController.ownerLeaseId === input.ownerLeaseId) {
       return currentController;
     }
 
-    currentController?.dispose();
+    if (currentController !== undefined) {
+      logger.info(
+        {
+          event: "sandbox_idle_controller_replaced",
+          sandboxInstanceId: input.sandboxInstanceId,
+          previousOwnerLeaseId: currentController.ownerLeaseId,
+          ownerLeaseId: input.ownerLeaseId,
+          nowMs: input.nowMs,
+        },
+        "Replacing sandbox idle controller for new owner lease",
+      );
+      currentController.dispose();
+    }
 
     const nextController = this.createController({
       sandboxInstanceId: input.sandboxInstanceId,
@@ -59,6 +70,15 @@ export class SandboxIdleControllerRegistry {
     });
 
     this.#controllersBySandboxInstanceId.set(input.sandboxInstanceId, nextController);
+    logger.info(
+      {
+        event: "sandbox_idle_controller_created",
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: input.ownerLeaseId,
+        nowMs: input.nowMs,
+      },
+      "Created sandbox idle controller",
+    );
     return nextController;
   }
 
@@ -71,8 +91,6 @@ export class SandboxIdleControllerRegistry {
     ownerLeaseId?: string;
     reason: SandboxIdleControllerDisposalReason;
   }): void {
-    void input.reason;
-
     const currentController = this.#controllersBySandboxInstanceId.get(input.sandboxInstanceId);
     if (currentController === undefined) {
       return;
@@ -83,6 +101,15 @@ export class SandboxIdleControllerRegistry {
     }
 
     this.#controllersBySandboxInstanceId.delete(input.sandboxInstanceId);
+    logger.info(
+      {
+        event: "sandbox_idle_controller_disposed",
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: currentController.ownerLeaseId,
+        reason: input.reason,
+      },
+      "Disposed sandbox idle controller",
+    );
     currentController.dispose();
   }
 }
