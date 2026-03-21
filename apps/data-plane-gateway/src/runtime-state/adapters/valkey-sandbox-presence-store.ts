@@ -1,3 +1,4 @@
+import { logger } from "../../logger.js";
 import type {
   SandboxPresenceLeaseKind,
   SandboxPresenceLeaseSource,
@@ -85,6 +86,20 @@ export class ValkeySandboxPresenceStore implements SandboxPresenceStore {
         },
       ),
     ]);
+
+    logger.debug(
+      {
+        event: "sandbox_presence_lease_touched",
+        sandboxInstanceId: input.sandboxInstanceId,
+        presenceLeaseId: input.leaseId,
+        kind: input.kind,
+        source: input.source,
+        sessionId: input.sessionId,
+        ttlMs: input.ttlMs,
+        expiresAtMs,
+      },
+      "Touched sandbox presence lease",
+    );
   }
 
   async releaseLease(input: { sandboxInstanceId: string; leaseId: string }): Promise<boolean> {
@@ -102,6 +117,20 @@ export class ValkeySandboxPresenceStore implements SandboxPresenceStore {
         sandboxInstanceId: input.sandboxInstanceId,
         leaseId: input.leaseId,
       }),
+    );
+
+    logger.debug(
+      {
+        event:
+          removedCount === 1
+            ? "sandbox_presence_lease_released"
+            : "sandbox_presence_lease_release_rejected",
+        sandboxInstanceId: input.sandboxInstanceId,
+        presenceLeaseId: input.leaseId,
+      },
+      removedCount === 1
+        ? "Released sandbox presence lease"
+        : "Rejected sandbox presence lease release",
     );
 
     return removedCount === 1;

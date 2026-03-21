@@ -1,5 +1,6 @@
 import type { Clock } from "@mistle/time";
 
+import { logger } from "../../logger.js";
 import type {
   SandboxActivityLeaseKind,
   SandboxActivityLeaseSource,
@@ -42,6 +43,7 @@ export class InMemorySandboxActivityStore implements SandboxActivityStore {
     const currentLeases =
       this.#leasesBySandboxInstanceId.get(input.sandboxInstanceId) ??
       new Map<string, InMemoryActivityLeaseRecord>();
+    const expiresAtMs = input.nowMs + input.ttlMs;
 
     currentLeases.set(input.leaseId, {
       sandboxInstanceId: input.sandboxInstanceId,
@@ -53,10 +55,26 @@ export class InMemorySandboxActivityStore implements SandboxActivityStore {
         : { externalExecutionId: input.externalExecutionId }),
       ...(input.metadata === undefined ? {} : { metadata: input.metadata }),
       nodeId: input.nodeId,
-      expiresAtMs: input.nowMs + input.ttlMs,
+      expiresAtMs,
     });
 
     this.#leasesBySandboxInstanceId.set(input.sandboxInstanceId, currentLeases);
+    logger.debug(
+      {
+        event: "sandbox_activity_lease_touched",
+        sandboxInstanceId: input.sandboxInstanceId,
+        activityLeaseId: input.leaseId,
+        kind: input.kind,
+        source: input.source,
+        nodeId: input.nodeId,
+        ttlMs: input.ttlMs,
+        expiresAtMs,
+        ...(input.externalExecutionId === undefined
+          ? {}
+          : { externalExecutionId: input.externalExecutionId }),
+      },
+      "Touched sandbox activity lease",
+    );
   }
 
   async renewLease(input: {
@@ -70,6 +88,15 @@ export class InMemorySandboxActivityStore implements SandboxActivityStore {
     const currentLeases = this.#leasesBySandboxInstanceId.get(input.sandboxInstanceId);
     const currentLease = currentLeases?.get(input.leaseId);
     if (currentLeases === undefined || currentLease === undefined) {
+      logger.debug(
+        {
+          event: "sandbox_activity_lease_renew_rejected",
+          sandboxInstanceId: input.sandboxInstanceId,
+          activityLeaseId: input.leaseId,
+          ttlMs: input.ttlMs,
+        },
+        "Rejected sandbox activity lease renewal",
+      );
       return false;
     }
 
@@ -77,6 +104,19 @@ export class InMemorySandboxActivityStore implements SandboxActivityStore {
       ...currentLease,
       expiresAtMs: input.nowMs + input.ttlMs,
     });
+    logger.debug(
+      {
+        event: "sandbox_activity_lease_renewed",
+        sandboxInstanceId: input.sandboxInstanceId,
+        activityLeaseId: input.leaseId,
+        kind: currentLease.kind,
+        source: currentLease.source,
+        nodeId: currentLease.nodeId,
+        ttlMs: input.ttlMs,
+        expiresAtMs: input.nowMs + input.ttlMs,
+      },
+      "Renewed sandbox activity lease",
+    );
     return true;
   }
 
@@ -92,6 +132,17 @@ export class InMemorySandboxActivityStore implements SandboxActivityStore {
     if (currentLeases.size === 0) {
       this.#leasesBySandboxInstanceId.delete(input.sandboxInstanceId);
     }
+
+    logger.debug(
+      {
+        event: didDelete
+          ? "sandbox_activity_lease_released"
+          : "sandbox_activity_lease_release_rejected",
+        sandboxInstanceId: input.sandboxInstanceId,
+        activityLeaseId: input.leaseId,
+      },
+      didDelete ? "Released sandbox activity lease" : "Rejected sandbox activity lease release",
+    );
 
     return didDelete;
   }

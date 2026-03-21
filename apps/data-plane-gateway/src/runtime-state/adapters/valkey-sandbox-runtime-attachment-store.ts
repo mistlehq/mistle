@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { logger } from "../../logger.js";
 import type {
   SandboxRuntimeAttachment,
   SandboxRuntimeAttachmentStore,
@@ -92,6 +93,18 @@ export class ValkeySandboxRuntimeAttachmentStore implements SandboxRuntimeAttach
         PX: input.ttlMs,
       },
     );
+    logger.debug(
+      {
+        event: "sandbox_runtime_attachment_upserted",
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: input.ownerLeaseId,
+        nodeId: input.nodeId,
+        sessionId: input.sessionId,
+        attachedAtMs: input.attachedAtMs,
+        ttlMs: input.ttlMs,
+      },
+      "Upserted sandbox runtime attachment",
+    );
   }
 
   async getAttachment(input: {
@@ -128,6 +141,17 @@ export class ValkeySandboxRuntimeAttachmentStore implements SandboxRuntimeAttach
       input.ownerLeaseId,
     ]);
 
-    return parseEvalBooleanResult(result);
+    const didClear = parseEvalBooleanResult(result);
+    logger.debug(
+      {
+        event: didClear
+          ? "sandbox_runtime_attachment_cleared"
+          : "sandbox_runtime_attachment_clear_rejected",
+        sandboxInstanceId: input.sandboxInstanceId,
+        ownerLeaseId: input.ownerLeaseId,
+      },
+      didClear ? "Cleared sandbox runtime attachment" : "Rejected sandbox runtime attachment clear",
+    );
+    return didClear;
   }
 }
