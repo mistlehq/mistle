@@ -1,11 +1,5 @@
-import { OpenAPIHono } from "@hono/zod-openapi";
-import { z } from "zod";
+import { OpenAPIHono, z } from "@hono/zod-openapi";
 
-import {
-  buildMembershipCapabilities,
-  parseOrganizationRole,
-  type OrganizationRole,
-} from "../auth/services/organization-policy.js";
 import type { AppContextBindings, AppRoutes } from "../types.js";
 import { ORGANIZATION_MEMBERSHIP_CAPABILITIES_ROUTE_BASE_PATH } from "./constants.js";
 import {
@@ -13,6 +7,10 @@ import {
   MembershipCapabilitiesErrorResponseSchema,
   MembershipCapabilitiesSuccessResponseSchema,
 } from "./contracts.js";
+import {
+  getOrganizationMembershipCapabilities,
+  type OrganizationMembershipCapabilitiesSuccess,
+} from "./services/get-organization-membership-capabilities.js";
 
 export function createOrganizationMembershipCapabilitiesApp(): AppRoutes<
   typeof ORGANIZATION_MEMBERSHIP_CAPABILITIES_ROUTE_BASE_PATH
@@ -26,32 +24,27 @@ export function createOrganizationMembershipCapabilitiesApp(): AppRoutes<
       throw new Error("Expected authenticated session to be available.");
     }
 
-    const membership = await ctx.get("db").query.members.findFirst({
-      columns: {
-        role: true,
+    const result = await getOrganizationMembershipCapabilities(
+      {
+        db: ctx.get("db"),
       },
-      where: (members, { and, eq }) =>
-        and(eq(members.organizationId, params.organizationId), eq(members.userId, session.user.id)),
-    });
+      {
+        actorUserId: session.user.id,
+        organizationId: params.organizationId,
+      },
+    );
 
-    if (membership === undefined) {
-      const organization = await ctx.get("db").query.organizations.findFirst({
-        columns: {
-          id: true,
-        },
-        where: (organizations, { eq }) => eq(organizations.id, params.organizationId),
-      });
+    if (result.kind === "not_found") {
+      return ctx.json(
+        buildErrorResponse({
+          code: "NOT_FOUND",
+          message: "Organization was not found.",
+        }),
+        404,
+      );
+    }
 
-      if (organization === undefined) {
-        return ctx.json(
-          buildErrorResponse({
-            code: "NOT_FOUND",
-            message: "Organization was not found.",
-          }),
-          404,
-        );
-      }
-
+    if (result.kind === "forbidden") {
       return ctx.json(
         buildErrorResponse({
           code: "FORBIDDEN",
@@ -61,18 +54,7 @@ export function createOrganizationMembershipCapabilitiesApp(): AppRoutes<
       );
     }
 
-    const actorRole = parseOrganizationRole(membership.role);
-    if (actorRole === null) {
-      throw new Error("Unexpected organization role was found.");
-    }
-
-    return ctx.json(
-      buildSuccessResponse({
-        actorRole,
-        organizationId: params.organizationId,
-      }),
-      200,
-    );
+    return ctx.json(buildSuccessResponse(result), 200);
   });
 
   return {
@@ -96,13 +78,12 @@ function buildErrorResponse(input: {
   };
 }
 
-function buildSuccessResponse(input: {
-  actorRole: OrganizationRole;
-  organizationId: string;
-}): z.infer<typeof MembershipCapabilitiesSuccessResponseSchema> {
+function buildSuccessResponse(
+  result: OrganizationMembershipCapabilitiesSuccess,
+): z.infer<typeof MembershipCapabilitiesSuccessResponseSchema> {
   return {
     ok: true,
-    data: buildMembershipCapabilities(input),
+    data: result.data,
     error: null,
   };
 }
