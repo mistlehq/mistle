@@ -1,4 +1,5 @@
 import { automations, AutomationKinds } from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import {
   createKeysetPaginationQuerySchema,
@@ -14,9 +15,9 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { AutomationWebhooksBadRequestCodes, AutomationWebhooksBadRequestError } from "./errors.js";
-import { loadWebhookAutomationAggregateOrThrow } from "./shared.js";
-import type { AutomationWebhookAggregate, CreateAutomationWebhooksServiceInput } from "./types.js";
+import { AutomationWebhooksBadRequestCodes, AutomationWebhooksBadRequestError } from "../errors.js";
+import { loadWebhookAutomationAggregateOrThrow } from "../shared.js";
+import type { AutomationWebhookAggregate } from "../types.js";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -40,12 +41,12 @@ export const ListWebhookAutomationsQuerySchema = createKeysetPaginationQuerySche
 export type ListWebhookAutomationsInput = {
   organizationId: string;
   limit?: number;
-  after?: string;
-  before?: string;
+  after?: string | undefined;
+  before?: string | undefined;
 };
 
-export async function listWebhookAutomations(
-  { db }: Pick<CreateAutomationWebhooksServiceInput, "db">,
+export async function listAutomationWebhooks(
+  { db }: { db: ControlPlaneDatabase },
   input: ListWebhookAutomationsInput,
 ): Promise<KeysetPaginatedResult<AutomationWebhookAggregate>> {
   let pageSize: number;

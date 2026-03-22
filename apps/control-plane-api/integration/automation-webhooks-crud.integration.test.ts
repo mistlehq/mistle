@@ -11,13 +11,13 @@ import {
 } from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
 
+import { ListAutomationWebhooksResponseSchema } from "../src/automation-webhooks/list-automation-webhooks/index.js";
 import {
   AutomationWebhookSchema,
   AutomationWebhooksBadRequestResponseSchema,
   AutomationWebhooksNotFoundResponseSchema,
-  ListAutomationWebhooksResponseSchema,
   ValidationErrorResponseSchema,
-} from "../src/automation-webhooks/contracts.js";
+} from "../src/automation-webhooks/shared-schemas.js";
 import { it } from "./test-context.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 

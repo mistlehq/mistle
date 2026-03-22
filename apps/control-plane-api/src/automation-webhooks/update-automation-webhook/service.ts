@@ -1,23 +1,25 @@
 import {
   automations,
   automationTargets,
+  type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   webhookAutomations,
 } from "@mistle/db/control-plane";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
 
 import {
   assertSandboxProfileReferenceOrThrow,
   assertWebhookConnectionReferenceOrThrow,
   loadWebhookAutomationAggregateOrThrow,
-} from "./shared.js";
-import type {
-  CreateAutomationWebhooksServiceInput,
-  UpdateWebhookAutomationInput,
-} from "./types.js";
+} from "../shared.js";
+import type { UpdateWebhookAutomationInput } from "../types.js";
 
-export async function updateWebhookAutomation(
-  input: CreateAutomationWebhooksServiceInput,
+export async function updateAutomationWebhook(
+  input: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+  },
   serviceInput: UpdateWebhookAutomationInput,
 ) {
   const existingAutomation = await loadWebhookAutomationAggregateOrThrow(input.db, {

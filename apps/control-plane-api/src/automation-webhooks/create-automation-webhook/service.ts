@@ -2,22 +2,24 @@ import {
   automations,
   AutomationKinds,
   automationTargets,
+  type ControlPlaneDatabase,
   type ControlPlaneTransaction,
   webhookAutomations,
 } from "@mistle/db/control-plane";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 
 import {
   assertSandboxProfileReferenceOrThrow,
   assertWebhookConnectionReferenceOrThrow,
   loadWebhookAutomationAggregateOrThrow,
-} from "./shared.js";
-import type {
-  CreateAutomationWebhooksServiceInput,
-  CreateWebhookAutomationInput,
-} from "./types.js";
+} from "../shared.js";
+import type { CreateWebhookAutomationInput } from "../types.js";
 
-export async function createWebhookAutomation(
-  input: CreateAutomationWebhooksServiceInput,
+export async function createAutomationWebhook(
+  input: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+  },
   serviceInput: CreateWebhookAutomationInput,
 ) {
   await assertWebhookConnectionReferenceOrThrow(input.db, input.integrationRegistry, {

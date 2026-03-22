@@ -1,14 +1,11 @@
-import { automations, AutomationKinds } from "@mistle/db/control-plane";
+import { automations, AutomationKinds, type ControlPlaneDatabase } from "@mistle/db/control-plane";
 import { and, eq } from "drizzle-orm";
 
-import { AutomationWebhooksNotFoundCodes, AutomationWebhooksNotFoundError } from "./errors.js";
-import type {
-  CreateAutomationWebhooksServiceInput,
-  DeleteWebhookAutomationInput,
-} from "./types.js";
+import { AutomationWebhooksNotFoundCodes, AutomationWebhooksNotFoundError } from "../errors.js";
+import type { DeleteWebhookAutomationInput } from "../types.js";
 
-export async function deleteWebhookAutomation(
-  input: Pick<CreateAutomationWebhooksServiceInput, "db">,
+export async function deleteAutomationWebhook(
+  input: { db: ControlPlaneDatabase },
   serviceInput: DeleteWebhookAutomationInput,
 ) {
   const deletedRows = await input.db

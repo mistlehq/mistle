@@ -1,7 +1,3 @@
-import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
-import type { KeysetPaginatedResult } from "@mistle/http/pagination";
-import type { IntegrationRegistry } from "@mistle/integrations-core";
-
 export type AutomationWebhookAggregate = {
   id: string;
   name: string;
@@ -19,11 +15,6 @@ export type AutomationWebhookAggregate = {
     sandboxProfileId: string;
     sandboxProfileVersion: number | null;
   };
-};
-
-export type CreateAutomationWebhooksServiceInput = {
-  db: ControlPlaneDatabase;
-  integrationRegistry: IntegrationRegistry;
 };
 
 export type ListWebhookAutomationsInput = {
@@ -71,18 +62,4 @@ export type UpdateWebhookAutomationInput = {
 export type DeleteWebhookAutomationInput = {
   organizationId: string;
   automationId: string;
-};
-
-export type AutomationWebhooksService = {
-  listWebhookAutomations: (
-    input: ListWebhookAutomationsInput,
-  ) => Promise<KeysetPaginatedResult<AutomationWebhookAggregate>>;
-  createWebhookAutomation: (
-    input: CreateWebhookAutomationInput,
-  ) => Promise<AutomationWebhookAggregate>;
-  getWebhookAutomation: (input: GetWebhookAutomationInput) => Promise<AutomationWebhookAggregate>;
-  updateWebhookAutomation: (
-    input: UpdateWebhookAutomationInput,
-  ) => Promise<AutomationWebhookAggregate>;
-  deleteWebhookAutomation: (input: DeleteWebhookAutomationInput) => Promise<void>;
 };
