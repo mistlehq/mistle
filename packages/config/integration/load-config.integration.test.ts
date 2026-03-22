@@ -263,6 +263,13 @@ const dataPlaneGatewayFixtureConfig = {
     host: "0.0.0.0",
     port: 5302,
   },
+  runtimeState: {
+    backend: "valkey",
+    valkey: {
+      url: "redis://127.0.0.1:6379",
+      keyPrefix: "mistle:runtime-state:fixture",
+    },
+  },
   dataPlaneApi: {
     baseUrl: "http://127.0.0.1:5300",
   },
