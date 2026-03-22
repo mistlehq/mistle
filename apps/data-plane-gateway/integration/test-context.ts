@@ -52,6 +52,8 @@ export type DataPlaneGatewayIntegrationFixture = {
   dbPool: Pool;
 };
 
+type RuntimeStateBackend = "memory" | "valkey";
+
 async function readSharedInfraConfig(): Promise<SharedInfraConfig> {
   return readTestContext({
     id: TestContextId,
@@ -159,119 +161,142 @@ async function dropDatabaseIfExists(input: {
   }
 }
 
-export const it = vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture }>({
-  fixture: [
-    async ({}, use) => {
-      const cleanupTasks: Array<() => Promise<void>> = [];
-      const sharedInfraConfig = await readSharedInfraConfig();
-      const runtimeDatabaseName = createFileScopedDatabaseName({
-        integrationRunId: sharedInfraConfig.integrationRunId,
-        filePath: getCurrentVitestFilePath(),
-        scopeId: createIntegrationRuntimeScopeId(),
-      });
+function createRuntimeStateConfig(input: {
+  backend: RuntimeStateBackend;
+  runtimeDatabaseName: string;
+  valkeyUrl: string;
+}): DataPlaneGatewayRuntimeConfig["app"]["runtimeState"] {
+  if (input.backend === "memory") {
+    return {
+      backend: "memory",
+    };
+  }
 
-      try {
-        await resetWorkerDatabaseFromTemplate({
-          username: sharedInfraConfig.databaseUsername,
-          password: sharedInfraConfig.databasePassword,
-          host: sharedInfraConfig.databaseDirectHost,
-          port: sharedInfraConfig.databaseDirectPort,
-          templateDatabaseName: sharedInfraConfig.templateDatabaseName,
-          runtimeDatabaseName,
+  return {
+    backend: "valkey",
+    valkey: {
+      url: input.valkeyUrl,
+      keyPrefix: `mistle:runtime-state:gateway-integration:${input.runtimeDatabaseName}`,
+    },
+  };
+}
+
+function createIntegrationIt(backend: RuntimeStateBackend) {
+  return vitestIt.extend<{ fixture: DataPlaneGatewayIntegrationFixture }>({
+    fixture: [
+      async ({}, use) => {
+        const cleanupTasks: Array<() => Promise<void>> = [];
+        const sharedInfraConfig = await readSharedInfraConfig();
+        const runtimeDatabaseName = createFileScopedDatabaseName({
+          integrationRunId: sharedInfraConfig.integrationRunId,
+          filePath: getCurrentVitestFilePath(),
+          scopeId: createIntegrationRuntimeScopeId(),
         });
 
-        const runtimeDatabaseUrl = createDatabaseUrl({
-          username: sharedInfraConfig.databaseUsername,
-          password: sharedInfraConfig.databasePassword,
-          host: sharedInfraConfig.databaseDirectHost,
-          port: sharedInfraConfig.databaseDirectPort,
-          databaseName: runtimeDatabaseName,
-        });
+        try {
+          await resetWorkerDatabaseFromTemplate({
+            username: sharedInfraConfig.databaseUsername,
+            password: sharedInfraConfig.databasePassword,
+            host: sharedInfraConfig.databaseDirectHost,
+            port: sharedInfraConfig.databaseDirectPort,
+            templateDatabaseName: sharedInfraConfig.templateDatabaseName,
+            runtimeDatabaseName,
+          });
 
-        const dbPool = new Pool({
-          connectionString: runtimeDatabaseUrl,
-        });
-        cleanupTasks.unshift(async () => {
-          await dbPool.end();
-        });
-        const db = createDataPlaneDatabase(dbPool);
-
-        const runtimeConfig: DataPlaneGatewayRuntimeConfig = {
-          app: {
-            server: {
-              host: "127.0.0.1",
-              port: await reserveAvailablePort({ host: "127.0.0.1" }),
-            },
-            database: {
-              url: runtimeDatabaseUrl,
-            },
-            runtimeState: {
-              backend: "valkey",
-              valkey: {
-                url: sharedInfraConfig.valkeyUrl,
-                keyPrefix: `mistle:runtime-state:gateway-integration:${runtimeDatabaseName}`,
-              },
-            },
-            dataPlaneApi: {
-              baseUrl: "http://127.0.0.1:5300",
-            },
-          },
-          internalAuth: {
-            serviceToken: "integration-service-token",
-          },
-          sandbox: {
-            provider: "docker",
-            defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
-            gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-            internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
-            connect: {
-              tokenSecret: "integration-connect-token-secret",
-              tokenIssuer: "integration-control-plane-api",
-              tokenAudience: IntegrationTokenAudience,
-            },
-            bootstrap: {
-              tokenSecret: IntegrationBootstrapTokenSecret,
-              tokenIssuer: IntegrationTokenIssuer,
-              tokenAudience: IntegrationTokenAudience,
-            },
-          },
-        };
-
-        const runtime = createDataPlaneGatewayRuntime(runtimeConfig);
-        await runtime.start();
-        cleanupTasks.unshift(async () => {
-          await runtime.stop();
-        });
-        cleanupTasks.push(async () => {
-          await dropDatabaseIfExists({
+          const runtimeDatabaseUrl = createDatabaseUrl({
             username: sharedInfraConfig.databaseUsername,
             password: sharedInfraConfig.databasePassword,
             host: sharedInfraConfig.databaseDirectHost,
             port: sharedInfraConfig.databaseDirectPort,
             databaseName: runtimeDatabaseName,
           });
-        });
 
-        await use({
-          baseUrl: `http://${runtimeConfig.app.server.host}:${String(runtimeConfig.app.server.port)}`,
-          websocketBaseUrl: `ws://${runtimeConfig.app.server.host}:${String(runtimeConfig.app.server.port)}`,
-          config: runtimeConfig,
-          databaseStack: {
-            directUrl: runtimeDatabaseUrl,
-            pooledUrl: runtimeDatabaseUrl,
-          },
-          db,
-          dbPool,
-        });
-      } finally {
-        await runCleanupTasks({
-          tasks: cleanupTasks,
-          context: "data-plane-gateway integration fixture cleanup",
-        });
-      }
-    },
-    {
-      scope: "file",
-    },
-  ],
-});
+          const dbPool = new Pool({
+            connectionString: runtimeDatabaseUrl,
+          });
+          cleanupTasks.unshift(async () => {
+            await dbPool.end();
+          });
+          const db = createDataPlaneDatabase(dbPool);
+
+          const runtimeConfig: DataPlaneGatewayRuntimeConfig = {
+            app: {
+              server: {
+                host: "127.0.0.1",
+                port: await reserveAvailablePort({ host: "127.0.0.1" }),
+              },
+              database: {
+                url: runtimeDatabaseUrl,
+              },
+              runtimeState: createRuntimeStateConfig({
+                backend,
+                runtimeDatabaseName,
+                valkeyUrl: sharedInfraConfig.valkeyUrl,
+              }),
+              dataPlaneApi: {
+                baseUrl: "http://127.0.0.1:5300",
+              },
+            },
+            internalAuth: {
+              serviceToken: "integration-service-token",
+            },
+            sandbox: {
+              provider: "docker",
+              defaultBaseImage: "127.0.0.1:5001/mistle/sandbox-base:dev",
+              gatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+              internalGatewayWsUrl: "ws://127.0.0.1:5202/tunnel/sandbox",
+              connect: {
+                tokenSecret: "integration-connect-token-secret",
+                tokenIssuer: "integration-control-plane-api",
+                tokenAudience: IntegrationTokenAudience,
+              },
+              bootstrap: {
+                tokenSecret: IntegrationBootstrapTokenSecret,
+                tokenIssuer: IntegrationTokenIssuer,
+                tokenAudience: IntegrationTokenAudience,
+              },
+            },
+          };
+
+          const runtime = createDataPlaneGatewayRuntime(runtimeConfig);
+          await runtime.start();
+          cleanupTasks.unshift(async () => {
+            await runtime.stop();
+          });
+          cleanupTasks.push(async () => {
+            await dropDatabaseIfExists({
+              username: sharedInfraConfig.databaseUsername,
+              password: sharedInfraConfig.databasePassword,
+              host: sharedInfraConfig.databaseDirectHost,
+              port: sharedInfraConfig.databaseDirectPort,
+              databaseName: runtimeDatabaseName,
+            });
+          });
+
+          await use({
+            baseUrl: `http://${runtimeConfig.app.server.host}:${String(runtimeConfig.app.server.port)}`,
+            websocketBaseUrl: `ws://${runtimeConfig.app.server.host}:${String(runtimeConfig.app.server.port)}`,
+            config: runtimeConfig,
+            databaseStack: {
+              directUrl: runtimeDatabaseUrl,
+              pooledUrl: runtimeDatabaseUrl,
+            },
+            db,
+            dbPool,
+          });
+        } finally {
+          await runCleanupTasks({
+            tasks: cleanupTasks,
+            context: "data-plane-gateway integration fixture cleanup",
+          });
+        }
+      },
+      {
+        scope: "file",
+      },
+    ],
+  });
+}
+
+export const it = createIntegrationIt("valkey");
+export const itMemory = createIntegrationIt("memory");
