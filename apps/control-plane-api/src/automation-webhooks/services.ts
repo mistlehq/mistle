@@ -7,7 +7,7 @@ import {
 import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
-import { AutomationWebhooksBadRequestCodes, AutomationWebhooksNotFoundCodes } from "./constants.js";
+import { AutomationWebhooksBadRequestCodes } from "./constants.js";
 
 export type AutomationWebhookAggregate = {
   id: string;
@@ -45,10 +45,7 @@ export async function loadWebhookAutomationAggregateOrThrow(
   });
 
   if (automation === undefined) {
-    throw new NotFoundError(
-      AutomationWebhooksNotFoundCodes.AUTOMATION_NOT_FOUND,
-      "Webhook automation was not found.",
-    );
+    throw new NotFoundError("NOT_FOUND", "Webhook automation was not found.");
   }
 
   const [webhookAutomation, targets] = await Promise.all([

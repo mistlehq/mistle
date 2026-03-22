@@ -276,7 +276,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -550,7 +550,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -710,7 +710,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -732,7 +732,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["AUTOMATION_NOT_FOUND"]
+                      "enum": ["NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -1010,7 +1010,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -1032,7 +1032,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["AUTOMATION_NOT_FOUND"]
+                      "enum": ["NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -1111,7 +1111,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -1133,7 +1133,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["AUTOMATION_NOT_FOUND"]
+                      "enum": ["NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -1421,7 +1421,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -1922,7 +1922,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -2428,7 +2428,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -2706,7 +2706,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -2909,7 +2909,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -3112,7 +3112,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -4005,7 +4005,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -4281,7 +4281,7 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                          "enum": ["FORBIDDEN"]
                         },
                         "message": {
                           "type": "string",
@@ -4625,7 +4625,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -4781,7 +4781,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -4971,7 +4971,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -5248,7 +5248,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -5401,7 +5401,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -5550,7 +5550,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -5736,7 +5736,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -5885,7 +5885,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -6045,7 +6045,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -6246,7 +6246,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -6574,7 +6574,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",
@@ -6790,7 +6790,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["ACTIVE_ORGANIZATION_REQUIRED"]
+                      "enum": ["FORBIDDEN"]
                     },
                     "message": {
                       "type": "string",

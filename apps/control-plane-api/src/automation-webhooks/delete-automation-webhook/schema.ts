@@ -1,18 +1,8 @@
 import { z } from "@hono/zod-openapi";
 
-import {
-  AutomationWebhookParamsSchema,
-  AutomationWebhooksForbiddenResponseSchema,
-  AutomationWebhooksNotFoundResponseSchema,
-  AutomationWebhooksUnauthorizedResponseSchema,
-} from "../schemas.js";
+import { AutomationWebhookParamsSchema } from "../schemas.js";
 
-export {
-  AutomationWebhookParamsSchema,
-  AutomationWebhooksForbiddenResponseSchema,
-  AutomationWebhooksNotFoundResponseSchema,
-  AutomationWebhooksUnauthorizedResponseSchema,
-};
+export { AutomationWebhookParamsSchema };
 
 export const DeleteAutomationWebhookResponseSchema = z
   .object({

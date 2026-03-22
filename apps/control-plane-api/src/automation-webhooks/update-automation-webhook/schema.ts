@@ -4,19 +4,10 @@ import {
   AutomationWebhookParamsSchema,
   AutomationWebhookSchema,
   AutomationWebhooksBadRequestResponseSchema,
-  AutomationWebhooksForbiddenResponseSchema,
-  AutomationWebhooksNotFoundResponseSchema,
-  AutomationWebhooksUnauthorizedResponseSchema,
   ValidationErrorResponseSchema,
 } from "../schemas.js";
 
-export {
-  AutomationWebhookParamsSchema,
-  AutomationWebhookSchema,
-  AutomationWebhooksForbiddenResponseSchema,
-  AutomationWebhooksNotFoundResponseSchema,
-  AutomationWebhooksUnauthorizedResponseSchema,
-};
+export { AutomationWebhookParamsSchema, AutomationWebhookSchema };
 
 export const UpdateAutomationWebhookBodySchema = z
   .object({

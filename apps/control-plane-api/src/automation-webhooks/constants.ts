@@ -7,7 +7,3 @@ export const AutomationWebhooksBadRequestCodes = {
   CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE: "CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE",
   INVALID_SANDBOX_PROFILE_REFERENCE: "INVALID_SANDBOX_PROFILE_REFERENCE",
 } as const;
-
-export const AutomationWebhooksNotFoundCodes = {
-  AUTOMATION_NOT_FOUND: "AUTOMATION_NOT_FOUND",
-} as const;

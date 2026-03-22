@@ -3,13 +3,10 @@ import { z } from "@hono/zod-openapi";
 import {
   AutomationWebhookSchema,
   AutomationWebhooksBadRequestResponseSchema,
-  AutomationWebhooksForbiddenResponseSchema,
-  AutomationWebhooksUnauthorizedResponseSchema,
   ValidationErrorResponseSchema,
 } from "../schemas.js";
 
 export { AutomationWebhookSchema };
-export { AutomationWebhooksForbiddenResponseSchema, AutomationWebhooksUnauthorizedResponseSchema };
 
 export const CreateAutomationWebhookBodySchema = z
   .object({

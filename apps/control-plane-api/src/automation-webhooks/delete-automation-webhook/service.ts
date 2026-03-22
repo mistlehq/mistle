@@ -2,8 +2,6 @@ import { automations, AutomationKinds, type ControlPlaneDatabase } from "@mistle
 import { NotFoundError } from "@mistle/http/errors.js";
 import { and, eq } from "drizzle-orm";
 
-import { AutomationWebhooksNotFoundCodes } from "../constants.js";
-
 export type DeleteWebhookAutomationInput = {
   organizationId: string;
   automationId: string;
@@ -27,9 +25,6 @@ export async function deleteAutomationWebhook(
     });
 
   if (deletedRows[0] === undefined) {
-    throw new NotFoundError(
-      AutomationWebhooksNotFoundCodes.AUTOMATION_NOT_FOUND,
-      "Webhook automation was not found.",
-    );
+    throw new NotFoundError("NOT_FOUND", "Webhook automation was not found.");
   }
 }

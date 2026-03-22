@@ -46,7 +46,7 @@ describe("webhook automations api errors", () => {
       operation: "getWebhookAutomation",
       error: {
         status: 404,
-        code: "AUTOMATION_NOT_FOUND",
+        code: "NOT_FOUND",
         message: "Automation missing.",
       },
       fallbackMessage: "Could not load webhook automation.",

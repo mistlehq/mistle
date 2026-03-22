@@ -1,7 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { createCodeMessageErrorSchema } from "@mistle/http/errors.js";
 
-import { AutomationWebhooksBadRequestCodes, AutomationWebhooksNotFoundCodes } from "./constants.js";
+import { AutomationWebhooksBadRequestCodes } from "./constants.js";
 
 export const AutomationWebhookTargetSchema = z
   .object({
@@ -60,15 +60,3 @@ const BadRequestCodeSchema = z.enum([
 
 export const AutomationWebhooksBadRequestResponseSchema =
   createCodeMessageErrorSchema(BadRequestCodeSchema);
-
-export const AutomationWebhooksNotFoundResponseSchema = createCodeMessageErrorSchema(
-  z.literal(AutomationWebhooksNotFoundCodes.AUTOMATION_NOT_FOUND),
-);
-
-export const AutomationWebhooksUnauthorizedResponseSchema = createCodeMessageErrorSchema(
-  z.literal("UNAUTHORIZED"),
-);
-
-export const AutomationWebhooksForbiddenResponseSchema = createCodeMessageErrorSchema(
-  z.literal("ACTIVE_ORGANIZATION_REQUIRED"),
-);

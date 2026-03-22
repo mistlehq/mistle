@@ -1,30 +1,27 @@
 import { Hono } from "hono";
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
 
 import {
-  createCodeMessageErrorSchema,
   handleHttpError,
+  NotFoundResponseSchema,
   NotFoundError,
   withHttpErrorHandler,
 } from "./errors.js";
 
-const NotFoundResponseSchema = createCodeMessageErrorSchema(z.literal("RESOURCE_NOT_FOUND"));
-
 describe("errors", () => {
   it("creates a strict code/message schema", () => {
     const parsed = NotFoundResponseSchema.parse({
-      code: "RESOURCE_NOT_FOUND",
+      code: "NOT_FOUND",
       message: "Missing resource.",
     });
 
     expect(parsed).toEqual({
-      code: "RESOURCE_NOT_FOUND",
+      code: "NOT_FOUND",
       message: "Missing resource.",
     });
     expect(() =>
       NotFoundResponseSchema.parse({
-        code: "RESOURCE_NOT_FOUND",
+        code: "NOT_FOUND",
         message: "Missing resource.",
         extra: "nope",
       }),
@@ -36,7 +33,7 @@ describe("errors", () => {
     app.get(
       "/resource",
       withHttpErrorHandler(async () => {
-        throw new NotFoundError("RESOURCE_NOT_FOUND", "Missing resource.");
+        throw new NotFoundError("NOT_FOUND", "Missing resource.");
       }),
     );
 
@@ -44,7 +41,7 @@ describe("errors", () => {
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
-      code: "RESOURCE_NOT_FOUND",
+      code: "NOT_FOUND",
       message: "Missing resource.",
     });
   });
@@ -68,14 +65,14 @@ describe("errors", () => {
   it("handles HttpError directly", async () => {
     const app = new Hono();
     app.get("/direct", (ctx) =>
-      handleHttpError(ctx, new NotFoundError("RESOURCE_NOT_FOUND", "Missing resource.")),
+      handleHttpError(ctx, new NotFoundError("NOT_FOUND", "Missing resource.")),
     );
 
     const response = await app.request("/direct");
 
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({
-      code: "RESOURCE_NOT_FOUND",
+      code: "NOT_FOUND",
       message: "Missing resource.",
     });
   });

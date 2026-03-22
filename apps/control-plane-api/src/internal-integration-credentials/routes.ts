@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 import { z } from "zod";
 
 import { createRequireInternalAuthMiddleware } from "../middleware/require-internal-auth.js";
@@ -9,7 +10,6 @@ import {
 } from "./constants.js";
 import {
   InternalIntegrationCredentialErrorResponseSchema,
-  InternalIntegrationCredentialUnauthorizedResponseSchema,
   resolveIntegrationCredentialRoute,
   resolveIntegrationTargetSecretsRoute,
   ResolveIntegrationCredentialRequestSchema,
@@ -115,9 +115,7 @@ export function createInternalIntegrationCredentialsRoutes(): AppRoutes<
 function handleResolveIntegrationCredentialError(ctx: AppContext, error: unknown) {
   if (error instanceof InternalIntegrationCredentialsError) {
     if (error.statusCode === 401) {
-      const unauthorizedResponseBody: z.infer<
-        typeof InternalIntegrationCredentialUnauthorizedResponseSchema
-      > = {
+      const unauthorizedResponseBody: z.infer<typeof UnauthorizedResponseSchema> = {
         code: InternalIntegrationCredentialsErrorCodes.UNAUTHORIZED,
         message: error.message,
       };
@@ -138,9 +136,7 @@ function handleResolveIntegrationCredentialError(ctx: AppContext, error: unknown
 function handleResolveTargetSecretsError(ctx: AppContext, error: unknown) {
   if (error instanceof InternalIntegrationCredentialsError) {
     if (error.statusCode === 401) {
-      const unauthorizedResponseBody: z.infer<
-        typeof InternalIntegrationCredentialUnauthorizedResponseSchema
-      > = {
+      const unauthorizedResponseBody: z.infer<typeof UnauthorizedResponseSchema> = {
         code: InternalIntegrationCredentialsErrorCodes.UNAUTHORIZED,
         message: error.message,
       };

@@ -47,6 +47,12 @@ export function createCodeMessageErrorSchema<TCode extends z.ZodType<string>>(co
     .strict();
 }
 
+export const UnauthorizedResponseSchema = createCodeMessageErrorSchema(z.literal("UNAUTHORIZED"));
+
+export const ForbiddenResponseSchema = createCodeMessageErrorSchema(z.literal("FORBIDDEN"));
+
+export const NotFoundResponseSchema = createCodeMessageErrorSchema(z.literal("NOT_FOUND"));
+
 export function handleHttpError(ctx: Context, error: unknown) {
   if (error instanceof HttpError) {
     return ctx.json(

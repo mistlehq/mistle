@@ -1,9 +1,8 @@
 import { createRoute } from "@hono/zod-openapi";
+import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
 import {
   AutomationWebhookSchema,
-  AutomationWebhooksForbiddenResponseSchema,
-  AutomationWebhooksUnauthorizedResponseSchema,
   CreateAutomationWebhookBadRequestResponseSchema,
   CreateAutomationWebhookBodySchema,
 } from "./schema.js";
@@ -43,7 +42,7 @@ export const route = createRoute({
       description: "Authentication is required.",
       content: {
         "application/json": {
-          schema: AutomationWebhooksUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },
@@ -51,7 +50,7 @@ export const route = createRoute({
       description: "Active organization is required.",
       content: {
         "application/json": {
-          schema: AutomationWebhooksForbiddenResponseSchema,
+          schema: ForbiddenResponseSchema,
         },
       },
     },

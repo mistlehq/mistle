@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 import {
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
@@ -114,20 +115,6 @@ export const SandboxInstancesConflictResponseSchema = z
   })
   .strict();
 
-export const SandboxInstancesUnauthorizedResponseSchema = z
-  .object({
-    code: z.literal("UNAUTHORIZED"),
-    message: z.string().min(1),
-  })
-  .strict();
-
-export const SandboxInstancesForbiddenResponseSchema = z
-  .object({
-    code: z.literal("ACTIVE_ORGANIZATION_REQUIRED"),
-    message: z.string().min(1),
-  })
-  .strict();
-
 export const listSandboxInstancesRoute = createRoute({
   method: "get",
   path: "/",
@@ -156,7 +143,7 @@ export const listSandboxInstancesRoute = createRoute({
       description: "Authentication is required.",
       content: {
         "application/json": {
-          schema: SandboxInstancesUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },
@@ -164,7 +151,7 @@ export const listSandboxInstancesRoute = createRoute({
       description: "Active organization is required.",
       content: {
         "application/json": {
-          schema: SandboxInstancesForbiddenResponseSchema,
+          schema: ForbiddenResponseSchema,
         },
       },
     },
@@ -207,7 +194,7 @@ export const getSandboxInstanceRoute = createRoute({
       description: "Authentication is required.",
       content: {
         "application/json": {
-          schema: SandboxInstancesUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },
@@ -215,7 +202,7 @@ export const getSandboxInstanceRoute = createRoute({
       description: "Active organization is required.",
       content: {
         "application/json": {
-          schema: SandboxInstancesForbiddenResponseSchema,
+          schema: ForbiddenResponseSchema,
         },
       },
     },
@@ -274,7 +261,7 @@ export const createSandboxInstanceConnectionTokenRoute = createRoute({
       description: "Authentication is required.",
       content: {
         "application/json": {
-          schema: SandboxInstancesUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },
@@ -282,7 +269,7 @@ export const createSandboxInstanceConnectionTokenRoute = createRoute({
       description: "Active organization is required.",
       content: {
         "application/json": {
-          schema: SandboxInstancesForbiddenResponseSchema,
+          schema: ForbiddenResponseSchema,
         },
       },
     },

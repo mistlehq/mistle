@@ -4,14 +4,11 @@ import { createKeysetPaginationEnvelopeSchema } from "@mistle/http/pagination";
 import {
   AutomationWebhookSchema,
   AutomationWebhooksBadRequestResponseSchema,
-  AutomationWebhooksForbiddenResponseSchema,
-  AutomationWebhooksUnauthorizedResponseSchema,
   ValidationErrorResponseSchema,
 } from "../schemas.js";
 import { ListWebhookAutomationsQuerySchema } from "./service.js";
 
 export { ListWebhookAutomationsQuerySchema };
-export { AutomationWebhooksForbiddenResponseSchema, AutomationWebhooksUnauthorizedResponseSchema };
 
 export const ListAutomationWebhooksResponseSchema = createKeysetPaginationEnvelopeSchema(
   AutomationWebhookSchema,

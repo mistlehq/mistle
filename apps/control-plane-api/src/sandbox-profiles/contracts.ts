@@ -6,6 +6,7 @@ import {
   sandboxProfileVersions,
   sandboxProfiles,
 } from "@mistle/db/control-plane";
+import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 import {
   createKeysetPaginationEnvelopeSchema,
   createKeysetPaginationQuerySchema,
@@ -13,7 +14,6 @@ import {
 import { createSelectSchema } from "drizzle-zod";
 
 import {
-  SandboxProfilesAuthErrorCodes,
   SandboxProfilesBadRequestCodes,
   SandboxProfilesCompileErrorCodes,
   SandboxProfilesIntegrationBindingsBadRequestCodes,
@@ -229,20 +229,6 @@ export const PutSandboxProfileVersionIntegrationBindingsBadRequestResponseSchema
     .strict(),
   ValidationErrorResponseSchema,
 ]);
-
-export const UnauthorizedResponseSchema = z
-  .object({
-    code: z.literal(SandboxProfilesAuthErrorCodes.UNAUTHORIZED),
-    message: z.string().min(1),
-  })
-  .strict();
-
-export const ForbiddenResponseSchema = z
-  .object({
-    code: z.literal(SandboxProfilesAuthErrorCodes.ACTIVE_ORGANIZATION_REQUIRED),
-    message: z.string().min(1),
-  })
-  .strict();
 
 export const SandboxProfileDeletionAcceptedResponseSchema = z
   .object({

@@ -7,14 +7,14 @@ import {
 } from "../api/http-api-error.js";
 
 const WebhookAutomationErrorMessages = {
-  ACTIVE_ORGANIZATION_REQUIRED: "Select an active organization to manage webhook automations.",
-  AUTOMATION_NOT_FOUND: "The webhook automation no longer exists.",
   CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE:
     "The selected integration connection does not support webhook automations.",
+  FORBIDDEN: "Select an active organization to manage webhook automations.",
   INVALID_CONNECTION_REFERENCE: "The selected integration connection is invalid.",
   INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT: "The webhook automations request is invalid.",
   INVALID_PAGINATION_CURSOR: "The webhook automations page cursor is invalid.",
   INVALID_SANDBOX_PROFILE_REFERENCE: "The selected sandbox profile is invalid.",
+  NOT_FOUND: "The webhook automation no longer exists.",
   UNAUTHORIZED: "Sign in again to manage webhook automations.",
 } as const;
 

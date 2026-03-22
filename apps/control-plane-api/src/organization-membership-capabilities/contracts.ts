@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
 import { ORGANIZATION_ROLES } from "../auth/services/organization-policy.js";
 
@@ -53,20 +54,6 @@ export const MembershipCapabilitiesParamsSchema = z
   })
   .strict();
 
-export const MembershipCapabilitiesUnauthorizedResponseSchema = z
-  .object({
-    code: z.literal("UNAUTHORIZED"),
-    message: z.string().min(1),
-  })
-  .strict();
-
-export const MembershipCapabilitiesActiveOrganizationRequiredResponseSchema = z
-  .object({
-    code: z.literal("ACTIVE_ORGANIZATION_REQUIRED"),
-    message: z.string().min(1),
-  })
-  .strict();
-
 export const getOrganizationMembershipCapabilitiesRoute = createRoute({
   method: "get",
   path: "/{organizationId}/membership-capabilities",
@@ -87,7 +74,7 @@ export const getOrganizationMembershipCapabilitiesRoute = createRoute({
       description: "Authentication is required.",
       content: {
         "application/json": {
-          schema: MembershipCapabilitiesUnauthorizedResponseSchema,
+          schema: UnauthorizedResponseSchema,
         },
       },
     },
@@ -95,10 +82,7 @@ export const getOrganizationMembershipCapabilitiesRoute = createRoute({
       description: "Forbidden request.",
       content: {
         "application/json": {
-          schema: z.union([
-            MembershipCapabilitiesActiveOrganizationRequiredResponseSchema,
-            MembershipCapabilitiesErrorResponseSchema,
-          ]),
+          schema: z.union([ForbiddenResponseSchema, MembershipCapabilitiesErrorResponseSchema]),
         },
       },
     },

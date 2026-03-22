@@ -9,13 +9,13 @@ import {
   sandboxProfiles,
   webhookAutomations,
 } from "@mistle/db/control-plane";
+import { NotFoundResponseSchema } from "@mistle/http/errors.js";
 import { describe, expect } from "vitest";
 
 import { ListAutomationWebhooksResponseSchema } from "../src/automation-webhooks/list-automation-webhooks/index.js";
 import {
   AutomationWebhookSchema,
   AutomationWebhooksBadRequestResponseSchema,
-  AutomationWebhooksNotFoundResponseSchema,
   ValidationErrorResponseSchema,
 } from "../src/automation-webhooks/schemas.js";
 import { it } from "./test-context.js";
@@ -537,10 +537,8 @@ describe("automation webhooks CRUD integration", () => {
       },
     );
     expect(notFoundResponse.status).toBe(404);
-    const notFoundBody = AutomationWebhooksNotFoundResponseSchema.parse(
-      await notFoundResponse.json(),
-    );
-    expect(notFoundBody.code).toBe("AUTOMATION_NOT_FOUND");
+    const notFoundBody = NotFoundResponseSchema.parse(await notFoundResponse.json());
+    expect(notFoundBody.code).toBe("NOT_FOUND");
 
     const invalidPatchResponse = await fixture.request("/v1/automations/webhooks/atm_invalid", {
       method: "PATCH",

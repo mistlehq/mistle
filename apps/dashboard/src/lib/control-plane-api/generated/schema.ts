@@ -115,7 +115,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -231,7 +231,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -313,7 +313,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -326,7 +326,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "AUTOMATION_NOT_FOUND";
+              code: "NOT_FOUND";
               message: string;
             };
           };
@@ -378,7 +378,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -391,7 +391,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "AUTOMATION_NOT_FOUND";
+              code: "NOT_FOUND";
               message: string;
             };
           };
@@ -510,7 +510,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -523,7 +523,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "AUTOMATION_NOT_FOUND";
+              code: "NOT_FOUND";
               message: string;
             };
           };
@@ -661,7 +661,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -808,7 +808,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -968,7 +968,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -1256,7 +1256,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -1638,7 +1638,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -1884,7 +1884,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -2076,7 +2076,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -2265,7 +2265,7 @@ export interface paths {
             "application/json":
               | {
                   /** @enum {string} */
-                  code: "ACTIVE_ORGANIZATION_REQUIRED";
+                  code: "FORBIDDEN";
                   message: string;
                 }
               | {
@@ -2422,7 +2422,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -2524,7 +2524,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -2645,7 +2645,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -2786,7 +2786,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -2874,7 +2874,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -2970,7 +2970,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -3064,7 +3064,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -3168,7 +3168,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -3270,7 +3270,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -3407,7 +3407,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -3523,7 +3523,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
@@ -3660,7 +3660,7 @@ export interface paths {
           content: {
             "application/json": {
               /** @enum {string} */
-              code: "ACTIVE_ORGANIZATION_REQUIRED";
+              code: "FORBIDDEN";
               message: string;
             };
           };
