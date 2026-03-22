@@ -1,8 +1,13 @@
 import { automations, AutomationKinds, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { NotFoundError } from "@mistle/http/errors.js";
 import { and, eq } from "drizzle-orm";
 
-import { AutomationWebhooksNotFoundCodes, AutomationWebhooksNotFoundError } from "../errors.js";
-import type { DeleteWebhookAutomationInput } from "../types.js";
+import { AutomationWebhooksNotFoundCodes } from "../constants.js";
+
+export type DeleteWebhookAutomationInput = {
+  organizationId: string;
+  automationId: string;
+};
 
 export async function deleteAutomationWebhook(
   input: { db: ControlPlaneDatabase },
@@ -22,7 +27,7 @@ export async function deleteAutomationWebhook(
     });
 
   if (deletedRows[0] === undefined) {
-    throw new AutomationWebhooksNotFoundError(
+    throw new NotFoundError(
       AutomationWebhooksNotFoundCodes.AUTOMATION_NOT_FOUND,
       "Webhook automation was not found.",
     );

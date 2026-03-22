@@ -1069,16 +1069,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "enum": ["deleted"]
-                    },
                     "automationId": {
                       "type": "string",
                       "minLength": 1
                     }
                   },
-                  "required": ["status", "automationId"],
+                  "required": ["automationId"],
                   "additionalProperties": false
                 }
               }

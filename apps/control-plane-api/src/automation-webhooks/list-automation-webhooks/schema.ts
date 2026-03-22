@@ -7,7 +7,7 @@ import {
   AutomationWebhooksForbiddenResponseSchema,
   AutomationWebhooksUnauthorizedResponseSchema,
   ValidationErrorResponseSchema,
-} from "../shared-schemas.js";
+} from "../schemas.js";
 import { ListWebhookAutomationsQuerySchema } from "./service.js";
 
 export { ListWebhookAutomationsQuerySchema };

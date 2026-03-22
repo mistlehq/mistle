@@ -1,5 +1,6 @@
 import { automations, AutomationKinds } from "@mistle/db/control-plane";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { BadRequestError } from "@mistle/http/errors.js";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import {
   createKeysetPaginationQuerySchema,
@@ -15,9 +16,11 @@ import {
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import { AutomationWebhooksBadRequestCodes, AutomationWebhooksBadRequestError } from "../errors.js";
-import { loadWebhookAutomationAggregateOrThrow } from "../shared.js";
-import type { AutomationWebhookAggregate } from "../types.js";
+import { AutomationWebhooksBadRequestCodes } from "../constants.js";
+import {
+  loadWebhookAutomationAggregateOrThrow,
+  type AutomationWebhookAggregate,
+} from "../services.js";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -55,7 +58,7 @@ export async function listAutomationWebhooks(
     pageSize = parseKeysetPageSize(input.limit, PageSizeOptions);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      throw new AutomationWebhooksBadRequestError(
+      throw new BadRequestError(
         AutomationWebhooksBadRequestCodes.INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT,
         `\`limit\` must be an integer between 1 and ${String(MAX_PAGE_SIZE)}.`,
       );
@@ -83,7 +86,7 @@ export async function listAutomationWebhooks(
               [KeysetCursorDecodeErrorReasons.INVALID_SHAPE]: `\`${decodeCursorName}\` cursor has an invalid shape.`,
             } as const;
 
-            return new AutomationWebhooksBadRequestError(
+            return new BadRequestError(
               AutomationWebhooksBadRequestCodes.INVALID_PAGINATION_CURSOR,
               reasonToMessage[reason],
             );
@@ -133,10 +136,13 @@ export async function listAutomationWebhooks(
 
         return Promise.all(
           automationRows.map((automation) =>
-            loadWebhookAutomationAggregateOrThrow(db, {
-              organizationId: input.organizationId,
-              automationId: automation.id,
-            }),
+            loadWebhookAutomationAggregateOrThrow(
+              { db },
+              {
+                organizationId: input.organizationId,
+                automationId: automation.id,
+              },
+            ),
           ),
         );
       },
@@ -161,7 +167,7 @@ export async function listAutomationWebhooks(
       error instanceof KeysetPaginationInputError &&
       error.reason === KeysetPaginationInputErrorReasons.BOTH_CURSORS_PROVIDED
     ) {
-      throw new AutomationWebhooksBadRequestError(
+      throw new BadRequestError(
         AutomationWebhooksBadRequestCodes.INVALID_LIST_WEBHOOK_AUTOMATIONS_INPUT,
         "Only one of `after` or `before` can be provided.",
       );

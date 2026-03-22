@@ -96,12 +96,10 @@ describe("webhook automations types", () => {
   it("parses delete responses", () => {
     const parsed = DeleteWebhookAutomationResultSchema.parse({
       automationId: "aut_123",
-      status: "deleted",
     });
 
     expect(parsed).toEqual({
       automationId: "aut_123",
-      status: "deleted",
     });
   });
 });

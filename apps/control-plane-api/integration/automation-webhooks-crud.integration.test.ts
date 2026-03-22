@@ -17,7 +17,7 @@ import {
   AutomationWebhooksBadRequestResponseSchema,
   AutomationWebhooksNotFoundResponseSchema,
   ValidationErrorResponseSchema,
-} from "../src/automation-webhooks/shared-schemas.js";
+} from "../src/automation-webhooks/schemas.js";
 import { it } from "./test-context.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
@@ -426,7 +426,6 @@ describe("automation webhooks CRUD integration", () => {
     });
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({
-      status: "deleted",
       automationId: "atm_webhook_delete_001",
     });
 

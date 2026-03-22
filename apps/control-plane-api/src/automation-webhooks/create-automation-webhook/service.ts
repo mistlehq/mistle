@@ -12,8 +12,23 @@ import {
   assertSandboxProfileReferenceOrThrow,
   assertWebhookConnectionReferenceOrThrow,
   loadWebhookAutomationAggregateOrThrow,
-} from "../shared.js";
-import type { CreateWebhookAutomationInput } from "../types.js";
+} from "../services.js";
+
+export type CreateWebhookAutomationInput = {
+  organizationId: string;
+  name: string;
+  enabled?: boolean | undefined;
+  integrationConnectionId: string;
+  eventTypes?: string[] | null | undefined;
+  payloadFilter?: Record<string, unknown> | null | undefined;
+  inputTemplate: string;
+  conversationKeyTemplate: string;
+  idempotencyKeyTemplate?: string | null | undefined;
+  target: {
+    sandboxProfileId: string;
+    sandboxProfileVersion?: number | null | undefined;
+  };
+};
 
 export async function createAutomationWebhook(
   input: {
@@ -22,21 +37,30 @@ export async function createAutomationWebhook(
   },
   serviceInput: CreateWebhookAutomationInput,
 ) {
-  await assertWebhookConnectionReferenceOrThrow(input.db, input.integrationRegistry, {
-    organizationId: serviceInput.organizationId,
-    integrationConnectionId: serviceInput.integrationConnectionId,
-  });
-  await assertSandboxProfileReferenceOrThrow(input.db, {
-    organizationId: serviceInput.organizationId,
-    sandboxProfileId: serviceInput.target.sandboxProfileId,
-  });
+  await assertWebhookConnectionReferenceOrThrow(
+    { db: input.db, integrationRegistry: input.integrationRegistry },
+    {
+      organizationId: serviceInput.organizationId,
+      integrationConnectionId: serviceInput.integrationConnectionId,
+    },
+  );
+  await assertSandboxProfileReferenceOrThrow(
+    { db: input.db },
+    {
+      organizationId: serviceInput.organizationId,
+      sandboxProfileId: serviceInput.target.sandboxProfileId,
+    },
+  );
 
   return input.db.transaction(async (tx) => {
     const automation = await createAutomationAggregate(tx, serviceInput);
-    return loadWebhookAutomationAggregateOrThrow(tx, {
-      organizationId: serviceInput.organizationId,
-      automationId: automation.id,
-    });
+    return loadWebhookAutomationAggregateOrThrow(
+      { db: tx },
+      {
+        organizationId: serviceInput.organizationId,
+        automationId: automation.id,
+      },
+    );
   });
 }
 

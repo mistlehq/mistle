@@ -354,8 +354,6 @@ export interface paths {
           content: {
             "application/json": {
               automationId: string;
-              /** @enum {string} */
-              status: "deleted";
             };
           };
         };

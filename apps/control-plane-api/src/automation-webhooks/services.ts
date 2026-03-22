@@ -4,20 +4,32 @@ import {
   type ControlPlaneDatabase,
   type ControlPlaneTransaction,
 } from "@mistle/db/control-plane";
+import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
-import {
-  AutomationWebhooksBadRequestCodes,
-  AutomationWebhooksBadRequestError,
-  AutomationWebhooksNotFoundCodes,
-  AutomationWebhooksNotFoundError,
-} from "./errors.js";
-import type { AutomationWebhookAggregate } from "./types.js";
+import { AutomationWebhooksBadRequestCodes, AutomationWebhooksNotFoundCodes } from "./constants.js";
 
-type AutomationWebhooksDatabase = ControlPlaneDatabase | ControlPlaneTransaction;
+export type AutomationWebhookAggregate = {
+  id: string;
+  name: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  integrationConnectionId: string;
+  eventTypes: string[] | null;
+  payloadFilter: Record<string, unknown> | null;
+  inputTemplate: string;
+  conversationKeyTemplate: string;
+  idempotencyKeyTemplate: string | null;
+  target: {
+    id: string;
+    sandboxProfileId: string;
+    sandboxProfileVersion: number | null;
+  };
+};
 
 export async function loadWebhookAutomationAggregateOrThrow(
-  db: AutomationWebhooksDatabase,
+  { db }: { db: ControlPlaneDatabase | ControlPlaneTransaction },
   input: {
     organizationId: string;
     automationId: string;
@@ -33,18 +45,20 @@ export async function loadWebhookAutomationAggregateOrThrow(
   });
 
   if (automation === undefined) {
-    throw new AutomationWebhooksNotFoundError(
+    throw new NotFoundError(
       AutomationWebhooksNotFoundCodes.AUTOMATION_NOT_FOUND,
       "Webhook automation was not found.",
     );
   }
 
-  const webhookAutomation = await db.query.webhookAutomations.findFirst({
-    where: (table, { eq }) => eq(table.automationId, automation.id),
-  });
-  const targets = await db.query.automationTargets.findMany({
-    where: (table, { eq }) => eq(table.automationId, automation.id),
-  });
+  const [webhookAutomation, targets] = await Promise.all([
+    db.query.webhookAutomations.findFirst({
+      where: (table, { eq }) => eq(table.automationId, automation.id),
+    }),
+    db.query.automationTargets.findMany({
+      where: (table, { eq }) => eq(table.automationId, automation.id),
+    }),
+  ]);
 
   if (webhookAutomation === undefined) {
     throw new Error(
@@ -67,22 +81,27 @@ export async function loadWebhookAutomationAggregateOrThrow(
     createdAt: automation.createdAt,
     updatedAt: automation.updatedAt,
     integrationConnectionId: webhookAutomation.integrationConnectionId,
-    eventTypes: webhookAutomation.eventTypes ?? null,
-    payloadFilter: webhookAutomation.payloadFilter ?? null,
+    eventTypes: webhookAutomation.eventTypes,
+    payloadFilter: webhookAutomation.payloadFilter,
     inputTemplate: webhookAutomation.inputTemplate,
     conversationKeyTemplate: webhookAutomation.conversationKeyTemplate,
-    idempotencyKeyTemplate: webhookAutomation.idempotencyKeyTemplate ?? null,
+    idempotencyKeyTemplate: webhookAutomation.idempotencyKeyTemplate,
     target: {
       id: target.id,
       sandboxProfileId: target.sandboxProfileId,
-      sandboxProfileVersion: target.sandboxProfileVersion ?? null,
+      sandboxProfileVersion: target.sandboxProfileVersion,
     },
   };
 }
 
 export async function assertWebhookConnectionReferenceOrThrow(
-  db: AutomationWebhooksDatabase,
-  integrationRegistry: IntegrationRegistry,
+  {
+    db,
+    integrationRegistry,
+  }: {
+    db: ControlPlaneDatabase | ControlPlaneTransaction;
+    integrationRegistry: IntegrationRegistry;
+  },
   input: {
     organizationId: string;
     integrationConnectionId: string;
@@ -98,7 +117,7 @@ export async function assertWebhookConnectionReferenceOrThrow(
   });
 
   if (connection === undefined) {
-    throw new AutomationWebhooksBadRequestError(
+    throw new BadRequestError(
       AutomationWebhooksBadRequestCodes.INVALID_CONNECTION_REFERENCE,
       "Integration connection must reference an active connection in the active organization.",
     );
@@ -124,7 +143,7 @@ export async function assertWebhookConnectionReferenceOrThrow(
   }
 
   if (definition.webhookHandler === undefined) {
-    throw new AutomationWebhooksBadRequestError(
+    throw new BadRequestError(
       AutomationWebhooksBadRequestCodes.CONNECTION_TARGET_NOT_WEBHOOK_CAPABLE,
       "Integration connection target does not define webhook handling.",
     );
@@ -132,7 +151,7 @@ export async function assertWebhookConnectionReferenceOrThrow(
 }
 
 export async function assertSandboxProfileReferenceOrThrow(
-  db: AutomationWebhooksDatabase,
+  { db }: { db: ControlPlaneDatabase | ControlPlaneTransaction },
   input: {
     organizationId: string;
     sandboxProfileId: string;
@@ -144,7 +163,7 @@ export async function assertSandboxProfileReferenceOrThrow(
   });
 
   if (profile === undefined) {
-    throw new AutomationWebhooksBadRequestError(
+    throw new BadRequestError(
       AutomationWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_REFERENCE,
       "Sandbox profile must reference a profile in the active organization.",
     );

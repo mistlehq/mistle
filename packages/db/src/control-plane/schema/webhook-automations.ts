@@ -13,7 +13,7 @@ export const webhookAutomations = controlPlaneSchema.table(
     integrationConnectionId: text("integration_connection_id")
       .notNull()
       .references(() => integrationConnections.id, { onDelete: "cascade" }),
-    eventTypes: jsonb("event_types").$type<ReadonlyArray<string>>(),
+    eventTypes: jsonb("event_types").$type<string[]>(),
     payloadFilter: jsonb("payload_filter").$type<Record<string, unknown>>(),
     inputTemplate: text("input_template").notNull(),
     conversationKeyTemplate: text("conversation_key_template").notNull(),

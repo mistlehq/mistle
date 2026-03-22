@@ -1,6 +1,7 @@
 import { z } from "@hono/zod-openapi";
+import { createCodeMessageErrorSchema } from "@mistle/http/errors.js";
 
-import { AutomationWebhooksBadRequestCodes, AutomationWebhooksNotFoundCodes } from "./errors.js";
+import { AutomationWebhooksBadRequestCodes, AutomationWebhooksNotFoundCodes } from "./constants.js";
 
 export const AutomationWebhookTargetSchema = z
   .object({
@@ -57,30 +58,17 @@ const BadRequestCodeSchema = z.enum([
   AutomationWebhooksBadRequestCodes.INVALID_SANDBOX_PROFILE_REFERENCE,
 ]);
 
-export const AutomationWebhooksBadRequestResponseSchema = z
-  .object({
-    code: BadRequestCodeSchema,
-    message: z.string().min(1),
-  })
-  .strict();
+export const AutomationWebhooksBadRequestResponseSchema =
+  createCodeMessageErrorSchema(BadRequestCodeSchema);
 
-export const AutomationWebhooksNotFoundResponseSchema = z
-  .object({
-    code: z.literal(AutomationWebhooksNotFoundCodes.AUTOMATION_NOT_FOUND),
-    message: z.string().min(1),
-  })
-  .strict();
+export const AutomationWebhooksNotFoundResponseSchema = createCodeMessageErrorSchema(
+  z.literal(AutomationWebhooksNotFoundCodes.AUTOMATION_NOT_FOUND),
+);
 
-export const AutomationWebhooksUnauthorizedResponseSchema = z
-  .object({
-    code: z.literal("UNAUTHORIZED"),
-    message: z.string().min(1),
-  })
-  .strict();
+export const AutomationWebhooksUnauthorizedResponseSchema = createCodeMessageErrorSchema(
+  z.literal("UNAUTHORIZED"),
+);
 
-export const AutomationWebhooksForbiddenResponseSchema = z
-  .object({
-    code: z.literal("ACTIVE_ORGANIZATION_REQUIRED"),
-    message: z.string().min(1),
-  })
-  .strict();
+export const AutomationWebhooksForbiddenResponseSchema = createCodeMessageErrorSchema(
+  z.literal("ACTIVE_ORGANIZATION_REQUIRED"),
+);

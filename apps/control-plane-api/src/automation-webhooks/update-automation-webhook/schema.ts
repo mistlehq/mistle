@@ -8,7 +8,7 @@ import {
   AutomationWebhooksNotFoundResponseSchema,
   AutomationWebhooksUnauthorizedResponseSchema,
   ValidationErrorResponseSchema,
-} from "../shared-schemas.js";
+} from "../schemas.js";
 
 export {
   AutomationWebhookParamsSchema,

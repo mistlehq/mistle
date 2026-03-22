@@ -6,7 +6,7 @@ import {
   AutomationWebhooksForbiddenResponseSchema,
   AutomationWebhooksUnauthorizedResponseSchema,
   ValidationErrorResponseSchema,
-} from "../shared-schemas.js";
+} from "../schemas.js";
 
 export { AutomationWebhookSchema };
 export { AutomationWebhooksForbiddenResponseSchema, AutomationWebhooksUnauthorizedResponseSchema };

@@ -5,7 +5,7 @@ import {
   AutomationWebhooksForbiddenResponseSchema,
   AutomationWebhooksNotFoundResponseSchema,
   AutomationWebhooksUnauthorizedResponseSchema,
-} from "../shared-schemas.js";
+} from "../schemas.js";
 
 export {
   AutomationWebhookParamsSchema,
@@ -16,7 +16,6 @@ export {
 
 export const DeleteAutomationWebhookResponseSchema = z
   .object({
-    status: z.literal("deleted"),
     automationId: z.string().min(1),
   })
   .strict();

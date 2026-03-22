@@ -1,46 +1,39 @@
 import type { RouteHandler } from "@hono/zod-openapi";
+import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
-import type { AppContextBindings } from "../../types.js";
-import {
-  handleAutomationWebhookBadRequestError,
-  requireSession,
-  toAutomationWebhookResponse,
-} from "../route-helpers.js";
+import { withRequiredSession } from "../../middleware/with-required-session.js";
+import type { AppContextBindings, AppSession } from "../../types.js";
 import { route } from "./route.js";
 import { createAutomationWebhook } from "./service.js";
 
-export const handler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
-  try {
-    const body = ctx.req.valid("json");
-    const session = requireSession(ctx);
-    const automationWebhook = await createAutomationWebhook(
-      {
-        db: ctx.get("db"),
-        integrationRegistry: ctx.get("integrationRegistry"),
-      },
-      {
-        name: body.name,
-        ...(body.enabled === undefined ? {} : { enabled: body.enabled }),
-        integrationConnectionId: body.integrationConnectionId,
-        ...(body.eventTypes === undefined ? {} : { eventTypes: body.eventTypes }),
-        ...(body.payloadFilter === undefined ? {} : { payloadFilter: body.payloadFilter }),
-        inputTemplate: body.inputTemplate,
-        conversationKeyTemplate: body.conversationKeyTemplate,
-        ...(body.idempotencyKeyTemplate === undefined
-          ? {}
-          : { idempotencyKeyTemplate: body.idempotencyKeyTemplate }),
-        target: {
-          sandboxProfileId: body.target.sandboxProfileId,
-          ...(body.target.sandboxProfileVersion === undefined
-            ? {}
-            : { sandboxProfileVersion: body.target.sandboxProfileVersion }),
-        },
-        organizationId: session.session.activeOrganizationId,
-      },
-    );
+const routeHandler = async (
+  ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
+  { session }: AppSession,
+) => {
+  const db = ctx.get("db");
+  const integrationRegistry = ctx.get("integrationRegistry");
+  const body = ctx.req.valid("json");
 
-    return ctx.json(toAutomationWebhookResponse(automationWebhook), 201);
-  } catch (error) {
-    return handleAutomationWebhookBadRequestError(ctx, error);
-  }
+  const automationWebhook = await createAutomationWebhook(
+    {
+      db,
+      integrationRegistry,
+    },
+    {
+      ...body,
+      organizationId: session.activeOrganizationId,
+    },
+  );
+
+  return ctx.json(
+    {
+      ...automationWebhook,
+      kind: "webhook" as const,
+    },
+    201,
+  );
 };
+
+export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(
+  withRequiredSession(routeHandler),
+);

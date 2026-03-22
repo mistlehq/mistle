@@ -1,30 +1,34 @@
-import { z, type RouteHandler } from "@hono/zod-openapi";
+import type { RouteHandler } from "@hono/zod-openapi";
+import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
-import type { AppContextBindings } from "../../types.js";
-import { handleAutomationWebhookNotFoundError, requireSession } from "../route-helpers.js";
+import { withRequiredSession } from "../../middleware/with-required-session.js";
+import type { AppContextBindings, AppSession } from "../../types.js";
 import { route } from "./route.js";
-import { DeleteAutomationWebhookResponseSchema } from "./schema.js";
 import { deleteAutomationWebhook } from "./service.js";
 
-export const handler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
-  try {
-    const params = ctx.req.valid("param");
-    const session = requireSession(ctx);
-    await deleteAutomationWebhook(
-      { db: ctx.get("db") },
-      {
-        automationId: params.automationId,
-        organizationId: session.session.activeOrganizationId,
-      },
-    );
+const routeHandler = async (
+  ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
+  { session }: AppSession,
+) => {
+  const db = ctx.get("db");
+  const { automationId } = ctx.req.valid("param");
 
-    const responseBody: z.infer<typeof DeleteAutomationWebhookResponseSchema> = {
-      status: "deleted",
-      automationId: params.automationId,
-    };
+  await deleteAutomationWebhook(
+    { db },
+    {
+      automationId,
+      organizationId: session.activeOrganizationId,
+    },
+  );
 
-    return ctx.json(responseBody, 200);
-  } catch (error) {
-    return handleAutomationWebhookNotFoundError(ctx, error);
-  }
+  return ctx.json(
+    {
+      automationId,
+    },
+    200,
+  );
 };
+
+export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(
+  withRequiredSession(routeHandler),
+);

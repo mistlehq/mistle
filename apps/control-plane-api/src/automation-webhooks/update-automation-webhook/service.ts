@@ -12,8 +12,26 @@ import {
   assertSandboxProfileReferenceOrThrow,
   assertWebhookConnectionReferenceOrThrow,
   loadWebhookAutomationAggregateOrThrow,
-} from "../shared.js";
-import type { UpdateWebhookAutomationInput } from "../types.js";
+} from "../services.js";
+
+export type UpdateWebhookAutomationInput = {
+  organizationId: string;
+  automationId: string;
+  name?: string | undefined;
+  enabled?: boolean | undefined;
+  integrationConnectionId?: string | undefined;
+  eventTypes?: string[] | null | undefined;
+  payloadFilter?: Record<string, unknown> | null | undefined;
+  inputTemplate?: string | undefined;
+  conversationKeyTemplate?: string | undefined;
+  idempotencyKeyTemplate?: string | null | undefined;
+  target?:
+    | {
+        sandboxProfileId?: string | undefined;
+        sandboxProfileVersion?: number | null | undefined;
+      }
+    | undefined;
+};
 
 export async function updateAutomationWebhook(
   input: {
@@ -22,34 +40,46 @@ export async function updateAutomationWebhook(
   },
   serviceInput: UpdateWebhookAutomationInput,
 ) {
-  const existingAutomation = await loadWebhookAutomationAggregateOrThrow(input.db, {
-    organizationId: serviceInput.organizationId,
-    automationId: serviceInput.automationId,
-  });
+  const existingAutomation = await loadWebhookAutomationAggregateOrThrow(
+    { db: input.db },
+    {
+      organizationId: serviceInput.organizationId,
+      automationId: serviceInput.automationId,
+    },
+  );
 
   const integrationConnectionId =
     serviceInput.integrationConnectionId ?? existingAutomation.integrationConnectionId;
   const sandboxProfileId =
     serviceInput.target?.sandboxProfileId ?? existingAutomation.target.sandboxProfileId;
 
-  await assertWebhookConnectionReferenceOrThrow(input.db, input.integrationRegistry, {
-    organizationId: serviceInput.organizationId,
-    integrationConnectionId,
-  });
-  await assertSandboxProfileReferenceOrThrow(input.db, {
-    organizationId: serviceInput.organizationId,
-    sandboxProfileId,
-  });
+  await assertWebhookConnectionReferenceOrThrow(
+    { db: input.db, integrationRegistry: input.integrationRegistry },
+    {
+      organizationId: serviceInput.organizationId,
+      integrationConnectionId,
+    },
+  );
+  await assertSandboxProfileReferenceOrThrow(
+    { db: input.db },
+    {
+      organizationId: serviceInput.organizationId,
+      sandboxProfileId,
+    },
+  );
 
   return input.db.transaction(async (tx) => {
     await updateAutomationBaseRow(tx, serviceInput);
     await updateWebhookConfigRow(tx, serviceInput);
     await updateAutomationTargetRow(tx, existingAutomation.target, serviceInput);
 
-    return loadWebhookAutomationAggregateOrThrow(tx, {
-      organizationId: serviceInput.organizationId,
-      automationId: serviceInput.automationId,
-    });
+    return loadWebhookAutomationAggregateOrThrow(
+      { db: tx },
+      {
+        organizationId: serviceInput.organizationId,
+        automationId: serviceInput.automationId,
+      },
+    );
   });
 }
 

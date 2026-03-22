@@ -1,28 +1,35 @@
 import type { RouteHandler } from "@hono/zod-openapi";
+import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
-import type { AppContextBindings } from "../../types.js";
-import {
-  handleAutomationWebhookNotFoundError,
-  requireSession,
-  toAutomationWebhookResponse,
-} from "../route-helpers.js";
+import { withRequiredSession } from "../../middleware/with-required-session.js";
+import type { AppContextBindings, AppSession } from "../../types.js";
+import { loadWebhookAutomationAggregateOrThrow } from "../services.js";
 import { route } from "./route.js";
-import { getAutomationWebhook } from "./service.js";
 
-export const handler: RouteHandler<typeof route, AppContextBindings> = async (ctx) => {
-  try {
-    const params = ctx.req.valid("param");
-    const session = requireSession(ctx);
-    const automationWebhook = await getAutomationWebhook(
-      { db: ctx.get("db") },
-      {
-        automationId: params.automationId,
-        organizationId: session.session.activeOrganizationId,
-      },
-    );
+const routeHandler = async (
+  ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
+  { session }: AppSession,
+) => {
+  const db = ctx.get("db");
+  const { automationId } = ctx.req.valid("param");
 
-    return ctx.json(toAutomationWebhookResponse(automationWebhook), 200);
-  } catch (error) {
-    return handleAutomationWebhookNotFoundError(ctx, error);
-  }
+  const automationWebhook = await loadWebhookAutomationAggregateOrThrow(
+    { db },
+    {
+      automationId,
+      organizationId: session.activeOrganizationId,
+    },
+  );
+
+  return ctx.json(
+    {
+      ...automationWebhook,
+      kind: "webhook" as const,
+    },
+    200,
+  );
 };
+
+export const handler: RouteHandler<typeof route, AppContextBindings> = withHttpErrorHandler(
+  withRequiredSession(routeHandler),
+);

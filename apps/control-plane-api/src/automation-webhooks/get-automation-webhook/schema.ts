@@ -4,4 +4,4 @@ export {
   AutomationWebhooksForbiddenResponseSchema,
   AutomationWebhooksNotFoundResponseSchema,
   AutomationWebhooksUnauthorizedResponseSchema,
-} from "../shared-schemas.js";
+} from "../schemas.js";
