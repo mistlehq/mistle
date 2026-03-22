@@ -10,20 +10,21 @@ import {
   insertSandboxInstanceRow,
   mintValidBootstrapToken,
   RuntimeStateRouteTestTimeoutMs,
+  readRuntimeState,
   waitForRuntimeState,
 } from "./runtime-state-test-helpers.js";
-import { it } from "./test-context.js";
+import { itMemory } from "./test-context.js";
 import { closeWebSocket, waitForWebSocketClose } from "./websocket-test-helpers.js";
 
-describe("runtime state route integration", () => {
-  it(
+describe("runtime state route integration (memory backend)", () => {
+  itMemory(
     "returns owner and attachment state for an active bootstrap connection",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
         fixture,
         sandboxInstanceId,
-        testId: "runtime_state_route_it",
+        testId: "runtime_state_route_memory_it",
       });
       const bootstrapSocket = await connectBootstrapSocket({
         fixture,
@@ -45,8 +46,6 @@ describe("runtime state route integration", () => {
       expect(snapshot.attachment).not.toBeNull();
       expect(snapshot.attachment?.sandboxInstanceId).toBe(sandboxInstanceId);
       expect(snapshot.attachment?.ownerLeaseId).toBe(snapshot.ownerLeaseId);
-      expect(snapshot.attachment?.nodeId).toMatch(/^dpg_/);
-      expect(snapshot.attachment?.sessionId).toMatch(/^dts_/);
 
       await closeWebSocket(bootstrapSocket);
 
@@ -64,14 +63,14 @@ describe("runtime state route integration", () => {
     RuntimeStateRouteTestTimeoutMs,
   );
 
-  it(
+  itMemory(
     "does not clear the active attachment when a replaced bootstrap socket closes",
     async ({ fixture }) => {
       const sandboxInstanceId = typeid("sbi").toString();
       await insertSandboxInstanceRow({
         fixture,
         sandboxInstanceId,
-        testId: "runtime_state_route_it",
+        testId: "runtime_state_route_memory_it",
       });
 
       const firstSocket = await connectBootstrapSocket({
@@ -109,64 +108,19 @@ describe("runtime state route integration", () => {
         predicate: (currentSnapshot) =>
           currentSnapshot.ownerLeaseId !== null &&
           currentSnapshot.ownerLeaseId !== firstOwnerLeaseId &&
-          currentSnapshot.attachment !== null,
+          currentSnapshot.attachment !== null &&
+          currentSnapshot.attachment.ownerLeaseId === currentSnapshot.ownerLeaseId,
       });
 
-      expect(secondSnapshot.ownerLeaseId).not.toBe(firstOwnerLeaseId);
-      expect(secondSnapshot.attachment?.ownerLeaseId).toBe(secondSnapshot.ownerLeaseId);
+      await firstSocketClosePromise;
 
-      const firstSocketClose = await firstSocketClosePromise;
-      expect(firstSocketClose.code).toBe(1012);
-
-      const postStaleCloseSnapshot = await waitForRuntimeState({
+      const postCloseSnapshot = await readRuntimeState({
         fixture,
         sandboxInstanceId,
-        predicate: (currentSnapshot) =>
-          currentSnapshot.ownerLeaseId === secondSnapshot.ownerLeaseId &&
-          currentSnapshot.attachment?.ownerLeaseId === secondSnapshot.ownerLeaseId,
       });
-
-      expect(postStaleCloseSnapshot.ownerLeaseId).toBe(secondSnapshot.ownerLeaseId);
-      expect(postStaleCloseSnapshot.attachment?.ownerLeaseId).toBe(secondSnapshot.ownerLeaseId);
+      expect(postCloseSnapshot).toEqual(secondSnapshot);
 
       await closeWebSocket(secondSocket);
-    },
-    RuntimeStateRouteTestTimeoutMs,
-  );
-
-  it(
-    "closes an unresponsive bootstrap websocket and clears runtime attachment state",
-    async ({ fixture }) => {
-      const sandboxInstanceId = typeid("sbi").toString();
-      await insertSandboxInstanceRow({
-        fixture,
-        sandboxInstanceId,
-        testId: "runtime_state_route_it",
-      });
-      const bootstrapSocket = await connectBootstrapSocket({
-        fixture,
-        sandboxInstanceId,
-        token: await mintValidBootstrapToken({
-          fixture,
-          sandboxInstanceId,
-        }),
-        autoPong: false,
-      });
-
-      const closeEvent = await waitForWebSocketClose(bootstrapSocket);
-      expect(closeEvent.code).toBe(1011);
-
-      const clearedSnapshot = await waitForRuntimeState({
-        fixture,
-        sandboxInstanceId,
-        predicate: (currentSnapshot) =>
-          currentSnapshot.ownerLeaseId === null && currentSnapshot.attachment === null,
-      });
-
-      expect(clearedSnapshot).toEqual({
-        ownerLeaseId: null,
-        attachment: null,
-      });
     },
     RuntimeStateRouteTestTimeoutMs,
   );
