@@ -28,7 +28,7 @@ import {
   SandboxProfilesNotFoundCodes,
 } from "./services/factory.js";
 
-export function createSandboxProfilesApp(): AppRoutes<typeof SANDBOX_PROFILES_ROUTE_BASE_PATH> {
+export function createSandboxProfilesRoutes(): AppRoutes<typeof SANDBOX_PROFILES_ROUTE_BASE_PATH> {
   const routes = new OpenAPIHono<AppContextBindings>();
 
   routes.openapi(listSandboxProfilesRoute, async (ctx) => {

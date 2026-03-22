@@ -1,21 +1,21 @@
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
-import { createAuthApp } from "../auth/app.js";
-import { createAutomationWebhooksApp } from "../automation-webhooks/index.js";
-import { createIntegrationConnectionsApp } from "../integration-connections/index.js";
-import { createIntegrationTargetsApp } from "../integration-targets/index.js";
-import { createIntegrationWebhooksApp } from "../integration-webhooks/index.js";
-import { createInternalIntegrationConnectionsApp } from "../internal-integration-connections/index.js";
-import { createInternalIntegrationCredentialsApp } from "../internal-integration-credentials/index.js";
-import { createInternalSandboxRuntimeApp } from "../internal-sandbox-runtime/index.js";
+import { createAuthRoutes } from "../auth/routes.js";
+import { createAutomationWebhooksRoutes } from "../automation-webhooks/index.js";
+import { createIntegrationConnectionsRoutes } from "../integration-connections/index.js";
+import { createIntegrationTargetsRoutes } from "../integration-targets/index.js";
+import { createIntegrationWebhooksRoutes } from "../integration-webhooks/index.js";
+import { createInternalIntegrationConnectionsRoutes } from "../internal-integration-connections/index.js";
+import { createInternalIntegrationCredentialsRoutes } from "../internal-integration-credentials/index.js";
+import { createInternalSandboxRuntimeRoutes } from "../internal-sandbox-runtime/index.js";
 import { createAppContextMiddleware } from "../middleware/app-context.js";
 import { createCorsMiddleware } from "../middleware/cors.js";
 import { withAuthSession } from "../middleware/with-auth-session.js";
 import { CONTROL_PLANE_OPENAPI_INFO, CONTROL_PLANE_OPENAPI_PATH } from "../openapi/constants.js";
-import { createOrganizationMembershipCapabilitiesApp } from "../organization-membership-capabilities/index.js";
-import { createSandboxInstancesApp } from "../sandbox-instances/index.js";
-import { createSandboxProfilesApp } from "../sandbox-profiles/index.js";
+import { createOrganizationMembershipCapabilitiesRoutes } from "../organization-membership-capabilities/index.js";
+import { createSandboxInstancesRoutes } from "../sandbox-instances/index.js";
+import { createSandboxProfilesRoutes } from "../sandbox-profiles/index.js";
 import type {
   AppServices,
   ControlPlaneApiConfig,
@@ -64,35 +64,41 @@ export function registerApiRouteModules(app: ControlPlaneApp): void {
 }
 
 export function registerPublicApiRouteModules(app: ControlPlaneApp): void {
-  const authApp = createAuthApp();
-  const automationWebhooksApp = withAuthSession(createAutomationWebhooksApp());
-  const integrationConnectionsApp = createIntegrationConnectionsApp();
-  const integrationTargetsApp = withAuthSession(createIntegrationTargetsApp());
-  const integrationWebhooksApp = createIntegrationWebhooksApp();
-  const organizationMembershipCapabilitiesApp = withAuthSession(
-    createOrganizationMembershipCapabilitiesApp(),
+  const authRoutes = createAuthRoutes();
+  const automationWebhooksRoutes = withAuthSession(createAutomationWebhooksRoutes());
+  const integrationConnectionsRoutes = createIntegrationConnectionsRoutes();
+  const integrationTargetsRoutes = withAuthSession(createIntegrationTargetsRoutes());
+  const integrationWebhooksRoutes = createIntegrationWebhooksRoutes();
+  const organizationMembershipCapabilitiesRoutes = withAuthSession(
+    createOrganizationMembershipCapabilitiesRoutes(),
   );
-  const sandboxInstancesApp = withAuthSession(createSandboxInstancesApp());
-  const sandboxProfilesApp = withAuthSession(createSandboxProfilesApp());
-  app.route(authApp.basePath, authApp.routes);
-  app.route(automationWebhooksApp.basePath, automationWebhooksApp.routes);
-  app.route(integrationConnectionsApp.basePath, integrationConnectionsApp.routes);
-  app.route(integrationTargetsApp.basePath, integrationTargetsApp.routes);
-  app.route(integrationWebhooksApp.basePath, integrationWebhooksApp.routes);
+  const sandboxInstancesRoutes = withAuthSession(createSandboxInstancesRoutes());
+  const sandboxProfilesRoutes = withAuthSession(createSandboxProfilesRoutes());
+  app.route(authRoutes.basePath, authRoutes.routes);
+  app.route(automationWebhooksRoutes.basePath, automationWebhooksRoutes.routes);
+  app.route(integrationConnectionsRoutes.basePath, integrationConnectionsRoutes.routes);
+  app.route(integrationTargetsRoutes.basePath, integrationTargetsRoutes.routes);
+  app.route(integrationWebhooksRoutes.basePath, integrationWebhooksRoutes.routes);
   app.route(
-    organizationMembershipCapabilitiesApp.basePath,
-    organizationMembershipCapabilitiesApp.routes,
+    organizationMembershipCapabilitiesRoutes.basePath,
+    organizationMembershipCapabilitiesRoutes.routes,
   );
-  app.route(sandboxInstancesApp.basePath, sandboxInstancesApp.routes);
-  app.route(sandboxProfilesApp.basePath, sandboxProfilesApp.routes);
+  app.route(sandboxInstancesRoutes.basePath, sandboxInstancesRoutes.routes);
+  app.route(sandboxProfilesRoutes.basePath, sandboxProfilesRoutes.routes);
 }
 
 export function registerInternalApiRouteModules(app: ControlPlaneApp): void {
-  const internalIntegrationConnectionsApp = createInternalIntegrationConnectionsApp();
-  const internalIntegrationCredentialsApp = createInternalIntegrationCredentialsApp();
-  const internalSandboxRuntimeApp = createInternalSandboxRuntimeApp();
+  const internalIntegrationConnectionsRoutes = createInternalIntegrationConnectionsRoutes();
+  const internalIntegrationCredentialsRoutes = createInternalIntegrationCredentialsRoutes();
+  const internalSandboxRuntimeRoutes = createInternalSandboxRuntimeRoutes();
 
-  app.route(internalIntegrationConnectionsApp.basePath, internalIntegrationConnectionsApp.routes);
-  app.route(internalIntegrationCredentialsApp.basePath, internalIntegrationCredentialsApp.routes);
-  app.route(internalSandboxRuntimeApp.basePath, internalSandboxRuntimeApp.routes);
+  app.route(
+    internalIntegrationConnectionsRoutes.basePath,
+    internalIntegrationConnectionsRoutes.routes,
+  );
+  app.route(
+    internalIntegrationCredentialsRoutes.basePath,
+    internalIntegrationCredentialsRoutes.routes,
+  );
+  app.route(internalSandboxRuntimeRoutes.basePath, internalSandboxRuntimeRoutes.routes);
 }

@@ -1,4 +1,4 @@
-export { createSandboxInstancesApp } from "./app.js";
+export { createSandboxInstancesRoutes } from "./routes.js";
 export { SANDBOX_INSTANCES_ROUTE_BASE_PATH } from "./constants.js";
 export {
   SandboxInstanceConnectionTokenSchema,

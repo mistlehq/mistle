@@ -20,7 +20,7 @@ import {
 } from "./services/factory.js";
 import type { AutomationWebhookAggregate } from "./services/types.js";
 
-export function createAutomationWebhooksApp(): AppRoutes<
+export function createAutomationWebhooksRoutes(): AppRoutes<
   typeof AUTOMATION_WEBHOOKS_ROUTE_BASE_PATH
 > {
   const routes = new OpenAPIHono<AppContextBindings>();

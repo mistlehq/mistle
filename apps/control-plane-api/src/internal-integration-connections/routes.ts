@@ -22,7 +22,7 @@ const InternalIntegrationConnectionsErrorCodes = {
   UNAUTHORIZED: "UNAUTHORIZED",
 } as const;
 
-export function createInternalIntegrationConnectionsApp(): AppRoutes<
+export function createInternalIntegrationConnectionsRoutes(): AppRoutes<
   typeof INTERNAL_INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH
 > {
   const routes = new OpenAPIHono<AppContextBindings>();

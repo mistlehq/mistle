@@ -27,7 +27,7 @@ const InternalSandboxRuntimeErrorCodes = {
   UNAUTHORIZED: "UNAUTHORIZED",
 } as const;
 
-export function createInternalSandboxRuntimeApp(): AppRoutes<
+export function createInternalSandboxRuntimeRoutes(): AppRoutes<
   typeof INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH
 > {
   const routes = new OpenAPIHono<AppContextBindings>();

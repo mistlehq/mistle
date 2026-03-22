@@ -24,7 +24,7 @@ import {
 import { resolveIntegrationCredential } from "./services/resolve-credential.js";
 import { resolveInternalIntegrationTargetSecrets } from "./services/resolve-target-secrets.js";
 
-export function createInternalIntegrationCredentialsApp(): AppRoutes<
+export function createInternalIntegrationCredentialsRoutes(): AppRoutes<
   typeof INTERNAL_INTEGRATION_CREDENTIALS_ROUTE_BASE_PATH
 > {
   const routes = new OpenAPIHono<AppContextBindings>();

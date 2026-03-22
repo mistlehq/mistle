@@ -42,7 +42,7 @@ export function createImmediateWebhookResponse(response: IntegrationWebhookImmed
   });
 }
 
-export function createIntegrationWebhooksApp(): AppRoutes<
+export function createIntegrationWebhooksRoutes(): AppRoutes<
   typeof INTEGRATION_WEBHOOKS_ROUTE_BASE_PATH
 > {
   const routes = new OpenAPIHono<AppContextBindings>();

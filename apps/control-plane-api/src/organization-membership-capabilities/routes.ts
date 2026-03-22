@@ -12,7 +12,7 @@ import {
   type OrganizationMembershipCapabilitiesSuccess,
 } from "./services/get-organization-membership-capabilities.js";
 
-export function createOrganizationMembershipCapabilitiesApp(): AppRoutes<
+export function createOrganizationMembershipCapabilitiesRoutes(): AppRoutes<
   typeof ORGANIZATION_MEMBERSHIP_CAPABILITIES_ROUTE_BASE_PATH
 > {
   const routes = new OpenAPIHono<AppContextBindings>();

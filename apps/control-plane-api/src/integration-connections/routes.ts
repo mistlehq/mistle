@@ -36,7 +36,7 @@ import { updateIntegrationConnection } from "./services/update-connection.js";
 
 const DashboardOrganizationIntegrationsPath = "/settings/organization/integrations";
 
-export function createIntegrationConnectionsApp(): AppRoutes<
+export function createIntegrationConnectionsRoutes(): AppRoutes<
   typeof INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH
 > {
   const routes = new OpenAPIHono<AppContextBindings>();

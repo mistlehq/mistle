@@ -10,7 +10,7 @@ import {
 import { IntegrationTargetsBadRequestError } from "./services/errors.js";
 import { listIntegrationTargets } from "./services/list-targets.js";
 
-export function createIntegrationTargetsApp(): AppRoutes<
+export function createIntegrationTargetsRoutes(): AppRoutes<
   typeof INTEGRATION_TARGETS_ROUTE_BASE_PATH
 > {
   const routes = new OpenAPIHono<AppContextBindings>();

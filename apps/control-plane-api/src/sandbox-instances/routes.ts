@@ -17,7 +17,9 @@ import {
   SandboxInstancesNotFoundError,
 } from "./services/factory.js";
 
-export function createSandboxInstancesApp(): AppRoutes<typeof SANDBOX_INSTANCES_ROUTE_BASE_PATH> {
+export function createSandboxInstancesRoutes(): AppRoutes<
+  typeof SANDBOX_INSTANCES_ROUTE_BASE_PATH
+> {
   const routes = new OpenAPIHono<AppContextBindings>();
 
   routes.openapi(listSandboxInstancesRoute, async (ctx) => {
