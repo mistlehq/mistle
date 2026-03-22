@@ -1,3 +1,5 @@
+import { WebSocket } from "ws";
+
 import type { RelayEnvelope, RelayPeerSocket, RelayTarget } from "../../types.js";
 import type { RelayTransportAdapter } from "../relay-transport-adapter.js";
 
@@ -30,7 +32,7 @@ export class InMemoryRelayTransportAdapter implements RelayTransportAdapter {
     if (socket === undefined) {
       return;
     }
-    if (socket.readyState !== 1) {
+    if (socket.readyState !== WebSocket.OPEN) {
       return;
     }
 

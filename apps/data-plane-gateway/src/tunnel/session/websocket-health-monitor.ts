@@ -1,8 +1,7 @@
 import type { Scheduler, TimerHandle } from "@mistle/time";
+import { WebSocket } from "ws";
 
 import type { RelayPeerSocket } from "../types.js";
-
-const WebSocketOpenReadyState = 1;
 
 export type WebSocketHealthHandle = {
   stop: () => void;
@@ -75,7 +74,7 @@ export function startWebSocketHealthMonitor(input: {
       if (stopped || !healthy) {
         return;
       }
-      if (input.socket.readyState !== WebSocketOpenReadyState) {
+      if (input.socket.readyState !== WebSocket.OPEN) {
         markUnhealthy();
         return;
       }
