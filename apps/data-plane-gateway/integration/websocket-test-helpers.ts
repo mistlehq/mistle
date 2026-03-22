@@ -12,11 +12,33 @@ export type FailedWebSocketConnectResult = {
   responseStatusCode: number | undefined;
 };
 
-export function connectWebSocket(url: string): Promise<WebSocket> {
+export type WebSocketConnectOptions = {
+  autoPong?: boolean;
+  handshakeTimeoutMs?: number;
+};
+
+export type SandboxTunnelWebSocketTokenKind = "bootstrap" | "connect";
+
+function createWebSocketClientOptions(input: WebSocketConnectOptions | undefined): {
+  autoPong?: boolean;
+  handshakeTimeout: number;
+} {
+  return input?.autoPong === undefined
+    ? {
+        handshakeTimeout: input?.handshakeTimeoutMs ?? ConnectTimeoutMs,
+      }
+    : {
+        autoPong: input.autoPong,
+        handshakeTimeout: input.handshakeTimeoutMs ?? ConnectTimeoutMs,
+      };
+}
+
+export function connectWebSocket(
+  url: string,
+  options?: WebSocketConnectOptions,
+): Promise<WebSocket> {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(url, {
-      handshakeTimeout: ConnectTimeoutMs,
-    });
+    const socket = new WebSocket(url, createWebSocketClientOptions(options));
 
     const onOpen = (): void => {
       socket.off("error", onError);
@@ -46,11 +68,33 @@ export function connectWebSocket(url: string): Promise<WebSocket> {
   });
 }
 
+export function connectSandboxTunnelWebSocket(input: {
+  websocketBaseUrl: string;
+  sandboxInstanceId: string;
+  tokenKind: SandboxTunnelWebSocketTokenKind;
+  token: string;
+  autoPong?: boolean;
+}): Promise<WebSocket> {
+  const tokenQueryParam = input.tokenKind === "bootstrap" ? "bootstrap_token" : "connect_token";
+
+  return connectWebSocket(
+    `${input.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(input.sandboxInstanceId)}?${tokenQueryParam}=${encodeURIComponent(input.token)}`,
+    input.autoPong === undefined
+      ? undefined
+      : {
+          autoPong: input.autoPong,
+        },
+  );
+}
+
 export function connectWebSocketExpectFailure(url: string): Promise<FailedWebSocketConnectResult> {
   return new Promise((resolve, reject) => {
-    const socket = new WebSocket(url, {
-      handshakeTimeout: ConnectTimeoutMs,
-    });
+    const socket = new WebSocket(
+      url,
+      createWebSocketClientOptions({
+        handshakeTimeoutMs: ConnectTimeoutMs,
+      }),
+    );
 
     socket.once("open", () => {
       socket.close();

@@ -16,7 +16,11 @@ import { ValkeySandboxPresenceStore } from "../src/runtime-state/adapters/valkey
 import { PRESENCE_LEASE_TTL_MS } from "../src/runtime-state/durations.js";
 import { closeValkeyClient, createValkeyClient } from "../src/runtime-state/valkey-client.js";
 import { it, type DataPlaneGatewayIntegrationFixture } from "./test-context.js";
-import { closeWebSocket, waitForWebSocketClose } from "./websocket-test-helpers.js";
+import {
+  closeWebSocket,
+  connectSandboxTunnelWebSocket,
+  waitForWebSocketClose,
+} from "./websocket-test-helpers.js";
 
 const IntegrationTestTimeoutMs = 60_000;
 
@@ -125,47 +129,12 @@ function connectTunnelSocket(input: {
   token: string;
   tokenKind: "bootstrap" | "connect";
 }): Promise<WebSocket> {
-  const tokenQueryParam = input.tokenKind === "bootstrap" ? "bootstrap_token" : "connect_token";
-
-  return new Promise((resolve, reject) => {
-    const socket = new WebSocket(
-      `${input.fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(input.sandboxInstanceId)}?${tokenQueryParam}=${encodeURIComponent(input.token)}`,
-      input.autoPong === undefined
-        ? {
-            autoPong: true,
-            handshakeTimeout: 4_000,
-          }
-        : {
-            autoPong: input.autoPong,
-            handshakeTimeout: 4_000,
-          },
-    );
-
-    const onOpen = (): void => {
-      socket.off("error", onError);
-      socket.off("unexpected-response", onUnexpectedResponse);
-      resolve(socket);
-    };
-
-    const onError = (error: Error): void => {
-      socket.off("open", onOpen);
-      socket.off("unexpected-response", onUnexpectedResponse);
-      reject(error);
-    };
-
-    const onUnexpectedResponse = (_request: unknown, response: { statusCode?: number }): void => {
-      socket.off("open", onOpen);
-      socket.off("error", onError);
-      reject(
-        Object.assign(new Error("Websocket upgrade failed."), {
-          statusCode: response.statusCode,
-        }),
-      );
-    };
-
-    socket.once("open", onOpen);
-    socket.once("error", onError);
-    socket.once("unexpected-response", onUnexpectedResponse);
+  return connectSandboxTunnelWebSocket({
+    websocketBaseUrl: input.fixture.websocketBaseUrl,
+    sandboxInstanceId: input.sandboxInstanceId,
+    tokenKind: input.tokenKind,
+    token: input.token,
+    ...(input.autoPong === undefined ? {} : { autoPong: input.autoPong }),
   });
 }
 

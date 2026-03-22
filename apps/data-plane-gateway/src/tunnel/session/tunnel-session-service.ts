@@ -1,4 +1,5 @@
 import type { Clock, Scheduler, TimerHandle } from "@mistle/time";
+import { WebSocket } from "ws";
 
 import type { SandboxIdleControllerRegistry } from "../../idle/sandbox-idle-controller-registry.js";
 import { logger } from "../../logger.js";
@@ -29,7 +30,6 @@ import { startWebSocketHealthMonitor } from "./websocket-health-monitor.js";
 
 const ConnectionPresenceLeaseKind = "agent";
 const ConnectionPresenceLeaseSource = "dashboard";
-const WebSocketOpenReadyState = 1;
 
 /**
  * Captures the live relay target for an attached websocket peer plus any
@@ -533,7 +533,7 @@ export class TunnelSessionService {
       if (stopped) {
         return;
       }
-      if (input.socket.readyState !== WebSocketOpenReadyState) {
+      if (input.socket.readyState !== WebSocket.OPEN) {
         stopped = true;
         scheduledHandle = undefined;
         return;

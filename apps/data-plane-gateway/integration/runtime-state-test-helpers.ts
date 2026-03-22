@@ -8,6 +8,7 @@ import WebSocket from "ws";
 import { z } from "zod";
 
 import type { DataPlaneGatewayIntegrationFixture } from "./test-context.js";
+import { connectSandboxTunnelWebSocket } from "./websocket-test-helpers.js";
 
 export const RuntimeStateRouteTestTimeoutMs = 40_000;
 
@@ -115,42 +116,11 @@ export function connectBootstrapSocket(input: {
   token: string;
   autoPong?: boolean;
 }): Promise<WebSocket> {
-  return new Promise((resolve, reject) => {
-    const socket = new WebSocket(
-      `${input.fixture.websocketBaseUrl}/tunnel/sandbox/${encodeURIComponent(input.sandboxInstanceId)}?bootstrap_token=${encodeURIComponent(input.token)}`,
-      input.autoPong === undefined
-        ? {
-            autoPong: true,
-            handshakeTimeout: 4_000,
-          }
-        : {
-            autoPong: input.autoPong,
-            handshakeTimeout: 4_000,
-          },
-    );
-
-    const onOpen = (): void => {
-      socket.off("error", onError);
-      socket.off("unexpected-response", onUnexpectedResponse);
-      resolve(socket);
-    };
-    const onError = (error: Error): void => {
-      socket.off("open", onOpen);
-      socket.off("unexpected-response", onUnexpectedResponse);
-      reject(error);
-    };
-    const onUnexpectedResponse = (_request: unknown, response: { statusCode?: number }): void => {
-      socket.off("open", onOpen);
-      socket.off("error", onError);
-      reject(
-        Object.assign(new Error("Websocket upgrade failed."), {
-          statusCode: response.statusCode,
-        }),
-      );
-    };
-
-    socket.once("open", onOpen);
-    socket.once("error", onError);
-    socket.once("unexpected-response", onUnexpectedResponse);
+  return connectSandboxTunnelWebSocket({
+    websocketBaseUrl: input.fixture.websocketBaseUrl,
+    sandboxInstanceId: input.sandboxInstanceId,
+    tokenKind: "bootstrap",
+    token: input.token,
+    ...(input.autoPong === undefined ? {} : { autoPong: input.autoPong }),
   });
 }
