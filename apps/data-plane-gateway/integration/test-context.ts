@@ -52,7 +52,7 @@ export type DataPlaneGatewayIntegrationFixture = {
   dbPool: Pool;
 };
 
-type RuntimeStateBackend = "memory" | "valkey";
+type RuntimeStateBackend = DataPlaneGatewayRuntimeConfig["app"]["runtimeState"]["backend"];
 
 async function readSharedInfraConfig(): Promise<SharedInfraConfig> {
   return readTestContext({
