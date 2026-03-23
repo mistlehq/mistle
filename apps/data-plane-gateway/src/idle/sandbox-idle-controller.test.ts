@@ -64,7 +64,6 @@ describe("LocalSandboxIdleController", () => {
     await presenceStore.touchLease({
       sandboxInstanceId: "sbi_idle",
       leaseId: "spl_reschedule",
-      kind: "agent",
       source: "dashboard",
       sessionId: "dts_idle",
       ttlMs: 10_000,

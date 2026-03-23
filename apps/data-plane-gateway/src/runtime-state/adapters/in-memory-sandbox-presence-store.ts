@@ -2,7 +2,6 @@ import type { Clock } from "@mistle/time";
 
 import { logger } from "../../logger.js";
 import type {
-  SandboxPresenceLeaseKind,
   SandboxPresenceLeaseSource,
   SandboxPresenceStore,
 } from "../sandbox-presence-store.js";
@@ -10,7 +9,6 @@ import type {
 type InMemoryPresenceLeaseRecord = {
   sandboxInstanceId: string;
   leaseId: string;
-  kind: SandboxPresenceLeaseKind;
   source: SandboxPresenceLeaseSource;
   sessionId: string;
   expiresAtMs: number;
@@ -30,7 +28,6 @@ export class InMemorySandboxPresenceStore implements SandboxPresenceStore {
   async touchLease(input: {
     sandboxInstanceId: string;
     leaseId: string;
-    kind: SandboxPresenceLeaseKind;
     source: SandboxPresenceLeaseSource;
     sessionId: string;
     ttlMs: number;
@@ -44,7 +41,6 @@ export class InMemorySandboxPresenceStore implements SandboxPresenceStore {
     currentLeases.set(input.leaseId, {
       sandboxInstanceId: input.sandboxInstanceId,
       leaseId: input.leaseId,
-      kind: input.kind,
       source: input.source,
       sessionId: input.sessionId,
       expiresAtMs,
@@ -56,7 +52,6 @@ export class InMemorySandboxPresenceStore implements SandboxPresenceStore {
         event: "sandbox_presence_lease_touched",
         sandboxInstanceId: input.sandboxInstanceId,
         presenceLeaseId: input.leaseId,
-        kind: input.kind,
         source: input.source,
         sessionId: input.sessionId,
         ttlMs: input.ttlMs,

@@ -1,6 +1,5 @@
 import { logger } from "../../logger.js";
 import type {
-  SandboxPresenceLeaseKind,
   SandboxPresenceLeaseSource,
   SandboxPresenceStore,
 } from "../sandbox-presence-store.js";
@@ -9,7 +8,6 @@ import type { ValkeyClient } from "../valkey-client.js";
 type SandboxPresenceLeaseRecord = {
   sandboxInstanceId: string;
   leaseId: string;
-  kind: SandboxPresenceLeaseKind;
   source: SandboxPresenceLeaseSource;
   sessionId: string;
   expiresAtMs: number;
@@ -46,7 +44,6 @@ export class ValkeySandboxPresenceStore implements SandboxPresenceStore {
   async touchLease(input: {
     sandboxInstanceId: string;
     leaseId: string;
-    kind: SandboxPresenceLeaseKind;
     source: SandboxPresenceLeaseSource;
     sessionId: string;
     ttlMs: number;
@@ -76,7 +73,6 @@ export class ValkeySandboxPresenceStore implements SandboxPresenceStore {
         JSON.stringify({
           sandboxInstanceId: input.sandboxInstanceId,
           leaseId: input.leaseId,
-          kind: input.kind,
           source: input.source,
           sessionId: input.sessionId,
           expiresAtMs,
@@ -92,7 +88,6 @@ export class ValkeySandboxPresenceStore implements SandboxPresenceStore {
         event: "sandbox_presence_lease_touched",
         sandboxInstanceId: input.sandboxInstanceId,
         presenceLeaseId: input.leaseId,
-        kind: input.kind,
         source: input.source,
         sessionId: input.sessionId,
         ttlMs: input.ttlMs,

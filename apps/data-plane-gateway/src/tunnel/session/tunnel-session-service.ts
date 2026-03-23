@@ -28,7 +28,6 @@ import type { TunnelSessionRegistry } from "../tunnel-session/index.js";
 import type { RelayPeerSocket, RelayTarget } from "../types.js";
 import { startWebSocketHealthMonitor } from "./websocket-health-monitor.js";
 
-const ConnectionPresenceLeaseKind = "agent";
 const ConnectionPresenceLeaseSource = "dashboard";
 
 /**
@@ -545,7 +544,6 @@ export class TunnelSessionService {
         await this.sandboxPresenceStore.touchLease({
           sandboxInstanceId: input.sandboxInstanceId,
           leaseId: input.leaseId,
-          kind: ConnectionPresenceLeaseKind,
           source: ConnectionPresenceLeaseSource,
           sessionId: input.relaySessionId,
           ttlMs: PRESENCE_LEASE_TTL_MS,
