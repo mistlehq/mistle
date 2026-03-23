@@ -20,7 +20,7 @@ import { createSandboxInstancesRoutes } from "./sandbox-instances/index.js";
 import { createSandboxProfilesRoutes } from "./sandbox-profiles/index.js";
 import type {
   AppContextBindings,
-  AppServices,
+  AppContextVariables,
   ControlPlaneApiConfig,
   ControlPlaneApiSandboxRuntimeConfig,
   ControlPlaneApp,
@@ -42,7 +42,7 @@ export type CreateAppInput = {
   dataPlaneClient: DataPlaneSandboxInstancesClient;
   connectionTokenConfig: AppContextBindings["Variables"]["connectionTokenConfig"];
   openWorkflow: OpenWorkflow;
-  services: AppServices;
+  auth: AppContextVariables["auth"];
 };
 
 export function createApp(input: CreateAppInput): ControlPlaneApp {
@@ -58,14 +58,14 @@ export function createApp(input: CreateAppInput): ControlPlaneApp {
     dataPlaneClient: input.dataPlaneClient,
     connectionTokenConfig: input.connectionTokenConfig,
     openWorkflow: input.openWorkflow,
-    services: input.services,
+    auth: input.auth,
   });
 
   return app;
 }
 
 export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): void {
-  const { app, config, db, services } = input;
+  const { app, config, db, auth } = input;
 
   app.use("*", createCorsMiddleware({ trustedOrigins: config.auth.trustedOrigins }));
   app.use(
@@ -79,7 +79,7 @@ export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): 
       dataPlaneClient: input.dataPlaneClient,
       connectionTokenConfig: input.connectionTokenConfig,
       openWorkflow: input.openWorkflow,
-      services,
+      auth,
     }),
   );
   app.doc(ControlPlaneOpenApiPath, {
