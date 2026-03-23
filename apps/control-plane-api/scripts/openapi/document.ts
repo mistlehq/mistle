@@ -1,8 +1,17 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 
-import { registerInternalApiRouteModules, registerPublicApiRouteModules } from "../app.js";
-import type { AppContextBindings } from "../types.js";
-import { CONTROL_PLANE_INTERNAL_OPENAPI_INFO, CONTROL_PLANE_OPENAPI_INFO } from "./constants.js";
+import { registerInternalApiRouteModules, registerPublicApiRouteModules } from "../../src/app.js";
+import type { AppContextBindings } from "../../src/types.js";
+
+const ControlPlaneOpenApiInfo = {
+  title: "Mistle Control Plane API",
+  version: "0.0.0",
+};
+
+const ControlPlaneInternalOpenApiInfo = {
+  title: "Mistle Control Plane Internal API",
+  version: "0.0.0",
+};
 
 export function createControlPlaneOpenApiDocument(): ReturnType<
   OpenAPIHono<AppContextBindings>["getOpenAPI31Document"]
@@ -12,7 +21,7 @@ export function createControlPlaneOpenApiDocument(): ReturnType<
 
   return app.getOpenAPI31Document({
     openapi: "3.1.0",
-    info: CONTROL_PLANE_OPENAPI_INFO,
+    info: ControlPlaneOpenApiInfo,
   });
 }
 
@@ -24,6 +33,6 @@ export function createControlPlaneInternalOpenApiDocument(): ReturnType<
 
   return app.getOpenAPI31Document({
     openapi: "3.1.0",
-    info: CONTROL_PLANE_INTERNAL_OPENAPI_INFO,
+    info: ControlPlaneInternalOpenApiInfo,
   });
 }

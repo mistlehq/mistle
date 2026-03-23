@@ -15,5 +15,5 @@
       "@mistle/*": ["../../packages/*/src/index.ts"]
     }
   },
-  "include": ["src/openapi/**/*.ts"]
+  "include": ["scripts/openapi/**/*.ts"]
 }
