@@ -60,10 +60,6 @@ export type StartTunnelClientInput = {
   runtimeClients: ReadonlyArray<CompiledRuntimeClient>;
 };
 
-export function classifyTunnelConnectionError(_error: unknown): "retry" {
-  return "retry";
-}
-
 function describeUnknownError(error: unknown): string {
   if (typeof error === "string") {
     return error;
@@ -343,14 +339,12 @@ async function runTunnelClientLoop(input: {
     if (connectionError === undefined) {
       return;
     }
-    if (classifyTunnelConnectionError(connectionError) === "retry") {
-      await waitForReconnect(input.signal, nextTunnelReconnectDelay());
-      continue;
+    if (!(connectionError instanceof Error)) {
+      throw new Error(describeUnknownError(connectionError));
     }
 
-    throw connectionError instanceof Error
-      ? connectionError
-      : new Error(describeUnknownError(connectionError));
+    await waitForReconnect(input.signal, nextTunnelReconnectDelay());
+    continue;
   }
 }
 
