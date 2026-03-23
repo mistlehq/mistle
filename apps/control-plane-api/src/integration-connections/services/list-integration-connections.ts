@@ -1,10 +1,12 @@
 import {
   integrationConnections,
+  type ControlPlaneDatabase,
   type IntegrationConnection,
   type IntegrationConnectionResourceState,
   type IntegrationConnectionResourceSyncState,
   type IntegrationConnectionStatus,
 } from "@mistle/db/control-plane";
+import { BadRequestError } from "@mistle/http/errors.js";
 import type { KeysetPaginatedResult } from "@mistle/http/pagination";
 import {
   decodeKeysetCursorOrThrow,
@@ -16,14 +18,11 @@ import {
   paginateKeyset,
   parseKeysetPageSize,
 } from "@mistle/http/pagination";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppContext } from "../../types.js";
-import {
-  IntegrationConnectionsBadRequestCodes,
-  IntegrationConnectionsBadRequestError,
-} from "./errors.js";
+import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import { projectConnectionResourceSummaries } from "./project-connection-resource-summaries.js";
 
 const PAGE_SIZE_OPTIONS = {
@@ -74,17 +73,20 @@ type IntegrationConnectionListRow = IntegrationConnection & {
 };
 
 export async function listIntegrationConnections(
-  db: AppContext["var"]["db"],
-  integrationRegistry: AppContext["var"]["integrationRegistry"],
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+  },
   input: ListIntegrationConnectionsInput,
 ): Promise<KeysetPaginatedResult<IntegrationConnectionListItem>> {
+  const { db, integrationRegistry } = ctx;
   let pageSize: number;
 
   try {
     pageSize = parseKeysetPageSize(input.limit, PAGE_SIZE_OPTIONS);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      throw new IntegrationConnectionsBadRequestError(
+      throw new BadRequestError(
         IntegrationConnectionsBadRequestCodes.INVALID_LIST_CONNECTIONS_INPUT,
         "`limit` must be an integer between 1 and 100.",
       );
@@ -113,7 +115,7 @@ export async function listIntegrationConnections(
                 [KeysetCursorDecodeErrorReasons.INVALID_SHAPE]: `\`${decodeCursorName}\` cursor has an invalid shape.`,
               } as const;
 
-              return new IntegrationConnectionsBadRequestError(
+              return new BadRequestError(
                 IntegrationConnectionsBadRequestCodes.INVALID_PAGINATION_CURSOR,
                 reasonToMessage[reason],
               );
@@ -192,7 +194,7 @@ export async function listIntegrationConnections(
       error instanceof KeysetPaginationInputError &&
       error.reason === KeysetPaginationInputErrorReasons.BOTH_CURSORS_PROVIDED
     ) {
-      throw new IntegrationConnectionsBadRequestError(
+      throw new BadRequestError(
         IntegrationConnectionsBadRequestCodes.INVALID_LIST_CONNECTIONS_INPUT,
         "Only one of `after` or `before` can be provided.",
       );
@@ -209,7 +211,7 @@ function normalizeTimestamp(value: string | Date): string {
 function buildResourceSummary(
   connection: IntegrationConnectionListRow,
   input: {
-    integrationRegistry: AppContext["var"]["integrationRegistry"];
+    integrationRegistry: IntegrationRegistry;
   },
 ): Pick<IntegrationConnectionListItem, "resources"> {
   const target = connection.target;

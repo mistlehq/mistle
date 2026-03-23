@@ -1,8 +1,8 @@
+import { BadRequestError } from "@mistle/http/errors.js";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
 import { assertApiKeyConnectionMethodSupportedOrThrow } from "./create-api-key-connection.js";
-import { IntegrationConnectionsBadRequestError } from "./errors.js";
 
 describe("assertApiKeyConnectionMethodSupportedOrThrow", () => {
   it("allows targets that include api-key auth", () => {
@@ -37,8 +37,8 @@ describe("assertApiKeyConnectionMethodSupportedOrThrow", () => {
       thrownError = error;
     }
 
-    expect(thrownError).toBeInstanceOf(IntegrationConnectionsBadRequestError);
-    if (!(thrownError instanceof IntegrationConnectionsBadRequestError)) {
+    expect(thrownError).toBeInstanceOf(BadRequestError);
+    if (!(thrownError instanceof BadRequestError)) {
       throw new Error("Expected API-key auth support guard to throw.");
     }
     expect(thrownError.code).toBe("API_KEY_NOT_SUPPORTED");

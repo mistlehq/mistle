@@ -5,12 +5,10 @@ import {
   IntegrationConnectionResourceSyncStates,
   integrationTargets,
 } from "@mistle/db/control-plane";
+import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 import { describe, expect } from "vitest";
 
-import {
-  ListIntegrationConnectionsResponseSchema,
-  ValidationErrorResponseSchema,
-} from "../src/integration-connections/contracts.js";
+import { ListIntegrationConnectionsResponseSchema } from "../src/integration-connections/list-integration-connections/schema.js";
 import { it } from "./test-context.js";
 
 describe("integration connections list integration", () => {
@@ -282,8 +280,10 @@ describe("integration connections list integration", () => {
     expect(response.status).toBe(400);
 
     const body = ValidationErrorResponseSchema.parse(await response.json());
-    expect(body.success).toBe(false);
-    expect(body.error.name).toBe("ZodError");
+    expect(body).toEqual({
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
+    });
   });
 
   it("returns 401 when the request is unauthenticated", async ({ fixture }) => {

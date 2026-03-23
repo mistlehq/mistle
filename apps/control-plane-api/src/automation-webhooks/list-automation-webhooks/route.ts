@@ -1,11 +1,11 @@
 import { createRoute } from "@hono/zod-openapi";
 import { ForbiddenResponseSchema, UnauthorizedResponseSchema } from "@mistle/http/errors.js";
 
+import { ListWebhookAutomationsQuerySchema } from "../services/list-automation-webhooks.js";
 import {
   ListAutomationWebhooksBadRequestResponseSchema,
   ListAutomationWebhooksResponseSchema,
 } from "./schema.js";
-import { ListWebhookAutomationsQuerySchema } from "./service.js";
 
 export const route = createRoute({
   method: "get",

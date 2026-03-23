@@ -8,15 +8,15 @@ export type DeleteWebhookAutomationInput = {
 };
 
 export async function deleteAutomationWebhook(
-  input: { db: ControlPlaneDatabase },
-  serviceInput: DeleteWebhookAutomationInput,
+  ctx: { db: ControlPlaneDatabase },
+  input: DeleteWebhookAutomationInput,
 ) {
-  const deletedRows = await input.db
+  const deletedRows = await ctx.db
     .delete(automations)
     .where(
       and(
-        eq(automations.id, serviceInput.automationId),
-        eq(automations.organizationId, serviceInput.organizationId),
+        eq(automations.id, input.automationId),
+        eq(automations.organizationId, input.organizationId),
         eq(automations.kind, AutomationKinds.WEBHOOK),
       ),
     )

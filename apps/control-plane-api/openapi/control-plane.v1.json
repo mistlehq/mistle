@@ -1332,28 +1332,7 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": [
-                            "INVALID_LIST_CONNECTIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
-                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
-                            "INVALID_RESOURCE_PAGINATION_CURSOR",
-                            "RESOURCE_KIND_NOT_SUPPORTED",
-                            "INVALID_CREATE_CONNECTION_INPUT",
-                            "INVALID_UPDATE_CONNECTION_INPUT",
-                            "API_KEY_NOT_SUPPORTED",
-                            "API_KEY_CONNECTION_REQUIRED",
-                            "INVALID_GITHUB_APP_INSTALLATION_START_INPUT",
-                            "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT",
-                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
-                            "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED",
-                            "INVALID_OAUTH2_START_INPUT",
-                            "INVALID_OAUTH2_COMPLETE_INPUT",
-                            "OAUTH2_NOT_SUPPORTED",
-                            "OAUTH2_CAPABILITY_NOT_CONFIGURED",
-                            "REDIRECT_STATE_INVALID",
-                            "REDIRECT_STATE_EXPIRED",
-                            "REDIRECT_STATE_ALREADY_USED"
-                          ]
+                          "enum": ["INVALID_LIST_CONNECTIONS_INPUT", "INVALID_PAGINATION_CURSOR"]
                         },
                         "message": {
                           "type": "string",
@@ -1366,27 +1345,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -1434,17 +1402,6 @@
                   },
                   "required": ["code", "message"],
                   "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
                 }
               }
             }
@@ -1637,26 +1594,9 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "INVALID_LIST_CONNECTIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
                             "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
                             "INVALID_RESOURCE_PAGINATION_CURSOR",
-                            "RESOURCE_KIND_NOT_SUPPORTED",
-                            "INVALID_CREATE_CONNECTION_INPUT",
-                            "INVALID_UPDATE_CONNECTION_INPUT",
-                            "API_KEY_NOT_SUPPORTED",
-                            "API_KEY_CONNECTION_REQUIRED",
-                            "INVALID_GITHUB_APP_INSTALLATION_START_INPUT",
-                            "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT",
-                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
-                            "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED",
-                            "INVALID_OAUTH2_START_INPUT",
-                            "INVALID_OAUTH2_COMPLETE_INPUT",
-                            "OAUTH2_NOT_SUPPORTED",
-                            "OAUTH2_CAPABILITY_NOT_CONFIGURED",
-                            "REDIRECT_STATE_INVALID",
-                            "REDIRECT_STATE_EXPIRED",
-                            "REDIRECT_STATE_ALREADY_USED"
+                            "RESOURCE_KIND_NOT_SUPPORTED"
                           ]
                         },
                         "message": {
@@ -1670,30 +1610,63 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -1707,7 +1680,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": ["CONNECTION_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -1750,17 +1723,6 @@
                   },
                   "required": ["code", "message"],
                   "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
                 }
               }
             }
@@ -1833,28 +1795,7 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": [
-                            "INVALID_LIST_CONNECTIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
-                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
-                            "INVALID_RESOURCE_PAGINATION_CURSOR",
-                            "RESOURCE_KIND_NOT_SUPPORTED",
-                            "INVALID_CREATE_CONNECTION_INPUT",
-                            "INVALID_UPDATE_CONNECTION_INPUT",
-                            "API_KEY_NOT_SUPPORTED",
-                            "API_KEY_CONNECTION_REQUIRED",
-                            "INVALID_GITHUB_APP_INSTALLATION_START_INPUT",
-                            "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT",
-                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
-                            "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED",
-                            "INVALID_OAUTH2_START_INPUT",
-                            "INVALID_OAUTH2_COMPLETE_INPUT",
-                            "OAUTH2_NOT_SUPPORTED",
-                            "OAUTH2_CAPABILITY_NOT_CONFIGURED",
-                            "REDIRECT_STATE_INVALID",
-                            "REDIRECT_STATE_EXPIRED",
-                            "REDIRECT_STATE_ALREADY_USED"
-                          ]
+                          "enum": ["RESOURCE_KIND_NOT_SUPPORTED"]
                         },
                         "message": {
                           "type": "string",
@@ -1867,27 +1808,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -1948,7 +1878,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": ["CONNECTION_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -1957,17 +1887,6 @@
                   },
                   "required": ["code", "message"],
                   "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
                 }
               }
             }
@@ -2110,28 +2029,7 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": [
-                            "INVALID_LIST_CONNECTIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
-                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
-                            "INVALID_RESOURCE_PAGINATION_CURSOR",
-                            "RESOURCE_KIND_NOT_SUPPORTED",
-                            "INVALID_CREATE_CONNECTION_INPUT",
-                            "INVALID_UPDATE_CONNECTION_INPUT",
-                            "API_KEY_NOT_SUPPORTED",
-                            "API_KEY_CONNECTION_REQUIRED",
-                            "INVALID_GITHUB_APP_INSTALLATION_START_INPUT",
-                            "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT",
-                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
-                            "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED",
-                            "INVALID_OAUTH2_START_INPUT",
-                            "INVALID_OAUTH2_COMPLETE_INPUT",
-                            "OAUTH2_NOT_SUPPORTED",
-                            "OAUTH2_CAPABILITY_NOT_CONFIGURED",
-                            "REDIRECT_STATE_INVALID",
-                            "REDIRECT_STATE_EXPIRED",
-                            "REDIRECT_STATE_ALREADY_USED"
-                          ]
+                          "enum": ["INVALID_CREATE_CONNECTION_INPUT", "API_KEY_NOT_SUPPORTED"]
                         },
                         "message": {
                           "type": "string",
@@ -2144,30 +2042,63 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["UNAUTHORIZED"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Active organization is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["FORBIDDEN"]
+                    },
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -2181,7 +2112,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": ["TARGET_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -2190,17 +2121,6 @@
                   },
                   "required": ["code", "message"],
                   "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
                 }
               }
             }
@@ -2333,70 +2253,19 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "code": {
-                          "type": "string",
-                          "enum": [
-                            "INVALID_LIST_CONNECTIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
-                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
-                            "INVALID_RESOURCE_PAGINATION_CURSOR",
-                            "RESOURCE_KIND_NOT_SUPPORTED",
-                            "INVALID_CREATE_CONNECTION_INPUT",
-                            "INVALID_UPDATE_CONNECTION_INPUT",
-                            "API_KEY_NOT_SUPPORTED",
-                            "API_KEY_CONNECTION_REQUIRED",
-                            "INVALID_GITHUB_APP_INSTALLATION_START_INPUT",
-                            "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT",
-                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
-                            "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED",
-                            "INVALID_OAUTH2_START_INPUT",
-                            "INVALID_OAUTH2_COMPLETE_INPUT",
-                            "OAUTH2_NOT_SUPPORTED",
-                            "OAUTH2_CAPABILITY_NOT_CONFIGURED",
-                            "REDIRECT_STATE_INVALID",
-                            "REDIRECT_STATE_EXPIRED",
-                            "REDIRECT_STATE_ALREADY_USED"
-                          ]
-                        },
-                        "message": {
-                          "type": "string",
-                          "minLength": 1
-                        }
-                      },
-                      "required": ["code", "message"],
-                      "additionalProperties": false
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": ["VALIDATION_ERROR"]
                     },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
-                        },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
-                        }
-                      },
-                      "required": ["success", "error"],
-                      "additionalProperties": false
+                    "message": {
+                      "type": "string",
+                      "minLength": 1
                     }
-                  ]
+                  },
+                  "required": ["code", "message"],
+                  "additionalProperties": false
                 }
               }
             }
@@ -2446,7 +2315,7 @@
             }
           },
           "404": {
-            "description": "Integration target or connection was not found.",
+            "description": "Integration connection was not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2454,7 +2323,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": ["CONNECTION_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -2463,17 +2332,6 @@
                   },
                   "required": ["code", "message"],
                   "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
                 }
               }
             }
@@ -2618,26 +2476,9 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "INVALID_LIST_CONNECTIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
-                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
-                            "INVALID_RESOURCE_PAGINATION_CURSOR",
-                            "RESOURCE_KIND_NOT_SUPPORTED",
-                            "INVALID_CREATE_CONNECTION_INPUT",
                             "INVALID_UPDATE_CONNECTION_INPUT",
-                            "API_KEY_NOT_SUPPORTED",
                             "API_KEY_CONNECTION_REQUIRED",
-                            "INVALID_GITHUB_APP_INSTALLATION_START_INPUT",
-                            "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT",
-                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
-                            "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED",
-                            "INVALID_OAUTH2_START_INPUT",
-                            "INVALID_OAUTH2_COMPLETE_INPUT",
-                            "OAUTH2_NOT_SUPPORTED",
-                            "OAUTH2_CAPABILITY_NOT_CONFIGURED",
-                            "REDIRECT_STATE_INVALID",
-                            "REDIRECT_STATE_EXPIRED",
-                            "REDIRECT_STATE_ALREADY_USED"
+                            "API_KEY_NOT_SUPPORTED"
                           ]
                         },
                         "message": {
@@ -2651,27 +2492,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -2744,17 +2574,6 @@
                 }
               }
             }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
-                }
-              }
-            }
           }
         }
       }
@@ -2821,26 +2640,9 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "INVALID_LIST_CONNECTIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
-                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
-                            "INVALID_RESOURCE_PAGINATION_CURSOR",
-                            "RESOURCE_KIND_NOT_SUPPORTED",
-                            "INVALID_CREATE_CONNECTION_INPUT",
-                            "INVALID_UPDATE_CONNECTION_INPUT",
-                            "API_KEY_NOT_SUPPORTED",
-                            "API_KEY_CONNECTION_REQUIRED",
                             "INVALID_GITHUB_APP_INSTALLATION_START_INPUT",
-                            "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT",
                             "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
-                            "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED",
-                            "INVALID_OAUTH2_START_INPUT",
-                            "INVALID_OAUTH2_COMPLETE_INPUT",
-                            "OAUTH2_NOT_SUPPORTED",
-                            "OAUTH2_CAPABILITY_NOT_CONFIGURED",
-                            "REDIRECT_STATE_INVALID",
-                            "REDIRECT_STATE_EXPIRED",
-                            "REDIRECT_STATE_ALREADY_USED"
+                            "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED"
                           ]
                         },
                         "message": {
@@ -2854,27 +2656,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -2935,7 +2726,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": ["TARGET_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -2944,17 +2735,6 @@
                   },
                   "required": ["code", "message"],
                   "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
                 }
               }
             }
@@ -3024,26 +2804,9 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "INVALID_LIST_CONNECTIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
-                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
-                            "INVALID_RESOURCE_PAGINATION_CURSOR",
-                            "RESOURCE_KIND_NOT_SUPPORTED",
-                            "INVALID_CREATE_CONNECTION_INPUT",
-                            "INVALID_UPDATE_CONNECTION_INPUT",
-                            "API_KEY_NOT_SUPPORTED",
-                            "API_KEY_CONNECTION_REQUIRED",
-                            "INVALID_GITHUB_APP_INSTALLATION_START_INPUT",
-                            "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT",
-                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
-                            "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED",
                             "INVALID_OAUTH2_START_INPUT",
-                            "INVALID_OAUTH2_COMPLETE_INPUT",
                             "OAUTH2_NOT_SUPPORTED",
-                            "OAUTH2_CAPABILITY_NOT_CONFIGURED",
-                            "REDIRECT_STATE_INVALID",
-                            "REDIRECT_STATE_EXPIRED",
-                            "REDIRECT_STATE_ALREADY_USED"
+                            "OAUTH2_CAPABILITY_NOT_CONFIGURED"
                           ]
                         },
                         "message": {
@@ -3057,27 +2820,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -3138,7 +2890,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": ["TARGET_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -3147,17 +2899,6 @@
                   },
                   "required": ["code", "message"],
                   "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
                 }
               }
             }
@@ -3267,23 +3008,9 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "INVALID_LIST_CONNECTIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
-                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
-                            "INVALID_RESOURCE_PAGINATION_CURSOR",
-                            "RESOURCE_KIND_NOT_SUPPORTED",
-                            "INVALID_CREATE_CONNECTION_INPUT",
-                            "INVALID_UPDATE_CONNECTION_INPUT",
-                            "API_KEY_NOT_SUPPORTED",
-                            "API_KEY_CONNECTION_REQUIRED",
-                            "INVALID_GITHUB_APP_INSTALLATION_START_INPUT",
                             "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT",
                             "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
                             "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED",
-                            "INVALID_OAUTH2_START_INPUT",
-                            "INVALID_OAUTH2_COMPLETE_INPUT",
-                            "OAUTH2_NOT_SUPPORTED",
-                            "OAUTH2_CAPABILITY_NOT_CONFIGURED",
                             "REDIRECT_STATE_INVALID",
                             "REDIRECT_STATE_EXPIRED",
                             "REDIRECT_STATE_ALREADY_USED"
@@ -3300,27 +3027,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -3337,7 +3053,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": ["TARGET_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -3346,17 +3062,6 @@
                   },
                   "required": ["code", "message"],
                   "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
                 }
               }
             }
@@ -3448,20 +3153,6 @@
                         "code": {
                           "type": "string",
                           "enum": [
-                            "INVALID_LIST_CONNECTIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
-                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
-                            "INVALID_RESOURCE_PAGINATION_CURSOR",
-                            "RESOURCE_KIND_NOT_SUPPORTED",
-                            "INVALID_CREATE_CONNECTION_INPUT",
-                            "INVALID_UPDATE_CONNECTION_INPUT",
-                            "API_KEY_NOT_SUPPORTED",
-                            "API_KEY_CONNECTION_REQUIRED",
-                            "INVALID_GITHUB_APP_INSTALLATION_START_INPUT",
-                            "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT",
-                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
-                            "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED",
-                            "INVALID_OAUTH2_START_INPUT",
                             "INVALID_OAUTH2_COMPLETE_INPUT",
                             "OAUTH2_NOT_SUPPORTED",
                             "OAUTH2_CAPABILITY_NOT_CONFIGURED",
@@ -3481,27 +3172,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -3518,7 +3198,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": ["TARGET_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",
@@ -3527,17 +3207,6 @@
                   },
                   "required": ["code", "message"],
                   "additionalProperties": false
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal server error.",
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string",
-                  "minLength": 1
                 }
               }
             }

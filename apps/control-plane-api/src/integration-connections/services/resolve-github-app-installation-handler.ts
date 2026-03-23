@@ -1,21 +1,18 @@
 import type { IntegrationTarget } from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationConnectionMethodIds,
+  type IntegrationRegistry,
   type IntegrationRedirectHandler,
 } from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { z } from "zod";
 
 import { resolveIntegrationTargetSecrets } from "../../integration-targets/services/resolve-target-secrets.js";
-import type { AppContext } from "../../types.js";
 import {
   IntegrationConnectionsBadRequestCodes,
-  IntegrationConnectionsBadRequestError,
   IntegrationConnectionsNotFoundCodes,
-  IntegrationConnectionsNotFoundError,
-} from "./errors.js";
-
-const registry = createIntegrationRegistry();
+} from "../constants.js";
 
 function toUnknownRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -60,7 +57,7 @@ export type ResolvedGitHubAppInstallationHandlerTarget = {
 };
 
 async function resolveEnabledTargetOrThrow(
-  db: AppContext["var"]["db"],
+  db: ControlPlaneDatabase,
   targetKey: string,
 ): Promise<IntegrationTarget> {
   const target = await db.query.integrationTargets.findFirst({
@@ -68,7 +65,7 @@ async function resolveEnabledTargetOrThrow(
   });
 
   if (target === undefined) {
-    throw new IntegrationConnectionsNotFoundError(
+    throw new NotFoundError(
       IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND,
       `Integration target '${targetKey}' was not found.`,
     );
@@ -78,23 +75,31 @@ async function resolveEnabledTargetOrThrow(
 }
 
 export async function resolveGitHubAppInstallationHandlerTargetOrThrow(
-  db: AppContext["var"]["db"],
-  integrationsConfig: AppContext["var"]["config"]["integrations"],
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: {
+      activeMasterEncryptionKeyVersion: number;
+      masterEncryptionKeys: Record<string, string>;
+    };
+  },
   input: {
     targetKey: string;
     invalidInputCode:
-      | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT
-      | typeof IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT;
+      | "INVALID_GITHUB_APP_INSTALLATION_START_INPUT"
+      | "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT";
   },
 ): Promise<ResolvedGitHubAppInstallationHandlerTarget> {
+  const { db, integrationRegistry, integrationsConfig } = ctx;
+
   const target = await resolveEnabledTargetOrThrow(db, input.targetKey);
-  const definition = registry.getDefinition({
+  const definition = integrationRegistry.getDefinition({
     familyId: target.familyId,
     variantId: target.variantId,
   });
 
   if (definition === undefined) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       input.invalidInputCode,
       `Integration definition '${target.familyId}/${target.variantId}' is not registered.`,
     );
@@ -105,7 +110,7 @@ export async function resolveGitHubAppInstallationHandlerTargetOrThrow(
       (method) => method.id === IntegrationConnectionMethodIds.GITHUB_APP_INSTALLATION,
     )
   ) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_NOT_SUPPORTED,
       `Integration target '${input.targetKey}' does not support GitHub App installation.`,
     );
@@ -113,7 +118,7 @@ export async function resolveGitHubAppInstallationHandlerTargetOrThrow(
 
   const redirectHandler = definition.redirectHandler;
   if (redirectHandler === undefined) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED,
       `Integration target '${input.targetKey}' does not define a GitHub App installation handler.`,
     );
@@ -137,7 +142,7 @@ export async function resolveGitHubAppInstallationHandlerTargetOrThrow(
     parsedConfig = targetConfigRecord;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      throw new IntegrationConnectionsBadRequestError(
+      throw new BadRequestError(
         input.invalidInputCode,
         `Integration target '${input.targetKey}' has invalid target config for '${target.familyId}/${target.variantId}'.`,
       );
@@ -156,7 +161,7 @@ export async function resolveGitHubAppInstallationHandlerTargetOrThrow(
     parsedSecrets = targetSecretsRecord;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      throw new IntegrationConnectionsBadRequestError(
+      throw new BadRequestError(
         input.invalidInputCode,
         `Integration target '${input.targetKey}' has invalid target secrets for '${target.familyId}/${target.variantId}'.`,
       );

@@ -1,20 +1,19 @@
 import {
   integrationConnectionResourceStates,
+  type ControlPlaneDatabase,
   type IntegrationConnectionResourceSyncState,
   IntegrationConnectionResourceSyncStates,
 } from "@mistle/db/control-plane";
-import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { SyncIntegrationConnectionResourcesWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { and, eq, sql } from "drizzle-orm";
+import type { OpenWorkflow } from "openworkflow";
 
-import type { createControlPlaneOpenWorkflow } from "../../openworkflow.js";
 import {
   IntegrationConnectionsBadRequestCodes,
-  IntegrationConnectionsBadRequestError,
   IntegrationConnectionsNotFoundCodes,
-  IntegrationConnectionsNotFoundError,
-} from "./errors.js";
+} from "../constants.js";
 
 export type RequestIntegrationConnectionResourceRefreshInput = {
   organizationId: string;
@@ -48,11 +47,14 @@ type AcquireResourceSyncAttemptResult =
     };
 
 export async function requestIntegrationConnectionResourceRefresh(
-  db: ControlPlaneDatabase,
-  integrationRegistry: IntegrationRegistry,
-  openWorkflow: ReturnType<typeof createControlPlaneOpenWorkflow>,
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    openWorkflow: OpenWorkflow;
+  },
   input: RequestIntegrationConnectionResourceRefreshInput,
 ): Promise<RequestIntegrationConnectionResourceRefreshResult> {
+  const { db, integrationRegistry, openWorkflow } = ctx;
   const connection = await db.query.integrationConnections.findFirst({
     columns: {
       id: true,
@@ -82,7 +84,7 @@ export async function requestIntegrationConnectionResourceRefresh(
   });
 
   if (connection === undefined) {
-    throw new IntegrationConnectionsNotFoundError(
+    throw new NotFoundError(
       IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,
       "Integration connection was not found.",
     );
@@ -101,7 +103,7 @@ export async function requestIntegrationConnectionResourceRefresh(
     (resourceDefinition) => resourceDefinition.kind === input.kind,
   );
   if (!isSupported) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.RESOURCE_KIND_NOT_SUPPORTED,
       `Resource kind \`${input.kind}\` is not supported for connection \`${connection.id}\`.`,
     );

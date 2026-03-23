@@ -1,13 +1,16 @@
 import { createHash } from "node:crypto";
 
-import { integrationConnectionRedirectSessions } from "@mistle/db/control-plane";
+import {
+  integrationConnectionRedirectSessions,
+  type ControlPlaneDatabase,
+} from "@mistle/db/control-plane";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 
 import {
   encryptRedirectSessionSecretUtf8,
   resolveMasterEncryptionKeyMaterial,
 } from "../../integration-credentials/crypto.js";
-import type { AppContext } from "../../types.js";
-import { IntegrationConnectionsBadRequestCodes } from "./errors.js";
+import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
@@ -40,7 +43,7 @@ function createPkceChallenge(verifier: string): string {
 }
 
 async function persistRedirectSession(input: {
-  db: AppContext["var"]["db"];
+  db: ControlPlaneDatabase;
   organizationId: string;
   targetKey: string;
   state: string;
@@ -69,14 +72,29 @@ async function persistRedirectSession(input: {
 }
 
 export async function startOAuth2Connection(
-  db: AppContext["var"]["db"],
-  integrationsConfig: AppContext["var"]["config"]["integrations"],
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: {
+      activeMasterEncryptionKeyVersion: number;
+      masterEncryptionKeys: Record<string, string>;
+    };
+  },
   input: StartOAuth2ConnectionInput,
 ): Promise<StartedOAuth2Connection> {
-  const resolved = await resolveOAuth2CapabilityTargetOrThrow(db, integrationsConfig, {
-    targetKey: input.targetKey,
-    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_START_INPUT,
-  });
+  const { db, integrationRegistry, integrationsConfig } = ctx;
+
+  const resolved = await resolveOAuth2CapabilityTargetOrThrow(
+    {
+      db,
+      integrationRegistry,
+      integrationsConfig,
+    },
+    {
+      targetKey: input.targetKey,
+      invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_START_INPUT,
+    },
+  );
 
   const state = encodeRedirectStateMetadata({
     state: createRedirectState(),

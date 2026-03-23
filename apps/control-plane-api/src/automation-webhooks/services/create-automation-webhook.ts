@@ -8,11 +8,9 @@ import {
 } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 
-import {
-  assertSandboxProfileReferenceOrThrow,
-  assertWebhookConnectionReferenceOrThrow,
-  loadWebhookAutomationAggregateOrThrow,
-} from "../services.js";
+import { assertSandboxProfileReferenceOrThrow } from "./assert-sandbox-profile-reference-or-throw.js";
+import { assertWebhookConnectionReferenceOrThrow } from "./assert-webhook-connection-reference-or-throw.js";
+import { loadWebhookAutomationAggregateOrThrow } from "./load-webhook-automation-aggregate-or-throw.js";
 
 export type CreateWebhookAutomationInput = {
   organizationId: string;
@@ -31,33 +29,33 @@ export type CreateWebhookAutomationInput = {
 };
 
 export async function createAutomationWebhook(
-  input: {
+  ctx: {
     db: ControlPlaneDatabase;
     integrationRegistry: IntegrationRegistry;
   },
-  serviceInput: CreateWebhookAutomationInput,
+  input: CreateWebhookAutomationInput,
 ) {
   await assertWebhookConnectionReferenceOrThrow(
-    { db: input.db, integrationRegistry: input.integrationRegistry },
+    { db: ctx.db, integrationRegistry: ctx.integrationRegistry },
     {
-      organizationId: serviceInput.organizationId,
-      integrationConnectionId: serviceInput.integrationConnectionId,
+      organizationId: input.organizationId,
+      integrationConnectionId: input.integrationConnectionId,
     },
   );
   await assertSandboxProfileReferenceOrThrow(
-    { db: input.db },
+    { db: ctx.db },
     {
-      organizationId: serviceInput.organizationId,
-      sandboxProfileId: serviceInput.target.sandboxProfileId,
+      organizationId: input.organizationId,
+      sandboxProfileId: input.target.sandboxProfileId,
     },
   );
 
-  return input.db.transaction(async (tx) => {
-    const automation = await createAutomationAggregate(tx, serviceInput);
+  return ctx.db.transaction(async (tx) => {
+    const automation = await createAutomationAggregate(tx, input);
     return loadWebhookAutomationAggregateOrThrow(
       { db: tx },
       {
-        organizationId: serviceInput.organizationId,
+        organizationId: input.organizationId,
         automationId: automation.id,
       },
     );
@@ -66,15 +64,15 @@ export async function createAutomationWebhook(
 
 async function createAutomationAggregate(
   tx: ControlPlaneTransaction,
-  serviceInput: CreateWebhookAutomationInput,
+  input: CreateWebhookAutomationInput,
 ) {
   const insertedAutomationRows = await tx
     .insert(automations)
     .values({
-      organizationId: serviceInput.organizationId,
+      organizationId: input.organizationId,
       kind: AutomationKinds.WEBHOOK,
-      name: serviceInput.name,
-      enabled: serviceInput.enabled ?? true,
+      name: input.name,
+      enabled: input.enabled ?? true,
     })
     .returning({
       id: automations.id,
@@ -88,18 +86,18 @@ async function createAutomationAggregate(
 
   await tx.insert(webhookAutomations).values({
     automationId: insertedAutomation.id,
-    integrationConnectionId: serviceInput.integrationConnectionId,
-    eventTypes: serviceInput.eventTypes ?? null,
-    payloadFilter: serviceInput.payloadFilter ?? null,
-    inputTemplate: serviceInput.inputTemplate,
-    conversationKeyTemplate: serviceInput.conversationKeyTemplate,
-    idempotencyKeyTemplate: serviceInput.idempotencyKeyTemplate ?? null,
+    integrationConnectionId: input.integrationConnectionId,
+    eventTypes: input.eventTypes ?? null,
+    payloadFilter: input.payloadFilter ?? null,
+    inputTemplate: input.inputTemplate,
+    conversationKeyTemplate: input.conversationKeyTemplate,
+    idempotencyKeyTemplate: input.idempotencyKeyTemplate ?? null,
   });
 
   await tx.insert(automationTargets).values({
     automationId: insertedAutomation.id,
-    sandboxProfileId: serviceInput.target.sandboxProfileId,
-    sandboxProfileVersion: serviceInput.target.sandboxProfileVersion ?? null,
+    sandboxProfileId: input.target.sandboxProfileId,
+    sandboxProfileVersion: input.target.sandboxProfileVersion ?? null,
   });
 
   return insertedAutomation;

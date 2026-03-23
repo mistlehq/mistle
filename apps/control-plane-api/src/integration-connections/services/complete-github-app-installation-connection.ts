@@ -7,6 +7,9 @@ import {
   IntegrationCredentialSecretKinds,
   integrationConnectionRedirectSessions,
 } from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { BadRequestError } from "@mistle/http/errors.js";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { and, eq, isNull } from "drizzle-orm";
 
 import {
@@ -14,11 +17,7 @@ import {
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../integration-credentials/crypto.js";
-import type { AppContext } from "../../types.js";
-import {
-  IntegrationConnectionsBadRequestCodes,
-  IntegrationConnectionsBadRequestError,
-} from "./errors.js";
+import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import { createRedirectQueryParams, resolveRedirectDisplayName } from "./redirect-flow.js";
 import { resolveGitHubAppInstallationHandlerTargetOrThrow } from "./resolve-github-app-installation-handler.js";
 
@@ -42,7 +41,7 @@ type CompletedConnection = {
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   const state = params.get("state");
   if (state === null || state.length === 0) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
       "GitHub App installation callback query must include `state`.",
     );
@@ -76,15 +75,30 @@ function resolveCredentialPurpose(purpose: string) {
 }
 
 export async function completeGitHubAppInstallationConnection(
-  db: AppContext["var"]["db"],
-  integrationsConfig: AppContext["var"]["config"]["integrations"],
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: {
+      activeMasterEncryptionKeyVersion: number;
+      masterEncryptionKeys: Record<string, string>;
+    };
+  },
   input: CompleteGitHubAppInstallationConnectionInput,
 ): Promise<CompletedConnection> {
-  const resolved = await resolveGitHubAppInstallationHandlerTargetOrThrow(db, integrationsConfig, {
-    targetKey: input.targetKey,
-    invalidInputCode:
-      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
-  });
+  const { db, integrationRegistry, integrationsConfig } = ctx;
+
+  const resolved = await resolveGitHubAppInstallationHandlerTargetOrThrow(
+    {
+      db,
+      integrationRegistry,
+      integrationsConfig,
+    },
+    {
+      targetKey: input.targetKey,
+      invalidInputCode:
+        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT,
+    },
+  );
 
   const queryParams = createRedirectQueryParams(input.query);
   const state = resolveRedirectStateOrThrow(queryParams);
@@ -95,7 +109,7 @@ export async function completeGitHubAppInstallationConnection(
   });
 
   if (redirectSession === undefined) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
       "Redirect state is invalid.",
     );
@@ -104,7 +118,7 @@ export async function completeGitHubAppInstallationConnection(
   const requestedDisplayName = resolveRedirectDisplayName(redirectSession.state);
 
   if (redirectSession.usedAt !== null) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
       "Redirect state has already been used.",
     );
@@ -117,7 +131,7 @@ export async function completeGitHubAppInstallationConnection(
   }
 
   if (expiresAt <= now) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
       "Redirect state has expired.",
     );
@@ -148,7 +162,7 @@ export async function completeGitHubAppInstallationConnection(
       });
 
     if (consumedSessionRows.length !== 1) {
-      throw new IntegrationConnectionsBadRequestError(
+      throw new BadRequestError(
         IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
         "Redirect state has already been used.",
       );

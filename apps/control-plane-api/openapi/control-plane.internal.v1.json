@@ -80,28 +80,7 @@
                       "properties": {
                         "code": {
                           "type": "string",
-                          "enum": [
-                            "INVALID_LIST_CONNECTIONS_INPUT",
-                            "INVALID_PAGINATION_CURSOR",
-                            "INVALID_LIST_CONNECTION_RESOURCES_INPUT",
-                            "INVALID_RESOURCE_PAGINATION_CURSOR",
-                            "RESOURCE_KIND_NOT_SUPPORTED",
-                            "INVALID_CREATE_CONNECTION_INPUT",
-                            "INVALID_UPDATE_CONNECTION_INPUT",
-                            "API_KEY_NOT_SUPPORTED",
-                            "API_KEY_CONNECTION_REQUIRED",
-                            "INVALID_GITHUB_APP_INSTALLATION_START_INPUT",
-                            "INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT",
-                            "GITHUB_APP_INSTALLATION_NOT_SUPPORTED",
-                            "GITHUB_APP_INSTALLATION_HANDLER_NOT_CONFIGURED",
-                            "INVALID_OAUTH2_START_INPUT",
-                            "INVALID_OAUTH2_COMPLETE_INPUT",
-                            "OAUTH2_NOT_SUPPORTED",
-                            "OAUTH2_CAPABILITY_NOT_CONFIGURED",
-                            "REDIRECT_STATE_INVALID",
-                            "REDIRECT_STATE_EXPIRED",
-                            "REDIRECT_STATE_ALREADY_USED"
-                          ]
+                          "enum": ["RESOURCE_KIND_NOT_SUPPORTED"]
                         },
                         "message": {
                           "type": "string",
@@ -114,27 +93,16 @@
                     {
                       "type": "object",
                       "properties": {
-                        "success": {
-                          "type": "boolean",
-                          "enum": [false]
+                        "code": {
+                          "type": "string",
+                          "enum": ["VALIDATION_ERROR"]
                         },
-                        "error": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "message": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": ["name", "message"],
-                          "additionalProperties": {}
+                        "message": {
+                          "type": "string",
+                          "minLength": 1
                         }
                       },
-                      "required": ["success", "error"],
+                      "required": ["code", "message"],
                       "additionalProperties": false
                     }
                   ]
@@ -173,7 +141,7 @@
                   "properties": {
                     "code": {
                       "type": "string",
-                      "enum": ["TARGET_NOT_FOUND", "CONNECTION_NOT_FOUND"]
+                      "enum": ["CONNECTION_NOT_FOUND"]
                     },
                     "message": {
                       "type": "string",

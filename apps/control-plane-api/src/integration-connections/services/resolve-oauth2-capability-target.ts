@@ -1,21 +1,18 @@
 import type { IntegrationTarget } from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationConnectionMethodIds,
+  type IntegrationRegistry,
   type IntegrationOAuth2Capability,
 } from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 import { z } from "zod";
 
 import { resolveIntegrationTargetSecrets } from "../../integration-targets/services/resolve-target-secrets.js";
-import type { AppContext } from "../../types.js";
 import {
   IntegrationConnectionsBadRequestCodes,
-  IntegrationConnectionsBadRequestError,
   IntegrationConnectionsNotFoundCodes,
-  IntegrationConnectionsNotFoundError,
-} from "./errors.js";
-
-const registry = createIntegrationRegistry();
+} from "../constants.js";
 
 function toUnknownRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -48,7 +45,7 @@ function toStringRecord(value: unknown): Record<string, string> | null {
 }
 
 async function resolveEnabledTargetOrThrow(
-  db: AppContext["var"]["db"],
+  db: ControlPlaneDatabase,
   targetKey: string,
 ): Promise<IntegrationTarget> {
   const target = await db.query.integrationTargets.findFirst({
@@ -56,7 +53,7 @@ async function resolveEnabledTargetOrThrow(
   });
 
   if (target === undefined) {
-    throw new IntegrationConnectionsNotFoundError(
+    throw new NotFoundError(
       IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND,
       `Integration target '${targetKey}' was not found.`,
     );
@@ -82,23 +79,29 @@ export type ResolvedOAuth2CapabilityTarget = {
 };
 
 export async function resolveOAuth2CapabilityTargetOrThrow(
-  db: AppContext["var"]["db"],
-  integrationsConfig: AppContext["var"]["config"]["integrations"],
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: {
+      activeMasterEncryptionKeyVersion: number;
+      masterEncryptionKeys: Record<string, string>;
+    };
+  },
   input: {
     targetKey: string;
-    invalidInputCode:
-      | typeof IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_START_INPUT
-      | typeof IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_COMPLETE_INPUT;
+    invalidInputCode: "INVALID_OAUTH2_START_INPUT" | "INVALID_OAUTH2_COMPLETE_INPUT";
   },
 ): Promise<ResolvedOAuth2CapabilityTarget> {
+  const { db, integrationRegistry, integrationsConfig } = ctx;
+
   const target = await resolveEnabledTargetOrThrow(db, input.targetKey);
-  const definition = registry.getDefinition({
+  const definition = integrationRegistry.getDefinition({
     familyId: target.familyId,
     variantId: target.variantId,
   });
 
   if (definition === undefined) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       input.invalidInputCode,
       `Integration definition '${target.familyId}/${target.variantId}' is not registered.`,
     );
@@ -109,7 +112,7 @@ export async function resolveOAuth2CapabilityTargetOrThrow(
       (method) => method.id === IntegrationConnectionMethodIds.OAUTH2,
     )
   ) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.OAUTH2_NOT_SUPPORTED,
       `Integration target '${input.targetKey}' does not support OAuth2.`,
     );
@@ -117,7 +120,7 @@ export async function resolveOAuth2CapabilityTargetOrThrow(
 
   const oauth2 = definition.oauth2;
   if (oauth2 === undefined) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.OAUTH2_CAPABILITY_NOT_CONFIGURED,
       `Integration target '${input.targetKey}' does not define an OAuth2 capability.`,
     );
@@ -141,7 +144,7 @@ export async function resolveOAuth2CapabilityTargetOrThrow(
     parsedConfig = targetConfigRecord;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      throw new IntegrationConnectionsBadRequestError(
+      throw new BadRequestError(
         input.invalidInputCode,
         `Integration target '${input.targetKey}' has invalid target config for '${target.familyId}/${target.variantId}'.`,
       );
@@ -160,7 +163,7 @@ export async function resolveOAuth2CapabilityTargetOrThrow(
     parsedSecrets = targetSecretsRecord;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      throw new IntegrationConnectionsBadRequestError(
+      throw new BadRequestError(
         input.invalidInputCode,
         `Integration target '${input.targetKey}' has invalid target secrets for '${target.familyId}/${target.variantId}'.`,
       );

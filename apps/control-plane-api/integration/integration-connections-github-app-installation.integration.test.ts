@@ -9,10 +9,13 @@ import { describe, expect } from "vitest";
 
 import { buildDashboardUrl } from "../src/dashboard-url.js";
 import {
+  CompleteGitHubAppInstallationConnectionBadRequestResponseSchema,
   CompleteGitHubAppInstallationConnectionQuerySchema,
-  IntegrationConnectionsBadRequestResponseSchema,
+} from "../src/integration-connections/complete-github-app-installation-connection/schema.js";
+import {
+  StartGitHubAppInstallationConnectionBadRequestResponseSchema,
   StartGitHubAppInstallationConnectionResponseSchema,
-} from "../src/integration-connections/contracts.js";
+} from "../src/integration-connections/start-github-app-installation-connection/schema.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
 
@@ -330,7 +333,7 @@ describe("integration connections GitHub App installation integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
+    const responseBody = CompleteGitHubAppInstallationConnectionBadRequestResponseSchema.parse(
       await response.json(),
     );
     expect(responseBody.code).toBe("INVALID_GITHUB_APP_INSTALLATION_COMPLETE_INPUT");
@@ -355,7 +358,7 @@ describe("integration connections GitHub App installation integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
+    const responseBody = CompleteGitHubAppInstallationConnectionBadRequestResponseSchema.parse(
       await response.json(),
     );
     expect(responseBody.code).toBe("REDIRECT_STATE_INVALID");
@@ -391,7 +394,7 @@ describe("integration connections GitHub App installation integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
+    const responseBody = CompleteGitHubAppInstallationConnectionBadRequestResponseSchema.parse(
       await response.json(),
     );
     expect(responseBody.code).toBe("REDIRECT_STATE_EXPIRED");
@@ -436,7 +439,7 @@ describe("integration connections GitHub App installation integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
+    const responseBody = CompleteGitHubAppInstallationConnectionBadRequestResponseSchema.parse(
       await response.json(),
     );
     expect(responseBody.code).toBe("REDIRECT_STATE_ALREADY_USED");
@@ -462,7 +465,7 @@ describe("integration connections GitHub App installation integration", () => {
     );
 
     expect(response.status).toBe(400);
-    const responseBody = IntegrationConnectionsBadRequestResponseSchema.parse(
+    const responseBody = StartGitHubAppInstallationConnectionBadRequestResponseSchema.parse(
       await response.json(),
     );
     expect(responseBody.code).toBe("GITHUB_APP_INSTALLATION_NOT_SUPPORTED");

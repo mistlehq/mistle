@@ -27,6 +27,7 @@ export async function createControlPlaneApiRuntime(
       internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
       db: resources.db,
       integrationRegistry: resources.integrationRegistry,
+      openWorkflow: resources.openWorkflow,
       services,
     });
   } catch (error) {

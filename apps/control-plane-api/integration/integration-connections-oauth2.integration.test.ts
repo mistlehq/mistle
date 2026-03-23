@@ -1,7 +1,7 @@
 import { integrationTargets } from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
 
-import { IntegrationConnectionsBadRequestResponseSchema } from "../src/integration-connections/contracts.js";
+import { StartOAuth2ConnectionBadRequestResponseSchema } from "../src/integration-connections/start-oauth2-connection/schema.js";
 import { it } from "./test-context.js";
 
 describe("integration connections OAuth2 integration", () => {
@@ -32,7 +32,7 @@ describe("integration connections OAuth2 integration", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual(
-      IntegrationConnectionsBadRequestResponseSchema.parse({
+      StartOAuth2ConnectionBadRequestResponseSchema.parse({
         code: "OAUTH2_NOT_SUPPORTED",
         message: "Integration target 'openai-default-oauth2-start' does not support OAuth2.",
       }),

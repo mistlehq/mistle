@@ -10,9 +10,9 @@ import {
 import { describe, expect } from "vitest";
 
 import {
-  IntegrationConnectionsConflictResponseSchema,
+  ListIntegrationConnectionResourcesConflictResponseSchema,
   ListIntegrationConnectionResourcesResponseSchema,
-} from "../src/integration-connections/contracts.js";
+} from "../src/integration-connections/list-integration-connection-resources/schema.js";
 import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
 describe("integration connection resources list integration", () => {
@@ -305,7 +305,9 @@ describe("integration connection resources list integration", () => {
     );
     expect(neverSyncedResponse.status).toBe(409);
     expect(
-      IntegrationConnectionsConflictResponseSchema.parse(await neverSyncedResponse.json()),
+      ListIntegrationConnectionResourcesConflictResponseSchema.parse(
+        await neverSyncedResponse.json(),
+      ),
     ).toEqual({
       code: "RESOURCE_SYNC_REQUIRED",
       message: "Resource sync is required before resources can be listed.",
@@ -321,7 +323,7 @@ describe("integration connection resources list integration", () => {
     );
     expect(syncingResponse.status).toBe(409);
     expect(
-      IntegrationConnectionsConflictResponseSchema.parse(await syncingResponse.json()),
+      ListIntegrationConnectionResourcesConflictResponseSchema.parse(await syncingResponse.json()),
     ).toEqual({
       code: "RESOURCE_SYNC_IN_PROGRESS",
       message: "Resource sync is still in progress and no previous snapshot is available yet.",
@@ -336,7 +338,9 @@ describe("integration connection resources list integration", () => {
       },
     );
     expect(errorResponse.status).toBe(409);
-    expect(IntegrationConnectionsConflictResponseSchema.parse(await errorResponse.json())).toEqual({
+    expect(
+      ListIntegrationConnectionResourcesConflictResponseSchema.parse(await errorResponse.json()),
+    ).toEqual({
       code: "RESOURCE_SYNC_FAILED",
       message: "Resource sync failed before any usable snapshot was stored.",
       lastErrorCode: "AUTH_FAILED",

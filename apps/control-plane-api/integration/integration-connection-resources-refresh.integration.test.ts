@@ -9,7 +9,7 @@ import { SyncIntegrationConnectionResourcesWorkflowSpec } from "@mistle/workflow
 import { and, eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
-import { RefreshIntegrationConnectionResourcesResponseSchema } from "../src/integration-connections/contracts.js";
+import { RefreshIntegrationConnectionResourcesResponseSchema } from "../src/integration-connections/refresh-integration-connection-resources/schema.js";
 import { countControlPlaneWorkflowRuns } from "./helpers/workflow-runs.js";
 import { it } from "./test-context.js";
 

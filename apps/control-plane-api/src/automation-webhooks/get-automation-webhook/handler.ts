@@ -3,7 +3,7 @@ import { withHttpErrorHandler } from "@mistle/http/errors.js";
 
 import { withRequiredSession } from "../../middleware/with-required-session.js";
 import type { AppContextBindings, AppSession } from "../../types.js";
-import { loadWebhookAutomationAggregateOrThrow } from "../services.js";
+import { loadWebhookAutomationAggregateOrThrow } from "../services/load-webhook-automation-aggregate-or-throw.js";
 import { route } from "./route.js";
 
 const routeHandler = async (

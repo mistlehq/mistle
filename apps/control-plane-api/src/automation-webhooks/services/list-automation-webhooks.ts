@@ -20,7 +20,7 @@ import { AutomationWebhooksBadRequestCodes } from "../constants.js";
 import {
   loadWebhookAutomationAggregateOrThrow,
   type AutomationWebhookAggregate,
-} from "../services.js";
+} from "./load-webhook-automation-aggregate-or-throw.js";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
@@ -49,7 +49,7 @@ export type ListWebhookAutomationsInput = {
 };
 
 export async function listAutomationWebhooks(
-  { db }: { db: ControlPlaneDatabase },
+  ctx: { db: ControlPlaneDatabase },
   input: ListWebhookAutomationsInput,
 ): Promise<KeysetPaginatedResult<AutomationWebhookAggregate>> {
   let pageSize: number;
@@ -98,7 +98,7 @@ export async function listAutomationWebhooks(
         id: automation.id,
       }),
       fetchPage: async ({ direction, cursor, limitPlusOne }) => {
-        const automationRows = await db.query.automations.findMany({
+        const automationRows = await ctx.db.query.automations.findMany({
           where: (table, { and, eq, gt, lt, or }) => {
             const organizationScope = and(
               eq(table.organizationId, input.organizationId),
@@ -137,7 +137,7 @@ export async function listAutomationWebhooks(
         return Promise.all(
           automationRows.map((automation) =>
             loadWebhookAutomationAggregateOrThrow(
-              { db },
+              { db: ctx.db },
               {
                 organizationId: input.organizationId,
                 automationId: automation.id,
@@ -147,7 +147,7 @@ export async function listAutomationWebhooks(
         );
       },
       countTotalResults: async () => {
-        const [result] = await db
+        const [result] = await ctx.db
           .select({
             totalResults: sql<number>`count(*)::int`,
           })
