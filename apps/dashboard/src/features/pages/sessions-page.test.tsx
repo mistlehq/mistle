@@ -173,7 +173,20 @@ describe("SessionsPage", () => {
       }),
     ).toStrictEqual({
       visibleCount: 2,
-      totalCount: 1,
+      totalCount: 2,
+    });
+  });
+
+  it("does not double-count optimistic sessions when the server total is already higher", () => {
+    expect(
+      resolveSessionResultsSummary({
+        listedSessionCount: 20,
+        totalResults: 41,
+        optimisticSessionCount: 1,
+      }),
+    ).toStrictEqual({
+      visibleCount: 21,
+      totalCount: 41,
     });
   });
 

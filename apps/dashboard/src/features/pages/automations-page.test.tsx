@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
@@ -294,5 +295,92 @@ describe("AutomationsPage", () => {
     expect(markup).not.toContain("Showing 1 of 1");
     expect(markup).not.toContain(">Previous<");
     expect(markup).not.toContain(">Next<");
+  });
+
+  it("updates the result summary when the list is filtered client-side", () => {
+    const queryClient = createQueryClient();
+    const listResult: WebhookAutomationsListResult = {
+      items: [
+        {
+          conversationKeyTemplate: "{{event.id}}",
+          createdAt: "2026-03-05T00:00:00.000Z",
+          enabled: true,
+          eventTypes: ["push"],
+          id: "aut_123",
+          idempotencyKeyTemplate: null,
+          inputTemplate: "{{payload}}",
+          integrationConnectionId: "icn_123",
+          kind: "webhook",
+          name: "Repo triage",
+          payloadFilter: null,
+          target: {
+            id: "target_123",
+            sandboxProfileId: "sbp_123",
+            sandboxProfileVersion: null,
+          },
+          updatedAt: "2026-03-05T00:00:00.000Z",
+        },
+        {
+          conversationKeyTemplate: "{{event.id}}",
+          createdAt: "2026-03-05T00:00:00.000Z",
+          enabled: true,
+          eventTypes: ["push"],
+          id: "aut_456",
+          idempotencyKeyTemplate: null,
+          inputTemplate: "{{payload}}",
+          integrationConnectionId: "icn_123",
+          kind: "webhook",
+          name: "Backlog sync",
+          payloadFilter: null,
+          target: {
+            id: "target_456",
+            sandboxProfileId: "sbp_123",
+            sandboxProfileVersion: null,
+          },
+          updatedAt: "2026-03-05T00:00:00.000Z",
+        },
+      ],
+      nextPage: null,
+      previousPage: null,
+      totalResults: 2,
+    };
+
+    queryClient.setQueryData(
+      webhookAutomationsListQueryKey({
+        limit: 25,
+        after: null,
+        before: null,
+      }),
+      listResult,
+    );
+    seedAutomationPrerequisites(queryClient);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter>
+          <AutomationsPage />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(
+      screen
+        .getAllByText((content, element) => {
+          return element?.textContent === "Showing 2 of 2";
+        })
+        .at(-1),
+    ).toBeDefined();
+
+    fireEvent.change(screen.getByRole("textbox", { name: "Search automations" }), {
+      target: { value: "Backlog" },
+    });
+
+    expect(
+      screen
+        .getAllByText((content, element) => {
+          return element?.textContent === "Showing 1 of 2";
+        })
+        .at(-1),
+    ).toBeDefined();
   });
 });

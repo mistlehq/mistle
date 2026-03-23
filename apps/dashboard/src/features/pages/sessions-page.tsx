@@ -227,9 +227,11 @@ export function resolveSessionResultsSummary(input: {
   visibleCount: number;
   totalCount: number;
 } {
+  const visibleCount = input.listedSessionCount + input.optimisticSessionCount;
+
   return {
-    visibleCount: input.listedSessionCount + input.optimisticSessionCount,
-    totalCount: input.totalResults,
+    visibleCount,
+    totalCount: Math.max(input.totalResults, visibleCount),
   };
 }
 

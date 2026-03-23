@@ -12,6 +12,8 @@ import {
   TableRow,
 } from "@mistle/ui";
 
+import { TableListingFooter } from "../shared/table-listing-footer.js";
+import { TablePagination } from "../shared/table-pagination.js";
 import { useWebhookAutomationListState } from "./use-webhook-automation-list-state.js";
 import { WebhookAutomationListToolbar } from "./webhook-automation-list-toolbar.js";
 
@@ -29,6 +31,13 @@ type WebhookAutomationListViewProps = {
   items: readonly WebhookAutomationListItemViewModel[];
   isLoading: boolean;
   errorMessage: string | null;
+  totalResults: number | null;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  nextPageDisabled?: boolean;
+  previousPageDisabled?: boolean;
+  onNextPage: () => void;
+  onPreviousPage: () => void;
   onOpenAutomation: (automationId: string) => void;
   onRetry: () => void;
 };
@@ -147,6 +156,32 @@ export function WebhookAutomationListView(
           ))}
         </TableBody>
       </Table>
+
+      <TableListingFooter
+        summary={
+          input.totalResults === null ? null : (
+            <p className="text-muted-foreground text-sm">
+              Showing {visibleItems.length} of {input.totalResults}
+            </p>
+          )
+        }
+        pagination={
+          input.totalResults === null ? null : (
+            <TablePagination
+              hasNextPage={input.hasNextPage}
+              hasPreviousPage={input.hasPreviousPage}
+              onNextPage={input.onNextPage}
+              onPreviousPage={input.onPreviousPage}
+              {...(input.nextPageDisabled === undefined
+                ? {}
+                : { nextPageDisabled: input.nextPageDisabled })}
+              {...(input.previousPageDisabled === undefined
+                ? {}
+                : { previousPageDisabled: input.previousPageDisabled })}
+            />
+          )
+        }
+      />
     </div>
   );
 }
