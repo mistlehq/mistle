@@ -27,13 +27,13 @@
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
     "@opentelemetry/api": "^1.9.0",
-    "drizzle-orm": "^0.45.1",
     "hono": "^4.12.8",
     "pg": "^8.20.0",
     "redis": "^5.11.0",
     "typeid-js": "^1.2.0"
   },
   "devDependencies": {
+    "@fast-check/vitest": "^0.3.0",
     "@mistle/test-harness": "workspace:*",
     "@types/pg": "^8.18.0",
     "@types/ws": "^8.18.1",

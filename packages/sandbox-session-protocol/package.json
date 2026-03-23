@@ -26,8 +26,5 @@
   },
   "dependencies": {
     "zod": "^4.3.6"
-  },
-  "devDependencies": {
-    "json-schema-to-typescript": "15.0.4"
   }
 }

@@ -19,14 +19,11 @@
     "format:check": "oxfmt --check ."
   },
   "dependencies": {
-    "@better-auth/drizzle-adapter": "1.5.5",
     "@hono/node-server": "^1.19.11",
     "@hono/zod-openapi": "^1.2.2",
     "@mistle/config": "workspace:*",
-    "@mistle/control-plane-internal-client": "workspace:*",
     "@mistle/data-plane-internal-client": "workspace:*",
     "@mistle/db": "workspace:*",
-    "@mistle/emails": "workspace:*",
     "@mistle/gateway-connection-auth": "workspace:*",
     "@mistle/http": "workspace:*",
     "@mistle/integrations-core": "workspace:*",
@@ -35,7 +32,6 @@
     "@mistle/telemetry": "workspace:*",
     "@mistle/time": "workspace:*",
     "@mistle/workflow-registry": "workspace:*",
-    "@openworkflow/cli": "^0.4.3",
     "better-auth": "1.5.4",
     "drizzle-orm": "^0.45.1",
     "drizzle-zod": "^0.8.3",
