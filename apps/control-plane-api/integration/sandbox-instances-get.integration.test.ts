@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import {
   automationConversationRoutes,
   automationConversations,
@@ -9,29 +7,17 @@ import {
   sandboxProfiles,
   SandboxProfileStatuses,
 } from "@mistle/db/control-plane";
-import { createDataPlaneDatabase as createDataPlaneInstanceDatabase } from "@mistle/db/data-plane";
 import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
-import {
-  DATA_PLANE_MIGRATIONS_FOLDER_PATH,
-  MigrationTracking,
-  runDataPlaneMigrations,
-} from "@mistle/db/migrator";
-import { reserveAvailablePort } from "@mistle/test-harness";
-import { Client, Pool } from "pg";
 import { afterEach, describe, expect } from "vitest";
 
-import { createDataPlaneBackend } from "../../data-plane-api/src/openworkflow/index.js";
-import { createDataPlaneApiRuntime } from "../../data-plane-api/src/runtime/index.js";
-import type { DataPlaneApiConfig } from "../../data-plane-api/src/types.js";
 import { SandboxInstanceStatusResponseSchema } from "../src/sandbox-instances/contracts.js";
+import {
+  createDisposableDataPlaneRuntime,
+  type DisposableDataPlaneRuntime,
+} from "./helpers/disposable-data-plane-runtime.js";
 import { it } from "./test-context.js";
 
-type StartedDataPlaneFixture = {
-  db: ReturnType<typeof createDataPlaneInstanceDatabase>;
-  stop: () => Promise<void>;
-};
-
-const startedDataPlaneFixtures: StartedDataPlaneFixture[] = [];
+const startedDataPlaneFixtures: DisposableDataPlaneRuntime[] = [];
 
 afterEach(async () => {
   while (startedDataPlaneFixtures.length > 0) {
@@ -42,137 +28,16 @@ afterEach(async () => {
   }
 });
 
-function parseDatabaseConnectionString(connectionString: string): {
-  username: string;
-  password: string;
-  host: string;
-  port: number;
-} {
-  const url = new URL(connectionString);
-  const port = Number(url.port);
-  if (!Number.isInteger(port) || port < 1) {
-    throw new Error("Expected database connection string to include a valid port.");
-  }
-
-  return {
-    username: decodeURIComponent(url.username),
-    password: decodeURIComponent(url.password),
-    host: url.hostname,
-    port,
-  };
-}
-
-function createDatabaseUrl(input: {
-  username: string;
-  password: string;
-  host: string;
-  port: number;
-  databaseName: string;
-}): string {
-  return `postgresql://${encodeURIComponent(input.username)}:${encodeURIComponent(input.password)}@${input.host}:${String(input.port)}/${input.databaseName}`;
-}
-
-async function createStartedDataPlaneFixture(input: {
-  controlPlaneDatabaseUrl: string;
-  internalAuthServiceToken: string;
-  workflowNamespaceId: string;
-}): Promise<StartedDataPlaneFixture> {
-  const adminConnection = parseDatabaseConnectionString(input.controlPlaneDatabaseUrl);
-  const databaseName = `mistle_cp_get_sandbox_instance_${randomUUID().replaceAll("-", "_")}`;
-  const databaseUrl = createDatabaseUrl({
-    ...adminConnection,
-    databaseName,
-  });
-  const adminClient = new Client({
-    connectionString: createDatabaseUrl({
-      ...adminConnection,
-      databaseName: "postgres",
-    }),
-  });
-
-  let runtime: Awaited<ReturnType<typeof createDataPlaneApiRuntime>> | undefined;
-  let dbPool: Pool | undefined;
-
-  await adminClient.connect();
-
-  try {
-    await adminClient.query(`CREATE DATABASE "${databaseName}"`);
-    await runDataPlaneMigrations({
-      connectionString: databaseUrl,
-      schemaName: MigrationTracking.DATA_PLANE.SCHEMA_NAME,
-      migrationsFolder: DATA_PLANE_MIGRATIONS_FOLDER_PATH,
-      migrationsSchema: MigrationTracking.DATA_PLANE.SCHEMA_NAME,
-      migrationsTable: MigrationTracking.DATA_PLANE.TABLE_NAME,
-    });
-
-    const workflowBackend = await createDataPlaneBackend({
-      url: databaseUrl,
-      namespaceId: input.workflowNamespaceId,
-      runMigrations: true,
-    });
-    await workflowBackend.stop();
-
-    dbPool = new Pool({
-      connectionString: databaseUrl,
-    });
-
-    const config: DataPlaneApiConfig = {
-      server: {
-        host: "127.0.0.1",
-        port: await reserveAvailablePort({ host: "127.0.0.1" }),
-      },
-      database: {
-        url: databaseUrl,
-      },
-      workflow: {
-        databaseUrl,
-        namespaceId: input.workflowNamespaceId,
-      },
-    };
-
-    runtime = await createDataPlaneApiRuntime({
-      app: config,
-      internalAuthServiceToken: input.internalAuthServiceToken,
-      sandboxProvider: "docker",
-    });
-    await runtime.start();
-
-    return {
-      db: createDataPlaneInstanceDatabase(dbPool),
-      stop: async () => {
-        if (runtime !== undefined) {
-          await runtime.stop();
-        }
-        if (dbPool !== undefined) {
-          await dbPool.end();
-        }
-
-        await adminClient.query(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
-        await adminClient.end();
-      },
-    };
-  } catch (error) {
-    if (runtime !== undefined) {
-      await runtime.stop();
-    }
-    if (dbPool !== undefined) {
-      await dbPool.end();
-    }
-
-    await adminClient.query(`DROP DATABASE IF EXISTS "${databaseName}" WITH (FORCE)`);
-    await adminClient.end();
-    throw error;
-  }
-}
-
 describe("sandbox instances get integration", () => {
   it("includes automation conversation metadata when the sandbox is route-bound", async ({
     fixture,
   }) => {
-    const dataPlaneFixture = await createStartedDataPlaneFixture({
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_get_sandbox_instance",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
     });
     startedDataPlaneFixtures.push(dataPlaneFixture);
 
@@ -252,10 +117,12 @@ describe("sandbox instances get integration", () => {
   it("includes pending automation conversation metadata while the route is preparing", async ({
     fixture,
   }) => {
-    const dataPlaneFixture = await createStartedDataPlaneFixture({
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_get_sandbox_instance",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
     });
     startedDataPlaneFixtures.push(dataPlaneFixture);
 
@@ -335,10 +202,12 @@ describe("sandbox instances get integration", () => {
   it("returns null automation conversation metadata when the sandbox is unbound", async ({
     fixture,
   }) => {
-    const dataPlaneFixture = await createStartedDataPlaneFixture({
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_get_sandbox_instance",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
     });
     startedDataPlaneFixtures.push(dataPlaneFixture);
 
@@ -376,10 +245,12 @@ describe("sandbox instances get integration", () => {
   it("returns the most recently updated automation conversation metadata when multiple active automation conversations match the sandbox", async ({
     fixture,
   }) => {
-    const dataPlaneFixture = await createStartedDataPlaneFixture({
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_get_sandbox_instance",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
     });
     startedDataPlaneFixtures.push(dataPlaneFixture);
 
@@ -490,10 +361,12 @@ describe("sandbox instances get integration", () => {
   it("returns the newest route even when its provider conversation id is still pending", async ({
     fixture,
   }) => {
-    const dataPlaneFixture = await createStartedDataPlaneFixture({
+    const dataPlaneFixture = await createDisposableDataPlaneRuntime({
       controlPlaneDatabaseUrl: fixture.databaseStack.directUrl,
       internalAuthServiceToken: fixture.internalAuthServiceToken,
       workflowNamespaceId: fixture.config.workflow.namespaceId,
+      databaseNamePrefix: "mistle_cp_get_sandbox_instance",
+      baseUrl: fixture.config.dataPlaneApi.baseUrl,
     });
     startedDataPlaneFixtures.push(dataPlaneFixture);
 
