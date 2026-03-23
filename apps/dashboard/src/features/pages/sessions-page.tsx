@@ -453,11 +453,11 @@ export function SessionsPage(): React.JSX.Element {
   const nextPageDisabled = sandboxInstancesQuery.isPending;
   const previousPageDisabled = sandboxInstancesQuery.isPending;
   const sessionResultsSummary =
-    sandboxInstancesQuery.data === undefined && optimisticSessions.length === 0
+    sandboxInstancesQuery.data === undefined
       ? null
       : resolveSessionResultsSummary({
-          listedSessionCount: sandboxInstancesQuery.data?.items.length ?? 0,
-          totalResults: sandboxInstancesQuery.data?.totalResults ?? 0,
+          listedSessionCount: sandboxInstancesQuery.data.items.length,
+          totalResults: sandboxInstancesQuery.data.totalResults,
           optimisticSessionCount: optimisticSessions.length,
         });
 
