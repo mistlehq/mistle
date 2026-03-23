@@ -22,7 +22,7 @@ export const dataPlaneWorkerDevelopmentPreset = {
           exchange_token_ttl_seconds: 3600,
         },
         runtime_state: {
-          gateway_base_url: "http://data-plane-gateway-relay:5202",
+          gateway_base_url: "http://127.0.0.1:5202",
         },
         sandbox: {
           tokenizer_proxy_egress_base_url:
