@@ -84,8 +84,8 @@ export function startWebSocketHealthMonitor(input: {
         markUnhealthy();
       }, input.pongTimeoutMs);
 
-      rawSocket.ping(undefined, false, (error?: Error) => {
-        if (error !== undefined) {
+      rawSocket.ping(undefined, false, (error: Error | null | undefined) => {
+        if (error != null) {
           markUnhealthy();
         }
       });
