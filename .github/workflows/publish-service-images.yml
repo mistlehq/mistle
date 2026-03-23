@@ -1,6 +1,25 @@
 name: Publish Service Images
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/publish-service-images.yml"
+      - "Dockerfile"
+      - "docker/apps/**"
+      - "apps/control-plane-api/**"
+      - "apps/control-plane-worker/**"
+      - "apps/data-plane-api/**"
+      - "apps/data-plane-worker/**"
+      - "apps/data-plane-gateway/**"
+      - "apps/tokenizer-proxy/**"
+      - "packages/**"
+      - "scripts/**"
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "tsconfig.base.json"
   workflow_dispatch:
     inputs:
       component:
@@ -33,7 +52,7 @@ concurrency:
 jobs:
   publish:
     name: Publish ${{ matrix.component }}
-    if: ${{ inputs.component == 'all' || inputs.component == matrix.component }}
+    if: ${{ github.event_name == 'push' || inputs.component == 'all' || inputs.component == matrix.component }}
     runs-on: ubuntu-latest
     timeout-minutes: 120
     strategy:
@@ -72,7 +91,7 @@ jobs:
         run: |
           tags=(--tag "${IMAGE_REPOSITORY}:${IMAGE_TAG}")
 
-          if [ "${{ inputs.publish_latest }}" = "true" ]; then
+          if [ "${{ github.event_name == 'push' || inputs.publish_latest }}" = "true" ]; then
             tags+=(--tag "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}")
           fi
 
@@ -90,7 +109,7 @@ jobs:
         run: |
           docker push "${IMAGE_REPOSITORY}:${IMAGE_TAG}"
 
-          if [ "${{ inputs.publish_latest }}" = "true" ]; then
+          if [ "${{ github.event_name == 'push' || inputs.publish_latest }}" = "true" ]; then
             docker push "${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}"
           fi
 
@@ -107,7 +126,7 @@ jobs:
             echo
             echo "- Component: \`${{ matrix.component }}\`"
             echo "- Tag: \`${IMAGE_REPOSITORY}:${IMAGE_TAG}\`"
-            if [ "${{ inputs.publish_latest }}" = "true" ]; then
+            if [ "${{ github.event_name == 'push' || inputs.publish_latest }}" = "true" ]; then
               echo "- Alias: \`${IMAGE_REPOSITORY}:${IMAGE_LATEST_TAG}\`"
             fi
             echo "- Digest: \`${{ steps.publish.outputs.image_ref }}\`"
