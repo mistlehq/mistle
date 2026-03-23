@@ -9,7 +9,7 @@ import { z } from "zod";
 import {
   encryptIntegrationTargetSecrets,
   resolveMasterEncryptionKeyMaterial,
-} from "../../src/integration-credentials/crypto.js";
+} from "../../src/lib/crypto.js";
 
 export const IntegrationTargetsProvisionManifestFileName = "integration-targets.provision.json";
 

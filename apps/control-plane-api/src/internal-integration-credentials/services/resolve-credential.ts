@@ -20,13 +20,13 @@ import {
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { resolveIntegrationTargetSecrets } from "../../integration-targets/services/resolve-target-secrets.js";
 import {
   encryptCredentialUtf8,
   decryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
-} from "../../integration-credentials/crypto.js";
-import { resolveIntegrationTargetSecrets } from "../../integration-targets/services/resolve-target-secrets.js";
+} from "../../lib/crypto.js";
 import type { AppContext } from "../../types.js";
 import {
   InternalIntegrationCredentialsError,

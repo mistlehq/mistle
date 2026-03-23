@@ -9,7 +9,7 @@ import type { IntegrationRegistry } from "@mistle/integrations-core";
 import {
   encryptRedirectSessionSecretUtf8,
   resolveMasterEncryptionKeyMaterial,
-} from "../../integration-credentials/crypto.js";
+} from "../../lib/crypto.js";
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import {
   createRedirectSessionExpiryTimestamp,

@@ -9,14 +9,14 @@ import { Pool } from "pg";
 import { describe, expect } from "vitest";
 
 import {
-  encryptIntegrationTargetSecrets,
-  resolveMasterEncryptionKeyMaterial,
-} from "../src/integration-credentials/crypto.js";
-import {
   IngestIntegrationWebhookResponseSchema,
   IntegrationWebhooksBadRequestResponseSchema,
   IntegrationWebhooksNotFoundResponseSchema,
 } from "../src/integration-webhooks/contracts.js";
+import {
+  encryptIntegrationTargetSecrets,
+  resolveMasterEncryptionKeyMaterial,
+} from "../src/lib/crypto.js";
 import { ControlPlaneOpenWorkflowSchema } from "../src/openworkflow.js";
 import { it } from "./test-context.js";
 

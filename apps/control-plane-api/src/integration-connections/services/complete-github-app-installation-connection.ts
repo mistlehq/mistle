@@ -16,7 +16,7 @@ import {
   encryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
-} from "../../integration-credentials/crypto.js";
+} from "../../lib/crypto.js";
 import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import { createRedirectQueryParams, resolveRedirectDisplayName } from "./redirect-flow.js";
 import { resolveGitHubAppInstallationHandlerTargetOrThrow } from "./resolve-github-app-installation-handler.js";
