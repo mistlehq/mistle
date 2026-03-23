@@ -10,20 +10,23 @@ const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
   { session }: AppSession,
 ) => {
-  const params = ctx.req.valid("param");
-  const body = ctx.req.valid("json");
+  const config = ctx.get("config");
+  const db = ctx.get("db");
+  const integrationRegistry = ctx.get("integrationRegistry");
+  const { targetKey } = ctx.req.valid("param");
+  const { displayName } = ctx.req.valid("json");
 
   const startedConnection = await startOAuth2Connection(
     {
-      db: ctx.get("db"),
-      integrationRegistry: ctx.get("integrationRegistry"),
-      integrationsConfig: ctx.get("config").integrations,
+      db,
+      integrationRegistry,
+      integrationsConfig: config.integrations,
     },
     {
       organizationId: session.activeOrganizationId,
-      targetKey: params.targetKey,
-      controlPlaneBaseUrl: ctx.get("config").auth.baseUrl,
-      ...(body?.displayName === undefined ? {} : { displayName: body.displayName }),
+      targetKey,
+      controlPlaneBaseUrl: config.auth.baseUrl,
+      ...(displayName === undefined ? {} : { displayName }),
     },
   );
 

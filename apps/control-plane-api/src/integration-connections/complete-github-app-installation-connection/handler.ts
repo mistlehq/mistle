@@ -13,22 +13,25 @@ function buildDashboardIntegrationsUrl(dashboardBaseUrl: string): string {
 }
 
 const routeHandler = async (ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0]) => {
-  const params = ctx.req.valid("param");
+  const config = ctx.get("config");
+  const db = ctx.get("db");
+  const integrationRegistry = ctx.get("integrationRegistry");
+  const { targetKey } = ctx.req.valid("param");
   const query = ctx.req.valid("query");
 
   await completeGitHubAppInstallationConnection(
     {
-      db: ctx.get("db"),
-      integrationRegistry: ctx.get("integrationRegistry"),
-      integrationsConfig: ctx.get("config").integrations,
+      db,
+      integrationRegistry,
+      integrationsConfig: config.integrations,
     },
     {
-      targetKey: params.targetKey,
+      targetKey,
       query,
     },
   );
 
-  return ctx.redirect(buildDashboardIntegrationsUrl(ctx.get("config").dashboard.baseUrl), 302);
+  return ctx.redirect(buildDashboardIntegrationsUrl(config.dashboard.baseUrl), 302);
 };
 
 export const handler: RouteHandler<typeof route, AppContextBindings> =

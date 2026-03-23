@@ -10,13 +10,17 @@ const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
   { session }: AppSession,
 ) => {
+  const db = ctx.get("db");
+  const integrationRegistry = ctx.get("integrationRegistry");
+  const query = ctx.req.valid("query");
+
   const result = await listIntegrationConnections(
     {
-      db: ctx.get("db"),
-      integrationRegistry: ctx.get("integrationRegistry"),
+      db,
+      integrationRegistry,
     },
     {
-      ...ctx.req.valid("query"),
+      ...query,
       organizationId: session.activeOrganizationId,
     },
   );

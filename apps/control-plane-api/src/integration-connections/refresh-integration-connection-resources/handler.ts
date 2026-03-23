@@ -10,18 +10,21 @@ const routeHandler = async (
   ctx: Parameters<RouteHandler<typeof route, AppContextBindings>>[0],
   { session }: AppSession,
 ) => {
-  const params = ctx.req.valid("param");
+  const db = ctx.get("db");
+  const integrationRegistry = ctx.get("integrationRegistry");
+  const openWorkflow = ctx.get("openWorkflow");
+  const { connectionId, kind } = ctx.req.valid("param");
 
   const result = await requestIntegrationConnectionResourceRefresh(
     {
-      db: ctx.get("db"),
-      integrationRegistry: ctx.get("integrationRegistry"),
-      openWorkflow: ctx.get("openWorkflow"),
+      db,
+      integrationRegistry,
+      openWorkflow,
     },
     {
       organizationId: session.activeOrganizationId,
-      connectionId: params.connectionId,
-      kind: params.kind,
+      connectionId,
+      kind,
     },
   );
 
