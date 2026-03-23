@@ -1,0 +1,83 @@
+{{- if .Values.valkey.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "mistle.componentName" (dict "root" . "component" "valkey") }}
+  namespace: {{ include "mistle.namespace" . }}
+  labels:
+    {{- include "mistle.labels" . | nindent 4 }}
+    {{- include "mistle.componentLabels" (dict "root" . "component" "valkey") | nindent 4 }}
+spec:
+  selector:
+    {{- include "mistle.componentSelectorLabels" (dict "root" . "component" "valkey") | nindent 4 }}
+  ports:
+    - name: valkey
+      port: {{ .Values.valkey.service.port }}
+      targetPort: {{ .Values.valkey.service.port }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mistle.componentName" (dict "root" . "component" "valkey") }}
+  namespace: {{ include "mistle.namespace" . }}
+  labels:
+    {{- include "mistle.labels" . | nindent 4 }}
+    {{- include "mistle.componentLabels" (dict "root" . "component" "valkey") | nindent 4 }}
+spec:
+  serviceName: {{ include "mistle.componentName" (dict "root" . "component" "valkey") }}
+  replicas: {{ .Values.valkey.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mistle.componentSelectorLabels" (dict "root" . "component" "valkey") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mistle.componentSelectorLabels" (dict "root" . "component" "valkey") | nindent 8 }}
+      {{- with .Values.global.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . }}
+        {{- end }}
+      {{- end }}
+      containers:
+        - name: valkey
+          image: {{ include "mistle.image" (dict "root" . "image" .Values.valkey.image) }}
+          imagePullPolicy: {{ .Values.valkey.image.pullPolicy }}
+          args:
+            - --port
+            - {{ .Values.valkey.service.port | quote }}
+          ports:
+            - name: valkey
+              containerPort: {{ .Values.valkey.service.port }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          {{- with .Values.valkey.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      {{- if not .Values.valkey.persistence.enabled }}
+      volumes:
+        - name: data
+          emptyDir: {}
+      {{- end }}
+  {{- if .Values.valkey.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        {{- if .Values.valkey.persistence.storageClassName }}
+        storageClassName: {{ .Values.valkey.persistence.storageClassName }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.valkey.persistence.size }}
+  {{- end }}
+{{- end }}

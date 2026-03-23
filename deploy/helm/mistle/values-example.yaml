@@ -1,0 +1,332 @@
+global:
+  namespaceOverride: mistle
+  imageRegistry: ghcr.io/mistlehq
+
+controlPlaneApi:
+  image:
+    repository: control-plane-api
+    digest: sha256:replace-with-control-plane-api-digest
+  ingress:
+    enabled: true
+    className: nginx
+    host: api.example.com
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: MISTLE_GLOBAL_TELEMETRY_ENABLED
+      value: "true"
+    - name: MISTLE_GLOBAL_TELEMETRY_DEBUG
+      value: "false"
+    - name: MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT
+      value: http://otel-collector:4318/v1/traces
+    - name: MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT
+      value: http://otel-collector:4318/v1/logs
+    - name: MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT
+      value: http://otel-collector:4318/v1/metrics
+    - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
+      value: deployment.environment=production
+    - name: MISTLE_GLOBAL_SANDBOX_PROVIDER
+      value: modal
+    - name: MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE
+      value: ghcr.io/mistlehq/sandbox-base:0123456789abcdef
+    - name: MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL
+      value: wss://gateway.example.com/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL
+      value: ws://mistle-data-plane-gateway:8084/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER
+      value: control-plane-api
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER
+      value: data-plane-worker
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_APPS_CONTROL_PLANE_API_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_CONTROL_PLANE_API_PORT
+      value: "8080"
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL
+      value: https://api.example.com
+    - name: MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL
+      value: https://app.example.com
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS
+      value: https://app.example.com
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_LENGTH
+      value: "6"
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_EXPIRES_IN_SECONDS
+      value: "300"
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_ALLOWED_ATTEMPTS
+      value: "3"
+    - name: MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID
+      value: production
+    - name: MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL
+      value: http://mistle-data-plane-api:8082
+    - name: MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION
+      value: "1"
+  secretEnv:
+    - name: MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN
+      secretName: mistle-runtime
+      secretKey: MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET
+      secretName: mistle-runtime
+      secretKey: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
+      secretName: mistle-runtime
+      secretKey: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
+    - name: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL
+    - name: MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_SECRET
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_API_AUTH_SECRET
+    - name: MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON
+
+controlPlaneWorker:
+  image:
+    repository: control-plane-worker
+    digest: sha256:replace-with-control-plane-worker-digest
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: MISTLE_GLOBAL_TELEMETRY_ENABLED
+      value: "true"
+    - name: MISTLE_GLOBAL_TELEMETRY_DEBUG
+      value: "false"
+    - name: MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT
+      value: http://otel-collector:4318/v1/traces
+    - name: MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT
+      value: http://otel-collector:4318/v1/logs
+    - name: MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT
+      value: http://otel-collector:4318/v1/metrics
+    - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
+      value: deployment.environment=production
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_PORT
+      value: "8081"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID
+      value: production
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS
+      value: "true"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY
+      value: "4"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_EMAIL_FROM_ADDRESS
+      value: no-reply@example.com
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_EMAIL_FROM_NAME
+      value: Mistle
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_HOST
+      value: smtp.resend.com
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT
+      value: "587"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE
+      value: "false"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL
+      value: http://mistle-data-plane-api:8082
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL
+      value: http://mistle-control-plane-api:8080
+  secretEnv:
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_USERNAME
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_USERNAME
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PASSWORD
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PASSWORD
+
+dataPlaneApi:
+  image:
+    repository: data-plane-api
+    digest: sha256:replace-with-data-plane-api-digest
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: MISTLE_GLOBAL_TELEMETRY_ENABLED
+      value: "true"
+    - name: MISTLE_GLOBAL_TELEMETRY_DEBUG
+      value: "false"
+    - name: MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT
+      value: http://otel-collector:4318/v1/traces
+    - name: MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT
+      value: http://otel-collector:4318/v1/logs
+    - name: MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT
+      value: http://otel-collector:4318/v1/metrics
+    - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
+      value: deployment.environment=production
+    - name: MISTLE_APPS_DATA_PLANE_API_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_DATA_PLANE_API_PORT
+      value: "8082"
+    - name: MISTLE_APPS_DATA_PLANE_API_WORKFLOW_NAMESPACE_ID
+      value: production
+  secretEnv:
+    - name: MISTLE_APPS_DATA_PLANE_API_DATABASE_URL
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_DATA_PLANE_API_DATABASE_URL
+    - name: MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_DATA_PLANE_API_WORKFLOW_DATABASE_URL
+
+dataPlaneWorker:
+  image:
+    repository: data-plane-worker
+    digest: sha256:replace-with-data-plane-worker-digest
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: MISTLE_GLOBAL_TELEMETRY_ENABLED
+      value: "true"
+    - name: MISTLE_GLOBAL_TELEMETRY_DEBUG
+      value: "false"
+    - name: MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT
+      value: http://otel-collector:4318/v1/traces
+    - name: MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT
+      value: http://otel-collector:4318/v1/logs
+    - name: MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT
+      value: http://otel-collector:4318/v1/metrics
+    - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
+      value: deployment.environment=production
+    - name: MISTLE_GLOBAL_SANDBOX_PROVIDER
+      value: modal
+    - name: MISTLE_GLOBAL_SANDBOX_DEFAULT_BASE_IMAGE
+      value: ghcr.io/mistlehq/sandbox-base:0123456789abcdef
+    - name: MISTLE_GLOBAL_SANDBOX_GATEWAY_WS_URL
+      value: wss://gateway.example.com/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_INTERNAL_GATEWAY_WS_URL
+      value: ws://mistle-data-plane-gateway:8084/tunnel/sandbox
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER
+      value: data-plane-worker
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_PORT
+      value: "8083"
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_NAMESPACE_ID
+      value: production
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS
+      value: "true"
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_CONCURRENCY
+      value: "4"
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_BOOTSTRAP_TOKEN_TTL_SECONDS
+      value: "120"
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_TUNNEL_EXCHANGE_TOKEN_TTL_SECONDS
+      value: "3600"
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_RUNTIME_STATE_GATEWAY_BASE_URL
+      value: http://mistle-data-plane-gateway:8084
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_TOKENIZER_PROXY_EGRESS_BASE_URL
+      value: https://api.example.com/tokenizer-proxy/egress
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_APP_NAME
+      value: mistle-sandbox
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_ENVIRONMENT_NAME
+      value: production
+    # For the docker sandbox provider, switch MISTLE_GLOBAL_SANDBOX_PROVIDER to docker
+    # and use the following keys instead of the modal keys above:
+    # - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_SOCKET_PATH
+    #   value: /var/run/docker.sock
+    # - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_NETWORK_NAME
+    #   value: mistle
+    # - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_DOCKER_TRACES_ENDPOINT
+    #   value: http://otel-collector:4318/v1/traces
+  secretEnv:
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
+      secretName: mistle-runtime
+      secretKey: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_DATA_PLANE_WORKER_DATABASE_URL
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_DATA_PLANE_WORKER_WORKFLOW_DATABASE_URL
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_ID
+    - name: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_DATA_PLANE_WORKER_SANDBOX_MODAL_TOKEN_SECRET
+
+dataPlaneGateway:
+  image:
+    repository: data-plane-gateway
+    digest: sha256:replace-with-data-plane-gateway-digest
+  ingress:
+    enabled: true
+    className: nginx
+    host: gateway.example.com
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: MISTLE_GLOBAL_TELEMETRY_ENABLED
+      value: "true"
+    - name: MISTLE_GLOBAL_TELEMETRY_DEBUG
+      value: "false"
+    - name: MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT
+      value: http://otel-collector:4318/v1/traces
+    - name: MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT
+      value: http://otel-collector:4318/v1/logs
+    - name: MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT
+      value: http://otel-collector:4318/v1/metrics
+    - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
+      value: deployment.environment=production
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_ISSUER
+      value: control-plane-api
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_ISSUER
+      value: data-plane-worker
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_AUDIENCE
+      value: data-plane-gateway
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_PORT
+      value: "8084"
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_BACKEND
+      value: valkey
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_URL
+      value: redis://mistle-valkey:6379
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_RUNTIME_STATE_VALKEY_KEY_PREFIX
+      value: mistle:runtime-state
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_DATA_PLANE_API_BASE_URL
+      value: http://mistle-data-plane-api:8082
+  secretEnv:
+    - name: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET
+      secretName: mistle-runtime
+      secretKey: MISTLE_GLOBAL_SANDBOX_CONNECT_TOKEN_SECRET
+    - name: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
+      secretName: mistle-runtime
+      secretKey: MISTLE_GLOBAL_SANDBOX_BOOTSTRAP_TOKEN_SECRET
+    - name: MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_DATA_PLANE_GATEWAY_DATABASE_URL
+
+tokenizerProxy:
+  image:
+    repository: tokenizer-proxy
+    digest: sha256:replace-with-tokenizer-proxy-digest
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: MISTLE_GLOBAL_TELEMETRY_ENABLED
+      value: "true"
+    - name: MISTLE_GLOBAL_TELEMETRY_DEBUG
+      value: "false"
+    - name: MISTLE_GLOBAL_TELEMETRY_TRACES_ENDPOINT
+      value: http://otel-collector:4318/v1/traces
+    - name: MISTLE_GLOBAL_TELEMETRY_LOGS_ENDPOINT
+      value: http://otel-collector:4318/v1/logs
+    - name: MISTLE_GLOBAL_TELEMETRY_METRICS_ENDPOINT
+      value: http://otel-collector:4318/v1/metrics
+    - name: MISTLE_GLOBAL_TELEMETRY_RESOURCE_ATTRIBUTES
+      value: deployment.environment=production
+    - name: MISTLE_APPS_TOKENIZER_PROXY_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_TOKENIZER_PROXY_PORT
+      value: "8085"
+    - name: MISTLE_APPS_TOKENIZER_PROXY_CONTROL_PLANE_API_BASE_URL
+      value: http://mistle-control-plane-api:8080

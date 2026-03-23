@@ -2,6 +2,14 @@
 
 User-facing documentation will be added here.
 
+## Deployment Packaging
+
+Kubernetes application packaging for Mistle lives under:
+
+- `deploy/helm/mistle/`
+
+Use this chart to deploy Mistle on Kubernetes.
+
 ## For Developers
 
 Local development is Nix-first.

@@ -1,0 +1,52 @@
+{{- if .Values.controlPlaneApi.enabled }}
+{{ include "mistle.workload" (dict "root" . "component" "control-plane-api" "values" .Values.controlPlaneApi) }}
+---
+{{- end }}
+{{- if and .Values.controlPlaneApi.enabled .Values.controlPlaneApi.service.enabled }}
+{{ include "mistle.service" (dict "root" . "component" "control-plane-api" "values" .Values.controlPlaneApi) }}
+---
+{{- end }}
+
+{{- if .Values.controlPlaneWorker.enabled }}
+{{ include "mistle.workload" (dict "root" . "component" "control-plane-worker" "values" .Values.controlPlaneWorker) }}
+---
+{{- end }}
+{{- if and .Values.controlPlaneWorker.enabled .Values.controlPlaneWorker.service.enabled }}
+{{ include "mistle.service" (dict "root" . "component" "control-plane-worker" "values" .Values.controlPlaneWorker) }}
+---
+{{- end }}
+
+{{- if .Values.dataPlaneApi.enabled }}
+{{ include "mistle.workload" (dict "root" . "component" "data-plane-api" "values" .Values.dataPlaneApi) }}
+---
+{{- end }}
+{{- if and .Values.dataPlaneApi.enabled .Values.dataPlaneApi.service.enabled }}
+{{ include "mistle.service" (dict "root" . "component" "data-plane-api" "values" .Values.dataPlaneApi) }}
+---
+{{- end }}
+
+{{- if .Values.dataPlaneWorker.enabled }}
+{{ include "mistle.workload" (dict "root" . "component" "data-plane-worker" "values" .Values.dataPlaneWorker) }}
+---
+{{- end }}
+{{- if and .Values.dataPlaneWorker.enabled .Values.dataPlaneWorker.service.enabled }}
+{{ include "mistle.service" (dict "root" . "component" "data-plane-worker" "values" .Values.dataPlaneWorker) }}
+---
+{{- end }}
+
+{{- if .Values.dataPlaneGateway.enabled }}
+{{ include "mistle.workload" (dict "root" . "component" "data-plane-gateway" "values" .Values.dataPlaneGateway) }}
+---
+{{- end }}
+{{- if and .Values.dataPlaneGateway.enabled .Values.dataPlaneGateway.service.enabled }}
+{{ include "mistle.service" (dict "root" . "component" "data-plane-gateway" "values" .Values.dataPlaneGateway) }}
+---
+{{- end }}
+
+{{- if .Values.tokenizerProxy.enabled }}
+{{ include "mistle.workload" (dict "root" . "component" "tokenizer-proxy" "values" .Values.tokenizerProxy) }}
+---
+{{- end }}
+{{- if and .Values.tokenizerProxy.enabled .Values.tokenizerProxy.service.enabled }}
+{{ include "mistle.service" (dict "root" . "component" "tokenizer-proxy" "values" .Values.tokenizerProxy) }}
+{{- end }}
