@@ -24,6 +24,39 @@ function isMissingPersistedThreadError(error: unknown): boolean {
   );
 }
 
+function isNoRolloutPersistedThreadError(error: unknown): boolean {
+  if (!(error instanceof CodexJsonRpcRequestError)) {
+    return false;
+  }
+
+  return (
+    error.message.startsWith("JSON-RPC request") &&
+    error.message.includes("no rollout found for thread id ")
+  );
+}
+
+export type ReconnectResumeFailureAction = "error_missing_persisted" | "start_new" | "rethrow";
+
+export function resolveReconnectResumeFailureAction(input: {
+  error: unknown;
+  preferredThreadId: string | null;
+  selectedThreadId: string;
+}): ReconnectResumeFailureAction {
+  if (
+    input.preferredThreadId !== null &&
+    input.selectedThreadId === input.preferredThreadId &&
+    isMissingPersistedThreadError(input.error)
+  ) {
+    return "error_missing_persisted";
+  }
+
+  if (isMissingPersistedThreadError(input.error) || isNoRolloutPersistedThreadError(input.error)) {
+    return "start_new";
+  }
+
+  return "rethrow";
+}
+
 export type CodexConnectionBootstrapResult = {
   generation: number;
   sandboxInstanceId: string;
@@ -67,17 +100,34 @@ export async function establishInitialCodexThread(input: {
         threadId: action.threadId,
       });
     } catch (error) {
-      if (
-        input.preferredThreadId !== null &&
-        action.threadId === input.preferredThreadId &&
-        isMissingPersistedThreadError(error)
-      ) {
+      const failureAction = resolveReconnectResumeFailureAction({
+        error,
+        preferredThreadId: input.preferredThreadId,
+        selectedThreadId: action.threadId,
+      });
+
+      if (failureAction === "error_missing_persisted") {
         throw describeCodexSessionStepError(
           "Resuming persisted chat session",
           new Error(
             `This chat session could not be resumed because the linked persisted session '${input.preferredThreadId}' is no longer available.`,
           ),
         );
+      }
+
+      if (failureAction === "start_new") {
+        const startedThread = await startCodexThread({
+          rpcClient: input.rpcClient,
+          model: DefaultCodexModel,
+        });
+        input.ensureCurrentGeneration(input.generation);
+
+        return {
+          generation: input.generation,
+          sandboxInstanceId: input.sandboxInstanceId,
+          mintedConnection: input.mintedConnection,
+          threadId: startedThread.threadId,
+        };
       }
 
       throw error;
