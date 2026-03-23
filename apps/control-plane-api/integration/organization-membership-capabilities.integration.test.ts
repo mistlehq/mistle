@@ -3,7 +3,7 @@ import { describe, expect } from "vitest";
 import {
   MembershipCapabilitiesErrorResponseSchema,
   MembershipCapabilitiesSuccessResponseSchema,
-} from "../src/organization-membership-capabilities/contracts.js";
+} from "../src/organization-membership-capabilities/index.js";
 import { it } from "./test-context.js";
 
 describe("organization membership capabilities integration", () => {

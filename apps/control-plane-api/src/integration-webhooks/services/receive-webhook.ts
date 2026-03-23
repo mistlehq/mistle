@@ -3,6 +3,7 @@ import {
   integrationWebhookEvents,
   IntegrationWebhookEventStatuses,
 } from "@mistle/db/control-plane";
+import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   IntegrationWebhookError,
   WebhookErrorCodes,
@@ -23,10 +24,8 @@ import {
 import type { AppContext } from "../../types.js";
 import {
   IntegrationWebhooksBadRequestCodes,
-  IntegrationWebhooksBadRequestError,
   IntegrationWebhooksNotFoundCodes,
-  IntegrationWebhooksNotFoundError,
-} from "./errors.js";
+} from "../constants.js";
 
 export type ReceiveIntegrationWebhookInput = {
   targetKey: string;
@@ -86,7 +85,7 @@ async function resolveConnectionSecretsOrThrow(input: {
   const connection = input.connectionsById.get(input.connectionId);
 
   if (connection === undefined) {
-    throw new IntegrationWebhooksBadRequestError(
+    throw new BadRequestError(
       IntegrationWebhooksBadRequestCodes.INVALID_WEBHOOK_REQUEST,
       `Webhook connection '${input.connectionId}' is not an active connection for this target.`,
     );
@@ -111,9 +110,15 @@ async function resolveConnectionSecretsOrThrow(input: {
 }
 
 export async function receiveIntegrationWebhook(
-  db: AppContext["var"]["db"],
-  integrationRegistry: AppContext["var"]["integrationRegistry"],
-  integrationsConfig: AppContext["var"]["config"]["integrations"],
+  {
+    db,
+    integrationRegistry,
+    integrationsConfig,
+  }: {
+    db: AppContext["var"]["db"];
+    integrationRegistry: AppContext["var"]["integrationRegistry"];
+    integrationsConfig: AppContext["var"]["config"]["integrations"];
+  },
   input: ReceiveIntegrationWebhookInput,
 ): Promise<ReceivedIntegrationWebhook> {
   const target = await db.query.integrationTargets.findFirst({
@@ -122,7 +127,7 @@ export async function receiveIntegrationWebhook(
   });
 
   if (target === undefined) {
-    throw new IntegrationWebhooksNotFoundError(
+    throw new NotFoundError(
       IntegrationWebhooksNotFoundCodes.TARGET_NOT_FOUND,
       `Integration target '${input.targetKey}' was not found.`,
     );
@@ -199,13 +204,13 @@ export async function receiveIntegrationWebhook(
   } catch (error) {
     if (error instanceof IntegrationWebhookError) {
       if (error.code === WebhookErrorCodes.WEBHOOK_CONNECTION_NOT_FOUND) {
-        throw new IntegrationWebhooksNotFoundError(
+        throw new NotFoundError(
           IntegrationWebhooksNotFoundCodes.CONNECTION_NOT_FOUND,
           error.message,
         );
       }
 
-      throw new IntegrationWebhooksBadRequestError(
+      throw new BadRequestError(
         IntegrationWebhooksBadRequestCodes.INVALID_WEBHOOK_REQUEST,
         error.message,
       );

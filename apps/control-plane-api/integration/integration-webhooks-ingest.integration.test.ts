@@ -12,7 +12,7 @@ import {
   IngestIntegrationWebhookResponseSchema,
   IntegrationWebhooksBadRequestResponseSchema,
   IntegrationWebhooksNotFoundResponseSchema,
-} from "../src/integration-webhooks/contracts.js";
+} from "../src/integration-webhooks/index.js";
 import {
   encryptIntegrationTargetSecrets,
   resolveMasterEncryptionKeyMaterial,

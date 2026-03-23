@@ -79,9 +79,11 @@ describe("receive integration webhook immediate response integration", () => {
     });
 
     const receivedWebhook = await receiveIntegrationWebhook(
-      fixture.db,
-      registry,
-      fixture.config.integrations,
+      {
+        db: fixture.db,
+        integrationRegistry: registry,
+        integrationsConfig: fixture.config.integrations,
+      },
       {
         targetKey,
         headers: {

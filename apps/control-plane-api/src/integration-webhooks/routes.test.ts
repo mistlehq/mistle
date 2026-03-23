@@ -1,7 +1,7 @@
 import type { IntegrationWebhookImmediateResponse } from "@mistle/integrations-core";
 import { describe, expect, it } from "vitest";
 
-import { createImmediateWebhookResponse } from "./routes.js";
+import { createImmediateWebhookResponse } from "./create-immediate-webhook-response.js";
 
 describe("integration webhooks app", () => {
   it("serializes JSON response bodies with a default application/json content type", async () => {
