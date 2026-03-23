@@ -1,8 +1,10 @@
+import { CodexJsonRpcRequestError } from "@mistle/integrations-definitions/openai/agent/client";
 import { describe, expect, it } from "vitest";
 
 import {
   createConnectedCodexSession,
   resolveInitialCodexThreadAction,
+  resolveReconnectResumeFailureAction,
 } from "./codex-session-connect.js";
 
 describe("codex session connect", () => {
@@ -78,6 +80,66 @@ describe("codex session connect", () => {
     ).toEqual({
       type: "start_new",
     });
+  });
+
+  it("starts a new thread when a reconnect-selected thread has no rollout", () => {
+    expect(
+      resolveReconnectResumeFailureAction({
+        error: new CodexJsonRpcRequestError({
+          method: "thread/resume",
+          id: 5,
+          code: -32600,
+          message: "no rollout found for thread id thread_empty",
+        }),
+        preferredThreadId: null,
+        selectedThreadId: "thread_empty",
+      }),
+    ).toBe("start_new");
+  });
+
+  it("starts a new thread when a non-persisted reconnect-selected thread is missing", () => {
+    expect(
+      resolveReconnectResumeFailureAction({
+        error: new CodexJsonRpcRequestError({
+          method: "thread/resume",
+          id: 6,
+          code: -32600,
+          message: "thread not found: thread_missing",
+        }),
+        preferredThreadId: null,
+        selectedThreadId: "thread_missing",
+      }),
+    ).toBe("start_new");
+  });
+
+  it("keeps the explicit error when the persisted linked thread is missing", () => {
+    expect(
+      resolveReconnectResumeFailureAction({
+        error: new CodexJsonRpcRequestError({
+          method: "thread/resume",
+          id: 7,
+          code: -32600,
+          message: "invalid thread id: thread_persisted",
+        }),
+        preferredThreadId: "thread_persisted",
+        selectedThreadId: "thread_persisted",
+      }),
+    ).toBe("error_broken_persisted");
+  });
+
+  it("keeps the explicit error when the persisted linked thread has no rollout", () => {
+    expect(
+      resolveReconnectResumeFailureAction({
+        error: new CodexJsonRpcRequestError({
+          method: "thread/resume",
+          id: 8,
+          code: -32600,
+          message: "no rollout found for thread id thread_persisted",
+        }),
+        preferredThreadId: "thread_persisted",
+        selectedThreadId: "thread_persisted",
+      }),
+    ).toBe("error_broken_persisted");
   });
 
   it("builds the connected session snapshot from the minted connection", () => {
