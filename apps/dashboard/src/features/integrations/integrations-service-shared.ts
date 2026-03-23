@@ -120,6 +120,7 @@ export const IntegrationConnectionSchema = z
     displayName: z.string().min(1),
     status: z.enum(["active", "error", "revoked"]),
     bindingCount: z.number().int().min(0).optional(),
+    automationCount: z.number().int().min(0).optional(),
     externalSubjectId: z.string().min(1).optional(),
     config: z.record(z.string(), z.unknown()).optional(),
     targetSnapshotConfig: z.record(z.string(), z.unknown()).optional(),

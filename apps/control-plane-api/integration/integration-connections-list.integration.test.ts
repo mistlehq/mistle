@@ -135,6 +135,24 @@ describe("integration connections list integration", () => {
       kind: "git",
       config: {},
     });
+    await fixture.db.insert(automations).values({
+      id: "atm_001",
+      organizationId: firstOrgSession.organizationId,
+      kind: AutomationKinds.WEBHOOK,
+      name: "GitHub webhook automation",
+      enabled: true,
+    });
+    await fixture.db.insert(webhookAutomations).values({
+      automationId: "atm_001",
+      integrationConnectionId: "icn_002",
+      eventTypes: ["response.created"],
+      payloadFilter: {
+        type: "response.created",
+      },
+      inputTemplate: "Handle payload",
+      conversationKeyTemplate: "conversation",
+      idempotencyKeyTemplate: "dedupe",
+    });
 
     const firstPageResponse = await fixture.request("/v1/integration/connections?limit=2", {
       headers: {
@@ -159,6 +177,7 @@ describe("integration connections list integration", () => {
         displayName: "GitHub Main",
         status: IntegrationConnectionStatuses.ACTIVE,
         bindingCount: 1,
+        automationCount: 0,
         externalSubjectId: "github-user-1",
         config: {
           installation_id: "12345",
@@ -196,6 +215,7 @@ describe("integration connections list integration", () => {
         displayName: "OpenAI Backup",
         status: IntegrationConnectionStatuses.ERROR,
         bindingCount: 0,
+        automationCount: 1,
         createdAt: secondConnectionCreatedAt.toISOString(),
         updatedAt: secondConnectionCreatedAt.toISOString(),
       },
@@ -233,6 +253,7 @@ describe("integration connections list integration", () => {
         displayName: "GitHub Revoked",
         status: IntegrationConnectionStatuses.REVOKED,
         bindingCount: 0,
+        automationCount: 0,
         resources: [
           {
             kind: "repository",

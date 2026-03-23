@@ -562,6 +562,7 @@ export interface paths {
           content: {
             "application/json": {
               items: {
+                automationCount?: number;
                 bindingCount?: number;
                 config?: {
                   [key: string]: unknown;
@@ -686,6 +687,7 @@ export interface paths {
           };
           content: {
             "application/json": {
+              automationCount?: number;
               bindingCount?: number;
               config?: {
                 [key: string]: unknown;
@@ -894,6 +896,7 @@ export interface paths {
           };
           content: {
             "application/json": {
+              automationCount?: number;
               bindingCount?: number;
               config?: {
                 [key: string]: unknown;
@@ -1273,6 +1276,7 @@ export interface paths {
           };
           content: {
             "application/json": {
+              automationCount?: number;
               bindingCount?: number;
               config?: {
                 [key: string]: unknown;

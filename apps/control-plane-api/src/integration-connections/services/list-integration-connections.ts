@@ -1,6 +1,7 @@
 import {
   integrationConnections,
   sandboxProfileVersionIntegrationBindings,
+  webhookAutomations,
   type ControlPlaneDatabase,
   type IntegrationConnection,
   type IntegrationConnectionResourceState,
@@ -52,6 +53,7 @@ type IntegrationConnectionListItem = {
   displayName: string;
   status: IntegrationConnectionStatus;
   bindingCount: number;
+  automationCount: number;
   externalSubjectId?: string;
   config?: Record<string, unknown>;
   targetSnapshotConfig?: Record<string, unknown>;
@@ -174,6 +176,10 @@ export async function listIntegrationConnections(
       db,
       connectionIds: result.items.map((connection) => connection.id),
     });
+    const automationCountsByConnectionId = await listAutomationCountsByConnectionId({
+      db,
+      connectionIds: result.items.map((connection) => connection.id),
+    });
 
     return {
       ...result,
@@ -186,6 +192,7 @@ export async function listIntegrationConnections(
         displayName: connection.displayName,
         status: connection.status,
         bindingCount: bindingCountsByConnectionId.get(connection.id) ?? 0,
+        automationCount: automationCountsByConnectionId.get(connection.id) ?? 0,
         ...(connection.externalSubjectId === null
           ? {}
           : { externalSubjectId: connection.externalSubjectId }),
@@ -230,6 +237,28 @@ async function listBindingCountsByConnectionId(input: {
     .groupBy(sandboxProfileVersionIntegrationBindings.connectionId);
 
   return new Map(bindingCounts.map((entry) => [entry.connectionId, entry.bindingCount] as const));
+}
+
+async function listAutomationCountsByConnectionId(input: {
+  db: ControlPlaneDatabase;
+  connectionIds: readonly string[];
+}): Promise<Map<string, number>> {
+  if (input.connectionIds.length === 0) {
+    return new Map();
+  }
+
+  const automationCounts = await input.db
+    .select({
+      connectionId: webhookAutomations.integrationConnectionId,
+      automationCount: sql<number>`count(*)::int`,
+    })
+    .from(webhookAutomations)
+    .where(inArray(webhookAutomations.integrationConnectionId, [...input.connectionIds]))
+    .groupBy(webhookAutomations.integrationConnectionId);
+
+  return new Map(
+    automationCounts.map((entry) => [entry.connectionId, entry.automationCount] as const),
+  );
 }
 
 function normalizeTimestamp(value: string | Date): string {

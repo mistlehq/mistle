@@ -1224,6 +1224,10 @@
                             "type": "integer",
                             "minimum": 0
                           },
+                          "automationCount": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
                           "externalSubjectId": {
                             "type": "string",
                             "minLength": 1
@@ -1962,6 +1966,10 @@
                       "type": "integer",
                       "minimum": 0
                     },
+                    "automationCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
                     "externalSubjectId": {
                       "type": "string",
                       "minLength": 1
@@ -2193,6 +2201,10 @@
                       "enum": ["active", "error", "revoked"]
                     },
                     "bindingCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "automationCount": {
                       "type": "integer",
                       "minimum": 0
                     },
@@ -2565,6 +2577,10 @@
                       "enum": ["active", "error", "revoked"]
                     },
                     "bindingCount": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "automationCount": {
                       "type": "integer",
                       "minimum": 0
                     },
