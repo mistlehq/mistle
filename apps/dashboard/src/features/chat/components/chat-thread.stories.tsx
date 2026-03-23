@@ -1,12 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
-  CodexStoryChatThreadEntries,
-  CodexStoryChatThreadEntriesWithExploringGroup,
-  CodexStoryChatThreadEntriesWithGenericItem,
-  CodexStoryChatThreadEntriesWithStructuredPlan,
-  CodexStoryChatThreadEntriesWithThinkingGroup,
-} from "../../session-agents/codex/fixtures/chat-story-fixtures.js";
+  CodexFixtureChatThreadEntries,
+  CodexFixtureChatThreadEntriesWithExploringGroup,
+  CodexFixtureChatThreadEntriesWithGenericItem,
+  CodexFixtureChatThreadEntriesWithStructuredPlan,
+  CodexFixtureChatThreadEntriesWithThinkingGroup,
+} from "../../session-agents/codex/fixtures/chat-fixtures.js";
 import { ChatThread } from "./chat-thread.js";
 
 const meta = {
@@ -24,7 +24,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   args: {
-    entries: CodexStoryChatThreadEntries,
+    entries: CodexFixtureChatThreadEntries,
     isRespondingToServerRequest: false,
     onRespondToServerRequest: function onRespondToServerRequest() {},
     pendingServerRequests: [],
@@ -33,7 +33,7 @@ export const Default: Story = {
 
 export const WithExploringGroup: Story = {
   args: {
-    entries: CodexStoryChatThreadEntriesWithExploringGroup,
+    entries: CodexFixtureChatThreadEntriesWithExploringGroup,
     isRespondingToServerRequest: false,
     onRespondToServerRequest: function onRespondToServerRequest() {},
     pendingServerRequests: [],
@@ -42,7 +42,7 @@ export const WithExploringGroup: Story = {
 
 export const WithThinkingGroup: Story = {
   args: {
-    entries: CodexStoryChatThreadEntriesWithThinkingGroup,
+    entries: CodexFixtureChatThreadEntriesWithThinkingGroup,
     isRespondingToServerRequest: false,
     onRespondToServerRequest: function onRespondToServerRequest() {},
     pendingServerRequests: [],
@@ -51,7 +51,7 @@ export const WithThinkingGroup: Story = {
 
 export const WithStructuredPlan: Story = {
   args: {
-    entries: CodexStoryChatThreadEntriesWithStructuredPlan,
+    entries: CodexFixtureChatThreadEntriesWithStructuredPlan,
     isRespondingToServerRequest: false,
     onRespondToServerRequest: function onRespondToServerRequest() {},
     pendingServerRequests: [],
@@ -60,7 +60,7 @@ export const WithStructuredPlan: Story = {
 
 export const WithGenericItem: Story = {
   args: {
-    entries: CodexStoryChatThreadEntriesWithGenericItem,
+    entries: CodexFixtureChatThreadEntriesWithGenericItem,
     isRespondingToServerRequest: false,
     onRespondToServerRequest: function onRespondToServerRequest() {},
     pendingServerRequests: [],

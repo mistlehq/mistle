@@ -25,6 +25,14 @@ This package hosts the single Storybook for the Mistle monorepo.
 - Use `*.stories.tsx`.
 - Keep dashboard stories in `apps/dashboard/src/**`.
 - Keep shared UI stories in `packages/ui/src/**`.
+- Keep Storybook-only helpers, decorators, and `*.story-fixtures.*` files out of the dashboard app tsconfig surface.
+- Validate dashboard stories through `@mistle/storybook`, not through `@mistle/dashboard` runtime typecheck.
+
+## Fixtures
+
+- Prefer neutral feature fixtures when both tests and stories need the same sample data.
+- Reserve `*.story-fixtures.ts` or `*.story-fixtures.tsx` for Storybook-only composition.
+- Do not import story fixtures from dashboard tests.
 
 Agent-specific working preferences live in `packages/storybook/AGENTS.md`.
 

@@ -2,12 +2,12 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, within } from "storybook/test";
 
 import { createDashboardMemoryRouterDecorator } from "../../storybook/decorators.js";
-import { SettingsShellView } from "./settings-shell-view.js";
 import {
-  createSettingsShellStoryArgs,
-  SettingsShellStoryForLocation,
-  SettingsStoryPathnames,
-} from "./settings-story-fixtures.js";
+  createSettingsShellStoryProps,
+  SettingsShellStoryForCurrentLocation,
+  SettingsShellStoryPathnames,
+} from "./settings-shell-story-support.js";
+import { SettingsShellView } from "./settings-shell-view.js";
 
 const meta = {
   title: "Dashboard/Settings/SettingsShellView",
@@ -16,7 +16,7 @@ const meta = {
     layout: "fullscreen",
   },
   decorators: [createDashboardMemoryRouterDecorator()],
-  args: createSettingsShellStoryArgs(SettingsStoryPathnames.ACCOUNT_PROFILE),
+  args: createSettingsShellStoryProps(SettingsShellStoryPathnames.ACCOUNT_PROFILE),
 } satisfies Meta<typeof SettingsShellView>;
 
 export default meta;
@@ -27,19 +27,19 @@ export const Profile: Story = {};
 
 export const OrganizationGeneral: Story = {
   args: {
-    ...createSettingsShellStoryArgs(SettingsStoryPathnames.ORGANIZATION_GENERAL),
+    ...createSettingsShellStoryProps(SettingsShellStoryPathnames.ORGANIZATION_GENERAL),
   },
 };
 
 export const OrganizationMembers: Story = {
   args: {
-    ...createSettingsShellStoryArgs(SettingsStoryPathnames.ORGANIZATION_MEMBERS),
+    ...createSettingsShellStoryProps(SettingsShellStoryPathnames.ORGANIZATION_MEMBERS),
   },
 };
 
 export const InteractiveNavigation: Story = {
-  decorators: [createDashboardMemoryRouterDecorator([SettingsStoryPathnames.ACCOUNT_PROFILE])],
-  render: SettingsShellStoryForLocation,
+  decorators: [createDashboardMemoryRouterDecorator([SettingsShellStoryPathnames.ACCOUNT_PROFILE])],
+  render: SettingsShellStoryForCurrentLocation,
   play: async ({ canvasElement }): Promise<void> => {
     const body = within(canvasElement.ownerDocument.body);
 

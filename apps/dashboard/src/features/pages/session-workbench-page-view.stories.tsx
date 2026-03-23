@@ -2,10 +2,10 @@ import { Badge } from "@mistle/ui";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
-  CodexStorySessionComposerProps,
-  CodexStorySessionEntriesWithExploringGroup,
-  CodexStorySessionServerRequests,
-} from "../session-agents/codex/fixtures/session-story-fixtures.js";
+  CodexFixtureSessionComposerProps,
+  CodexFixtureSessionEntriesWithExploringGroup,
+  CodexFixtureSessionServerRequests,
+} from "../session-agents/codex/fixtures/session-fixtures.js";
 import {
   SessionConversationBottomPanel,
   SessionConversationMainContent,
@@ -25,20 +25,20 @@ const meta = {
     isSecondaryPanelVisible: false,
     mainContent: (
       <SessionConversationMainContent
-        chatEntries={CodexStorySessionEntriesWithExploringGroup}
-        composerProps={CodexStorySessionComposerProps}
+        chatEntries={CodexFixtureSessionEntriesWithExploringGroup}
+        composerProps={CodexFixtureSessionComposerProps}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={function onRespondToServerRequest() {}}
-        serverRequestPanelEntries={CodexStorySessionServerRequests}
+        serverRequestPanelEntries={CodexFixtureSessionServerRequests}
       />
     ),
     primaryBottomPanel: (
       <SessionConversationBottomPanel
-        chatEntries={CodexStorySessionEntriesWithExploringGroup}
-        composerProps={CodexStorySessionComposerProps}
+        chatEntries={CodexFixtureSessionEntriesWithExploringGroup}
+        composerProps={CodexFixtureSessionComposerProps}
         isRespondingToServerRequest={false}
         onRespondToServerRequest={function onRespondToServerRequest() {}}
-        serverRequestPanelEntries={CodexStorySessionServerRequests}
+        serverRequestPanelEntries={CodexFixtureSessionServerRequests}
       />
     ),
     secondaryPanel: <div className="h-full w-full border-t bg-white" />,

@@ -5,9 +5,18 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["DOM", "ES2022"],
-    "types": ["node"],
+    "types": ["node", "vite/client"],
     "jsx": "react-jsx",
     "noEmit": true
   },
-  "include": [".storybook/**/*.ts", ".storybook/**/*.tsx"]
+  "include": [
+    ".storybook/**/*.ts",
+    ".storybook/**/*.tsx",
+    "../../packages/ui/src/**/*.stories.tsx",
+    "../../apps/dashboard/src/**/*.stories.tsx",
+    "../../apps/dashboard/src/**/*.story-fixtures.ts",
+    "../../apps/dashboard/src/**/*.story-fixtures.tsx",
+    "../../apps/dashboard/src/storybook/**/*.ts",
+    "../../apps/dashboard/src/storybook/**/*.tsx"
+  ]
 }

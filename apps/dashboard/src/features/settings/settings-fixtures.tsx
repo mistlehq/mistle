@@ -1,6 +1,5 @@
 import { Button } from "@mistle/ui";
 import type React from "react";
-import { useLocation } from "react-router";
 
 import { OrganizationGeneralSettingsPageView } from "../pages/organization-general-settings-page-view.js";
 import { OrganizationMembersSettingsPageView } from "../pages/organization-members-settings-page-view.js";
@@ -10,17 +9,8 @@ import type {
   SettingsInvitation,
   SettingsMember,
 } from "./members/members-api.js";
-import type { SettingsShellViewProps } from "./settings-shell-view.js";
-import { SettingsShellView } from "./settings-shell-view.js";
 
-export const SettingsStoryPathnames = {
-  ACCOUNT_PROFILE: "/settings/account/profile",
-  ORGANIZATION_GENERAL: "/settings/organization/general",
-  ORGANIZATION_INTEGRATIONS: "/settings/organization/integrations",
-  ORGANIZATION_MEMBERS: "/settings/organization/members",
-} as const;
-
-const DemoCapabilities: MembershipCapabilities = {
+export const SettingsFixtureCapabilities: MembershipCapabilities = {
   organizationId: "org_storybook",
   actorRole: "admin",
   invite: {
@@ -37,7 +27,7 @@ const DemoCapabilities: MembershipCapabilities = {
   },
 };
 
-const DemoMembers: SettingsMember[] = [
+export const SettingsFixtureMembers: SettingsMember[] = [
   {
     id: "mem_owner",
     userId: "user_owner",
@@ -56,7 +46,7 @@ const DemoMembers: SettingsMember[] = [
   },
 ];
 
-const DemoInvitations: SettingsInvitation[] = [
+export const SettingsFixtureInvitations: SettingsInvitation[] = [
   {
     id: "inv_pending",
     organizationId: "org_storybook",
@@ -70,7 +60,7 @@ const DemoInvitations: SettingsInvitation[] = [
   },
 ];
 
-async function inviteMemberRequest(): Promise<{
+export async function queueSettingsFixtureInviteMemberRequest(): Promise<{
   status: string | null;
   message: string | null;
   code: string | null;
@@ -84,11 +74,7 @@ async function inviteMemberRequest(): Promise<{
   };
 }
 
-function createStoryBreadcrumb(text: string): React.JSX.Element {
-  return <p className="truncate text-sm">{text}</p>;
-}
-
-function createInviteMembersButton(): React.JSX.Element {
+export function createSettingsFixtureInviteMembersButton(): React.JSX.Element {
   return (
     <Button size="sm" type="button">
       Invite members
@@ -96,7 +82,7 @@ function createInviteMembersButton(): React.JSX.Element {
   );
 }
 
-function createProfileSettingsContent(): React.JSX.Element {
+export function createProfileSettingsFixtureContent(): React.JSX.Element {
   return (
     <ProfileSettingsPageView
       displayName="Mistle Developer"
@@ -113,7 +99,7 @@ function createProfileSettingsContent(): React.JSX.Element {
   );
 }
 
-function createOrganizationGeneralContent(): React.JSX.Element {
+export function createOrganizationGeneralSettingsFixtureContent(): React.JSX.Element {
   return (
     <OrganizationGeneralSettingsPageView
       hasDirtyChanges={false}
@@ -132,19 +118,19 @@ function createOrganizationGeneralContent(): React.JSX.Element {
   );
 }
 
-function createOrganizationMembersContent(): React.JSX.Element {
+export function createOrganizationMembersSettingsFixtureContent(): React.JSX.Element {
   return (
     <OrganizationMembersSettingsPageView
-      capabilities={DemoCapabilities}
+      capabilities={SettingsFixtureCapabilities}
       capabilitiesErrorMessage={null}
       invitationActionState={null}
-      invitations={DemoInvitations}
+      invitations={SettingsFixtureInvitations}
       inviteDialogOpen={false}
-      inviteMemberRequest={inviteMemberRequest}
+      inviteMemberRequest={queueSettingsFixtureInviteMemberRequest}
       isLoading={false}
       isUpdatingRole={false}
       loadErrorMessage={null}
-      members={DemoMembers}
+      members={SettingsFixtureMembers}
       onChangeRole={() => {}}
       onInviteCompleted={async () => {}}
       onInviteDialogOpenChange={() => {}}
@@ -164,56 +150,4 @@ function createOrganizationMembersContent(): React.JSX.Element {
       roleUpdateErrorMessage={null}
     />
   );
-}
-
-export function createSettingsShellStoryArgs(pathname: string): SettingsShellViewProps {
-  if (pathname === SettingsStoryPathnames.ACCOUNT_PROFILE) {
-    return {
-      backLabel: "Back",
-      breadcrumbs: createStoryBreadcrumb("Settings / Profile"),
-      content: createProfileSettingsContent(),
-      headerActions: null,
-      onBack: () => {},
-      pathname,
-      showBreadcrumbs: true,
-      supportingText: "Update your name and account information.",
-      title: "Profile",
-    };
-  }
-
-  if (pathname === SettingsStoryPathnames.ORGANIZATION_GENERAL) {
-    return {
-      backLabel: "Back",
-      breadcrumbs: createStoryBreadcrumb("Settings / Organization / General"),
-      content: createOrganizationGeneralContent(),
-      headerActions: null,
-      onBack: () => {},
-      pathname,
-      showBreadcrumbs: true,
-      supportingText: "Manage the organization name and defaults.",
-      title: "General",
-    };
-  }
-
-  if (pathname === SettingsStoryPathnames.ORGANIZATION_MEMBERS) {
-    return {
-      backLabel: "Back",
-      breadcrumbs: createStoryBreadcrumb("Settings / Organization / Members"),
-      content: createOrganizationMembersContent(),
-      headerActions: createInviteMembersButton(),
-      onBack: () => {},
-      pathname,
-      showBreadcrumbs: true,
-      supportingText: "Invite members, update roles, and review pending invitations.",
-      title: "Members",
-    };
-  }
-
-  throw new Error(`Unsupported settings story pathname: ${pathname}`);
-}
-
-export function SettingsShellStoryForLocation(): React.JSX.Element {
-  const location = useLocation();
-
-  return <SettingsShellView {...createSettingsShellStoryArgs(location.pathname)} />;
 }

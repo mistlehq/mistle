@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
-  createCodexStoryPanelEntriesWithResponseErrors,
-  CodexStoryPanelEntries,
-} from "../fixtures/approval-story-fixtures.js";
+  createCodexFixturePanelEntriesWithResponseErrors,
+  CodexFixturePanelEntries,
+} from "../fixtures/approval-fixtures.js";
 import { CodexApprovalRequestsPanel } from "./codex-approval-requests-panel.js";
 
 const meta = {
@@ -14,7 +14,7 @@ const meta = {
     layout: "padded",
   },
   args: {
-    entries: CodexStoryPanelEntries,
+    entries: CodexFixturePanelEntries,
     isRespondingToServerRequest: false,
     onRespondToServerRequest: function onRespondToServerRequest() {},
   },
@@ -28,7 +28,7 @@ export const MixedRequests: Story = {};
 
 export const ResponseErrors: Story = {
   args: {
-    entries: createCodexStoryPanelEntriesWithResponseErrors(),
+    entries: createCodexFixturePanelEntriesWithResponseErrors(),
   },
 };
 

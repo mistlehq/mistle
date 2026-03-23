@@ -5,7 +5,7 @@ import type {
   CodexFileChangeApprovalRequestEntry,
 } from "../approvals/codex-approval-requests-state.js";
 
-export const CodexStoryCommandApprovalRequest: CodexCommandApprovalRequestEntry = {
+export const CodexFixtureCommandApprovalRequest: CodexCommandApprovalRequestEntry = {
   requestId: "request-command-1",
   method: "item/commandExecution/requestApproval",
   kind: "command-approval",
@@ -23,7 +23,7 @@ export const CodexStoryCommandApprovalRequest: CodexCommandApprovalRequestEntry 
   responseErrorMessage: null,
 };
 
-export const CodexStoryFileChangeApprovalRequest: CodexFileChangeApprovalRequestEntry = {
+export const CodexFixtureFileChangeApprovalRequest: CodexFileChangeApprovalRequestEntry = {
   requestId: "request-file-change-1",
   method: "item/fileChange/requestApproval",
   kind: "file-change-approval",
@@ -37,7 +37,7 @@ export const CodexStoryFileChangeApprovalRequest: CodexFileChangeApprovalRequest
   responseErrorMessage: null,
 };
 
-export const CodexStoryCommandBlock: ChatCommandEntry = {
+export const CodexFixtureCommandBlock: ChatCommandEntry = {
   id: "command-1",
   turnId: "turn-1",
   kind: "command-execution",
@@ -55,7 +55,7 @@ export const CodexStoryCommandBlock: ChatCommandEntry = {
   status: "completed",
 };
 
-export const CodexStoryFileChangeBlock: ChatFileChangeEntry = {
+export const CodexFixtureFileChangeBlock: ChatFileChangeEntry = {
   id: "file-change-1",
   turnId: "turn-3",
   kind: "file-change",
@@ -88,7 +88,7 @@ export const CodexStoryFileChangeBlock: ChatFileChangeEntry = {
   status: "completed",
 };
 
-export const CodexStoryPanelEntries: readonly CodexApprovalRequestEntry[] = [
+export const CodexFixturePanelEntries: readonly CodexApprovalRequestEntry[] = [
   {
     requestId: "command-request-1",
     method: "item/commandExecution/requestApproval",
@@ -185,8 +185,8 @@ export const CodexStoryPanelEntries: readonly CodexApprovalRequestEntry[] = [
   },
 ];
 
-export function createCodexStoryPanelEntriesWithResponseErrors(): readonly CodexApprovalRequestEntry[] {
-  return CodexStoryPanelEntries.map((entry) => {
+export function createCodexFixturePanelEntriesWithResponseErrors(): readonly CodexApprovalRequestEntry[] {
+  return CodexFixturePanelEntries.map((entry) => {
     return {
       ...entry,
       responseErrorMessage: "The request response was not accepted. Try again.",

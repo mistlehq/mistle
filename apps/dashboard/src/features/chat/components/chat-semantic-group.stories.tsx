@@ -1,13 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import {
-  CodexStoryExploringGroupEntry,
-  CodexStoryMakingEditsGroupEntry,
-  CodexStoryRunningCommandsLongOutputGroupEntry,
-  CodexStorySearchingWebGroupEntry,
-  CodexStoryThinkingGroupEntry,
-  CodexStoryToolCallGroupEntry,
-} from "../../session-agents/codex/fixtures/chat-story-fixtures.js";
+  CodexFixtureExploringGroupEntry,
+  CodexFixtureMakingEditsGroupEntry,
+  CodexFixtureRunningCommandsLongOutputGroupEntry,
+  CodexFixtureSearchingWebGroupEntry,
+  CodexFixtureThinkingGroupEntry,
+  CodexFixtureToolCallGroupEntry,
+} from "../../session-agents/codex/fixtures/chat-fixtures.js";
 import { ChatSemanticGroup } from "./chat-semantic-group.js";
 
 const meta = {
@@ -30,36 +30,36 @@ type Story = StoryObj<typeof meta>;
 
 export const Exploring: Story = {
   args: {
-    block: CodexStoryExploringGroupEntry,
+    block: CodexFixtureExploringGroupEntry,
   },
 };
 
 export const Thinking: Story = {
   args: {
-    block: CodexStoryThinkingGroupEntry,
+    block: CodexFixtureThinkingGroupEntry,
   },
 };
 
 export const MakingEdits: Story = {
   args: {
-    block: CodexStoryMakingEditsGroupEntry,
+    block: CodexFixtureMakingEditsGroupEntry,
   },
 };
 
 export const SearchingWeb: Story = {
   args: {
-    block: CodexStorySearchingWebGroupEntry,
+    block: CodexFixtureSearchingWebGroupEntry,
   },
 };
 
 export const ToolCall: Story = {
   args: {
-    block: CodexStoryToolCallGroupEntry,
+    block: CodexFixtureToolCallGroupEntry,
   },
 };
 
 export const RunningCommands: Story = {
   args: {
-    block: CodexStoryRunningCommandsLongOutputGroupEntry,
+    block: CodexFixtureRunningCommandsLongOutputGroupEntry,
   },
 };

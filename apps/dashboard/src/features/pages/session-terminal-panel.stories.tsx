@@ -3,10 +3,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useMemo, useState } from "react";
 
 import {
-  CodexStorySessionComposerProps,
-  CodexStorySessionEntriesWithExploringGroup,
-  CodexStorySessionServerRequests,
-} from "../session-agents/codex/fixtures/session-story-fixtures.js";
+  CodexFixtureSessionComposerProps,
+  CodexFixtureSessionEntriesWithExploringGroup,
+  CodexFixtureSessionServerRequests,
+} from "../session-agents/codex/fixtures/session-fixtures.js";
 import { type UseSandboxPtyStateResult } from "../sessions/use-sandbox-pty-state.js";
 import {
   SessionConversationBottomPanel,
@@ -115,21 +115,21 @@ function StoryTerminalWorkbench(input: TerminalStoryScenario): React.JSX.Element
           isSecondaryPanelVisible={isTerminalVisible}
           mainContent={
             <SessionConversationMainContent
-              chatEntries={CodexStorySessionEntriesWithExploringGroup}
-              composerProps={CodexStorySessionComposerProps}
+              chatEntries={CodexFixtureSessionEntriesWithExploringGroup}
+              composerProps={CodexFixtureSessionComposerProps}
               isRespondingToServerRequest={false}
               onRespondToServerRequest={function onRespondToServerRequest() {}}
-              serverRequestPanelEntries={CodexStorySessionServerRequests}
+              serverRequestPanelEntries={CodexFixtureSessionServerRequests}
             />
           }
           onSecondaryPanelResize={setPanelSize}
           primaryBottomPanel={
             <SessionConversationBottomPanel
-              chatEntries={CodexStorySessionEntriesWithExploringGroup}
-              composerProps={CodexStorySessionComposerProps}
+              chatEntries={CodexFixtureSessionEntriesWithExploringGroup}
+              composerProps={CodexFixtureSessionComposerProps}
               isRespondingToServerRequest={false}
               onRespondToServerRequest={function onRespondToServerRequest() {}}
-              serverRequestPanelEntries={CodexStorySessionServerRequests}
+              serverRequestPanelEntries={CodexFixtureSessionServerRequests}
             />
           }
           secondaryPanel={
