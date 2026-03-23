@@ -41,6 +41,7 @@ import { listSandboxInstances } from "../sessions/sessions-service.js";
 import type { SandboxInstanceListItem } from "../sessions/sessions-types.js";
 import { useSandboxSessionLaunchState } from "../sessions/use-sandbox-session-launch-state.js";
 import { formatRelativeOrDate } from "../shared/date-formatters.js";
+import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 import { resolveUserDisplayName } from "../shared/user-display-name.js";
 import { useCachedRequiredSession } from "../shell/session-context.js";
@@ -216,6 +217,20 @@ export function buildOptimisticSessions(input: {
   }
 
   return items;
+}
+
+export function resolveSessionResultsSummary(input: {
+  listedSessionCount: number;
+  totalResults: number;
+  optimisticSessionCount: number;
+}): {
+  visibleCount: number;
+  totalCount: number;
+} {
+  return {
+    visibleCount: input.listedSessionCount + input.optimisticSessionCount,
+    totalCount: input.totalResults + input.optimisticSessionCount,
+  };
 }
 
 export function SessionsPage(): React.JSX.Element {
@@ -435,6 +450,14 @@ export function SessionsPage(): React.JSX.Element {
   const hasPreviousPage = sandboxInstancesQuery.data?.previousPage != null;
   const nextPageDisabled = sandboxInstancesQuery.isPending;
   const previousPageDisabled = sandboxInstancesQuery.isPending;
+  const sessionResultsSummary =
+    sandboxInstancesQuery.data === undefined && optimisticSessions.length === 0
+      ? null
+      : resolveSessionResultsSummary({
+          listedSessionCount: sandboxInstancesQuery.data?.items.length ?? 0,
+          totalResults: sandboxInstancesQuery.data?.totalResults ?? 0,
+          optimisticSessionCount: optimisticSessions.length,
+        });
 
   const optimisticSessionIds = new Set(optimisticSessions.map((session) => session.id));
 
@@ -640,20 +663,25 @@ export function SessionsPage(): React.JSX.Element {
             </TableBody>
           </Table>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-muted-foreground text-sm">
-              Showing {sandboxInstancesQuery.data?.items.length ?? 0} of{" "}
-              {sandboxInstancesQuery.data?.totalResults ?? 0}
-            </p>
-            <TablePagination
-              hasNextPage={hasNextPage}
-              hasPreviousPage={hasPreviousPage}
-              nextPageDisabled={nextPageDisabled}
-              onNextPage={goToNextPage}
-              onPreviousPage={goToPreviousPage}
-              previousPageDisabled={previousPageDisabled}
-            />
-          </div>
+          <TableListingFooter
+            summary={
+              sessionResultsSummary === null ? null : (
+                <p className="text-muted-foreground text-sm">
+                  Showing {sessionResultsSummary.visibleCount} of {sessionResultsSummary.totalCount}
+                </p>
+              )
+            }
+            pagination={
+              <TablePagination
+                hasNextPage={hasNextPage}
+                hasPreviousPage={hasPreviousPage}
+                nextPageDisabled={nextPageDisabled}
+                onNextPage={goToNextPage}
+                onPreviousPage={goToPreviousPage}
+                previousPageDisabled={previousPageDisabled}
+              />
+            }
+          />
         </div>
       </div>
     </div>

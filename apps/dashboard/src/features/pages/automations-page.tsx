@@ -8,6 +8,7 @@ import { buildWebhookAutomationListItems } from "../automations/webhook-automati
 import { WebhookAutomationListView } from "../automations/webhook-automation-list-view.js";
 import { webhookAutomationsListQueryKey } from "../automations/webhook-automations-query-keys.js";
 import { listWebhookAutomations } from "../automations/webhook-automations-service.js";
+import { TableListingFooter } from "../shared/table-listing-footer.js";
 import { TablePagination } from "../shared/table-pagination.js";
 
 const AUTOMATIONS_LIST_LIMIT = 25;
@@ -74,6 +75,11 @@ export function AutomationsPage(): React.JSX.Element {
     setSearchParams(nextSearchParams);
   }
 
+  const canShowListingFooter =
+    automationsQuery.data !== undefined &&
+    !prerequisites.isPending &&
+    prerequisites.errorMessage === null;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-row items-start justify-between gap-3">
@@ -101,41 +107,47 @@ export function AutomationsPage(): React.JSX.Element {
         }}
       />
 
-      {automationsQuery.data === undefined ? null : (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-muted-foreground text-sm">
-            Showing {items.length} of {automationsQuery.data.totalResults}
-          </p>
-          <TablePagination
-            hasNextPage={automationsQuery.data.nextPage !== null}
-            hasPreviousPage={automationsQuery.data.previousPage !== null}
-            nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
-            onNextPage={() => {
-              const nextPage = automationsQuery.data?.nextPage;
-              if (nextPage === null || nextPage === undefined) {
-                return;
-              }
+      <TableListingFooter
+        summary={
+          !canShowListingFooter ? null : (
+            <p className="text-muted-foreground text-sm">
+              Showing {items.length} of {automationsQuery.data.totalResults}
+            </p>
+          )
+        }
+        pagination={
+          !canShowListingFooter ? null : (
+            <TablePagination
+              hasNextPage={automationsQuery.data.nextPage !== null}
+              hasPreviousPage={automationsQuery.data.previousPage !== null}
+              nextPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
+              onNextPage={() => {
+                const nextPage = automationsQuery.data?.nextPage;
+                if (nextPage === null || nextPage === undefined) {
+                  return;
+                }
 
-              updatePagination({
-                nextAfter: nextPage.after,
-                nextBefore: null,
-              });
-            }}
-            onPreviousPage={() => {
-              const previousPage = automationsQuery.data?.previousPage;
-              if (previousPage === null || previousPage === undefined) {
-                return;
-              }
+                updatePagination({
+                  nextAfter: nextPage.after,
+                  nextBefore: null,
+                });
+              }}
+              onPreviousPage={() => {
+                const previousPage = automationsQuery.data?.previousPage;
+                if (previousPage === null || previousPage === undefined) {
+                  return;
+                }
 
-              updatePagination({
-                nextAfter: null,
-                nextBefore: previousPage.before,
-              });
-            }}
-            previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
-          />
-        </div>
-      )}
+                updatePagination({
+                  nextAfter: null,
+                  nextBefore: previousPage.before,
+                });
+              }}
+              previousPageDisabled={automationsQuery.isFetching || automationsQuery.isPending}
+            />
+          )
+        }
+      />
     </div>
   );
 }

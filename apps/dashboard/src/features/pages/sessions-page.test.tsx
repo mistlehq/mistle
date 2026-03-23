@@ -10,6 +10,7 @@ import { seedAuthenticatedSession } from "../../test-support/auth-session.js";
 import { sandboxInstancesListQueryKey } from "../sessions/sessions-query-keys.js";
 import {
   buildOptimisticSessions,
+  resolveSessionResultsSummary,
   SandboxSessionStatusBadge,
   SessionsPage,
 } from "./sessions-page.js";
@@ -161,6 +162,19 @@ describe("SessionsPage", () => {
     expect(markup).toContain("Showing 1 of 1");
     expect(markup).not.toContain(">Previous<");
     expect(markup).not.toContain(">Next<");
+  });
+
+  it("counts optimistic sessions in the result summary totals", () => {
+    expect(
+      resolveSessionResultsSummary({
+        listedSessionCount: 1,
+        totalResults: 1,
+        optimisticSessionCount: 1,
+      }),
+    ).toStrictEqual({
+      visibleCount: 2,
+      totalCount: 2,
+    });
   });
 
   it("renders a compact failure indicator with tooltip details", () => {
