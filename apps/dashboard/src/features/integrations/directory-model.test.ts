@@ -42,6 +42,7 @@ function createConnection(input: {
     targetKey: input.targetKey,
     displayName: `${input.id}-name`,
     status: input.status,
+    bindingCount: 0,
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-03T00:00:00.000Z",
   };

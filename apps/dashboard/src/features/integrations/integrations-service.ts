@@ -4,6 +4,7 @@ export {
 } from "./integration-connection-resources-service.js";
 export {
   createApiKeyIntegrationConnection,
+  deleteIntegrationConnection,
   startRedirectIntegrationConnection,
   updateApiKeyIntegrationConnection,
   updateIntegrationConnection,
@@ -12,6 +13,7 @@ export { listIntegrationDirectory } from "./integrations-directory-service.js";
 export {
   IntegrationsApiError,
   type CreatedIntegrationConnection,
+  type DeletedIntegrationConnection,
   type IntegrationConnection,
   type IntegrationConnectionResource,
   type IntegrationConnectionResources,

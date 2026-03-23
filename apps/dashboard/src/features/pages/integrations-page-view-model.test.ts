@@ -397,6 +397,7 @@ function createConnection(
     targetKey: "github",
     displayName: input.displayName ?? `GitHub ${input.id}`,
     status: input.status,
+    bindingCount: input.bindingCount ?? 0,
     createdAt: "2026-03-03T00:00:00.000Z",
     updatedAt: "2026-03-11T04:30:00.000Z",
     ...(input.resources === undefined ? {} : { resources: input.resources }),

@@ -7,6 +7,7 @@ import * as completeGitHubAppInstallationConnection from "./complete-github-app-
 import * as completeOAuth2Connection from "./complete-oauth2-connection/index.js";
 import { INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH } from "./constants.js";
 import * as createApiKeyConnection from "./create-api-key-connection/index.js";
+import * as deleteIntegrationConnection from "./delete-integration-connection/index.js";
 import * as listIntegrationConnectionResources from "./list-integration-connection-resources/index.js";
 import * as listIntegrationConnections from "./list-integration-connections/index.js";
 import * as refreshIntegrationConnectionResources from "./refresh-integration-connection-resources/index.js";
@@ -43,6 +44,9 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
 
   routes.use(updateIntegrationConnection.route.path, requireAuthSession);
   routes.openapi(updateIntegrationConnection.route, updateIntegrationConnection.handler);
+
+  routes.use(deleteIntegrationConnection.route.path, requireAuthSession);
+  routes.openapi(deleteIntegrationConnection.route, deleteIntegrationConnection.handler);
 
   routes.use(updateApiKeyConnection.route.path, requireAuthSession);
   routes.openapi(updateApiKeyConnection.route, updateApiKeyConnection.handler);

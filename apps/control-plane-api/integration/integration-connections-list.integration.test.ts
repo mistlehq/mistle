@@ -4,6 +4,9 @@ import {
   IntegrationConnectionStatuses,
   IntegrationConnectionResourceSyncStates,
   integrationTargets,
+  sandboxProfiles,
+  sandboxProfileVersionIntegrationBindings,
+  sandboxProfileVersions,
 } from "@mistle/db/control-plane";
 import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 import { describe, expect } from "vitest";
@@ -109,6 +112,24 @@ describe("integration connections list integration", () => {
       lastErrorMessage: null,
     });
 
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "spf_001",
+      organizationId: firstOrgSession.organizationId,
+      displayName: "Profile 1",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "spf_001",
+      version: 1,
+    });
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+      id: "ibd_001",
+      sandboxProfileId: "spf_001",
+      sandboxProfileVersion: 1,
+      connectionId: "icn_001",
+      kind: "git",
+      config: {},
+    });
+
     const firstPageResponse = await fixture.request("/v1/integration/connections?limit=2", {
       headers: {
         cookie: firstOrgSession.cookie,
@@ -131,6 +152,7 @@ describe("integration connections list integration", () => {
         targetKey: "github_cloud",
         displayName: "GitHub Main",
         status: IntegrationConnectionStatuses.ACTIVE,
+        bindingCount: 1,
         externalSubjectId: "github-user-1",
         config: {
           installation_id: "12345",
@@ -167,6 +189,7 @@ describe("integration connections list integration", () => {
         targetKey: "openai-default",
         displayName: "OpenAI Backup",
         status: IntegrationConnectionStatuses.ERROR,
+        bindingCount: 0,
         createdAt: secondConnectionCreatedAt.toISOString(),
         updatedAt: secondConnectionCreatedAt.toISOString(),
       },
@@ -203,6 +226,7 @@ describe("integration connections list integration", () => {
         targetKey: "github_cloud",
         displayName: "GitHub Revoked",
         status: IntegrationConnectionStatuses.REVOKED,
+        bindingCount: 0,
         resources: [
           {
             kind: "repository",
@@ -284,6 +308,102 @@ describe("integration connections list integration", () => {
       code: "VALIDATION_ERROR",
       message: "Invalid request.",
     });
+  });
+
+  it("deletes an unbound connection and blocks deleting a bound connection", async ({
+    fixture,
+  }) => {
+    const session = await fixture.authSession({
+      email: "integration-connections-delete@example.com",
+    });
+
+    await fixture.db
+      .insert(integrationTargets)
+      .values({
+        targetKey: "github_cloud",
+        familyId: "github",
+        variantId: "github-cloud",
+        enabled: true,
+        config: {
+          base_url: "https://github.com",
+        },
+      })
+      .onConflictDoNothing();
+
+    await fixture.db.insert(integrationConnections).values([
+      {
+        id: "icn_delete_free",
+        organizationId: session.organizationId,
+        targetKey: "github_cloud",
+        displayName: "Free connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      },
+      {
+        id: "icn_delete_bound",
+        organizationId: session.organizationId,
+        targetKey: "github_cloud",
+        displayName: "Bound connection",
+        status: IntegrationConnectionStatuses.ACTIVE,
+      },
+    ]);
+
+    await fixture.db.insert(sandboxProfiles).values({
+      id: "spf_delete",
+      organizationId: session.organizationId,
+      displayName: "Delete test profile",
+    });
+    await fixture.db.insert(sandboxProfileVersions).values({
+      sandboxProfileId: "spf_delete",
+      version: 1,
+    });
+    await fixture.db.insert(sandboxProfileVersionIntegrationBindings).values({
+      id: "ibd_delete_bound",
+      sandboxProfileId: "spf_delete",
+      sandboxProfileVersion: 1,
+      connectionId: "icn_delete_bound",
+      kind: "git",
+      config: {},
+    });
+
+    const deleteFreeResponse = await fixture.request(
+      "/v1/integration/connections/icn_delete_free",
+      {
+        method: "DELETE",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(deleteFreeResponse.status).toBe(200);
+    expect(await deleteFreeResponse.json()).toEqual({
+      connectionId: "icn_delete_free",
+    });
+
+    const deletedConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { eq }) => eq(table.id, "icn_delete_free"),
+    });
+    expect(deletedConnection).toBeUndefined();
+
+    const deleteBoundResponse = await fixture.request(
+      "/v1/integration/connections/icn_delete_bound",
+      {
+        method: "DELETE",
+        headers: {
+          cookie: session.cookie,
+        },
+      },
+    );
+    expect(deleteBoundResponse.status).toBe(409);
+    expect(await deleteBoundResponse.json()).toEqual({
+      code: "CONNECTION_HAS_BINDINGS",
+      message:
+        "This integration connection cannot be deleted while it is still used by one or more bindings.",
+    });
+
+    const boundConnection = await fixture.db.query.integrationConnections.findFirst({
+      where: (table, { eq }) => eq(table.id, "icn_delete_bound"),
+    });
+    expect(boundConnection).toBeDefined();
   });
 
   it("returns 401 when the request is unauthenticated", async ({ fixture }) => {

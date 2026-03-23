@@ -1,5 +1,5 @@
 import { Alert, AlertDescription, Badge, Button } from "@mistle/ui";
-import { ArrowClockwiseIcon, PencilSimpleIcon } from "@phosphor-icons/react";
+import { ArrowClockwiseIcon, PencilSimpleIcon, TrashIcon } from "@phosphor-icons/react";
 import { useState } from "react";
 
 import { EditableHeading } from "../shared/editable-heading.js";
@@ -23,6 +23,8 @@ export type IntegrationConnectionDetailResourceSummary = {
 export type IntegrationConnectionDetailItem = {
   authMethodId?: "api-key" | "oauth2" | "github-app-installation" | null;
   authMethodLabel?: string | null;
+  bindingCount: number;
+  canDelete: boolean;
   contextItems?: readonly {
     label: string;
     value: string;
@@ -36,6 +38,7 @@ export type IntegrationConnectionDetailItem = {
 export type IntegrationConnectionDetailViewProps = {
   connections: readonly IntegrationConnectionDetailItem[];
   logoKey?: string;
+  onDeleteConnection?: (connectionId: string) => void;
   onEditApiKey?: (connectionId: string) => void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: ReadonlyMap<
@@ -78,6 +81,9 @@ export function IntegrationConnectionDetailView(
         <ConnectionCard
           connection={connection}
           key={connection.id}
+          {...(props.onDeleteConnection === undefined
+            ? {}
+            : { onDeleteConnection: props.onDeleteConnection })}
           {...(props.onEditApiKey === undefined ? {} : { onEditApiKey: props.onEditApiKey })}
           {...(props.onRefreshResource === undefined
             ? {}
@@ -94,6 +100,7 @@ export function IntegrationConnectionDetailView(
 
 function ConnectionCard(input: {
   connection: IntegrationConnectionDetailItem;
+  onDeleteConnection?: (connectionId: string) => void;
   onEditApiKey?: (connectionId: string) => void;
   onRefreshResource?: (input: { connectionId: string; kind: string }) => void;
   resourceItemsByKey?: IntegrationConnectionDetailViewProps["resourceItemsByKey"];
@@ -102,20 +109,39 @@ function ConnectionCard(input: {
   return (
     <section className="gap-4 flex flex-col overflow-hidden rounded-md border bg-card p-4">
       <div className="gap-4 flex flex-col">
-        <div className="gap-2 flex flex-wrap items-start">
-          {input.titleEditor ? (
-            <EditableConnectionTitle
-              connection={input.connection}
-              titleEditor={input.titleEditor}
-            />
-          ) : (
-            <h2 className="text-base font-semibold leading-tight">
-              {input.connection.displayName}
-            </h2>
-          )}
-          {input.connection.status === "active" ? null : (
-            <Badge variant="outline">{formatConnectionStatusLabel(input.connection.status)}</Badge>
-          )}
+        <div className="flex items-start justify-between gap-3">
+          <div className="gap-2 flex flex-wrap items-start">
+            {input.titleEditor ? (
+              <EditableConnectionTitle
+                connection={input.connection}
+                titleEditor={input.titleEditor}
+              />
+            ) : (
+              <h2 className="text-base font-semibold leading-tight">
+                {input.connection.displayName}
+              </h2>
+            )}
+            {input.connection.status === "active" ? null : (
+              <Badge variant="outline">
+                {formatConnectionStatusLabel(input.connection.status)}
+              </Badge>
+            )}
+          </div>
+          {input.onDeleteConnection && input.connection.canDelete ? (
+            <Button
+              aria-label={`Delete connection ${input.connection.displayName}`}
+              className="shrink-0"
+              onClick={() => {
+                input.onDeleteConnection?.(input.connection.id);
+              }}
+              size="icon-sm"
+              type="button"
+              variant="destructive"
+              title="Delete connection"
+            >
+              <TrashIcon aria-hidden className="size-4" />
+            </Button>
+          ) : null}
         </div>
         <ConnectionAuthSection
           authMethodId={input.connection.authMethodId}

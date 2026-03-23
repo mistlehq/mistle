@@ -94,6 +94,8 @@ export function buildIntegrationConnectionDetailItems(input: {
       id: connection.id,
       displayName: connection.displayName,
       status: connection.status,
+      bindingCount: connection.bindingCount ?? 0,
+      canDelete: (connection.bindingCount ?? 0) === 0,
       ...(connectionMethodId === null
         ? { authMethodId: null }
         : { authMethodId: connectionMethodId }),
