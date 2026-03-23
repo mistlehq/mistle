@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+const HttpBaseUrlSchema = z.url().refine((value) => {
+  const parsedUrl = new URL(value);
+  return parsedUrl.protocol === "http:" || parsedUrl.protocol === "https:";
+}, "Expected an http or https URL.");
+
 export const DataPlaneApiServerConfigSchema = z
   .object({
     host: z.string().min(1),
@@ -20,11 +25,18 @@ export const DataPlaneApiWorkflowConfigSchema = z
   })
   .strict();
 
+export const DataPlaneApiRuntimeStateConfigSchema = z
+  .object({
+    gatewayBaseUrl: HttpBaseUrlSchema,
+  })
+  .strict();
+
 export const DataPlaneApiConfigSchema = z
   .object({
     server: DataPlaneApiServerConfigSchema,
     database: DataPlaneApiDatabaseConfigSchema,
     workflow: DataPlaneApiWorkflowConfigSchema,
+    runtimeState: DataPlaneApiRuntimeStateConfigSchema,
   })
   .strict();
 
@@ -33,6 +45,7 @@ export const PartialDataPlaneApiConfigSchema = z
     server: DataPlaneApiServerConfigSchema.partial().optional(),
     database: DataPlaneApiDatabaseConfigSchema.partial().optional(),
     workflow: DataPlaneApiWorkflowConfigSchema.partial().optional(),
+    runtimeState: DataPlaneApiRuntimeStateConfigSchema.partial().optional(),
   })
   .strict();
 

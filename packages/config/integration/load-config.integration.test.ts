@@ -223,6 +223,9 @@ const dataPlaneApiEnvConfig = {
     databaseUrl: "postgresql://mistle:mistle@127.0.0.1:6432/mistle",
     namespaceId: "development",
   },
+  runtimeState: {
+    gatewayBaseUrl: "http://127.0.0.1:5003",
+  },
 } as const;
 
 const dataPlaneApiFixtureConfig = {
@@ -234,6 +237,9 @@ const dataPlaneApiFixtureConfig = {
   workflow: {
     ...dataPlaneApiEnvConfig.workflow,
     namespaceId: "fixture",
+  },
+  runtimeState: {
+    gatewayBaseUrl: "http://127.0.0.1:5302",
   },
 } as const;
 

@@ -104,6 +104,9 @@ url = "postgresql://mistle:replace-with-password@db:5432/mistle"
 database_url = "postgresql://mistle:replace-with-password@db:6432/mistle"
 namespace_id = "production"
 
+[apps.data_plane_api.runtime_state]
+gateway_base_url = "http://data-plane-gateway:8084"
+
 [apps.data_plane_gateway.server]
 host = "0.0.0.0"
 port = 8084

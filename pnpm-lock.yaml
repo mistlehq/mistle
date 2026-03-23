@@ -384,12 +384,21 @@ importers:
       '@mistle/data-plane-internal-client':
         specifier: workspace:*
         version: link:../../packages/data-plane-internal-client
+      '@mistle/gateway-tunnel-auth':
+        specifier: workspace:*
+        version: link:../../packages/gateway-tunnel-auth
       '@mistle/test-harness':
         specifier: workspace:*
         version: link:../../packages/test-harness
       '@types/pg':
         specifier: ^8.18.0
         version: 8.18.0
+      '@types/ws':
+        specifier: ^8.18.1
+        version: 8.18.1
+      ws:
+        specifier: ^8.18.3
+        version: 8.19.0
 
   apps/data-plane-gateway:
     dependencies:

@@ -37,7 +37,10 @@
   },
   "devDependencies": {
     "@mistle/data-plane-internal-client": "workspace:*",
+    "@mistle/gateway-tunnel-auth": "workspace:*",
     "@mistle/test-harness": "workspace:*",
-    "@types/pg": "^8.18.0"
+    "@types/pg": "^8.18.0",
+    "@types/ws": "^8.18.1",
+    "ws": "^8.18.3"
   }
 }

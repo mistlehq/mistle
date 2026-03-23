@@ -1,6 +1,5 @@
 const TUNNEL_TOKEN_EXCHANGE_ROUTE_SUFFIX = "/token-exchange";
-const TUNNEL_TOKEN_EXCHANGE_RETRY_DELAY_MIN = 1_000;
-const TUNNEL_TOKEN_EXCHANGE_RETRY_DELAY_MAX = 30_000;
+const TUNNEL_RECONNECT_DELAY_MS = 1_000;
 
 type TunnelTokenExchangeResponse = {
   bootstrapToken: string;
@@ -8,11 +7,8 @@ type TunnelTokenExchangeResponse = {
 };
 
 export class TunnelTokenExchangeError extends Error {
-  readonly retryable: boolean;
-
-  constructor(message: string, retryable: boolean) {
+  constructor(message: string) {
     super(message);
-    this.retryable = retryable;
   }
 }
 
@@ -85,16 +81,8 @@ export function normalizeBootstrapToken(bootstrapToken: string): string {
   return normalizedToken;
 }
 
-export function nextTunnelReconnectDelay(attempt: number): number {
-  let delay = TUNNEL_TOKEN_EXCHANGE_RETRY_DELAY_MIN;
-  for (let retryIndex = 1; retryIndex < attempt; retryIndex += 1) {
-    if (delay >= TUNNEL_TOKEN_EXCHANGE_RETRY_DELAY_MAX / 2) {
-      return TUNNEL_TOKEN_EXCHANGE_RETRY_DELAY_MAX;
-    }
-    delay *= 2;
-  }
-
-  return delay;
+export function nextTunnelReconnectDelay(): number {
+  return TUNNEL_RECONNECT_DELAY_MS;
 }
 
 export function parseTunnelTokenJwtWindow(token: string): {
@@ -165,14 +153,6 @@ export function nextTunnelTokenExchangeDelay(now: Date, issuedAt: Date, expiresA
   return renewAt.getTime() - now.getTime();
 }
 
-function isRetryableTunnelTokenExchangeStatus(statusCode: number): boolean {
-  return statusCode === 408 || statusCode === 429 || statusCode >= 500;
-}
-
-export function shouldRetryTunnelTokenExchange(error: unknown): boolean {
-  return error instanceof TunnelTokenExchangeError && error.retryable;
-}
-
 function validateTunnelTokenExchangeResponse(response: TunnelTokenExchangeResponse): void {
   normalizeTunnelTokenValue("bootstrap", response.bootstrapToken);
   normalizeTunnelTokenValue("exchange", response.tunnelExchangeToken);
@@ -190,14 +170,12 @@ export async function exchangeTunnelTokens(
   }).catch((error: unknown) => {
     throw new TunnelTokenExchangeError(
       `sandbox tunnel token exchange request failed: ${error instanceof Error ? error.message : String(error)}`,
-      true,
     );
   });
 
   if (response.status !== 200) {
     throw new TunnelTokenExchangeError(
       `sandbox tunnel token exchange request failed with status ${String(response.status)}`,
-      isRetryableTunnelTokenExchangeStatus(response.status),
     );
   }
 
@@ -271,7 +249,6 @@ export async function runTunnelTokenExchangeLoop(input: {
         signal.addEventListener("abort", abortListener, { once: true });
       }));
 
-  let retryAttempt = 1;
   while (!input.signal.aborted) {
     const { issuedAt, expiresAt } = parseTunnelTokenJwtWindow(
       input.tokens.currentTunnelExchangeToken(),
@@ -281,14 +258,8 @@ export async function runTunnelTokenExchangeLoop(input: {
 
     try {
       await exchangeTunnelTokensNow(input.gatewayWsUrl, input.tokens);
-      retryAttempt = 1;
-    } catch (error) {
-      if (!shouldRetryTunnelTokenExchange(error)) {
-        throw error;
-      }
-
-      await sleep(nextTunnelReconnectDelay(retryAttempt), input.signal);
-      retryAttempt += 1;
+    } catch {
+      await sleep(nextTunnelReconnectDelay(), input.signal);
     }
   }
 }

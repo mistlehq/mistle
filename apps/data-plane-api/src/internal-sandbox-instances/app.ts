@@ -25,12 +25,14 @@ import { typeid } from "typeid-js";
 
 import { createRequireInternalAuthMiddleware } from "../middleware/require-internal-auth.js";
 import { DataPlaneOpenWorkflowSchema } from "../openworkflow/index.js";
+import type { AppRuntimeResources } from "../runtime/resources.js";
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 import {
   DATA_PLANE_INTERNAL_AUTH_HEADER,
   INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH,
 } from "./constants.js";
 import {
+  DataPlaneSandboxInstanceStatuses,
   GetSandboxInstanceResponseSchema,
   internalGetSandboxInstanceRoute,
   internalListSandboxInstancesRoute,
@@ -46,6 +48,7 @@ import {
   StartSandboxInstanceAcceptedResponseSchema,
   StartSandboxInstanceInputValidationSchema,
 } from "./contracts.js";
+import { resolveEffectiveSandboxInstanceStatus } from "./effective-sandbox-instance-status.js";
 
 const WorkflowRunInputSchema = z
   .object({
@@ -181,6 +184,31 @@ async function resolveWorkflowSandboxInstanceId(input: {
   return parsedInput.data.sandboxInstanceId;
 }
 
+async function readEffectiveSandboxStatus(input: {
+  resources: AppRuntimeResources;
+  sandboxInstanceId: string;
+  persistedStatus: SandboxInstance["status"];
+}): Promise<
+  (typeof DataPlaneSandboxInstanceStatuses)[keyof typeof DataPlaneSandboxInstanceStatuses]
+> {
+  if (
+    input.persistedStatus !== SandboxInstanceStatuses.STARTING &&
+    input.persistedStatus !== SandboxInstanceStatuses.RUNNING
+  ) {
+    return input.persistedStatus;
+  }
+
+  const runtimeStateSnapshot = await input.resources.runtimeStateReader.readSnapshot({
+    sandboxInstanceId: input.sandboxInstanceId,
+    nowMs: Date.now(),
+  });
+
+  return resolveEffectiveSandboxInstanceStatus({
+    persistedStatus: input.persistedStatus,
+    runtimeStateSnapshot,
+  });
+}
+
 export function createInternalSandboxInstancesApp(): AppRoutes<
   typeof INTERNAL_SANDBOX_INSTANCES_ROUTE_BASE_PATH
 > {
@@ -247,6 +275,7 @@ export function createInternalSandboxInstancesApp(): AppRoutes<
 
   routes.openapi(internalGetSandboxInstanceRoute, async (ctx) => {
     const body = ctx.req.valid("json");
+    const resources = ctx.get("resources");
     const sandboxInstance = await ctx.get("resources").db.query.sandboxInstances.findFirst({
       columns: {
         id: true,
@@ -263,7 +292,11 @@ export function createInternalSandboxInstancesApp(): AppRoutes<
         ? null
         : {
             id: sandboxInstance.id,
-            status: sandboxInstance.status,
+            status: await readEffectiveSandboxStatus({
+              resources,
+              sandboxInstanceId: sandboxInstance.id,
+              persistedStatus: sandboxInstance.status,
+            }),
             failureCode: sandboxInstance.failureCode,
             failureMessage: sandboxInstance.failureMessage,
           };
@@ -406,13 +439,16 @@ export function createInternalSandboxInstancesApp(): AppRoutes<
         },
       });
 
-      const serializedResponse: z.infer<typeof ListSandboxInstancesResponseSchema> = {
-        totalResults: responseBody.totalResults,
-        items: responseBody.items.map((item) => ({
+      const serializedItems = await Promise.all(
+        responseBody.items.map(async (item) => ({
           id: item.id,
           sandboxProfileId: item.sandboxProfileId,
           sandboxProfileVersion: item.sandboxProfileVersion,
-          status: item.status,
+          status: await readEffectiveSandboxStatus({
+            resources: ctx.get("resources"),
+            sandboxInstanceId: item.id,
+            persistedStatus: item.status,
+          }),
           startedBy: {
             kind: item.startedByKind,
             id: item.startedById,
@@ -423,6 +459,11 @@ export function createInternalSandboxInstancesApp(): AppRoutes<
           failureCode: item.failureCode,
           failureMessage: item.failureMessage,
         })),
+      );
+
+      const serializedResponse: z.infer<typeof ListSandboxInstancesResponseSchema> = {
+        totalResults: responseBody.totalResults,
+        items: serializedItems,
         nextPage: responseBody.nextPage,
         previousPage: responseBody.previousPage,
       };
