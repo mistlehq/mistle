@@ -21,31 +21,41 @@ export function createIntegrationConnectionsRoutes(): AppRoutes<
   const routes = new OpenAPIHono<AppContextBindings>({
     defaultHook: OpenApiValidationHook,
   });
-  const protectedRoutes = new OpenAPIHono<AppContextBindings>({
-    defaultHook: OpenApiValidationHook,
-  });
+  const requireAuthSession = createRequireAuthSessionMiddleware();
 
-  protectedRoutes.use("*", createRequireAuthSessionMiddleware());
+  routes.use(listIntegrationConnections.route.path, requireAuthSession);
+  routes.openapi(listIntegrationConnections.route, listIntegrationConnections.handler);
 
-  protectedRoutes.openapi(listIntegrationConnections.route, listIntegrationConnections.handler);
-  protectedRoutes.openapi(
+  routes.use(listIntegrationConnectionResources.route.path, requireAuthSession);
+  routes.openapi(
     listIntegrationConnectionResources.route,
     listIntegrationConnectionResources.handler,
   );
-  protectedRoutes.openapi(
+
+  routes.use(refreshIntegrationConnectionResources.route.path, requireAuthSession);
+  routes.openapi(
     refreshIntegrationConnectionResources.route,
     refreshIntegrationConnectionResources.handler,
   );
-  protectedRoutes.openapi(createApiKeyConnection.route, createApiKeyConnection.handler);
-  protectedRoutes.openapi(updateIntegrationConnection.route, updateIntegrationConnection.handler);
-  protectedRoutes.openapi(updateApiKeyConnection.route, updateApiKeyConnection.handler);
-  protectedRoutes.openapi(
+
+  routes.use(createApiKeyConnection.route.path, requireAuthSession);
+  routes.openapi(createApiKeyConnection.route, createApiKeyConnection.handler);
+
+  routes.use(updateIntegrationConnection.route.path, requireAuthSession);
+  routes.openapi(updateIntegrationConnection.route, updateIntegrationConnection.handler);
+
+  routes.use(updateApiKeyConnection.route.path, requireAuthSession);
+  routes.openapi(updateApiKeyConnection.route, updateApiKeyConnection.handler);
+
+  routes.use(startGitHubAppInstallationConnection.route.path, requireAuthSession);
+  routes.openapi(
     startGitHubAppInstallationConnection.route,
     startGitHubAppInstallationConnection.handler,
   );
-  protectedRoutes.openapi(startOAuth2Connection.route, startOAuth2Connection.handler);
 
-  routes.route("/", protectedRoutes);
+  routes.use(startOAuth2Connection.route.path, requireAuthSession);
+  routes.openapi(startOAuth2Connection.route, startOAuth2Connection.handler);
+
   routes.openapi(
     completeGitHubAppInstallationConnection.route,
     completeGitHubAppInstallationConnection.handler,
