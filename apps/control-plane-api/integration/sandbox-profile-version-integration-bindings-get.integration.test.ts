@@ -12,7 +12,7 @@ import { describe, expect } from "vitest";
 import {
   PutSandboxProfileVersionIntegrationBindingsResponseSchema,
   SandboxProfileVersionNotFoundResponseSchema,
-} from "../src/sandbox-profiles/contracts.js";
+} from "../src/sandbox-profiles/index.js";
 import { it } from "./test-context.js";
 
 describe("sandbox profile version integration bindings get integration", () => {

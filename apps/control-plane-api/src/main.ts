@@ -1,3 +1,5 @@
+import { createDataPlaneSandboxInstancesClient } from "@mistle/data-plane-internal-client";
+
 import { createApp } from "./app.js";
 import { createAppResources, stopAppResources } from "./resources.js";
 import { startServer } from "./server.js";
@@ -13,6 +15,10 @@ export async function createControlPlaneApiRuntime(
   runtimeConfig: ControlPlaneApiRuntimeConfig,
 ): Promise<ControlPlaneApiRuntime> {
   const resources = await createAppResources(runtimeConfig.app);
+  const dataPlaneClient = createDataPlaneSandboxInstancesClient({
+    baseUrl: runtimeConfig.app.dataPlaneApi.baseUrl,
+    serviceToken: runtimeConfig.internalAuthServiceToken,
+  });
   let app: ControlPlaneApp;
 
   try {
@@ -27,6 +33,8 @@ export async function createControlPlaneApiRuntime(
       internalAuthServiceToken: runtimeConfig.internalAuthServiceToken,
       db: resources.db,
       integrationRegistry: resources.integrationRegistry,
+      dataPlaneClient,
+      connectionTokenConfig: runtimeConfig.connectionToken,
       openWorkflow: resources.openWorkflow,
       services,
     });

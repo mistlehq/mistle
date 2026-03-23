@@ -7,7 +7,7 @@ import { createControlPlaneApiRuntime } from "../src/main.js";
 import {
   SandboxInstanceConnectionTokenSchema,
   SandboxInstancesConflictResponseSchema,
-} from "../src/sandbox-instances/contracts.js";
+} from "../src/sandbox-instances/index.js";
 import type { ControlPlaneApiConfig } from "../src/types.js";
 import { createAuthenticatedSession } from "./helpers/auth-session.js";
 import {

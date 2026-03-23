@@ -5,7 +5,7 @@ import {
   NotFoundResponseSchema,
   SandboxProfileSchema,
   ValidationErrorResponseSchema,
-} from "../src/sandbox-profiles/contracts.js";
+} from "../src/sandbox-profiles/index.js";
 import { it } from "./test-context.js";
 
 describe("sandbox profiles update integration", () => {
@@ -74,8 +74,8 @@ describe("sandbox profiles update integration", () => {
     expect(response.status).toBe(400);
 
     const body = ValidationErrorResponseSchema.parse(await response.json());
-    expect(body.success).toBe(false);
-    expect(body.error.name).toBe("ZodError");
+    expect(body.code).toBe("VALIDATION_ERROR");
+    expect(body.message).toBe("Invalid request.");
   });
 
   it("returns 400 when status is provided in update payload", async ({ fixture }) => {
@@ -105,8 +105,8 @@ describe("sandbox profiles update integration", () => {
     expect(response.status).toBe(400);
 
     const body = ValidationErrorResponseSchema.parse(await response.json());
-    expect(body.success).toBe(false);
-    expect(body.error.name).toBe("ZodError");
+    expect(body.code).toBe("VALIDATION_ERROR");
+    expect(body.message).toBe("Invalid request.");
   });
 
   it("returns 404 for profiles outside the authenticated user's organization", async ({

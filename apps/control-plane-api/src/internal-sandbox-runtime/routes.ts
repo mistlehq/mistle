@@ -1,16 +1,20 @@
-import { OpenAPIHono } from "@hono/zod-openapi";
-import { z } from "zod";
+import { OpenAPIHono, z } from "@hono/zod-openapi";
+import { OpenApiValidationHook } from "@mistle/http/errors.js";
 
 import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "../internal-integration-credentials/constants.js";
 import { createRequireInternalAuthMiddleware } from "../middleware/require-internal-auth.js";
+import { SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS } from "../sandbox-instances/constants.js";
 import {
   SandboxInstancesConflictError,
   SandboxInstancesNotFoundError,
-} from "../sandbox-instances/services/factory.js";
+} from "../sandbox-instances/index.js";
+import { getInstance } from "../sandbox-instances/services/get-instance.js";
+import { mintConnectionTokenForInstance } from "../sandbox-instances/services/mint-connection-token-for-instance.js";
 import {
   SandboxProfilesCompileError,
   SandboxProfilesNotFoundError,
-} from "../sandbox-profiles/services/factory.js";
+} from "../sandbox-profiles/index.js";
+import { startProfileInstance } from "../sandbox-profiles/services/start-profile-instance.js";
 import type { AppContext, AppContextBindings, AppRoutes } from "../types.js";
 import { INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH } from "./constants.js";
 import {
@@ -18,9 +22,6 @@ import {
   internalSandboxRuntimeGetSandboxInstanceRoute,
   internalSandboxRuntimeMintConnectionTokenRoute,
   internalSandboxRuntimeStartProfileInstanceRoute,
-  InternalSandboxRuntimeGetSandboxInstanceResponseSchema,
-  InternalSandboxRuntimeMintConnectionResponseSchema,
-  InternalSandboxRuntimeStartProfileInstanceResponseSchema,
 } from "./contracts.js";
 
 const InternalSandboxRuntimeErrorCodes = {
@@ -30,7 +31,9 @@ const InternalSandboxRuntimeErrorCodes = {
 export function createInternalSandboxRuntimeRoutes(): AppRoutes<
   typeof INTERNAL_SANDBOX_RUNTIME_ROUTE_BASE_PATH
 > {
-  const routes = new OpenAPIHono<AppContextBindings>();
+  const routes = new OpenAPIHono<AppContextBindings>({
+    defaultHook: OpenApiValidationHook,
+  });
   routes.use(
     "*",
     createRequireInternalAuthMiddleware({
@@ -42,29 +45,32 @@ export function createInternalSandboxRuntimeRoutes(): AppRoutes<
 
   routes.openapi(internalSandboxRuntimeStartProfileInstanceRoute, async (ctx) => {
     const body = ctx.req.valid("json");
+    const db = ctx.get("db");
+    const dataPlaneClient = ctx.get("dataPlaneClient");
+    const integrationsConfig = ctx.get("config").integrations;
+    const sandboxConfig = ctx.get("sandboxConfig");
 
     try {
-      const startedSandboxInstance = await ctx
-        .get("services")
-        .sandboxProfiles.startProfileInstance({
+      const startedSandboxInstance = await startProfileInstance(
+        {
+          db,
+          integrationsConfig,
+          dataPlaneClient,
+        },
+        {
           organizationId: body.organizationId,
           profileId: body.profileId,
           profileVersion: body.profileVersion,
           startedBy: body.startedBy,
           source: body.source,
           image: {
-            imageId: ctx.get("sandboxConfig").defaultBaseImage,
+            imageId: sandboxConfig.defaultBaseImage,
             createdAt: new Date().toISOString(),
           },
-        });
+        },
+      );
 
-      const responseBody: z.infer<typeof InternalSandboxRuntimeStartProfileInstanceResponseSchema> =
-        {
-          status: startedSandboxInstance.status,
-          workflowRunId: startedSandboxInstance.workflowRunId,
-          sandboxInstanceId: startedSandboxInstance.sandboxInstanceId,
-        };
-      return ctx.json(responseBody, 200);
+      return ctx.json(startedSandboxInstance, 200);
     } catch (error) {
       return handleStartProfileInstanceError(ctx, error);
     }
@@ -72,16 +78,22 @@ export function createInternalSandboxRuntimeRoutes(): AppRoutes<
 
   routes.openapi(internalSandboxRuntimeGetSandboxInstanceRoute, async (ctx) => {
     const body = ctx.req.valid("json");
+    const db = ctx.get("db");
+    const dataPlaneClient = ctx.get("dataPlaneClient");
 
     try {
-      const sandboxInstance = await ctx.get("services").sandboxInstances.getInstance({
-        organizationId: body.organizationId,
-        instanceId: body.instanceId,
-      });
+      const sandboxInstance = await getInstance(
+        {
+          db,
+          dataPlaneClient,
+        },
+        {
+          organizationId: body.organizationId,
+          instanceId: body.instanceId,
+        },
+      );
 
-      const responseBody: z.infer<typeof InternalSandboxRuntimeGetSandboxInstanceResponseSchema> =
-        sandboxInstance;
-      return ctx.json(responseBody, 200);
+      return ctx.json(sandboxInstance, 200);
     } catch (error) {
       return handleSandboxInstanceReadError(ctx, error);
     }
@@ -89,18 +101,31 @@ export function createInternalSandboxRuntimeRoutes(): AppRoutes<
 
   routes.openapi(internalSandboxRuntimeMintConnectionTokenRoute, async (ctx) => {
     const body = ctx.req.valid("json");
+    const dataPlaneClient = ctx.get("dataPlaneClient");
+    const sandboxConfig = ctx.get("sandboxConfig");
+    const connectionTokenConfig = ctx.get("connectionTokenConfig");
 
     try {
-      const mintedToken = await ctx
-        .get("services")
-        .sandboxInstances.mintConnectionTokenForInstance({
+      const mintedToken = await mintConnectionTokenForInstance(
+        {
+          dataPlaneClient,
+          defaultConnectionToken: {
+            gatewayWebsocketUrl: sandboxConfig.gatewayWsUrl,
+            tokenTtlSeconds: SANDBOX_INSTANCE_CONNECTION_TOKEN_TTL_SECONDS,
+            tokenConfig: {
+              connectionTokenSecret: connectionTokenConfig.secret,
+              tokenIssuer: connectionTokenConfig.issuer,
+              tokenAudience: connectionTokenConfig.audience,
+            },
+          },
+        },
+        {
           organizationId: body.organizationId,
           instanceId: body.instanceId,
-        });
+        },
+      );
 
-      const responseBody: z.infer<typeof InternalSandboxRuntimeMintConnectionResponseSchema> =
-        mintedToken;
-      return ctx.json(responseBody, 200);
+      return ctx.json(mintedToken, 200);
     } catch (error) {
       return handleMintConnectionError(ctx, error);
     }

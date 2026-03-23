@@ -1,7 +1,7 @@
 import { sandboxInstances, SandboxInstanceStatuses } from "@mistle/db/data-plane";
 import { afterEach, describe, expect } from "vitest";
 
-import { ListSandboxInstancesResponseSchema } from "../src/sandbox-instances/contracts.js";
+import { ListSandboxInstancesResponseSchema } from "../src/sandbox-instances/index.js";
 import {
   createDisposableDataPlaneRuntime,
   type DisposableDataPlaneRuntime,

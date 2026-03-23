@@ -1,30 +1,4 @@
-export const SandboxProfilesAuthErrorCodes = {
-  UNAUTHORIZED: "UNAUTHORIZED",
-  ACTIVE_ORGANIZATION_REQUIRED: "ACTIVE_ORGANIZATION_REQUIRED",
-} as const;
-
-export type SandboxProfilesAuthErrorCode =
-  (typeof SandboxProfilesAuthErrorCodes)[keyof typeof SandboxProfilesAuthErrorCodes];
-
-export class SandboxProfilesUnauthorizedError extends Error {
-  code: SandboxProfilesAuthErrorCode;
-
-  constructor(message: string) {
-    super(message);
-    this.name = "SandboxProfilesUnauthorizedError";
-    this.code = SandboxProfilesAuthErrorCodes.UNAUTHORIZED;
-  }
-}
-
-export class SandboxProfilesForbiddenError extends Error {
-  code: SandboxProfilesAuthErrorCode;
-
-  constructor(message: string) {
-    super(message);
-    this.name = "SandboxProfilesForbiddenError";
-    this.code = SandboxProfilesAuthErrorCodes.ACTIVE_ORGANIZATION_REQUIRED;
-  }
-}
+import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 
 export const SandboxProfilesBadRequestCodes = {
   INVALID_LIST_PROFILES_INPUT: "INVALID_LIST_PROFILES_INPUT",
@@ -34,12 +8,11 @@ export const SandboxProfilesBadRequestCodes = {
 export type SandboxProfilesBadRequestCode =
   (typeof SandboxProfilesBadRequestCodes)[keyof typeof SandboxProfilesBadRequestCodes];
 
-export class SandboxProfilesBadRequestError extends Error {
+export class SandboxProfilesBadRequestError extends BadRequestError {
   code: SandboxProfilesBadRequestCode;
 
   constructor(code: SandboxProfilesBadRequestCode, message: string) {
-    super(message);
-    this.name = "SandboxProfilesBadRequestError";
+    super(code, message);
     this.code = code;
   }
 }
@@ -53,7 +26,7 @@ export const SandboxProfilesIntegrationBindingsBadRequestCodes = {
 export type SandboxProfilesIntegrationBindingsBadRequestCode =
   (typeof SandboxProfilesIntegrationBindingsBadRequestCodes)[keyof typeof SandboxProfilesIntegrationBindingsBadRequestCodes];
 
-export class SandboxProfilesIntegrationBindingsBadRequestError extends Error {
+export class SandboxProfilesIntegrationBindingsBadRequestError extends BadRequestError {
   code: SandboxProfilesIntegrationBindingsBadRequestCode;
   details?: {
     issues: ReadonlyArray<{
@@ -78,8 +51,7 @@ export class SandboxProfilesIntegrationBindingsBadRequestError extends Error {
       }>;
     },
   ) {
-    super(message);
-    this.name = "SandboxProfilesIntegrationBindingsBadRequestError";
+    super(code, message);
     this.code = code;
     if (details !== undefined) {
       this.details = details;
@@ -107,12 +79,11 @@ export const SandboxProfilesCompileErrorCodes = {
 export type SandboxProfilesCompileErrorCode =
   (typeof SandboxProfilesCompileErrorCodes)[keyof typeof SandboxProfilesCompileErrorCodes];
 
-export class SandboxProfilesCompileError extends Error {
+export class SandboxProfilesCompileError extends BadRequestError {
   code: SandboxProfilesCompileErrorCode;
 
   constructor(code: SandboxProfilesCompileErrorCode, message: string) {
-    super(message);
-    this.name = "SandboxProfilesCompileError";
+    super(code, message);
     this.code = code;
   }
 }
@@ -125,12 +96,11 @@ export const SandboxProfilesNotFoundCodes = {
 export type SandboxProfilesNotFoundCode =
   (typeof SandboxProfilesNotFoundCodes)[keyof typeof SandboxProfilesNotFoundCodes];
 
-export class SandboxProfilesNotFoundError extends Error {
+export class SandboxProfilesNotFoundError extends NotFoundError {
   code: SandboxProfilesNotFoundCode;
 
   constructor(code: SandboxProfilesNotFoundCode, message: string) {
-    super(message);
-    this.name = "SandboxProfilesNotFoundError";
+    super(code, message);
     this.code = code;
   }
 }

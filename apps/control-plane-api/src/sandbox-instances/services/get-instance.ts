@@ -90,8 +90,13 @@ async function resolveAutomationConversation(
 }
 
 export async function getInstance(
-  db: ControlPlaneDatabase,
-  dataPlaneClient: DataPlaneSandboxInstancesClient,
+  {
+    db,
+    dataPlaneClient,
+  }: {
+    db: ControlPlaneDatabase;
+    dataPlaneClient: DataPlaneSandboxInstancesClient;
+  },
   input: { organizationId: string; instanceId: string },
 ): Promise<SandboxInstanceStatus> {
   const sandboxInstance = await dataPlaneClient.getSandboxInstance({
