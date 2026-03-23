@@ -8,11 +8,9 @@ import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
 import { buildDashboardUrl } from "../src/dashboard-url.js";
-import {
-  CompleteGitHubAppInstallationConnectionQuerySchema,
-  IntegrationConnectionsBadRequestResponseSchema,
-  StartGitHubAppInstallationConnectionResponseSchema,
-} from "../src/integration-connections/contracts.js";
+import { CompleteGitHubAppInstallationConnectionQuerySchema } from "../src/integration-connections/complete-github-app-installation-connection/schema.js";
+import { IntegrationConnectionsBadRequestResponseSchema } from "../src/integration-connections/schemas.js";
+import { StartGitHubAppInstallationConnectionResponseSchema } from "../src/integration-connections/start-github-app-installation-connection/schema.js";
 import type { ControlPlaneApiIntegrationFixture } from "./test-context.js";
 import { it } from "./test-context.js";
 

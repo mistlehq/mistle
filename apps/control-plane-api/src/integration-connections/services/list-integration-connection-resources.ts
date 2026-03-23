@@ -1,5 +1,6 @@
 import {
   integrationConnectionResources,
+  type ControlPlaneDatabase,
   IntegrationConnectionResourceStatuses,
   IntegrationConnectionResourceSyncStates,
   type IntegrationConnection,
@@ -7,6 +8,7 @@ import {
   type IntegrationConnectionResourceState,
   type IntegrationConnectionResourceSyncState,
 } from "@mistle/db/control-plane";
+import { BadRequestError, ConflictError, NotFoundError } from "@mistle/http/errors.js";
 import {
   decodeKeysetCursorOrThrow,
   encodeKeysetCursor,
@@ -17,18 +19,15 @@ import {
   paginateKeyset,
   parseKeysetPageSize,
 } from "@mistle/http/pagination";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { and, eq, gt, ilike, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 
-import type { AppContext } from "../../types.js";
 import {
   IntegrationConnectionsBadRequestCodes,
-  IntegrationConnectionsBadRequestError,
   IntegrationConnectionsConflictCodes,
-  IntegrationConnectionsConflictError,
   IntegrationConnectionsNotFoundCodes,
-  IntegrationConnectionsNotFoundError,
-} from "./errors.js";
+} from "../constants.js";
 
 const PAGE_SIZE_OPTIONS = {
   defaultLimit: 20,
@@ -80,18 +79,44 @@ export type ListIntegrationConnectionResourcesResult = {
   };
 };
 
+export class IntegrationConnectionResourcesConflictError extends ConflictError {
+  declare readonly code:
+    | typeof IntegrationConnectionsConflictCodes.RESOURCE_SYNC_REQUIRED
+    | typeof IntegrationConnectionsConflictCodes.RESOURCE_SYNC_IN_PROGRESS
+    | typeof IntegrationConnectionsConflictCodes.RESOURCE_SYNC_FAILED;
+  readonly lastErrorCode: string | null;
+  readonly lastErrorMessage: string | null;
+
+  constructor(input: {
+    code:
+      | typeof IntegrationConnectionsConflictCodes.RESOURCE_SYNC_REQUIRED
+      | typeof IntegrationConnectionsConflictCodes.RESOURCE_SYNC_IN_PROGRESS
+      | typeof IntegrationConnectionsConflictCodes.RESOURCE_SYNC_FAILED;
+    message: string;
+    lastErrorCode?: string | null;
+    lastErrorMessage?: string | null;
+  }) {
+    super(input.code, input.message);
+    this.lastErrorCode = input.lastErrorCode ?? null;
+    this.lastErrorMessage = input.lastErrorMessage ?? null;
+  }
+}
+
 export async function listIntegrationConnectionResources(
-  db: AppContext["var"]["db"],
-  integrationRegistry: AppContext["var"]["integrationRegistry"],
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+  },
   input: ListIntegrationConnectionResourcesInput,
 ): Promise<ListIntegrationConnectionResourcesResult> {
+  const { db, integrationRegistry } = ctx;
   let pageSize: number;
 
   try {
     pageSize = parseKeysetPageSize(input.limit, PAGE_SIZE_OPTIONS);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      throw new IntegrationConnectionsBadRequestError(
+      throw new BadRequestError(
         IntegrationConnectionsBadRequestCodes.INVALID_LIST_CONNECTION_RESOURCES_INPUT,
         "`limit` must be an integer between 1 and 100.",
       );
@@ -114,7 +139,7 @@ export async function listIntegrationConnectionResources(
   });
 
   if (connection === undefined) {
-    throw new IntegrationConnectionsNotFoundError(
+    throw new NotFoundError(
       IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,
       "Integration connection was not found.",
     );
@@ -156,7 +181,7 @@ export async function listIntegrationConnectionResources(
               [KeysetCursorDecodeErrorReasons.INVALID_SHAPE]: `\`${decodeCursorName}\` cursor has an invalid shape.`,
             } as const;
 
-            return new IntegrationConnectionsBadRequestError(
+            return new BadRequestError(
               IntegrationConnectionsBadRequestCodes.INVALID_RESOURCE_PAGINATION_CURSOR,
               reasonToMessage[reason],
             );
@@ -247,7 +272,7 @@ export async function listIntegrationConnectionResources(
       error instanceof KeysetPaginationInputError &&
       error.reason === KeysetPaginationInputErrorReasons.BOTH_CURSORS_PROVIDED
     ) {
-      throw new IntegrationConnectionsBadRequestError(
+      throw new BadRequestError(
         IntegrationConnectionsBadRequestCodes.INVALID_LIST_CONNECTION_RESOURCES_INPUT,
         "Only one of `after` or `before` can be provided.",
       );
@@ -258,7 +283,7 @@ export async function listIntegrationConnectionResources(
 }
 
 function ensureResourceKindIsSupported(
-  integrationRegistry: AppContext["var"]["integrationRegistry"],
+  integrationRegistry: IntegrationRegistry,
   connection: IntegrationConnection,
   target: {
     familyId: string;
@@ -275,7 +300,7 @@ function ensureResourceKindIsSupported(
   );
 
   if (!isSupported) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.RESOURCE_KIND_NOT_SUPPORTED,
       `Resource kind \`${kind}\` is not supported for connection \`${connection.id}\`.`,
     );
@@ -289,7 +314,7 @@ function assertResourceStateIsReadable(
     resourceState === undefined ||
     resourceState.syncState === IntegrationConnectionResourceSyncStates.NEVER_SYNCED
   ) {
-    throw new IntegrationConnectionsConflictError({
+    throw new IntegrationConnectionResourcesConflictError({
       code: IntegrationConnectionsConflictCodes.RESOURCE_SYNC_REQUIRED,
       message: "Resource sync is required before resources can be listed.",
     });
@@ -299,7 +324,7 @@ function assertResourceStateIsReadable(
     resourceState.syncState === IntegrationConnectionResourceSyncStates.SYNCING &&
     resourceState.lastSyncedAt === null
   ) {
-    throw new IntegrationConnectionsConflictError({
+    throw new IntegrationConnectionResourcesConflictError({
       code: IntegrationConnectionsConflictCodes.RESOURCE_SYNC_IN_PROGRESS,
       message: "Resource sync is still in progress and no previous snapshot is available yet.",
     });
@@ -309,7 +334,7 @@ function assertResourceStateIsReadable(
     resourceState.syncState === IntegrationConnectionResourceSyncStates.ERROR &&
     resourceState.lastSyncedAt === null
   ) {
-    throw new IntegrationConnectionsConflictError({
+    throw new IntegrationConnectionResourcesConflictError({
       code: IntegrationConnectionsConflictCodes.RESOURCE_SYNC_FAILED,
       message: "Resource sync failed before any usable snapshot was stored.",
       ...(resourceState.lastErrorCode === null

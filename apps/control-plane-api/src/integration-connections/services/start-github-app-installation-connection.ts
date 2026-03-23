@@ -1,7 +1,10 @@
-import { integrationConnectionRedirectSessions } from "@mistle/db/control-plane";
+import {
+  integrationConnectionRedirectSessions,
+  type ControlPlaneDatabase,
+} from "@mistle/db/control-plane";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 
-import type { AppContext } from "../../types.js";
-import { IntegrationConnectionsBadRequestCodes } from "./errors.js";
+import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import {
   createRedirectSessionExpiryTimestamp,
   createRedirectState,
@@ -20,7 +23,7 @@ type StartedGitHubAppInstallationConnection = {
 };
 
 async function persistRedirectSession(input: {
-  db: AppContext["var"]["db"];
+  db: ControlPlaneDatabase;
   organizationId: string;
   targetKey: string;
   state: string;
@@ -46,15 +49,30 @@ async function persistRedirectSession(input: {
   }
 }
 export async function startGitHubAppInstallationConnection(
-  db: AppContext["var"]["db"],
-  integrationsConfig: AppContext["var"]["config"]["integrations"],
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: {
+      activeMasterEncryptionKeyVersion: number;
+      masterEncryptionKeys: Record<string, string>;
+    };
+  },
   input: StartGitHubAppInstallationConnectionInput,
 ): Promise<StartedGitHubAppInstallationConnection> {
-  const resolved = await resolveGitHubAppInstallationHandlerTargetOrThrow(db, integrationsConfig, {
-    targetKey: input.targetKey,
-    invalidInputCode:
-      IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT,
-  });
+  const { db, integrationRegistry, integrationsConfig } = ctx;
+
+  const resolved = await resolveGitHubAppInstallationHandlerTargetOrThrow(
+    {
+      db,
+      integrationRegistry,
+      integrationsConfig,
+    },
+    {
+      targetKey: input.targetKey,
+      invalidInputCode:
+        IntegrationConnectionsBadRequestCodes.INVALID_GITHUB_APP_INSTALLATION_START_INPUT,
+    },
+  );
 
   const state = encodeRedirectStateMetadata({
     state: createRedirectState(),

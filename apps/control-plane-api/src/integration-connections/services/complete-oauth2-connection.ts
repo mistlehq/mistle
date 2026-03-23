@@ -7,7 +7,10 @@ import {
   IntegrationCredentialSecretKinds,
   integrationConnectionRedirectSessions,
 } from "@mistle/db/control-plane";
+import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { BadRequestError } from "@mistle/http/errors.js";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { and, eq, isNull } from "drizzle-orm";
 
 import {
@@ -16,11 +19,7 @@ import {
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../integration-credentials/crypto.js";
-import type { AppContext } from "../../types.js";
-import {
-  IntegrationConnectionsBadRequestCodes,
-  IntegrationConnectionsBadRequestError,
-} from "./errors.js";
+import { IntegrationConnectionsBadRequestCodes } from "../constants.js";
 import { createRedirectQueryParams, resolveRedirectDisplayName } from "./redirect-flow.js";
 import { resolveOAuth2CapabilityTargetOrThrow } from "./resolve-oauth2-capability-target.js";
 
@@ -52,7 +51,7 @@ function buildOAuth2CompleteUrl(input: { controlPlaneBaseUrl: string; targetKey:
 function resolveRedirectStateOrThrow(params: URLSearchParams): string {
   const state = params.get("state");
   if (state === null || state.length === 0) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_COMPLETE_INPUT,
       "OAuth2 callback query must include `state`.",
     );
@@ -76,14 +75,29 @@ function resolvePkceVerifier(input: {
 }
 
 export async function completeOAuth2Connection(
-  db: AppContext["var"]["db"],
-  integrationsConfig: AppContext["var"]["config"]["integrations"],
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: {
+      activeMasterEncryptionKeyVersion: number;
+      masterEncryptionKeys: Record<string, string>;
+    };
+  },
   input: CompleteOAuth2ConnectionInput,
 ): Promise<CompletedConnection> {
-  const resolved = await resolveOAuth2CapabilityTargetOrThrow(db, integrationsConfig, {
-    targetKey: input.targetKey,
-    invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_COMPLETE_INPUT,
-  });
+  const { db, integrationRegistry, integrationsConfig } = ctx;
+
+  const resolved = await resolveOAuth2CapabilityTargetOrThrow(
+    {
+      db,
+      integrationRegistry,
+      integrationsConfig,
+    },
+    {
+      targetKey: input.targetKey,
+      invalidInputCode: IntegrationConnectionsBadRequestCodes.INVALID_OAUTH2_COMPLETE_INPUT,
+    },
+  );
 
   const queryParams = createRedirectQueryParams(input.query);
   const state = resolveRedirectStateOrThrow(queryParams);
@@ -94,7 +108,7 @@ export async function completeOAuth2Connection(
   });
 
   if (redirectSession === undefined) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_INVALID,
       "Redirect state is invalid.",
     );
@@ -103,7 +117,7 @@ export async function completeOAuth2Connection(
   const requestedDisplayName = resolveRedirectDisplayName(redirectSession.state);
 
   if (redirectSession.usedAt !== null) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
       "Redirect state has already been used.",
     );
@@ -116,7 +130,7 @@ export async function completeOAuth2Connection(
   }
 
   if (expiresAt <= now) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_EXPIRED,
       "Redirect state has expired.",
     );
@@ -157,7 +171,7 @@ export async function completeOAuth2Connection(
       });
 
     if (consumedSessionRows.length !== 1) {
-      throw new IntegrationConnectionsBadRequestError(
+      throw new BadRequestError(
         IntegrationConnectionsBadRequestCodes.REDIRECT_STATE_ALREADY_USED,
         "Redirect state has already been used.",
       );

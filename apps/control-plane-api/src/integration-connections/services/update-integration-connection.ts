@@ -1,11 +1,8 @@
-import { integrationConnections } from "@mistle/db/control-plane";
+import { integrationConnections, type ControlPlaneDatabase } from "@mistle/db/control-plane";
+import { NotFoundError } from "@mistle/http/errors.js";
 import { eq, sql } from "drizzle-orm";
 
-import type { AppContext } from "../../types.js";
-import {
-  IntegrationConnectionsNotFoundCodes,
-  IntegrationConnectionsNotFoundError,
-} from "./errors.js";
+import { IntegrationConnectionsNotFoundCodes } from "../constants.js";
 
 type UpdatedConnection = {
   id: string;
@@ -26,7 +23,7 @@ export type UpdateConnectionInput = {
 };
 
 export async function updateIntegrationConnection(
-  db: AppContext["var"]["db"],
+  { db }: { db: ControlPlaneDatabase },
   input: UpdateConnectionInput,
 ): Promise<UpdatedConnection> {
   const existingConnection = await db.query.integrationConnections.findFirst({
@@ -35,7 +32,7 @@ export async function updateIntegrationConnection(
   });
 
   if (existingConnection === undefined) {
-    throw new IntegrationConnectionsNotFoundError(
+    throw new NotFoundError(
       IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,
       `Integration connection '${input.connectionId}' was not found.`,
     );

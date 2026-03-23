@@ -1,12 +1,14 @@
 import {
   integrationConnectionCredentials,
   integrationConnections,
+  type ControlPlaneDatabase,
   IntegrationConnectionCredentialPurposes,
   integrationCredentials,
   IntegrationCredentialSecretKinds,
 } from "@mistle/db/control-plane";
+import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
+import type { IntegrationRegistry } from "@mistle/integrations-core";
 import { eq, sql } from "drizzle-orm";
 
 import {
@@ -14,16 +16,11 @@ import {
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../integration-credentials/crypto.js";
-import type { AppContext } from "../../types.js";
-import { assertApiKeyConnectionMethodSupportedOrThrow } from "./create-api-key-connection.js";
 import {
   IntegrationConnectionsBadRequestCodes,
-  IntegrationConnectionsBadRequestError,
   IntegrationConnectionsNotFoundCodes,
-  IntegrationConnectionsNotFoundError,
-} from "./errors.js";
-
-const registry = createIntegrationRegistry();
+} from "../constants.js";
+import { assertApiKeyConnectionMethodSupportedOrThrow } from "./create-api-key-connection.js";
 
 type UpdatedConnection = {
   id: string;
@@ -58,17 +55,24 @@ function resolveConnectionMethodId(config: Record<string, unknown> | null): stri
 }
 
 export async function updateApiKeyConnection(
-  db: AppContext["var"]["db"],
-  integrationsConfig: AppContext["var"]["config"]["integrations"],
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: {
+      masterEncryptionKeys: Record<string, string>;
+    };
+  },
   input: UpdateApiKeyConnectionInput,
 ): Promise<UpdatedConnection> {
+  const { db, integrationRegistry, integrationsConfig } = ctx;
+
   const existingConnection = await db.query.integrationConnections.findFirst({
     where: (table, { and, eq }) =>
       and(eq(table.id, input.connectionId), eq(table.organizationId, input.organizationId)),
   });
 
   if (existingConnection === undefined) {
-    throw new IntegrationConnectionsNotFoundError(
+    throw new NotFoundError(
       IntegrationConnectionsNotFoundCodes.CONNECTION_NOT_FOUND,
       `Integration connection '${input.connectionId}' was not found.`,
     );
@@ -78,7 +82,7 @@ export async function updateApiKeyConnection(
   const normalizedApiKey = input.apiKey.trim();
 
   if (normalizedApiKey.length === 0) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
       "`apiKey` must contain at least one non-whitespace character when provided.",
     );
@@ -89,26 +93,26 @@ export async function updateApiKeyConnection(
   });
 
   if (target === undefined) {
-    throw new IntegrationConnectionsNotFoundError(
+    throw new NotFoundError(
       IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND,
       `Integration target '${existingConnection.targetKey}' was not found.`,
     );
   }
 
-  const definition = registry.getDefinition({
+  const definition = integrationRegistry.getDefinition({
     familyId: target.familyId,
     variantId: target.variantId,
   });
 
   if (definition === undefined) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.INVALID_UPDATE_CONNECTION_INPUT,
       `Integration definition '${target.familyId}/${target.variantId}' is not registered.`,
     );
   }
 
   if (existingConnectionMethodId !== IntegrationConnectionMethodIds.API_KEY) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.API_KEY_CONNECTION_REQUIRED,
       `Integration connection '${input.connectionId}' is not an API-key connection.`,
     );

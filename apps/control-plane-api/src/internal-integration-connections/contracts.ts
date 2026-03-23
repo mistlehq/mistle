@@ -1,10 +1,11 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 
+import { RefreshIntegrationConnectionResourcesResponseSchema } from "../integration-connections/refresh-integration-connection-resources/schema.js";
 import {
   IntegrationConnectionsBadRequestResponseSchema,
   IntegrationConnectionsNotFoundResponseSchema,
-  RefreshIntegrationConnectionResourcesResponseSchema,
-} from "../integration-connections/contracts.js";
+} from "../integration-connections/schemas.js";
 
 export const InternalIntegrationConnectionsErrorResponseSchema = z
   .object({
@@ -13,19 +14,9 @@ export const InternalIntegrationConnectionsErrorResponseSchema = z
   })
   .strict();
 
-export const InternalIntegrationConnectionsValidationErrorResponseSchema = z
-  .object({
-    success: z.literal(false),
-    error: z.looseObject({
-      name: z.string().min(1),
-      message: z.string().min(1),
-    }),
-  })
-  .strict();
-
 export const InternalIntegrationConnectionsBadRequestResponseSchema = z.union([
   IntegrationConnectionsBadRequestResponseSchema,
-  InternalIntegrationConnectionsValidationErrorResponseSchema,
+  ValidationErrorResponseSchema,
 ]);
 
 export const InternalRefreshIntegrationConnectionResourcesRequestSchema = z

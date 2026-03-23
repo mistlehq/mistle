@@ -1,31 +1,28 @@
 import {
   integrationConnectionCredentials,
   integrationConnections,
+  type ControlPlaneDatabase,
   IntegrationConnectionCredentialPurposes,
   IntegrationConnectionStatuses,
   integrationCredentials,
   IntegrationCredentialSecretKinds,
 } from "@mistle/db/control-plane";
+import { BadRequestError, NotFoundError } from "@mistle/http/errors.js";
 import {
   type IntegrationConnectionMethodId,
   IntegrationConnectionMethodIds,
+  type IntegrationRegistry,
 } from "@mistle/integrations-core";
-import { createIntegrationRegistry } from "@mistle/integrations-definitions";
 
 import {
   encryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
   unwrapOrganizationCredentialKey,
 } from "../../integration-credentials/crypto.js";
-import type { AppContext } from "../../types.js";
 import {
-  IntegrationConnectionsBadRequestError,
   IntegrationConnectionsBadRequestCodes,
   IntegrationConnectionsNotFoundCodes,
-  IntegrationConnectionsNotFoundError,
-} from "./errors.js";
-
-const registry = createIntegrationRegistry();
+} from "../constants.js";
 
 export type CreateApiKeyConnectionInput = {
   organizationId: string;
@@ -53,7 +50,7 @@ export function assertApiKeyConnectionMethodSupportedOrThrow(input: {
   if (
     !input.connectionMethods.some((method) => method.id === IntegrationConnectionMethodIds.API_KEY)
   ) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.API_KEY_NOT_SUPPORTED,
       `Integration target '${input.targetKey}' does not support API-key authentication.`,
     );
@@ -61,28 +58,35 @@ export function assertApiKeyConnectionMethodSupportedOrThrow(input: {
 }
 
 export async function createApiKeyConnection(
-  db: AppContext["var"]["db"],
-  integrationsConfig: AppContext["var"]["config"]["integrations"],
+  ctx: {
+    db: ControlPlaneDatabase;
+    integrationRegistry: IntegrationRegistry;
+    integrationsConfig: {
+      masterEncryptionKeys: Record<string, string>;
+    };
+  },
   input: CreateApiKeyConnectionInput,
 ): Promise<CreatedConnection> {
+  const { db, integrationRegistry, integrationsConfig } = ctx;
+
   const target = await db.query.integrationTargets.findFirst({
     where: (table, { and, eq }) =>
       and(eq(table.targetKey, input.targetKey), eq(table.enabled, true)),
   });
 
   if (target === undefined) {
-    throw new IntegrationConnectionsNotFoundError(
+    throw new NotFoundError(
       IntegrationConnectionsNotFoundCodes.TARGET_NOT_FOUND,
       `Integration target '${input.targetKey}' was not found.`,
     );
   }
 
-  const definition = registry.getDefinition({
+  const definition = integrationRegistry.getDefinition({
     familyId: target.familyId,
     variantId: target.variantId,
   });
   if (definition === undefined) {
-    throw new IntegrationConnectionsBadRequestError(
+    throw new BadRequestError(
       IntegrationConnectionsBadRequestCodes.INVALID_CREATE_CONNECTION_INPUT,
       `Integration definition '${target.familyId}/${target.variantId}' is not registered.`,
     );

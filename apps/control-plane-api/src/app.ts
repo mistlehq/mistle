@@ -1,6 +1,7 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
+import type { OpenWorkflow } from "openworkflow";
 
 import { createAuthRoutes } from "./auth/routes.js";
 import { createAutomationWebhooksRoutes } from "./automation-webhooks/index.js";
@@ -31,6 +32,7 @@ export type CreateAppInput = {
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   integrationRegistry: IntegrationRegistry;
+  openWorkflow: OpenWorkflow;
   services: AppServices;
 };
 
@@ -44,6 +46,7 @@ export function createApp(input: CreateAppInput): ControlPlaneApp {
     internalAuthServiceToken: input.internalAuthServiceToken,
     db: input.db,
     integrationRegistry: input.integrationRegistry,
+    openWorkflow: input.openWorkflow,
     services: input.services,
   });
 
@@ -62,6 +65,7 @@ export function configureApp(input: CreateAppInput & { app: ControlPlaneApp }): 
       internalAuthServiceToken: input.internalAuthServiceToken,
       db,
       integrationRegistry: input.integrationRegistry,
+      openWorkflow: input.openWorkflow,
       services,
     }),
   );

@@ -8,7 +8,7 @@ import {
 import { SyncIntegrationConnectionResourcesWorkflowSpec } from "@mistle/workflow-registry/control-plane";
 import { describe, expect } from "vitest";
 
-import { RefreshIntegrationConnectionResourcesResponseSchema } from "../src/integration-connections/contracts.js";
+import { RefreshIntegrationConnectionResourcesResponseSchema } from "../src/integration-connections/refresh-integration-connection-resources/schema.js";
 import { INTERNAL_INTEGRATION_CONNECTIONS_ROUTE_BASE_PATH } from "../src/internal-integration-connections/index.js";
 import { CONTROL_PLANE_INTERNAL_AUTH_HEADER } from "../src/internal-integration-credentials/index.js";
 import { countControlPlaneWorkflowRuns } from "./helpers/workflow-runs.js";

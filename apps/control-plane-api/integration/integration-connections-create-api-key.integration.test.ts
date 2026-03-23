@@ -5,16 +5,16 @@ import {
   IntegrationCredentialSecretKinds,
   integrationTargets,
 } from "@mistle/db/control-plane";
+import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import { CreateApiKeyConnectionBodySchema } from "../src/integration-connections/create-api-key-connection/schema.js";
 import {
-  CreateApiKeyConnectionBodySchema,
   IntegrationConnectionSchema,
   IntegrationConnectionsNotFoundResponseSchema,
-  ValidationErrorResponseSchema,
-} from "../src/integration-connections/contracts.js";
+} from "../src/integration-connections/schemas.js";
 import {
   decryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
@@ -248,8 +248,10 @@ describe("integration connections create api key integration", () => {
 
     expect(response.status).toBe(400);
     const responseBody = ValidationErrorResponseSchema.parse(await response.json());
-    expect(responseBody.success).toBe(false);
-    expect(responseBody.error.name).toBe("ZodError");
+    expect(responseBody).toEqual({
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
+    });
   });
 
   it("returns 401 when request is unauthenticated", async ({ fixture }) => {

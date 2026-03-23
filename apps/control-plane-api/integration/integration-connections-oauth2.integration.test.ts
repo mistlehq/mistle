@@ -1,7 +1,7 @@
 import { integrationTargets } from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
 
-import { IntegrationConnectionsBadRequestResponseSchema } from "../src/integration-connections/contracts.js";
+import { IntegrationConnectionsBadRequestResponseSchema } from "../src/integration-connections/schemas.js";
 import { it } from "./test-context.js";
 
 describe("integration connections OAuth2 integration", () => {

@@ -5,9 +5,9 @@ import type { ControlPlaneDatabase } from "@mistle/db/control-plane";
 import type { IntegrationRegistry } from "@mistle/integrations-core";
 import type { HandleIntegrationWebhookEventWorkflowInput } from "@mistle/workflow-registry/control-plane";
 import type { Context, Hono } from "hono";
+import type { OpenWorkflow } from "openworkflow";
 
 import type { ControlPlaneAuth } from "./auth/index.js";
-import type { IntegrationConnectionsService } from "./integration-connections/services/factory.js";
 import type { SandboxInstancesService } from "./sandbox-instances/services/factory.js";
 import type { SandboxProfilesService } from "./sandbox-profiles/services/factory.js";
 
@@ -44,7 +44,6 @@ export type AppRoutes<BasePath> = {
 
 export type AppServices = {
   auth: ControlPlaneAuth;
-  integrationConnections: IntegrationConnectionsService;
   integrationWebhooks: {
     receiveWebhookEvent: (input: HandleIntegrationWebhookEventWorkflowInput) => Promise<void>;
   };
@@ -69,6 +68,7 @@ export type AppContextVariables = {
   internalAuthServiceToken: string;
   db: ControlPlaneDatabase;
   integrationRegistry: IntegrationRegistry;
+  openWorkflow: OpenWorkflow;
   services: AppServices;
   session: AppSession | null;
 };

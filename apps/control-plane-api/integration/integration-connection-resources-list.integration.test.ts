@@ -9,10 +9,8 @@ import {
 } from "@mistle/db/control-plane";
 import { describe, expect } from "vitest";
 
-import {
-  IntegrationConnectionsConflictResponseSchema,
-  ListIntegrationConnectionResourcesResponseSchema,
-} from "../src/integration-connections/contracts.js";
+import { ListIntegrationConnectionResourcesResponseSchema } from "../src/integration-connections/list-integration-connection-resources/schema.js";
+import { IntegrationConnectionsConflictResponseSchema } from "../src/integration-connections/schemas.js";
 import { it, type ControlPlaneApiIntegrationFixture } from "./test-context.js";
 
 describe("integration connection resources list integration", () => {

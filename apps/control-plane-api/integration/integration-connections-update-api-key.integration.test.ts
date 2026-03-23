@@ -3,18 +3,18 @@ import {
   IntegrationCredentialSecretKinds,
   integrationTargets,
 } from "@mistle/db/control-plane";
+import { ValidationErrorResponseSchema } from "@mistle/http/errors.js";
 import { IntegrationConnectionMethodIds } from "@mistle/integrations-core";
 import { eq } from "drizzle-orm";
 import { describe, expect } from "vitest";
 
+import { CreateApiKeyConnectionBodySchema } from "../src/integration-connections/create-api-key-connection/schema.js";
 import {
-  CreateApiKeyConnectionBodySchema,
   IntegrationConnectionSchema,
   IntegrationConnectionsBadRequestResponseSchema,
   IntegrationConnectionsNotFoundResponseSchema,
-  UpdateApiKeyConnectionBodySchema,
-  ValidationErrorResponseSchema,
-} from "../src/integration-connections/contracts.js";
+} from "../src/integration-connections/schemas.js";
+import { UpdateApiKeyConnectionBodySchema } from "../src/integration-connections/update-api-key-connection/schema.js";
 import {
   decryptCredentialUtf8,
   resolveMasterEncryptionKeyMaterial,
@@ -426,8 +426,10 @@ describe("integration connections update api key integration", () => {
 
     expect(updateResponse.status).toBe(400);
     const responseBody = ValidationErrorResponseSchema.parse(await updateResponse.json());
-    expect(responseBody.success).toBe(false);
-    expect(responseBody.error.message).toContain("apiKey");
+    expect(responseBody).toEqual({
+      code: "VALIDATION_ERROR",
+      message: "Invalid request.",
+    });
 
     const updatedLink = await fixture.db.query.integrationConnectionCredentials.findFirst({
       where: (table, { and, eq }) =>
