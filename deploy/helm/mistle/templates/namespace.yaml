@@ -1,0 +1,8 @@
+{{- if and .Values.global.createNamespace .Values.global.namespaceOverride }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "mistle.namespace" . }}
+  labels:
+    {{- include "mistle.labels" . | nindent 4 }}
+{{- end }}

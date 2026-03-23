@@ -1,0 +1,155 @@
+global:
+  createNamespace: false
+  namespaceOverride: ""
+  imageRegistry: ""
+  imagePullSecrets: []
+  commonLabels: {}
+  podAnnotations: {}
+  serviceAccountName: ""
+
+controlPlaneApi:
+  enabled: true
+  replicaCount: 1
+  containerPort: 8080
+  image:
+    repository: control-plane-api
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+    useGlobalRegistry: true
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: ""
+    path: /
+    pathType: Prefix
+    tls: []
+  env: []
+  secretEnv: []
+  resources: {}
+
+controlPlaneWorker:
+  enabled: true
+  replicaCount: 1
+  containerPort: 8081
+  image:
+    repository: control-plane-worker
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+    useGlobalRegistry: true
+  service:
+    enabled: false
+    type: ClusterIP
+    port: 8081
+    targetPort: 8081
+  env: []
+  secretEnv: []
+  resources: {}
+
+dataPlaneApi:
+  enabled: true
+  replicaCount: 1
+  containerPort: 8082
+  image:
+    repository: data-plane-api
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+    useGlobalRegistry: true
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8082
+    targetPort: 8082
+  env: []
+  secretEnv: []
+  resources: {}
+
+dataPlaneWorker:
+  enabled: true
+  replicaCount: 1
+  containerPort: 8083
+  image:
+    repository: data-plane-worker
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+    useGlobalRegistry: true
+  service:
+    enabled: false
+    type: ClusterIP
+    port: 8083
+    targetPort: 8083
+  env: []
+  secretEnv: []
+  resources: {}
+
+dataPlaneGateway:
+  enabled: true
+  replicaCount: 1
+  containerPort: 8084
+  image:
+    repository: data-plane-gateway
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+    useGlobalRegistry: true
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8084
+    targetPort: 8084
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    host: ""
+    path: /
+    pathType: Prefix
+    tls: []
+  env: []
+  secretEnv: []
+  resources: {}
+
+tokenizerProxy:
+  enabled: true
+  replicaCount: 1
+  containerPort: 8085
+  image:
+    repository: tokenizer-proxy
+    tag: ""
+    digest: ""
+    pullPolicy: IfNotPresent
+    useGlobalRegistry: true
+  service:
+    enabled: true
+    type: ClusterIP
+    port: 8085
+    targetPort: 8085
+  env: []
+  secretEnv: []
+  resources: {}
+
+valkey:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: valkey/valkey
+    tag: 9.0-alpine
+    digest: ""
+    pullPolicy: IfNotPresent
+    useGlobalRegistry: false
+  service:
+    port: 6379
+  persistence:
+    enabled: false
+    size: 8Gi
+    storageClassName: ""
+  resources: {}

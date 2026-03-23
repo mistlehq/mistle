@@ -1,0 +1,7 @@
+{{- if and .Values.controlPlaneApi.enabled .Values.controlPlaneApi.service.enabled .Values.controlPlaneApi.ingress.enabled }}
+{{ include "mistle.ingress" (dict "root" . "component" "control-plane-api" "values" .Values.controlPlaneApi) }}
+---
+{{- end }}
+{{- if and .Values.dataPlaneGateway.enabled .Values.dataPlaneGateway.service.enabled .Values.dataPlaneGateway.ingress.enabled }}
+{{ include "mistle.ingress" (dict "root" . "component" "data-plane-gateway" "values" .Values.dataPlaneGateway) }}
+{{- end }}

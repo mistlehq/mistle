@@ -2,6 +2,16 @@
 
 User-facing documentation will be added here.
 
+## Deployment Packaging
+
+Kubernetes application packaging for Mistle lives under:
+
+- `deploy/helm/mistle/`
+
+This chart is intended to describe how to run Mistle on an existing Kubernetes cluster.
+
+It should not assume or provision any particular cloud provider infrastructure. Cluster, DNS, storage, database, secret-management, and ingress-controller choices remain the responsibility of the operator.
+
 ## For Developers
 
 Local development is Nix-first.

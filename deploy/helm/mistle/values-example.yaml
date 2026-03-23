@@ -1,0 +1,119 @@
+global:
+  namespaceOverride: mistle
+  imageRegistry: us-central1-docker.pkg.dev/example-project/mistle
+
+controlPlaneApi:
+  image:
+    repository: control-plane-api
+    digest: sha256:replace-with-control-plane-api-digest
+  ingress:
+    enabled: true
+    className: nginx
+    host: api.example.com
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: MISTLE_APPS_CONTROL_PLANE_API_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_CONTROL_PLANE_API_PORT
+      value: "8080"
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_BASE_URL
+      value: https://api.example.com
+    - name: MISTLE_APPS_CONTROL_PLANE_API_DASHBOARD_BASE_URL
+      value: https://app.example.com
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_TRUSTED_ORIGINS
+      value: https://app.example.com
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_LENGTH
+      value: "6"
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_EXPIRES_IN_SECONDS
+      value: "300"
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_OTP_ALLOWED_ATTEMPTS
+      value: "3"
+    - name: MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_NAMESPACE_ID
+      value: production
+    - name: MISTLE_APPS_CONTROL_PLANE_API_DATA_PLANE_API_BASE_URL
+      value: http://mistle-data-plane-api:8082
+    - name: MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_ACTIVE_MASTER_ENCRYPTION_KEY_VERSION
+      value: "1"
+  secretEnv:
+    - name: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_API_DATABASE_URL
+    - name: MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_API_WORKFLOW_DATABASE_URL
+    - name: MISTLE_APPS_CONTROL_PLANE_API_AUTH_SECRET
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_API_AUTH_SECRET
+    - name: MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_API_INTEGRATIONS_MASTER_ENCRYPTION_KEYS_JSON
+    - name: MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN
+      secretName: mistle-runtime
+      secretKey: MISTLE_GLOBAL_INTERNAL_AUTH_SERVICE_TOKEN
+
+controlPlaneWorker:
+  image:
+    repository: control-plane-worker
+    digest: sha256:replace-with-control-plane-worker-digest
+  env:
+    - name: NODE_ENV
+      value: production
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_HOST
+      value: 0.0.0.0
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_PORT
+      value: "8081"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_NAMESPACE_ID
+      value: production
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_RUN_MIGRATIONS
+      value: "true"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_CONCURRENCY
+      value: "4"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_EMAIL_FROM_ADDRESS
+      value: no-reply@example.com
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_EMAIL_FROM_NAME
+      value: Mistle
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_HOST
+      value: smtp.resend.com
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PORT
+      value: "587"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_SECURE
+      value: "false"
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_DATA_PLANE_API_BASE_URL
+      value: http://mistle-data-plane-api:8082
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_CONTROL_PLANE_API_BASE_URL
+      value: http://mistle-control-plane-api:8080
+  secretEnv:
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_WORKER_WORKFLOW_DATABASE_URL
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_USERNAME
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_USERNAME
+    - name: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PASSWORD
+      secretName: mistle-runtime
+      secretKey: MISTLE_APPS_CONTROL_PLANE_WORKER_SMTP_PASSWORD
+
+dataPlaneApi:
+  image:
+    repository: data-plane-api
+    digest: sha256:replace-with-data-plane-api-digest
+
+dataPlaneWorker:
+  image:
+    repository: data-plane-worker
+    digest: sha256:replace-with-data-plane-worker-digest
+
+dataPlaneGateway:
+  image:
+    repository: data-plane-gateway
+    digest: sha256:replace-with-data-plane-gateway-digest
+  ingress:
+    enabled: true
+    className: nginx
+    host: gateway.example.com
+
+tokenizerProxy:
+  image:
+    repository: tokenizer-proxy
+    digest: sha256:replace-with-tokenizer-proxy-digest
